@@ -1,0 +1,5 @@
+1. Used $(VULKAN_SDK) environment variable for vulkan SDK
+
+2. Used "Show All Files" as standart project layout
+
+3. GLM is used from vulkan SDK
