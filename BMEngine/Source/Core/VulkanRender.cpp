@@ -1,12 +1,12 @@
 #include <vector>
-#include <cassert>
 #include <algorithm>
 
 #include "VulkanRender.h"
+#include "Util/Log.h"
 
 namespace Core
 {
-	bool Core::VulkanRender::Init(Window* NewWindow)
+	bool VulkanRender::Init(Window* NewWindow)
 	{
 		_Window = NewWindow;
 		if (!CreateInstance())
@@ -14,18 +14,26 @@ namespace Core
 			return false;
 		}
 
-		SetupPhysicalDevice();
-		CreateLogicalDevice();
+		if (!SetupPhysicalDevice())
+		{
+			return false;
+		}
+
+		if (!CreateLogicalDevice())
+		{
+			return false;
+		}
+
 		return true;
 	}
 
 	void VulkanRender::Cleanup()
 	{
-		vkDestroyDevice(_MainDevice._LogicalDevice, nullptr);
+		vkDestroyDevice(_LogicalDevice, nullptr);
 		vkDestroyInstance(_Instance, nullptr);
 	}
 
-	bool Core::VulkanRender::CreateInstance()
+	bool VulkanRender::CreateInstance()
 	{
 		// ApplicationInfo initialization
 		VkApplicationInfo ApplicationInfo = { };
@@ -41,6 +49,7 @@ namespace Core
 		const char** Extensions = glfwGetRequiredInstanceExtensions(&ExtensionsCount);
 		if (Extensions == nullptr)
 		{
+			Util::GlfwLogError();
 			return false;
 		}
 
@@ -48,8 +57,9 @@ namespace Core
 		for (uint32_t i = 0; i < ExtensionsCount; ++i)
 		{
 			const char* Extension = Extensions[i];
-			if (!IsInstanceExtensionSupported(Extension))
+			if (IsInstanceExtensionSupported(Extension))
 			{
+				Util::ErrorLog("Extension {} unsupported", Extension);
 				return false;
 			}
 
@@ -68,15 +78,16 @@ namespace Core
 		const VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &_Instance);
 		if (Result != VK_SUCCESS)
 		{
+			// todo log error
 			return false;
 		}
 
 		return true;
 	}
 
-	void VulkanRender::CreateLogicalDevice()
+	bool VulkanRender::CreateLogicalDevice()
 	{
-		QueueFamilyIndices Indices = SetupQueueFamilies(_MainDevice._PhysicalDevice);
+		QueueFamilyIndices Indices = GetQueueFamilies(_PhysicalDevice);
 		const float Priority = 1.0f;
 
 		VkDeviceQueueCreateInfo QueueCreateInfo = { };
@@ -95,26 +106,29 @@ namespace Core
 		DeviceCreateInfo.ppEnabledExtensionNames = nullptr;
 		DeviceCreateInfo.pEnabledFeatures = &DeviceFeatures;
 
-		const VkResult Result = vkCreateDevice(_MainDevice._PhysicalDevice, &DeviceCreateInfo, nullptr, &_MainDevice._LogicalDevice);
+		const VkResult Result = vkCreateDevice(_PhysicalDevice, &DeviceCreateInfo, nullptr, &_LogicalDevice);
 		if (Result != VK_SUCCESS)
 		{
 			// toto check
+			return false;
 		}
 
 		// toto check
 		// queues are created at the same time as the device
 		// so we want to handle them
-		vkGetDeviceQueue(_MainDevice._LogicalDevice, Indices._GraphicsFamily, 0, &GraphicsQueue);
+		vkGetDeviceQueue(_LogicalDevice, Indices._GraphicsFamily, 0, &GraphicsQueue);
+
+		return true;
 	}
 
-	void VulkanRender::SetupPhysicalDevice()
+	bool VulkanRender::SetupPhysicalDevice()
 	{
 		uint32_t DevicesCount = 0;
 		vkEnumeratePhysicalDevices(_Instance, &DevicesCount, nullptr);
 		if (DevicesCount <= 0)
 		{
 			// todo error
-			return;
+			return false;
 		}
 
 		std::vector<VkPhysicalDevice> DeviceList(DevicesCount);
@@ -124,40 +138,46 @@ namespace Core
 		{
 			if (IsDeviceSuitable(Device))
 			{
-				_MainDevice._PhysicalDevice = Device;
-				break;
+				_PhysicalDevice = Device;
+				return true;
 			}
 		}
+
+		// todo error
+		return false;
 	}
 
-	// todo validate function
-	QueueFamilyIndices VulkanRender::SetupQueueFamilies(VkPhysicalDevice Device) const
+	QueueFamilyIndices VulkanRender::GetQueueFamilies(VkPhysicalDevice Device) const
 	{
-		QueueFamilyIndices Indices;
-
-		uint32_t FamilyCount = 0;
-		vkGetPhysicalDeviceQueueFamilyProperties(Device, &FamilyCount, nullptr);
-
-		std::vector<VkQueueFamilyProperties> FamilyProperties(FamilyCount);
-		vkGetPhysicalDeviceQueueFamilyProperties(Device, &FamilyCount, FamilyProperties.data());
-
-		int i = 0;
-		for (const auto& QueueFamily : FamilyProperties)
+		static QueueFamilyIndices FamilyIndices = [Device]()
 		{
-			if (QueueFamily.queueCount > 0 && QueueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			QueueFamilyIndices Indices;
+			uint32_t FamilyCount = 0;
+			vkGetPhysicalDeviceQueueFamilyProperties(Device, &FamilyCount, nullptr);
+
+			std::vector<VkQueueFamilyProperties> FamilyProperties(FamilyCount);
+			vkGetPhysicalDeviceQueueFamilyProperties(Device, &FamilyCount, FamilyProperties.data());
+
+			int i = 0;
+			for (const auto& QueueFamily : FamilyProperties)
 			{
-				Indices._GraphicsFamily = i;
+				if (QueueFamily.queueCount > 0 && QueueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+				{
+					Indices._GraphicsFamily = i;
+				}
+
+				if (Indices.IsValid())
+				{
+					break;
+				}
+
+				++i;
 			}
 
-			if (Indices.IsValid())
-			{
-				break;
-			}
+			return Indices;
+		}();
 
-			++i;
-		}
-
-		return Indices;
+		return FamilyIndices;
 	}
 
 	bool VulkanRender::IsInstanceExtensionSupported(const char* Extension) const
@@ -173,9 +193,15 @@ namespace Core
 			return Extensions;
 		}();
 
-		return std::ranges::any_of(AvalibleExtensions, [Extension](VkExtensionProperties AvalibleExtension) {
-				return std::strcmp(Extension, AvalibleExtension.extensionName);
-			});
+		for (const auto& AvalibleExtension : AvalibleExtensions)
+		{
+			if (std::strcmp(Extension, AvalibleExtension.extensionName) == 0)
+			{
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	// todo validate function
@@ -191,7 +217,7 @@ namespace Core
 		vkGetPhysicalDeviceFeatures(Device, &Features);
 		*/
 
-		QueueFamilyIndices Indices = SetupQueueFamilies(Device);
+		QueueFamilyIndices Indices = GetQueueFamilies(Device);
 		return Indices.IsValid();
 	}
 }

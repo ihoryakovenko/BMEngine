@@ -11,7 +11,7 @@ namespace Core
 		_Window = glfwCreateWindow(Width, Height, Name.c_str(), nullptr, nullptr);
 		if (_Window == nullptr)
 		{
-			Util::GlfwCheckError();
+			Util::GlfwLogError();
 			return false;
 		}
 

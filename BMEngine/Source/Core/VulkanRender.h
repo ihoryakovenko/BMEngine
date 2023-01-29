@@ -27,23 +27,18 @@ namespace Core
 
 	private:
 		bool CreateInstance();
-		void CreateLogicalDevice();
+		bool CreateLogicalDevice();
 
-		void SetupPhysicalDevice();
-		QueueFamilyIndices SetupQueueFamilies(VkPhysicalDevice Device) const;
+		bool SetupPhysicalDevice();
+		QueueFamilyIndices GetQueueFamilies(VkPhysicalDevice Device) const;
 
 		bool IsInstanceExtensionSupported(const char* Extension) const;
 		bool IsDeviceSuitable(VkPhysicalDevice Device) const;
 	private:
 		Window* _Window = nullptr;
 		VkInstance _Instance = nullptr;
-
-		struct
-		{
-			VkPhysicalDevice _PhysicalDevice;
-			VkDevice _LogicalDevice;
-		} _MainDevice;
-
+		VkPhysicalDevice _PhysicalDevice = nullptr;
+		VkDevice _LogicalDevice = nullptr;
 		VkQueue GraphicsQueue = nullptr;
 	};
 }

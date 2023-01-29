@@ -1,7 +1,17 @@
 #pragma once
 
+#include <string>
+#include <iostream>
+#include <format>
+
 namespace Util
 {
-	// if Condition false, checks error and returns true
-	void GlfwCheckError();
+	void GlfwLogError();
+
+	template <typename... TArgs>
+	void ErrorLog(const std::string& Message, TArgs&&... Args)
+	{
+		const auto& test = std::vformat(Message, std::make_format_args(Args...));
+		std::cout << test << std::endl;
+	}
 }

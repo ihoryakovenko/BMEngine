@@ -1,7 +1,3 @@
-#include <string>
-#include <iostream>
-#include <cassert>
-
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -9,7 +5,7 @@
 
 namespace Util
 {
-	void GlfwCheckError()
+	void GlfwLogError()
 	{
 		const char* ErrorDescription;
 		const int LastErrorCode = glfwGetError(&ErrorDescription);
