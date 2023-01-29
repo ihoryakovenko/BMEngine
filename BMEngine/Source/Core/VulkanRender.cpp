@@ -57,7 +57,7 @@ namespace Core
 		for (uint32_t i = 0; i < ExtensionsCount; ++i)
 		{
 			const char* Extension = Extensions[i];
-			if (IsInstanceExtensionSupported(Extension))
+			if (!IsInstanceExtensionSupported(Extension))
 			{
 				Util::ErrorLog("Extension {} unsupported", Extension);
 				return false;
