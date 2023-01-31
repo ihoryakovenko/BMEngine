@@ -12,11 +12,13 @@
     <ClCompile Include="Source\Core\Window.cpp" />
     <ClCompile Include="Source\Core\Engine.cpp" />
     <ClCompile Include="Source\Util\Log.cpp" />
+    <ClCompile Include="Source\Core\VulkanUtil.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Core\VulkanRender.h" />
     <ClInclude Include="Source\Core\Window.h" />
     <ClInclude Include="Source\Util\Log.h" />
     <ClInclude Include="Source\Core\Engine.h" />
+    <ClInclude Include="Source\Core\VulkanUtil.h" />
   </ItemGroup>
 </Project>
