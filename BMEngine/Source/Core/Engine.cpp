@@ -11,7 +11,7 @@ namespace Core
 		const int InitResult = glfwInit();
 		if (InitResult == GL_FALSE)
 		{
-			Util::GlfwLogError();
+			Util::Log().GlfwLogError();
 			return false;
 		}
 
