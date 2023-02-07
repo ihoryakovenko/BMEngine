@@ -17,6 +17,8 @@ namespace Core
 			return false;
 		}
 
+		VulkanUtil::SetupDebugMessenger(_Instance);
+
 		if (!SetupPhysicalDevice())
 		{
 			return false;
@@ -33,6 +35,7 @@ namespace Core
 	void VulkanRender::Cleanup()
 	{
 		vkDestroyDevice(_LogicalDevice, nullptr);
+		VulkanUtil::DestroyDebugMessenger(_Instance);
 		vkDestroyInstance(_Instance, nullptr);
 	}
 
@@ -59,10 +62,12 @@ namespace Core
 		CreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		CreateInfo.pApplicationInfo = &ApplicationInfo;
 
-		VulkanUtil::GetEnabledValidationLayers(CreateInfo.enabledLayerCount, CreateInfo.ppEnabledLayerNames);
+		VulkanUtil::SetEnabledValidationLayers(CreateInfo);
 
 		CreateInfo.enabledExtensionCount = static_cast<uint32_t>(InstanceExtensions.size());
 		CreateInfo.ppEnabledExtensionNames = InstanceExtensions.data();
+
+		VulkanUtil::SetDebugCreateInfo(CreateInfo);
 
 		// Create instance
 		const VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &_Instance);

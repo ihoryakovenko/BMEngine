@@ -21,7 +21,15 @@ namespace Util
 		template <typename... TArgs>
 		void Error(std::string_view Message, TArgs&&... Args) const
 		{
-			Print(Message, Args...);
+			std::cout << "\033[31;5m"; // Set red color
+			Print("Error", Message, Args...);
+			std::cout << "\033[m"; // Reset red color
+		}
+
+		template <typename... TArgs>
+		void Info(std::string_view Message, TArgs&&... Args) const
+		{
+			Print("Info", Message, Args...);
 		}
 
 		void GlfwLogError() const
@@ -35,10 +43,10 @@ namespace Util
 
 	private:
 		template <typename... TArgs>
-		void Print(std::string_view Message, TArgs&&... Args) const
+		void Print(std::string_view Type, std::string_view Message, TArgs&&... Args) const
 		{
-			std::cout << std::format("{}, line: {}, function: {}, Error: {}\n", _Location.file_name(),
-				_Location.line(), _Location.function_name(), std::vformat(Message, std::make_format_args(Args...)));
+			std::cout << std::format("{}, line: {}, function: {}, {}: {}\n", _Location.file_name(),
+				_Location.line(), _Location.function_name(), Type, std::vformat(Message, std::make_format_args(Args...)));
 		}
 
 	private:

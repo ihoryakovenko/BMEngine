@@ -133,7 +133,7 @@ namespace Core
 		return true;
 	}
 
-	void VulkanUtil::GetEnabledValidationLayers(uint32_t& EnabledLayerCount, const char* const*& EnabledLayerNames)
+	void VulkanUtil::SetEnabledValidationLayers(VkInstanceCreateInfo& CreateInfo)
 	{
 		if (_EnableValidationLayers)
 		{
@@ -148,12 +148,112 @@ namespace Core
 				return false;
 			});
 
-			EnabledLayerCount = static_cast<uint32_t>(_ValidationLayers.size());
-			EnabledLayerNames = VulkanUtil::_ValidationLayers.data();
+
+			CreateInfo.enabledLayerCount = static_cast<uint32_t>(_ValidationLayers.size());
+			CreateInfo.ppEnabledLayerNames = VulkanUtil::_ValidationLayers.data();
 			return;
 		}
 
-		EnabledLayerNames = nullptr;
-		EnabledLayerCount = 0;
+		CreateInfo.ppEnabledLayerNames = nullptr;
+		CreateInfo.enabledLayerCount = 0;
+	}
+
+	VkDebugUtilsMessengerCreateInfoEXT* VulkanUtil::GetDebugCreateInfo()
+	{
+		static VkDebugUtilsMessengerCreateInfoEXT DebugCreateInfo = []()
+		{
+			VkDebugUtilsMessengerCreateInfoEXT CreateInfo;
+			CreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+			CreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
+				| VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+
+			CreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
+				| VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+
+			CreateInfo.pfnUserCallback = DebugCallback;
+			CreateInfo.pUserData = nullptr;
+
+			return CreateInfo;
+		}();
+
+		return &DebugCreateInfo;
+	}
+
+	void VulkanUtil::SetupDebugMessenger(VkInstance Instance)
+	{
+		if (_EnableValidationLayers)
+		{
+			VkDebugUtilsMessengerCreateInfoEXT* DebugCreateInfo = GetDebugCreateInfo();
+			CreateDebugUtilsMessengerEXT(Instance, DebugCreateInfo, nullptr, &_DebugMessenger);
+		}
+	}
+
+	void VulkanUtil::DestroyDebugMessenger(VkInstance Instance)
+	{
+		if (_EnableValidationLayers)
+		{
+			DestroyDebugUtilsMessengerEXT(Instance, _DebugMessenger, nullptr);
+		}
+	}
+
+	void VulkanUtil::SetDebugCreateInfo(VkInstanceCreateInfo& CreateInfo)
+	{
+		if (_EnableValidationLayers)
+		{
+			CreateInfo.pNext = GetDebugCreateInfo();
+		}
+		else
+		{
+			CreateInfo.pNext = nullptr;
+		}
+	}
+
+	VKAPI_ATTR VkBool32 VKAPI_CALL VulkanUtil::DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
+		[[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
+		[[maybe_unused]] void* UserData)
+	{
+		auto&& Log = Util::Log();
+		if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+		{
+			Log.Error("Validation layer: {}", CallbackData->pMessage);
+		}
+		else
+		{
+			Log.Info("Validation layer: {}", CallbackData->pMessage);
+		}
+
+		return VK_FALSE;
+	}
+
+	void VulkanUtil::CreateDebugUtilsMessengerEXT(VkInstance Instance, const VkDebugUtilsMessengerCreateInfoEXT* CreateInfo,
+		const VkAllocationCallbacks* Allocator, VkDebugUtilsMessengerEXT* DebugMessenger)
+	{
+		auto CreateMessengerFunc = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(Instance, "vkCreateDebugUtilsMessengerEXT");
+		if (CreateMessengerFunc != nullptr)
+		{
+			const VkResult Result = CreateMessengerFunc(Instance, CreateInfo, Allocator, DebugMessenger);
+			if (Result != VK_SUCCESS)
+			{
+				Util::Log().Error("CreateMessengerFunc result is {}", static_cast<int>(Result));
+			}
+		}
+		else
+		{
+			Util::Log().Error("CreateMessengerFunc is nullptr");
+		}
+	}
+
+	void VulkanUtil::DestroyDebugUtilsMessengerEXT(VkInstance Instance, VkDebugUtilsMessengerEXT DebugMessenger,
+		const VkAllocationCallbacks* Allocator)
+	{
+		auto DestroyMessengerFunc = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(Instance, "vkDestroyDebugUtilsMessengerEXT");
+		if (DestroyMessengerFunc != nullptr)
+		{
+			DestroyMessengerFunc(Instance, DebugMessenger, Allocator);
+		}
+		else
+		{
+			Util::Log().Error("DestroyMessengerFunc is nullptr");
+		}
 	}
 }
