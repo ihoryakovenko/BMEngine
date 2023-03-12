@@ -5,10 +5,12 @@
 
 #include <vector>
 
-#include "Window.h"
+#include "VulkanUtil.h"
 
 namespace Core
 {
+	class Window;
+
 	class VulkanRender
 	{
 	public:
@@ -25,7 +27,11 @@ namespace Core
 		Window* _Window = nullptr;
 		VkInstance _Instance = nullptr;
 		VkPhysicalDevice _PhysicalDevice = nullptr;
+		QueueFamilyIndices _PhysicalDeviceIndices;
+		SwapchainDetails _SwapchainDetails;
 		VkDevice _LogicalDevice = nullptr;
-		VkQueue GraphicsQueue = nullptr;
+		VkQueue _GraphicsQueue = nullptr;
+		VkQueue _PresentationQueue = nullptr;
+		VkSurfaceKHR _Surface = nullptr;
 	};
 }

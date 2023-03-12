@@ -14,6 +14,7 @@ namespace Core
 		bool ShouldClose() const;
 		void PollEvents() const;
 		void Destroy();
+		VkSurfaceKHR CreateSurface(VkInstance Instance, const VkAllocationCallbacks* Allocator) const;
 
 	private:
 		GLFWwindow* _Window = nullptr;

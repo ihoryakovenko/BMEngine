@@ -32,4 +32,18 @@ namespace Core
 	{
 		glfwDestroyWindow(_Window);
 	}
+
+	// check if Surface can be made a member
+	VkSurfaceKHR Window::CreateSurface(VkInstance Instance, const VkAllocationCallbacks* Allocator) const
+	{
+		VkSurfaceKHR Surface;
+		const VkResult Result = glfwCreateWindowSurface(Instance, _Window, Allocator, &Surface);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().GlfwLogError();
+			return nullptr;
+		}
+
+		return Surface;
+	}
 }

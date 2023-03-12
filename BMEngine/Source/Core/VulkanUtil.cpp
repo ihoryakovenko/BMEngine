@@ -6,37 +6,49 @@
 
 namespace Core
 {
-	QueueFamilyIndices QueueFamilyIndices::GetQueueFamilies(VkPhysicalDevice Device)
+	// TODO check function
+	bool QueueFamilyIndices::Init(VkPhysicalDevice Device, VkSurfaceKHR Surface)
 	{
-		static QueueFamilyIndices FamilyIndices = [Device]()
+		uint32_t FamilyCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(Device, &FamilyCount, nullptr);
+
+		std::vector<VkQueueFamilyProperties> FamilyProperties(FamilyCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(Device, &FamilyCount, FamilyProperties.data());
+
+		int i = 0;
+		for (const auto& QueueFamily : FamilyProperties)
 		{
-			QueueFamilyIndices Indices;
-			uint32_t FamilyCount = 0;
-			vkGetPhysicalDeviceQueueFamilyProperties(Device, &FamilyCount, nullptr);
-
-			std::vector<VkQueueFamilyProperties> FamilyProperties(FamilyCount);
-			vkGetPhysicalDeviceQueueFamilyProperties(Device, &FamilyCount, FamilyProperties.data());
-
-			int i = 0;
-			for (const auto& QueueFamily : FamilyProperties)
+			// check if Queue is graphics type
+			if (QueueFamily.queueCount > 0 && QueueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
 			{
-				if (QueueFamily.queueCount > 0 && QueueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
-				{
-					Indices._GraphicsFamily = i;
-				}
-
-				if (Indices.IsValid())
-				{
-					break;
-				}
-
-				++i;
+				// if we QueueFamily[i] graphics type but not presentation type
+				// and QueueFamily[i + 1] graphics type and presentation type
+				// then we rewrite _GraphicsFamily
+				// toto check what is better rewrite or have different QueueFamilys
+				_GraphicsFamily = i;
 			}
 
-			return Indices;
-		}();
+			// check if Queue is presentation type (can be graphics and presentation)
+			VkBool32 PresentationSupport = false;
+			vkGetPhysicalDeviceSurfaceSupportKHR(Device, i, Surface, &PresentationSupport);
+			if (QueueFamily.queueCount > 0 && PresentationSupport)
+			{
+				_PresentationFamily = i;
+			}
 
-		return FamilyIndices;
+			if (IsValid())
+			{
+				return true;
+			}
+
+			++i;
+		}
+
+		Util::Log().Warning("Device does not support required indices");
+
+		_GraphicsFamily = -1;
+		_PresentationFamily = -i;
+		return false;
 	}
 
 	bool VulkanUtil::IsInstanceExtensionSupported(const char* Extension)
@@ -63,6 +75,25 @@ namespace Core
 		return false;
 	}
 
+	bool VulkanUtil::IsDeviceExtensionSupported(VkPhysicalDevice Device, const char* Extension)
+	{
+		uint32_t ExtensionsCount = 0;
+		vkEnumerateDeviceExtensionProperties(Device, nullptr, &ExtensionsCount, nullptr);
+
+		std::vector<VkExtensionProperties> AvalibleDeviceExtensions(ExtensionsCount);
+		vkEnumerateDeviceExtensionProperties(Device, nullptr, &ExtensionsCount, AvalibleDeviceExtensions.data());
+
+		for (const auto& AvalibleExtension : AvalibleDeviceExtensions)
+		{
+			if (std::strcmp(Extension, AvalibleExtension.extensionName) == 0)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	bool VulkanUtil::IsDeviceSuitable(VkPhysicalDevice Device)
 	{
 		/*
@@ -75,8 +106,16 @@ namespace Core
 		vkGetPhysicalDeviceFeatures(Device, &Features);
 		*/
 
-		QueueFamilyIndices Indices = QueueFamilyIndices::GetQueueFamilies(Device);
-		return Indices.IsValid();
+		for (const char* Extension : _DeviceExtensions)
+		{
+			if (!IsDeviceExtensionSupported(Device, Extension))
+			{
+				Util::Log().Error("Device extension {} unsupported", Extension);
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	bool VulkanUtil::IsValidationLayerSupported(const char* Layer)
@@ -103,7 +142,7 @@ namespace Core
 		return false;
 	}
 
-	bool VulkanUtil::GetRequiredExtensions(std::vector<const char*>& InstanceExtensions)
+	bool VulkanUtil::GetRequiredInstanceExtensions(std::vector<const char*>& InstanceExtensions)
 	{
 		uint32_t ExtensionsCount = 0;
 		const char** Extensions = glfwGetRequiredInstanceExtensions(&ExtensionsCount);
@@ -133,7 +172,7 @@ namespace Core
 		return true;
 	}
 
-	void VulkanUtil::SetEnabledValidationLayers(VkInstanceCreateInfo& CreateInfo)
+	void VulkanUtil::GetEnabledValidationLayers(VkInstanceCreateInfo& CreateInfo)
 	{
 		if (_EnableValidationLayers)
 		{
@@ -158,7 +197,7 @@ namespace Core
 		CreateInfo.enabledLayerCount = 0;
 	}
 
-	VkDebugUtilsMessengerCreateInfoEXT* VulkanUtil::GetDebugCreateInfo()
+	VkDebugUtilsMessengerCreateInfoEXT* VulkanUtil::GetDebugMessengerCreateInfo()
 	{
 		static VkDebugUtilsMessengerCreateInfoEXT DebugCreateInfo = []()
 		{
@@ -183,7 +222,7 @@ namespace Core
 	{
 		if (_EnableValidationLayers)
 		{
-			VkDebugUtilsMessengerCreateInfoEXT* DebugCreateInfo = GetDebugCreateInfo();
+			VkDebugUtilsMessengerCreateInfoEXT* DebugCreateInfo = GetDebugMessengerCreateInfo();
 			CreateDebugUtilsMessengerEXT(Instance, DebugCreateInfo, nullptr, &_DebugMessenger);
 		}
 	}
@@ -196,11 +235,11 @@ namespace Core
 		}
 	}
 
-	void VulkanUtil::SetDebugCreateInfo(VkInstanceCreateInfo& CreateInfo)
+	void VulkanUtil::GetDebugCreateInfo(VkInstanceCreateInfo& CreateInfo)
 	{
 		if (_EnableValidationLayers)
 		{
-			CreateInfo.pNext = GetDebugCreateInfo();
+			CreateInfo.pNext = GetDebugMessengerCreateInfo();
 		}
 		else
 		{
@@ -255,5 +294,34 @@ namespace Core
 		{
 			Util::Log().Error("DestroyMessengerFunc is nullptr");
 		}
+	}
+
+	bool SwapchainDetails::Init(VkPhysicalDevice Device, VkSurfaceKHR Surface)
+	{
+		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Device, Surface, &_SurfaceCapabilities);
+
+		uint32_t FormatCount = 0;
+		vkGetPhysicalDeviceSurfaceFormatsKHR(Device, Surface, &FormatCount, nullptr);
+		if (FormatCount == 0)
+		{
+			Util::Log().Error("FormatCount is 0");
+			return false;
+		}
+
+		_Formats.resize(static_cast<size_t>(FormatCount));
+		vkGetPhysicalDeviceSurfaceFormatsKHR(Device, Surface, &FormatCount, _Formats.data());
+
+		uint32_t PresentationCount = 0;
+		vkGetPhysicalDeviceSurfacePresentModesKHR(Device, Surface, &PresentationCount, nullptr);
+		if (PresentationCount == 0)
+		{
+			Util::Log().Error("PresentationCount is 0");
+			return false;
+		}
+
+		_PresentationModes.resize(static_cast<size_t>(PresentationCount));
+		vkGetPhysicalDeviceSurfacePresentModesKHR(Device, Surface, &PresentationCount, _PresentationModes.data());
+
+		return true;
 	}
 }

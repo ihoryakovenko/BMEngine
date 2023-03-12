@@ -27,6 +27,14 @@ namespace Util
 		}
 
 		template <typename... TArgs>
+		void Warning(std::string_view Message, TArgs&&... Args) const
+		{
+			std::cout << "\033[33;5m"; // Set red color
+			Print("Warning", Message, Args...);
+			std::cout << "\033[m"; // Reset red color
+		}
+
+		template <typename... TArgs>
 		void Info(std::string_view Message, TArgs&&... Args) const
 		{
 			Print("Info", Message, Args...);

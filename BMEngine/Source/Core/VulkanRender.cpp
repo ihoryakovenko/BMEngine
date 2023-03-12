@@ -1,10 +1,11 @@
 #include <vector>
 #include <algorithm>
 #include <cassert>
+#include <unordered_set>
 
 #include "VulkanRender.h"
-#include "VulkanUtil.h"
 #include "Util/Log.h"
+#include "Window.h"
 
 namespace Core
 {
@@ -18,6 +19,12 @@ namespace Core
 		}
 
 		VulkanUtil::SetupDebugMessenger(_Instance);
+
+		_Surface = _Window->CreateSurface(_Instance, nullptr);
+		if (_Surface == nullptr)
+		{
+			return false;
+		}
 
 		if (!SetupPhysicalDevice())
 		{
@@ -34,6 +41,7 @@ namespace Core
 
 	void VulkanRender::Cleanup()
 	{
+		vkDestroySurfaceKHR(_Instance, _Surface, nullptr); // todo check
 		vkDestroyDevice(_LogicalDevice, nullptr);
 		VulkanUtil::DestroyDebugMessenger(_Instance);
 		vkDestroyInstance(_Instance, nullptr);
@@ -52,7 +60,7 @@ namespace Core
 
 		// Extensions info initialization
 		std::vector<const char*> InstanceExtensions;
-		if (!VulkanUtil::GetRequiredExtensions(InstanceExtensions))
+		if (!VulkanUtil::GetRequiredInstanceExtensions(InstanceExtensions))
 		{
 			return false;
 		}
@@ -62,12 +70,12 @@ namespace Core
 		CreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		CreateInfo.pApplicationInfo = &ApplicationInfo;
 
-		VulkanUtil::SetEnabledValidationLayers(CreateInfo);
+		VulkanUtil::GetEnabledValidationLayers(CreateInfo);
 
 		CreateInfo.enabledExtensionCount = static_cast<uint32_t>(InstanceExtensions.size());
 		CreateInfo.ppEnabledExtensionNames = InstanceExtensions.data();
 
-		VulkanUtil::SetDebugCreateInfo(CreateInfo);
+		VulkanUtil::GetDebugCreateInfo(CreateInfo);
 
 		// Create instance
 		const VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &_Instance);
@@ -82,25 +90,37 @@ namespace Core
 
 	bool VulkanRender::CreateLogicalDevice()
 	{
-		QueueFamilyIndices Indices = QueueFamilyIndices::GetQueueFamilies(_PhysicalDevice);
 		const float Priority = 1.0f;
 
-		VkDeviceQueueCreateInfo QueueCreateInfo = { };
-		QueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		QueueCreateInfo.queueFamilyIndex = static_cast<uint32_t>(Indices._GraphicsFamily);
-		QueueCreateInfo.queueCount = 1;
-		QueueCreateInfo.pQueuePriorities = &Priority;
+		// One family can suppurt graphics and presentation
+		// In that case create mulltiple VkDeviceQueueCreateInfo
+		std::unordered_set<int> FamilyIndices = { _PhysicalDeviceIndices._GraphicsFamily,
+			_PhysicalDeviceIndices._PresentationFamily };
+
+		const size_t FamilyIndicesSize = FamilyIndices.size();
+		std::vector<VkDeviceQueueCreateInfo> QueueCreateInfos(FamilyIndicesSize);
+
+		int i = 0;
+		for (int QueueFamilyIndex : FamilyIndices)
+		{
+			QueueCreateInfos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+			QueueCreateInfos[i].queueFamilyIndex = static_cast<uint32_t>(QueueFamilyIndex);
+			QueueCreateInfos[i].queueCount = 1;
+			QueueCreateInfos[i].pQueuePriorities = &Priority;
+			++i;
+		}
 
 		VkPhysicalDeviceFeatures DeviceFeatures = {};
 
 		VkDeviceCreateInfo DeviceCreateInfo = { };
 		DeviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-		DeviceCreateInfo.queueCreateInfoCount = 1;
-		DeviceCreateInfo.pQueueCreateInfos = &QueueCreateInfo;
-		DeviceCreateInfo.enabledExtensionCount = 0;
-		DeviceCreateInfo.ppEnabledExtensionNames = nullptr;
+		DeviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(FamilyIndicesSize);
+		DeviceCreateInfo.pQueueCreateInfos = QueueCreateInfos.data();
+		DeviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(VulkanUtil::_DeviceExtensions.size());
+		DeviceCreateInfo.ppEnabledExtensionNames = VulkanUtil::_DeviceExtensions.data();
 		DeviceCreateInfo.pEnabledFeatures = &DeviceFeatures;
 
+		// Queues are created at the same time as the device
 		const VkResult Result = vkCreateDevice(_PhysicalDevice, &DeviceCreateInfo, nullptr, &_LogicalDevice);
 		if (Result != VK_SUCCESS)
 		{
@@ -108,9 +128,8 @@ namespace Core
 			return false;
 		}
 
-		// Queues are created at the same time as the device
-		// So we want to handle them
-		vkGetDeviceQueue(_LogicalDevice, Indices._GraphicsFamily, 0, &GraphicsQueue);
+		vkGetDeviceQueue(_LogicalDevice, static_cast<uint32_t>(_PhysicalDeviceIndices._GraphicsFamily), 0, &_GraphicsQueue);
+		vkGetDeviceQueue(_LogicalDevice, static_cast<uint32_t>(_PhysicalDeviceIndices._PresentationFamily), 0, &_PresentationQueue);
 
 		return true;
 	}
@@ -129,7 +148,9 @@ namespace Core
 
 		for (const auto& Device : DeviceList)
 		{
-			if (VulkanUtil::IsDeviceSuitable(Device))
+			// todo validate
+			if (VulkanUtil::IsDeviceSuitable(Device) && _PhysicalDeviceIndices.Init(Device, _Surface)
+				&& _SwapchainDetails.Init(Device, _Surface))
 			{
 				_PhysicalDevice = Device;
 				return true;
