@@ -7,28 +7,6 @@
 
 namespace Core
 {
-	struct QueueFamilyIndices
-	{
-		int _GraphicsFamily = -1;
-		int _PresentationFamily = -1;
-
-		bool IsValid() const
-		{
-			return _GraphicsFamily >= 0 && _PresentationFamily >= 0;
-		}
-
-		bool Init(VkPhysicalDevice Device, VkSurfaceKHR Surface);
-	};
-
-	struct SwapchainDetails
-	{
-		VkSurfaceCapabilitiesKHR _SurfaceCapabilities{};
-		std::vector<VkSurfaceFormatKHR> _Formats;
-		std::vector<VkPresentModeKHR> _PresentationModes;
-
-		bool Init(VkPhysicalDevice Device, VkSurfaceKHR Surface);
-	};
-
 	struct VulkanUtil
 	{
 		static bool IsInstanceExtensionSupported(const char* Extension);

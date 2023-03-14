@@ -13,6 +13,7 @@
     <ClCompile Include="Source\Core\Engine.cpp" />
     <ClCompile Include="Source\Util\Log.cpp" />
     <ClCompile Include="Source\Core\VulkanUtil.cpp" />
+    <ClCompile Include="Source\Core\VulkanHelpers.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Core\VulkanRender.h" />
@@ -20,5 +21,6 @@
     <ClInclude Include="Source\Util\Log.h" />
     <ClInclude Include="Source\Core\Engine.h" />
     <ClInclude Include="Source\Core\VulkanUtil.h" />
+    <ClInclude Include="Source\Core\VulkanHelpers.h" />
   </ItemGroup>
 </Project>

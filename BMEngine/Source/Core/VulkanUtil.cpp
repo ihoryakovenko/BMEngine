@@ -1,4 +1,5 @@
 #include <vector>
+#include <algorithm>
 
 #include "VulkanUtil.h"
 
@@ -6,51 +7,6 @@
 
 namespace Core
 {
-	// TODO check function
-	bool QueueFamilyIndices::Init(VkPhysicalDevice Device, VkSurfaceKHR Surface)
-	{
-		uint32_t FamilyCount = 0;
-		vkGetPhysicalDeviceQueueFamilyProperties(Device, &FamilyCount, nullptr);
-
-		std::vector<VkQueueFamilyProperties> FamilyProperties(FamilyCount);
-		vkGetPhysicalDeviceQueueFamilyProperties(Device, &FamilyCount, FamilyProperties.data());
-
-		int i = 0;
-		for (const auto& QueueFamily : FamilyProperties)
-		{
-			// check if Queue is graphics type
-			if (QueueFamily.queueCount > 0 && QueueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
-			{
-				// if we QueueFamily[i] graphics type but not presentation type
-				// and QueueFamily[i + 1] graphics type and presentation type
-				// then we rewrite _GraphicsFamily
-				// toto check what is better rewrite or have different QueueFamilys
-				_GraphicsFamily = i;
-			}
-
-			// check if Queue is presentation type (can be graphics and presentation)
-			VkBool32 PresentationSupport = false;
-			vkGetPhysicalDeviceSurfaceSupportKHR(Device, i, Surface, &PresentationSupport);
-			if (QueueFamily.queueCount > 0 && PresentationSupport)
-			{
-				_PresentationFamily = i;
-			}
-
-			if (IsValid())
-			{
-				return true;
-			}
-
-			++i;
-		}
-
-		Util::Log().Warning("Device does not support required indices");
-
-		_GraphicsFamily = -1;
-		_PresentationFamily = -i;
-		return false;
-	}
-
 	bool VulkanUtil::IsInstanceExtensionSupported(const char* Extension)
 	{
 		static const std::vector<VkExtensionProperties>& AvalibleExtensions = []()
@@ -294,34 +250,5 @@ namespace Core
 		{
 			Util::Log().Error("DestroyMessengerFunc is nullptr");
 		}
-	}
-
-	bool SwapchainDetails::Init(VkPhysicalDevice Device, VkSurfaceKHR Surface)
-	{
-		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Device, Surface, &_SurfaceCapabilities);
-
-		uint32_t FormatCount = 0;
-		vkGetPhysicalDeviceSurfaceFormatsKHR(Device, Surface, &FormatCount, nullptr);
-		if (FormatCount == 0)
-		{
-			Util::Log().Error("FormatCount is 0");
-			return false;
-		}
-
-		_Formats.resize(static_cast<size_t>(FormatCount));
-		vkGetPhysicalDeviceSurfaceFormatsKHR(Device, Surface, &FormatCount, _Formats.data());
-
-		uint32_t PresentationCount = 0;
-		vkGetPhysicalDeviceSurfacePresentModesKHR(Device, Surface, &PresentationCount, nullptr);
-		if (PresentationCount == 0)
-		{
-			Util::Log().Error("PresentationCount is 0");
-			return false;
-		}
-
-		_PresentationModes.resize(static_cast<size_t>(PresentationCount));
-		vkGetPhysicalDeviceSurfacePresentModesKHR(Device, Surface, &PresentationCount, _PresentationModes.data());
-
-		return true;
 	}
 }

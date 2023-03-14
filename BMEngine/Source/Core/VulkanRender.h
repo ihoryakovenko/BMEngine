@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "VulkanUtil.h"
+#include "VulkanHelpers.h"
 
 namespace Core
 {
@@ -20,6 +21,7 @@ namespace Core
 	private:
 		bool CreateInstance();
 		bool CreateLogicalDevice();
+		bool CreateSwapchain();
 
 		bool SetupPhysicalDevice();
 
@@ -33,5 +35,11 @@ namespace Core
 		VkQueue _GraphicsQueue = nullptr;
 		VkQueue _PresentationQueue = nullptr;
 		VkSurfaceKHR _Surface = nullptr;
+
+		std::vector<SwapchainImage> _SwapchainImages;
+
+		VkSwapchainKHR _Swapchain = nullptr;
+		VkFormat _SwapchainImageFormat{};
+		VkExtent2D _SwapchainExtent{};
 	};
 }

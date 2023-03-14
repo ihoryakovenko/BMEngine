@@ -46,4 +46,9 @@ namespace Core
 
 		return Surface;
 	}
+
+	void Window::GetWindowSize(int& Width, int& Height) const
+	{
+		glfwGetFramebufferSize(_Window, &Width, &Height);
+	}
 }

@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Core\Engine.cpp" />
+    <ClCompile Include="Source\Core\VulkanHelpers.cpp" />
     <ClCompile Include="Source\Core\VulkanRender.cpp" />
     <ClCompile Include="Source\Core\VulkanUtil.cpp" />
     <ClCompile Include="Source\main.cpp" />
@@ -28,6 +29,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Core\Engine.h" />
+    <ClInclude Include="Source\Core\VulkanHelpers.h" />
     <ClInclude Include="Source\Core\VulkanRender.h" />
     <ClInclude Include="Source\Core\VulkanUtil.h" />
     <ClInclude Include="Source\Core\Window.h" />
