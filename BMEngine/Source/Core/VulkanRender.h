@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "VulkanUtil.h"
-#include "VulkanHelpers.h"
+#include "VulkanCoreTypes.h"
 
 namespace Core
 {
@@ -19,27 +19,11 @@ namespace Core
 		void Cleanup();
 
 	private:
-		bool CreateInstance();
-		bool CreateLogicalDevice();
-		bool CreateSwapchain();
-
-		bool SetupPhysicalDevice();
-
-	private:
 		Window* _Window = nullptr;
-		VkInstance _Instance = nullptr;
-		VkPhysicalDevice _PhysicalDevice = nullptr;
-		QueueFamilyIndices _PhysicalDeviceIndices;
-		SwapchainDetails _SwapchainDetails;
-		VkDevice _LogicalDevice = nullptr;
-		VkQueue _GraphicsQueue = nullptr;
-		VkQueue _PresentationQueue = nullptr;
 		VkSurfaceKHR _Surface = nullptr;
-
-		std::vector<SwapchainImage> _SwapchainImages;
-
-		VkSwapchainKHR _Swapchain = nullptr;
-		VkFormat _SwapchainImageFormat{};
-		VkExtent2D _SwapchainExtent{};
+		Queues _Queues;
+		Instance _Instance;
+		MainDevice _MainDevice;
+		Swapchain _Swapchain;
 	};
 }

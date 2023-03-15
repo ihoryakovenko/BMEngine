@@ -7,73 +7,6 @@
 
 namespace Core
 {
-	bool VulkanUtil::IsInstanceExtensionSupported(const char* Extension)
-	{
-		static const std::vector<VkExtensionProperties>& AvalibleExtensions = []()
-		{
-			uint32_t ExtensionsCount = 0;
-			vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionsCount, nullptr);
-
-			std::vector<VkExtensionProperties> Extensions(ExtensionsCount);
-			vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionsCount, Extensions.data());
-
-			return Extensions;
-		}();
-
-		for (const auto& AvalibleExtension : AvalibleExtensions)
-		{
-			if (std::strcmp(Extension, AvalibleExtension.extensionName) == 0)
-			{
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	bool VulkanUtil::IsDeviceExtensionSupported(VkPhysicalDevice Device, const char* Extension)
-	{
-		uint32_t ExtensionsCount = 0;
-		vkEnumerateDeviceExtensionProperties(Device, nullptr, &ExtensionsCount, nullptr);
-
-		std::vector<VkExtensionProperties> AvalibleDeviceExtensions(ExtensionsCount);
-		vkEnumerateDeviceExtensionProperties(Device, nullptr, &ExtensionsCount, AvalibleDeviceExtensions.data());
-
-		for (const auto& AvalibleExtension : AvalibleDeviceExtensions)
-		{
-			if (std::strcmp(Extension, AvalibleExtension.extensionName) == 0)
-			{
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	bool VulkanUtil::IsDeviceSuitable(VkPhysicalDevice Device)
-	{
-		/*
-		// ID, name, type, vendor, etc
-		VkPhysicalDeviceProperties Properties;
-		vkGetPhysicalDeviceProperties(Device, &Properties);
-
-		// geo shader, tess shader, wide lines, etc
-		VkPhysicalDeviceFeatures Features;
-		vkGetPhysicalDeviceFeatures(Device, &Features);
-		*/
-
-		for (const char* Extension : _DeviceExtensions)
-		{
-			if (!IsDeviceExtensionSupported(Device, Extension))
-			{
-				Util::Log().Error("Device extension {} unsupported", Extension);
-				return false;
-			}
-		}
-
-		return true;
-	}
-
 	bool VulkanUtil::IsValidationLayerSupported(const char* Layer)
 	{
 		static const std::vector<VkLayerProperties>& AvailableLayers = []()
@@ -96,36 +29,6 @@ namespace Core
 		}
 
 		return false;
-	}
-
-	bool VulkanUtil::GetRequiredInstanceExtensions(std::vector<const char*>& InstanceExtensions)
-	{
-		uint32_t ExtensionsCount = 0;
-		const char** Extensions = glfwGetRequiredInstanceExtensions(&ExtensionsCount);
-		if (Extensions == nullptr)
-		{
-			Util::Log().GlfwLogError();
-			return false;
-		}
-
-		for (uint32_t i = 0; i < ExtensionsCount; ++i)
-		{
-			const char* Extension = Extensions[i];
-			if (!IsInstanceExtensionSupported(Extension))
-			{
-				Util::Log().Error("Extension {} unsupported", Extension);
-				return false;
-			}
-
-			InstanceExtensions.push_back(Extension);
-		}
-
-		if (_EnableValidationLayers)
-		{
-			InstanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-		}
-
-		return true;
 	}
 
 	void VulkanUtil::GetEnabledValidationLayers(VkInstanceCreateInfo& CreateInfo)

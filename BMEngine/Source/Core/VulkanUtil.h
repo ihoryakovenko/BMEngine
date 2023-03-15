@@ -9,11 +9,7 @@ namespace Core
 {
 	struct VulkanUtil
 	{
-		static bool IsInstanceExtensionSupported(const char* Extension);
-		static bool IsDeviceExtensionSupported(VkPhysicalDevice Device, const char* Extension);
-		static bool IsDeviceSuitable(VkPhysicalDevice Device);
 		static bool IsValidationLayerSupported(const char* Layer);
-		static bool GetRequiredInstanceExtensions(std::vector<const char*>& InstanceExtensions);
 		static void GetEnabledValidationLayers(VkInstanceCreateInfo& CreateInfo);
 		
 		static void SetupDebugMessenger(VkInstance Instance);
@@ -33,10 +29,11 @@ namespace Core
 			const VkAllocationCallbacks* Allocator);
 
 	public:
-		// TODO validate
-		static inline std::vector<const char*> _DeviceExtensions = {
-			VK_KHR_SWAPCHAIN_EXTENSION_NAME
-		};
+#ifdef NDEBUG
+		static inline bool _EnableValidationLayers = false;
+#else
+		static inline bool _EnableValidationLayers = true;
+#endif
 
 	private:
 		static inline std::vector<const char*> _ValidationLayers = {
@@ -44,11 +41,5 @@ namespace Core
 		};
 
 		static inline VkDebugUtilsMessengerEXT _DebugMessenger;
-
-#ifdef NDEBUG
-		static inline bool _EnableValidationLayers = false;
-#else
-		static inline bool _EnableValidationLayers = true;
-#endif
 	};
 }
