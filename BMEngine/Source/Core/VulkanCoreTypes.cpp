@@ -2,8 +2,11 @@
 #include "VulkanUtil.h"
 
 #include <unordered_set>
+#include <algorithm>
 
 #include "Util/Log.h"
+#include "Util/File.h"
+#include "Util/Config.h"
 
 namespace Core
 {
@@ -484,6 +487,15 @@ namespace Core
 		{
 			InstanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 		}
+
+		return true;
+	}
+
+	bool GraphicsPipeline::CreateGraphicsPipeline()
+	{
+		// TODO FIX!!!
+		auto VertexShaderCode = Util::File::ReadFileFull(Util::Config::GetVertexShaderPath());
+		auto FragmentShaderCode = Util::File::ReadFileFull(Util::Config::GetFragmentShaderPath());
 
 		return true;
 	}

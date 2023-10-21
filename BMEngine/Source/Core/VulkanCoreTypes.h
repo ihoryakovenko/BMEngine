@@ -91,4 +91,9 @@ namespace Core
 		bool IsInstanceExtensionSupported(const char* Extension) const;
 		bool GetRequiredInstanceExtensions(std::vector<const char*>& InstanceExtensions) const;
 	};
+
+	struct GraphicsPipeline
+	{
+		bool CreateGraphicsPipeline();
+	};
 }

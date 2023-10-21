@@ -18,22 +18,11 @@ namespace Core
 		return true;
 	}
 
-	bool Window::ShouldClose() const
-	{
-		return glfwWindowShouldClose(_Window);
-	}
-
-	void Window::PollEvents() const
-	{
-		glfwPollEvents();
-	}
-
 	void Window::Destroy()
 	{
 		glfwDestroyWindow(_Window);
 	}
 
-	// check if Surface can be made a member
 	VkSurfaceKHR Window::CreateSurface(VkInstance Instance, const VkAllocationCallbacks* Allocator) const
 	{
 		VkSurfaceKHR Surface;

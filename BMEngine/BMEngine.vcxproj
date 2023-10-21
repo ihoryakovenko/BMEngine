@@ -19,20 +19,18 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source\Core\Engine.cpp" />
     <ClCompile Include="Source\Core\VulkanCoreTypes.cpp" />
-    <ClCompile Include="Source\Core\VulkanRender.cpp" />
     <ClCompile Include="Source\Core\VulkanUtil.cpp" />
     <ClCompile Include="Source\main.cpp" />
     <ClCompile Include="Source\Core\Window.cpp" />
+    <ClCompile Include="Source\Util\File.cpp" />
     <ClCompile Include="Source\Util\Log.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\Core\Engine.h" />
     <ClInclude Include="Source\Core\VulkanCoreTypes.h" />
-    <ClInclude Include="Source\Core\VulkanRender.h" />
     <ClInclude Include="Source\Core\VulkanUtil.h" />
     <ClInclude Include="Source\Core\Window.h" />
+    <ClInclude Include="Source\Util\File.h" />
     <ClInclude Include="Source\Util\Log.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

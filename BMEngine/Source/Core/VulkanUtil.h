@@ -16,7 +16,6 @@ namespace Core
 		static void DestroyDebugMessenger(VkInstance Instance);
 		static void GetDebugCreateInfo(VkInstanceCreateInfo& CreateInfo);
 
-	private:
 		static VkDebugUtilsMessengerCreateInfoEXT* GetDebugMessengerCreateInfo();
 
 		static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
@@ -28,14 +27,12 @@ namespace Core
 		static void DestroyDebugUtilsMessengerEXT(VkInstance Instance, VkDebugUtilsMessengerEXT DebugMessenger,
 			const VkAllocationCallbacks* Allocator);
 
-	public:
 #ifdef NDEBUG
 		static inline bool _EnableValidationLayers = false;
 #else
 		static inline bool _EnableValidationLayers = true;
 #endif
 
-	private:
 		static inline std::vector<const char*> _ValidationLayers = {
 			"VK_LAYER_KHRONOS_validation"
 		};
