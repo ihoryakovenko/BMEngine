@@ -1,29 +1,27 @@
 #include "VulkanCoreTypes.h"
-#include "VulkanUtil.h"
 
 #include <unordered_set>
 #include <algorithm>
 
-#include "Util/Log.h"
-#include "Util/File.h"
-#include "Util/Config.h"
+#include "Util/Util.h"
 
 namespace Core
 {
 	// TODO check function
+	// In current realization if _GraphicsFamily is valid but if _PresentationFamily is not valid
+	// _GraphicsFamily could be overridden on next iteration even when it is valid
 	bool QueueFamilyIndices::CreateQueueFamilyIndices(VkPhysicalDevice Device, VkSurfaceKHR Surface)
 	{
-		uint32_t FamilyCount = 0;
+		uint32_t FamilyCount = 1;
 		vkGetPhysicalDeviceQueueFamilyProperties(Device, &FamilyCount, nullptr);
 
-		std::vector<VkQueueFamilyProperties> FamilyProperties(FamilyCount);
-		vkGetPhysicalDeviceQueueFamilyProperties(Device, &FamilyCount, FamilyProperties.data());
+		VkQueueFamilyProperties* FamilyProperties = new VkQueueFamilyProperties[FamilyCount];
+		vkGetPhysicalDeviceQueueFamilyProperties(Device, &FamilyCount, FamilyProperties);
 
-		int i = 0;
-		for (const auto& QueueFamily : FamilyProperties)
+		for (uint32_t i = 0; i < FamilyCount; ++i)
 		{
 			// check if Queue is graphics type
-			if (QueueFamily.queueCount > 0 && QueueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			if (FamilyProperties[i].queueCount > 0 && FamilyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
 			{
 				// if we QueueFamily[i] graphics type but not presentation type
 				// and QueueFamily[i + 1] graphics type and presentation type
@@ -35,24 +33,22 @@ namespace Core
 			// check if Queue is presentation type (can be graphics and presentation)
 			VkBool32 PresentationSupport = false;
 			vkGetPhysicalDeviceSurfaceSupportKHR(Device, i, Surface, &PresentationSupport);
-			if (QueueFamily.queueCount > 0 && PresentationSupport)
+			if (FamilyProperties[i].queueCount > 0 && PresentationSupport)
 			{
 				_PresentationFamily = i;
 			}
 
 			if (IsValid())
 			{
+				delete[] FamilyProperties;
 				return true;
 			}
-
-			++i;
 		}
 
 		// Todo walidate warning
 		Util::Log().Warning("Device does not support required indices");
 
-		_GraphicsFamily = -1;
-		_PresentationFamily = -i;
+		delete[] FamilyProperties;
 		return false;
 	}
 
@@ -123,7 +119,7 @@ namespace Core
 		return VK_PRESENT_MODE_FIFO_KHR;
 	}
 
-	VkExtent2D SwapchainDetails::GetBestSwapExtent(const Window& Window) const
+	VkExtent2D SwapchainDetails::GetBestSwapExtent(GLFWwindow* Window) const
 	{
 		if (_SurfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
 		{
@@ -133,7 +129,7 @@ namespace Core
 		{
 			int Width;
 			int Height;
-			Window.GetWindowSize(Width, Height);
+			glfwGetFramebufferSize(Window, &Width, &Height);
 
 			Width = std::clamp(static_cast<uint32_t>(Width), _SurfaceCapabilities.minImageExtent.width, _SurfaceCapabilities.maxImageExtent.width);
 			Height = std::clamp(static_cast<uint32_t>(Height), _SurfaceCapabilities.minImageExtent.height, _SurfaceCapabilities.maxImageExtent.height);
@@ -178,24 +174,23 @@ namespace Core
 	{
 		uint32_t DevicesCount = 0;
 		vkEnumeratePhysicalDevices(Instance, &DevicesCount, nullptr);
-		if (DevicesCount <= 0)
-		{
-			return false;
-		}
 
-		std::vector<VkPhysicalDevice> DeviceList(DevicesCount);
-		vkEnumeratePhysicalDevices(Instance, &DevicesCount, DeviceList.data());
+		VkPhysicalDevice* DeviceList = new VkPhysicalDevice[DevicesCount];
+		vkEnumeratePhysicalDevices(Instance, &DevicesCount, DeviceList);
 
-		for (const auto& Device : DeviceList)
+		for (uint32_t i = 0; i < DevicesCount; ++i)
 		{
-			_PhysicalDevice = Device;
+			_PhysicalDevice = DeviceList[i];
 			if (IsDeviceSuitable(Surface))
 			{
+				delete[] DeviceList;
 				return true;
 			}
 		}
 
 		Util::Log().Error("No physical devices found");
+
+		delete[] DeviceList;
 		return false;
 	}
 
@@ -205,28 +200,30 @@ namespace Core
 
 		// One family can suppurt graphics and presentation
 		// In that case create mulltiple VkDeviceQueueCreateInfo
-		std::unordered_set<int> FamilyIndices = { _PhysicalDeviceIndices._GraphicsFamily,
-			_PhysicalDeviceIndices._PresentationFamily };
+		VkDeviceQueueCreateInfo QueueCreateInfos[2] = {};
+		uint32_t FamilyIndicesSize = 1;
 
-		const size_t FamilyIndicesSize = FamilyIndices.size();
-		std::vector<VkDeviceQueueCreateInfo> QueueCreateInfos(FamilyIndicesSize);
+		QueueCreateInfos[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		QueueCreateInfos[0].queueFamilyIndex = static_cast<uint32_t>(_PhysicalDeviceIndices._GraphicsFamily);
+		QueueCreateInfos[0].queueCount = 1;
+		QueueCreateInfos[0].pQueuePriorities = &Priority;
 
-		int i = 0;
-		for (int QueueFamilyIndex : FamilyIndices)
+		if (_PhysicalDeviceIndices._GraphicsFamily != _PhysicalDeviceIndices._PresentationFamily)
 		{
-			QueueCreateInfos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-			QueueCreateInfos[i].queueFamilyIndex = static_cast<uint32_t>(QueueFamilyIndex);
-			QueueCreateInfos[i].queueCount = 1;
-			QueueCreateInfos[i].pQueuePriorities = &Priority;
-			++i;
+			QueueCreateInfos[1].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+			QueueCreateInfos[1].queueFamilyIndex = static_cast<uint32_t>(_PhysicalDeviceIndices._PresentationFamily);
+			QueueCreateInfos[1].queueCount = 1;
+			QueueCreateInfos[1].pQueuePriorities = &Priority;
+
+			++FamilyIndicesSize;
 		}
 
 		VkPhysicalDeviceFeatures DeviceFeatures = {};
 
 		VkDeviceCreateInfo DeviceCreateInfo = { };
 		DeviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-		DeviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(FamilyIndicesSize);
-		DeviceCreateInfo.pQueueCreateInfos = QueueCreateInfos.data();
+		DeviceCreateInfo.queueCreateInfoCount = (FamilyIndicesSize);
+		DeviceCreateInfo.pQueueCreateInfos = QueueCreateInfos;
 		DeviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(_DeviceExtensions.size());
 		DeviceCreateInfo.ppEnabledExtensionNames = _DeviceExtensions.data();
 		DeviceCreateInfo.pEnabledFeatures = &DeviceFeatures;
@@ -247,18 +244,21 @@ namespace Core
 		uint32_t ExtensionsCount = 0;
 		vkEnumerateDeviceExtensionProperties(_PhysicalDevice, nullptr, &ExtensionsCount, nullptr);
 
-		std::vector<VkExtensionProperties> AvalibleDeviceExtensions(ExtensionsCount);
-		vkEnumerateDeviceExtensionProperties(_PhysicalDevice, nullptr, &ExtensionsCount, AvalibleDeviceExtensions.data());
+		VkExtensionProperties* AvalibleDeviceExtensions = new VkExtensionProperties[ExtensionsCount];
+		vkEnumerateDeviceExtensionProperties(_PhysicalDevice, nullptr, &ExtensionsCount, AvalibleDeviceExtensions);
 
-		for (const auto& AvalibleExtension : AvalibleDeviceExtensions)
+		for (uint32_t i = 0; i < ExtensionsCount; ++i)
 		{
-			if (std::strcmp(Extension, AvalibleExtension.extensionName) == 0)
+			if (std::strcmp(Extension, AvalibleDeviceExtensions[i].extensionName) == 0)
 			{
+				delete[] AvalibleDeviceExtensions;
 				return true;
 			}
 		}
 
 		Util::Log().Error("Device extension {} unsupported", Extension);
+
+		delete[] AvalibleDeviceExtensions;
 		return false;
 	}
 
@@ -301,7 +301,7 @@ namespace Core
 		vkGetDeviceQueue(LogicalDevice, static_cast<uint32_t>(Indices._PresentationFamily), 0, &_PresentationQueue);
 	}
 
-	bool Swapchain::CreateSwapchain(MainDevice& Device, Window ActiveWindow, VkSurfaceKHR Surface)
+	bool Swapchain::CreateSwapchain(MainDevice& Device, GLFWwindow* ActiveWindow, VkSurfaceKHR Surface)
 	{
 		VkSurfaceFormatKHR SurfaceFormat = Device._SwapchainDetails.GetBestSurfaceFormat();
 		if (SurfaceFormat.format == VK_FORMAT_UNDEFINED)
@@ -373,16 +373,17 @@ namespace Core
 		uint32_t SwapchainImageCount = 0;
 		vkGetSwapchainImagesKHR(Device._LogicalDevice, _VulkanSwapchain, &SwapchainImageCount, nullptr);
 
-		std::vector<VkImage> Images(SwapchainImageCount);
-		vkGetSwapchainImagesKHR(Device._LogicalDevice, _VulkanSwapchain, &SwapchainImageCount, Images.data());
+		VkImage* Images = new VkImage[SwapchainImageCount];
+		vkGetSwapchainImagesKHR(Device._LogicalDevice, _VulkanSwapchain, &SwapchainImageCount, Images);
 
-		for (VkImage Image : Images)
+		for (uint32_t i = 0; i < SwapchainImageCount; ++i)
 		{
 			SwapchainImage SwapImage;
-			SwapImage.CreateSwapchainImage(Device._LogicalDevice, Image, _SwapchainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+			SwapImage.CreateSwapchainImage(Device._LogicalDevice, Images[i], _SwapchainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 			_SwapchainImages.push_back(SwapImage);
 		}
 
+		delete[] Images;
 		return true;
 	}
 
@@ -396,107 +397,26 @@ namespace Core
 		vkDestroySwapchainKHR(_LogicalDevice, _VulkanSwapchain, nullptr);
 	}
 
-	bool Instance::CreateInstance()
-	{
-		// ApplicationInfo initialization
-		VkApplicationInfo ApplicationInfo = { };
-		ApplicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-		ApplicationInfo.pApplicationName = "Blank App";
-		ApplicationInfo.applicationVersion = VK_MAKE_VERSION(0, 1, 0); // todo set from settings
-		ApplicationInfo.pEngineName = "BMEngine";
-		ApplicationInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0); // todo set from settings
-		ApplicationInfo.apiVersion = VK_API_VERSION_1_3;
-
-		// Extensions info initialization
-		std::vector<const char*> InstanceExtensions;
-		if (!GetRequiredInstanceExtensions(InstanceExtensions))
-		{
-			return false;
-		}
-
-		// CreateInfo info initialization
-		VkInstanceCreateInfo CreateInfo = { };
-		CreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-		CreateInfo.pApplicationInfo = &ApplicationInfo;
-
-		VulkanUtil::GetEnabledValidationLayers(CreateInfo);
-
-		CreateInfo.enabledExtensionCount = static_cast<uint32_t>(InstanceExtensions.size());
-		CreateInfo.ppEnabledExtensionNames = InstanceExtensions.data();
-
-		VulkanUtil::GetDebugCreateInfo(CreateInfo);
-
-		// Create instance
-		const VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &_VulkanInstance);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkCreateInstance result is {}", static_cast<int>(Result));
-			return false;
-		}
-
-		return true;
-	}
-
-	bool Instance::IsInstanceExtensionSupported(const char* Extension) const
-	{
-		static const std::vector<VkExtensionProperties>& AvalibleExtensions = []()
-		{
-			uint32_t ExtensionsCount = 0;
-			vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionsCount, nullptr);
-
-			std::vector<VkExtensionProperties> Extensions(ExtensionsCount);
-			vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionsCount, Extensions.data());
-
-			return Extensions;
-		}();
-
-		for (const auto& AvalibleExtension : AvalibleExtensions)
-		{
-			if (std::strcmp(Extension, AvalibleExtension.extensionName) == 0)
-			{
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	bool Instance::GetRequiredInstanceExtensions(std::vector<const char*>& InstanceExtensions) const
-	{
-		uint32_t ExtensionsCount = 0;
-		const char** Extensions = glfwGetRequiredInstanceExtensions(&ExtensionsCount);
-		if (Extensions == nullptr)
-		{
-			Util::Log().GlfwLogError();
-			return false;
-		}
-
-		for (uint32_t i = 0; i < ExtensionsCount; ++i)
-		{
-			const char* Extension = Extensions[i];
-			if (!IsInstanceExtensionSupported(Extension))
-			{
-				Util::Log().Error("Extension {} unsupported", Extension);
-				return false;
-			}
-
-			InstanceExtensions.push_back(Extension);
-		}
-
-		if (VulkanUtil::_EnableValidationLayers)
-		{
-			InstanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-		}
-
-		return true;
-	}
-
 	bool GraphicsPipeline::CreateGraphicsPipeline()
 	{
 		// TODO FIX!!!
-		auto VertexShaderCode = Util::File::ReadFileFull(Util::Config::GetVertexShaderPath());
-		auto FragmentShaderCode = Util::File::ReadFileFull(Util::Config::GetFragmentShaderPath());
+		std::vector<char> VertexShaderCode;
+		Util::UtilHelper::OpenAndReadFileFull(Util::UtilHelper::GetVertexShaderPath().data(), VertexShaderCode, "rb");
+
+		std::vector<char> FragmentShaderCode;
+		Util::UtilHelper::OpenAndReadFileFull(Util::UtilHelper::GetFragmentShaderPath().data(), FragmentShaderCode, "rb");
+
+		// TODO build shader modules
 
 		return true;
+	}
+
+	void Surface::CreateSurface(VkInstance Instance, GLFWwindow* Window, const VkAllocationCallbacks* Allocator)
+	{
+		const VkResult Result = glfwCreateWindowSurface(Instance, Window, Allocator, &_Surface);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().GlfwLogError();
+		}
 	}
 }

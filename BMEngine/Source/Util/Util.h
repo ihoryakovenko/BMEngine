@@ -4,15 +4,32 @@
 #include <iostream>
 #include <format>
 #include <source_location>
+#include <vector>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 namespace Util
 {
-	class Log
+	struct UtilHelper
 	{
-	public:
+		// TODO FIX!!!
+		static std::string_view GetVertexShaderPath()
+		{
+			return "./Resources/Shaders/Shader.vert";
+		}
+
+		static std::string_view GetFragmentShaderPath()
+		{
+			return "./Resources/Shaders/Shader.frag";
+		}
+
+		static bool ReadFileFull(FILE* File, std::vector<char>& OutFileData);
+		static bool OpenAndReadFileFull(const char* FileName, std::vector<char>& OutFileData, const char* Mode);
+	};
+
+	struct Log
+	{
 		Log(std::source_location&& Location = std::source_location::current()) :
 			_Location{ std::move(Location) }
 		{
@@ -49,7 +66,6 @@ namespace Util
 			Error(ErrorLog);
 		}
 
-	private:
 		template <typename... TArgs>
 		void Print(std::string_view Type, std::string_view Message, TArgs&&... Args) const
 		{
@@ -57,7 +73,6 @@ namespace Util
 				_Location.line(), _Location.function_name(), Type, std::vformat(Message, std::make_format_args(Args...)));
 		}
 
-	private:
 		std::source_location _Location;
 	};
 }

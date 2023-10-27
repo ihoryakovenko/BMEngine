@@ -2,8 +2,6 @@
 
 #include <vector>
 
-#include "Window.h"
-
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -32,7 +30,7 @@ namespace Core
 
 		VkSurfaceFormatKHR GetBestSurfaceFormat() const;
 		VkPresentModeKHR GetBestPresentationMode() const;
-		VkExtent2D GetBestSwapExtent(const Window& Window) const;
+		VkExtent2D GetBestSwapExtent(GLFWwindow* Window) const;
 	};
 
 	struct SwapchainImage
@@ -78,22 +76,19 @@ namespace Core
 		VkFormat _SwapchainImageFormat{};
 		VkExtent2D _SwapchainExtent{};
 
-		bool CreateSwapchain(MainDevice& Device, Window ActiveWindow, VkSurfaceKHR Surface);
+		bool CreateSwapchain(MainDevice& Device, GLFWwindow* ActiveWindow, VkSurfaceKHR Surface);
 		void CleanupSwapchain(VkDevice _LogicalDevice);
-	};
-
-	struct Instance
-	{
-		VkInstance _VulkanInstance = nullptr;
-
-		bool CreateInstance();
-
-		bool IsInstanceExtensionSupported(const char* Extension) const;
-		bool GetRequiredInstanceExtensions(std::vector<const char*>& InstanceExtensions) const;
 	};
 
 	struct GraphicsPipeline
 	{
 		bool CreateGraphicsPipeline();
+	};
+
+	struct Surface
+	{
+		VkSurfaceKHR _Surface = nullptr;
+
+		void CreateSurface(VkInstance Instance, GLFWwindow* Window, const VkAllocationCallbacks* Allocator);
 	};
 }

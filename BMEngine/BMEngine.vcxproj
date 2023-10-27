@@ -20,18 +20,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Core\VulkanCoreTypes.cpp" />
-    <ClCompile Include="Source\Core\VulkanUtil.cpp" />
     <ClCompile Include="Source\main.cpp" />
-    <ClCompile Include="Source\Core\Window.cpp" />
-    <ClCompile Include="Source\Util\File.cpp" />
-    <ClCompile Include="Source\Util\Log.cpp" />
+    <ClCompile Include="Source\Util\Util.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Core\VulkanCoreTypes.h" />
-    <ClInclude Include="Source\Core\VulkanUtil.h" />
-    <ClInclude Include="Source\Core\Window.h" />
-    <ClInclude Include="Source\Util\File.h" />
-    <ClInclude Include="Source\Util\Log.h" />
+    <ClInclude Include="Source\Util\Util.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
