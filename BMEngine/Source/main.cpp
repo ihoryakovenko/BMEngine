@@ -8,8 +8,8 @@
 
 #include "Util/Util.h"
 
-#include <iostream>
 #include <vector>
+#include <cassert>
 
 #include "Core/VulkanCoreTypes.h"
 
@@ -26,62 +26,9 @@ static constexpr uint32_t ValidationLayersSize = sizeof(ValidationLayers) / size
 
 static inline VkDebugUtilsMessengerEXT _DebugMessenger;
 
-void CreateDebugUtilsMessengerEXT(VkInstance Instance, const VkDebugUtilsMessengerCreateInfoEXT* CreateInfo,
-	const VkAllocationCallbacks* Allocator, VkDebugUtilsMessengerEXT* InDebugMessenger)
+int Start()
 {
-	auto CreateMessengerFunc = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(Instance, "vkCreateDebugUtilsMessengerEXT");
-	if (CreateMessengerFunc != nullptr)
-	{
-		const VkResult Result = CreateMessengerFunc(Instance, CreateInfo, Allocator, InDebugMessenger);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("CreateMessengerFunc result is {}", static_cast<int>(Result));
-		}
-	}
-	else
-	{
-		Util::Log().Error("CreateMessengerFunc is nullptr");
-	}
-}
-
-void DestroyDebugMessenger(VkInstance Instance, VkDebugUtilsMessengerEXT InDebugMessenger,
-	const VkAllocationCallbacks* Allocator)
-{
-	if (EnableValidationLayers)
-	{
-		auto DestroyMessengerFunc = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(Instance, "vkDestroyDebugUtilsMessengerEXT");
-		if (DestroyMessengerFunc != nullptr)
-		{
-			DestroyMessengerFunc(Instance, InDebugMessenger, Allocator);
-		}
-		else
-		{
-			Util::Log().Error("DestroyMessengerFunc is nullptr");
-		}
-	}
-}
-
-VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
-	[[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
-	[[maybe_unused]] void* UserData)
-{
-	auto&& Log = Util::Log();
-	if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-	{
-		Log.Error("Validation layer: {}", CallbackData->pMessage);
-	}
-	else
-	{
-		Log.Info("Validation layer: {}", CallbackData->pMessage);
-	}
-
-	return VK_FALSE;
-}
-
-int main()
-{
-	const int InitResult = glfwInit();
-	if (InitResult == GL_FALSE)
+	if (glfwInit() == GL_FALSE)
 	{
 		Util::Log().GlfwLogError();
 		return -1;
@@ -109,7 +56,7 @@ int main()
 	uint32_t AvalibleExtensionsCount = 0;
 	vkEnumerateInstanceExtensionProperties(nullptr, &AvalibleExtensionsCount, nullptr);
 
-	VkExtensionProperties* AvalibleExtensions = new VkExtensionProperties[AvalibleExtensionsCount];
+	VkExtensionProperties* AvalibleExtensions = Util::Memory::Allocate<VkExtensionProperties>(AvalibleExtensionsCount);
 	vkEnumerateInstanceExtensionProperties(nullptr, &AvalibleExtensionsCount, AvalibleExtensions);
 
 	for (uint32_t i = 0; i < RequiredExtensionsCount; ++i)
@@ -126,13 +73,13 @@ int main()
 
 		if (!IsExtentionSupported)
 		{
-			delete[] AvalibleExtensions;
+			Util::Memory::Deallocate(AvalibleExtensions);
 			Util::Log().Error("Extension {} unsupported", RequiredInstanceExtensions[i]);
 			return -1;
 		}
 	}
 
-	delete[] AvalibleExtensions;
+	Util::Memory::Deallocate(AvalibleExtensions);
 
 	uint32_t TotalExtensionsCount = RequiredExtensionsCount;
 	const char** TotalExtensions = nullptr;
@@ -140,7 +87,7 @@ int main()
 	if (EnableValidationLayers)
 	{
 		++TotalExtensionsCount;
-		TotalExtensions = new const char* [TotalExtensionsCount];
+		TotalExtensions = Util::Memory::Allocate<const char*>(TotalExtensionsCount);
 
 		uint32_t i = 0;
 		for (; i < RequiredExtensionsCount; i++)
@@ -184,7 +131,7 @@ int main()
 		MessengerCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
 			| VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 
-		MessengerCreateInfo.pfnUserCallback = DebugCallback;
+		MessengerCreateInfo.pfnUserCallback = Util::MessengerDebugCallback;
 		MessengerCreateInfo.pUserData = nullptr;
 
 		CreateInfo.pNext = &MessengerCreateInfo;
@@ -200,7 +147,7 @@ int main()
 		uint32_t LayerCount = 0;
 		vkEnumerateInstanceLayerProperties(&LayerCount, nullptr);
 
-		VkLayerProperties* AvalibleLayers = new VkLayerProperties[LayerCount];
+		VkLayerProperties* AvalibleLayers = Util::Memory::Allocate<VkLayerProperties>(LayerCount);
 		vkEnumerateInstanceLayerProperties(&LayerCount, AvalibleLayers);
 
 		for (uint32_t i = 0; i < ValidationLayersSize; ++i)
@@ -217,12 +164,12 @@ int main()
 
 			if (!IsLayerAvalible)
 			{
-				delete[] AvalibleLayers;
+				Util::Memory::Deallocate(AvalibleLayers);
 				Util::Log().Error("Extension {} unsupported", RequiredInstanceExtensions[i]);
 				return -1;
 			}
 		}
-		delete[] AvalibleLayers;
+		Util::Memory::Deallocate(AvalibleLayers);
 
 		CreateInfo.enabledLayerCount = ValidationLayersSize;
 		CreateInfo.ppEnabledLayerNames = ValidationLayers;
@@ -235,12 +182,12 @@ int main()
 	// Function end: GetEnabledValidationLayers 
 
 	VkInstance VulkanInstance = nullptr;
-	const VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &VulkanInstance);
+	VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &VulkanInstance);
 	if (Result != VK_SUCCESS)
 	{
 		if (TotalExtensionsCount > RequiredExtensionsCount)
 		{
-			delete[] TotalExtensions;
+			Util::Memory::Deallocate(TotalExtensions);
 		}
 
 		Util::Log().Error("vkCreateInstance result is {}", static_cast<int>(Result));
@@ -249,64 +196,210 @@ int main()
 
 	if (TotalExtensionsCount > RequiredExtensionsCount)
 	{
-		delete[] TotalExtensions;
+		Util::Memory::Deallocate(TotalExtensions);
 	}
 	// Function end: CreateInstance
 
 	// Function: SetupDebugMessenger
 	if (EnableValidationLayers)
 	{
-		CreateDebugUtilsMessengerEXT(VulkanInstance, &MessengerCreateInfo, nullptr, &_DebugMessenger);
+		Util::CreateDebugUtilsMessengerEXT(VulkanInstance, &MessengerCreateInfo, nullptr, &_DebugMessenger);
 	}
 	// Function end: SetupDebugMessenger
 
-	Core::Surface Surface;
-	 Surface.CreateSurface(VulkanInstance, Window, nullptr);
-	if (Surface._Surface == nullptr)
+	VkSurfaceKHR Surface = nullptr;
+	if (glfwCreateWindowSurface(VulkanInstance, Window, nullptr, &Surface) != VK_SUCCESS)
+	{
+		Util::Log().GlfwLogError();
+		return -1;
+	}
+
+	// Function: SetupPhysicalDevice
+	Core::MainDevice MainDevice;
+	if (!MainDevice.SetupPhysicalDevice(VulkanInstance, Surface))
+	{
+		return -1;
+	}
+	// Function end: SetupPhysicalDevice
+
+	if (!MainDevice.CreateLogicalDevice())
+	{
+		return -1;
+	}
+	// Function end: SetupPhysicalDevice
+
+	// Function: SetupQueues
+	VkQueue GraphicsQueue = nullptr;
+	VkQueue PresentationQueue = nullptr;
+
+	vkGetDeviceQueue(MainDevice._LogicalDevice, static_cast<uint32_t>(MainDevice._GraphicsFamily), 0, &GraphicsQueue);
+	vkGetDeviceQueue(MainDevice._LogicalDevice, static_cast<uint32_t>(MainDevice._PresentationFamily), 0, &PresentationQueue);
+
+	if (GraphicsQueue == nullptr && PresentationQueue == nullptr)
+	{
+		return -1;
+	}
+	// Function end: SetupQueues
+
+	// Function: CreateSwapchain
+	VkSurfaceFormatKHR SurfaceFormat = MainDevice.GetBestSurfaceFormat();
+	if (SurfaceFormat.format == VK_FORMAT_UNDEFINED)
 	{
 		return -1;
 	}
 
-	Core::MainDevice _MainDevice;
-	if (!_MainDevice.SetupPhysicalDevice(VulkanInstance, Surface._Surface))
+	VkPresentModeKHR PresentationMode = MainDevice.GetBestPresentationMode();
+	VkExtent2D SwapExtent = MainDevice.GetBestSwapExtent(Window);
+
+	// How many images are in the swap chain
+	// Get 1 more then the minimum to allow triple buffering
+	uint32_t ImageCount = MainDevice._SurfaceCapabilities.minImageCount + 1;
+
+	// If maxImageCount > 0, then limitless
+	if (MainDevice._SurfaceCapabilities.maxImageCount > 0
+		&& MainDevice._SurfaceCapabilities.maxImageCount < ImageCount)
 	{
+		ImageCount = MainDevice._SurfaceCapabilities.maxImageCount;
+	}
+
+	VkSwapchainCreateInfoKHR SwapchainCreateInfo = {};
+	SwapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	SwapchainCreateInfo.surface = Surface;
+	SwapchainCreateInfo.imageFormat = SurfaceFormat.format;
+	SwapchainCreateInfo.imageColorSpace = SurfaceFormat.colorSpace;
+	SwapchainCreateInfo.presentMode = PresentationMode;
+	SwapchainCreateInfo.imageExtent = SwapExtent;
+	SwapchainCreateInfo.minImageCount = ImageCount;
+	SwapchainCreateInfo.imageArrayLayers = 1;
+	SwapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	SwapchainCreateInfo.preTransform = MainDevice._SurfaceCapabilities.currentTransform;
+	SwapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // How to handle windows blending
+	SwapchainCreateInfo.clipped = VK_TRUE;
+
+	uint32_t Indices[] = {
+		static_cast<uint32_t>(MainDevice._GraphicsFamily),
+		static_cast<uint32_t>(MainDevice._PresentationFamily)
+	};
+
+	if (MainDevice._GraphicsFamily != MainDevice._PresentationFamily)
+	{
+		// Less efficient mode
+		SwapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+		SwapchainCreateInfo.queueFamilyIndexCount = 2;
+		SwapchainCreateInfo.pQueueFamilyIndices = Indices;
+	}
+	else
+	{
+		SwapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		SwapchainCreateInfo.queueFamilyIndexCount = 0;
+		SwapchainCreateInfo.pQueueFamilyIndices = nullptr;
+	}
+
+	// Used if old cwap chain been destroyed and this one replaces it
+	SwapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
+
+	VkSwapchainKHR VulkanSwapchain = nullptr;
+	Result = vkCreateSwapchainKHR(MainDevice._LogicalDevice, &SwapchainCreateInfo, nullptr, &VulkanSwapchain);
+	if (Result != VK_SUCCESS)
+	{
+		Util::Log().Error("vkCreateSwapchainKHR result is {}", static_cast<int>(Result));
 		return -1;
 	}
 
-	if (!_MainDevice.CreateLogicalDevice())
+	// Get swap chain images
+	uint32_t SwapchainImageCount = 0;
+	vkGetSwapchainImagesKHR(MainDevice._LogicalDevice, VulkanSwapchain, &SwapchainImageCount, nullptr);
+
+	VkImage* Images = Util::Memory::Allocate<VkImage>(SwapchainImageCount);
+	vkGetSwapchainImagesKHR(MainDevice._LogicalDevice, VulkanSwapchain, &SwapchainImageCount, Images);
+
+	VkImageViewCreateInfo ViewCreateInfo = {};
+	ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+
+	ViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	ViewCreateInfo.format = SurfaceFormat.format;
+	ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	ViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+	// Subresources allow the view to view only a part of an image
+	ViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	ViewCreateInfo.subresourceRange.baseMipLevel = 0;
+	ViewCreateInfo.subresourceRange.levelCount = 1;
+	ViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+	ViewCreateInfo.subresourceRange.layerCount = 1;
+
+	VkImageView* ImageViews = Util::Memory::Allocate<VkImageView>(SwapchainImageCount);
+
+	for (uint32_t i = 0; i < SwapchainImageCount; ++i)
 	{
-		return -1;
+		ViewCreateInfo.image = Images[i];
+
+		VkImageView ImageView;
+		Result = vkCreateImageView(MainDevice._LogicalDevice, &ViewCreateInfo, nullptr, &ImageView);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkCreateImageView result is {}", static_cast<int>(Result));
+			Util::Memory::Deallocate(Images);
+			Util::Memory::Deallocate(ImageViews);
+			return -1;
+		}
+
+		ImageViews[i] = ImageView;
 	}
 
-	Core::Queues _Queues;
-	_Queues.SetupQueues(_MainDevice._LogicalDevice, _MainDevice._PhysicalDeviceIndices);
+	Util::Memory::Deallocate(Images);
+	// Function end: CreateSwapchain
 
-	Core::Swapchain _Swapchain;
-	if (!_Swapchain.CreateSwapchain(_MainDevice, Window, Surface._Surface))
-	{
-		return -1;
-	}
+	// TODO FIX!!!
+	std::vector<char> VertexShaderCode;
+	Util::UtilHelper::OpenAndReadFileFull(Util::UtilHelper::GetVertexShaderPath().data(), VertexShaderCode, "rb");
 
-	//
-	Core::GraphicsPipeline _GraphicsPipeline;
-	if (!_GraphicsPipeline.CreateGraphicsPipeline())
-	{
-		return -1;
-	}
+	std::vector<char> FragmentShaderCode;
+	Util::UtilHelper::OpenAndReadFileFull(Util::UtilHelper::GetFragmentShaderPath().data(), FragmentShaderCode, "rb");
+
+	// TODO build shader modules
 
 	while (!glfwWindowShouldClose(Window))
 	{
 		glfwPollEvents();
 	}
 
-	_Swapchain.CleanupSwapchain(_MainDevice._LogicalDevice);
-	vkDestroySurfaceKHR(VulkanInstance, Surface._Surface, nullptr);
-	vkDestroyDevice(_MainDevice._LogicalDevice, nullptr);
-	DestroyDebugMessenger(VulkanInstance, _DebugMessenger, nullptr);
+	// TODO: add destroing to invalid initialization
+	for (uint32_t i = 0; i < SwapchainImageCount; ++i)
+	{
+		vkDestroyImageView(MainDevice._LogicalDevice, ImageViews[i], nullptr);
+	}
+	Util::Memory::Deallocate(ImageViews);
+
+	vkDestroySwapchainKHR(MainDevice._LogicalDevice, VulkanSwapchain, nullptr);
+
+	vkDestroySurfaceKHR(VulkanInstance, Surface, nullptr);
+	vkDestroyDevice(MainDevice._LogicalDevice, nullptr);
+
+	if (EnableValidationLayers)
+	{
+		Util::DestroyDebugMessenger(VulkanInstance, _DebugMessenger, nullptr);
+	}
+
 	vkDestroyInstance(VulkanInstance, nullptr);
 
 	glfwDestroyWindow(Window);
 	glfwTerminate();
 
 	return 0;
+}
+
+int main()
+{
+	const int Result = Start();
+
+	if (Util::Memory::AlocateCounter != 0)
+	{
+		Util::Log().Error("AlocateCounter in not equal 0, counter is {}", Util::Memory::AlocateCounter);
+		assert(false);
+	}
+	
+	return Result;
 }

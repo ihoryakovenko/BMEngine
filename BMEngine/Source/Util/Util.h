@@ -75,4 +75,38 @@ namespace Util
 
 		std::source_location _Location;
 	};
+
+	void CreateDebugUtilsMessengerEXT(VkInstance Instance, const VkDebugUtilsMessengerCreateInfoEXT* CreateInfo,
+		const VkAllocationCallbacks* Allocator, VkDebugUtilsMessengerEXT* InDebugMessenger);
+
+	void DestroyDebugMessenger(VkInstance Instance, VkDebugUtilsMessengerEXT InDebugMessenger,
+		const VkAllocationCallbacks* Allocator);
+
+	VKAPI_ATTR VkBool32 VKAPI_CALL MessengerDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
+		VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
+		void* UserData);
+
+	struct Memory
+	{
+#ifndef NDEBUG
+		static inline int AlocateCounter = 0;
+#endif
+
+		template <typename T>
+		static T* Allocate(size_t Count)
+		{
+#ifndef NDEBUG
+			++AlocateCounter;
+#endif
+			return static_cast<T*>(std::malloc(Count * sizeof(T)));
+		}
+
+		static void Deallocate(void* Ptr)
+		{
+#ifndef NDEBUG
+			--AlocateCounter;
+#endif
+			std::free(Ptr);
+		}
+	};
 }

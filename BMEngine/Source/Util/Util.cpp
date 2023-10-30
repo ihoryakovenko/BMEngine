@@ -44,4 +44,53 @@ namespace Util
 		Log().Error("Cannot open file {}: Result = {}", FileName, Result);
 		return false;
 	}
+
+	void CreateDebugUtilsMessengerEXT(VkInstance Instance, const VkDebugUtilsMessengerCreateInfoEXT* CreateInfo,
+		const VkAllocationCallbacks* Allocator, VkDebugUtilsMessengerEXT* InDebugMessenger)
+	{
+		auto CreateMessengerFunc = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(Instance, "vkCreateDebugUtilsMessengerEXT");
+		if (CreateMessengerFunc != nullptr)
+		{
+			const VkResult Result = CreateMessengerFunc(Instance, CreateInfo, Allocator, InDebugMessenger);
+			if (Result != VK_SUCCESS)
+			{
+				Util::Log().Error("CreateMessengerFunc result is {}", static_cast<int>(Result));
+			}
+		}
+		else
+		{
+			Util::Log().Error("CreateMessengerFunc is nullptr");
+		}
+	}
+
+	void DestroyDebugMessenger(VkInstance Instance, VkDebugUtilsMessengerEXT InDebugMessenger,
+		const VkAllocationCallbacks* Allocator)
+	{
+		auto DestroyMessengerFunc = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(Instance, "vkDestroyDebugUtilsMessengerEXT");
+		if (DestroyMessengerFunc != nullptr)
+		{
+			DestroyMessengerFunc(Instance, InDebugMessenger, Allocator);
+		}
+		else
+		{
+			Util::Log().Error("DestroyMessengerFunc is nullptr");
+		}
+	}
+
+	VKAPI_ATTR VkBool32 VKAPI_CALL MessengerDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
+		[[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
+		[[maybe_unused]] void* UserData)
+	{
+		auto&& Log = Util::Log();
+		if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+		{
+			Log.Error("Validation layer: {}", CallbackData->pMessage);
+		}
+		else
+		{
+			Log.Info("Validation layer: {}", CallbackData->pMessage);
+		}
+
+		return VK_FALSE;
+	}
 }
