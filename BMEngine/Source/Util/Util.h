@@ -109,4 +109,10 @@ namespace Util
 			std::free(Ptr);
 		}
 	};
+
+#ifdef NDEBUG
+	static bool EnableValidationLayers = false;
+#else
+	static bool EnableValidationLayers = true;
+#endif
 }
