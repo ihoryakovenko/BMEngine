@@ -88,17 +88,14 @@ namespace Util
 
 	struct Memory
 	{
-#ifndef NDEBUG
 		static inline int AlocateCounter = 0;
-#endif
 
-		template <typename T>
-		static T* Allocate(size_t Count)
+		static void* Allocate(size_t Size)
 		{
 #ifndef NDEBUG
 			++AlocateCounter;
 #endif
-			return static_cast<T*>(std::malloc(Count * sizeof(T)));
+			return std::malloc(Size);
 		}
 
 		static void Deallocate(void* Ptr)

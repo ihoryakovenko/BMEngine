@@ -39,63 +39,18 @@ int Start()
 		return -1;
 	}
 
-	// Function: GetRequiredInstanceExtensions
-	uint32_t RequiredExtensionsCount = 0;
-	const char** RequiredInstanceExtensions = glfwGetRequiredInstanceExtensions(&RequiredExtensionsCount);
-	if (RequiredInstanceExtensions == nullptr)
+	Core::VkInstanceCreateInfoData InstanceCreateInfoData;
+	if (!Core::InitVkInstanceCreateInfoData(InstanceCreateInfoData))
 	{
-		Util::Log().GlfwLogError();
 		return -1;
 	}
 
-	uint32_t AvalibleExtensionsCount = 0;
-	vkEnumerateInstanceExtensionProperties(nullptr, &AvalibleExtensionsCount, nullptr);
-
-	VkExtensionProperties* AvalibleExtensions = Util::Memory::Allocate<VkExtensionProperties>(AvalibleExtensionsCount);
-	vkEnumerateInstanceExtensionProperties(nullptr, &AvalibleExtensionsCount, AvalibleExtensions);
-
-	for (uint32_t i = 0; i < RequiredExtensionsCount; ++i)
+	if (!Core::CheckRequiredInstanceExtensionsSupport(InstanceCreateInfoData))
 	{
-		bool IsExtentionSupported = false;
-		for (uint32_t j = 0; j < AvalibleExtensionsCount; ++j)
-		{
-			if (std::strcmp(RequiredInstanceExtensions[i], AvalibleExtensions[j].extensionName) == 0)
-			{
-				IsExtentionSupported = true;
-				break;
-			}
-		}
-
-		if (!IsExtentionSupported)
-		{
-			Util::Memory::Deallocate(AvalibleExtensions);
-			Util::Log().Error("Extension {} unsupported", RequiredInstanceExtensions[i]);
-			return -1;
-		}
+		Core::DeinitVkInstanceCreateInfoData(InstanceCreateInfoData);
+		return -1;
 	}
 
-	Util::Memory::Deallocate(AvalibleExtensions);
-
-	uint32_t TotalExtensionsCount = RequiredExtensionsCount;
-	const char** TotalExtensions = nullptr;
-
-	if (Util::EnableValidationLayers)
-	{
-		++TotalExtensionsCount;
-		TotalExtensions = Util::Memory::Allocate<const char*>(TotalExtensionsCount);
-
-		uint32_t i = 0;
-		for (; i < RequiredExtensionsCount; i++)
-		{
-			TotalExtensions[i] = RequiredInstanceExtensions[i];
-		}
-
-		TotalExtensions[i] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
-	}
-	else
-	{
-		TotalExtensions = RequiredInstanceExtensions;
-	}
 	// Function end: GetRequiredInstanceExtensions
 
 	// Function: CreateInstance
@@ -112,8 +67,17 @@ int Start()
 	VkInstanceCreateInfo CreateInfo = { };
 	CreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	CreateInfo.pApplicationInfo = &ApplicationInfo;
-	CreateInfo.enabledExtensionCount = static_cast<uint32_t>(TotalExtensionsCount);
-	CreateInfo.ppEnabledExtensionNames = TotalExtensions;
+
+	if (Util::EnableValidationLayers)
+	{
+		CreateInfo.enabledExtensionCount = InstanceCreateInfoData.RequiredAndValidationExtensionsCount;
+		CreateInfo.ppEnabledExtensionNames = InstanceCreateInfoData.RequiredAndValidationExtensions;
+	}
+	else
+	{
+		CreateInfo.enabledExtensionCount = InstanceCreateInfoData.RequiredExtensionsCount;
+		CreateInfo.ppEnabledExtensionNames = InstanceCreateInfoData.RequiredInstanceExtensions;
+	}
 
 	VkDebugUtilsMessengerCreateInfoEXT MessengerCreateInfo = { };
 
@@ -142,7 +106,7 @@ int Start()
 		uint32_t LayerCount = 0;
 		vkEnumerateInstanceLayerProperties(&LayerCount, nullptr);
 
-		VkLayerProperties* AvalibleLayers = Util::Memory::Allocate<VkLayerProperties>(LayerCount);
+		VkLayerProperties* AvalibleLayers = static_cast<VkLayerProperties*>(Util::Memory::Allocate(LayerCount * sizeof(VkLayerProperties)));
 		vkEnumerateInstanceLayerProperties(&LayerCount, AvalibleLayers);
 
 		for (uint32_t i = 0; i < ValidationLayersSize; ++i)
@@ -159,12 +123,11 @@ int Start()
 
 			if (!IsLayerAvalible)
 			{
+				Util::Log().Error("Extension {} unsupported", ValidationLayers[i]);
 				Util::Memory::Deallocate(AvalibleLayers);
-				Util::Log().Error("Extension {} unsupported", RequiredInstanceExtensions[i]);
 				return -1;
 			}
 		}
-		Util::Memory::Deallocate(AvalibleLayers);
 
 		CreateInfo.enabledLayerCount = ValidationLayersSize;
 		CreateInfo.ppEnabledLayerNames = ValidationLayers;
@@ -180,19 +143,14 @@ int Start()
 	VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &VulkanInstance);
 	if (Result != VK_SUCCESS)
 	{
-		if (TotalExtensionsCount > RequiredExtensionsCount)
-		{
-			Util::Memory::Deallocate(TotalExtensions);
-		}
-
 		Util::Log().Error("vkCreateInstance result is {}", static_cast<int>(Result));
+		Core::DeinitVkInstanceCreateInfoData(InstanceCreateInfoData);
+
 		return -1;
 	}
 
-	if (TotalExtensionsCount > RequiredExtensionsCount)
-	{
-		Util::Memory::Deallocate(TotalExtensions);
-	}
+	Core::DeinitVkInstanceCreateInfoData(InstanceCreateInfoData);
+
 	// Function end: CreateInstance
 
 	// Function: SetupDebugMessenger
@@ -216,7 +174,7 @@ int Start()
 	uint32_t DevicesCount = 0;
 	vkEnumeratePhysicalDevices(VulkanInstance, &DevicesCount, nullptr);
 
-	VkPhysicalDevice* DeviceList = Util::Memory::Allocate<VkPhysicalDevice>(DevicesCount);
+	VkPhysicalDevice* DeviceList = static_cast<VkPhysicalDevice*>(Util::Memory::Allocate(DevicesCount * sizeof(VkPhysicalDevice)));
 	vkEnumeratePhysicalDevices(VulkanInstance, &DevicesCount, DeviceList);
 
 	std::vector<VkSurfaceFormatKHR> Formats;
@@ -243,7 +201,7 @@ int Start()
 		uint32_t ExtensionsCount = 0;
 		vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &ExtensionsCount, nullptr);
 
-		VkExtensionProperties* AvalibleDeviceExtensions = Util::Memory::Allocate<VkExtensionProperties>(ExtensionsCount);
+		VkExtensionProperties* AvalibleDeviceExtensions = static_cast<VkExtensionProperties*>(Util::Memory::Allocate(ExtensionsCount * sizeof(VkExtensionProperties)));
 		vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &ExtensionsCount, AvalibleDeviceExtensions);
 
 		for (const char* Extension : DeviceExtensions)
@@ -276,7 +234,7 @@ int Start()
 		uint32_t FamilyCount = 1;
 		vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &FamilyCount, nullptr);
 
-		VkQueueFamilyProperties* FamilyProperties = Util::Memory::Allocate<VkQueueFamilyProperties>(FamilyCount);
+		VkQueueFamilyProperties* FamilyProperties = static_cast<VkQueueFamilyProperties*>(Util::Memory::Allocate(FamilyCount * sizeof(VkQueueFamilyProperties)));
 		vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &FamilyCount, FamilyProperties);
 
 		for (uint32_t j = 0; j < FamilyCount; ++j)
@@ -353,11 +311,6 @@ int Start()
 	// Function end: SetupPhysicalDevice
 
 	// Function: CreateLogicalDevice
-	//if (!MainDevice.CreateLogicalDevice())
-	//{
-	//	return -1;
-	//}
-	
 	const float Priority = 1.0f;
 
 	// One family can suppurt graphics and presentation
@@ -537,7 +490,7 @@ int Start()
 	uint32_t SwapchainImageCount = 0;
 	vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &SwapchainImageCount, nullptr);
 
-	VkImage* Images = Util::Memory::Allocate<VkImage>(SwapchainImageCount);
+	VkImage* Images = static_cast<VkImage*>(Util::Memory::Allocate(SwapchainImageCount * sizeof(VkImage)));
 	vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &SwapchainImageCount, Images);
 
 	VkImageViewCreateInfo ViewCreateInfo = {};
@@ -557,7 +510,7 @@ int Start()
 	ViewCreateInfo.subresourceRange.baseArrayLayer = 0;
 	ViewCreateInfo.subresourceRange.layerCount = 1;
 
-	VkImageView* ImageViews = Util::Memory::Allocate<VkImageView>(SwapchainImageCount);
+	VkImageView* ImageViews = static_cast<VkImageView*>(Util::Memory::Allocate(SwapchainImageCount * sizeof(VkImageView)));
 
 	for (uint32_t i = 0; i < SwapchainImageCount; ++i)
 	{
