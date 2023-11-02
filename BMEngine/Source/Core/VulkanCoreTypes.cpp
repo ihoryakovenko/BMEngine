@@ -2,12 +2,12 @@
 
 #include "Util/Util.h"
 
-#include <iostream>
-
 namespace Core
 {
-	bool InitVkInstanceCreateInfoData(VkInstanceCreateInfoData& Data)
+	bool InitVkInstanceCreateInfoData(VkInstanceCreateInfoData& Data, const char** ValidationExtensions, uint32_t ValidationExtensionsSize,
+		bool EnumerateInstanceLayerProperties)
 	{
+		// Get count part
 		const char** RequiredInstanceExtensions = glfwGetRequiredInstanceExtensions(&Data.RequiredExtensionsCount);
 		if (Data.RequiredExtensionsCount == 0)
 		{
@@ -22,20 +22,37 @@ namespace Core
 			return false;
 		}
 
-		const size_t AdditionalExtensionCount = 1;
+		if (EnumerateInstanceLayerProperties)
+		{
+			Result = vkEnumerateInstanceLayerProperties(&Data.AvalibleValidationLayersCount, nullptr);
+			if (Result != VK_SUCCESS)
+			{
+				Util::Log().Error("vkEnumerateInstanceLayerProperties result is {}", static_cast<int>(Result));
+				return false;
+			}
+		}
 
-		const size_t AdditionalExtensionSize = AdditionalExtensionCount * sizeof(const char*);
+		// Allocation part
+		const size_t AdditionalExtensionSize = ValidationExtensionsSize * sizeof(const char**);
 		const size_t RequiredExtensionsSize = Data.RequiredExtensionsCount * sizeof(const char**);
 		const size_t AvalibleExtensionsSize = Data.AvalibleExtensionsCount * sizeof(VkExtensionProperties);
+		const size_t AvalibleLayerSize = Data.AvalibleValidationLayersCount * sizeof(VkLayerProperties);
 
-		Data.Buffer = Util::Memory::Allocate(RequiredExtensionsSize + AvalibleExtensionsSize + AdditionalExtensionSize);
+		Data.Buffer = Util::Memory::Allocate(RequiredExtensionsSize + AvalibleExtensionsSize + AdditionalExtensionSize + AvalibleLayerSize);
 		
+		// Data structuring part
 		Data.RequiredAndValidationExtensions = reinterpret_cast<const char**>(Data.Buffer);
-		Data.RequiredAndValidationExtensions[0] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
-		Data.RequiredAndValidationExtensionsCount = AdditionalExtensionCount + Data.RequiredExtensionsCount;
+		Data.RequiredAndValidationExtensionsCount = ValidationExtensionsSize + Data.RequiredExtensionsCount;
 
-		Data.RequiredInstanceExtensions = static_cast<const char**>(Data.Buffer) + AdditionalExtensionCount;
+		Data.RequiredInstanceExtensions = static_cast<const char**>(Data.Buffer) + ValidationExtensionsSize;
 		Data.AvalibleExtensions = reinterpret_cast<VkExtensionProperties*>(Data.RequiredInstanceExtensions + Data.RequiredExtensionsCount);
+		Data.AvalibleValidationLayers = reinterpret_cast<VkLayerProperties*>(Data.AvalibleExtensions + Data.AvalibleExtensionsCount);
+
+		// Data assignment part
+		for (uint32_t i = 0; i < ValidationExtensionsSize; ++i)
+		{
+			Data.RequiredAndValidationExtensions[i] = ValidationExtensions[i];
+		}
 
 		for (uint32_t i = 0; i < Data.RequiredExtensionsCount; ++i)
 		{
@@ -43,6 +60,8 @@ namespace Core
 		}
 
 		vkEnumerateInstanceExtensionProperties(nullptr, &Data.AvalibleExtensionsCount, Data.AvalibleExtensions);
+
+		vkEnumerateInstanceLayerProperties(&Data.AvalibleValidationLayersCount, Data.AvalibleValidationLayers);
 
 		return true;
 	}
@@ -69,6 +88,30 @@ namespace Core
 			if (!IsExtensionSupported)
 			{
 				Util::Log().Error("Extension {} unsupported", Data.RequiredAndValidationExtensions[i]);
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	bool CheckValidationLayersSupport(VkInstanceCreateInfoData& Data, const char** ValidationLeyersToCheck, uint32_t ValidationLeyersToCheckSize)
+	{
+		for (uint32_t i = 0; i < ValidationLeyersToCheckSize; ++i)
+		{
+			bool IsLayerAvalible = false;
+			for (uint32_t j = 0; j < Data.AvalibleValidationLayersCount; ++j)
+			{
+				if (std::strcmp(ValidationLeyersToCheck[i], Data.AvalibleValidationLayers[j].layerName) == 0)
+				{
+					IsLayerAvalible = true;
+					break;
+				}
+			}
+
+			if (!IsLayerAvalible)
+			{
+				Util::Log().Error("Validation layer {} unsupported", ValidationLeyersToCheck[i]);
 				return false;
 			}
 		}

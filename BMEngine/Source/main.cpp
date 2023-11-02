@@ -39,8 +39,13 @@ int Start()
 		return -1;
 	}
 
+	const char* ValidationExtensions[] = {
+		VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+	};
+	const uint32_t ValidationExtensionsSize = Util::EnableValidationLayers ? sizeof(ValidationExtensions) / sizeof(ValidationExtensions[0]) : 0;
+
 	Core::VkInstanceCreateInfoData InstanceCreateInfoData;
-	if (!Core::InitVkInstanceCreateInfoData(InstanceCreateInfoData))
+	if (!Core::InitVkInstanceCreateInfoData(InstanceCreateInfoData, ValidationExtensions, ValidationExtensionsSize, Util::EnableValidationLayers))
 	{
 		return -1;
 	}
@@ -103,31 +108,7 @@ int Start()
 	// Function: GetEnabledValidationLayers 
 	if (Util::EnableValidationLayers)
 	{
-		uint32_t LayerCount = 0;
-		vkEnumerateInstanceLayerProperties(&LayerCount, nullptr);
-
-		VkLayerProperties* AvalibleLayers = static_cast<VkLayerProperties*>(Util::Memory::Allocate(LayerCount * sizeof(VkLayerProperties)));
-		vkEnumerateInstanceLayerProperties(&LayerCount, AvalibleLayers);
-
-		for (uint32_t i = 0; i < ValidationLayersSize; ++i)
-		{
-			bool IsLayerAvalible = false;
-			for (uint32_t j = 0; j < LayerCount; ++j)
-			{
-				if (std::strcmp(ValidationLayers[i], AvalibleLayers[j].layerName) == 0)
-				{
-					IsLayerAvalible = true;
-					break;
-				}
-			}
-
-			if (!IsLayerAvalible)
-			{
-				Util::Log().Error("Extension {} unsupported", ValidationLayers[i]);
-				Util::Memory::Deallocate(AvalibleLayers);
-				return -1;
-			}
-		}
+		Core::CheckValidationLayersSupport(InstanceCreateInfoData, ValidationLayers, ValidationLayersSize);
 
 		CreateInfo.enabledLayerCount = ValidationLayersSize;
 		CreateInfo.ppEnabledLayerNames = ValidationLayers;
