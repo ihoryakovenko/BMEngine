@@ -8,7 +8,6 @@
 
 #include "Util/Util.h"
 
-#include <vector>
 #include <cassert>
 #include <algorithm>
 
@@ -32,31 +31,22 @@ int Start()
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-	GLFWwindow* Window = glfwCreateWindow(800, 600, "BMEngine", nullptr, nullptr);
-	if (Window == nullptr)
-	{
-		Util::Log().GlfwLogError();
-		return -1;
-	}
-
 	const char* ValidationExtensions[] = {
 		VK_EXT_DEBUG_UTILS_EXTENSION_NAME
 	};
 	const uint32_t ValidationExtensionsSize = Util::EnableValidationLayers ? sizeof(ValidationExtensions) / sizeof(ValidationExtensions[0]) : 0;
 
-	Core::VkInstanceCreateInfoData InstanceCreateInfoData;
-	if (!Core::InitVkInstanceCreateInfoData(InstanceCreateInfoData, ValidationExtensions, ValidationExtensionsSize, Util::EnableValidationLayers))
+	Core::VkInstanceCreateInfoSetupData InstanceCreateInfoData;
+	if (!Core::InitVkInstanceCreateInfoSetupData(InstanceCreateInfoData, ValidationExtensions, ValidationExtensionsSize, Util::EnableValidationLayers))
 	{
 		return -1;
 	}
 
 	if (!Core::CheckRequiredInstanceExtensionsSupport(InstanceCreateInfoData))
 	{
-		Core::DeinitVkInstanceCreateInfoData(InstanceCreateInfoData);
+		Core::DeinitVkInstanceCreateInfoSetupData(InstanceCreateInfoData);
 		return -1;
 	}
-
-	// Function end: GetRequiredInstanceExtensions
 
 	// Function: CreateInstance
 	VkApplicationInfo ApplicationInfo = { };
@@ -66,7 +56,6 @@ int Start()
 	ApplicationInfo.pEngineName = "BMEngine";
 	ApplicationInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0); // todo set from settings
 	ApplicationInfo.apiVersion = VK_API_VERSION_1_3;
-
 
 	// CreateInfo info initialization
 	VkInstanceCreateInfo CreateInfo = { };
@@ -125,21 +114,25 @@ int Start()
 	if (Result != VK_SUCCESS)
 	{
 		Util::Log().Error("vkCreateInstance result is {}", static_cast<int>(Result));
-		Core::DeinitVkInstanceCreateInfoData(InstanceCreateInfoData);
+		Core::DeinitVkInstanceCreateInfoSetupData(InstanceCreateInfoData);
 
 		return -1;
 	}
 
-	Core::DeinitVkInstanceCreateInfoData(InstanceCreateInfoData);
-
+	Core::DeinitVkInstanceCreateInfoSetupData(InstanceCreateInfoData);
 	// Function end: CreateInstance
 
-	// Function: SetupDebugMessenger
 	if (Util::EnableValidationLayers)
 	{
 		Util::CreateDebugUtilsMessengerEXT(VulkanInstance, &MessengerCreateInfo, nullptr, &_DebugMessenger);
 	}
-	// Function end: SetupDebugMessenger
+
+	GLFWwindow* Window = glfwCreateWindow(800, 600, "BMEngine", nullptr, nullptr);
+	if (Window == nullptr)
+	{
+		Util::Log().GlfwLogError();
+		return -1;
+	}
 
 	VkSurfaceKHR Surface = nullptr;
 	if (glfwCreateWindowSurface(VulkanInstance, Window, nullptr, &Surface) != VK_SUCCESS)
@@ -149,143 +142,68 @@ int Start()
 	}
 
 	// Function: SetupPhysicalDevice
-	int GraphicsFamily = -1;
-	int PresentationFamily = -1;
-
 	uint32_t DevicesCount = 0;
 	vkEnumeratePhysicalDevices(VulkanInstance, &DevicesCount, nullptr);
 
 	VkPhysicalDevice* DeviceList = static_cast<VkPhysicalDevice*>(Util::Memory::Allocate(DevicesCount * sizeof(VkPhysicalDevice)));
 	vkEnumeratePhysicalDevices(VulkanInstance, &DevicesCount, DeviceList);
 
-	std::vector<VkSurfaceFormatKHR> Formats;
-	VkSurfaceCapabilitiesKHR SurfaceCapabilities{};
-	VkPhysicalDevice PhysicalDevice = nullptr;
-	std::vector<VkPresentModeKHR> PresentationModes;
-	static std::vector<const char*> DeviceExtensions = {
-	VK_KHR_SWAPCHAIN_EXTENSION_NAME
-	};
-	for (uint32_t i = 0; i < DevicesCount; ++i)
-	{
-		PhysicalDevice = DeviceList[i];
+	Core::VkPhysicalDeviceSetupData VkPhysicalDeviceSetupData;
 
-		/*
-		// ID, name, type, vendor, etc
+	Core::PhysicalDeviceIndices PhysicalDeviceIndices;
+	VkSurfaceCapabilitiesKHR SurfaceCapabilities = { };
+
+	VkPhysicalDevice PhysicalDevice = nullptr;
+
+	const char* DeviceExtensions[] = {
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME
+	};
+	const uint32_t DeviceExtensionsSize = sizeof(DeviceExtensions) / sizeof(DeviceExtensions[0]);
+
+	for (uint32_t i = 0; i < DevicesCount; ++i)
+	{	
+		/* ID, name, type, vendor, etc
 		VkPhysicalDeviceProperties Properties;
 		vkGetPhysicalDeviceProperties(Device, &Properties);
 
 		// geo shader, tess shader, wide lines, etc
 		VkPhysicalDeviceFeatures Features;
-		vkGetPhysicalDeviceFeatures(Device, &Features);
-		*/
-
-		uint32_t ExtensionsCount = 0;
-		vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &ExtensionsCount, nullptr);
-
-		VkExtensionProperties* AvalibleDeviceExtensions = static_cast<VkExtensionProperties*>(Util::Memory::Allocate(ExtensionsCount * sizeof(VkExtensionProperties)));
-		vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &ExtensionsCount, AvalibleDeviceExtensions);
-
-		for (const char* Extension : DeviceExtensions)
+		vkGetPhysicalDeviceFeatures(Device, &Features); */
+		
+		if (!Core::InitVkPhysicalDeviceSetupData(VkPhysicalDeviceSetupData, DeviceList[i], Surface))
 		{
-			bool IsDeviceExtensionSupported = false;
-			for (uint32_t j = 0; j < ExtensionsCount; ++j)
-			{
-				if (std::strcmp(Extension, AvalibleDeviceExtensions[j].extensionName) == 0)
-				{
-					IsDeviceExtensionSupported = true;
-					break;
-				}
-			}
-
-			if (!IsDeviceExtensionSupported)
-			{
-				Util::Log().Error("Device extension {} unsupported", Extension);
-
-				Util::Memory::Deallocate(AvalibleDeviceExtensions);
-				Util::Memory::Deallocate(DeviceList);
-				return -1;
-			}
-		}
-
-		Util::Memory::Deallocate(AvalibleDeviceExtensions);
-
-		// TODO check function
-		// In current realization if GraphicsFamily is valid but if PresentationFamily is not valid
-		// GraphicsFamily could be overridden on next iteration even when it is valid
-		uint32_t FamilyCount = 1;
-		vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &FamilyCount, nullptr);
-
-		VkQueueFamilyProperties* FamilyProperties = static_cast<VkQueueFamilyProperties*>(Util::Memory::Allocate(FamilyCount * sizeof(VkQueueFamilyProperties)));
-		vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &FamilyCount, FamilyProperties);
-
-		for (uint32_t j = 0; j < FamilyCount; ++j)
-		{
-			// check if Queue is graphics type
-			if (FamilyProperties[j].queueCount > 0 && FamilyProperties[j].queueFlags & VK_QUEUE_GRAPHICS_BIT)
-			{
-				// if we QueueFamily[i] graphics type but not presentation type
-				// and QueueFamily[i + 1] graphics type and presentation type
-				// then we rewrite GraphicsFamily
-				// toto check what is better rewrite or have different QueueFamilys
-				GraphicsFamily = j;
-			}
-
-			// check if Queue is presentation type (can be graphics and presentation)
-			VkBool32 PresentationSupport = false;
-			vkGetPhysicalDeviceSurfaceSupportKHR(PhysicalDevice, j, Surface, &PresentationSupport);
-			if (FamilyProperties[j].queueCount > 0 && PresentationSupport)
-			{
-				PresentationFamily = j;
-			}
-
-			if (GraphicsFamily < 0 && PresentationFamily < 0)
-			{
-				// Todo walidate warning
-				Util::Log().Warning("Device does not support required indices");
-				break;
-			}
-		}
-
-		if (GraphicsFamily < 0 && PresentationFamily < 0)
-		{
-			PhysicalDevice = nullptr;
 			break;
 		}
 
-		Util::Memory::Deallocate(FamilyProperties);
-
-		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(PhysicalDevice, Surface, &SurfaceCapabilities);
-
-		uint32_t FormatCount = 0;
-		vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, Surface, &FormatCount, nullptr);
-		if (FormatCount == 0)
+		if (!Core::CheckDeviceExtensionsSupport(VkPhysicalDeviceSetupData, DeviceExtensions, DeviceExtensionsSize))
 		{
-			Util::Log().Error("FormatCount is 0");
-			PhysicalDevice = nullptr;
+			break;
 		}
 
-		Formats.resize(static_cast<size_t>(FormatCount));
-		vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, Surface, &FormatCount, Formats.data());
+		PhysicalDeviceIndices = Core::GetPhysicalDeviceIndices(VkPhysicalDeviceSetupData, DeviceList[i], Surface);
 
-		uint32_t PresentationCount = 0;
-		vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &PresentationCount, nullptr);
-		if (PresentationCount == 0)
+		if (PhysicalDeviceIndices.GraphicsFamily < 0 || PhysicalDeviceIndices.PresentationFamily < 0)
 		{
-			Util::Log().Error("PresentationCount is 0");
-			PhysicalDevice = nullptr;
-		}
-		else
-		{
-			PresentationModes.resize(static_cast<size_t>(PresentationCount));
-			vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &PresentationCount, PresentationModes.data());
+			Util::Log().Warning("PhysicalDeviceIndices are not initialized");
+			break;
 		}
 
-		if (PhysicalDevice == nullptr)
+		Result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(DeviceList[i], Surface, &SurfaceCapabilities);
+		if (Result != VK_SUCCESS)
 		{
-			Util::Memory::Deallocate(DeviceList);
-			Util::Log().Error("No physical devices found");
-			return -1;
+			Util::Log().Warning("vkGetPhysicalDeviceSurfaceCapabilitiesKHR result is {}", static_cast<int>(Result));
+			break;
 		}
+
+		PhysicalDevice = DeviceList[i];
+	}
+
+	if (PhysicalDevice == nullptr)
+	{
+		Util::Memory::Deallocate(DeviceList);
+		Core::DeinitVkPhysicalDeviceSetupData(VkPhysicalDeviceSetupData);
+		Util::Log().Error("No physical devices found");
+		return -1;
 	}
 
 	Util::Memory::Deallocate(DeviceList);
@@ -300,14 +218,14 @@ int Start()
 	uint32_t FamilyIndicesSize = 1;
 
 	QueueCreateInfos[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-	QueueCreateInfos[0].queueFamilyIndex = static_cast<uint32_t>(GraphicsFamily);
+	QueueCreateInfos[0].queueFamilyIndex = static_cast<uint32_t>(PhysicalDeviceIndices.GraphicsFamily);
 	QueueCreateInfos[0].queueCount = 1;
 	QueueCreateInfos[0].pQueuePriorities = &Priority;
 
-	if (GraphicsFamily != PresentationFamily)
+	if (PhysicalDeviceIndices.GraphicsFamily != PhysicalDeviceIndices.PresentationFamily)
 	{
 		QueueCreateInfos[1].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		QueueCreateInfos[1].queueFamilyIndex = static_cast<uint32_t>(PresentationFamily);
+		QueueCreateInfos[1].queueFamilyIndex = static_cast<uint32_t>(PhysicalDeviceIndices.PresentationFamily);
 		QueueCreateInfos[1].queueCount = 1;
 		QueueCreateInfos[1].pQueuePriorities = &Priority;
 
@@ -320,8 +238,8 @@ int Start()
 	DeviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	DeviceCreateInfo.queueCreateInfoCount = (FamilyIndicesSize);
 	DeviceCreateInfo.pQueueCreateInfos = QueueCreateInfos;
-	DeviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(DeviceExtensions.size());
-	DeviceCreateInfo.ppEnabledExtensionNames = DeviceExtensions.data();
+	DeviceCreateInfo.enabledExtensionCount = DeviceExtensionsSize;
+	DeviceCreateInfo.ppEnabledExtensionNames = DeviceExtensions;
 	DeviceCreateInfo.pEnabledFeatures = &DeviceFeatures;
 
 	// Queues are created at the same time as the device
@@ -339,8 +257,8 @@ int Start()
 	VkQueue GraphicsQueue = nullptr;
 	VkQueue PresentationQueue = nullptr;
 
-	vkGetDeviceQueue(LogicalDevice, static_cast<uint32_t>(GraphicsFamily), 0, &GraphicsQueue);
-	vkGetDeviceQueue(LogicalDevice, static_cast<uint32_t>(PresentationFamily), 0, &PresentationQueue);
+	vkGetDeviceQueue(LogicalDevice, static_cast<uint32_t>(PhysicalDeviceIndices.GraphicsFamily), 0, &GraphicsQueue);
+	vkGetDeviceQueue(LogicalDevice, static_cast<uint32_t>(PhysicalDeviceIndices.PresentationFamily), 0, &PresentationQueue);
 
 	if (GraphicsQueue == nullptr && PresentationQueue == nullptr)
 	{
@@ -352,14 +270,15 @@ int Start()
 	// Return most common format
 	VkSurfaceFormatKHR SurfaceFormat = { VK_FORMAT_UNDEFINED, static_cast<VkColorSpaceKHR>(0) };
 	// All formats avalible
-	if (Formats.size() == 1 && Formats[0].format == VK_FORMAT_UNDEFINED)
+	if (VkPhysicalDeviceSetupData.SurfaceFormatsCount == 1 && VkPhysicalDeviceSetupData.SurfaceFormats[0].format == VK_FORMAT_UNDEFINED)
 	{
 		SurfaceFormat = { VK_FORMAT_R8G8B8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
 	}
 	else
 	{
-		for (const VkSurfaceFormatKHR Format : Formats)
+		for (uint32_t i = 0; i < VkPhysicalDeviceSetupData.SurfaceFormatsCount; ++i)
 		{
+			VkSurfaceFormatKHR Format = VkPhysicalDeviceSetupData.SurfaceFormats[i];
 			if ((Format.format == VK_FORMAT_R8G8B8_UNORM || Format.format == VK_FORMAT_B8G8R8A8_UNORM)
 				&& Format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 			{
@@ -367,6 +286,7 @@ int Start()
 			}
 		}
 	}
+
 
 	if (SurfaceFormat.format == VK_FORMAT_UNDEFINED)
 	{
@@ -378,13 +298,15 @@ int Start()
 	// Function: GetBestPresentationMode
 	// Optimal presentation mode
 	VkPresentModeKHR PresentationMode = VK_PRESENT_MODE_FIFO_KHR;
-	for (const VkPresentModeKHR Mode : PresentationModes)
+	for (uint32_t i = 0; i < VkPhysicalDeviceSetupData.PresentModesCount; ++i)
 	{
-		if (Mode == VK_PRESENT_MODE_MAILBOX_KHR)
+		if (VkPhysicalDeviceSetupData.PresentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR)
 		{
 			PresentationMode = VK_PRESENT_MODE_MAILBOX_KHR;
 		}
 	}
+
+	Core::DeinitVkPhysicalDeviceSetupData(VkPhysicalDeviceSetupData);
 
 	// Has to be present by spec
 	if (PresentationMode != VK_PRESENT_MODE_MAILBOX_KHR)
@@ -438,11 +360,11 @@ int Start()
 	SwapchainCreateInfo.clipped = VK_TRUE;
 
 	uint32_t Indices[] = {
-		static_cast<uint32_t>(GraphicsFamily),
-		static_cast<uint32_t>(PresentationFamily)
+		static_cast<uint32_t>(PhysicalDeviceIndices.GraphicsFamily),
+		static_cast<uint32_t>(PhysicalDeviceIndices.PresentationFamily)
 	};
 
-	if (GraphicsFamily != PresentationFamily)
+	if (PhysicalDeviceIndices.GraphicsFamily != PhysicalDeviceIndices.PresentationFamily)
 	{
 		// Less efficient mode
 		SwapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
@@ -543,6 +465,7 @@ int Start()
 	{
 		Util::DestroyDebugMessenger(VulkanInstance, _DebugMessenger, nullptr);
 	}
+
 
 	vkDestroyInstance(VulkanInstance, nullptr);
 

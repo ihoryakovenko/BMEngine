@@ -45,7 +45,7 @@ namespace Util
 		return false;
 	}
 
-	void CreateDebugUtilsMessengerEXT(VkInstance Instance, const VkDebugUtilsMessengerCreateInfoEXT* CreateInfo,
+	bool CreateDebugUtilsMessengerEXT(VkInstance Instance, const VkDebugUtilsMessengerCreateInfoEXT* CreateInfo,
 		const VkAllocationCallbacks* Allocator, VkDebugUtilsMessengerEXT* InDebugMessenger)
 	{
 		auto CreateMessengerFunc = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(Instance, "vkCreateDebugUtilsMessengerEXT");
@@ -55,25 +55,31 @@ namespace Util
 			if (Result != VK_SUCCESS)
 			{
 				Util::Log().Error("CreateMessengerFunc result is {}", static_cast<int>(Result));
+				return false;
 			}
 		}
 		else
 		{
 			Util::Log().Error("CreateMessengerFunc is nullptr");
+			return false;
 		}
+
+		return true;
 	}
 
-	void DestroyDebugMessenger(VkInstance Instance, VkDebugUtilsMessengerEXT InDebugMessenger,
+	bool DestroyDebugMessenger(VkInstance Instance, VkDebugUtilsMessengerEXT InDebugMessenger,
 		const VkAllocationCallbacks* Allocator)
 	{
 		auto DestroyMessengerFunc = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(Instance, "vkDestroyDebugUtilsMessengerEXT");
 		if (DestroyMessengerFunc != nullptr)
 		{
 			DestroyMessengerFunc(Instance, InDebugMessenger, Allocator);
+			return true;
 		}
 		else
 		{
 			Util::Log().Error("DestroyMessengerFunc is nullptr");
+			return false;
 		}
 	}
 
