@@ -2,7 +2,7 @@
 
 namespace Util
 {
-	bool UtilHelper::ReadFileFull(FILE* File, std::vector<char>& OutFileData)
+	bool ReadFileFull(FILE* File, std::vector<char>& OutFileData)
 	{
 		_fseeki64(File, 0LL, static_cast<int>(SEEK_END));
 		const long long FileSize = _ftelli64(File);
@@ -24,7 +24,7 @@ namespace Util
 		return false;
 	}
 
-	bool UtilHelper::OpenAndReadFileFull(const char* FileName, std::vector<char>& OutFileData, const char* Mode)
+	bool OpenAndReadFileFull(const char* FileName, std::vector<char>& OutFileData, const char* Mode)
 	{
 		FILE* File = nullptr;
 		const int Result = fopen_s(&File, FileName, Mode);

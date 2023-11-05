@@ -16,17 +16,18 @@ namespace Util
 		// TODO FIX!!!
 		static std::string_view GetVertexShaderPath()
 		{
-			return "./Resources/Shaders/Shader.vert";
+			return "./Resources/Shaders/vert.spv";
 		}
 
 		static std::string_view GetFragmentShaderPath()
 		{
-			return "./Resources/Shaders/Shader.frag";
+			return "./Resources/Shaders/frag.spv";
 		}
 
-		static bool ReadFileFull(FILE* File, std::vector<char>& OutFileData);
-		static bool OpenAndReadFileFull(const char* FileName, std::vector<char>& OutFileData, const char* Mode);
 	};
+
+	bool ReadFileFull(FILE* File, std::vector<char>& OutFileData);
+	bool OpenAndReadFileFull(const char* FileName, std::vector<char>& OutFileData, const char* Mode);
 
 	struct Log
 	{
