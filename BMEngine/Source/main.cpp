@@ -379,11 +379,11 @@ int Start()
 	}
 
 	// Get swap chain images
-	uint32_t SwapchainImageCount = 0;
-	vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &SwapchainImageCount, nullptr);
+	uint32_t SwapchainImagesCount = 0;
+	vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &SwapchainImagesCount, nullptr);
 
-	VkImage* Images = static_cast<VkImage*>(Util::Memory::Allocate(SwapchainImageCount * sizeof(VkImage)));
-	vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &SwapchainImageCount, Images);
+	VkImage* Images = static_cast<VkImage*>(Util::Memory::Allocate(SwapchainImagesCount * sizeof(VkImage)));
+	vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &SwapchainImagesCount, Images);
 
 	VkImageViewCreateInfo ViewCreateInfo = {};
 	ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -402,12 +402,12 @@ int Start()
 	ViewCreateInfo.subresourceRange.baseArrayLayer = 0;
 	ViewCreateInfo.subresourceRange.layerCount = 1;
 
-	VkImageView* ImageViews = static_cast<VkImageView*>(Util::Memory::Allocate(SwapchainImageCount * sizeof(VkImageView)));
+	VkImageView* ImageViews = static_cast<VkImageView*>(Util::Memory::Allocate(SwapchainImagesCount * sizeof(VkImageView)));
 
-	for (uint32_t i = 0; i < SwapchainImageCount; ++i)
+	for (uint32_t i = 0; i < SwapchainImagesCount; ++i)
 	{
 		ViewCreateInfo.image = Images[i];
-
+		
 		VkImageView ImageView;
 		Result = vkCreateImageView(LogicalDevice, &ViewCreateInfo, nullptr, &ImageView);
 		if (Result != VK_SUCCESS)
@@ -417,7 +417,7 @@ int Start()
 			Util::Memory::Deallocate(ImageViews);
 			return -1;
 		}
-
+		
 		ImageViews[i] = ImageView;
 	}
 
@@ -686,17 +686,142 @@ int Start()
 	vkDestroyShaderModule(LogicalDevice, VertexShaderModule, nullptr);
 	// Function end: CreateGraphicsPipeline
 
+	VkFramebuffer* SwapchainFramebuffers = static_cast<VkFramebuffer*>(Util::Memory::Allocate(SwapchainImagesCount * sizeof(VkFramebuffer)));
+
+	// Function CreateFrameBuffers
+	// Create a framebuffer for each swap chain image
+	for (uint32_t i = 0; i < SwapchainImagesCount; i++)
+	{
+		const uint32_t AttachmentsCount = 1;
+		VkImageView Attachments[AttachmentsCount] = {
+			ImageViews[i]
+		};
+
+		VkFramebufferCreateInfo FramebufferCreateInfo = {};
+		FramebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		FramebufferCreateInfo.renderPass = RenderPass;								// Render Pass layout the Framebuffer will be used with
+		FramebufferCreateInfo.attachmentCount = AttachmentsCount;
+		FramebufferCreateInfo.pAttachments = Attachments;							// List of attachments (1:1 with Render Pass)
+		FramebufferCreateInfo.width = SwapExtent.width;								// Framebuffer width
+		FramebufferCreateInfo.height = SwapExtent.height;							// Framebuffer height
+		FramebufferCreateInfo.layers = 1;											// Framebuffer layers
+
+		Result = vkCreateFramebuffer(LogicalDevice, &FramebufferCreateInfo, nullptr, &SwapchainFramebuffers[i]);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkCreateFramebuffer result is {}", static_cast<int>(Result));
+			return -1;
+		}
+	}
+	// Function end CreateFrameBuffers
+
+	// Function CreateCommandPool
+	VkCommandPoolCreateInfo PoolInfo = {};
+	PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	PoolInfo.queueFamilyIndex = PhysicalDeviceIndices.GraphicsFamily;	// Queue Family type that buffers from this command pool will use
+
+	VkCommandPool GraphicsCommandPool = nullptr;
+	// Create a Graphics Queue Family Command Pool
+	Result = vkCreateCommandPool(LogicalDevice, &PoolInfo, nullptr, &GraphicsCommandPool);
+	if (Result != VK_SUCCESS)
+	{
+		Util::Log().Error("vkCreateCommandPool result is {}", static_cast<int>(Result));
+		return -1;
+	}
+	// Function end CreateCommandPool
+
+	// Function CreateCommandBuffers
+	VkCommandBufferAllocateInfo CommandBufferAllocateInfo = {};
+	CommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	CommandBufferAllocateInfo.commandPool = GraphicsCommandPool;
+	CommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;	// VK_COMMAND_BUFFER_LEVEL_PRIMARY	: Buffer you submit directly to queue. Cant be called by other buffers.
+	// VK_COMMAND_BUFFER_LEVEL_SECONARY	: Buffer can't be called directly. Can be called from other buffers via "vkCmdExecuteCommands" when recording commands in primary buffer
+	CommandBufferAllocateInfo.commandBufferCount = static_cast<uint32_t>(SwapchainImagesCount);
+
+	// Allocate command buffers and place handles in array of buffers
+	VkCommandBuffer* CommandBuffers = static_cast<VkCommandBuffer*>(Util::Memory::Allocate(SwapchainImagesCount * sizeof(VkCommandBuffer)));
+	Result = vkAllocateCommandBuffers(LogicalDevice, &CommandBufferAllocateInfo, CommandBuffers);
+	if (Result != VK_SUCCESS)
+	{
+		Util::Log().Error("vkAllocateCommandBuffers result is {}", static_cast<int>(Result));
+		return -1;
+	}
+	// Function end CreateCommandBuffers
+
+	// Function RecordCommands
+	// Information about how to begin each command buffer
+	VkCommandBufferBeginInfo CommandBufferBeginInfo = {};
+	CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	CommandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;	// Buffer can be resubmitted when it has already been submitted and is awaiting execution
+
+	// Information about how to begin a render pass (only needed for graphical applications)
+	VkRenderPassBeginInfo RenderPassBeginInfo = {};
+	RenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	RenderPassBeginInfo.renderPass = RenderPass;							// Render Pass to begin
+	RenderPassBeginInfo.renderArea.offset = { 0, 0 };						// Start point of render pass in pixels
+	RenderPassBeginInfo.renderArea.extent = SwapExtent;				// Size of region to run render pass on (starting at offset)
+
+	const uint32_t ClearValuesSize = 1;
+	VkClearValue ClearValues[ClearValuesSize] = {
+		{0.6f, 0.65f, 0.4f, 1.0f}
+	};
+	RenderPassBeginInfo.pClearValues = ClearValues;							// List of clear values (TODO: Depth Attachment Clear Value)
+	RenderPassBeginInfo.clearValueCount = ClearValuesSize;
+
+	for (uint32_t i = 0; i < SwapchainImagesCount; i++)
+	{
+		RenderPassBeginInfo.framebuffer = SwapchainFramebuffers[i];
+
+		// Start recording commands to command buffer!
+		Result = vkBeginCommandBuffer(CommandBuffers[i], &CommandBufferBeginInfo);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkBeginCommandBuffer result is {}", static_cast<int>(Result));
+			return -1;
+		}
+
+		// Begin Render Pass
+		vkCmdBeginRenderPass(CommandBuffers[i], &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+		// Bind Pipeline to be used in render pass
+		vkCmdBindPipeline(CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicsPipeline);
+
+		// Execute pipeline
+		vkCmdDraw(CommandBuffers[i], 3, 1, 0, 0);
+
+		// End Render Pass
+		vkCmdEndRenderPass(CommandBuffers[i]);
+
+		// Stop recording to command buffer
+		Result = vkEndCommandBuffer(CommandBuffers[i]);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkBeginCommandBuffer result is {}", static_cast<int>(Result));
+		}
+	}
+	// Function end RecordCommands
+
 	while (!glfwWindowShouldClose(Window))
 	{
 		glfwPollEvents();
 	}
 
+	Util::Memory::Deallocate(CommandBuffers);
+
+	vkDestroyCommandPool(LogicalDevice, GraphicsCommandPool, nullptr);
+
+	for (uint32_t i = 0; i < SwapchainImagesCount; i++)
+	{
+		vkDestroyFramebuffer(LogicalDevice, SwapchainFramebuffers[i], nullptr);
+	}
+
+	Util::Memory::Deallocate(SwapchainFramebuffers);
+
 	vkDestroyPipeline(LogicalDevice, GraphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
 	vkDestroyRenderPass(LogicalDevice, RenderPass, nullptr);
 
-	// TODO: add destroing to invalid initialization
-	for (uint32_t i = 0; i < SwapchainImageCount; ++i)
+	for (uint32_t i = 0; i < SwapchainImagesCount; ++i)
 	{
 		vkDestroyImageView(LogicalDevice, ImageViews[i], nullptr);
 	}
@@ -734,9 +859,9 @@ int main()
 
 	glfwTerminate();
 
-	if (Util::Memory::AlocateCounter != 0)
+	if (Util::Memory::AllocateCounter != 0)
 	{
-		Util::Log().Error("AlocateCounter in not equal 0, counter is {}", Util::Memory::AlocateCounter);
+		Util::Log().Error("AllocateCounter in not equal 0, counter is {}", Util::Memory::AllocateCounter);
 		assert(false);
 	}
 

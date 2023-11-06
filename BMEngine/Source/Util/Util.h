@@ -89,12 +89,12 @@ namespace Util
 
 	struct Memory
 	{
-		static inline int AlocateCounter = 0;
+		static inline int AllocateCounter = 0;
 
 		static void* Allocate(size_t Size)
 		{
 #ifndef NDEBUG
-			++AlocateCounter;
+			++AllocateCounter;
 #endif
 			return std::malloc(Size);
 		}
@@ -102,7 +102,7 @@ namespace Util
 		static void Deallocate(void* Ptr)
 		{
 #ifndef NDEBUG
-			--AlocateCounter;
+			--AllocateCounter;
 #endif
 			std::free(Ptr);
 		}
