@@ -752,8 +752,7 @@ int Start()
 	// Information about how to begin each command buffer
 	VkCommandBufferBeginInfo CommandBufferBeginInfo = {};
 	CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	CommandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;	// Buffer can be resubmitted when it has already been submitted and is awaiting execution
-
+	
 	// Information about how to begin a render pass (only needed for graphical applications)
 	VkRenderPassBeginInfo RenderPassBeginInfo = {};
 	RenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -797,14 +796,106 @@ int Start()
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkBeginCommandBuffer result is {}", static_cast<int>(Result));
+			return -1;
 		}
 	}
 	// Function end RecordCommands
 
+	const int MaxFrameDraws = 2;
+	int CurrentFrame = 0;
+
+	// Function CreateSynchronisation
+	VkSemaphore* ImageAvalible = static_cast<VkSemaphore*>(Util::Memory::Allocate(MaxFrameDraws * sizeof(VkSemaphore)));
+	VkSemaphore* RenderFinished = static_cast<VkSemaphore*>(Util::Memory::Allocate(MaxFrameDraws * sizeof(VkSemaphore)));
+	VkFence* DrawFences = static_cast<VkFence*>(Util::Memory::Allocate(MaxFrameDraws * sizeof(VkFence)));
+
+	VkSemaphoreCreateInfo SemaphoreCreateInfo = {};
+	SemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+	// Fence creation information
+	VkFenceCreateInfo FenceCreateInfo = {};
+	FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+	for (size_t i = 0; i < MaxFrameDraws; i++)
+	{
+		if (vkCreateSemaphore(LogicalDevice, &SemaphoreCreateInfo, nullptr, &ImageAvalible[i]) != VK_SUCCESS ||
+			vkCreateSemaphore(LogicalDevice, &SemaphoreCreateInfo, nullptr, &RenderFinished[i]) != VK_SUCCESS ||
+			vkCreateFence(LogicalDevice, &FenceCreateInfo, nullptr, &DrawFences[i]) != VK_SUCCESS)
+		{
+			Util::Log().Error("CreateSynchronisation error");
+			return -1;
+		}
+	}
+
+	// Function end CreateSynchronisation
+
 	while (!glfwWindowShouldClose(Window))
 	{
 		glfwPollEvents();
+
+		vkWaitForFences(LogicalDevice, 1, &DrawFences[CurrentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
+		vkResetFences(LogicalDevice, 1, &DrawFences[CurrentFrame]);
+
+		// Get index of next image to be drawn to, and signal semaphore when ready to be drawn to
+		uint32_t ImageIndex;
+		vkAcquireNextImageKHR(LogicalDevice, VulkanSwapchain, std::numeric_limits<uint64_t>::max(), ImageAvalible[CurrentFrame], VK_NULL_HANDLE, &ImageIndex);
+
+		// -- SUBMIT COMMAND BUFFER TO RENDER --
+		// Queue submission information
+		VkSubmitInfo submitInfo = {};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submitInfo.waitSemaphoreCount = 1;										// Number of semaphores to wait on
+		submitInfo.pWaitSemaphores = &ImageAvalible[CurrentFrame];				// List of semaphores to wait on
+		VkPipelineStageFlags waitStages[] = {
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+		};
+		submitInfo.pWaitDstStageMask = waitStages;						// Stages to check semaphores at
+		submitInfo.commandBufferCount = 1;								// Number of command buffers to submit
+		submitInfo.pCommandBuffers = &CommandBuffers[ImageIndex];		// Command buffer to submit
+		submitInfo.signalSemaphoreCount = 1;							// Number of semaphores to signal
+		submitInfo.pSignalSemaphores = &RenderFinished[CurrentFrame];	// Semaphores to signal when command buffer finishes
+
+		// Submit command buffer to queue
+		Result = vkQueueSubmit(GraphicsQueue, 1, &submitInfo, DrawFences[CurrentFrame]);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkQueueSubmit result is {}", static_cast<int>(Result));
+			return -1;
+		}
+
+		// -- PRESENT RENDERED IMAGE TO SCREEN --
+		VkPresentInfoKHR presentInfo = {};
+		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+		presentInfo.waitSemaphoreCount = 1;										// Number of semaphores to wait on
+		presentInfo.pWaitSemaphores = &RenderFinished[CurrentFrame];			// Semaphores to wait on
+		presentInfo.swapchainCount = 1;											// Number of swapchains to present to
+		presentInfo.pSwapchains = &VulkanSwapchain;									// Swapchains to present images to
+		presentInfo.pImageIndices = &ImageIndex;								// Index of images in swapchains to present
+
+		// Present image
+		Result = vkQueuePresentKHR(PresentationQueue, &presentInfo);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkQueuePresentKHR result is {}", static_cast<int>(Result));
+			return -1;
+		}
+
+		CurrentFrame = (CurrentFrame + 1) % MaxFrameDraws;
 	}
+
+	vkDeviceWaitIdle(LogicalDevice);
+
+	for (size_t i = 0; i < MaxFrameDraws; i++)
+	{
+		vkDestroySemaphore(LogicalDevice, RenderFinished[i], nullptr);
+		vkDestroySemaphore(LogicalDevice, ImageAvalible[i], nullptr);
+		vkDestroyFence(LogicalDevice, DrawFences[i], nullptr);
+	}
+
+	Util::Memory::Deallocate(DrawFences);
+	Util::Memory::Deallocate(RenderFinished);
+	Util::Memory::Deallocate(ImageAvalible);
 
 	Util::Memory::Deallocate(CommandBuffers);
 
