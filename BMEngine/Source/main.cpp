@@ -13,18 +13,14 @@
 
 #include "Core/VulkanCoreTypes.h"
 
-static const char* ValidationLayers[] = {
-	"VK_LAYER_KHRONOS_validation"
-};
-static constexpr uint32_t ValidationLayersSize = sizeof(ValidationLayers) / sizeof(ValidationLayers[0]);
-
-static inline VkDebugUtilsMessengerEXT _DebugMessenger;
-
 int Start()
 {
+	// INSTANCE CREATION
+
 	const char* ValidationExtensions[] = {
-		VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+	VK_EXT_DEBUG_UTILS_EXTENSION_NAME
 	};
+
 	const uint32_t ValidationExtensionsSize = Util::EnableValidationLayers ? sizeof(ValidationExtensions) / sizeof(ValidationExtensions[0]) : 0;
 
 	Core::VkInstanceCreateInfoSetupData InstanceCreateInfoData;
@@ -39,7 +35,6 @@ int Start()
 		return -1;
 	}
 
-	// Function: CreateInstance
 	VkApplicationInfo ApplicationInfo = { };
 	ApplicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	ApplicationInfo.pApplicationName = "Blank App";
@@ -48,21 +43,9 @@ int Start()
 	ApplicationInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0); // todo set from settings
 	ApplicationInfo.apiVersion = VK_API_VERSION_1_3;
 
-	// CreateInfo info initialization
 	VkInstanceCreateInfo CreateInfo = { };
 	CreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	CreateInfo.pApplicationInfo = &ApplicationInfo;
-
-	if (Util::EnableValidationLayers)
-	{
-		CreateInfo.enabledExtensionCount = InstanceCreateInfoData.RequiredAndValidationExtensionsCount;
-		CreateInfo.ppEnabledExtensionNames = InstanceCreateInfoData.RequiredAndValidationExtensions;
-	}
-	else
-	{
-		CreateInfo.enabledExtensionCount = InstanceCreateInfoData.RequiredExtensionsCount;
-		CreateInfo.ppEnabledExtensionNames = InstanceCreateInfoData.RequiredInstanceExtensions;
-	}
 
 	VkDebugUtilsMessengerCreateInfoEXT MessengerCreateInfo = { };
 
@@ -78,27 +61,27 @@ int Start()
 		MessengerCreateInfo.pfnUserCallback = Util::MessengerDebugCallback;
 		MessengerCreateInfo.pUserData = nullptr;
 
-		CreateInfo.pNext = &MessengerCreateInfo;
-	}
-	else
-	{
-		CreateInfo.pNext = nullptr;
-	}
+		const char* ValidationLayers[] = {
+			"VK_LAYER_KHRONOS_validation"
+		};
+		const uint32_t ValidationLayersSize = sizeof(ValidationLayers) / sizeof(ValidationLayers[0]);
 
-	// Function: GetEnabledValidationLayers 
-	if (Util::EnableValidationLayers)
-	{
 		Core::CheckValidationLayersSupport(InstanceCreateInfoData, ValidationLayers, ValidationLayersSize);
 
+		CreateInfo.enabledExtensionCount = InstanceCreateInfoData.RequiredAndValidationExtensionsCount;
+		CreateInfo.ppEnabledExtensionNames = InstanceCreateInfoData.RequiredAndValidationExtensions;
+		CreateInfo.pNext = &MessengerCreateInfo;
 		CreateInfo.enabledLayerCount = ValidationLayersSize;
 		CreateInfo.ppEnabledLayerNames = ValidationLayers;
 	}
 	else
 	{
+		CreateInfo.enabledExtensionCount = InstanceCreateInfoData.RequiredExtensionsCount;
+		CreateInfo.ppEnabledExtensionNames = InstanceCreateInfoData.RequiredInstanceExtensions;
 		CreateInfo.ppEnabledLayerNames = nullptr;
 		CreateInfo.enabledLayerCount = 0;
+		CreateInfo.pNext = nullptr;
 	}
-	// Function end: GetEnabledValidationLayers 
 
 	VkInstance VulkanInstance = nullptr;
 	VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &VulkanInstance);
@@ -111,12 +94,14 @@ int Start()
 	}
 
 	Core::DeinitVkInstanceCreateInfoSetupData(InstanceCreateInfoData);
-	// Function end: CreateInstance
 
+	VkDebugUtilsMessengerEXT DebugMessenger = nullptr;
 	if (Util::EnableValidationLayers)
 	{
-		Util::CreateDebugUtilsMessengerEXT(VulkanInstance, &MessengerCreateInfo, nullptr, &_DebugMessenger);
+		Util::CreateDebugUtilsMessengerEXT(VulkanInstance, &MessengerCreateInfo, nullptr, &DebugMessenger);
 	}
+
+	// INSTANCE CREATION END
 
 	GLFWwindow* Window = glfwCreateWindow(800, 600, "BMEngine", nullptr, nullptr);
 	if (Window == nullptr)
@@ -240,8 +225,76 @@ int Start()
 		Util::Log().Error("vkCreateDevice result is {}", static_cast<int>(Result));
 		return -1;
 	}
-
 	// Function end: CreateLogicalDevice
+
+	// Mesh
+	const uint32_t MeshVerticesCount = 3;
+	Core::Vertex MeshVertices[MeshVerticesCount] = {
+		{{0.4, -0.4, 0.0}, {1.0f, 0.0f, 0.0f}},
+		{{0.4, 0.4, 0.0}, {0.0f, 1.0f, 0.0f}},
+		{{-0.4, 0.4, 0.0}, {0.0f, 0.0f, 1.0f}}
+	};
+
+	// CREATE VERTEX BUFFER
+	// Information to create a buffer (doesn't include assigning memory)
+	VkBufferCreateInfo BufferCreateInfo = {};
+	BufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	BufferCreateInfo.size = sizeof(Core::Vertex) * MeshVerticesCount;		// Size of buffer (size of 1 vertex * number of vertices)
+	BufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;		// Multiple types of buffer possible, we want Vertex Buffer
+	BufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;			// Similar to Swap Chain images, can share vertex buffers
+
+	VkBuffer VertexBuffer = nullptr;
+	Result = vkCreateBuffer(LogicalDevice, &BufferCreateInfo, nullptr, &VertexBuffer);
+	if (Result != VK_SUCCESS)
+	{
+		return -1;
+	}
+
+	// GET BUFFER MEMORY REQUIREMENTS
+	VkMemoryRequirements MemoryRequirements;
+	vkGetBufferMemoryRequirements(LogicalDevice, VertexBuffer, &MemoryRequirements);
+
+	// Function FindMemoryTypeIndex
+	VkPhysicalDeviceMemoryProperties MemoryProperties;
+	vkGetPhysicalDeviceMemoryProperties(PhysicalDevice, &MemoryProperties);
+
+	const VkMemoryPropertyFlags MemoryPropertyFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT; // VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT	: CPU can interact with memory
+	// VK_MEMORY_PROPERTY_HOST_COHERENT_BIT	: Allows placement of data straight into buffer after mapping (otherwise would have to specify manually)
+
+	uint32_t MemoryTypeIndex = 0;
+	for (; MemoryTypeIndex < MemoryProperties.memoryTypeCount; MemoryTypeIndex++)
+	{
+		if ((MemoryRequirements.memoryTypeBits & (1 << MemoryTypeIndex))														// Index of memory type must match corresponding bit in allowedTypes
+			&& (MemoryProperties.memoryTypes[MemoryTypeIndex].propertyFlags & MemoryPropertyFlags) == MemoryPropertyFlags)	// Desired property bit flags are part of memory type's property flags
+		{
+			// This memory type is valid, so return its index
+			break;
+		}
+	}
+	// Function end FindMemoryTypeIndex
+
+	// ALLOCATE MEMORY TO BUFFER
+	VkMemoryAllocateInfo memoryAllocInfo = {};
+	memoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	memoryAllocInfo.allocationSize = MemoryRequirements.size;
+	memoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;		// Index of memory type on Physical Device that has required bit flags			
+	
+	VkDeviceMemory VertexBufferMemory = nullptr;
+	Result = vkAllocateMemory(LogicalDevice, &memoryAllocInfo, nullptr, &VertexBufferMemory);
+	if (Result != VK_SUCCESS)
+	{
+		return -1;
+	}
+
+	// Allocate memory to given vertex buffer
+	vkBindBufferMemory(LogicalDevice, VertexBuffer, VertexBufferMemory, 0);
+
+	// MAP MEMORY TO VERTEX BUFFER
+	void* data;																// 1. Create pointer to a point in normal memory
+	vkMapMemory(LogicalDevice, VertexBufferMemory, 0, BufferCreateInfo.size, 0, &data);		// 2. "Map" the vertex buffer memory to that point
+	memcpy(data, MeshVertices, (size_t)(BufferCreateInfo.size));					// 3. Copy memory from vertices vector to the point
+	vkUnmapMemory(LogicalDevice, VertexBufferMemory);									// 4. Unmap the vertex buffer memory
+	// Mesh
 
 	// Function: SetupQueues
 	VkQueue GraphicsQueue = nullptr;
@@ -546,13 +599,37 @@ int Start()
 	const uint32_t ShaderStagesCount = 2;
 	VkPipelineShaderStageCreateInfo ShaderStages[ShaderStagesCount] = { VertexShaderCreateInfo , FragmentShaderCreateInfo };
 
+	// How the data for a single vertex (including info such as position, colour, texture coords, normals, etc) is as a whole
+	VkVertexInputBindingDescription VertexInputBindingDescription = {};
+	VertexInputBindingDescription.binding = 0;									// Can bind multiple streams of data, this defines which one
+	VertexInputBindingDescription.stride = sizeof(Core::Vertex);						// Size of a single vertex object
+	VertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;		// How to move between data after each vertex.
+	// VK_VERTEX_INPUT_RATE_INDEX		: Move on to the next vertex
+	// VK_VERTEX_INPUT_RATE_INSTANCE	: Move to a vertex for the next instance
+
+	// How the data for an attribute is defined within a vertex
+	const uint32_t VertexInputBindingDescriptionCount = 2;
+	VkVertexInputAttributeDescription AttributeDescriptions[VertexInputBindingDescriptionCount];
+
+	// Position Attribute
+	AttributeDescriptions[0].binding = 0;							// Which binding the data is at (should be same as above)
+	AttributeDescriptions[0].location = 0;							// Location in shader where data will be read from
+	AttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;	// Format the data will take (also helps define size of data)
+	AttributeDescriptions[0].offset = offsetof(Core::Vertex, Position);		// Where this attribute is defined in the data for a single vertex
+
+	// Colour Attribute
+	AttributeDescriptions[1].binding = 0;
+	AttributeDescriptions[1].location = 1;
+	AttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+	AttributeDescriptions[1].offset = offsetof(Core::Vertex, Color);
+
 	// Vertex input
 	VkPipelineVertexInputStateCreateInfo VertexInputCreateInfo = {};
 	VertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	VertexInputCreateInfo.vertexBindingDescriptionCount = 0;
-	VertexInputCreateInfo.pVertexBindingDescriptions = nullptr;
-	VertexInputCreateInfo.vertexAttributeDescriptionCount = 0;
-	VertexInputCreateInfo.pVertexAttributeDescriptions = nullptr;
+	VertexInputCreateInfo.vertexBindingDescriptionCount = 1;
+	VertexInputCreateInfo.pVertexBindingDescriptions = &VertexInputBindingDescription;
+	VertexInputCreateInfo.vertexAttributeDescriptionCount = VertexInputBindingDescriptionCount;
+	VertexInputCreateInfo.pVertexAttributeDescriptions = AttributeDescriptions;
 
 	// Inputassembly
 	VkPipelineInputAssemblyStateCreateInfo InputAssemblyStateCreateInfo = {};
@@ -785,8 +862,14 @@ int Start()
 		// Bind Pipeline to be used in render pass
 		vkCmdBindPipeline(CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicsPipeline);
 
+
+		VkBuffer VertexBuffers[] = { VertexBuffer };					// Buffers to bind
+		VkDeviceSize Offsets[] = { 0 };												// Offsets into buffers being bound
+		vkCmdBindVertexBuffers(CommandBuffers[i], 0, 1, VertexBuffers, Offsets);	// Command to bind vertex buffer before drawing with them
+
+
 		// Execute pipeline
-		vkCmdDraw(CommandBuffers[i], 3, 1, 0, 0);
+		vkCmdDraw(CommandBuffers[i], MeshVerticesCount, 1, 0, 0);
 
 		// End Render Pass
 		vkCmdEndRenderPass(CommandBuffers[i]);
@@ -886,6 +969,9 @@ int Start()
 
 	vkDeviceWaitIdle(LogicalDevice);
 
+	vkDestroyBuffer(LogicalDevice, VertexBuffer, nullptr);
+	vkFreeMemory(LogicalDevice, VertexBufferMemory, nullptr);
+
 	for (size_t i = 0; i < MaxFrameDraws; i++)
 	{
 		vkDestroySemaphore(LogicalDevice, RenderFinished[i], nullptr);
@@ -925,7 +1011,7 @@ int Start()
 
 	if (Util::EnableValidationLayers)
 	{
-		Util::DestroyDebugMessenger(VulkanInstance, _DebugMessenger, nullptr);
+		Util::DestroyDebugMessenger(VulkanInstance, DebugMessenger, nullptr);
 	}
 
 	vkDestroyInstance(VulkanInstance, nullptr);
@@ -946,7 +1032,7 @@ int main()
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-	const int Result = Start();
+	int Result = Start();
 
 	glfwTerminate();
 

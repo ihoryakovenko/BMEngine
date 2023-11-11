@@ -2,6 +2,7 @@
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
 
 namespace Core
 {
@@ -60,4 +61,10 @@ namespace Core
 
 	PhysicalDeviceIndices GetPhysicalDeviceIndices(const VkPhysicalDeviceSetupData& Data, VkPhysicalDevice PhysicalDevice,
 		VkSurfaceKHR Surface);
+
+	struct Vertex
+	{
+		glm::vec3 Position;
+		glm::vec3 Color;
+	};
 }
