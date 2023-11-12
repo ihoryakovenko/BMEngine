@@ -75,10 +75,24 @@ namespace Core
 		VkDeviceMemory VertexBufferMemory = nullptr;
 	};
 
-	struct VulkanRenderInstance
+	bool CreateVulkanBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, VkDeviceSize BufferSize,
+		VkBufferUsageFlags BufferUsage, VkMemoryPropertyFlags BufferProperties, VkBuffer& OutBuffer, VkDeviceMemory& OutBufferMemory);
+
+	void CopyBuffer(VkDevice LogicalDevice, VkQueue TransferQueue, VkCommandPool TransferCommandPool, VkBuffer SourceBuffer,
+		VkBuffer DstinationBuffer, VkDeviceSize BufferSize);
+
+	struct MainInstance
 	{
 		VkInstance VulkanInstance = nullptr;
 		VkDebugUtilsMessengerEXT DebugMessenger = nullptr;
+	};
+
+	bool InitMainInstance(MainInstance& Instance, bool IsValidationLayersEnabled);
+	void DeinitMainInstance(MainInstance& Instance);
+
+	struct VulkanRenderInstance
+	{
+		VkInstance VulkanInstance = nullptr;
 
 		GLFWwindow* Window = nullptr;
 		VkSurfaceKHR Surface = nullptr;
@@ -114,7 +128,7 @@ namespace Core
 		VkFence* DrawFences = nullptr;
 	};
 
-	bool InitVulkanRenderInstance(VulkanRenderInstance& RenderInstance);
+	bool InitVulkanRenderInstance(VulkanRenderInstance& RenderInstance, VkInstance VulkanInstance, GLFWwindow* Window);
 	bool LoadVertices(VulkanRenderInstance& RenderInstance, Vertex* MeshVertices, uint32_t MeshVerticesCount);
 	bool RecordCommands(VulkanRenderInstance& RenderInstance);
 	bool Draw(VulkanRenderInstance& RenderInstance);

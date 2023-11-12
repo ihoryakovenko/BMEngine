@@ -225,18 +225,119 @@ namespace Core
 		return Indices;
 	}
 
-	bool InitVulkanRenderInstance(VulkanRenderInstance& RenderInstance)
+	bool CreateVulkanBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, VkDeviceSize BufferSize, VkBufferUsageFlags BufferUsage,
+		VkMemoryPropertyFlags BufferProperties, VkBuffer& OutBuffer, VkDeviceMemory& OutBufferMemory)
 	{
-		// INSTANCE CREATION
+		VkBufferCreateInfo BufferCreateInfo = {};
+		BufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		BufferCreateInfo.size = BufferSize;		// Size of buffer (size of 1 vertex * number of vertices)
+		BufferCreateInfo.usage = BufferUsage;		// Multiple types of buffer possible, we want Vertex Buffer
+		BufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;			// Similar to Swap Chain images, can share vertex buffers
 
+		VkResult Result = vkCreateBuffer(LogicalDevice, &BufferCreateInfo, nullptr, &OutBuffer);
+		if (Result != VK_SUCCESS)
+		{
+			return false;
+		}
+
+		// GET BUFFER MEMORY REQUIREMENTS
+		VkMemoryRequirements MemoryRequirements;
+		vkGetBufferMemoryRequirements(LogicalDevice, OutBuffer, &MemoryRequirements);
+
+		// Function FindMemoryTypeIndex
+		VkPhysicalDeviceMemoryProperties MemoryProperties;
+		vkGetPhysicalDeviceMemoryProperties(PhysicalDevice, &MemoryProperties);
+
+		uint32_t MemoryTypeIndex = 0;
+		for (; MemoryTypeIndex < MemoryProperties.memoryTypeCount; MemoryTypeIndex++)
+		{
+			if ((MemoryRequirements.memoryTypeBits & (1 << MemoryTypeIndex))														// Index of memory type must match corresponding bit in allowedTypes
+				&& (MemoryProperties.memoryTypes[MemoryTypeIndex].propertyFlags & BufferProperties) == BufferProperties)	// Desired property bit flags are part of memory type's property flags
+			{
+				// This memory type is valid, so return its index
+				break;
+			}
+		}
+		// Function end FindMemoryTypeIndex
+
+		// ALLOCATE MEMORY TO BUFFER
+		VkMemoryAllocateInfo MemoryAllocInfo = {};
+		MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		MemoryAllocInfo.allocationSize = MemoryRequirements.size;
+		MemoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;		// Index of memory type on Physical Device that has required bit flags			
+
+		Result = vkAllocateMemory(LogicalDevice, &MemoryAllocInfo, nullptr, &OutBufferMemory);
+		if (Result != VK_SUCCESS)
+		{
+			return false;
+		}
+
+		// Allocate memory to given vertex buffer
+		vkBindBufferMemory(LogicalDevice, OutBuffer, OutBufferMemory, 0);
+
+		return true;
+	}
+
+	void CopyBuffer(VkDevice LogicalDevice, VkQueue TransferQueue, VkCommandPool TransferCommandPool, VkBuffer SourceBuffer,
+		VkBuffer DstinationBuffer, VkDeviceSize BufferSize)
+	{
+		// Command buffer to hold transfer commands
+		VkCommandBuffer TransferCommandBuffer;
+
+		// Command Buffer details
+		VkCommandBufferAllocateInfo AllocInfo = {};
+		AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		AllocInfo.commandPool = TransferCommandPool;
+		AllocInfo.commandBufferCount = 1;
+
+		// Allocate command buffer from pool
+		vkAllocateCommandBuffers(LogicalDevice, &AllocInfo, &TransferCommandBuffer);
+
+		// Information to begin the command buffer record
+		VkCommandBufferBeginInfo BeginInfo = {};
+		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;	// We're only using the command buffer once, so set up for one time submit
+
+		// Begin recording transfer commands
+		vkBeginCommandBuffer(TransferCommandBuffer, &BeginInfo);
+
+		// Region of data to copy from and to
+		VkBufferCopy bufferCopyRegion = {};
+		bufferCopyRegion.srcOffset = 0;
+		bufferCopyRegion.dstOffset = 0;
+		bufferCopyRegion.size = BufferSize;
+
+		// Command to copy src buffer to dst buffer
+		vkCmdCopyBuffer(TransferCommandBuffer, SourceBuffer, DstinationBuffer, 1, &bufferCopyRegion);
+
+		// End commands
+		vkEndCommandBuffer(TransferCommandBuffer);
+
+		// Queue submission information
+		VkSubmitInfo submitInfo = {};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &TransferCommandBuffer;
+
+		// Submit transfer command to transfer queue and wait until it finishes
+		vkQueueSubmit(TransferQueue, 1, &submitInfo, VK_NULL_HANDLE);
+		vkQueueWaitIdle(TransferQueue);
+
+		// Free temporary command buffer back to pool
+		vkFreeCommandBuffers(LogicalDevice, TransferCommandPool, 1, &TransferCommandBuffer);
+	}
+
+	bool InitMainInstance(MainInstance& Instance, bool IsValidationLayersEnabled)
+	{
 		const char* ValidationExtensions[] = {
 		VK_EXT_DEBUG_UTILS_EXTENSION_NAME
 		};
 
-		const uint32_t ValidationExtensionsSize = Util::EnableValidationLayers ? sizeof(ValidationExtensions) / sizeof(ValidationExtensions[0]) : 0;
+		const uint32_t ValidationExtensionsSize = IsValidationLayersEnabled ? sizeof(ValidationExtensions) / sizeof(ValidationExtensions[0]) : 0;
 
 		Core::VkInstanceCreateInfoSetupData InstanceCreateInfoData;
-		if (!Core::InitVkInstanceCreateInfoSetupData(InstanceCreateInfoData, ValidationExtensions, ValidationExtensionsSize, Util::EnableValidationLayers))
+		if (!Core::InitVkInstanceCreateInfoSetupData(InstanceCreateInfoData, ValidationExtensions, ValidationExtensionsSize, IsValidationLayersEnabled))
 		{
 			return false;
 		}
@@ -261,7 +362,7 @@ namespace Core
 
 		VkDebugUtilsMessengerCreateInfoEXT MessengerCreateInfo = { };
 
-		if (Util::EnableValidationLayers)
+		if (IsValidationLayersEnabled)
 		{
 			MessengerCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
 			MessengerCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
@@ -295,7 +396,7 @@ namespace Core
 			CreateInfo.pNext = nullptr;
 		}
 
-		VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &RenderInstance.VulkanInstance);
+		VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &Instance.VulkanInstance);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkCreateInstance result is {}", static_cast<int>(Result));
@@ -306,19 +407,28 @@ namespace Core
 
 		Core::DeinitVkInstanceCreateInfoSetupData(InstanceCreateInfoData);
 
-		if (Util::EnableValidationLayers)
+		if (IsValidationLayersEnabled)
 		{
-			Util::CreateDebugUtilsMessengerEXT(RenderInstance.VulkanInstance, &MessengerCreateInfo, nullptr, &RenderInstance.DebugMessenger);
+			Util::CreateDebugUtilsMessengerEXT(Instance.VulkanInstance, &MessengerCreateInfo, nullptr, &Instance.DebugMessenger);
 		}
 
-		// INSTANCE CREATION END
+		return true;
+	}
 
-		RenderInstance.Window = glfwCreateWindow(800, 600, "BMEngine", nullptr, nullptr);
-		if (RenderInstance.Window == nullptr)
+	void DeinitMainInstance(MainInstance& Instance)
+	{
+		if (Instance.DebugMessenger != nullptr)
 		{
-			Util::Log().GlfwLogError();
-			return false;
+			Util::DestroyDebugMessenger(Instance.VulkanInstance, Instance.DebugMessenger, nullptr);
 		}
+
+		vkDestroyInstance(Instance.VulkanInstance, nullptr);
+	}
+
+	bool InitVulkanRenderInstance(VulkanRenderInstance& RenderInstance, VkInstance VulkanInstance, GLFWwindow* Window)
+	{
+		RenderInstance.VulkanInstance = VulkanInstance;
+		RenderInstance.Window = Window;
 
 		if (glfwCreateWindowSurface(RenderInstance.VulkanInstance, RenderInstance.Window, nullptr, &RenderInstance.Surface) != VK_SUCCESS)
 		{
@@ -371,7 +481,7 @@ namespace Core
 				break;
 			}
 
-			Result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(DeviceList[i], RenderInstance.Surface, &SurfaceCapabilities);
+			VkResult Result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(DeviceList[i], RenderInstance.Surface, &SurfaceCapabilities);
 			if (Result != VK_SUCCESS)
 			{
 				Util::Log().Warning("vkGetPhysicalDeviceSurfaceCapabilitiesKHR result is {}", static_cast<int>(Result));
@@ -425,7 +535,7 @@ namespace Core
 		DeviceCreateInfo.pEnabledFeatures = &DeviceFeatures;
 
 		// Queues are created at the same time as the device
-		Result = vkCreateDevice(RenderInstance.PhysicalDevice, &DeviceCreateInfo, nullptr, &RenderInstance.LogicalDevice);
+		VkResult Result = vkCreateDevice(RenderInstance.PhysicalDevice, &DeviceCreateInfo, nullptr, &RenderInstance.LogicalDevice);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkCreateDevice result is {}", static_cast<int>(Result));
@@ -986,63 +1096,35 @@ namespace Core
 	bool LoadVertices(VulkanRenderInstance& RenderInstance, Vertex* MeshVertices, uint32_t MeshVerticesCount)
 	{
 		// CREATE VERTEX BUFFER
-	// Information to create a buffer (doesn't include assigning memory)
-		VkBufferCreateInfo BufferCreateInfo = {};
-		BufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		BufferCreateInfo.size = sizeof(Core::Vertex) * MeshVerticesCount;		// Size of buffer (size of 1 vertex * number of vertices)
-		BufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;		// Multiple types of buffer possible, we want Vertex Buffer
-		BufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;			// Similar to Swap Chain images, can share vertex buffers
+		const VkDeviceSize BufferSize = sizeof(Vertex) * MeshVerticesCount;
 
-		VkResult Result = vkCreateBuffer(RenderInstance.LogicalDevice, &BufferCreateInfo, nullptr, &RenderInstance.Mesh.VertexBuffer);
-		if (Result != VK_SUCCESS)
-		{
-			return false;
-		}
-
-		// GET BUFFER MEMORY REQUIREMENTS
-		VkMemoryRequirements MemoryRequirements;
-		vkGetBufferMemoryRequirements(RenderInstance.LogicalDevice, RenderInstance.Mesh.VertexBuffer, &MemoryRequirements);
-
-		// Function FindMemoryTypeIndex
-		VkPhysicalDeviceMemoryProperties MemoryProperties;
-		vkGetPhysicalDeviceMemoryProperties(RenderInstance.PhysicalDevice, &MemoryProperties);
-
-		const VkMemoryPropertyFlags MemoryPropertyFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT; // VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT	: CPU can interact with memory
-		// VK_MEMORY_PROPERTY_HOST_COHERENT_BIT	: Allows placement of data straight into buffer after mapping (otherwise would have to specify manually)
-
-		uint32_t MemoryTypeIndex = 0;
-		for (; MemoryTypeIndex < MemoryProperties.memoryTypeCount; MemoryTypeIndex++)
-		{
-			if ((MemoryRequirements.memoryTypeBits & (1 << MemoryTypeIndex))														// Index of memory type must match corresponding bit in allowedTypes
-				&& (MemoryProperties.memoryTypes[MemoryTypeIndex].propertyFlags & MemoryPropertyFlags) == MemoryPropertyFlags)	// Desired property bit flags are part of memory type's property flags
-			{
-				// This memory type is valid, so return its index
-				break;
-			}
-		}
-		// Function end FindMemoryTypeIndex
-
-		// ALLOCATE MEMORY TO BUFFER
-		VkMemoryAllocateInfo memoryAllocInfo = {};
-		memoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		memoryAllocInfo.allocationSize = MemoryRequirements.size;
-		memoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;		// Index of memory type on Physical Device that has required bit flags			
-
-		Result = vkAllocateMemory(RenderInstance.LogicalDevice, &memoryAllocInfo, nullptr, &RenderInstance.Mesh.VertexBufferMemory);
-		if (Result != VK_SUCCESS)
-		{
-			return false;
-		}
-
-		// Allocate memory to given vertex buffer
-		vkBindBufferMemory(RenderInstance.LogicalDevice, RenderInstance.Mesh.VertexBuffer, RenderInstance.Mesh.VertexBufferMemory, 0);
+		VkBuffer StagingBuffer = nullptr;
+		VkDeviceMemory StagingBufferMemory = nullptr;
+;
+		CreateVulkanBuffer(RenderInstance.PhysicalDevice, RenderInstance.LogicalDevice, BufferSize,
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			StagingBuffer, StagingBufferMemory);
+		
 
 		// MAP MEMORY TO VERTEX BUFFER
 		void* data;																// 1. Create pointer to a point in normal memory
-		vkMapMemory(RenderInstance.LogicalDevice, RenderInstance.Mesh.VertexBufferMemory, 0, BufferCreateInfo.size, 0, &data);		// 2. "Map" the vertex buffer memory to that point
-		memcpy(data, MeshVertices, (size_t)(BufferCreateInfo.size));					// 3. Copy memory from vertices vector to the point
-		vkUnmapMemory(RenderInstance.LogicalDevice, RenderInstance.Mesh.VertexBufferMemory);									// 4. Unmap the vertex buffer memory
-		// Mesh
+		vkMapMemory(RenderInstance.LogicalDevice, StagingBufferMemory, 0, BufferSize, 0, &data);		// 2. "Map" the vertex buffer memory to that point
+		memcpy(data, MeshVertices, (size_t)(BufferSize));					// 3. Copy memory from vertices vector to the point
+		vkUnmapMemory(RenderInstance.LogicalDevice, StagingBufferMemory);									// 4. Unmap the vertex buffer memory
+
+		// Create buffer with TRANSFER_DST_BIT to mark as recipient of transfer data (also VERTEX_BUFFER)
+		// Buffer memory is to be DEVICE_LOCAL_BIT meaning memory is on the GPU and only accessible by it and not CPU (host)
+		CreateVulkanBuffer(RenderInstance.PhysicalDevice, RenderInstance.LogicalDevice, BufferSize,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			RenderInstance.Mesh.VertexBuffer, RenderInstance.Mesh.VertexBufferMemory);
+
+		// Copy staging buffer to vertex buffer on GPU
+		CopyBuffer(RenderInstance.LogicalDevice, RenderInstance.GraphicsQueue, RenderInstance.GraphicsCommandPool, StagingBuffer,
+			RenderInstance.Mesh.VertexBuffer, BufferSize);
+
+		// Clean up staging buffer parts
+		vkDestroyBuffer(RenderInstance.LogicalDevice, StagingBuffer, nullptr);
+		vkFreeMemory(RenderInstance.LogicalDevice, StagingBufferMemory, nullptr);
 
 		RenderInstance.Mesh.MeshVerticesCount = MeshVerticesCount;
 
@@ -1052,7 +1134,7 @@ namespace Core
 	bool RecordCommands(VulkanRenderInstance& RenderInstance)
 	{
 		// Function RecordCommands
-// Information about how to begin each command buffer
+		// Information about how to begin each command buffer
 		VkCommandBufferBeginInfo CommandBufferBeginInfo = {};
 		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -1210,14 +1292,5 @@ namespace Core
 		vkDestroySwapchainKHR(RenderInstance.LogicalDevice, RenderInstance.VulkanSwapchain, nullptr);
 		vkDestroySurfaceKHR(RenderInstance.VulkanInstance, RenderInstance.Surface, nullptr);
 		vkDestroyDevice(RenderInstance.LogicalDevice, nullptr);
-
-		if (Util::EnableValidationLayers)
-		{
-			Util::DestroyDebugMessenger(RenderInstance.VulkanInstance, RenderInstance.DebugMessenger, nullptr);
-		}
-
-		vkDestroyInstance(RenderInstance.VulkanInstance, nullptr);
-
-		glfwDestroyWindow(RenderInstance.Window);
 	}
 }
