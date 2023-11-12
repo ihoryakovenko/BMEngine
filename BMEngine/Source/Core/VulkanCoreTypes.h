@@ -67,4 +67,56 @@ namespace Core
 		glm::vec3 Position;
 		glm::vec3 Color;
 	};
+
+	struct Mesh
+	{
+		uint32_t MeshVerticesCount = 0;
+		VkBuffer VertexBuffer = nullptr;
+		VkDeviceMemory VertexBufferMemory = nullptr;
+	};
+
+	struct VulkanRenderInstance
+	{
+		VkInstance VulkanInstance = nullptr;
+		VkDebugUtilsMessengerEXT DebugMessenger = nullptr;
+
+		GLFWwindow* Window = nullptr;
+		VkSurfaceKHR Surface = nullptr;
+
+		VkPhysicalDevice PhysicalDevice = nullptr;
+		VkDevice LogicalDevice = nullptr;
+
+		VkQueue GraphicsQueue = nullptr;
+		VkQueue PresentationQueue = nullptr;
+
+		VkExtent2D SwapExtent;
+		VkSwapchainKHR VulkanSwapchain = nullptr;
+
+		uint32_t SwapchainImagesCount = 0;
+		VkImageView* ImageViews = nullptr;
+
+		VkFramebuffer* SwapchainFramebuffers = nullptr;
+		VkCommandBuffer* CommandBuffers = nullptr;
+		VkPipeline GraphicsPipeline = nullptr;
+		VkCommandPool GraphicsCommandPool = nullptr;
+
+		VkPipelineLayout PipelineLayout = nullptr;
+
+		VkRenderPass RenderPass = nullptr;
+
+		Mesh Mesh;
+
+		int MaxFrameDraws = 0;
+		int CurrentFrame = 0;
+
+		VkSemaphore* ImageAvalible = nullptr;
+		VkSemaphore* RenderFinished = nullptr;
+		VkFence* DrawFences = nullptr;
+	};
+
+	bool InitVulkanRenderInstance(VulkanRenderInstance& RenderInstance);
+	bool LoadVertices(VulkanRenderInstance& RenderInstance, Vertex* MeshVertices, uint32_t MeshVerticesCount);
+	bool RecordCommands(VulkanRenderInstance& RenderInstance);
+	bool Draw(VulkanRenderInstance& RenderInstance);
+	void DeinitVulkanRenderInstance(VulkanRenderInstance& RenderInstance);
 }
