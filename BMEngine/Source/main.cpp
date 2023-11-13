@@ -39,14 +39,27 @@ int main()
 	Core::InitVulkanRenderInstance(RenderInstance, Instance.VulkanInstance, Window);
 
 	// Mesh
-	const uint32_t MeshVerticesCount = 3;
+	const uint32_t MeshVerticesCount = 4;
 	Core::Vertex MeshVertices[MeshVerticesCount] = {
-		{{0.0, -0.4, 0.0}, {1.0f, 0.0f, 0.0f}},
-		{{0.4, 0.4, 0.0}, {0.0f, 1.0f, 0.0f}},
-		{{-0.4, 0.4, 0.0}, {0.0f, 0.0f, 1.0f}}
+			{ { -0.1, -0.4, 0.0 },{ 1.0f, 0.0f, 0.0f } },	// 0
+			{ { -0.1, 0.4, 0.0 },{ 0.0f, 1.0f, 0.0f } },	    // 1
+			{ { -0.9, 0.4, 0.0 },{ 0.0f, 0.0f, 1.0f } },    // 2
+			{ { -0.9, -0.4, 0.0 },{ 1.0f, 1.0f, 0.0f } }   // 3
 	};
 
-	Core::LoadVertices(RenderInstance, MeshVertices, MeshVerticesCount);
+	const uint32_t MeshIndicesCount = 6;
+	uint32_t MeshIndices[MeshIndicesCount] = {
+		0, 1, 2,
+		2, 3, 0
+	};
+
+	Core::Mesh Mesh;
+	Mesh.MeshVerticesCount = MeshVerticesCount;
+	Mesh.MeshVertices = MeshVertices;
+	Mesh.MeshIndicesCount = MeshIndicesCount;
+	Mesh.MeshIndices = MeshIndices;
+
+	Core::LoadMesh(RenderInstance, Mesh);
 	Core::RecordCommands(RenderInstance);
 
 	while (!glfwWindowShouldClose(RenderInstance.Window))

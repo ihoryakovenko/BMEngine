@@ -225,8 +225,8 @@ namespace Core
 		return Indices;
 	}
 
-	bool CreateVulkanBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, VkDeviceSize BufferSize, VkBufferUsageFlags BufferUsage,
-		VkMemoryPropertyFlags BufferProperties, VkBuffer& OutBuffer, VkDeviceMemory& OutBufferMemory)
+	bool CreateVulkanBuffer(const VulkanRenderInstance& RenderInstance, VkDeviceSize BufferSize,
+		VkBufferUsageFlags BufferUsage, VkMemoryPropertyFlags BufferProperties, VulkanBuffer& OutBuffer)
 	{
 		VkBufferCreateInfo BufferCreateInfo = {};
 		BufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -234,7 +234,7 @@ namespace Core
 		BufferCreateInfo.usage = BufferUsage;		// Multiple types of buffer possible, we want Vertex Buffer
 		BufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;			// Similar to Swap Chain images, can share vertex buffers
 
-		VkResult Result = vkCreateBuffer(LogicalDevice, &BufferCreateInfo, nullptr, &OutBuffer);
+		VkResult Result = vkCreateBuffer(RenderInstance.LogicalDevice, &BufferCreateInfo, nullptr, &OutBuffer.Buffer);
 		if (Result != VK_SUCCESS)
 		{
 			return false;
@@ -242,11 +242,11 @@ namespace Core
 
 		// GET BUFFER MEMORY REQUIREMENTS
 		VkMemoryRequirements MemoryRequirements;
-		vkGetBufferMemoryRequirements(LogicalDevice, OutBuffer, &MemoryRequirements);
+		vkGetBufferMemoryRequirements(RenderInstance.LogicalDevice, OutBuffer.Buffer, &MemoryRequirements);
 
 		// Function FindMemoryTypeIndex
 		VkPhysicalDeviceMemoryProperties MemoryProperties;
-		vkGetPhysicalDeviceMemoryProperties(PhysicalDevice, &MemoryProperties);
+		vkGetPhysicalDeviceMemoryProperties(RenderInstance.PhysicalDevice, &MemoryProperties);
 
 		uint32_t MemoryTypeIndex = 0;
 		for (; MemoryTypeIndex < MemoryProperties.memoryTypeCount; MemoryTypeIndex++)
@@ -266,19 +266,25 @@ namespace Core
 		MemoryAllocInfo.allocationSize = MemoryRequirements.size;
 		MemoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;		// Index of memory type on Physical Device that has required bit flags			
 
-		Result = vkAllocateMemory(LogicalDevice, &MemoryAllocInfo, nullptr, &OutBufferMemory);
+		Result = vkAllocateMemory(RenderInstance.LogicalDevice, &MemoryAllocInfo, nullptr, &OutBuffer.BufferMemory);
 		if (Result != VK_SUCCESS)
 		{
 			return false;
 		}
 
 		// Allocate memory to given vertex buffer
-		vkBindBufferMemory(LogicalDevice, OutBuffer, OutBufferMemory, 0);
+		vkBindBufferMemory(RenderInstance.LogicalDevice, OutBuffer.Buffer, OutBuffer.BufferMemory, 0);
 
 		return true;
 	}
 
-	void CopyBuffer(VkDevice LogicalDevice, VkQueue TransferQueue, VkCommandPool TransferCommandPool, VkBuffer SourceBuffer,
+	void DestroyVulkanBuffer(const VulkanRenderInstance& RenderInstance, VulkanBuffer& Buffer)
+	{
+		vkDestroyBuffer(RenderInstance.LogicalDevice, Buffer.Buffer, nullptr);
+		vkFreeMemory(RenderInstance.LogicalDevice, Buffer.BufferMemory, nullptr);
+	}
+
+	void CopyBuffer(const VulkanRenderInstance& RenderInstance, VkBuffer SourceBuffer,
 		VkBuffer DstinationBuffer, VkDeviceSize BufferSize)
 	{
 		// Command buffer to hold transfer commands
@@ -288,11 +294,11 @@ namespace Core
 		VkCommandBufferAllocateInfo AllocInfo = {};
 		AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		AllocInfo.commandPool = TransferCommandPool;
+		AllocInfo.commandPool = RenderInstance.GraphicsCommandPool;
 		AllocInfo.commandBufferCount = 1;
 
 		// Allocate command buffer from pool
-		vkAllocateCommandBuffers(LogicalDevice, &AllocInfo, &TransferCommandBuffer);
+		vkAllocateCommandBuffers(RenderInstance.LogicalDevice, &AllocInfo, &TransferCommandBuffer);
 
 		// Information to begin the command buffer record
 		VkCommandBufferBeginInfo BeginInfo = {};
@@ -321,11 +327,11 @@ namespace Core
 		submitInfo.pCommandBuffers = &TransferCommandBuffer;
 
 		// Submit transfer command to transfer queue and wait until it finishes
-		vkQueueSubmit(TransferQueue, 1, &submitInfo, VK_NULL_HANDLE);
-		vkQueueWaitIdle(TransferQueue);
+		vkQueueSubmit(RenderInstance.GraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+		vkQueueWaitIdle(RenderInstance.GraphicsQueue);
 
 		// Free temporary command buffer back to pool
-		vkFreeCommandBuffers(LogicalDevice, TransferCommandPool, 1, &TransferCommandBuffer);
+		vkFreeCommandBuffers(RenderInstance.LogicalDevice, RenderInstance.GraphicsCommandPool, 1, &TransferCommandBuffer);
 	}
 
 	bool InitMainInstance(MainInstance& Instance, bool IsValidationLayersEnabled)
@@ -1093,52 +1099,53 @@ namespace Core
 		return true;
 	}
 
-	bool LoadVertices(VulkanRenderInstance& RenderInstance, Vertex* MeshVertices, uint32_t MeshVerticesCount)
+	bool LoadMesh(VulkanRenderInstance& RenderInstance, Mesh Mesh)
 	{
-		// CREATE VERTEX BUFFER
-		const VkDeviceSize BufferSize = sizeof(Vertex) * MeshVerticesCount;
+		const VkDeviceSize VerticesBufferSize = sizeof(Vertex) * Mesh.MeshVerticesCount;
+		const VkDeviceSize IndecesBufferSize = sizeof(uint32_t) * Mesh.MeshIndicesCount;
+		const VkDeviceSize StagingBufferSize = VerticesBufferSize > IndecesBufferSize ? VerticesBufferSize : IndecesBufferSize;
+		void* data = nullptr;
 
-		VkBuffer StagingBuffer = nullptr;
-		VkDeviceMemory StagingBufferMemory = nullptr;
-;
-		CreateVulkanBuffer(RenderInstance.PhysicalDevice, RenderInstance.LogicalDevice, BufferSize,
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			StagingBuffer, StagingBufferMemory);
-		
+		VulkanBuffer StagingBuffer;
+		CreateVulkanBuffer(RenderInstance, StagingBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, StagingBuffer);
 
-		// MAP MEMORY TO VERTEX BUFFER
-		void* data;																// 1. Create pointer to a point in normal memory
-		vkMapMemory(RenderInstance.LogicalDevice, StagingBufferMemory, 0, BufferSize, 0, &data);		// 2. "Map" the vertex buffer memory to that point
-		memcpy(data, MeshVertices, (size_t)(BufferSize));					// 3. Copy memory from vertices vector to the point
-		vkUnmapMemory(RenderInstance.LogicalDevice, StagingBufferMemory);									// 4. Unmap the vertex buffer memory
+		// Vertex buffer
+		vkMapMemory(RenderInstance.LogicalDevice, StagingBuffer.BufferMemory, 0, VerticesBufferSize, 0, &data);
+		memcpy(data, Mesh.MeshVertices, (size_t)(VerticesBufferSize));
+		vkUnmapMemory(RenderInstance.LogicalDevice, StagingBuffer.BufferMemory);
 
-		// Create buffer with TRANSFER_DST_BIT to mark as recipient of transfer data (also VERTEX_BUFFER)
-		// Buffer memory is to be DEVICE_LOCAL_BIT meaning memory is on the GPU and only accessible by it and not CPU (host)
-		CreateVulkanBuffer(RenderInstance.PhysicalDevice, RenderInstance.LogicalDevice, BufferSize,
+		CreateVulkanBuffer(RenderInstance, VerticesBufferSize,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			RenderInstance.Mesh.VertexBuffer, RenderInstance.Mesh.VertexBufferMemory);
+			RenderInstance.DrawableObject.VertexBuffer);
 
-		// Copy staging buffer to vertex buffer on GPU
-		CopyBuffer(RenderInstance.LogicalDevice, RenderInstance.GraphicsQueue, RenderInstance.GraphicsCommandPool, StagingBuffer,
-			RenderInstance.Mesh.VertexBuffer, BufferSize);
+		CopyBuffer(RenderInstance, StagingBuffer.Buffer, RenderInstance.DrawableObject.VertexBuffer.Buffer, VerticesBufferSize);
 
-		// Clean up staging buffer parts
-		vkDestroyBuffer(RenderInstance.LogicalDevice, StagingBuffer, nullptr);
-		vkFreeMemory(RenderInstance.LogicalDevice, StagingBufferMemory, nullptr);
+		RenderInstance.DrawableObject.VerticesCount = Mesh.MeshVerticesCount;
+		
+		// Index buffer
+		vkMapMemory(RenderInstance.LogicalDevice, StagingBuffer.BufferMemory, 0, IndecesBufferSize, 0, &data);
+		memcpy(data, Mesh.MeshIndices, (size_t)(IndecesBufferSize));
+		vkUnmapMemory(RenderInstance.LogicalDevice, StagingBuffer.BufferMemory);
 
-		RenderInstance.Mesh.MeshVerticesCount = MeshVerticesCount;
+		CreateVulkanBuffer(RenderInstance, IndecesBufferSize,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			RenderInstance.DrawableObject.IndexBuffer);
+
+		CopyBuffer(RenderInstance, StagingBuffer.Buffer, RenderInstance.DrawableObject.IndexBuffer.Buffer, IndecesBufferSize);
+
+		RenderInstance.DrawableObject.IndicesCount = Mesh.MeshIndicesCount;
+
+		DestroyVulkanBuffer(RenderInstance, StagingBuffer);
 
 		return true;
 	}
 
 	bool RecordCommands(VulkanRenderInstance& RenderInstance)
 	{
-		// Function RecordCommands
-		// Information about how to begin each command buffer
 		VkCommandBufferBeginInfo CommandBufferBeginInfo = {};
 		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-		// Information about how to begin a render pass (only needed for graphical applications)
 		VkRenderPassBeginInfo RenderPassBeginInfo = {};
 		RenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		RenderPassBeginInfo.renderPass = RenderInstance.RenderPass;							// Render Pass to begin
@@ -1149,14 +1156,13 @@ namespace Core
 		VkClearValue ClearValues[ClearValuesSize] = {
 			{0.6f, 0.65f, 0.4f, 1.0f}
 		};
-		RenderPassBeginInfo.pClearValues = ClearValues;							// List of clear values (TODO: Depth Attachment Clear Value)
-		RenderPassBeginInfo.clearValueCount = ClearValuesSize;
+		RenderPassBeginInfo.pClearValues = ClearValues;
+		RenderPassBeginInfo.clearValueCount = ClearValuesSize; // List of clear values (TODO: Depth Attachment Clear Value)
 
 		for (uint32_t i = 0; i < RenderInstance.SwapchainImagesCount; i++)
 		{
 			RenderPassBeginInfo.framebuffer = RenderInstance.SwapchainFramebuffers[i];
 
-			// Start recording commands to command buffer!
 			VkResult Result = vkBeginCommandBuffer(RenderInstance.CommandBuffers[i], &CommandBufferBeginInfo);
 			if (Result != VK_SUCCESS)
 			{
@@ -1170,19 +1176,20 @@ namespace Core
 			// Bind Pipeline to be used in render pass
 			vkCmdBindPipeline(RenderInstance.CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.GraphicsPipeline);
 
-
-			VkBuffer VertexBuffers[] = { RenderInstance.Mesh.VertexBuffer };					// Buffers to bind
+			// TODO: Support rework to not create identical index buffers
+			VkBuffer VertexBuffers[] = { RenderInstance.DrawableObject.VertexBuffer.Buffer };					// Buffers to bind
 			VkDeviceSize Offsets[] = { 0 };												// Offsets into buffers being bound
-			vkCmdBindVertexBuffers(RenderInstance.CommandBuffers[i], 0, 1, VertexBuffers, Offsets);	// Command to bind vertex buffer before drawing with them
+			vkCmdBindVertexBuffers(RenderInstance.CommandBuffers[i], 0, 1, VertexBuffers, Offsets);
 
+			vkCmdBindIndexBuffer(RenderInstance.CommandBuffers[i], RenderInstance.DrawableObject.IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
 			// Execute pipeline
-			vkCmdDraw(RenderInstance.CommandBuffers[i], RenderInstance.Mesh.MeshVerticesCount, 1, 0, 0);
+			//vkCmdDraw(RenderInstance.CommandBuffers[i], RenderInstance.DrawableObject.VerticesCount, 1, 0, 0);
+			vkCmdDrawIndexed(RenderInstance.CommandBuffers[i], RenderInstance.DrawableObject.IndicesCount, 1, 0, 0, 0);
 
 			// End Render Pass
 			vkCmdEndRenderPass(RenderInstance.CommandBuffers[i]);
 
-			// Stop recording to command buffer
 			Result = vkEndCommandBuffer(RenderInstance.CommandBuffers[i]);
 			if (Result != VK_SUCCESS)
 			{
@@ -1190,7 +1197,6 @@ namespace Core
 				return false;
 			}
 		}
-		// Function end RecordCommands
 
 		return true;
 	}
@@ -1253,8 +1259,8 @@ namespace Core
 	{
 		vkDeviceWaitIdle(RenderInstance.LogicalDevice);
 
-		vkDestroyBuffer(RenderInstance.LogicalDevice, RenderInstance.Mesh.VertexBuffer, nullptr);
-		vkFreeMemory(RenderInstance.LogicalDevice, RenderInstance.Mesh.VertexBufferMemory, nullptr);
+		DestroyVulkanBuffer(RenderInstance, RenderInstance.DrawableObject.VertexBuffer);
+		DestroyVulkanBuffer(RenderInstance, RenderInstance.DrawableObject.IndexBuffer);
 
 		for (size_t i = 0; i < RenderInstance.MaxFrameDraws; i++)
 		{

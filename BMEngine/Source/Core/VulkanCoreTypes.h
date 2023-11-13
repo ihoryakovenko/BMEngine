@@ -71,15 +71,26 @@ namespace Core
 	struct Mesh
 	{
 		uint32_t MeshVerticesCount = 0;
-		VkBuffer VertexBuffer = nullptr;
-		VkDeviceMemory VertexBufferMemory = nullptr;
+		Vertex* MeshVertices = nullptr;
+
+		uint32_t MeshIndicesCount = 0;
+		uint32_t* MeshIndices = nullptr;
 	};
 
-	bool CreateVulkanBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, VkDeviceSize BufferSize,
-		VkBufferUsageFlags BufferUsage, VkMemoryPropertyFlags BufferProperties, VkBuffer& OutBuffer, VkDeviceMemory& OutBufferMemory);
+	struct VulkanBuffer
+	{
+		VkBuffer Buffer = nullptr;
+		VkDeviceMemory BufferMemory = nullptr;
+	};
 
-	void CopyBuffer(VkDevice LogicalDevice, VkQueue TransferQueue, VkCommandPool TransferCommandPool, VkBuffer SourceBuffer,
-		VkBuffer DstinationBuffer, VkDeviceSize BufferSize);
+	struct DrawableObject
+	{
+		uint32_t VerticesCount = 0;
+		VulkanBuffer VertexBuffer;
+
+		uint32_t IndicesCount = 0;
+		VulkanBuffer IndexBuffer;
+	};
 
 	struct MainInstance
 	{
@@ -118,7 +129,7 @@ namespace Core
 
 		VkRenderPass RenderPass = nullptr;
 
-		Mesh Mesh;
+		DrawableObject DrawableObject;
 
 		int MaxFrameDraws = 0;
 		int CurrentFrame = 0;
@@ -129,8 +140,16 @@ namespace Core
 	};
 
 	bool InitVulkanRenderInstance(VulkanRenderInstance& RenderInstance, VkInstance VulkanInstance, GLFWwindow* Window);
-	bool LoadVertices(VulkanRenderInstance& RenderInstance, Vertex* MeshVertices, uint32_t MeshVerticesCount);
+	bool LoadMesh(VulkanRenderInstance& RenderInstance, Mesh Mesh);
 	bool RecordCommands(VulkanRenderInstance& RenderInstance);
 	bool Draw(VulkanRenderInstance& RenderInstance);
 	void DeinitVulkanRenderInstance(VulkanRenderInstance& RenderInstance);
+
+	bool CreateVulkanBuffer(const VulkanRenderInstance& RenderInstance, VkDeviceSize BufferSize,
+		VkBufferUsageFlags BufferUsage, VkMemoryPropertyFlags BufferProperties, VulkanBuffer& OutBuffer);
+
+	void DestroyVulkanBuffer(const VulkanRenderInstance& RenderInstance, VulkanBuffer& Buffer);
+
+	void CopyBuffer(const VulkanRenderInstance& RenderInstance, VkBuffer SourceBuffer,
+		VkBuffer DstinationBuffer, VkDeviceSize BufferSize);
 }
