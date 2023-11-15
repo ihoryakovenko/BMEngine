@@ -47,6 +47,8 @@ int main()
 			{ { -0.9, -0.4, 0.0 },{ 1.0f, 1.0f, 0.0f } }   // 3
 	};
 
+
+
 	const uint32_t MeshIndicesCount = 6;
 	uint32_t MeshIndices[MeshIndicesCount] = {
 		0, 1, 2,
@@ -58,6 +60,17 @@ int main()
 	Mesh.MeshVertices = MeshVertices;
 	Mesh.MeshIndicesCount = MeshIndicesCount;
 	Mesh.MeshIndices = MeshIndices;
+
+	Core::LoadMesh(RenderInstance, Mesh);
+
+	Core::Vertex MeshVertices2[MeshVerticesCount] = {
+		{ { 0.9, -0.3, 0.0 },{ 1.0f, 0.0f, 0.0f } },	// 0
+		{ { 0.9, 0.1, 0.0 },{ 0.0f, 1.0f, 0.0f } },	    // 1
+		{ { 0.1, 0.3, 0.0 },{ 0.0f, 0.0f, 1.0f } },    // 2
+		{ { 0.1, -0.3, 0.0 },{ 1.0f, 1.0f, 0.0f } },   // 3
+	};
+
+	Mesh.MeshVertices = MeshVertices2;
 
 	Core::LoadMesh(RenderInstance, Mesh);
 	Core::RecordCommands(RenderInstance);

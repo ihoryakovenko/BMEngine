@@ -129,7 +129,9 @@ namespace Core
 
 		VkRenderPass RenderPass = nullptr;
 
-		DrawableObject DrawableObject;
+		const uint32_t DrawableObjectsMaxCount = 4;
+		uint32_t DrawableObjectsCount = 0;
+		DrawableObject DrawableObjects[4];
 
 		int MaxFrameDraws = 0;
 		int CurrentFrame = 0;

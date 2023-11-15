@@ -1117,11 +1117,11 @@ namespace Core
 
 		CreateVulkanBuffer(RenderInstance, VerticesBufferSize,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			RenderInstance.DrawableObject.VertexBuffer);
+			RenderInstance.DrawableObjects[RenderInstance.DrawableObjectsCount].VertexBuffer);
 
-		CopyBuffer(RenderInstance, StagingBuffer.Buffer, RenderInstance.DrawableObject.VertexBuffer.Buffer, VerticesBufferSize);
+		CopyBuffer(RenderInstance, StagingBuffer.Buffer, RenderInstance.DrawableObjects[RenderInstance.DrawableObjectsCount].VertexBuffer.Buffer, VerticesBufferSize);
 
-		RenderInstance.DrawableObject.VerticesCount = Mesh.MeshVerticesCount;
+		RenderInstance.DrawableObjects[RenderInstance.DrawableObjectsCount].VerticesCount = Mesh.MeshVerticesCount;
 		
 		// Index buffer
 		vkMapMemory(RenderInstance.LogicalDevice, StagingBuffer.BufferMemory, 0, IndecesBufferSize, 0, &data);
@@ -1130,13 +1130,15 @@ namespace Core
 
 		CreateVulkanBuffer(RenderInstance, IndecesBufferSize,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			RenderInstance.DrawableObject.IndexBuffer);
+			RenderInstance.DrawableObjects[RenderInstance.DrawableObjectsCount].IndexBuffer);
 
-		CopyBuffer(RenderInstance, StagingBuffer.Buffer, RenderInstance.DrawableObject.IndexBuffer.Buffer, IndecesBufferSize);
+		CopyBuffer(RenderInstance, StagingBuffer.Buffer, RenderInstance.DrawableObjects[RenderInstance.DrawableObjectsCount].IndexBuffer.Buffer, IndecesBufferSize);
 
-		RenderInstance.DrawableObject.IndicesCount = Mesh.MeshIndicesCount;
+		RenderInstance.DrawableObjects[RenderInstance.DrawableObjectsCount].IndicesCount = Mesh.MeshIndicesCount;
 
 		DestroyVulkanBuffer(RenderInstance, StagingBuffer);
+
+		++RenderInstance.DrawableObjectsCount;
 
 		return true;
 	}
@@ -1177,15 +1179,18 @@ namespace Core
 			vkCmdBindPipeline(RenderInstance.CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.GraphicsPipeline);
 
 			// TODO: Support rework to not create identical index buffers
-			VkBuffer VertexBuffers[] = { RenderInstance.DrawableObject.VertexBuffer.Buffer };					// Buffers to bind
-			VkDeviceSize Offsets[] = { 0 };												// Offsets into buffers being bound
-			vkCmdBindVertexBuffers(RenderInstance.CommandBuffers[i], 0, 1, VertexBuffers, Offsets);
+			for (uint32_t j = 0; j < RenderInstance.DrawableObjectsCount; ++j)
+			{
+				VkBuffer VertexBuffers[] = { RenderInstance.DrawableObjects[j].VertexBuffer.Buffer};					// Buffers to bind
+				VkDeviceSize Offsets[] = { 0 };												// Offsets into buffers being bound
+				vkCmdBindVertexBuffers(RenderInstance.CommandBuffers[i], 0, 1, VertexBuffers, Offsets);
 
-			vkCmdBindIndexBuffer(RenderInstance.CommandBuffers[i], RenderInstance.DrawableObject.IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+				vkCmdBindIndexBuffer(RenderInstance.CommandBuffers[i], RenderInstance.DrawableObjects[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
-			// Execute pipeline
-			//vkCmdDraw(RenderInstance.CommandBuffers[i], RenderInstance.DrawableObject.VerticesCount, 1, 0, 0);
-			vkCmdDrawIndexed(RenderInstance.CommandBuffers[i], RenderInstance.DrawableObject.IndicesCount, 1, 0, 0, 0);
+				// Execute pipeline
+				//vkCmdDraw(RenderInstance.CommandBuffers[i], RenderInstance.DrawableObject.VerticesCount, 1, 0, 0);
+				vkCmdDrawIndexed(RenderInstance.CommandBuffers[i], RenderInstance.DrawableObjects[j].IndicesCount, 1, 0, 0, 0);
+			}
 
 			// End Render Pass
 			vkCmdEndRenderPass(RenderInstance.CommandBuffers[i]);
@@ -1259,8 +1264,11 @@ namespace Core
 	{
 		vkDeviceWaitIdle(RenderInstance.LogicalDevice);
 
-		DestroyVulkanBuffer(RenderInstance, RenderInstance.DrawableObject.VertexBuffer);
-		DestroyVulkanBuffer(RenderInstance, RenderInstance.DrawableObject.IndexBuffer);
+		for (uint32_t i = 0; i < RenderInstance.DrawableObjectsCount; ++i)
+		{
+			DestroyVulkanBuffer(RenderInstance, RenderInstance.DrawableObjects[i].VertexBuffer);
+			DestroyVulkanBuffer(RenderInstance, RenderInstance.DrawableObjects[i].IndexBuffer);
+		}
 
 		for (size_t i = 0; i < RenderInstance.MaxFrameDraws; i++)
 		{
