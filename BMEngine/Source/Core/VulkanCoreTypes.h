@@ -103,38 +103,49 @@ namespace Core
 
 	struct VulkanRenderInstance
 	{
-		VkInstance VulkanInstance = nullptr;
-
 		GLFWwindow* Window = nullptr;
-		VkSurfaceKHR Surface = nullptr;
+
+		VkInstance VulkanInstance = nullptr;
 
 		VkPhysicalDevice PhysicalDevice = nullptr;
 		VkDevice LogicalDevice = nullptr;
 
 		VkQueue GraphicsQueue = nullptr;
 		VkQueue PresentationQueue = nullptr;
-
+		VkSurfaceKHR Surface = nullptr;
 		VkExtent2D SwapExtent;
 		VkSwapchainKHR VulkanSwapchain = nullptr;
 
 		uint32_t SwapchainImagesCount = 0;
 		VkImageView* ImageViews = nullptr;
-
 		VkFramebuffer* SwapchainFramebuffers = nullptr;
 		VkCommandBuffer* CommandBuffers = nullptr;
+
+		VkDescriptorSetLayout DescriptorSetLayout = nullptr;
+
+		VkDescriptorPool DescriptorPool = nullptr;
+		VkDescriptorSet* DescriptorSets = nullptr;
+
+		VulkanBuffer* UniformBuffers = nullptr;
+
 		VkPipeline GraphicsPipeline = nullptr;
-		VkCommandPool GraphicsCommandPool = nullptr;
-
 		VkPipelineLayout PipelineLayout = nullptr;
-
 		VkRenderPass RenderPass = nullptr;
+
+		struct MVP
+		{
+			glm::mat4 Model;
+			glm::mat4 View;
+			glm::mat4 Projection;
+		} Mvp;
 
 		const uint32_t DrawableObjectsMaxCount = 4;
 		uint32_t DrawableObjectsCount = 0;
 		DrawableObject DrawableObjects[4];
-
 		int MaxFrameDraws = 0;
 		int CurrentFrame = 0;
+
+		VkCommandPool GraphicsCommandPool = nullptr;
 
 		VkSemaphore* ImageAvalible = nullptr;
 		VkSemaphore* RenderFinished = nullptr;
