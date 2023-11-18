@@ -43,10 +43,10 @@ int main()
 	//Mesh
 	const uint32_t MeshVerticesCount = 4;
 	Core::Vertex MeshVertices[MeshVerticesCount] = {
-			{ { -0.1, -0.4, 0.0 },{ 1.0f, 0.0f, 0.0f } },	// 0
-			{ { -0.1, 0.4, 0.0 },{ 0.0f, 1.0f, 0.0f } },	    // 1
-			{ { -0.9, 0.4, 0.0 },{ 0.0f, 0.0f, 1.0f } },    // 2
-			{ { -0.9, -0.4, 0.0 },{ 1.0f, 1.0f, 0.0f } }   // 3
+			{ { -0.4, 0.4, 0.0 },{ 1.0f, 0.0f, 0.0f } },	// 0
+			{ { -0.4, -0.4, 0.0 },{ 0.0f, 1.0f, 0.0f } },	    // 1
+			{ { 0.4, -0.4, 0.0 },{ 0.0f, 0.0f, 1.0f } },    // 2
+			{ { 0.4, 0.4, 0.0 },{ 1.0f, 1.0f, 0.0f } },   // 3
 	};
 
 	const uint32_t MeshIndicesCount = 6;
@@ -64,16 +64,17 @@ int main()
 	Core::LoadMesh(RenderInstance, Mesh);
 
 	Core::Vertex MeshVertices2[MeshVerticesCount] = {
-		{ { 0.9, -0.3, 0.0 },{ 1.0f, 0.0f, 0.0f } },	// 0
-		{ { 0.9, 0.1, 0.0 },{ 0.0f, 1.0f, 0.0f } },	    // 1
-		{ { 0.1, 0.3, 0.0 },{ 0.0f, 0.0f, 1.0f } },    // 2
-		{ { 0.1, -0.3, 0.0 },{ 1.0f, 1.0f, 0.0f } },   // 3
+			{ { -0.25, 0.6, 0.0 },{ 1.0f, 0.0f, 0.0f } },	// 0
+			{ { -0.25, -0.6, 0.0 },{ 0.0f, 1.0f, 0.0f } },	    // 1
+			{ { 0.25, -0.6, 0.0 },{ 0.0f, 0.0f, 1.0f } },    // 2
+			{ { 0.25, 0.6, 0.0 },{ 1.0f, 1.0f, 0.0f } },   // 3
 	};
 
 	Mesh.MeshVertices = MeshVertices2;
 
 	Core::LoadMesh(RenderInstance, Mesh);
 	Core::RecordCommands(RenderInstance);
+
 
 	float Angle = 0.0f;
 	double DeltaTime = 0.0f;
@@ -87,13 +88,23 @@ int main()
 		DeltaTime = CurrentTime - LastTime;
 		LastTime = static_cast<float>(CurrentTime);
 
-		Angle += 60.0f * static_cast<float>(DeltaTime);
+		Angle += 10.0f * static_cast<float>(DeltaTime);
 		if (Angle > 360.0f)
 		{
 			Angle -= 360.0f;
 		}
 
-		RenderInstance.Mvp.Model = glm::rotate(glm::mat4(1.0f), glm::radians(Angle), glm::vec3(0.0f, 0.0f, 1.0f));
+		glm::mat4 firstModel(1.0f);
+		glm::mat4 secondModel(1.0f);
+
+		firstModel = glm::translate(firstModel, glm::vec3(-1.0f, -0.5f, -1.5f));
+		firstModel = glm::rotate(firstModel, glm::radians(Angle), glm::vec3(0.0f, 0.0f, 1.0f));
+
+		secondModel = glm::translate(secondModel, glm::vec3(1.0f, 0.0f, -1.0f));
+		secondModel = glm::rotate(secondModel, glm::radians(-Angle * 100), glm::vec3(0.0f, 0.0f, 1.0f));
+
+		RenderInstance.DrawableObjects[0].Model = firstModel;
+		RenderInstance.DrawableObjects[1].Model = secondModel;
 
 		Core::Draw(RenderInstance);
 	}

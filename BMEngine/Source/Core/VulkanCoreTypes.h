@@ -83,6 +83,8 @@ namespace Core
 		VkDeviceMemory BufferMemory = nullptr;
 	};
 
+	typedef glm::mat4 UboModel;
+
 	struct DrawableObject
 	{
 		uint32_t VerticesCount = 0;
@@ -90,6 +92,8 @@ namespace Core
 
 		uint32_t IndicesCount = 0;
 		VulkanBuffer IndexBuffer;
+
+		UboModel Model;
 	};
 
 	struct MainInstance
@@ -107,6 +111,7 @@ namespace Core
 
 		VkInstance VulkanInstance = nullptr;
 
+		VkPhysicalDeviceProperties PhysicalDeviceProperties;
 		VkPhysicalDevice PhysicalDevice = nullptr;
 		VkDevice LogicalDevice = nullptr;
 
@@ -126,24 +131,28 @@ namespace Core
 		VkDescriptorPool DescriptorPool = nullptr;
 		VkDescriptorSet* DescriptorSets = nullptr;
 
-		VulkanBuffer* UniformBuffers = nullptr;
+		VulkanBuffer* VpUniformBuffers = nullptr;
+		VulkanBuffer* ModelDynamicUniformBuffers = nullptr;
+
+		uint32_t ModelUniformAlignment = 0;
+		UboModel* ModelTransferSpace = nullptr;
 
 		VkPipeline GraphicsPipeline = nullptr;
 		VkPipelineLayout PipelineLayout = nullptr;
 		VkRenderPass RenderPass = nullptr;
 
-		struct MVP
+		struct UboViewProjection
 		{
-			glm::mat4 Model;
 			glm::mat4 View;
 			glm::mat4 Projection;
-		} Mvp;
+		} ViewProjection;
 
-		const uint32_t DrawableObjectsMaxCount = 4;
+		const uint32_t MaxObjects = 2;
 		uint32_t DrawableObjectsCount = 0;
-		DrawableObject DrawableObjects[4];
-		int MaxFrameDraws = 0;
+		DrawableObject DrawableObjects[2];
+		const int MaxFrameDraws = 2;
 		int CurrentFrame = 0;
+		
 
 		VkCommandPool GraphicsCommandPool = nullptr;
 
