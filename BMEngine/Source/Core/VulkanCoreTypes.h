@@ -83,7 +83,7 @@ namespace Core
 		VkDeviceMemory BufferMemory = nullptr;
 	};
 
-	typedef glm::mat4 UboModel;
+	typedef glm::mat4 Model;
 
 	struct DrawableObject
 	{
@@ -93,7 +93,7 @@ namespace Core
 		uint32_t IndicesCount = 0;
 		VulkanBuffer IndexBuffer;
 
-		UboModel Model;
+		Model Model;
 	};
 
 	struct MainInstance
@@ -127,15 +127,16 @@ namespace Core
 		VkCommandBuffer* CommandBuffers = nullptr;
 
 		VkDescriptorSetLayout DescriptorSetLayout = nullptr;
+		VkPushConstantRange PushConstantRange;
 
 		VkDescriptorPool DescriptorPool = nullptr;
-		VkDescriptorSet* DescriptorSets = nullptr;
+		VkDescriptorSet* DescriptorSets = nullptr;	
 
 		VulkanBuffer* VpUniformBuffers = nullptr;
-		VulkanBuffer* ModelDynamicUniformBuffers = nullptr;
+		//VulkanBuffer* ModelDynamicUniformBuffers = nullptr;
 
-		uint32_t ModelUniformAlignment = 0;
-		UboModel* ModelTransferSpace = nullptr;
+		//uint32_t ModelUniformAlignment = 0;
+		//UboModel* ModelTransferSpace = nullptr;
 
 		VkPipeline GraphicsPipeline = nullptr;
 		VkPipelineLayout PipelineLayout = nullptr;
@@ -163,7 +164,6 @@ namespace Core
 
 	bool InitVulkanRenderInstance(VulkanRenderInstance& RenderInstance, VkInstance VulkanInstance, GLFWwindow* Window);
 	bool LoadMesh(VulkanRenderInstance& RenderInstance, Mesh Mesh);
-	bool RecordCommands(VulkanRenderInstance& RenderInstance);
 	bool Draw(VulkanRenderInstance& RenderInstance);
 	void DeinitVulkanRenderInstance(VulkanRenderInstance& RenderInstance);
 

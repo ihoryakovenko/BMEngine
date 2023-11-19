@@ -807,15 +807,19 @@ namespace Core
 		VpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;				// Shader stage to bind to
 		VpLayoutBinding.pImmutableSamplers = nullptr;							// For Texture: Can make sampler data unchangeable (immutable) by specifying in layout
 
-		VkDescriptorSetLayoutBinding ModelLayoutBinding = {};
-		ModelLayoutBinding.binding = 1;
-		ModelLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		ModelLayoutBinding.descriptorCount = 1;
-		ModelLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-		ModelLayoutBinding.pImmutableSamplers = nullptr;
+		// UNIFORM BUFFER SETUP CODE
+		//VkDescriptorSetLayoutBinding ModelLayoutBinding = {};
+		//ModelLayoutBinding.binding = 1;
+		//ModelLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		//ModelLayoutBinding.descriptorCount = 1;
+		//ModelLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		//ModelLayoutBinding.pImmutableSamplers = nullptr;
 
-		const uint32_t BindingCount = 2;
-		VkDescriptorSetLayoutBinding Bindings[BindingCount] = { VpLayoutBinding, ModelLayoutBinding };
+		//const uint32_t BindingCount = 2;
+		//VkDescriptorSetLayoutBinding Bindings[BindingCount] = { VpLayoutBinding, ModelLayoutBinding };
+
+		const uint32_t BindingCount = 1;
+		VkDescriptorSetLayoutBinding Bindings[BindingCount] = { VpLayoutBinding };
 
 		// Create Descriptor Set Layout with given bindings
 		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = {};
@@ -830,6 +834,13 @@ namespace Core
 		}
 
 		// Function end CreateDescriptorSetLayout
+
+		// Function: CreatePushConstantRange
+		RenderInstance.PushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		RenderInstance.PushConstantRange.offset = 0;
+		// Todo: check constant and model size?
+		RenderInstance.PushConstantRange.size = sizeof(Model);
+		// Function end CreatePushConstantRange
 
 		// Function: CreateGraphicsPipeline
 		// TODO FIX!!!
@@ -995,8 +1006,8 @@ namespace Core
 		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		PipelineLayoutCreateInfo.setLayoutCount = 1;
 		PipelineLayoutCreateInfo.pSetLayouts = &RenderInstance.DescriptorSetLayout;
-		PipelineLayoutCreateInfo.pushConstantRangeCount = 0;
-		PipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
+		PipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+		PipelineLayoutCreateInfo.pPushConstantRanges = &RenderInstance.PushConstantRange;
 
 		Result = vkCreatePipelineLayout(RenderInstance.LogicalDevice, &PipelineLayoutCreateInfo, nullptr, &RenderInstance.PipelineLayout);
 		if (Result != VK_SUCCESS)
@@ -1074,6 +1085,7 @@ namespace Core
 		// Function CreateCommandPool
 		VkCommandPoolCreateInfo PoolInfo = {};
 		PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		PoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 		PoolInfo.queueFamilyIndex = PhysicalDeviceIndices.GraphicsFamily;	// Queue Family type that buffers from this command pool will use
 
 		// Create a Graphics Queue Family Command Pool
@@ -1103,14 +1115,15 @@ namespace Core
 		}
 		// Function end CreateCommandBuffers
 
+		// UNIFORM BUFFER SETUP CODE
 		// Function AllocateDynamicBufferTransferSpace
 		// Calculate alignment of model data
-		RenderInstance.ModelUniformAlignment = static_cast<uint32_t>((sizeof(UboModel) + RenderInstance.PhysicalDeviceProperties.limits.minUniformBufferOffsetAlignment - 1)
-			& ~(RenderInstance.PhysicalDeviceProperties.limits.minUniformBufferOffsetAlignment - 1));
+		//RenderInstance.ModelUniformAlignment = static_cast<uint32_t>((sizeof(UboModel) + RenderInstance.PhysicalDeviceProperties.limits.minUniformBufferOffsetAlignment - 1)
+		//	& ~(RenderInstance.PhysicalDeviceProperties.limits.minUniformBufferOffsetAlignment - 1));
 
-		// Create space in memory to hold dynamic buffer that is aligned to our required alignment and holds MAX_OBJECTS
-		RenderInstance.ModelTransferSpace = (UboModel*)_aligned_malloc(RenderInstance.ModelUniformAlignment * RenderInstance.MaxObjects, RenderInstance.ModelUniformAlignment);
-		// Function end AllocateDynamicBufferTransferSpace
+		//// Create space in memory to hold dynamic buffer that is aligned to our required alignment and holds MAX_OBJECTS
+		//RenderInstance.ModelTransferSpace = (UboModel*)_aligned_malloc(RenderInstance.ModelUniformAlignment * RenderInstance.MaxObjects, RenderInstance.ModelUniformAlignment);
+		//// Function end AllocateDynamicBufferTransferSpace
 
 		// Function CreateSynchronisation
 		RenderInstance.ImageAvalible = static_cast<VkSemaphore*>(Util::Memory::Allocate(RenderInstance.MaxFrameDraws * sizeof(VkSemaphore)));
@@ -1139,10 +1152,11 @@ namespace Core
 
 		// Function CreateUniformBuffers
 		const VkDeviceSize VpBufferSize = sizeof(Core::VulkanRenderInstance::UboViewProjection);
-		const VkDeviceSize ModelBufferSize = RenderInstance.ModelUniformAlignment * RenderInstance.MaxObjects;
+		//const VkDeviceSize ModelBufferSize = RenderInstance.ModelUniformAlignment * RenderInstance.MaxObjects;
 
 		RenderInstance.VpUniformBuffers = static_cast<VulkanBuffer*>(Util::Memory::Allocate(RenderInstance.SwapchainImagesCount * sizeof(VulkanBuffer)));
-		RenderInstance.ModelDynamicUniformBuffers = static_cast<VulkanBuffer*>(Util::Memory::Allocate(RenderInstance.SwapchainImagesCount * sizeof(VulkanBuffer)));
+		// UNIFORM BUFFER SETUP CODE
+		//RenderInstance.ModelDynamicUniformBuffers = static_cast<VulkanBuffer*>(Util::Memory::Allocate(RenderInstance.SwapchainImagesCount * sizeof(VulkanBuffer)));
 	
 		// Create Uniform buffers
 		for (uint32_t i = 0; i < RenderInstance.SwapchainImagesCount; i++)
@@ -1150,8 +1164,9 @@ namespace Core
 			CreateVulkanBuffer(RenderInstance, VpBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, RenderInstance.VpUniformBuffers[i]);
 
-			CreateVulkanBuffer(RenderInstance, ModelBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, RenderInstance.ModelDynamicUniformBuffers[i]);
+			// UNIFORM BUFFER SETUP CODE
+			//CreateVulkanBuffer(RenderInstance, ModelBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			//	VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, RenderInstance.ModelDynamicUniformBuffers[i]);
 		}
 
 		// Function end CreateUniformBuffers
@@ -1161,12 +1176,16 @@ namespace Core
 		VpPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		VpPoolSize.descriptorCount = RenderInstance.SwapchainImagesCount;
 
-		VkDescriptorPoolSize ModelPoolSize = {};
-		ModelPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		ModelPoolSize.descriptorCount = RenderInstance.SwapchainImagesCount;
+		// UNIFORM BUFFER SETUP CODE
+		//VkDescriptorPoolSize ModelPoolSize = {};
+		//ModelPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		//ModelPoolSize.descriptorCount = RenderInstance.SwapchainImagesCount;
 
-		const uint32_t PoolSizeCount = 2;
-		VkDescriptorPoolSize PoolSizes[PoolSizeCount] = { VpPoolSize, ModelPoolSize };
+		//const uint32_t PoolSizeCount = 2;
+		//VkDescriptorPoolSize PoolSizes[PoolSizeCount] = { VpPoolSize, ModelPoolSize };
+
+		const uint32_t PoolSizeCount = 1;
+		VkDescriptorPoolSize PoolSizes[PoolSizeCount] = { VpPoolSize };
 
 		// Data to create Descriptor Pool
 		VkDescriptorPoolCreateInfo PoolCreateInfo = {};
@@ -1207,7 +1226,8 @@ namespace Core
 		}
 
 		VkDescriptorBufferInfo VpBufferInfo = {};
-		VkDescriptorBufferInfo ModelBufferInfo = {};
+		// UNIFORM BUFFER SETUP CODE
+		//VkDescriptorBufferInfo ModelBufferInfo = {};
 		// Update all of descriptor set buffer bindings
 		for (uint32_t i = 0; i < RenderInstance.SwapchainImagesCount; i++)
 		{
@@ -1224,21 +1244,25 @@ namespace Core
 			VpSetWrite.descriptorCount = 1;
 			VpSetWrite.pBufferInfo = &VpBufferInfo;
 
-			ModelBufferInfo.buffer = RenderInstance.ModelDynamicUniformBuffers[i].Buffer;
-			ModelBufferInfo.offset = 0;
-			ModelBufferInfo.range = RenderInstance.ModelUniformAlignment;
+			// UNIFORM BUFFER SETUP CODE
+			//ModelBufferInfo.buffer = RenderInstance.ModelDynamicUniformBuffers[i].Buffer;
+			//ModelBufferInfo.offset = 0;
+			//ModelBufferInfo.range = RenderInstance.ModelUniformAlignment;
 
-			VkWriteDescriptorSet ModelSetWrite = {};
-			ModelSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			ModelSetWrite.dstSet = RenderInstance.DescriptorSets[i];
-			ModelSetWrite.dstBinding = 1;
-			ModelSetWrite.dstArrayElement = 0;
-			ModelSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-			ModelSetWrite.descriptorCount = 1;
-			ModelSetWrite.pBufferInfo = &ModelBufferInfo;
+			//VkWriteDescriptorSet ModelSetWrite = {};
+			//ModelSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			//ModelSetWrite.dstSet = RenderInstance.DescriptorSets[i];
+			//ModelSetWrite.dstBinding = 1;
+			//ModelSetWrite.dstArrayElement = 0;
+			//ModelSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+			//ModelSetWrite.descriptorCount = 1;
+			//ModelSetWrite.pBufferInfo = &ModelBufferInfo;
 
-			const uint32_t WriteSetsCount = 2;
-			VkWriteDescriptorSet WriteSets[WriteSetsCount] = { VpSetWrite, ModelSetWrite };
+			//const uint32_t WriteSetsCount = 2;
+			//VkWriteDescriptorSet WriteSets[WriteSetsCount] = { VpSetWrite, ModelSetWrite };
+
+			const uint32_t WriteSetsCount = 1;
+			VkWriteDescriptorSet WriteSets[WriteSetsCount] = { VpSetWrite };
 
 			// Todo: use one vkUpdateDescriptorSets call to update all descriptors
 			vkUpdateDescriptorSets(RenderInstance.LogicalDevice, WriteSetsCount, WriteSets, 0, nullptr);
@@ -1305,8 +1329,16 @@ namespace Core
 		return true;
 	}
 
-	bool RecordCommands(VulkanRenderInstance& RenderInstance)
+	bool Draw(VulkanRenderInstance& RenderInstance)
 	{
+		vkWaitForFences(RenderInstance.LogicalDevice, 1, &RenderInstance.DrawFences[RenderInstance.CurrentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
+		vkResetFences(RenderInstance.LogicalDevice, 1, &RenderInstance.DrawFences[RenderInstance.CurrentFrame]);
+
+		// Get index of next image to be drawn to, and signal semaphore when ready to be drawn to
+		uint32_t ImageIndex;
+		vkAcquireNextImageKHR(RenderInstance.LogicalDevice, RenderInstance.VulkanSwapchain, std::numeric_limits<uint64_t>::max(), RenderInstance.ImageAvalible[RenderInstance.CurrentFrame], VK_NULL_HANDLE, &ImageIndex);
+
+		// Function RecordCommands
 		VkCommandBufferBeginInfo CommandBufferBeginInfo = {};
 		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -1323,64 +1355,54 @@ namespace Core
 		RenderPassBeginInfo.pClearValues = ClearValues;
 		RenderPassBeginInfo.clearValueCount = ClearValuesSize; // List of clear values (TODO: Depth Attachment Clear Value)
 
-		for (uint32_t i = 0; i < RenderInstance.SwapchainImagesCount; i++)
+		RenderPassBeginInfo.framebuffer = RenderInstance.SwapchainFramebuffers[ImageIndex];
+
+		VkResult Result = vkBeginCommandBuffer(RenderInstance.CommandBuffers[ImageIndex], &CommandBufferBeginInfo);
+		if (Result != VK_SUCCESS)
 		{
-			RenderPassBeginInfo.framebuffer = RenderInstance.SwapchainFramebuffers[i];
-
-			VkResult Result = vkBeginCommandBuffer(RenderInstance.CommandBuffers[i], &CommandBufferBeginInfo);
-			if (Result != VK_SUCCESS)
-			{
-				Util::Log().Error("vkBeginCommandBuffer result is {}", static_cast<int>(Result));
-				return false;
-			}
-
-			// Begin Render Pass
-			vkCmdBeginRenderPass(RenderInstance.CommandBuffers[i], &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-			// Bind Pipeline to be used in render pass
-			vkCmdBindPipeline(RenderInstance.CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.GraphicsPipeline);
-
-			// TODO: Support rework to not create identical index buffers
-			for (uint32_t j = 0; j < RenderInstance.DrawableObjectsCount; ++j)
-			{
-				VkBuffer VertexBuffers[] = { RenderInstance.DrawableObjects[j].VertexBuffer.Buffer};					// Buffers to bind
-				VkDeviceSize Offsets[] = { 0 };												// Offsets into buffers being bound
-				vkCmdBindVertexBuffers(RenderInstance.CommandBuffers[i], 0, 1, VertexBuffers, Offsets);
-
-				vkCmdBindIndexBuffer(RenderInstance.CommandBuffers[i], RenderInstance.DrawableObjects[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-
-				uint32_t DynamicOffset = RenderInstance.ModelUniformAlignment * j;
-
-				vkCmdBindDescriptorSets(RenderInstance.CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.PipelineLayout, 0, 1,
-					&RenderInstance.DescriptorSets[i], 1, &DynamicOffset);
-
-				// Execute pipeline
-				//vkCmdDraw(RenderInstance.CommandBuffers[i], RenderInstance.DrawableObject.VerticesCount, 1, 0, 0);
-				vkCmdDrawIndexed(RenderInstance.CommandBuffers[i], RenderInstance.DrawableObjects[j].IndicesCount, 1, 0, 0, 0);
-			}
-
-			// End Render Pass
-			vkCmdEndRenderPass(RenderInstance.CommandBuffers[i]);
-
-			Result = vkEndCommandBuffer(RenderInstance.CommandBuffers[i]);
-			if (Result != VK_SUCCESS)
-			{
-				Util::Log().Error("vkBeginCommandBuffer result is {}", static_cast<int>(Result));
-				return false;
-			}
+			Util::Log().Error("vkBeginCommandBuffer result is {}", static_cast<int>(Result));
+			return false;
 		}
 
-		return true;
-	}
+		// Begin Render Pass
+		vkCmdBeginRenderPass(RenderInstance.CommandBuffers[ImageIndex], &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-	bool Draw(VulkanRenderInstance& RenderInstance)
-	{
-		vkWaitForFences(RenderInstance.LogicalDevice, 1, &RenderInstance.DrawFences[RenderInstance.CurrentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
-		vkResetFences(RenderInstance.LogicalDevice, 1, &RenderInstance.DrawFences[RenderInstance.CurrentFrame]);
+		// Bind Pipeline to be used in render pass
+		vkCmdBindPipeline(RenderInstance.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.GraphicsPipeline);
 
-		// Get index of next image to be drawn to, and signal semaphore when ready to be drawn to
-		uint32_t ImageIndex;
-		vkAcquireNextImageKHR(RenderInstance.LogicalDevice, RenderInstance.VulkanSwapchain, std::numeric_limits<uint64_t>::max(), RenderInstance.ImageAvalible[RenderInstance.CurrentFrame], VK_NULL_HANDLE, &ImageIndex);
+		// TODO: Support rework to not create identical index buffers
+		for (uint32_t j = 0; j < RenderInstance.DrawableObjectsCount; ++j)
+		{
+			VkBuffer VertexBuffers[] = { RenderInstance.DrawableObjects[j].VertexBuffer.Buffer };					// Buffers to bind
+			VkDeviceSize Offsets[] = { 0 };												// Offsets into buffers being bound
+			vkCmdBindVertexBuffers(RenderInstance.CommandBuffers[ImageIndex], 0, 1, VertexBuffers, Offsets);
+
+			vkCmdBindIndexBuffer(RenderInstance.CommandBuffers[ImageIndex], RenderInstance.DrawableObjects[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+
+			// UNIFORM BUFFER SETUP CODE
+			//uint32_t DynamicOffset = RenderInstance.ModelUniformAlignment * j;
+
+			vkCmdPushConstants(RenderInstance.CommandBuffers[ImageIndex], RenderInstance.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
+				0, sizeof(Model), &RenderInstance.DrawableObjects[j].Model);
+
+			vkCmdBindDescriptorSets(RenderInstance.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.PipelineLayout, 0, 1,
+				&RenderInstance.DescriptorSets[ImageIndex], 0, nullptr /*1, &DynamicOffset*/);
+
+			// Execute pipeline
+			//vkCmdDraw(RenderInstance.CommandBuffers[i], RenderInstance.DrawableObject.VerticesCount, 1, 0, 0);
+			vkCmdDrawIndexed(RenderInstance.CommandBuffers[ImageIndex], RenderInstance.DrawableObjects[j].IndicesCount, 1, 0, 0, 0);
+		}
+
+		// End Render Pass
+		vkCmdEndRenderPass(RenderInstance.CommandBuffers[ImageIndex]);
+
+		Result = vkEndCommandBuffer(RenderInstance.CommandBuffers[ImageIndex]);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkBeginCommandBuffer result is {}", static_cast<int>(Result));
+			return false;
+		}
+		// Function end RecordCommands
 
 		//UpdateUniformBuffer
 		void* Data;
@@ -1389,17 +1411,18 @@ namespace Core
 		std::memcpy(Data, &RenderInstance.ViewProjection, sizeof(Core::VulkanRenderInstance::UboViewProjection));
 		vkUnmapMemory(RenderInstance.LogicalDevice, RenderInstance.VpUniformBuffers[ImageIndex].BufferMemory);
 
-		for (uint32_t i = 0; i < RenderInstance.DrawableObjectsCount; ++i)
-		{
-			UboModel* ThisModel = (UboModel*)((uint64_t)RenderInstance.ModelTransferSpace + (i * RenderInstance.ModelUniformAlignment));
-			*ThisModel = RenderInstance.DrawableObjects[i].Model;
-		}
+		// UNIFORM BUFFER SETUP CODE
+		//for (uint32_t i = 0; i < RenderInstance.DrawableObjectsCount; ++i)
+		//{
+		//	UboModel* ThisModel = (UboModel*)((uint64_t)RenderInstance.ModelTransferSpace + (i * RenderInstance.ModelUniformAlignment));
+		//	*ThisModel = RenderInstance.DrawableObjects[i].Model;
+		//}
 
-		vkMapMemory(RenderInstance.LogicalDevice, RenderInstance.ModelDynamicUniformBuffers[ImageIndex].BufferMemory, 0,
-			RenderInstance.ModelUniformAlignment * RenderInstance.DrawableObjectsCount, 0, &Data);
+		//vkMapMemory(RenderInstance.LogicalDevice, RenderInstance.ModelDynamicUniformBuffers[ImageIndex].BufferMemory, 0,
+		//	RenderInstance.ModelUniformAlignment * RenderInstance.DrawableObjectsCount, 0, &Data);
 
-		std::memcpy(Data, RenderInstance.ModelTransferSpace, RenderInstance.ModelUniformAlignment * RenderInstance.DrawableObjectsCount);
-		vkUnmapMemory(RenderInstance.LogicalDevice, RenderInstance.ModelDynamicUniformBuffers[ImageIndex].BufferMemory);
+		//std::memcpy(Data, RenderInstance.ModelTransferSpace, RenderInstance.ModelUniformAlignment * RenderInstance.DrawableObjectsCount);
+		//vkUnmapMemory(RenderInstance.LogicalDevice, RenderInstance.ModelDynamicUniformBuffers[ImageIndex].BufferMemory);
 
 		// -- SUBMIT COMMAND BUFFER TO RENDER --
 		// Queue submission information
@@ -1417,7 +1440,7 @@ namespace Core
 		submitInfo.pSignalSemaphores = &RenderInstance.RenderFinished[RenderInstance.CurrentFrame];	// Semaphores to signal when command buffer finishes
 
 		// Submit command buffer to queue
-		VkResult Result = vkQueueSubmit(RenderInstance.GraphicsQueue, 1, &submitInfo, RenderInstance.DrawFences[RenderInstance.CurrentFrame]);
+		Result = vkQueueSubmit(RenderInstance.GraphicsQueue, 1, &submitInfo, RenderInstance.DrawFences[RenderInstance.CurrentFrame]);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkQueueSubmit result is {}", static_cast<int>(Result));
@@ -1450,7 +1473,8 @@ namespace Core
 	{
 		vkDeviceWaitIdle(RenderInstance.LogicalDevice);
 
-		_aligned_free(RenderInstance.ModelTransferSpace);
+		// UNIFORM BUFFER SETUP CODE
+		//_aligned_free(RenderInstance.ModelTransferSpace);
 
 		Util::Memory::Deallocate(RenderInstance.DescriptorSets);
 
@@ -1461,11 +1485,13 @@ namespace Core
 		for (uint32_t i = 0; i < RenderInstance.SwapchainImagesCount; i++)
 		{
 			Core::DestroyVulkanBuffer(RenderInstance, RenderInstance.VpUniformBuffers[i]);
-			Core::DestroyVulkanBuffer(RenderInstance, RenderInstance.ModelDynamicUniformBuffers[i]);
+			// UNIFORM BUFFER SETUP CODE
+			//Core::DestroyVulkanBuffer(RenderInstance, RenderInstance.ModelDynamicUniformBuffers[i]);
 		}
 
 		Util::Memory::Deallocate(RenderInstance.VpUniformBuffers);
-		Util::Memory::Deallocate(RenderInstance.ModelDynamicUniformBuffers);
+		// UNIFORM BUFFER SETUP CODE
+		//Util::Memory::Deallocate(RenderInstance.ModelDynamicUniformBuffers);
 
 		for (uint32_t i = 0; i < RenderInstance.DrawableObjectsCount; ++i)
 		{

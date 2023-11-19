@@ -31,13 +31,8 @@ namespace Util
 
 	struct Log
 	{
-		Log(std::source_location&& Location = std::source_location::current()) :
-			_Location{ std::move(Location) }
-		{
-		}
-
 		template <typename... TArgs>
-		void Error(std::string_view Message, TArgs&&... Args) const
+		static void Error(std::string_view Message, TArgs&&... Args)
 		{
 			std::cout << "\033[31;5m"; // Set red color
 			Print("Error", Message, Args...);
@@ -45,7 +40,7 @@ namespace Util
 		}
 
 		template <typename... TArgs>
-		void Warning(std::string_view Message, TArgs&&... Args) const
+		static void Warning(std::string_view Message, TArgs&&... Args)
 		{
 			std::cout << "\033[33;5m"; // Set red color
 			Print("Warning", Message, Args...);
@@ -53,12 +48,12 @@ namespace Util
 		}
 
 		template <typename... TArgs>
-		void Info(std::string_view Message, TArgs&&... Args) const
+		static void Info(std::string_view Message, TArgs&&... Args)
 		{
 			Print("Info", Message, Args...);
 		}
 
-		void GlfwLogError() const
+		static void GlfwLogError()
 		{
 			const char* ErrorDescription;
 			const int LastErrorCode = glfwGetError(&ErrorDescription);
@@ -68,13 +63,10 @@ namespace Util
 		}
 
 		template <typename... TArgs>
-		void Print(std::string_view Type, std::string_view Message, TArgs&&... Args) const
+		static void Print(std::string_view Type, std::string_view Message, TArgs&&... Args)
 		{
-			std::cout << std::format("{}, line: {}, function: {}, {}: {}\n", _Location.file_name(),
-				_Location.line(), _Location.function_name(), Type, std::vformat(Message, std::make_format_args(Args...)));
+			std::cout << std::format("{}: {}\n", Type, std::vformat(Message, std::make_format_args(Args...)));
 		}
-
-		std::source_location _Location;
 	};
 
 	bool CreateDebugUtilsMessengerEXT(VkInstance Instance, const VkDebugUtilsMessengerCreateInfoEXT* CreateInfo,

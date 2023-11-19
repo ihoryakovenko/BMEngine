@@ -9,7 +9,13 @@ layout(binding = 0) uniform UboViewProjection
 	mat4 Projection;
 } ViewProjection;
 
+// TODO: delete Not in use!!!
 layout(binding = 1) uniform UboModel
+{
+	mat4 Model;
+} Model_deprecated;
+
+layout(push_constant) uniform PushModel
 {
 	mat4 Model;
 } Model;

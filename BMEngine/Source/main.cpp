@@ -19,7 +19,7 @@ int main()
 {
 	if (glfwInit() == GL_FALSE)
 	{
-		Util::Log().Error("glfwInit result is GL_FALSE");
+		Util::Log::Error("glfwInit result is GL_FALSE");
 		return -1;
 	}
 
@@ -29,7 +29,7 @@ int main()
 	GLFWwindow* Window = glfwCreateWindow(800, 600, "BMEngine", nullptr, nullptr);
 	if (Window == nullptr)
 	{
-		Util::Log().GlfwLogError();
+		Util::Log::GlfwLogError();
 		glfwTerminate();
 		return -1;
 	}
@@ -73,8 +73,6 @@ int main()
 	Mesh.MeshVertices = MeshVertices2;
 
 	Core::LoadMesh(RenderInstance, Mesh);
-	Core::RecordCommands(RenderInstance);
-
 
 	float Angle = 0.0f;
 	double DeltaTime = 0.0f;
@@ -118,7 +116,7 @@ int main()
 
 	if (Util::Memory::AllocateCounter != 0)
 	{
-		Util::Log().Error("AllocateCounter in not equal 0, counter is {}", Util::Memory::AllocateCounter);
+		Util::Log::Error("AllocateCounter in not equal 0, counter is {}", Util::Memory::AllocateCounter);
 		assert(false);
 	}
 

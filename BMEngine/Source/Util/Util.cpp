@@ -36,12 +36,12 @@ namespace Util
 				return true;
 			}
 
-			Log().Error("Failed to read file {}: ", FileName);
+			Log::Error("Failed to read file {}: ", FileName);
 			fclose(File);
 			return false;
 		}
 
-		Log().Error("Cannot open file {}: Result = {}", FileName, Result);
+		Log::Error("Cannot open file {}: Result = {}", FileName, Result);
 		return false;
 	}
 
@@ -54,13 +54,13 @@ namespace Util
 			const VkResult Result = CreateMessengerFunc(Instance, CreateInfo, Allocator, InDebugMessenger);
 			if (Result != VK_SUCCESS)
 			{
-				Util::Log().Error("CreateMessengerFunc result is {}", static_cast<int>(Result));
+				Util::Log::Error("CreateMessengerFunc result is {}", static_cast<int>(Result));
 				return false;
 			}
 		}
 		else
 		{
-			Util::Log().Error("CreateMessengerFunc is nullptr");
+			Util::Log::Error("CreateMessengerFunc is nullptr");
 			return false;
 		}
 
@@ -78,7 +78,7 @@ namespace Util
 		}
 		else
 		{
-			Util::Log().Error("DestroyMessengerFunc is nullptr");
+			Util::Log::Error("DestroyMessengerFunc is nullptr");
 			return false;
 		}
 	}
@@ -90,7 +90,7 @@ namespace Util
 		auto&& Log = Util::Log();
 		if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
 		{
-			Log.Error("Validation layer: {}", CallbackData->pMessage);
+			Log.Error(CallbackData->pMessage);
 		}
 		else
 		{
