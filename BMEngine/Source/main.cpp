@@ -3,6 +3,7 @@
 //#include <glm/glm.hpp>
 //#include <glm/mat4x4.hpp>
 
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -78,6 +79,9 @@ int main()
 	double DeltaTime = 0.0f;
 	double LastTime = 0.0f;
 
+	float XMove = 0.0f;
+	float MoveScale = 4.0f;
+
 	while (!glfwWindowShouldClose(RenderInstance.Window))
 	{
 		glfwPollEvents();
@@ -95,14 +99,22 @@ int main()
 		glm::mat4 firstModel(1.0f);
 		glm::mat4 secondModel(1.0f);
 
-		firstModel = glm::translate(firstModel, glm::vec3(-1.0f, -0.5f, -1.5f));
+		firstModel = glm::translate(firstModel, glm::vec3(0.0f, -0.5f, -2.0f));
 		firstModel = glm::rotate(firstModel, glm::radians(Angle), glm::vec3(0.0f, 0.0f, 1.0f));
 
-		secondModel = glm::translate(secondModel, glm::vec3(1.0f, 0.0f, -1.0f));
+		secondModel = glm::translate(secondModel, glm::vec3(0.0f, 0.0f, -2.5f));
 		secondModel = glm::rotate(secondModel, glm::radians(-Angle * 100), glm::vec3(0.0f, 0.0f, 1.0f));
 
 		RenderInstance.DrawableObjects[0].Model = firstModel;
 		RenderInstance.DrawableObjects[1].Model = secondModel;
+
+		XMove += MoveScale * static_cast<float>(DeltaTime);
+		if (std::abs(XMove) >= 8.0f)
+		{
+			MoveScale *= -1;
+		}
+
+		RenderInstance.ViewProjection.View = glm::lookAt(glm::vec3(XMove, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, -6.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 		Core::Draw(RenderInstance);
 	}

@@ -126,6 +126,11 @@ namespace Core
 		VkFramebuffer* SwapchainFramebuffers = nullptr;
 		VkCommandBuffer* CommandBuffers = nullptr;
 
+		// Todo struct depth buffer?
+		VkImage DepthBufferImage = nullptr;
+		VkDeviceMemory DepthBufferImageMemory = nullptr;
+		VkImageView DepthBufferImageView = nullptr;
+
 		VkDescriptorSetLayout DescriptorSetLayout = nullptr;
 		VkPushConstantRange PushConstantRange;
 
@@ -174,4 +179,12 @@ namespace Core
 
 	void CopyBuffer(const VulkanRenderInstance& RenderInstance, VkBuffer SourceBuffer,
 		VkBuffer DstinationBuffer, VkDeviceSize BufferSize);
+
+	VkImage CreateImage(const VulkanRenderInstance& RenderInstance, uint32_t Width, uint32_t Height,
+		VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags,
+		VkDeviceMemory* OutImageMemory);
+
+	uint32_t FindMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, uint32_t AllowedTypes, VkMemoryPropertyFlags Properties);
+
+	VkImageView CreateImageView(const VulkanRenderInstance& RenderInstance, VkImage Image, VkFormat Format, VkImageAspectFlags AspectFlags);
 }
