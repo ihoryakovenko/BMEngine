@@ -25,6 +25,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Core\VulkanCoreTypes.h" />
+    <ClInclude Include="Source\Util\stb_image.h" />
     <ClInclude Include="Source\Util\Util.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -145,7 +146,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)External\GLFW\include;$(VULKAN_SDK)\Include;$(ProjectDir)Source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <TreatWarningAsError>true</TreatWarningAsError>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

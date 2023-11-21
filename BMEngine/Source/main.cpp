@@ -3,6 +3,8 @@
 //#include <glm/glm.hpp>
 //#include <glm/mat4x4.hpp>
 
+#define STB_IMAGE_IMPLEMENTATION
+
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -15,6 +17,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Core/VulkanCoreTypes.h"
+
+#include "Util/stb_image.h"
 
 int main()
 {
@@ -74,6 +78,23 @@ int main()
 	Mesh.MeshVertices = MeshVertices2;
 
 	Core::LoadMesh(RenderInstance, Mesh);
+
+	//// Function LoadTexture
+	//int Width, Height;
+	//uint64_t ImageSize; // Todo: DeviceSize?
+	//int Channels;
+
+	//std::string fileLoc = "Textures/" + fileName;
+	//stbi_uc* ImageData = stbi_load(fileLoc.c_str(), &Width, &Height, &Channels, STBI_rgb_alpha);
+
+	//if (ImageData == nullptr)
+	//{
+	//	return -1;
+	//}
+
+	//ImageSize = Width * Height * 4;
+	//// Function end LoadTexture
+
 
 	float Angle = 0.0f;
 	double DeltaTime = 0.0f;

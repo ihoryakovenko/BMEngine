@@ -226,14 +226,14 @@ namespace Core
 		return Indices;
 	}
 
-	bool CreateVulkanBuffer(const VulkanRenderInstance& RenderInstance, VkDeviceSize BufferSize,
-		VkBufferUsageFlags BufferUsage, VkMemoryPropertyFlags BufferProperties, VulkanBuffer& OutBuffer)
+	bool CreateGenericBuffer(const VulkanRenderInstance& RenderInstance, VkDeviceSize BufferSize,
+		VkBufferUsageFlags BufferUsage, VkMemoryPropertyFlags BufferProperties, GenericBuffer& OutBuffer)
 	{
 		VkBufferCreateInfo BufferCreateInfo = {};
 		BufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		BufferCreateInfo.size = BufferSize;		// Size of buffer (size of 1 vertex * number of vertices)
-		BufferCreateInfo.usage = BufferUsage;		// Multiple types of buffer possible, we want Vertex Buffer
-		BufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;			// Similar to Swap Chain images, can share vertex buffers
+		BufferCreateInfo.size = BufferSize;
+		BufferCreateInfo.usage = BufferUsage;
+		BufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 		VkResult Result = vkCreateBuffer(RenderInstance.LogicalDevice, &BufferCreateInfo, nullptr, &OutBuffer.Buffer);
 		if (Result != VK_SUCCESS)
@@ -241,16 +241,14 @@ namespace Core
 			return false;
 		}
 
-		// GET BUFFER MEMORY REQUIREMENTS
 		VkMemoryRequirements MemoryRequirements;
 		vkGetBufferMemoryRequirements(RenderInstance.LogicalDevice, OutBuffer.Buffer, &MemoryRequirements);
 
-		// ALLOCATE MEMORY TO BUFFER
 		VkMemoryAllocateInfo MemoryAllocInfo = {};
 		MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		MemoryAllocInfo.allocationSize = MemoryRequirements.size;
 		MemoryAllocInfo.memoryTypeIndex = FindMemoryTypeIndex(RenderInstance.PhysicalDevice, MemoryRequirements.memoryTypeBits,
-			BufferProperties);		// Index of memory type on Physical Device that has required bit flags			
+			BufferProperties);	
 
 		Result = vkAllocateMemory(RenderInstance.LogicalDevice, &MemoryAllocInfo, nullptr, &OutBuffer.BufferMemory);
 		if (Result != VK_SUCCESS)
@@ -258,13 +256,12 @@ namespace Core
 			return false;
 		}
 
-		// Allocate memory to given vertex buffer
 		vkBindBufferMemory(RenderInstance.LogicalDevice, OutBuffer.Buffer, OutBuffer.BufferMemory, 0);
 
 		return true;
 	}
 
-	void DestroyVulkanBuffer(const VulkanRenderInstance& RenderInstance, VulkanBuffer& Buffer)
+	void DestroyGenericBuffer(const VulkanRenderInstance& RenderInstance, GenericBuffer& Buffer)
 	{
 		vkDestroyBuffer(RenderInstance.LogicalDevice, Buffer.Buffer, nullptr);
 		vkFreeMemory(RenderInstance.LogicalDevice, Buffer.BufferMemory, nullptr);
@@ -273,51 +270,129 @@ namespace Core
 	void CopyBuffer(const VulkanRenderInstance& RenderInstance, VkBuffer SourceBuffer,
 		VkBuffer DstinationBuffer, VkDeviceSize BufferSize)
 	{
-		// Command buffer to hold transfer commands
+		// Todo: Use 1 CommandBuffer for all copy operations?
 		VkCommandBuffer TransferCommandBuffer;
 
-		// Command Buffer details
 		VkCommandBufferAllocateInfo AllocInfo = {};
 		AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 		AllocInfo.commandPool = RenderInstance.GraphicsCommandPool;
 		AllocInfo.commandBufferCount = 1;
 
-		// Allocate command buffer from pool
 		vkAllocateCommandBuffers(RenderInstance.LogicalDevice, &AllocInfo, &TransferCommandBuffer);
 
-		// Information to begin the command buffer record
 		VkCommandBufferBeginInfo BeginInfo = {};
 		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;	// We're only using the command buffer once, so set up for one time submit
+		BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-		// Begin recording transfer commands
 		vkBeginCommandBuffer(TransferCommandBuffer, &BeginInfo);
 
-		// Region of data to copy from and to
-		VkBufferCopy bufferCopyRegion = {};
-		bufferCopyRegion.srcOffset = 0;
-		bufferCopyRegion.dstOffset = 0;
-		bufferCopyRegion.size = BufferSize;
+		VkBufferCopy BufferCopyRegion = {};
+		BufferCopyRegion.srcOffset = 0;
+		BufferCopyRegion.dstOffset = 0;
+		BufferCopyRegion.size = BufferSize;
 
-		// Command to copy src buffer to dst buffer
-		vkCmdCopyBuffer(TransferCommandBuffer, SourceBuffer, DstinationBuffer, 1, &bufferCopyRegion);
+		// Todo copy multiple regions at once?
+		vkCmdCopyBuffer(TransferCommandBuffer, SourceBuffer, DstinationBuffer, 1, &BufferCopyRegion);
 
-		// End commands
 		vkEndCommandBuffer(TransferCommandBuffer);
 
-		// Queue submission information
-		VkSubmitInfo submitInfo = {};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &TransferCommandBuffer;
+		VkSubmitInfo SubmitInfo = {};
+		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		SubmitInfo.commandBufferCount = 1;
+		SubmitInfo.pCommandBuffers = &TransferCommandBuffer;
 
-		// Submit transfer command to transfer queue and wait until it finishes
-		vkQueueSubmit(RenderInstance.GraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+		vkQueueSubmit(RenderInstance.GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
 		vkQueueWaitIdle(RenderInstance.GraphicsQueue);
 
-		// Free temporary command buffer back to pool
 		vkFreeCommandBuffers(RenderInstance.LogicalDevice, RenderInstance.GraphicsCommandPool, 1, &TransferCommandBuffer);
+	}
+
+	void CopyBufferToImage(const VulkanRenderInstance& RenderInstance, VkBuffer SourceBuffer,
+		VkImage Image, uint32_t Width, uint32_t Height)
+	{
+		// Todo: Use 1 CommandBuffer for all copy operations?
+		VkCommandBuffer TransferCommandBuffer;
+
+		VkCommandBufferAllocateInfo AllocInfo = {};
+		AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		AllocInfo.commandPool = RenderInstance.GraphicsCommandPool;
+		AllocInfo.commandBufferCount = 1;
+
+		vkAllocateCommandBuffers(RenderInstance.LogicalDevice, &AllocInfo, &TransferCommandBuffer);
+
+		VkCommandBufferBeginInfo BeginInfo = {};
+		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+		vkBeginCommandBuffer(TransferCommandBuffer, &BeginInfo);
+
+		VkBufferImageCopy ImageRegion = {};
+		ImageRegion.bufferOffset = 0;
+		ImageRegion.bufferRowLength = 0;
+		ImageRegion.bufferImageHeight = 0;
+		ImageRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		ImageRegion.imageSubresource.mipLevel = 0;
+		ImageRegion.imageSubresource.baseArrayLayer = 0;						// Starting array layer (if array)
+		ImageRegion.imageSubresource.layerCount = 1;
+		ImageRegion.imageOffset = { 0, 0, 0 };
+		ImageRegion.imageExtent = { Width, Height, 1 };
+
+		// Todo copy multiple regions at once?
+		vkCmdCopyBufferToImage(TransferCommandBuffer, SourceBuffer, Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ImageRegion);
+
+		vkEndCommandBuffer(TransferCommandBuffer);
+
+		VkSubmitInfo SubmitInfo = {};
+		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		SubmitInfo.commandBufferCount = 1;
+		SubmitInfo.pCommandBuffers = &TransferCommandBuffer;
+
+		vkQueueSubmit(RenderInstance.GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
+		vkQueueWaitIdle(RenderInstance.GraphicsQueue);
+
+		vkFreeCommandBuffers(RenderInstance.LogicalDevice, RenderInstance.GraphicsCommandPool, 1, &TransferCommandBuffer);
+	}
+
+	void CreateTexture(VulkanRenderInstance& RenderInstance, struct stbi_uc* TextureData, int Width, int Height, VkDeviceSize ImageSize)
+	{
+		assert(RenderInstance.TextureImagesCount < RenderInstance.MaxTextures);
+
+		GenericBuffer StagingBuffer;
+		CreateGenericBuffer(RenderInstance, ImageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			StagingBuffer);
+
+		// Copy image data to staging buffer
+		void* Data;
+		vkMapMemory(RenderInstance.LogicalDevice, StagingBuffer.BufferMemory, 0, ImageSize, 0, &Data);
+		memcpy(Data, TextureData, static_cast<size_t>(ImageSize));
+		vkUnmapMemory(RenderInstance.LogicalDevice, StagingBuffer.BufferMemory);
+
+		// Create image to hold final texture
+		ImageBuffer ImageBuffeObject;
+		ImageBuffeObject.TextureImage = CreateImage(RenderInstance, Width, Height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &ImageBuffeObject.TextureImagesMemory);
+
+
+		//// COPY DATA TO IMAGE
+		//// Transition image to be DST for copy operation
+		//transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool,
+		//	texImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+		// Copy image data
+		CopyBufferToImage(RenderInstance, StagingBuffer.Buffer, ImageBuffeObject.TextureImage, Width, Height);
+
+		//// Transition image to be shader readable for shader usage
+		//transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool,
+		//	texImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+		// Add texture data to vector for reference
+		RenderInstance.TextureImageBuffer[RenderInstance.TextureImagesCount] = ImageBuffeObject;
+
+		// Destroy staging buffers
+		DestroyGenericBuffer(RenderInstance, StagingBuffer);
 	}
 
 	uint32_t FindMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, uint32_t AllowedTypes, VkMemoryPropertyFlags Properties)
@@ -1278,18 +1353,18 @@ namespace Core
 		const VkDeviceSize VpBufferSize = sizeof(Core::VulkanRenderInstance::UboViewProjection);
 		//const VkDeviceSize ModelBufferSize = RenderInstance.ModelUniformAlignment * RenderInstance.MaxObjects;
 
-		RenderInstance.VpUniformBuffers = static_cast<VulkanBuffer*>(Util::Memory::Allocate(RenderInstance.SwapchainImagesCount * sizeof(VulkanBuffer)));
+		RenderInstance.VpUniformBuffers = static_cast<GenericBuffer*>(Util::Memory::Allocate(RenderInstance.SwapchainImagesCount * sizeof(GenericBuffer)));
 		// UNIFORM BUFFER SETUP CODE
-		//RenderInstance.ModelDynamicUniformBuffers = static_cast<VulkanBuffer*>(Util::Memory::Allocate(RenderInstance.SwapchainImagesCount * sizeof(VulkanBuffer)));
+		//RenderInstance.ModelDynamicUniformBuffers = static_cast<GenericBuffer*>(Util::Memory::Allocate(RenderInstance.SwapchainImagesCount * sizeof(GenericBuffer)));
 	
 		// Create Uniform buffers
 		for (uint32_t i = 0; i < RenderInstance.SwapchainImagesCount; i++)
 		{
-			CreateVulkanBuffer(RenderInstance, VpBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			CreateGenericBuffer(RenderInstance, VpBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, RenderInstance.VpUniformBuffers[i]);
 
 			// UNIFORM BUFFER SETUP CODE
-			//CreateVulkanBuffer(RenderInstance, ModelBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			//CreateGenericBuffer(RenderInstance, ModelBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			//	VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, RenderInstance.ModelDynamicUniformBuffers[i]);
 		}
 
@@ -1414,8 +1489,9 @@ namespace Core
 		const VkDeviceSize StagingBufferSize = VerticesBufferSize > IndecesBufferSize ? VerticesBufferSize : IndecesBufferSize;
 		void* data = nullptr;
 
-		VulkanBuffer StagingBuffer;
-		CreateVulkanBuffer(RenderInstance, StagingBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		// Todo: Load many meshes using one buffer?
+		GenericBuffer StagingBuffer;
+		CreateGenericBuffer(RenderInstance, StagingBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, StagingBuffer);
 
 		// Vertex buffer
@@ -1423,7 +1499,7 @@ namespace Core
 		std::memcpy(data, Mesh.MeshVertices, (size_t)(VerticesBufferSize));
 		vkUnmapMemory(RenderInstance.LogicalDevice, StagingBuffer.BufferMemory);
 
-		CreateVulkanBuffer(RenderInstance, VerticesBufferSize,
+		CreateGenericBuffer(RenderInstance, VerticesBufferSize,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			RenderInstance.DrawableObjects[RenderInstance.DrawableObjectsCount].VertexBuffer);
 
@@ -1436,7 +1512,7 @@ namespace Core
 		std::memcpy(data, Mesh.MeshIndices, (size_t)(IndecesBufferSize));
 		vkUnmapMemory(RenderInstance.LogicalDevice, StagingBuffer.BufferMemory);
 
-		CreateVulkanBuffer(RenderInstance, IndecesBufferSize,
+		CreateGenericBuffer(RenderInstance, IndecesBufferSize,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			RenderInstance.DrawableObjects[RenderInstance.DrawableObjectsCount].IndexBuffer);
 
@@ -1444,7 +1520,7 @@ namespace Core
 
 		RenderInstance.DrawableObjects[RenderInstance.DrawableObjectsCount].IndicesCount = Mesh.MeshIndicesCount;
 
-		DestroyVulkanBuffer(RenderInstance, StagingBuffer);
+		DestroyGenericBuffer(RenderInstance, StagingBuffer);
 
 		RenderInstance.DrawableObjects[RenderInstance.DrawableObjectsCount].Model = glm::mat4(1.0f);
 
@@ -1602,6 +1678,12 @@ namespace Core
 		// UNIFORM BUFFER SETUP CODE
 		//_aligned_free(RenderInstance.ModelTransferSpace);
 
+		for (uint32_t i = 0; i < RenderInstance.TextureImagesCount; ++i)
+		{
+			vkDestroyImage(RenderInstance.LogicalDevice, RenderInstance.TextureImageBuffer[i].TextureImage, nullptr);
+			vkFreeMemory(RenderInstance.LogicalDevice, RenderInstance.TextureImageBuffer[i].TextureImagesMemory, nullptr);
+		}
+
 		vkDestroyImageView(RenderInstance.LogicalDevice, RenderInstance.DepthBufferImageView, nullptr);
 		vkDestroyImage(RenderInstance.LogicalDevice, RenderInstance.DepthBufferImage, nullptr);
 		vkFreeMemory(RenderInstance.LogicalDevice, RenderInstance.DepthBufferImageMemory, nullptr);
@@ -1614,9 +1696,9 @@ namespace Core
 		
 		for (uint32_t i = 0; i < RenderInstance.SwapchainImagesCount; i++)
 		{
-			Core::DestroyVulkanBuffer(RenderInstance, RenderInstance.VpUniformBuffers[i]);
+			Core::DestroyGenericBuffer(RenderInstance, RenderInstance.VpUniformBuffers[i]);
 			// UNIFORM BUFFER SETUP CODE
-			//Core::DestroyVulkanBuffer(RenderInstance, RenderInstance.ModelDynamicUniformBuffers[i]);
+			//Core::DestroyGenericBuffer(RenderInstance, RenderInstance.ModelDynamicUniformBuffers[i]);
 		}
 
 		Util::Memory::Deallocate(RenderInstance.VpUniformBuffers);
@@ -1625,8 +1707,8 @@ namespace Core
 
 		for (uint32_t i = 0; i < RenderInstance.DrawableObjectsCount; ++i)
 		{
-			DestroyVulkanBuffer(RenderInstance, RenderInstance.DrawableObjects[i].VertexBuffer);
-			DestroyVulkanBuffer(RenderInstance, RenderInstance.DrawableObjects[i].IndexBuffer);
+			DestroyGenericBuffer(RenderInstance, RenderInstance.DrawableObjects[i].VertexBuffer);
+			DestroyGenericBuffer(RenderInstance, RenderInstance.DrawableObjects[i].IndexBuffer);
 		}
 
 		for (size_t i = 0; i < RenderInstance.MaxFrameDraws; i++)

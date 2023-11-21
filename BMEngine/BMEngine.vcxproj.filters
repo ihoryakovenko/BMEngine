@@ -14,5 +14,6 @@
   <ItemGroup>
     <ClInclude Include="Source\Core\VulkanCoreTypes.h" />
     <ClInclude Include="Source\Util\Util.h" />
+    <ClInclude Include="Source\Util\stb_image.h" />
   </ItemGroup>
 </Project>

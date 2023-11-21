@@ -77,10 +77,16 @@ namespace Core
 		uint32_t* MeshIndices = nullptr;
 	};
 
-	struct VulkanBuffer
+	struct GenericBuffer
 	{
 		VkBuffer Buffer = nullptr;
 		VkDeviceMemory BufferMemory = nullptr;
+	};
+
+	struct ImageBuffer
+	{
+		VkImage TextureImage = nullptr;
+		VkDeviceMemory TextureImagesMemory = nullptr;
 	};
 
 	typedef glm::mat4 Model;
@@ -88,10 +94,10 @@ namespace Core
 	struct DrawableObject
 	{
 		uint32_t VerticesCount = 0;
-		VulkanBuffer VertexBuffer;
+		GenericBuffer VertexBuffer;
 
 		uint32_t IndicesCount = 0;
-		VulkanBuffer IndexBuffer;
+		GenericBuffer IndexBuffer;
 
 		Model Model;
 	};
@@ -137,8 +143,8 @@ namespace Core
 		VkDescriptorPool DescriptorPool = nullptr;
 		VkDescriptorSet* DescriptorSets = nullptr;	
 
-		VulkanBuffer* VpUniformBuffers = nullptr;
-		//VulkanBuffer* ModelDynamicUniformBuffers = nullptr;
+		GenericBuffer* VpUniformBuffers = nullptr;
+		//GenericBuffer* ModelDynamicUniformBuffers = nullptr;
 
 		//uint32_t ModelUniformAlignment = 0;
 		//UboModel* ModelTransferSpace = nullptr;
@@ -159,26 +165,35 @@ namespace Core
 		const int MaxFrameDraws = 2;
 		int CurrentFrame = 0;
 		
-
 		VkCommandPool GraphicsCommandPool = nullptr;
 
 		VkSemaphore* ImageAvalible = nullptr;
 		VkSemaphore* RenderFinished = nullptr;
 		VkFence* DrawFences = nullptr;
+
+		const uint32_t MaxTextures = 2;
+		uint32_t TextureImagesCount = 0;
+		// Todo: have single TextureImagesMemory and VkImage offset references in it
+		ImageBuffer TextureImageBuffer[2];
 	};
 
 	bool InitVulkanRenderInstance(VulkanRenderInstance& RenderInstance, VkInstance VulkanInstance, GLFWwindow* Window);
 	bool LoadMesh(VulkanRenderInstance& RenderInstance, Mesh Mesh);
 	bool Draw(VulkanRenderInstance& RenderInstance);
 	void DeinitVulkanRenderInstance(VulkanRenderInstance& RenderInstance);
+	void CreateTexture(VulkanRenderInstance& RenderInstance, struct stbi_uc* TextureData, int Width, int Height, VkDeviceSize ImageSize);
 
-	bool CreateVulkanBuffer(const VulkanRenderInstance& RenderInstance, VkDeviceSize BufferSize,
-		VkBufferUsageFlags BufferUsage, VkMemoryPropertyFlags BufferProperties, VulkanBuffer& OutBuffer);
+	bool CreateGenericBuffer(const VulkanRenderInstance& RenderInstance, VkDeviceSize BufferSize,
+		VkBufferUsageFlags BufferUsage, VkMemoryPropertyFlags BufferProperties, GenericBuffer& OutBuffer);
 
-	void DestroyVulkanBuffer(const VulkanRenderInstance& RenderInstance, VulkanBuffer& Buffer);
+	void DestroyGenericBuffer(const VulkanRenderInstance& RenderInstance, GenericBuffer& Buffer);
 
+	// Todo: Refactor CopyBuffer and CopyBufferToImage?
 	void CopyBuffer(const VulkanRenderInstance& RenderInstance, VkBuffer SourceBuffer,
 		VkBuffer DstinationBuffer, VkDeviceSize BufferSize);
+
+	void CopyBufferToImage(const VulkanRenderInstance& RenderInstance, VkBuffer SourceBuffer,
+		VkImage Image, uint32_t Width, uint32_t Height);
 
 	VkImage CreateImage(const VulkanRenderInstance& RenderInstance, uint32_t Width, uint32_t Height,
 		VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags,
