@@ -18,8 +18,6 @@
 
 #include "Core/VulkanCoreTypes.h"
 
-#include "Util/stb_image.h"
-
 int main()
 {
 	if (glfwInit() == GL_FALSE)
@@ -44,6 +42,26 @@ int main()
 
 	Core::VulkanRenderInstance RenderInstance;
 	Core::InitVulkanRenderInstance(RenderInstance, Instance.VulkanInstance, Window);
+
+	// Function LoadTexture
+	int Width, Height;
+	uint64_t ImageSize; // Todo: DeviceSize?
+	int Channels;
+
+	const char* TestTexture = "./Resources/Textures/giraffe.jpg";
+	stbi_uc* ImageData = stbi_load(TestTexture, &Width, &Height, &Channels, STBI_rgb_alpha);
+
+	if (ImageData == nullptr)
+	{
+		return -1;
+	}
+
+	ImageSize = Width * Height * 4;
+	// Function end LoadTexture
+
+	Core::CreateTexture(RenderInstance, ImageData, Width, Height, ImageSize);
+
+	stbi_image_free(ImageData);
 
 	//Mesh
 	const uint32_t MeshVerticesCount = 4;
@@ -78,23 +96,6 @@ int main()
 	Mesh.MeshVertices = MeshVertices2;
 
 	Core::LoadMesh(RenderInstance, Mesh);
-
-	//// Function LoadTexture
-	//int Width, Height;
-	//uint64_t ImageSize; // Todo: DeviceSize?
-	//int Channels;
-
-	//std::string fileLoc = "Textures/" + fileName;
-	//stbi_uc* ImageData = stbi_load(fileLoc.c_str(), &Width, &Height, &Channels, STBI_rgb_alpha);
-
-	//if (ImageData == nullptr)
-	//{
-	//	return -1;
-	//}
-
-	//ImageSize = Width * Height * 4;
-	//// Function end LoadTexture
-
 
 	float Angle = 0.0f;
 	double DeltaTime = 0.0f;

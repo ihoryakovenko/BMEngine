@@ -355,7 +355,7 @@ namespace Core
 		vkFreeCommandBuffers(RenderInstance.LogicalDevice, RenderInstance.GraphicsCommandPool, 1, &TransferCommandBuffer);
 	}
 
-	void CreateTexture(VulkanRenderInstance& RenderInstance, struct stbi_uc* TextureData, int Width, int Height, VkDeviceSize ImageSize)
+	void CreateTexture(VulkanRenderInstance& RenderInstance, stbi_uc* TextureData, int Width, int Height, VkDeviceSize ImageSize)
 	{
 		assert(RenderInstance.TextureImagesCount < RenderInstance.MaxTextures);
 
@@ -364,35 +364,100 @@ namespace Core
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			StagingBuffer);
 
-		// Copy image data to staging buffer
 		void* Data;
 		vkMapMemory(RenderInstance.LogicalDevice, StagingBuffer.BufferMemory, 0, ImageSize, 0, &Data);
 		memcpy(Data, TextureData, static_cast<size_t>(ImageSize));
 		vkUnmapMemory(RenderInstance.LogicalDevice, StagingBuffer.BufferMemory);
 
-		// Create image to hold final texture
 		ImageBuffer ImageBuffeObject;
 		ImageBuffeObject.TextureImage = CreateImage(RenderInstance, Width, Height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
 			VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &ImageBuffeObject.TextureImagesMemory);
 
+		// Todo: Create beginCommandBuffer function?
+		VkCommandBuffer CommandBuffer;
 
-		//// COPY DATA TO IMAGE
-		//// Transition image to be DST for copy operation
-		//transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool,
-		//	texImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		VkCommandBufferAllocateInfo AllocInfo = {};
+		AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		AllocInfo.commandPool = RenderInstance.GraphicsCommandPool;
+		AllocInfo.commandBufferCount = 1;
+
+		vkAllocateCommandBuffers(RenderInstance.LogicalDevice, &AllocInfo, &CommandBuffer);
+
+		VkCommandBufferBeginInfo BeginInfo = {};
+		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+		vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
+
+		VkImageMemoryBarrier ImageMemoryBarrier = {};
+		ImageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		ImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;									// Layout to transition from
+		ImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;									// Layout to transition to
+		ImageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition from
+		ImageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition to
+		ImageMemoryBarrier.image = ImageBuffeObject.TextureImage;											// Image being accessed and modified as part of barrier
+		ImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;	// Aspect of image being altered
+		ImageMemoryBarrier.subresourceRange.baseMipLevel = 0;						// First mip level to start alterations on
+		ImageMemoryBarrier.subresourceRange.levelCount = 1;							// Number of mip levels to alter starting from baseMipLevel
+		ImageMemoryBarrier.subresourceRange.baseArrayLayer = 0;						// First layer to start alterations on
+		ImageMemoryBarrier.subresourceRange.layerCount = 1;							// Number of layers to alter starting from baseArrayLayer
+
+		ImageMemoryBarrier.srcAccessMask = 0;								// Memory access stage transition must after...
+		ImageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;		// Memory access stage transition must before...
+
+		VkPipelineStageFlags SrcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		VkPipelineStageFlags DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+
+		vkCmdPipelineBarrier(
+			CommandBuffer,
+			SrcStage, DstStage,		// Pipeline stages (match to src and dst AccessMasks)
+			0,						// Dependency flags
+			0, nullptr,				// Memory Barrier count + data
+			0, nullptr,				// Buffer Memory Barrier count + data
+			1, &ImageMemoryBarrier	// Image Memory Barrier count + data
+		);
+
+		vkEndCommandBuffer(CommandBuffer);
+
+		VkSubmitInfo SubmitInfo = {};
+		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		SubmitInfo.commandBufferCount = 1;
+		SubmitInfo.pCommandBuffers = &CommandBuffer;
+
+		vkQueueSubmit(RenderInstance.GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
+		vkQueueWaitIdle(RenderInstance.GraphicsQueue);
 
 		// Copy image data
 		CopyBufferToImage(RenderInstance, StagingBuffer.Buffer, ImageBuffeObject.TextureImage, Width, Height);
+		
+		ImageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		ImageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-		//// Transition image to be shader readable for shader usage
-		//transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool,
-		//	texImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		SrcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		DstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
-		// Add texture data to vector for reference
-		RenderInstance.TextureImageBuffer[RenderInstance.TextureImagesCount] = ImageBuffeObject;
+		vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
 
-		// Destroy staging buffers
+		vkCmdPipelineBarrier(
+			CommandBuffer,
+			SrcStage, DstStage,
+			0,
+			0, nullptr,
+			0, nullptr,
+			1, &ImageMemoryBarrier
+		);
+
+		vkEndCommandBuffer(CommandBuffer);
+
+		vkQueueSubmit(RenderInstance.GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
+		vkQueueWaitIdle(RenderInstance.GraphicsQueue);
+
+		vkFreeCommandBuffers(RenderInstance.LogicalDevice, RenderInstance.GraphicsCommandPool, 1, &CommandBuffer);
 		DestroyGenericBuffer(RenderInstance, StagingBuffer);
+
+		RenderInstance.TextureImageBuffer[RenderInstance.TextureImagesCount] = ImageBuffeObject;
+		++RenderInstance.TextureImagesCount;
 	}
 
 	uint32_t FindMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, uint32_t AllowedTypes, VkMemoryPropertyFlags Properties)

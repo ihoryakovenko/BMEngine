@@ -4,6 +4,8 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
+#include "Util/stb_image.h"
+
 namespace Core
 {
 	// Deinit if InitVkInstanceCreateInfoSetupData returns true
@@ -181,7 +183,7 @@ namespace Core
 	bool LoadMesh(VulkanRenderInstance& RenderInstance, Mesh Mesh);
 	bool Draw(VulkanRenderInstance& RenderInstance);
 	void DeinitVulkanRenderInstance(VulkanRenderInstance& RenderInstance);
-	void CreateTexture(VulkanRenderInstance& RenderInstance, struct stbi_uc* TextureData, int Width, int Height, VkDeviceSize ImageSize);
+	void CreateTexture(VulkanRenderInstance& RenderInstance, stbi_uc* TextureData, int Width, int Height, VkDeviceSize ImageSize);
 
 	bool CreateGenericBuffer(const VulkanRenderInstance& RenderInstance, VkDeviceSize BufferSize,
 		VkBufferUsageFlags BufferUsage, VkMemoryPropertyFlags BufferProperties, GenericBuffer& OutBuffer);
