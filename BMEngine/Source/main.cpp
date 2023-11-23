@@ -43,6 +43,13 @@ int main()
 	Core::VulkanRenderInstance RenderInstance;
 	Core::InitVulkanRenderInstance(RenderInstance, Instance.VulkanInstance, Window);
 
+	RenderInstance.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
+		static_cast<float>(RenderInstance.SwapExtent.width) / static_cast<float>(RenderInstance.SwapExtent.height), 0.1f, 100.0f);
+
+	RenderInstance.ViewProjection.Projection[1][1] *= -1;
+
+	RenderInstance.ViewProjection.View = glm::lookAt(glm::vec3(-4.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, -6.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
 	// Function LoadTexture
 	int Width, Height;
 	uint64_t ImageSize; // Todo: DeviceSize?
@@ -60,16 +67,31 @@ int main()
 	// Function end LoadTexture
 
 	Core::CreateTexture(RenderInstance, ImageData, Width, Height, ImageSize);
+	
+
+	stbi_image_free(ImageData);
+
+	TestTexture = "./Resources/Textures/panda.jpg";
+	ImageData = stbi_load(TestTexture, &Width, &Height, &Channels, STBI_rgb_alpha);
+
+	if (ImageData == nullptr)
+	{
+		return -1;
+	}
+
+	ImageSize = Width * Height * 4;
+
+	Core::CreateTexture(RenderInstance, ImageData, Width, Height, ImageSize);
 
 	stbi_image_free(ImageData);
 
 	//Mesh
 	const uint32_t MeshVerticesCount = 4;
 	Core::Vertex MeshVertices[MeshVerticesCount] = {
-			{ { -0.4, 0.4, 0.0 },{ 1.0f, 0.0f, 0.0f } },	// 0
-			{ { -0.4, -0.4, 0.0 },{ 0.0f, 1.0f, 0.0f } },	    // 1
-			{ { 0.4, -0.4, 0.0 },{ 0.0f, 0.0f, 1.0f } },    // 2
-			{ { 0.4, 0.4, 0.0 },{ 1.0f, 1.0f, 0.0f } },   // 3
+		{ { -0.4, 0.4, 0.0 },{ 1.0f, 0.0f, 0.0f },{ 1.0f, 1.0f } },	// 0
+		{ { -0.4, -0.4, 0.0 },{ 1.0f, 0.0f, 0.0f },{ 1.0f, 0.0f } },	    // 1
+		{ { 0.4, -0.4, 0.0 },{ 1.0f, 0.0f, 0.0f },{ 0.0f, 0.0f } },    // 2
+		{ { 0.4, 0.4, 0.0 },{ 1.0f, 0.0f, 0.0f },{ 0.0f, 1.0f } },   // 3
 	};
 
 	const uint32_t MeshIndicesCount = 6;
@@ -87,15 +109,18 @@ int main()
 	Core::LoadMesh(RenderInstance, Mesh);
 
 	Core::Vertex MeshVertices2[MeshVerticesCount] = {
-			{ { -0.25, 0.6, 0.0 },{ 1.0f, 0.0f, 0.0f } },	// 0
-			{ { -0.25, -0.6, 0.0 },{ 0.0f, 1.0f, 0.0f } },	    // 1
-			{ { 0.25, -0.6, 0.0 },{ 0.0f, 0.0f, 1.0f } },    // 2
-			{ { 0.25, 0.6, 0.0 },{ 1.0f, 1.0f, 0.0f } },   // 3
+		{ { -0.25, 0.6, 0.0 },{ 0.0f, 0.0f, 1.0f },{ 1.0f, 1.0f } },	// 0
+		{ { -0.25, -0.6, 0.0 },{ 0.0f, 0.0f, 1.0f },{ 1.0f, 0.0f } },	    // 1
+		{ { 0.25, -0.6, 0.0 },{ 0.0f, 0.0f, 1.0f },{ 0.0f, 0.0f } },    // 2
+		{ { 0.25, 0.6, 0.0 },{ 0.0f, 0.0f, 1.0f },{ 0.0f, 1.0f } },   // 3
 	};
 
 	Mesh.MeshVertices = MeshVertices2;
 
 	Core::LoadMesh(RenderInstance, Mesh);
+
+	RenderInstance.DrawableObjects[0].TextureId = 0;
+	RenderInstance.DrawableObjects[1].TextureId = 1;
 
 	float Angle = 0.0f;
 	double DeltaTime = 0.0f;
@@ -125,7 +150,7 @@ int main()
 		firstModel = glm::rotate(firstModel, glm::radians(Angle), glm::vec3(0.0f, 0.0f, 1.0f));
 
 		secondModel = glm::translate(secondModel, glm::vec3(0.0f, 0.0f, -2.5f));
-		secondModel = glm::rotate(secondModel, glm::radians(-Angle * 100), glm::vec3(0.0f, 0.0f, 1.0f));
+		secondModel = glm::rotate(secondModel, glm::radians(-Angle * 10), glm::vec3(0.0f, 0.0f, 1.0f));
 
 		RenderInstance.DrawableObjects[0].Model = firstModel;
 		RenderInstance.DrawableObjects[1].Model = secondModel;

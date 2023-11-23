@@ -431,6 +431,8 @@ namespace Core
 		// Copy image data
 		CopyBufferToImage(RenderInstance, StagingBuffer.Buffer, ImageBuffeObject.TextureImage, Width, Height);
 		
+		ImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;									// Layout to transition from
+		ImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		ImageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 		ImageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
@@ -455,6 +457,41 @@ namespace Core
 
 		vkFreeCommandBuffers(RenderInstance.LogicalDevice, RenderInstance.GraphicsCommandPool, 1, &CommandBuffer);
 		DestroyGenericBuffer(RenderInstance, StagingBuffer);
+
+		//CreateImageView
+		ImageBuffeObject.TextureImageView = CreateImageView(RenderInstance, ImageBuffeObject.TextureImage,
+			VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+
+		//CreateTextureDescriptor
+		VkDescriptorSetAllocateInfo SetAllocInfo = {};
+		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		SetAllocInfo.descriptorPool = RenderInstance.SamplerDescriptorPool;
+		SetAllocInfo.descriptorSetCount = 1;
+		SetAllocInfo.pSetLayouts = &RenderInstance.SamplerSetLayout;
+
+		VkResult result = vkAllocateDescriptorSets(RenderInstance.LogicalDevice, &SetAllocInfo, &RenderInstance.SamplerDescriptorSets[RenderInstance.TextureImagesCount]);
+		if (result != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to allocate Texture Descriptor Sets!");
+		}
+
+		VkDescriptorImageInfo ImageInfo = {};
+		ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;	// Image layout when in use
+		ImageInfo.imageView = ImageBuffeObject.TextureImageView;									// Image to bind to set
+		ImageInfo.sampler = RenderInstance.TextureSampler;									// Sampler to use for set
+
+		// Descriptor Write Info
+		VkWriteDescriptorSet DescriptorWrite = {};
+		DescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		DescriptorWrite.dstSet = RenderInstance.SamplerDescriptorSets[RenderInstance.TextureImagesCount];
+		DescriptorWrite.dstBinding = 0;
+		DescriptorWrite.dstArrayElement = 0;
+		DescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		DescriptorWrite.descriptorCount = 1;
+		DescriptorWrite.pImageInfo = &ImageInfo;
+
+		// Todo: create descriptor sets for multiple textures?
+		vkUpdateDescriptorSets(RenderInstance.LogicalDevice, 1, &DescriptorWrite, 0, nullptr);
 
 		RenderInstance.TextureImageBuffer[RenderInstance.TextureImagesCount] = ImageBuffeObject;
 		++RenderInstance.TextureImagesCount;
@@ -719,9 +756,14 @@ namespace Core
 			vkGetPhysicalDeviceProperties(DeviceList[i], &RenderInstance.PhysicalDeviceProperties);
 			//RenderInstance.PhysicalDeviceProperties.limits.minUniformBufferOffsetAlignment;
 			/*
-			// geo shader, tess shader, wide lines, etc
+			// geo shader, tess shader, wide lines, etc*/
 			VkPhysicalDeviceFeatures Features;
-			vkGetPhysicalDeviceFeatures(Device, &Features); */
+			vkGetPhysicalDeviceFeatures(DeviceList[i], &Features);
+
+			if (!Features.samplerAnisotropy)
+			{
+				break; //  Todo: support if device doues not support Anisotropy
+			}
 		}
 
 		Util::Memory::Deallocate(DeviceList);
@@ -758,6 +800,7 @@ namespace Core
 		}
 
 		VkPhysicalDeviceFeatures DeviceFeatures = {};
+		DeviceFeatures.samplerAnisotropy = VK_TRUE; // Todo: get from configs
 
 		VkDeviceCreateInfo DeviceCreateInfo = { };
 		DeviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -1046,7 +1089,6 @@ namespace Core
 		// Function end CreateRenderPath
 
 		// Function: CreateDescriptorSetLayout
-		// MVP Binding Info
 		VkDescriptorSetLayoutBinding VpLayoutBinding = {};
 		VpLayoutBinding.binding = 0;											// Binding point in shader (designated by binding number in shader)
 		VpLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;	// Type of descriptor (uniform, dynamic uniform, image sampler, etc)
@@ -1080,6 +1122,26 @@ namespace Core
 			return false;
 		}
 
+		// Texture binding info
+		VkDescriptorSetLayoutBinding SamplerLayoutBinding = {};
+		SamplerLayoutBinding.binding = 0;
+		SamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		SamplerLayoutBinding.descriptorCount = 1;
+		SamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		SamplerLayoutBinding.pImmutableSamplers = nullptr;
+
+		// Create a Descriptor Set Layout with given bindings for texture
+		VkDescriptorSetLayoutCreateInfo TextureLayoutCreateInfo = {};
+		TextureLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		TextureLayoutCreateInfo.bindingCount = 1;
+		TextureLayoutCreateInfo.pBindings = &SamplerLayoutBinding;
+
+		// Create Descriptor Set Layout
+		Result = vkCreateDescriptorSetLayout(RenderInstance.LogicalDevice, &TextureLayoutCreateInfo, nullptr, &RenderInstance.SamplerSetLayout);
+		if (Result != VK_SUCCESS)
+		{
+			return false;
+		}
 		// Function end CreateDescriptorSetLayout
 
 		// Function: CreatePushConstantRange
@@ -1147,7 +1209,7 @@ namespace Core
 		// VK_VERTEX_INPUT_RATE_INSTANCE	: Move to a vertex for the next instance
 
 		// How the data for an attribute is defined within a vertex
-		const uint32_t VertexInputBindingDescriptionCount = 2;
+		const uint32_t VertexInputBindingDescriptionCount = 3;
 		VkVertexInputAttributeDescription AttributeDescriptions[VertexInputBindingDescriptionCount];
 
 		// Position Attribute
@@ -1161,6 +1223,12 @@ namespace Core
 		AttributeDescriptions[1].location = 1;
 		AttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
 		AttributeDescriptions[1].offset = offsetof(Core::Vertex, Color);
+
+		// Texture Attribute
+		AttributeDescriptions[2].binding = 0;
+		AttributeDescriptions[2].location = 2;
+		AttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+		AttributeDescriptions[2].offset = offsetof(Core::Vertex, TextureCoords);
 
 		// Vertex input
 		VkPipelineVertexInputStateCreateInfo VertexInputCreateInfo = {};
@@ -1249,10 +1317,13 @@ namespace Core
 		ColourBlendingCreateInfo.pAttachments = &ColorBlendAttachmentState;
 
 		// Pipeline layout
+		const uint32_t DescriptorSetLayoutsCount = 2;
+		VkDescriptorSetLayout DescriptorSetLayouts[DescriptorSetLayoutsCount] = { RenderInstance.DescriptorSetLayout, RenderInstance.SamplerSetLayout };
+
 		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = {};
 		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		PipelineLayoutCreateInfo.setLayoutCount = 1;
-		PipelineLayoutCreateInfo.pSetLayouts = &RenderInstance.DescriptorSetLayout;
+		PipelineLayoutCreateInfo.setLayoutCount = DescriptorSetLayoutsCount;
+		PipelineLayoutCreateInfo.pSetLayouts = DescriptorSetLayouts;
 		PipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 		PipelineLayoutCreateInfo.pPushConstantRanges = &RenderInstance.PushConstantRange;
 
@@ -1464,10 +1535,29 @@ namespace Core
 		{
 			return false;
 		}
+
+		// Texture sampler pool
+		VkDescriptorPoolSize SamplerPoolSize = {};
+		// Todo: support VK_DESCRIPTOR_TYPE_SAMPLER and VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE separatly
+		SamplerPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		SamplerPoolSize.descriptorCount = RenderInstance.MaxObjects;
+
+		VkDescriptorPoolCreateInfo SamplerPoolCreateInfo = {};
+		SamplerPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		SamplerPoolCreateInfo.maxSets = RenderInstance.MaxObjects;
+		SamplerPoolCreateInfo.poolSizeCount = 1;
+		SamplerPoolCreateInfo.pPoolSizes = &SamplerPoolSize;
+
+		Result = vkCreateDescriptorPool(RenderInstance.LogicalDevice, &SamplerPoolCreateInfo, nullptr, &RenderInstance.SamplerDescriptorPool);
+		if (Result != VK_SUCCESS)
+		{
+			return false;
+		}
 		// Function end CreateDescriptorPool
 
 		// Function CreateDescriptorSets
 		RenderInstance.DescriptorSets = static_cast<VkDescriptorSet*>(Util::Memory::Allocate(RenderInstance.SwapchainImagesCount * sizeof(VkDescriptorSet)));
+		RenderInstance.SamplerDescriptorSets = static_cast<VkDescriptorSet*>(Util::Memory::Allocate(RenderInstance.MaxTextures * sizeof(VkDescriptorSet)));
 
 		VkDescriptorSetLayout* SetLayouts = static_cast<VkDescriptorSetLayout*>(Util::Memory::Allocate(RenderInstance.SwapchainImagesCount * sizeof(VkDescriptorSetLayout)));
 		for (uint32_t i = 0; i < RenderInstance.SwapchainImagesCount; i++)
@@ -1535,12 +1625,29 @@ namespace Core
 		Util::Memory::Deallocate(SetLayouts);
 		// Function end CreateDescriptorSets
 
-		RenderInstance.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-			static_cast<float>(RenderInstance.SwapExtent.width) / static_cast<float>(RenderInstance.SwapExtent.height), 0.1f, 100.0f);
+		// Function CreateTextureSampler
+		VkSamplerCreateInfo SamplerCreateInfo = {};
+		SamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		SamplerCreateInfo.magFilter = VK_FILTER_LINEAR;						// How to render when image is magnified on screen
+		SamplerCreateInfo.minFilter = VK_FILTER_LINEAR;						// How to render when image is minified on screen
+		SamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;	// How to handle texture wrap in U (x) direction
+		SamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;	// How to handle texture wrap in V (y) direction
+		SamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;	// How to handle texture wrap in W (z) direction
+		SamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;	// Border beyond texture (only workds for border clamp)
+		SamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;				// Whether coords should be normalized (between 0 and 1)
+		SamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;		// Mipmap interpolation mode
+		SamplerCreateInfo.mipLodBias = 0.0f;								// Level of Details bias for mip level
+		SamplerCreateInfo.minLod = 0.0f;									// Minimum Level of Detail to pick mip level
+		SamplerCreateInfo.maxLod = 0.0f;									// Maximum Level of Detail to pick mip level
+		SamplerCreateInfo.anisotropyEnable = VK_TRUE;						// Enable Anisotropy
+		SamplerCreateInfo.maxAnisotropy = 16; // Todo: support in config
 
-		RenderInstance.ViewProjection.Projection[1][1] *= -1;
-
-		RenderInstance.ViewProjection.View = glm::lookAt(glm::vec3(-4.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, -6.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		Result = vkCreateSampler(RenderInstance.LogicalDevice, &SamplerCreateInfo, nullptr, &RenderInstance.TextureSampler);
+		if (Result != VK_SUCCESS)
+		{
+			return -1;
+		}
+		// Function end CreateTextureSampler
 
 		return true;
 	}
@@ -1601,7 +1708,8 @@ namespace Core
 
 		// Get index of next image to be drawn to, and signal semaphore when ready to be drawn to
 		uint32_t ImageIndex;
-		vkAcquireNextImageKHR(RenderInstance.LogicalDevice, RenderInstance.VulkanSwapchain, std::numeric_limits<uint64_t>::max(), RenderInstance.ImageAvalible[RenderInstance.CurrentFrame], VK_NULL_HANDLE, &ImageIndex);
+		vkAcquireNextImageKHR(RenderInstance.LogicalDevice, RenderInstance.VulkanSwapchain, std::numeric_limits<uint64_t>::max(),
+			RenderInstance.ImageAvalible[RenderInstance.CurrentFrame], VK_NULL_HANDLE, &ImageIndex);
 
 		// Function RecordCommands
 		VkCommandBufferBeginInfo CommandBufferBeginInfo = {};
@@ -1652,8 +1760,13 @@ namespace Core
 			vkCmdPushConstants(RenderInstance.CommandBuffers[ImageIndex], RenderInstance.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
 				0, sizeof(Model), &RenderInstance.DrawableObjects[j].Model);
 
-			vkCmdBindDescriptorSets(RenderInstance.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.PipelineLayout, 0, 1,
-				&RenderInstance.DescriptorSets[ImageIndex], 0, nullptr /*1, &DynamicOffset*/);
+			// Todo: do not record textureId on each frame?
+			const uint32_t DescriptorSetGroupCount = 2;
+			VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] = { RenderInstance.DescriptorSets[ImageIndex],
+				RenderInstance.SamplerDescriptorSets[RenderInstance.DrawableObjects[j].TextureId] };
+
+			vkCmdBindDescriptorSets(RenderInstance.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.PipelineLayout,
+				0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
 
 			// Execute pipeline
 			//vkCmdDraw(RenderInstance.CommandBuffers[i], RenderInstance.DrawableObject.VerticesCount, 1, 0, 0);
@@ -1743,8 +1856,11 @@ namespace Core
 		// UNIFORM BUFFER SETUP CODE
 		//_aligned_free(RenderInstance.ModelTransferSpace);
 
+		vkDestroySampler(RenderInstance.LogicalDevice, RenderInstance.TextureSampler, nullptr);
+
 		for (uint32_t i = 0; i < RenderInstance.TextureImagesCount; ++i)
 		{
+			vkDestroyImageView(RenderInstance.LogicalDevice, RenderInstance.TextureImageBuffer[i].TextureImageView, nullptr);
 			vkDestroyImage(RenderInstance.LogicalDevice, RenderInstance.TextureImageBuffer[i].TextureImage, nullptr);
 			vkFreeMemory(RenderInstance.LogicalDevice, RenderInstance.TextureImageBuffer[i].TextureImagesMemory, nullptr);
 		}
@@ -1753,10 +1869,13 @@ namespace Core
 		vkDestroyImage(RenderInstance.LogicalDevice, RenderInstance.DepthBufferImage, nullptr);
 		vkFreeMemory(RenderInstance.LogicalDevice, RenderInstance.DepthBufferImageMemory, nullptr);
 
+		Util::Memory::Deallocate(RenderInstance.SamplerDescriptorSets);
 		Util::Memory::Deallocate(RenderInstance.DescriptorSets);
 
+		vkDestroyDescriptorPool(RenderInstance.LogicalDevice, RenderInstance.SamplerDescriptorPool, nullptr);
 		vkDestroyDescriptorPool(RenderInstance.LogicalDevice, RenderInstance.DescriptorPool, nullptr);
 
+		vkDestroyDescriptorSetLayout(RenderInstance.LogicalDevice, RenderInstance.SamplerSetLayout, nullptr);
 		vkDestroyDescriptorSetLayout(RenderInstance.LogicalDevice, RenderInstance.DescriptorSetLayout, nullptr);
 		
 		for (uint32_t i = 0; i < RenderInstance.SwapchainImagesCount; i++)

@@ -68,6 +68,7 @@ namespace Core
 	{
 		glm::vec3 Position;
 		glm::vec3 Color;
+		glm::vec2 TextureCoords;
 	};
 
 	struct Mesh
@@ -89,6 +90,7 @@ namespace Core
 	{
 		VkImage TextureImage = nullptr;
 		VkDeviceMemory TextureImagesMemory = nullptr;
+		VkImageView TextureImageView = nullptr;
 	};
 
 	typedef glm::mat4 Model;
@@ -102,6 +104,8 @@ namespace Core
 		GenericBuffer IndexBuffer;
 
 		Model Model;
+
+		uint32_t TextureId = 0;
 	};
 
 	struct MainInstance
@@ -140,10 +144,14 @@ namespace Core
 		VkImageView DepthBufferImageView = nullptr;
 
 		VkDescriptorSetLayout DescriptorSetLayout = nullptr;
+		VkDescriptorSetLayout SamplerSetLayout = nullptr;
 		VkPushConstantRange PushConstantRange;
 
+		// Todo: put textures in DescriptorSets to use only one descriptor set and pool?
 		VkDescriptorPool DescriptorPool = nullptr;
-		VkDescriptorSet* DescriptorSets = nullptr;	
+		VkDescriptorPool SamplerDescriptorPool = nullptr;
+		VkDescriptorSet* DescriptorSets = nullptr;
+		VkDescriptorSet* SamplerDescriptorSets = nullptr;
 
 		GenericBuffer* VpUniformBuffers = nullptr;
 		//GenericBuffer* ModelDynamicUniformBuffers = nullptr;
@@ -173,6 +181,8 @@ namespace Core
 		VkSemaphore* RenderFinished = nullptr;
 		VkFence* DrawFences = nullptr;
 
+		VkSampler TextureSampler = nullptr;
+		// Todo: put all textures in atlases or texture layers
 		const uint32_t MaxTextures = 2;
 		uint32_t TextureImagesCount = 0;
 		// Todo: have single TextureImagesMemory and VkImage offset references in it
