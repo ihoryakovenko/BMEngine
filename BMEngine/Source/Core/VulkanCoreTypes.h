@@ -169,9 +169,9 @@ namespace Core
 			glm::mat4 Projection;
 		} ViewProjection;
 
-		const uint32_t MaxObjects = 2;
+		const uint32_t MaxObjects = 528;
 		uint32_t DrawableObjectsCount = 0;
-		DrawableObject DrawableObjects[2];
+		DrawableObject DrawableObjects[528];
 		const int MaxFrameDraws = 2;
 		int CurrentFrame = 0;
 		
@@ -183,10 +183,10 @@ namespace Core
 
 		VkSampler TextureSampler = nullptr;
 		// Todo: put all textures in atlases or texture layers
-		const uint32_t MaxTextures = 2;
+		const uint32_t MaxTextures = 64;
 		uint32_t TextureImagesCount = 0;
 		// Todo: have single TextureImagesMemory and VkImage offset references in it
-		ImageBuffer TextureImageBuffer[2];
+		ImageBuffer TextureImageBuffer[64];
 	};
 
 	bool InitVulkanRenderInstance(VulkanRenderInstance& RenderInstance, VkInstance VulkanInstance, GLFWwindow* Window);

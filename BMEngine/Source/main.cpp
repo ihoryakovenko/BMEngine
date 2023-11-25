@@ -18,6 +18,77 @@
 
 #include "Core/VulkanCoreTypes.h"
 
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+
+struct TestMesh
+{
+	std::vector<Core::Vertex> vertices;
+	std::vector<uint32_t> indices;
+	int TextureId;
+};
+
+TestMesh LoadMesh(aiMesh* mesh, const aiScene* scene, std::vector<int> matToTex)
+{
+	TestMesh Mesh;
+	
+
+	Mesh.vertices.resize(mesh->mNumVertices);
+
+	// Go through each vertex and copy it across to our vertices
+	for (size_t i = 0; i < mesh->mNumVertices; i++)
+	{
+		Mesh.vertices[i].Position = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
+
+		if (mesh->mTextureCoords[0])
+		{
+			Mesh.vertices[i].TextureCoords = { mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y };
+		}
+		else
+		{
+			Mesh.vertices[i].TextureCoords = { 0.0f, 0.0f };
+		}
+
+		Mesh.vertices[i].Color = { 1.0f, 1.0f, 1.0f };
+	}
+
+	for (size_t i = 0; i < mesh->mNumFaces; i++)
+	{
+		// Get a face
+		aiFace face = mesh->mFaces[i];
+
+		for (size_t j = 0; j < face.mNumIndices; j++)
+		{
+			Mesh.indices.push_back(face.mIndices[j]);
+		}
+	}
+
+	Mesh.TextureId = matToTex[mesh->mMaterialIndex];
+	return Mesh;
+}
+
+std::vector<TestMesh> LoadNode(aiNode* node, const aiScene* scene, std::vector<int> matToTex)
+{
+	std::vector<TestMesh> meshList;
+
+	// Go through each mesh at this node and create it, then add it to our meshList
+	for (size_t i = 0; i < node->mNumMeshes; i++)
+	{
+		meshList.push_back(LoadMesh(scene->mMeshes[node->mMeshes[i]], scene, matToTex)
+		);
+	}
+
+	// Go through each node attached to this node and load it, then append their meshes to this node's mesh list
+	for (size_t i = 0; i < node->mNumChildren; i++)
+	{
+		std::vector<TestMesh> newList = LoadNode(node->mChildren[i], scene, matToTex);
+		meshList.insert(meshList.end(), newList.begin(), newList.end());
+	}
+
+	return meshList;
+}
+
 int main()
 {
 	if (glfwInit() == GL_FALSE)
@@ -29,7 +100,7 @@ int main()
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-	GLFWwindow* Window = glfwCreateWindow(800, 600, "BMEngine", nullptr, nullptr);
+	GLFWwindow* Window = glfwCreateWindow(1600, 800, "BMEngine", nullptr, nullptr);
 	if (Window == nullptr)
 	{
 		Util::Log::GlfwLogError();
@@ -48,7 +119,7 @@ int main()
 
 	RenderInstance.ViewProjection.Projection[1][1] *= -1;
 
-	RenderInstance.ViewProjection.View = glm::lookAt(glm::vec3(-4.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, -6.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	RenderInstance.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	// Function LoadTexture
 	int Width, Height;
@@ -67,60 +138,76 @@ int main()
 	// Function end LoadTexture
 
 	Core::CreateTexture(RenderInstance, ImageData, Width, Height, ImageSize);
-	
 
-	stbi_image_free(ImageData);
 
-	TestTexture = "./Resources/Textures/panda.jpg";
-	ImageData = stbi_load(TestTexture, &Width, &Height, &Channels, STBI_rgb_alpha);
-
-	if (ImageData == nullptr)
+	// TMP shit
+	Assimp::Importer AssimpImporter;
+	const char* Modelpath = "./Resources/Models/uh60.obj";
+	const aiScene* Scene = AssimpImporter.ReadFile(Modelpath, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices);
+	if (!Scene)
 	{
 		return -1;
 	}
 
-	ImageSize = Width * Height * 4;
+	std::vector<std::string> TextureList(Scene->mNumMaterials);
+	std::vector<int> MaterialToTexture(TextureList.size());
 
-	Core::CreateTexture(RenderInstance, ImageData, Width, Height, ImageSize);
+	for (size_t i = 0; i < Scene->mNumMaterials; i++)
+	{
+		aiMaterial* Material = Scene->mMaterials[i];
 
-	stbi_image_free(ImageData);
+		TextureList[i] = "";
 
-	//Mesh
-	const uint32_t MeshVerticesCount = 4;
-	Core::Vertex MeshVertices[MeshVerticesCount] = {
-		{ { -0.4, 0.4, 0.0 },{ 1.0f, 0.0f, 0.0f },{ 1.0f, 1.0f } },	// 0
-		{ { -0.4, -0.4, 0.0 },{ 1.0f, 0.0f, 0.0f },{ 1.0f, 0.0f } },	    // 1
-		{ { 0.4, -0.4, 0.0 },{ 1.0f, 0.0f, 0.0f },{ 0.0f, 0.0f } },    // 2
-		{ { 0.4, 0.4, 0.0 },{ 1.0f, 0.0f, 0.0f },{ 0.0f, 1.0f } },   // 3
-	};
+		if (Material->GetTextureCount(aiTextureType_DIFFUSE))
+		{
+			aiString Path;
+			if (Material->GetTexture(aiTextureType_DIFFUSE, 0, &Path) == AI_SUCCESS)
+			{
+				int idx = std::string(Path.data).rfind("\\");
+				std::string fileName = "./Resources/Textures/" + std::string(Path.data).substr(idx + 1);
 
-	const uint32_t MeshIndicesCount = 6;
-	uint32_t MeshIndices[MeshIndicesCount] = {
-		0, 1, 2,
-		2, 3, 0
-	};
+				TextureList[i] = fileName;
+			}
+		}
+	}
 
-	Core::Mesh Mesh;
-	Mesh.MeshVerticesCount = MeshVerticesCount;
-	Mesh.MeshVertices = MeshVertices;
-	Mesh.MeshIndicesCount = MeshIndicesCount;
-	Mesh.MeshIndices = MeshIndices;
+	for (size_t i = 0; i < TextureList.size(); i++)
+	{
+		if (TextureList[i].empty())
+		{
+			MaterialToTexture[i] = 0;
+		}
+		else
+		{
+			MaterialToTexture[i] = RenderInstance.TextureImagesCount;
 
-	Core::LoadMesh(RenderInstance, Mesh);
+			stbi_uc* ImageData = stbi_load(TextureList[i].c_str(), &Width, &Height, &Channels, STBI_rgb_alpha);
 
-	Core::Vertex MeshVertices2[MeshVerticesCount] = {
-		{ { -0.25, 0.6, 0.0 },{ 0.0f, 0.0f, 1.0f },{ 1.0f, 1.0f } },	// 0
-		{ { -0.25, -0.6, 0.0 },{ 0.0f, 0.0f, 1.0f },{ 1.0f, 0.0f } },	    // 1
-		{ { 0.25, -0.6, 0.0 },{ 0.0f, 0.0f, 1.0f },{ 0.0f, 0.0f } },    // 2
-		{ { 0.25, 0.6, 0.0 },{ 0.0f, 0.0f, 1.0f },{ 0.0f, 1.0f } },   // 3
-	};
+			if (ImageData == nullptr)
+			{
+				return -1;
+			}
 
-	Mesh.MeshVertices = MeshVertices2;
+			ImageSize = Width * Height * 4;
 
-	Core::LoadMesh(RenderInstance, Mesh);
+			Core::CreateTexture(RenderInstance, ImageData, Width, Height, ImageSize);
 
-	RenderInstance.DrawableObjects[0].TextureId = 0;
-	RenderInstance.DrawableObjects[1].TextureId = 1;
+			stbi_image_free(ImageData);
+		}
+	}
+
+	std::vector<TestMesh> ModelMeshes = LoadNode(Scene->mRootNode, Scene, MaterialToTexture);
+
+	for (int i = 0; i < ModelMeshes.size(); ++i)
+	{
+		Core::Mesh m;
+		m.MeshVertices = ModelMeshes[i].vertices.data();
+		m.MeshVerticesCount = ModelMeshes[i].vertices.size();
+		m.MeshIndices = ModelMeshes[i].indices.data();
+		m.MeshIndicesCount = ModelMeshes[i].indices.size();
+		Core::LoadMesh(RenderInstance, m);
+		RenderInstance.DrawableObjects[RenderInstance.DrawableObjectsCount - 1].TextureId = ModelMeshes[i].TextureId;
+	}
 
 	float Angle = 0.0f;
 	double DeltaTime = 0.0f;
@@ -137,31 +224,18 @@ int main()
 		DeltaTime = CurrentTime - LastTime;
 		LastTime = static_cast<float>(CurrentTime);
 
-		Angle += 10.0f * static_cast<float>(DeltaTime);
+		Angle += 30.0f * static_cast<float>(DeltaTime);
 		if (Angle > 360.0f)
 		{
 			Angle -= 360.0f;
 		}
 
-		glm::mat4 firstModel(1.0f);
-		glm::mat4 secondModel(1.0f);
+		glm::mat4 TestMat = glm::rotate(glm::mat4(1.0f), glm::radians(Angle), glm::vec3(0.0f, 1.0f, 0.0f));
 
-		firstModel = glm::translate(firstModel, glm::vec3(0.0f, -0.5f, -2.0f));
-		firstModel = glm::rotate(firstModel, glm::radians(Angle), glm::vec3(0.0f, 0.0f, 1.0f));
-
-		secondModel = glm::translate(secondModel, glm::vec3(0.0f, 0.0f, -2.5f));
-		secondModel = glm::rotate(secondModel, glm::radians(-Angle * 10), glm::vec3(0.0f, 0.0f, 1.0f));
-
-		RenderInstance.DrawableObjects[0].Model = firstModel;
-		RenderInstance.DrawableObjects[1].Model = secondModel;
-
-		XMove += MoveScale * static_cast<float>(DeltaTime);
-		if (std::abs(XMove) >= 8.0f)
+		for (int i = 0; i < RenderInstance.DrawableObjectsCount; ++i)
 		{
-			MoveScale *= -1;
+			RenderInstance.DrawableObjects[i].Model = TestMat;
 		}
-
-		RenderInstance.ViewProjection.View = glm::lookAt(glm::vec3(XMove, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, -6.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 		Core::Draw(RenderInstance);
 	}

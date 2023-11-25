@@ -1645,7 +1645,7 @@ namespace Core
 		Result = vkCreateSampler(RenderInstance.LogicalDevice, &SamplerCreateInfo, nullptr, &RenderInstance.TextureSampler);
 		if (Result != VK_SUCCESS)
 		{
-			return -1;
+			return false;
 		}
 		// Function end CreateTextureSampler
 
