@@ -472,7 +472,7 @@ namespace Core
 		VkResult result = vkAllocateDescriptorSets(RenderInstance.LogicalDevice, &SetAllocInfo, &RenderInstance.SamplerDescriptorSets[RenderInstance.TextureImagesCount]);
 		if (result != VK_SUCCESS)
 		{
-			throw std::runtime_error("Failed to allocate Texture Descriptor Sets!");
+			//return -1
 		}
 
 		VkDescriptorImageInfo ImageInfo = {};
@@ -974,22 +974,8 @@ namespace Core
 		Util::Memory::Deallocate(Images);
 		// Function end: CreateSwapchain
 
-		// Function CreateRenderPass
-		// Colour attachment of render pass
-		VkAttachmentDescription ColourAttachment = {};
-		ColourAttachment.format = SurfaceFormat.format;
-		ColourAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-		ColourAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		ColourAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		ColourAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		ColourAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
-		// Framebuffer data will be stored as an image, but images can be given different data layouts
-		// to give optimal use for certain operations
-		ColourAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;			// Image data layout before render pass starts
-		ColourAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;		// Image data layout after render pass (to change to)
-
 		// Function ChooseSupportedFormat
+		VkFormat ColorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Todo: check if VK_FORMAT_R8G8B8A8_UNORM supported
 		VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
 		VkFormat BackupFormats[] = { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT };
 
@@ -1009,37 +995,81 @@ namespace Core
 		}
 		// Function end ChooseSupportedFormat
 
-		VkAttachmentDescription DepthAttachment = {};
-		DepthAttachment.format = DepthFormat;
-		DepthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-		DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		DepthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		DepthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		DepthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		DepthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		// Function CreateRenderPass
+		const uint32_t SubpassesCount = 2;
+		VkSubpassDescription Subpasses[SubpassesCount];
+		
+		// Subpass 1 attachments and references
+		VkAttachmentDescription SubpassOneColorAttachment = {};
+		SubpassOneColorAttachment.format = ColorFormat;
+		SubpassOneColorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+		SubpassOneColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		SubpassOneColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		SubpassOneColorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		SubpassOneColorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		SubpassOneColorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		SubpassOneColorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-		// Attachment reference uses an attachment index that refers to index in the attachment list passed to renderPassCreateInfo
-		VkAttachmentReference ColourAttachmentReference = {};
+		VkAttachmentDescription SubpassOneDepthAttachment = {};
+		SubpassOneDepthAttachment.format = DepthFormat;
+		SubpassOneDepthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+		SubpassOneDepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		SubpassOneDepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		SubpassOneDepthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		SubpassOneDepthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		SubpassOneDepthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		SubpassOneDepthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+		VkAttachmentReference SubpassOneColourAttachmentReference = {};
+		SubpassOneColourAttachmentReference.attachment = 1; // this index is related to Attachments array
+		SubpassOneColourAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		VkAttachmentReference SubpassOneDepthAttachmentReference = {};
+		SubpassOneDepthAttachmentReference.attachment = 2; // this index is related to Attachments array
+		SubpassOneDepthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+		Subpasses[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		Subpasses[0].colorAttachmentCount = 1;
+		Subpasses[0].pColorAttachments = &SubpassOneColourAttachmentReference;
+		Subpasses[0].pDepthStencilAttachment = &SubpassOneDepthAttachmentReference;
+
+		// Subpass 2 attachments and references
+		
+		VkAttachmentDescription SwapchainColorAttachment = {};
+		SwapchainColorAttachment.format = SurfaceFormat.format;
+		SwapchainColorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+		SwapchainColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		SwapchainColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		SwapchainColorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		SwapchainColorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+		// Framebuffer data will be stored as an image, but images can be given different data layouts
+		// to give optimal use for certain operations
+		SwapchainColorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;			// Image data layout before render pass starts
+		SwapchainColorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;		// Image data layout after render pass (to change to)
+
+		VkAttachmentReference SwapchainColorAttachmentReference = {};
 		// Todo: do not forget about position in array AttachmentDescriptions
-		ColourAttachmentReference.attachment = 0;
-		ColourAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		SwapchainColorAttachmentReference.attachment = 0;
+		SwapchainColorAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-		// Depth Attachment Reference
-		VkAttachmentReference DepthAttachmentReference = {};
-		DepthAttachmentReference.attachment = 1;
-		// TODO: Do manual transition to increase performance? check depth buffer docs
-		DepthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		const uint32_t InputReferencesCount = 2;
+		VkAttachmentReference InputReferences[InputReferencesCount];
+		InputReferences[0].attachment = 1; // SubpassOneColorAttachment
+		InputReferences[0].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		InputReferences[1].attachment = 2; // SubpassOneDepthAttachment
+		InputReferences[1].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-		// Information about a particular subpass the Render Pass is using
-		VkSubpassDescription SubpassDescription = {};
-		SubpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;		// Pipeline type subpass is to be bound to
-		SubpassDescription.colorAttachmentCount = 1;
-		SubpassDescription.pColorAttachments = &ColourAttachmentReference;
-		SubpassDescription.pDepthStencilAttachment = &DepthAttachmentReference;
+		Subpasses[1].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		Subpasses[1].colorAttachmentCount = 1;
+		Subpasses[1].pColorAttachments = &SwapchainColorAttachmentReference;
+		Subpasses[1].inputAttachmentCount = InputReferencesCount;
+		Subpasses[1].pInputAttachments = InputReferences;
+
+		// Subpass dependencies
 
 		// Need to determine when layout transitions occur using subpass dependencies
-		const uint32_t SubpassDependenciesSize = 2;
+		const uint32_t SubpassDependenciesSize = 3;
 		VkSubpassDependency SubpassDependencies[SubpassDependenciesSize];
 
 		// Conversion from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
@@ -1053,30 +1083,40 @@ namespace Core
 		SubpassDependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		SubpassDependencies[0].dependencyFlags = 0;
 
+		// Subpass 1 layout (colour/depth) to Subpass 2 layout (shader read)
+		SubpassDependencies[1].srcSubpass = 0;
+		SubpassDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		SubpassDependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		SubpassDependencies[1].dstSubpass = 1;
+		SubpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		SubpassDependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		SubpassDependencies[1].dependencyFlags = 0;
 
 		// Conversion from VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
 		// Transition must happen after...
-		SubpassDependencies[1].srcSubpass = 0;
-		SubpassDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		SubpassDependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;;
+		SubpassDependencies[2].srcSubpass = 0;
+		SubpassDependencies[2].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		SubpassDependencies[2].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;;
 		// But must happen before...
-		SubpassDependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-		SubpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-		SubpassDependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-		SubpassDependencies[1].dependencyFlags = 0;
+		SubpassDependencies[2].dstSubpass = VK_SUBPASS_EXTERNAL;
+		SubpassDependencies[2].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+		SubpassDependencies[2].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+		SubpassDependencies[2].dependencyFlags = 0;
 
 		// Todo: do not copy atachments to array
-		const uint32_t AttachmentDescriptionsCount = 2;
-		VkAttachmentDescription AttachmentDescriptions[AttachmentDescriptionsCount] = { ColourAttachment, DepthAttachment };
+		const uint32_t AttachmentDescriptionsCount = 3;
+		// must match .attachment
+		VkAttachmentDescription AttachmentDescriptions[AttachmentDescriptionsCount] =
+			{ SwapchainColorAttachment, SubpassOneColorAttachment, SubpassOneDepthAttachment };
 
 		// Create info for Render Pass
 		VkRenderPassCreateInfo RenderPassCreateInfo = {};
 		RenderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 		RenderPassCreateInfo.attachmentCount = AttachmentDescriptionsCount;
 		RenderPassCreateInfo.pAttachments = AttachmentDescriptions;
-		RenderPassCreateInfo.subpassCount = 1;
-		RenderPassCreateInfo.pSubpasses = &SubpassDescription;
-		RenderPassCreateInfo.dependencyCount = static_cast<uint32_t>(SubpassDependenciesSize);
+		RenderPassCreateInfo.subpassCount = SubpassesCount;
+		RenderPassCreateInfo.pSubpasses = Subpasses;
+		RenderPassCreateInfo.dependencyCount = SubpassDependenciesSize;
 		RenderPassCreateInfo.pDependencies = SubpassDependencies;
 
 		Result = vkCreateRenderPass(RenderInstance.LogicalDevice, &RenderPassCreateInfo, nullptr, &RenderInstance.RenderPass);
@@ -1117,6 +1157,39 @@ namespace Core
 		LayoutCreateInfo.pBindings = Bindings;		// Array of binding infos
 
 		Result = vkCreateDescriptorSetLayout(RenderInstance.LogicalDevice, &LayoutCreateInfo, nullptr, &RenderInstance.DescriptorSetLayout);
+		if (Result != VK_SUCCESS)
+		{
+			return false;
+		}
+
+		//Create input attachment image descriptor set layout
+		// Colour Input Binding
+		VkDescriptorSetLayoutBinding ColourInputLayoutBinding = {};
+		ColourInputLayoutBinding.binding = 0;
+		ColourInputLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		ColourInputLayoutBinding.descriptorCount = 1;
+		ColourInputLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		// Depth Input Binding
+		VkDescriptorSetLayoutBinding DepthInputLayoutBinding = {};
+		DepthInputLayoutBinding.binding = 1;
+		DepthInputLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		DepthInputLayoutBinding.descriptorCount = 1;
+		DepthInputLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		// Array of input attachment bindings
+		const uint32_t InputBindingsCount = 2;
+		// Todo: do not copy InputBindings
+		VkDescriptorSetLayoutBinding InputBindings[InputBindingsCount] = {ColourInputLayoutBinding, DepthInputLayoutBinding};
+
+		// Create a descriptor set layout for input attachments
+		VkDescriptorSetLayoutCreateInfo InputLayoutCreateInfo = {};
+		InputLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		InputLayoutCreateInfo.bindingCount = InputBindingsCount;
+		InputLayoutCreateInfo.pBindings = InputBindings;
+
+		// Create Descriptor Set Layout
+		Result = vkCreateDescriptorSetLayout(RenderInstance.LogicalDevice, &InputLayoutCreateInfo, nullptr, &RenderInstance.InputSetLayout);
 		if (Result != VK_SUCCESS)
 		{
 			return false;
@@ -1200,7 +1273,7 @@ namespace Core
 		const uint32_t ShaderStagesCount = 2;
 		VkPipelineShaderStageCreateInfo ShaderStages[ShaderStagesCount] = { VertexShaderCreateInfo , FragmentShaderCreateInfo };
 
-		// How the data for a single vertex (including info such as position, colour, texture coords, normals, etc) is as a whole
+		// How the data for a single vertex (including info such as position, color, texture coords, normals, etc) is as a whole
 		VkVertexInputBindingDescription VertexInputBindingDescription = {};
 		VertexInputBindingDescription.binding = 0;									// Can bind multiple streams of data, this defines which one
 		VertexInputBindingDescription.stride = sizeof(Core::Vertex);						// Size of a single vertex object
@@ -1218,7 +1291,7 @@ namespace Core
 		AttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;	// Format the data will take (also helps define size of data)
 		AttributeDescriptions[0].offset = offsetof(Core::Vertex, Position);		// Where this attribute is defined in the data for a single vertex
 
-		// Colour Attribute
+		// Color Attribute
 		AttributeDescriptions[1].binding = 0;
 		AttributeDescriptions[1].location = 1;
 		AttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -1293,28 +1366,28 @@ namespace Core
 		// Blending
 
 		VkPipelineColorBlendAttachmentState ColorBlendAttachmentState = {};
-		ColorBlendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT	// Colours to apply blending to
+		ColorBlendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT	// Colors to apply blending to
 			| VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 		ColorBlendAttachmentState.blendEnable = VK_TRUE;													// Enable blending
 
-		// Blending uses equation: (srcColorBlendFactor * new colour) colorBlendOp (dstColorBlendFactor * old colour)
+		// Blending uses equation: (srcColorBlendFactor * new color) colorBlendOp (dstColorBlendFactor * old color)
 		ColorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 		ColorBlendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
 		ColorBlendAttachmentState.colorBlendOp = VK_BLEND_OP_ADD;
 
-		// Summarised: (VK_BLEND_FACTOR_SRC_ALPHA * new colour) + (VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA * old colour)
-		//			   (new colour alpha * new colour) + ((1 - new colour alpha) * old colour)
+		// Summarised: (VK_BLEND_FACTOR_SRC_ALPHA * new color) + (VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA * old color)
+		//			   (new color alpha * new color) + ((1 - new color alpha) * old color)
 
 		ColorBlendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 		ColorBlendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
 		ColorBlendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
 		// Summarised: (1 * new alpha) + (0 * old alpha) = new alpharesult != VK_SUCCESS
 
-		VkPipelineColorBlendStateCreateInfo ColourBlendingCreateInfo = {};
-		ColourBlendingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-		ColourBlendingCreateInfo.logicOpEnable = VK_FALSE;				// Alternative to calculations is to use logical operations
-		ColourBlendingCreateInfo.attachmentCount = 1;
-		ColourBlendingCreateInfo.pAttachments = &ColorBlendAttachmentState;
+		VkPipelineColorBlendStateCreateInfo ColorBlendingCreateInfo = {};
+		ColorBlendingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		ColorBlendingCreateInfo.logicOpEnable = VK_FALSE;				// Alternative to calculations is to use logical operations
+		ColorBlendingCreateInfo.attachmentCount = 1;
+		ColorBlendingCreateInfo.pAttachments = &ColorBlendAttachmentState;
 
 		// Pipeline layout
 		const uint32_t DescriptorSetLayoutsCount = 2;
@@ -1355,7 +1428,7 @@ namespace Core
 		GraphicsPipelineCreateInfo.pDynamicState = nullptr;
 		GraphicsPipelineCreateInfo.pRasterizationState = &RasterizationStateCreateInfo;
 		GraphicsPipelineCreateInfo.pMultisampleState = &MultisampleStateCreateInfo;
-		GraphicsPipelineCreateInfo.pColorBlendState = &ColourBlendingCreateInfo;
+		GraphicsPipelineCreateInfo.pColorBlendState = &ColorBlendingCreateInfo;
 		GraphicsPipelineCreateInfo.pDepthStencilState = &DepthStencilCreateInfo;
 		GraphicsPipelineCreateInfo.layout = RenderInstance.PipelineLayout;							// Pipeline Layout pipeline should use
 		GraphicsPipelineCreateInfo.renderPass = RenderInstance.RenderPass;							// Render pass description the pipeline is compatible with
@@ -1377,14 +1450,29 @@ namespace Core
 		vkDestroyShaderModule(RenderInstance.LogicalDevice, VertexShaderModule, nullptr);
 		// Function end: CreateGraphicsPipeline
 		
-		// Function CreateDepthBufferImage
-		RenderInstance.DepthBufferImage = CreateImage(RenderInstance, RenderInstance.SwapExtent.width, RenderInstance.SwapExtent.height,
-			DepthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			&RenderInstance.DepthBufferImageMemory);
+		
+		RenderInstance.DepthBuffers = static_cast<GenericImageBuffer*>(Util::Memory::Allocate(RenderInstance.SwapchainImagesCount * sizeof(GenericImageBuffer)));
+		RenderInstance.ColorBuffers = static_cast<GenericImageBuffer*>(Util::Memory::Allocate(RenderInstance.SwapchainImagesCount * sizeof(GenericImageBuffer)));
 
-		// Create Depth Buffer Image View
-		RenderInstance.DepthBufferImageView = CreateImageView(RenderInstance, RenderInstance.DepthBufferImage, DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
-		// Function end CreateDepthBufferImage
+		for (uint32_t i = 0; i < RenderInstance.SwapchainImagesCount; ++i)
+		{
+			// Function CreateDepthBuffer
+			RenderInstance.DepthBuffers[i].Image = CreateImage(RenderInstance, RenderInstance.SwapExtent.width, RenderInstance.SwapExtent.height,
+				DepthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+				&RenderInstance.DepthBuffers[i].ImageMemory);
+
+			RenderInstance.DepthBuffers[i].ImageView = CreateImageView(RenderInstance, RenderInstance.DepthBuffers[i].Image, DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+			// Function end CreateDepthBuffer
+
+			// Function CreateColorBuffer
+			// VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT says that image can be used only as attachment. Used only for sub pass
+			RenderInstance.ColorBuffers[i].Image = CreateImage(RenderInstance, RenderInstance.SwapExtent.width, RenderInstance.SwapExtent.height,
+				ColorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+				&RenderInstance.ColorBuffers[i].ImageMemory);
+
+			RenderInstance.ColorBuffers[i].ImageView = CreateImageView(RenderInstance, RenderInstance.ColorBuffers[i].Image, ColorFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+			// Function end CreateDepthBuffer
+		}
 
 		RenderInstance.SwapchainFramebuffers = static_cast<VkFramebuffer*>(Util::Memory::Allocate(RenderInstance.SwapchainImagesCount * sizeof(VkFramebuffer)));
 
@@ -1392,11 +1480,12 @@ namespace Core
 		// Create a framebuffer for each swap chain image
 		for (uint32_t i = 0; i < RenderInstance.SwapchainImagesCount; i++)
 		{
-			const uint32_t AttachmentsCount = 2;
+			const uint32_t AttachmentsCount = 3;
 			VkImageView Attachments[AttachmentsCount] = {
 				RenderInstance.ImageViews[i],
 				// Todo: do not forget about position in array AttachmentDescriptions
-				RenderInstance.DepthBufferImageView
+				RenderInstance.ColorBuffers[i].ImageView,
+				RenderInstance.DepthBuffers[i].ImageView
 			};
 
 			VkFramebufferCreateInfo FramebufferCreateInfo = {};
@@ -1540,7 +1629,7 @@ namespace Core
 		VkDescriptorPoolSize SamplerPoolSize = {};
 		// Todo: support VK_DESCRIPTOR_TYPE_SAMPLER and VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE separatly
 		SamplerPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		SamplerPoolSize.descriptorCount = RenderInstance.MaxObjects;
+		SamplerPoolSize.descriptorCount = RenderInstance.MaxObjects; // Todo: max objects or max textures?
 
 		VkDescriptorPoolCreateInfo SamplerPoolCreateInfo = {};
 		SamplerPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1553,11 +1642,37 @@ namespace Core
 		{
 			return false;
 		}
+
+		// CREATE INPUT ATTACHMENT DESCRIPTOR POOL
+		VkDescriptorPoolSize ColourInputPoolSize = {};
+		ColourInputPoolSize.type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		ColourInputPoolSize.descriptorCount = RenderInstance.SwapchainImagesCount;
+
+		VkDescriptorPoolSize DepthInputPoolSize = {};
+		DepthInputPoolSize.type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		DepthInputPoolSize.descriptorCount = RenderInstance.SwapchainImagesCount;
+
+		// Todo: do not copy VkDescriptorPoolSize
+		const uint32_t InputPoolSizesCount = 2;
+		VkDescriptorPoolSize InputPoolSizes[InputPoolSizesCount] = { ColourInputPoolSize, DepthInputPoolSize };
+
+		VkDescriptorPoolCreateInfo InputPoolCreateInfo = {};
+		InputPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		InputPoolCreateInfo.maxSets = RenderInstance.SwapchainImagesCount;
+		InputPoolCreateInfo.poolSizeCount = InputPoolSizesCount;
+		InputPoolCreateInfo.pPoolSizes = InputPoolSizes;
+
+		Result = vkCreateDescriptorPool(RenderInstance.LogicalDevice, &InputPoolCreateInfo, nullptr, &RenderInstance.InputDescriptorPool);
+		if (Result != VK_SUCCESS)
+		{
+			return -1;
+		}
 		// Function end CreateDescriptorPool
 
 		// Function CreateDescriptorSets
 		RenderInstance.DescriptorSets = static_cast<VkDescriptorSet*>(Util::Memory::Allocate(RenderInstance.SwapchainImagesCount * sizeof(VkDescriptorSet)));
 		RenderInstance.SamplerDescriptorSets = static_cast<VkDescriptorSet*>(Util::Memory::Allocate(RenderInstance.MaxTextures * sizeof(VkDescriptorSet)));
+		RenderInstance.InputDescriptorSets = static_cast<VkDescriptorSet*>(Util::Memory::Allocate(RenderInstance.SwapchainImagesCount * sizeof(VkDescriptorSet)));
 
 		VkDescriptorSetLayout* SetLayouts = static_cast<VkDescriptorSetLayout*>(Util::Memory::Allocate(RenderInstance.SwapchainImagesCount * sizeof(VkDescriptorSetLayout)));
 		for (uint32_t i = 0; i < RenderInstance.SwapchainImagesCount; i++)
@@ -1585,6 +1700,7 @@ namespace Core
 		// Update all of descriptor set buffer bindings
 		for (uint32_t i = 0; i < RenderInstance.SwapchainImagesCount; i++)
 		{
+			// Todo: validate
 			VpBufferInfo.buffer = RenderInstance.VpUniformBuffers[i].Buffer;
 			VpBufferInfo.offset = 0;
 			VpBufferInfo.range = sizeof(Core::VulkanRenderInstance::UboViewProjection);
@@ -1616,10 +1732,66 @@ namespace Core
 			//VkWriteDescriptorSet WriteSets[WriteSetsCount] = { VpSetWrite, ModelSetWrite };
 
 			const uint32_t WriteSetsCount = 1;
+			// Todo: do not copy
 			VkWriteDescriptorSet WriteSets[WriteSetsCount] = { VpSetWrite };
 
 			// Todo: use one vkUpdateDescriptorSets call to update all descriptors
 			vkUpdateDescriptorSets(RenderInstance.LogicalDevice, WriteSetsCount, WriteSets, 0, nullptr);
+		}
+
+		for (uint32_t i = 0; i < RenderInstance.SwapchainImagesCount; i++)
+		{
+			SetLayouts[i] = RenderInstance.InputSetLayout;
+		}
+
+		SetAllocInfo.descriptorPool = RenderInstance.InputDescriptorPool;
+		SetAllocInfo.descriptorSetCount = RenderInstance.SwapchainImagesCount;
+
+		Result = vkAllocateDescriptorSets(RenderInstance.LogicalDevice, &SetAllocInfo, RenderInstance.InputDescriptorSets);
+		if (Result != VK_SUCCESS)
+		{
+			return false;
+		}
+
+		// Todo: move this and previus loop to function?
+		for (size_t i = 0; i < RenderInstance.SwapchainImagesCount; i++)
+		{
+			// Todo: move from loop?
+			VkDescriptorImageInfo ColourAttachmentDescriptor = {};
+			ColourAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			ColourAttachmentDescriptor.imageView = RenderInstance.ColorBuffers[i].ImageView;
+			ColourAttachmentDescriptor.sampler = VK_NULL_HANDLE;
+
+			VkWriteDescriptorSet ColourWrite = {};
+			ColourWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			ColourWrite.dstSet = RenderInstance.InputDescriptorSets[i];
+			ColourWrite.dstBinding = 0;
+			ColourWrite.dstArrayElement = 0;
+			ColourWrite.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+			ColourWrite.descriptorCount = 1;
+			ColourWrite.pImageInfo = &ColourAttachmentDescriptor;
+
+			VkDescriptorImageInfo DepthAttachmentDescriptor = {};
+			DepthAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			DepthAttachmentDescriptor.imageView = RenderInstance.DepthBuffers[i].ImageView;
+			DepthAttachmentDescriptor.sampler = VK_NULL_HANDLE;
+
+			VkWriteDescriptorSet DepthWrite = {};
+			DepthWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			DepthWrite.dstSet = RenderInstance.InputDescriptorSets[i];
+			DepthWrite.dstBinding = 1;
+			DepthWrite.dstArrayElement = 0;
+			DepthWrite.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+			DepthWrite.descriptorCount = 1;
+			DepthWrite.pImageInfo = &DepthAttachmentDescriptor;
+
+
+			// Todo: do not copy
+			const uint32_t CetWritesCount = 2;
+			VkWriteDescriptorSet SetWrites[CetWritesCount] = {ColourWrite, DepthWrite};
+
+			// Update descriptor sets
+			vkUpdateDescriptorSets(RenderInstance.LogicalDevice, CetWritesCount, SetWrites, 0, nullptr);
 		}
 
 		Util::Memory::Deallocate(SetLayouts);
@@ -1856,7 +2028,11 @@ namespace Core
 		// UNIFORM BUFFER SETUP CODE
 		//_aligned_free(RenderInstance.ModelTransferSpace);
 
+		vkDestroyDescriptorPool(RenderInstance.LogicalDevice, RenderInstance.InputDescriptorPool, nullptr);
+
 		vkDestroySampler(RenderInstance.LogicalDevice, RenderInstance.TextureSampler, nullptr);
+
+		vkDestroyDescriptorSetLayout(RenderInstance.LogicalDevice, RenderInstance.InputSetLayout, nullptr);
 
 		for (uint32_t i = 0; i < RenderInstance.TextureImagesCount; ++i)
 		{
@@ -1865,9 +2041,19 @@ namespace Core
 			vkFreeMemory(RenderInstance.LogicalDevice, RenderInstance.TextureImageBuffer[i].TextureImagesMemory, nullptr);
 		}
 
-		vkDestroyImageView(RenderInstance.LogicalDevice, RenderInstance.DepthBufferImageView, nullptr);
-		vkDestroyImage(RenderInstance.LogicalDevice, RenderInstance.DepthBufferImage, nullptr);
-		vkFreeMemory(RenderInstance.LogicalDevice, RenderInstance.DepthBufferImageMemory, nullptr);
+		for (uint32_t i = 0; i < RenderInstance.SwapchainImagesCount; ++i)
+		{
+			vkDestroyImageView(RenderInstance.LogicalDevice, RenderInstance.DepthBuffers[i].ImageView, nullptr);
+			vkDestroyImage(RenderInstance.LogicalDevice, RenderInstance.DepthBuffers[i].Image, nullptr);
+			vkFreeMemory(RenderInstance.LogicalDevice, RenderInstance.DepthBuffers[i].ImageMemory, nullptr);
+
+			vkDestroyImageView(RenderInstance.LogicalDevice, RenderInstance.ColorBuffers[i].ImageView, nullptr);
+			vkDestroyImage(RenderInstance.LogicalDevice, RenderInstance.ColorBuffers[i].Image, nullptr);
+			vkFreeMemory(RenderInstance.LogicalDevice, RenderInstance.ColorBuffers[i].ImageMemory, nullptr);
+		}
+
+		Util::Memory::Deallocate(RenderInstance.DepthBuffers);
+		Util::Memory::Deallocate(RenderInstance.ColorBuffers);
 
 		Util::Memory::Deallocate(RenderInstance.SamplerDescriptorSets);
 		Util::Memory::Deallocate(RenderInstance.DescriptorSets);

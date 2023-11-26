@@ -108,6 +108,13 @@ namespace Core
 		uint32_t TextureId = 0;
 	};
 
+	struct GenericImageBuffer
+	{
+		VkImage Image = nullptr;
+		VkDeviceMemory ImageMemory = nullptr;
+		VkImageView ImageView = nullptr;
+	};
+
 	struct MainInstance
 	{
 		VkInstance VulkanInstance = nullptr;
@@ -138,20 +145,23 @@ namespace Core
 		VkFramebuffer* SwapchainFramebuffers = nullptr;
 		VkCommandBuffer* CommandBuffers = nullptr;
 
-		// Todo struct depth buffer?
-		VkImage DepthBufferImage = nullptr;
-		VkDeviceMemory DepthBufferImageMemory = nullptr;
-		VkImageView DepthBufferImageView = nullptr;
+		GenericImageBuffer* ColorBuffers = nullptr;
+
+		VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
+		GenericImageBuffer* DepthBuffers = nullptr;
 
 		VkDescriptorSetLayout DescriptorSetLayout = nullptr;
 		VkDescriptorSetLayout SamplerSetLayout = nullptr;
+		VkDescriptorSetLayout InputSetLayout = nullptr; // Set for diferent pipeline, goes to diferent shader
 		VkPushConstantRange PushConstantRange;
 
 		// Todo: put textures in DescriptorSets to use only one descriptor set and pool?
 		VkDescriptorPool DescriptorPool = nullptr;
 		VkDescriptorPool SamplerDescriptorPool = nullptr;
+		VkDescriptorPool InputDescriptorPool = nullptr;
 		VkDescriptorSet* DescriptorSets = nullptr;
 		VkDescriptorSet* SamplerDescriptorSets = nullptr;
+		VkDescriptorSet* InputDescriptorSets = nullptr;
 
 		GenericBuffer* VpUniformBuffers = nullptr;
 		//GenericBuffer* ModelDynamicUniformBuffers = nullptr;
