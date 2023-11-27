@@ -1028,6 +1028,7 @@ namespace Core
 		SubpassOneDepthAttachmentReference.attachment = 2; // this index is related to Attachments array
 		SubpassOneDepthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+		Subpasses[0] = {};
 		Subpasses[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		Subpasses[0].colorAttachmentCount = 1;
 		Subpasses[0].pColorAttachments = &SubpassOneColourAttachmentReference;
@@ -1060,6 +1061,7 @@ namespace Core
 		InputReferences[1].attachment = 2; // SubpassOneDepthAttachment
 		InputReferences[1].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+		Subpasses[1] = {};
 		Subpasses[1].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		Subpasses[1].colorAttachmentCount = 1;
 		Subpasses[1].pColorAttachments = &SwapchainColorAttachmentReference;
@@ -1448,8 +1450,86 @@ namespace Core
 
 		vkDestroyShaderModule(RenderInstance.LogicalDevice, FragmentShaderModule, nullptr);
 		vkDestroyShaderModule(RenderInstance.LogicalDevice, VertexShaderModule, nullptr);
-		// Function end: CreateGraphicsPipeline
+
+		// Second pipeline
+		// Todo: move to function to avoid code duplication?
+		// Todo: use separate pipeline initialization structures or remove all values that are not used in next pipeline
+		// TODO FIX!!!
+		std::vector<char> SecondVertexShaderCode;
+		Util::OpenAndReadFileFull("./Resources/Shaders/second_vert.spv", VertexShaderCode, "rb");
+
+		std::vector<char> SecondFragmentShaderCode;
+		Util::OpenAndReadFileFull("./Resources/Shaders/second_frag.spv", FragmentShaderCode, "rb");
+
+		// Build shaders
+		ShaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		ShaderModuleCreateInfo.codeSize = VertexShaderCode.size();
+		ShaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(VertexShaderCode.data());
+
+		Result = vkCreateShaderModule(RenderInstance.LogicalDevice, &ShaderModuleCreateInfo, nullptr, &VertexShaderModule);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkCreateShaderModule result is {}", static_cast<int>(Result));
+			return false;
+		}
+
+		ShaderModuleCreateInfo.codeSize = FragmentShaderCode.size();
+		ShaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(FragmentShaderCode.data());
+
+		Result = vkCreateShaderModule(RenderInstance.LogicalDevice, &ShaderModuleCreateInfo, nullptr, &FragmentShaderModule);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkCreateShaderModule result is {}", static_cast<int>(Result));
+			return false;
+		}
+		// Set new shaders
+
+		VertexShaderCreateInfo.module = VertexShaderModule;
+		FragmentShaderCreateInfo.module = FragmentShaderModule;
+
+		const uint32_t SecondShaderStagesCount = 2;
+		VkPipelineShaderStageCreateInfo SecondShaderStages[SecondShaderStagesCount] = { VertexShaderCreateInfo, FragmentShaderCreateInfo };
+
+		// No vertex data for second pass
+		VertexInputCreateInfo.vertexBindingDescriptionCount = 0;
+		VertexInputCreateInfo.pVertexBindingDescriptions = nullptr;
+		VertexInputCreateInfo.vertexAttributeDescriptionCount = 0;
+		VertexInputCreateInfo.pVertexAttributeDescriptions = nullptr;
+
+		// Don't want to write to depth buffer
+		DepthStencilCreateInfo.depthWriteEnable = VK_FALSE;
+
+		// Create new pipeline layout
+		VkPipelineLayoutCreateInfo SecondPipelineLayoutCreateInfo = {};
+		SecondPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		SecondPipelineLayoutCreateInfo.setLayoutCount = 1;
+		SecondPipelineLayoutCreateInfo.pSetLayouts = &RenderInstance.InputSetLayout;
+		SecondPipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+		SecondPipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
+
+		Result = vkCreatePipelineLayout(RenderInstance.LogicalDevice, &SecondPipelineLayoutCreateInfo, nullptr, &RenderInstance.SecondPipelineLayout);
+		if (Result != VK_SUCCESS)
+		{
+			return -1;
+		}
+
+		GraphicsPipelineCreateInfo.pStages = SecondShaderStages;	// Update second shader stage list
+		GraphicsPipelineCreateInfo.layout = RenderInstance.SecondPipelineLayout;	// Change pipeline layout for input attachment descriptor sets
+		GraphicsPipelineCreateInfo.subpass = 1;						// Use second subpass
+
+		// Create second pipeline
+		// Todo: !!! Use one vkCreateGraphicsPipelines call to create pipelines
+		Result = vkCreateGraphicsPipelines(RenderInstance.LogicalDevice, VK_NULL_HANDLE, 1, &GraphicsPipelineCreateInfo, nullptr, &RenderInstance.SecondPipeline);
+		if (Result != VK_SUCCESS)
+		{
+			return -1;
+		}
+
+		// Destroy second shader modules
+		vkDestroyShaderModule(RenderInstance.LogicalDevice, FragmentShaderModule, nullptr);
+		vkDestroyShaderModule(RenderInstance.LogicalDevice, VertexShaderModule, nullptr);
 		
+		// Function end: CreateGraphicsPipeline
 		
 		RenderInstance.DepthBuffers = static_cast<GenericImageBuffer*>(Util::Memory::Allocate(RenderInstance.SwapchainImagesCount * sizeof(GenericImageBuffer)));
 		RenderInstance.ColorBuffers = static_cast<GenericImageBuffer*>(Util::Memory::Allocate(RenderInstance.SwapchainImagesCount * sizeof(GenericImageBuffer)));
@@ -1458,7 +1538,7 @@ namespace Core
 		{
 			// Function CreateDepthBuffer
 			RenderInstance.DepthBuffers[i].Image = CreateImage(RenderInstance, RenderInstance.SwapExtent.width, RenderInstance.SwapExtent.height,
-				DepthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+				DepthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 				&RenderInstance.DepthBuffers[i].ImageMemory);
 
 			RenderInstance.DepthBuffers[i].ImageView = CreateImageView(RenderInstance, RenderInstance.DepthBuffers[i].Image, DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
@@ -1893,11 +1973,12 @@ namespace Core
 		RenderPassBeginInfo.renderArea.offset = { 0, 0 };						// Start point of render pass in pixels
 		RenderPassBeginInfo.renderArea.extent = RenderInstance.SwapExtent;				// Size of region to run render pass on (starting at offset)
 
-		const uint32_t ClearValuesSize = 2;
+		const uint32_t ClearValuesSize = 3;
 		VkClearValue ClearValues[ClearValuesSize];
 		// Todo: do not forget about position in array AttachmentDescriptions
-		ClearValues[0].color = { 0.6f, 0.65f, 0.4f, 1.0f };
-		ClearValues[1].depthStencil.depth = 1.0f;
+		ClearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
+		ClearValues[1].color = { 0.0f, 0.0f, 0.0f, 1.0f };
+		ClearValues[2].depthStencil.depth = 1.0f;
 		
 		RenderPassBeginInfo.pClearValues = ClearValues;
 		RenderPassBeginInfo.clearValueCount = ClearValuesSize;
@@ -1944,6 +2025,13 @@ namespace Core
 			//vkCmdDraw(RenderInstance.CommandBuffers[i], RenderInstance.DrawableObject.VerticesCount, 1, 0, 0);
 			vkCmdDrawIndexed(RenderInstance.CommandBuffers[ImageIndex], RenderInstance.DrawableObjects[j].IndicesCount, 1, 0, 0, 0);
 		}
+
+		vkCmdNextSubpass(RenderInstance.CommandBuffers[ImageIndex], VK_SUBPASS_CONTENTS_INLINE);
+
+		vkCmdBindPipeline(RenderInstance.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.SecondPipeline);
+		vkCmdBindDescriptorSets(RenderInstance.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.SecondPipelineLayout,
+			0, 1, &RenderInstance.InputDescriptorSets[ImageIndex], 0, nullptr);
+		vkCmdDraw(RenderInstance.CommandBuffers[ImageIndex], 3, 1, 0, 0); // 3 hardcoded indices for second "post processing" subpass
 
 		// End Render Pass
 		vkCmdEndRenderPass(RenderInstance.CommandBuffers[ImageIndex]);
@@ -2102,6 +2190,9 @@ namespace Core
 		}
 
 		Util::Memory::Deallocate(RenderInstance.SwapchainFramebuffers);
+
+		vkDestroyPipeline(RenderInstance.LogicalDevice, RenderInstance.SecondPipeline, nullptr);
+		vkDestroyPipelineLayout(RenderInstance.LogicalDevice, RenderInstance.SecondPipelineLayout, nullptr);
 
 		vkDestroyPipeline(RenderInstance.LogicalDevice, RenderInstance.GraphicsPipeline, nullptr);
 		vkDestroyPipelineLayout(RenderInstance.LogicalDevice, RenderInstance.PipelineLayout, nullptr);

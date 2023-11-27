@@ -28,6 +28,10 @@
     <ClInclude Include="Source\Util\stb_image.h" />
     <ClInclude Include="Source\Util\Util.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Shaders\Second.frag" />
+    <None Include="Resources\Shaders\Second.vert" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>

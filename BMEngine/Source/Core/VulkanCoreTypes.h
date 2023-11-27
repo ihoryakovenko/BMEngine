@@ -171,6 +171,8 @@ namespace Core
 
 		VkPipeline GraphicsPipeline = nullptr;
 		VkPipelineLayout PipelineLayout = nullptr;
+		VkPipeline SecondPipeline = nullptr;
+		VkPipelineLayout SecondPipelineLayout = nullptr;
 		VkRenderPass RenderPass = nullptr;
 
 		struct UboViewProjection
