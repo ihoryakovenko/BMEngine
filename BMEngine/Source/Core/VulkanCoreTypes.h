@@ -4,7 +4,7 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
-#include "Util/stb_image.h"
+#include <stb_image.h>
 
 namespace Core
 {

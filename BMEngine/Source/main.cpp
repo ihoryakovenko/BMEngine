@@ -4,6 +4,7 @@
 //#include <glm/mat4x4.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
+#define TINYOBJLOADER_IMPLEMENTATION
 
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLFW_INCLUDE_VULKAN
@@ -18,9 +19,12 @@
 
 #include "Core/VulkanCoreTypes.h"
 
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
+#include <tiny_obj_loader.h>
+
+#include <unordered_map>
+
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
 
 struct TestMesh
 {
@@ -29,64 +33,42 @@ struct TestMesh
 	int TextureId;
 };
 
-TestMesh LoadMesh(aiMesh* mesh, const aiScene* scene, std::vector<int> matToTex)
+template<> struct std::hash<Core::Vertex>
 {
-	TestMesh Mesh;
-	
-
-	Mesh.vertices.resize(mesh->mNumVertices);
-
-	// Go through each vertex and copy it across to our vertices
-	for (size_t i = 0; i < mesh->mNumVertices; i++)
+	size_t operator()(Core::Vertex const& vertex) const
 	{
-		Mesh.vertices[i].Position = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
-
-		if (mesh->mTextureCoords[0])
-		{
-			Mesh.vertices[i].TextureCoords = { mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y };
-		}
-		else
-		{
-			Mesh.vertices[i].TextureCoords = { 0.0f, 0.0f };
-		}
-
-		Mesh.vertices[i].Color = { 1.0f, 1.0f, 1.0f };
+		return ((std::hash<glm::vec3>()(vertex.Position) ^
+			(std::hash<glm::vec3>()(vertex.Color) << 1)) >> 1) ^
+			(std::hash<glm::vec2>()(vertex.TextureCoords) << 1);
 	}
+};
 
-	for (size_t i = 0; i < mesh->mNumFaces; i++)
-	{
-		// Get a face
-		aiFace face = mesh->mFaces[i];
-
-		for (size_t j = 0; j < face.mNumIndices; j++)
-		{
-			Mesh.indices.push_back(face.mIndices[j]);
-		}
-	}
-
-	Mesh.TextureId = matToTex[mesh->mMaterialIndex];
-	return Mesh;
-}
-
-std::vector<TestMesh> LoadNode(aiNode* node, const aiScene* scene, std::vector<int> matToTex)
+struct VertexEqual
 {
-	std::vector<TestMesh> meshList;
-
-	// Go through each mesh at this node and create it, then add it to our meshList
-	for (size_t i = 0; i < node->mNumMeshes; i++)
+	bool operator()(const Core::Vertex& lhs, const Core::Vertex& rhs) const
 	{
-		meshList.push_back(LoadMesh(scene->mMeshes[node->mMeshes[i]], scene, matToTex)
-		);
+		return lhs.Position == rhs.Position && lhs.Color == rhs.Color && lhs.TextureCoords == rhs.TextureCoords;
+	}
+};
+
+void AddTexture(Core::VulkanRenderInstance& RenderInstance, const char* TexturePath)
+{
+	int Width, Height;
+	uint64_t ImageSize; // Todo: DeviceSize?
+	int Channels;
+
+	stbi_uc* ImageData = stbi_load(TexturePath, &Width, &Height, &Channels, STBI_rgb_alpha);
+
+	if (ImageData == nullptr)
+	{
+		return;
 	}
 
-	// Go through each node attached to this node and load it, then append their meshes to this node's mesh list
-	for (size_t i = 0; i < node->mNumChildren; i++)
-	{
-		std::vector<TestMesh> newList = LoadNode(node->mChildren[i], scene, matToTex);
-		meshList.insert(meshList.end(), newList.begin(), newList.end());
-	}
+	ImageSize = Width * Height * 4;
 
-	return meshList;
+	Core::CreateTexture(RenderInstance, ImageData, Width, Height, ImageSize);
+
+	stbi_image_free(ImageData);
 }
 
 int main()
@@ -121,53 +103,35 @@ int main()
 
 	RenderInstance.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
-	// Function LoadTexture
-	int Width, Height;
-	uint64_t ImageSize; // Todo: DeviceSize?
-	int Channels;
-
 	const char* TestTexture = "./Resources/Textures/giraffe.jpg";
-	stbi_uc* ImageData = stbi_load(TestTexture, &Width, &Height, &Channels, STBI_rgb_alpha);
+	AddTexture(RenderInstance, TestTexture);
 
-	if (ImageData == nullptr)
-	{
-		return -1;
-	}
-
-	ImageSize = Width * Height * 4;
-	// Function end LoadTexture
-
-	Core::CreateTexture(RenderInstance, ImageData, Width, Height, ImageSize);
-
-
-	// TMP shit
-	Assimp::Importer AssimpImporter;
 	const char* Modelpath = "./Resources/Models/uh60.obj";
-	const aiScene* Scene = AssimpImporter.ReadFile(Modelpath, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices);
-	if (!Scene)
+	const char* BaseDir = "./Resources/Models/";
+
+	tinyobj::attrib_t Attrib;
+	std::vector<tinyobj::shape_t> Shapes;
+	std::vector<tinyobj::material_t> Materials;
+	std::string Warn, Err;
+
+	if (!tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &Warn, &Err, Modelpath, BaseDir))
 	{
 		return -1;
 	}
 
-	std::vector<std::string> TextureList(Scene->mNumMaterials);
+	std::vector<std::string> TextureList(Materials.size());
 	std::vector<int> MaterialToTexture(TextureList.size());
 
-	for (size_t i = 0; i < Scene->mNumMaterials; i++)
+	for (size_t i = 0; i < Materials.size(); i++)
 	{
-		aiMaterial* Material = Scene->mMaterials[i];
-
 		TextureList[i] = "";
-
-		if (Material->GetTextureCount(aiTextureType_DIFFUSE))
+		const tinyobj::material_t& Material = Materials[i];
+		if (!Material.diffuse_texname.empty())
 		{
-			aiString Path;
-			if (Material->GetTexture(aiTextureType_DIFFUSE, 0, &Path) == AI_SUCCESS)
-			{
-				int idx = std::string(Path.data).rfind("\\");
-				std::string fileName = "./Resources/Textures/" + std::string(Path.data).substr(idx + 1);
+			int idx = Material.diffuse_texname.rfind("\\");
+			std::string fileName = "./Resources/Textures/" + Material.diffuse_texname.substr(idx + 1);
 
-				TextureList[i] = fileName;
-			}
+			TextureList[i] = fileName;
 		}
 	}
 
@@ -180,31 +144,61 @@ int main()
 		else
 		{
 			MaterialToTexture[i] = RenderInstance.TextureImagesCount;
-
-			stbi_uc* ImageData = stbi_load(TextureList[i].c_str(), &Width, &Height, &Channels, STBI_rgb_alpha);
-
-			if (ImageData == nullptr)
-			{
-				return -1;
-			}
-
-			ImageSize = Width * Height * 4;
-
-			Core::CreateTexture(RenderInstance, ImageData, Width, Height, ImageSize);
-
-			stbi_image_free(ImageData);
+			AddTexture(RenderInstance, TextureList[i].c_str());
 		}
 	}
 
-	std::vector<TestMesh> ModelMeshes = LoadNode(Scene->mRootNode, Scene, MaterialToTexture);
+	std::vector<TestMesh> ModelMeshes;
+	ModelMeshes.reserve(Shapes.size());
+
+	std::unordered_map < Core::Vertex, uint32_t, std::hash<Core::Vertex>, VertexEqual> uniqueVertices{};
+
+	for (const auto& Shape : Shapes)
+	{
+		TestMesh Tm;
+
+		for (const auto& index : Shape.mesh.indices)
+		{
+			Core::Vertex vertex{};
+
+			vertex.Position =
+			{
+				Attrib.vertices[3 * index.vertex_index + 0],
+				Attrib.vertices[3 * index.vertex_index + 1],
+				Attrib.vertices[3 * index.vertex_index + 2]
+			};
+
+			vertex.TextureCoords =
+			{
+				Attrib.texcoords[2 * index.texcoord_index + 0],
+				Attrib.texcoords[2 * index.texcoord_index + 1]
+			};
+
+			vertex.Color = { 1.0f, 1.0f, 1.0f };
+
+			if (uniqueVertices.count(vertex) == 0) {
+				uniqueVertices[vertex] = static_cast<uint32_t>(Tm.vertices.size());
+				Tm.vertices.push_back(vertex);
+			}
+			
+			Tm.indices.push_back(1);		
+		}
+
+		Tm.TextureId = MaterialToTexture[Shape.mesh.material_ids[0]];
+
+		ModelMeshes.push_back(Tm);
+	}
 
 	for (int i = 0; i < ModelMeshes.size(); ++i)
 	{
 		Core::Mesh m;
 		m.MeshVertices = ModelMeshes[i].vertices.data();
 		m.MeshVerticesCount = ModelMeshes[i].vertices.size();
+
+
 		m.MeshIndices = ModelMeshes[i].indices.data();
 		m.MeshIndicesCount = ModelMeshes[i].indices.size();
+
 		Core::LoadMesh(RenderInstance, m);
 		RenderInstance.DrawableObjects[RenderInstance.DrawableObjectsCount - 1].TextureId = ModelMeshes[i].TextureId;
 	}
@@ -212,9 +206,6 @@ int main()
 	float Angle = 0.0f;
 	double DeltaTime = 0.0f;
 	double LastTime = 0.0f;
-
-	float XMove = 0.0f;
-	float MoveScale = 4.0f;
 
 	while (!glfwWindowShouldClose(RenderInstance.Window))
 	{
