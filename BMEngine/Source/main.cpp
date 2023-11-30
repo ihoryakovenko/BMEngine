@@ -181,7 +181,7 @@ int main()
 				Tm.vertices.push_back(vertex);
 			}
 			
-			Tm.indices.push_back(1);		
+			Tm.indices.push_back(uniqueVertices[vertex]);
 		}
 
 		Tm.TextureId = MaterialToTexture[Shape.mesh.material_ids[0]];
