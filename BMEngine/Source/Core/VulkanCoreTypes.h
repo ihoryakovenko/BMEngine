@@ -124,46 +124,67 @@ namespace Core
 	bool InitMainInstance(MainInstance& Instance, bool IsValidationLayersEnabled);
 	void DeinitMainInstance(MainInstance& Instance);
 
-	struct VulkanRenderInstance
+	struct ViewportInstence
 	{
 		GLFWwindow* Window = nullptr;
-
-		VkInstance VulkanInstance = nullptr;
-
-		VkPhysicalDeviceProperties PhysicalDeviceProperties;
-		VkPhysicalDevice PhysicalDevice = nullptr;
-		VkDevice LogicalDevice = nullptr;
-
-		VkQueue GraphicsQueue = nullptr;
-		VkQueue PresentationQueue = nullptr;
 		VkSurfaceKHR Surface = nullptr;
+
 		VkExtent2D SwapExtent;
 		VkSwapchainKHR VulkanSwapchain = nullptr;
 
 		uint32_t SwapchainImagesCount = 0;
 		VkImageView* ImageViews = nullptr;
+
 		VkFramebuffer* SwapchainFramebuffers = nullptr;
 		VkCommandBuffer* CommandBuffers = nullptr;
-
 		GenericImageBuffer* ColorBuffers = nullptr;
-
-		VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
 		GenericImageBuffer* DepthBuffers = nullptr;
 
 		VkDescriptorSetLayout DescriptorSetLayout = nullptr;
-		VkDescriptorSetLayout SamplerSetLayout = nullptr;
 		VkDescriptorSetLayout InputSetLayout = nullptr; // Set for diferent pipeline, goes to diferent shader
-		VkPushConstantRange PushConstantRange;
+
+		GenericBuffer* VpUniformBuffers = nullptr;
 
 		// Todo: put textures in DescriptorSets to use only one descriptor set and pool?
 		VkDescriptorPool DescriptorPool = nullptr;
-		VkDescriptorPool SamplerDescriptorPool = nullptr;
 		VkDescriptorPool InputDescriptorPool = nullptr;
 		VkDescriptorSet* DescriptorSets = nullptr;
-		VkDescriptorSet* SamplerDescriptorSets = nullptr;
 		VkDescriptorSet* InputDescriptorSets = nullptr;
 
-		GenericBuffer* VpUniformBuffers = nullptr;
+		struct UboViewProjection
+		{
+			glm::mat4 View;
+			glm::mat4 Projection;
+		} ViewProjection;
+	};
+
+	struct VulkanRenderInstance
+	{
+		VkInstance VulkanInstance = nullptr;
+
+		ViewportInstence Viewport;
+
+		ViewportInstence SecondTestViewport;
+
+		VkPhysicalDeviceProperties PhysicalDeviceProperties;
+		VkPhysicalDevice PhysicalDevice = nullptr;
+		VkDevice LogicalDevice = nullptr;
+
+		// Todo: ViewportInstence?
+		VkQueue GraphicsQueue = nullptr;
+		VkQueue PresentationQueue = nullptr;
+
+		// Todo: pass as AddViewport params? 
+		VkFormat ColorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Todo: check if VK_FORMAT_R8G8B8A8_UNORM supported
+		VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
+
+		VkDescriptorPool SamplerDescriptorPool = nullptr;
+		VkDescriptorSetLayout SamplerSetLayout = nullptr;
+		VkDescriptorSet* SamplerDescriptorSets = nullptr;
+		
+		VkPushConstantRange PushConstantRange;
+
+		
 		//GenericBuffer* ModelDynamicUniformBuffers = nullptr;
 
 		//uint32_t ModelUniformAlignment = 0;
@@ -174,12 +195,6 @@ namespace Core
 		VkPipeline SecondPipeline = nullptr;
 		VkPipelineLayout SecondPipelineLayout = nullptr;
 		VkRenderPass RenderPass = nullptr;
-
-		struct UboViewProjection
-		{
-			glm::mat4 View;
-			glm::mat4 Projection;
-		} ViewProjection;
 
 		const uint32_t MaxObjects = 528;
 		uint32_t DrawableObjectsCount = 0;
@@ -206,6 +221,7 @@ namespace Core
 	bool Draw(VulkanRenderInstance& RenderInstance);
 	void DeinitVulkanRenderInstance(VulkanRenderInstance& RenderInstance);
 	void CreateTexture(VulkanRenderInstance& RenderInstance, stbi_uc* TextureData, int Width, int Height, VkDeviceSize ImageSize);
+	bool AddViewport(VulkanRenderInstance& RenderInstance, GLFWwindow* Window);
 
 	bool CreateGenericBuffer(const VulkanRenderInstance& RenderInstance, VkDeviceSize BufferSize,
 		VkBufferUsageFlags BufferUsage, VkMemoryPropertyFlags BufferProperties, GenericBuffer& OutBuffer);
@@ -226,4 +242,8 @@ namespace Core
 	uint32_t FindMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, uint32_t AllowedTypes, VkMemoryPropertyFlags Properties);
 
 	VkImageView CreateImageView(const VulkanRenderInstance& RenderInstance, VkImage Image, VkFormat Format, VkImageAspectFlags AspectFlags);
+
+	//VkExtent2D GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities, GLFWwindow* Window);
+
+	//bool InitNewViewport(const VulkanRenderInstance& RenderInstance, VkSurfaceKHR Surface, GLFWwindow* Window, ViewportInstence& OutViewport);
 }

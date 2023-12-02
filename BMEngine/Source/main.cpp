@@ -96,12 +96,12 @@ int main()
 	Core::VulkanRenderInstance RenderInstance;
 	Core::InitVulkanRenderInstance(RenderInstance, Instance.VulkanInstance, Window);
 
-	RenderInstance.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-		static_cast<float>(RenderInstance.SwapExtent.width) / static_cast<float>(RenderInstance.SwapExtent.height), 0.1f, 100.0f);
+	RenderInstance.Viewport.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
+		static_cast<float>(RenderInstance.Viewport.SwapExtent.width) / static_cast<float>(RenderInstance.Viewport.SwapExtent.height), 0.1f, 100.0f);
 
-	RenderInstance.ViewProjection.Projection[1][1] *= -1;
+	RenderInstance.Viewport.ViewProjection.Projection[1][1] *= -1;
 
-	RenderInstance.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	RenderInstance.Viewport.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	const char* TestTexture = "./Resources/Textures/giraffe.jpg";
 	AddTexture(RenderInstance, TestTexture);
@@ -119,32 +119,19 @@ int main()
 		return -1;
 	}
 
-	std::vector<std::string> TextureList(Materials.size());
-	std::vector<int> MaterialToTexture(TextureList.size());
+	std::vector<int> MaterialToTexture(Materials.size());
 
 	for (size_t i = 0; i < Materials.size(); i++)
 	{
-		TextureList[i] = "";
+		MaterialToTexture[i] = 0;
 		const tinyobj::material_t& Material = Materials[i];
 		if (!Material.diffuse_texname.empty())
 		{
-			int idx = Material.diffuse_texname.rfind("\\");
-			std::string fileName = "./Resources/Textures/" + Material.diffuse_texname.substr(idx + 1);
+			int Idx = Material.diffuse_texname.rfind("\\");
+			std::string FileName = "./Resources/Textures/" + Material.diffuse_texname.substr(Idx + 1);
 
-			TextureList[i] = fileName;
-		}
-	}
-
-	for (size_t i = 0; i < TextureList.size(); i++)
-	{
-		if (TextureList[i].empty())
-		{
-			MaterialToTexture[i] = 0;
-		}
-		else
-		{
 			MaterialToTexture[i] = RenderInstance.TextureImagesCount;
-			AddTexture(RenderInstance, TextureList[i].c_str());
+			AddTexture(RenderInstance, FileName.c_str());
 		}
 	}
 
@@ -176,7 +163,8 @@ int main()
 
 			vertex.Color = { 1.0f, 1.0f, 1.0f };
 
-			if (uniqueVertices.count(vertex) == 0) {
+			if (uniqueVertices.count(vertex) == 0)
+			{
 				uniqueVertices[vertex] = static_cast<uint32_t>(Tm.vertices.size());
 				Tm.vertices.push_back(vertex);
 			}
@@ -207,7 +195,13 @@ int main()
 	double DeltaTime = 0.0f;
 	double LastTime = 0.0f;
 
-	while (!glfwWindowShouldClose(RenderInstance.Window))
+	glm::vec3 CameraPosition = glm::vec3(0.0f, 0.0f, 20.0f);
+	glm::vec3 CameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+	glm::vec3 CameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+	const float RotationSpeed = 2.0f;
+	const float CameraSpeed = 10.0f;
+
+	while (!glfwWindowShouldClose(RenderInstance.Viewport.Window))
 	{
 		glfwPollEvents();
 
@@ -215,18 +209,68 @@ int main()
 		DeltaTime = CurrentTime - LastTime;
 		LastTime = static_cast<float>(CurrentTime);
 
-		Angle += 30.0f * static_cast<float>(DeltaTime);
-		if (Angle > 360.0f)
+		float CameraDeltaSpeed = CameraSpeed * DeltaTime;
+		float CameraDeltaRotationSpeed = RotationSpeed * DeltaTime;
+
+			
+		if (glfwGetKey(RenderInstance.Viewport.Window, GLFW_KEY_W) == GLFW_PRESS)
 		{
-			Angle -= 360.0f;
+			CameraPosition += CameraDeltaSpeed * CameraFront;
 		}
 
-		glm::mat4 TestMat = glm::rotate(glm::mat4(1.0f), glm::radians(Angle), glm::vec3(0.0f, 1.0f, 0.0f));
-
-		for (int i = 0; i < RenderInstance.DrawableObjectsCount; ++i)
+		if (glfwGetKey(RenderInstance.Viewport.Window, GLFW_KEY_S) == GLFW_PRESS)
 		{
-			RenderInstance.DrawableObjects[i].Model = TestMat;
+			CameraPosition -= CameraDeltaSpeed * CameraFront;
 		}
+
+		if (glfwGetKey(RenderInstance.Viewport.Window, GLFW_KEY_A) == GLFW_PRESS)
+		{
+			CameraPosition -= glm::normalize(glm::cross(CameraFront, CameraUp)) * CameraDeltaSpeed;
+		}
+
+		if (glfwGetKey(RenderInstance.Viewport.Window, GLFW_KEY_D) == GLFW_PRESS)
+		{
+			CameraPosition += glm::normalize(glm::cross(CameraFront, CameraUp)) * CameraDeltaSpeed;
+		}
+
+		// Move camera up when Space key or Shift key is pressed
+		if (glfwGetKey(RenderInstance.Viewport.Window, GLFW_KEY_SPACE) == GLFW_PRESS)
+		{
+			CameraPosition += CameraDeltaSpeed * CameraUp;
+		}
+
+		if (glfwGetKey(RenderInstance.Viewport.Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+		{
+			CameraPosition -= CameraDeltaSpeed * CameraUp;
+		}
+
+		if (glfwGetKey(RenderInstance.Viewport.Window, GLFW_KEY_Q) == GLFW_PRESS)
+		{
+			glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), CameraDeltaRotationSpeed, CameraUp);
+			CameraFront = glm::mat3(rotation) * CameraFront;
+		}
+
+		// Rotate camera right when E key is pressed
+		if (glfwGetKey(RenderInstance.Viewport.Window, GLFW_KEY_E) == GLFW_PRESS)
+		{
+			glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), -CameraDeltaRotationSpeed, CameraUp);
+			CameraFront = glm::mat3(rotation) * CameraFront;
+		}
+
+		RenderInstance.Viewport.ViewProjection.View = glm::lookAt(CameraPosition, CameraPosition + CameraFront, CameraUp);
+
+		//Angle += 30.0f * static_cast<float>(DeltaTime);
+		//if (Angle > 360.0f)
+		//{
+		//	Angle -= 360.0f;
+		//}
+
+		//glm::mat4 TestMat = glm::rotate(glm::mat4(1.0f), glm::radians(Angle), glm::vec3(0.0f, 1.0f, 0.0f));
+
+		//for (int i = 0; i < RenderInstance.DrawableObjectsCount; ++i)
+		//{
+		//	RenderInstance.DrawableObjects[i].Model = TestMat;
+		//}
 
 		Core::Draw(RenderInstance);
 	}
