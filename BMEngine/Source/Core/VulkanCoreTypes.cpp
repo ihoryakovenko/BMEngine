@@ -731,9 +731,8 @@ namespace Core
 		VkPhysicalDevice* DeviceList = static_cast<VkPhysicalDevice*>(Util::Memory::Allocate(DevicesCount * sizeof(VkPhysicalDevice)));
 		vkEnumeratePhysicalDevices(RenderInstance.VulkanInstance, &DevicesCount, DeviceList);
 
-		Core::VkPhysicalDeviceSetupData VkPhysicalDeviceSetupData;
+		VkPhysicalDeviceSetupData VkPhysicalDeviceSetupData;
 
-		Core::PhysicalDeviceIndices PhysicalDeviceIndices;
 		VkSurfaceCapabilitiesKHR SurfaceCapabilities = { };
 
 		const char* DeviceExtensions[] = {
@@ -753,9 +752,9 @@ namespace Core
 				break;
 			}
 
-			PhysicalDeviceIndices = Core::GetPhysicalDeviceIndices(VkPhysicalDeviceSetupData, DeviceList[i], RenderInstance.Viewport.Surface);
+			RenderInstance.PhysicalDeviceIndices = Core::GetPhysicalDeviceIndices(VkPhysicalDeviceSetupData, DeviceList[i], RenderInstance.Viewport.Surface);
 
-			if (PhysicalDeviceIndices.GraphicsFamily < 0 || PhysicalDeviceIndices.PresentationFamily < 0)
+			if (RenderInstance.PhysicalDeviceIndices.GraphicsFamily < 0 || RenderInstance.PhysicalDeviceIndices.PresentationFamily < 0)
 			{
 				Util::Log().Warning("PhysicalDeviceIndices are not initialized");
 				break;
@@ -804,14 +803,14 @@ namespace Core
 		uint32_t FamilyIndicesSize = 1;
 
 		QueueCreateInfos[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		QueueCreateInfos[0].queueFamilyIndex = static_cast<uint32_t>(PhysicalDeviceIndices.GraphicsFamily);
+		QueueCreateInfos[0].queueFamilyIndex = static_cast<uint32_t>(RenderInstance.PhysicalDeviceIndices.GraphicsFamily);
 		QueueCreateInfos[0].queueCount = 1;
 		QueueCreateInfos[0].pQueuePriorities = &Priority;
 
-		if (PhysicalDeviceIndices.GraphicsFamily != PhysicalDeviceIndices.PresentationFamily)
+		if (RenderInstance.PhysicalDeviceIndices.GraphicsFamily != RenderInstance.PhysicalDeviceIndices.PresentationFamily)
 		{
 			QueueCreateInfos[1].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-			QueueCreateInfos[1].queueFamilyIndex = static_cast<uint32_t>(PhysicalDeviceIndices.PresentationFamily);
+			QueueCreateInfos[1].queueFamilyIndex = static_cast<uint32_t>(RenderInstance.PhysicalDeviceIndices.PresentationFamily);
 			QueueCreateInfos[1].queueCount = 1;
 			QueueCreateInfos[1].pQueuePriorities = &Priority;
 
@@ -838,23 +837,15 @@ namespace Core
 		}
 		// Function end: CreateLogicalDevice
 
-		// Function: SetupQueues
-		vkGetDeviceQueue(RenderInstance.LogicalDevice, static_cast<uint32_t>(PhysicalDeviceIndices.GraphicsFamily), 0, &RenderInstance.GraphicsQueue);
-		vkGetDeviceQueue(RenderInstance.LogicalDevice, static_cast<uint32_t>(PhysicalDeviceIndices.PresentationFamily), 0, &RenderInstance.PresentationQueue);
 
-		if (RenderInstance.GraphicsQueue == nullptr && RenderInstance.PresentationQueue == nullptr)
-		{
-			return false;
-		}
-		// Function end: SetupQueues
 
 		// Function: GetBestSurfaceFormat
 		// Return most common format
-		VkSurfaceFormatKHR SurfaceFormat = { VK_FORMAT_UNDEFINED, static_cast<VkColorSpaceKHR>(0) };
+		RenderInstance.SurfaceFormat = { VK_FORMAT_UNDEFINED, static_cast<VkColorSpaceKHR>(0) };
 		// All formats avalible
 		if (VkPhysicalDeviceSetupData.SurfaceFormatsCount == 1 && VkPhysicalDeviceSetupData.SurfaceFormats[0].format == VK_FORMAT_UNDEFINED)
 		{
-			SurfaceFormat = { VK_FORMAT_R8G8B8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
+			RenderInstance.SurfaceFormat = { VK_FORMAT_R8G8B8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
 		}
 		else
 		{
@@ -864,12 +855,12 @@ namespace Core
 				if ((Format.format == VK_FORMAT_R8G8B8_UNORM || Format.format == VK_FORMAT_B8G8R8A8_UNORM)
 					&& Format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 				{
-					SurfaceFormat = Format;
+					RenderInstance.SurfaceFormat = Format;
 				}
 			}
 		}
 
-		if (SurfaceFormat.format == VK_FORMAT_UNDEFINED)
+		if (RenderInstance.SurfaceFormat.format == VK_FORMAT_UNDEFINED)
 		{
 			Util::Log().Error("SurfaceFormat is undefined");
 			return false;
@@ -878,120 +869,43 @@ namespace Core
 
 		// Function: GetBestPresentationMode
 		// Optimal presentation mode
-		VkPresentModeKHR PresentationMode = VK_PRESENT_MODE_FIFO_KHR;
+		RenderInstance.PresentationMode = VK_PRESENT_MODE_FIFO_KHR;
 		for (uint32_t i = 0; i < VkPhysicalDeviceSetupData.PresentModesCount; ++i)
 		{
 			if (VkPhysicalDeviceSetupData.PresentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR)
 			{
-				PresentationMode = VK_PRESENT_MODE_MAILBOX_KHR;
+				RenderInstance.PresentationMode = VK_PRESENT_MODE_MAILBOX_KHR;
 			}
 		}
 
 		Core::DeinitVkPhysicalDeviceSetupData(VkPhysicalDeviceSetupData);
 
 		// Has to be present by spec
-		if (PresentationMode != VK_PRESENT_MODE_MAILBOX_KHR)
+		if (RenderInstance.PresentationMode != VK_PRESENT_MODE_MAILBOX_KHR)
 		{
 			Util::Log().Warning("Using default VK_PRESENT_MODE_FIFO_KHR");
 		}
 		// Function end: GetBestPresentationMode
 
-		// Function: GetBestSwapExtent
-		if (SurfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
+		
+
+
+
+
+
+
+
+
+
+		// Function: SetupQueues
+		vkGetDeviceQueue(RenderInstance.LogicalDevice, static_cast<uint32_t>(RenderInstance.PhysicalDeviceIndices.GraphicsFamily), 0, &RenderInstance.GraphicsQueue);
+		vkGetDeviceQueue(RenderInstance.LogicalDevice, static_cast<uint32_t>(RenderInstance.PhysicalDeviceIndices.PresentationFamily), 0, &RenderInstance.PresentationQueue);
+
+		if (RenderInstance.GraphicsQueue == nullptr && RenderInstance.PresentationQueue == nullptr)
 		{
-			RenderInstance.Viewport.SwapExtent = SurfaceCapabilities.currentExtent;
-		}
-		else
-		{
-			int Width;
-			int Height;
-			glfwGetFramebufferSize(RenderInstance.Viewport.Window, &Width, &Height);
-
-			Width = std::clamp(static_cast<uint32_t>(Width), SurfaceCapabilities.minImageExtent.width, SurfaceCapabilities.maxImageExtent.width);
-			Height = std::clamp(static_cast<uint32_t>(Height), SurfaceCapabilities.minImageExtent.height, SurfaceCapabilities.maxImageExtent.height);
-
-			RenderInstance.Viewport.SwapExtent = { static_cast<uint32_t>(Width), static_cast<uint32_t>(Height) };
-		}
-		// Function end: GetBestSwapExtent
-
-		// How many images are in the swap chain
-		// Get 1 more then the minimum to allow triple buffering
-		uint32_t ImageCount = SurfaceCapabilities.minImageCount + 1;
-
-		// If maxImageCount > 0, then limitless
-		if (SurfaceCapabilities.maxImageCount > 0
-			&& SurfaceCapabilities.maxImageCount < ImageCount)
-		{
-			ImageCount = SurfaceCapabilities.maxImageCount;
-		}
-
-		VkSwapchainCreateInfoKHR SwapchainCreateInfo = {};
-		SwapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-		SwapchainCreateInfo.surface = RenderInstance.Viewport.Surface;
-		SwapchainCreateInfo.imageFormat = SurfaceFormat.format;
-		SwapchainCreateInfo.imageColorSpace = SurfaceFormat.colorSpace;
-		SwapchainCreateInfo.presentMode = PresentationMode;
-		SwapchainCreateInfo.imageExtent = RenderInstance.Viewport.SwapExtent;
-		SwapchainCreateInfo.minImageCount = ImageCount;
-		SwapchainCreateInfo.imageArrayLayers = 1;
-		SwapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-		SwapchainCreateInfo.preTransform = SurfaceCapabilities.currentTransform;
-		SwapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // How to handle windows blending
-		SwapchainCreateInfo.clipped = VK_TRUE;
-
-		uint32_t Indices[] = {
-			static_cast<uint32_t>(PhysicalDeviceIndices.GraphicsFamily),
-			static_cast<uint32_t>(PhysicalDeviceIndices.PresentationFamily)
-		};
-
-		if (PhysicalDeviceIndices.GraphicsFamily != PhysicalDeviceIndices.PresentationFamily)
-		{
-			// Less efficient mode
-			SwapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-			SwapchainCreateInfo.queueFamilyIndexCount = 2;
-			SwapchainCreateInfo.pQueueFamilyIndices = Indices;
-		}
-		else
-		{
-			SwapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-			SwapchainCreateInfo.queueFamilyIndexCount = 0;
-			SwapchainCreateInfo.pQueueFamilyIndices = nullptr;
-		}
-
-		// Used if old cwap chain been destroyed and this one replaces it
-		SwapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
-
-		Result = vkCreateSwapchainKHR(RenderInstance.LogicalDevice, &SwapchainCreateInfo, nullptr, &RenderInstance.Viewport.VulkanSwapchain);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkCreateSwapchainKHR result is {}", static_cast<int>(Result));
 			return false;
 		}
-
-		// Get swap chain images
-		vkGetSwapchainImagesKHR(RenderInstance.LogicalDevice, RenderInstance.Viewport.VulkanSwapchain, &RenderInstance.Viewport.SwapchainImagesCount, nullptr);
-
-		VkImage* Images = static_cast<VkImage*>(Util::Memory::Allocate(RenderInstance.Viewport.SwapchainImagesCount * sizeof(VkImage)));
-		vkGetSwapchainImagesKHR(RenderInstance.LogicalDevice, RenderInstance.Viewport.VulkanSwapchain, &RenderInstance.Viewport.SwapchainImagesCount, Images);
-
-		RenderInstance.Viewport.ImageViews = static_cast<VkImageView*>(Util::Memory::Allocate(RenderInstance.Viewport.SwapchainImagesCount * sizeof(VkImageView)));
-
-		for (uint32_t i = 0; i < RenderInstance.Viewport.SwapchainImagesCount; ++i)
-		{
-			VkImageView ImageView = CreateImageView(RenderInstance, Images[i], SurfaceFormat.format, VK_IMAGE_ASPECT_COLOR_BIT);
-			if (ImageView == nullptr)
-			{
-				Util::Log().Error("vkCreateImageView result is {}", static_cast<int>(Result));
-				Util::Memory::Deallocate(Images);
-				Util::Memory::Deallocate(RenderInstance.Viewport.ImageViews);
-				return false;
-			}
-
-			RenderInstance.Viewport.ImageViews[i] = ImageView;
-		}
-
-		Util::Memory::Deallocate(Images);
-		// Function end: CreateSwapchain
+		// Function end: SetupQueues
 
 		// Function ChooseSupportedFormat
 		VkFormat BackupFormats[] = { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT };
@@ -1054,7 +968,7 @@ namespace Core
 		// Subpass 2 attachments and references
 		
 		VkAttachmentDescription SwapchainColorAttachment = {};
-		SwapchainColorAttachment.format = SurfaceFormat.format;
+		SwapchainColorAttachment.format = RenderInstance.SurfaceFormat.format;
 		SwapchainColorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 		SwapchainColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		SwapchainColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1184,7 +1098,7 @@ namespace Core
 		VkCommandPoolCreateInfo PoolInfo = {};
 		PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 		PoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		PoolInfo.queueFamilyIndex = PhysicalDeviceIndices.GraphicsFamily;	// Queue Family type that buffers from this command pool will use
+		PoolInfo.queueFamilyIndex = RenderInstance.PhysicalDeviceIndices.GraphicsFamily;	// Queue Family type that buffers from this command pool will use
 
 		// Create a Graphics Queue Family Command Pool
 		Result = vkCreateCommandPool(RenderInstance.LogicalDevice, &PoolInfo, nullptr, &RenderInstance.GraphicsCommandPool);
@@ -1257,14 +1171,134 @@ namespace Core
 		}
 		// Function end CreateTextureSampler
 
-		AddViewport(RenderInstance, nullptr);
+		InitViewport(RenderInstance, SurfaceCapabilities, RenderInstance.PhysicalDeviceIndices, RenderInstance.Viewport);
 
 		return true;
 	}
 
 	bool AddViewport(VulkanRenderInstance& RenderInstance, GLFWwindow* Window)
 	{
+		RenderInstance.SecondTestViewport.Window = Window;
+
+		if (glfwCreateWindowSurface(RenderInstance.VulkanInstance, RenderInstance.SecondTestViewport.Window, nullptr, &RenderInstance.SecondTestViewport.Surface) != VK_SUCCESS)
+		{
+			Util::Log().GlfwLogError();
+			return false;
+		}
+
+		VkSurfaceCapabilitiesKHR SurfaceCapabilities = { };
+
+		VkResult Result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(RenderInstance.PhysicalDevice, RenderInstance.SecondTestViewport.Surface, &SurfaceCapabilities);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Warning("vkGetPhysicalDeviceSurfaceCapabilitiesKHR result is {}", static_cast<int>(Result));
+			return false;
+		}
+
+		InitViewport(RenderInstance, SurfaceCapabilities, RenderInstance.PhysicalDeviceIndices, RenderInstance.SecondTestViewport);
+	}
+
+	bool InitViewport(VulkanRenderInstance& RenderInstance, const VkSurfaceCapabilitiesKHR& SurfaceCapabilities,
+		PhysicalDeviceIndices PhysicalDeviceIndices, ViewportInstence& OutViewport)
+	{
 		VkResult Result;
+
+		// Function: GetBestSwapExtent
+		if (SurfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
+		{
+			OutViewport.SwapExtent = SurfaceCapabilities.currentExtent;
+		}
+		else
+		{
+			int Width;
+			int Height;
+			glfwGetFramebufferSize(OutViewport.Window, &Width, &Height);
+
+			Width = std::clamp(static_cast<uint32_t>(Width), SurfaceCapabilities.minImageExtent.width, SurfaceCapabilities.maxImageExtent.width);
+			Height = std::clamp(static_cast<uint32_t>(Height), SurfaceCapabilities.minImageExtent.height, SurfaceCapabilities.maxImageExtent.height);
+
+			OutViewport.SwapExtent = { static_cast<uint32_t>(Width), static_cast<uint32_t>(Height) };
+		}
+		// Function end: GetBestSwapExtent
+
+		// How many images are in the swap chain
+		// Get 1 more then the minimum to allow triple buffering
+		uint32_t ImageCount = SurfaceCapabilities.minImageCount + 1;
+
+		// If maxImageCount > 0, then limitless
+		if (SurfaceCapabilities.maxImageCount > 0
+			&& SurfaceCapabilities.maxImageCount < ImageCount)
+		{
+			ImageCount = SurfaceCapabilities.maxImageCount;
+		}
+
+		VkSwapchainCreateInfoKHR SwapchainCreateInfo = {};
+		SwapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+		SwapchainCreateInfo.surface = OutViewport.Surface;
+		SwapchainCreateInfo.imageFormat = RenderInstance.SurfaceFormat.format;
+		SwapchainCreateInfo.imageColorSpace = RenderInstance.SurfaceFormat.colorSpace;
+		SwapchainCreateInfo.presentMode = RenderInstance.PresentationMode;
+		SwapchainCreateInfo.imageExtent = OutViewport.SwapExtent;
+		SwapchainCreateInfo.minImageCount = ImageCount;
+		SwapchainCreateInfo.imageArrayLayers = 1;
+		SwapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		SwapchainCreateInfo.preTransform = SurfaceCapabilities.currentTransform;
+		SwapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // How to handle windows blending
+		SwapchainCreateInfo.clipped = VK_TRUE;
+
+		uint32_t Indices[] = {
+			static_cast<uint32_t>(PhysicalDeviceIndices.GraphicsFamily),
+			static_cast<uint32_t>(PhysicalDeviceIndices.PresentationFamily)
+		};
+
+		if (PhysicalDeviceIndices.GraphicsFamily != PhysicalDeviceIndices.PresentationFamily)
+		{
+			// Less efficient mode
+			SwapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+			SwapchainCreateInfo.queueFamilyIndexCount = 2;
+			SwapchainCreateInfo.pQueueFamilyIndices = Indices;
+		}
+		else
+		{
+			SwapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			SwapchainCreateInfo.queueFamilyIndexCount = 0;
+			SwapchainCreateInfo.pQueueFamilyIndices = nullptr;
+		}
+
+		// Used if old cwap chain been destroyed and this one replaces it
+		SwapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
+
+		Result = vkCreateSwapchainKHR(RenderInstance.LogicalDevice, &SwapchainCreateInfo, nullptr, &OutViewport.VulkanSwapchain);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkCreateSwapchainKHR result is {}", static_cast<int>(Result));
+			return false;
+		}
+
+		// Get swap chain images
+		vkGetSwapchainImagesKHR(RenderInstance.LogicalDevice, OutViewport.VulkanSwapchain, &OutViewport.SwapchainImagesCount, nullptr);
+
+		VkImage* Images = static_cast<VkImage*>(Util::Memory::Allocate(OutViewport.SwapchainImagesCount * sizeof(VkImage)));
+		vkGetSwapchainImagesKHR(RenderInstance.LogicalDevice, OutViewport.VulkanSwapchain, &OutViewport.SwapchainImagesCount, Images);
+
+		OutViewport.ImageViews = static_cast<VkImageView*>(Util::Memory::Allocate(OutViewport.SwapchainImagesCount * sizeof(VkImageView)));
+
+		for (uint32_t i = 0; i < OutViewport.SwapchainImagesCount; ++i)
+		{
+			VkImageView ImageView = CreateImageView(RenderInstance, Images[i], RenderInstance.SurfaceFormat.format, VK_IMAGE_ASPECT_COLOR_BIT);
+			if (ImageView == nullptr)
+			{
+				Util::Log().Error("vkCreateImageView result is {}", static_cast<int>(Result));
+				Util::Memory::Deallocate(Images);
+				Util::Memory::Deallocate(OutViewport.ImageViews);
+				return false;
+			}
+
+			OutViewport.ImageViews[i] = ImageView;
+		}
+
+		Util::Memory::Deallocate(Images);
+		// Function end: CreateSwapchain
 
 		// Function: CreateDescriptorSetLayout
 		VkDescriptorSetLayoutBinding VpLayoutBinding = {};
@@ -1294,7 +1328,7 @@ namespace Core
 		LayoutCreateInfo.bindingCount = BindingCount;					// Number of binding infos
 		LayoutCreateInfo.pBindings = Bindings;		// Array of binding infos
 
-		Result = vkCreateDescriptorSetLayout(RenderInstance.LogicalDevice, &LayoutCreateInfo, nullptr, &RenderInstance.Viewport.DescriptorSetLayout);
+		Result = vkCreateDescriptorSetLayout(RenderInstance.LogicalDevice, &LayoutCreateInfo, nullptr, &OutViewport.DescriptorSetLayout);
 		if (Result != VK_SUCCESS)
 		{
 			return false;
@@ -1327,7 +1361,7 @@ namespace Core
 		InputLayoutCreateInfo.pBindings = InputBindings;
 
 		// Create Descriptor Set Layout
-		Result = vkCreateDescriptorSetLayout(RenderInstance.LogicalDevice, &InputLayoutCreateInfo, nullptr, &RenderInstance.Viewport.InputSetLayout);
+		Result = vkCreateDescriptorSetLayout(RenderInstance.LogicalDevice, &InputLayoutCreateInfo, nullptr, &OutViewport.InputSetLayout);
 		if (Result != VK_SUCCESS)
 		{
 			return false;
@@ -1430,14 +1464,14 @@ namespace Core
 		VkViewport Viewport = {};
 		Viewport.x = 0.0f;
 		Viewport.y = 0.0f;
-		Viewport.width = static_cast<float>(RenderInstance.Viewport.SwapExtent.width);
-		Viewport.height = static_cast<float>(RenderInstance.Viewport.SwapExtent.height);
+		Viewport.width = static_cast<float>(OutViewport.SwapExtent.width);
+		Viewport.height = static_cast<float>(OutViewport.SwapExtent.height);
 		Viewport.minDepth = 0.0f;
 		Viewport.maxDepth = 1.0f;
 
 		VkRect2D Scissor = {};
 		Scissor.offset = { 0, 0 };
-		Scissor.extent = RenderInstance.Viewport.SwapExtent;
+		Scissor.extent = OutViewport.SwapExtent;
 
 		VkPipelineViewportStateCreateInfo ViewportStateCreateInfo = {};
 		ViewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -1500,7 +1534,7 @@ namespace Core
 
 		// Pipeline layout
 		const uint32_t DescriptorSetLayoutsCount = 2;
-		VkDescriptorSetLayout DescriptorSetLayouts[DescriptorSetLayoutsCount] = { RenderInstance.Viewport.DescriptorSetLayout, RenderInstance.SamplerSetLayout };
+		VkDescriptorSetLayout DescriptorSetLayouts[DescriptorSetLayoutsCount] = { OutViewport.DescriptorSetLayout, RenderInstance.SamplerSetLayout };
 
 		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = {};
 		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -1610,7 +1644,7 @@ namespace Core
 		VkPipelineLayoutCreateInfo SecondPipelineLayoutCreateInfo = {};
 		SecondPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		SecondPipelineLayoutCreateInfo.setLayoutCount = 1;
-		SecondPipelineLayoutCreateInfo.pSetLayouts = &RenderInstance.Viewport.InputSetLayout;
+		SecondPipelineLayoutCreateInfo.pSetLayouts = &OutViewport.InputSetLayout;
 		SecondPipelineLayoutCreateInfo.pushConstantRangeCount = 0;
 		SecondPipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
 
@@ -1638,41 +1672,41 @@ namespace Core
 
 		// Function end: CreateGraphicsPipeline
 
-		RenderInstance.Viewport.DepthBuffers = static_cast<GenericImageBuffer*>(Util::Memory::Allocate(RenderInstance.Viewport.SwapchainImagesCount * sizeof(GenericImageBuffer)));
-		RenderInstance.Viewport.ColorBuffers = static_cast<GenericImageBuffer*>(Util::Memory::Allocate(RenderInstance.Viewport.SwapchainImagesCount * sizeof(GenericImageBuffer)));
+		OutViewport.DepthBuffers = static_cast<GenericImageBuffer*>(Util::Memory::Allocate(OutViewport.SwapchainImagesCount * sizeof(GenericImageBuffer)));
+		OutViewport.ColorBuffers = static_cast<GenericImageBuffer*>(Util::Memory::Allocate(OutViewport.SwapchainImagesCount * sizeof(GenericImageBuffer)));
 
-		for (uint32_t i = 0; i < RenderInstance.Viewport.SwapchainImagesCount; ++i)
+		for (uint32_t i = 0; i < OutViewport.SwapchainImagesCount; ++i)
 		{
 			// Function CreateDepthBuffer
-			RenderInstance.Viewport.DepthBuffers[i].Image = CreateImage(RenderInstance, RenderInstance.Viewport.SwapExtent.width, RenderInstance.Viewport.SwapExtent.height,
+			OutViewport.DepthBuffers[i].Image = CreateImage(RenderInstance, OutViewport.SwapExtent.width, OutViewport.SwapExtent.height,
 				RenderInstance.DepthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-				&RenderInstance.Viewport.DepthBuffers[i].ImageMemory);
+				&OutViewport.DepthBuffers[i].ImageMemory);
 
-			RenderInstance.Viewport.DepthBuffers[i].ImageView = CreateImageView(RenderInstance, RenderInstance.Viewport.DepthBuffers[i].Image, RenderInstance.DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+			OutViewport.DepthBuffers[i].ImageView = CreateImageView(RenderInstance, OutViewport.DepthBuffers[i].Image, RenderInstance.DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 			// Function end CreateDepthBuffer
 
 			// Function CreateColorBuffer
 			// VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT says that image can be used only as attachment. Used only for sub pass
-			RenderInstance.Viewport.ColorBuffers[i].Image = CreateImage(RenderInstance, RenderInstance.Viewport.SwapExtent.width, RenderInstance.Viewport.SwapExtent.height,
+			OutViewport.ColorBuffers[i].Image = CreateImage(RenderInstance, OutViewport.SwapExtent.width, OutViewport.SwapExtent.height,
 				RenderInstance.ColorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-				&RenderInstance.Viewport.ColorBuffers[i].ImageMemory);
+				&OutViewport.ColorBuffers[i].ImageMemory);
 
-			RenderInstance.Viewport.ColorBuffers[i].ImageView = CreateImageView(RenderInstance, RenderInstance.Viewport.ColorBuffers[i].Image, RenderInstance.ColorFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+			OutViewport.ColorBuffers[i].ImageView = CreateImageView(RenderInstance, OutViewport.ColorBuffers[i].Image, RenderInstance.ColorFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 			// Function end CreateDepthBuffer
 		}
 
-		RenderInstance.Viewport.SwapchainFramebuffers = static_cast<VkFramebuffer*>(Util::Memory::Allocate(RenderInstance.Viewport.SwapchainImagesCount * sizeof(VkFramebuffer)));
+		OutViewport.SwapchainFramebuffers = static_cast<VkFramebuffer*>(Util::Memory::Allocate(OutViewport.SwapchainImagesCount * sizeof(VkFramebuffer)));
 
 		// Function CreateFrameBuffers
 		// Create a framebuffer for each swap chain image
-		for (uint32_t i = 0; i < RenderInstance.Viewport.SwapchainImagesCount; i++)
+		for (uint32_t i = 0; i < OutViewport.SwapchainImagesCount; i++)
 		{
 			const uint32_t AttachmentsCount = 3;
 			VkImageView Attachments[AttachmentsCount] = {
-				RenderInstance.Viewport.ImageViews[i],
+				OutViewport.ImageViews[i],
 				// Todo: do not forget about position in array AttachmentDescriptions
-				RenderInstance.Viewport.ColorBuffers[i].ImageView,
-				RenderInstance.Viewport.DepthBuffers[i].ImageView
+				OutViewport.ColorBuffers[i].ImageView,
+				OutViewport.DepthBuffers[i].ImageView
 			};
 
 			VkFramebufferCreateInfo FramebufferCreateInfo = {};
@@ -1680,11 +1714,11 @@ namespace Core
 			FramebufferCreateInfo.renderPass = RenderInstance.RenderPass;								// Render Pass layout the Framebuffer will be used with
 			FramebufferCreateInfo.attachmentCount = AttachmentsCount;
 			FramebufferCreateInfo.pAttachments = Attachments;							// List of attachments (1:1 with Render Pass)
-			FramebufferCreateInfo.width = RenderInstance.Viewport.SwapExtent.width;								// Framebuffer width
-			FramebufferCreateInfo.height = RenderInstance.Viewport.SwapExtent.height;							// Framebuffer height
+			FramebufferCreateInfo.width = OutViewport.SwapExtent.width;								// Framebuffer width
+			FramebufferCreateInfo.height = OutViewport.SwapExtent.height;							// Framebuffer height
 			FramebufferCreateInfo.layers = 1;											// Framebuffer layers
 
-			Result = vkCreateFramebuffer(RenderInstance.LogicalDevice, &FramebufferCreateInfo, nullptr, &RenderInstance.Viewport.SwapchainFramebuffers[i]);
+			Result = vkCreateFramebuffer(RenderInstance.LogicalDevice, &FramebufferCreateInfo, nullptr, &OutViewport.SwapchainFramebuffers[i]);
 			if (Result != VK_SUCCESS)
 			{
 				Util::Log().Error("vkCreateFramebuffer result is {}", static_cast<int>(Result));
@@ -1699,11 +1733,11 @@ namespace Core
 		CommandBufferAllocateInfo.commandPool = RenderInstance.GraphicsCommandPool;
 		CommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;	// VK_COMMAND_BUFFER_LEVEL_PRIMARY	: Buffer you submit directly to queue. Cant be called by other buffers.
 		// VK_COMMAND_BUFFER_LEVEL_SECONARY	: Buffer can't be called directly. Can be called from other buffers via "vkCmdExecuteCommands" when recording commands in primary buffer
-		CommandBufferAllocateInfo.commandBufferCount = static_cast<uint32_t>(RenderInstance.Viewport.SwapchainImagesCount);
+		CommandBufferAllocateInfo.commandBufferCount = static_cast<uint32_t>(OutViewport.SwapchainImagesCount);
 
 		// Allocate command buffers and place handles in array of buffers
-		RenderInstance.Viewport.CommandBuffers = static_cast<VkCommandBuffer*>(Util::Memory::Allocate(RenderInstance.Viewport.SwapchainImagesCount * sizeof(VkCommandBuffer)));
-		Result = vkAllocateCommandBuffers(RenderInstance.LogicalDevice, &CommandBufferAllocateInfo, RenderInstance.Viewport.CommandBuffers);
+		OutViewport.CommandBuffers = static_cast<VkCommandBuffer*>(Util::Memory::Allocate(OutViewport.SwapchainImagesCount * sizeof(VkCommandBuffer)));
+		Result = vkAllocateCommandBuffers(RenderInstance.LogicalDevice, &CommandBufferAllocateInfo, OutViewport.CommandBuffers);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkAllocateCommandBuffers result is {}", static_cast<int>(Result));
@@ -1715,15 +1749,15 @@ namespace Core
 		const VkDeviceSize VpBufferSize = sizeof(Core::ViewportInstence::UboViewProjection);
 		//const VkDeviceSize ModelBufferSize = RenderInstance.ModelUniformAlignment * RenderInstance.MaxObjects;
 
-		RenderInstance.Viewport.VpUniformBuffers = static_cast<GenericBuffer*>(Util::Memory::Allocate(RenderInstance.Viewport.SwapchainImagesCount * sizeof(GenericBuffer)));
+		OutViewport.VpUniformBuffers = static_cast<GenericBuffer*>(Util::Memory::Allocate(OutViewport.SwapchainImagesCount * sizeof(GenericBuffer)));
 		// UNIFORM BUFFER SETUP CODE
-		//RenderInstance.ModelDynamicUniformBuffers = static_cast<GenericBuffer*>(Util::Memory::Allocate(RenderInstance.Viewport.SwapchainImagesCount * sizeof(GenericBuffer)));
+		//RenderInstance.ModelDynamicUniformBuffers = static_cast<GenericBuffer*>(Util::Memory::Allocate(OutViewport.SwapchainImagesCount * sizeof(GenericBuffer)));
 
 		// Create Uniform buffers
-		for (uint32_t i = 0; i < RenderInstance.Viewport.SwapchainImagesCount; i++)
+		for (uint32_t i = 0; i < OutViewport.SwapchainImagesCount; i++)
 		{
 			CreateGenericBuffer(RenderInstance, VpBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, RenderInstance.Viewport.VpUniformBuffers[i]);
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, OutViewport.VpUniformBuffers[i]);
 
 			// UNIFORM BUFFER SETUP CODE
 			//CreateGenericBuffer(RenderInstance, ModelBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -1735,12 +1769,12 @@ namespace Core
 		// Function CreateDescriptorPool
 		VkDescriptorPoolSize VpPoolSize = {};
 		VpPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		VpPoolSize.descriptorCount = RenderInstance.Viewport.SwapchainImagesCount;
+		VpPoolSize.descriptorCount = OutViewport.SwapchainImagesCount;
 
 		// UNIFORM BUFFER SETUP CODE
 		//VkDescriptorPoolSize ModelPoolSize = {};
 		//ModelPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		//ModelPoolSize.descriptorCount = RenderInstance.Viewport.SwapchainImagesCount;
+		//ModelPoolSize.descriptorCount = OutViewport.SwapchainImagesCount;
 
 		//const uint32_t PoolSizeCount = 2;
 		//VkDescriptorPoolSize PoolSizes[PoolSizeCount] = { VpPoolSize, ModelPoolSize };
@@ -1751,12 +1785,12 @@ namespace Core
 		// Data to create Descriptor Pool
 		VkDescriptorPoolCreateInfo PoolCreateInfo = {};
 		PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		PoolCreateInfo.maxSets = RenderInstance.Viewport.SwapchainImagesCount;	// Maximum number of Descriptor Sets that can be created from pool
+		PoolCreateInfo.maxSets = OutViewport.SwapchainImagesCount;	// Maximum number of Descriptor Sets that can be created from pool
 		PoolCreateInfo.poolSizeCount = PoolSizeCount;										// Amount of Pool Sizes being passed
 		PoolCreateInfo.pPoolSizes = PoolSizes;									// Pool Sizes to create pool with
 
 		// Create Descriptor Pool
-		Result = vkCreateDescriptorPool(RenderInstance.LogicalDevice, &PoolCreateInfo, nullptr, &RenderInstance.Viewport.DescriptorPool);
+		Result = vkCreateDescriptorPool(RenderInstance.LogicalDevice, &PoolCreateInfo, nullptr, &OutViewport.DescriptorPool);
 		if (Result != VK_SUCCESS)
 		{
 			return false;
@@ -1783,11 +1817,11 @@ namespace Core
 		// CREATE INPUT ATTACHMENT DESCRIPTOR POOL
 		VkDescriptorPoolSize ColourInputPoolSize = {};
 		ColourInputPoolSize.type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-		ColourInputPoolSize.descriptorCount = RenderInstance.Viewport.SwapchainImagesCount;
+		ColourInputPoolSize.descriptorCount = OutViewport.SwapchainImagesCount;
 
 		VkDescriptorPoolSize DepthInputPoolSize = {};
 		DepthInputPoolSize.type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-		DepthInputPoolSize.descriptorCount = RenderInstance.Viewport.SwapchainImagesCount;
+		DepthInputPoolSize.descriptorCount = OutViewport.SwapchainImagesCount;
 
 		// Todo: do not copy VkDescriptorPoolSize
 		const uint32_t InputPoolSizesCount = 2;
@@ -1795,11 +1829,11 @@ namespace Core
 
 		VkDescriptorPoolCreateInfo InputPoolCreateInfo = {};
 		InputPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		InputPoolCreateInfo.maxSets = RenderInstance.Viewport.SwapchainImagesCount;
+		InputPoolCreateInfo.maxSets = OutViewport.SwapchainImagesCount;
 		InputPoolCreateInfo.poolSizeCount = InputPoolSizesCount;
 		InputPoolCreateInfo.pPoolSizes = InputPoolSizes;
 
-		Result = vkCreateDescriptorPool(RenderInstance.LogicalDevice, &InputPoolCreateInfo, nullptr, &RenderInstance.Viewport.InputDescriptorPool);
+		Result = vkCreateDescriptorPool(RenderInstance.LogicalDevice, &InputPoolCreateInfo, nullptr, &OutViewport.InputDescriptorPool);
 		if (Result != VK_SUCCESS)
 		{
 			return -1;
@@ -1807,25 +1841,25 @@ namespace Core
 		// Function end CreateDescriptorPool
 		// 
 		// Function CreateDescriptorSets
-		RenderInstance.Viewport.DescriptorSets = static_cast<VkDescriptorSet*>(Util::Memory::Allocate(RenderInstance.Viewport.SwapchainImagesCount * sizeof(VkDescriptorSet)));
+		OutViewport.DescriptorSets = static_cast<VkDescriptorSet*>(Util::Memory::Allocate(OutViewport.SwapchainImagesCount * sizeof(VkDescriptorSet)));
 
-		RenderInstance.Viewport.InputDescriptorSets = static_cast<VkDescriptorSet*>(Util::Memory::Allocate(RenderInstance.Viewport.SwapchainImagesCount * sizeof(VkDescriptorSet)));
+		OutViewport.InputDescriptorSets = static_cast<VkDescriptorSet*>(Util::Memory::Allocate(OutViewport.SwapchainImagesCount * sizeof(VkDescriptorSet)));
 
-		VkDescriptorSetLayout* SetLayouts = static_cast<VkDescriptorSetLayout*>(Util::Memory::Allocate(RenderInstance.Viewport.SwapchainImagesCount * sizeof(VkDescriptorSetLayout)));
-		for (uint32_t i = 0; i < RenderInstance.Viewport.SwapchainImagesCount; i++)
+		VkDescriptorSetLayout* SetLayouts = static_cast<VkDescriptorSetLayout*>(Util::Memory::Allocate(OutViewport.SwapchainImagesCount * sizeof(VkDescriptorSetLayout)));
+		for (uint32_t i = 0; i < OutViewport.SwapchainImagesCount; i++)
 		{
-			SetLayouts[i] = RenderInstance.Viewport.DescriptorSetLayout;
+			SetLayouts[i] = OutViewport.DescriptorSetLayout;
 		}
 
 		// Descriptor Set Allocation Info
 		VkDescriptorSetAllocateInfo SetAllocInfo = {};
 		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		SetAllocInfo.descriptorPool = RenderInstance.Viewport.DescriptorPool;									// Pool to allocate Descriptor Set from
-		SetAllocInfo.descriptorSetCount = RenderInstance.Viewport.SwapchainImagesCount;	// Number of sets to allocate
+		SetAllocInfo.descriptorPool = OutViewport.DescriptorPool;									// Pool to allocate Descriptor Set from
+		SetAllocInfo.descriptorSetCount = OutViewport.SwapchainImagesCount;	// Number of sets to allocate
 		SetAllocInfo.pSetLayouts = SetLayouts;									// Layouts to use to allocate sets (1:1 relationship)
 
 		// Allocate descriptor sets (multiple)
-		Result = vkAllocateDescriptorSets(RenderInstance.LogicalDevice, &SetAllocInfo, RenderInstance.Viewport.DescriptorSets);
+		Result = vkAllocateDescriptorSets(RenderInstance.LogicalDevice, &SetAllocInfo, OutViewport.DescriptorSets);
 		if (Result != VK_SUCCESS)
 		{
 			return false;
@@ -1835,16 +1869,16 @@ namespace Core
 		// UNIFORM BUFFER SETUP CODE
 		//VkDescriptorBufferInfo ModelBufferInfo = {};
 		// Update all of descriptor set buffer bindings
-		for (uint32_t i = 0; i < RenderInstance.Viewport.SwapchainImagesCount; i++)
+		for (uint32_t i = 0; i < OutViewport.SwapchainImagesCount; i++)
 		{
 			// Todo: validate
-			VpBufferInfo.buffer = RenderInstance.Viewport.VpUniformBuffers[i].Buffer;
+			VpBufferInfo.buffer = OutViewport.VpUniformBuffers[i].Buffer;
 			VpBufferInfo.offset = 0;
 			VpBufferInfo.range = sizeof(Core::ViewportInstence::UboViewProjection);
 
 			VkWriteDescriptorSet VpSetWrite = {};
 			VpSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			VpSetWrite.dstSet = RenderInstance.Viewport.DescriptorSets[i];
+			VpSetWrite.dstSet = OutViewport.DescriptorSets[i];
 			VpSetWrite.dstBinding = 0;
 			VpSetWrite.dstArrayElement = 0;
 			VpSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1858,7 +1892,7 @@ namespace Core
 
 			//VkWriteDescriptorSet ModelSetWrite = {};
 			//ModelSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			//ModelSetWrite.dstSet = RenderInstance.Viewport.DescriptorSets[i];
+			//ModelSetWrite.dstSet = OutViewport.DescriptorSets[i];
 			//ModelSetWrite.dstBinding = 1;
 			//ModelSetWrite.dstArrayElement = 0;
 			//ModelSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
@@ -1876,32 +1910,32 @@ namespace Core
 			vkUpdateDescriptorSets(RenderInstance.LogicalDevice, WriteSetsCount, WriteSets, 0, nullptr);
 		}
 
-		for (uint32_t i = 0; i < RenderInstance.Viewport.SwapchainImagesCount; i++)
+		for (uint32_t i = 0; i < OutViewport.SwapchainImagesCount; i++)
 		{
-			SetLayouts[i] = RenderInstance.Viewport.InputSetLayout;
+			SetLayouts[i] = OutViewport.InputSetLayout;
 		}
 
-		SetAllocInfo.descriptorPool = RenderInstance.Viewport.InputDescriptorPool;
-		SetAllocInfo.descriptorSetCount = RenderInstance.Viewport.SwapchainImagesCount;
+		SetAllocInfo.descriptorPool = OutViewport.InputDescriptorPool;
+		SetAllocInfo.descriptorSetCount = OutViewport.SwapchainImagesCount;
 
-		Result = vkAllocateDescriptorSets(RenderInstance.LogicalDevice, &SetAllocInfo, RenderInstance.Viewport.InputDescriptorSets);
+		Result = vkAllocateDescriptorSets(RenderInstance.LogicalDevice, &SetAllocInfo, OutViewport.InputDescriptorSets);
 		if (Result != VK_SUCCESS)
 		{
 			return false;
 		}
 
 		// Todo: move this and previus loop to function?
-		for (size_t i = 0; i < RenderInstance.Viewport.SwapchainImagesCount; i++)
+		for (size_t i = 0; i < OutViewport.SwapchainImagesCount; i++)
 		{
 			// Todo: move from loop?
 			VkDescriptorImageInfo ColourAttachmentDescriptor = {};
 			ColourAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			ColourAttachmentDescriptor.imageView = RenderInstance.Viewport.ColorBuffers[i].ImageView;
+			ColourAttachmentDescriptor.imageView = OutViewport.ColorBuffers[i].ImageView;
 			ColourAttachmentDescriptor.sampler = VK_NULL_HANDLE;
 
 			VkWriteDescriptorSet ColourWrite = {};
 			ColourWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			ColourWrite.dstSet = RenderInstance.Viewport.InputDescriptorSets[i];
+			ColourWrite.dstSet = OutViewport.InputDescriptorSets[i];
 			ColourWrite.dstBinding = 0;
 			ColourWrite.dstArrayElement = 0;
 			ColourWrite.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
@@ -1910,12 +1944,12 @@ namespace Core
 
 			VkDescriptorImageInfo DepthAttachmentDescriptor = {};
 			DepthAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			DepthAttachmentDescriptor.imageView = RenderInstance.Viewport.DepthBuffers[i].ImageView;
+			DepthAttachmentDescriptor.imageView = OutViewport.DepthBuffers[i].ImageView;
 			DepthAttachmentDescriptor.sampler = VK_NULL_HANDLE;
 
 			VkWriteDescriptorSet DepthWrite = {};
 			DepthWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			DepthWrite.dstSet = RenderInstance.Viewport.InputDescriptorSets[i];
+			DepthWrite.dstSet = OutViewport.InputDescriptorSets[i];
 			DepthWrite.dstBinding = 1;
 			DepthWrite.dstArrayElement = 0;
 			DepthWrite.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
@@ -1987,153 +2021,164 @@ namespace Core
 
 	bool Draw(VulkanRenderInstance& RenderInstance)
 	{
+		ViewportInstence* ProcessedViewport = &RenderInstance.Viewport;
+
+		for (int test = 0; test < 2; ++test)
+		{
+
 		vkWaitForFences(RenderInstance.LogicalDevice, 1, &RenderInstance.DrawFences[RenderInstance.CurrentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
 		vkResetFences(RenderInstance.LogicalDevice, 1, &RenderInstance.DrawFences[RenderInstance.CurrentFrame]);
 
-		// Get index of next image to be drawn to, and signal semaphore when ready to be drawn to
-		uint32_t ImageIndex;
-		vkAcquireNextImageKHR(RenderInstance.LogicalDevice, RenderInstance.Viewport.VulkanSwapchain, std::numeric_limits<uint64_t>::max(),
-			RenderInstance.ImageAvalible[RenderInstance.CurrentFrame], VK_NULL_HANDLE, &ImageIndex);
-
-		// Function RecordCommands
-		VkCommandBufferBeginInfo CommandBufferBeginInfo = {};
-		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-		VkRenderPassBeginInfo RenderPassBeginInfo = {};
-		RenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		RenderPassBeginInfo.renderPass = RenderInstance.RenderPass;							// Render Pass to begin
-		RenderPassBeginInfo.renderArea.offset = { 0, 0 };						// Start point of render pass in pixels
-		RenderPassBeginInfo.renderArea.extent = RenderInstance.Viewport.SwapExtent;				// Size of region to run render pass on (starting at offset)
-
-		const uint32_t ClearValuesSize = 3;
-		VkClearValue ClearValues[ClearValuesSize];
-		// Todo: do not forget about position in array AttachmentDescriptions
-		ClearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
-		ClearValues[1].color = { 0.0f, 0.0f, 0.0f, 1.0f };
-		ClearValues[2].depthStencil.depth = 1.0f;
 		
-		RenderPassBeginInfo.pClearValues = ClearValues;
-		RenderPassBeginInfo.clearValueCount = ClearValuesSize;
 
-		RenderPassBeginInfo.framebuffer = RenderInstance.Viewport.SwapchainFramebuffers[ImageIndex];
 
-		VkResult Result = vkBeginCommandBuffer(RenderInstance.Viewport.CommandBuffers[ImageIndex], &CommandBufferBeginInfo);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkBeginCommandBuffer result is {}", static_cast<int>(Result));
-			return false;
-		}
+			// Get index of next image to be drawn to, and signal semaphore when ready to be drawn to
+			uint32_t ImageIndex;
+			vkAcquireNextImageKHR(RenderInstance.LogicalDevice, ProcessedViewport->VulkanSwapchain, std::numeric_limits<uint64_t>::max(),
+				RenderInstance.ImageAvalible[RenderInstance.CurrentFrame], VK_NULL_HANDLE, &ImageIndex);
 
-		// Begin Render Pass
-		vkCmdBeginRenderPass(RenderInstance.Viewport.CommandBuffers[ImageIndex], &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+			// Function RecordCommands
+			VkCommandBufferBeginInfo CommandBufferBeginInfo = {};
+			CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-		// Bind Pipeline to be used in render pass
-		vkCmdBindPipeline(RenderInstance.Viewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.GraphicsPipeline);
+			VkRenderPassBeginInfo RenderPassBeginInfo = {};
+			RenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			RenderPassBeginInfo.renderPass = RenderInstance.RenderPass;							// Render Pass to begin
+			RenderPassBeginInfo.renderArea.offset = { 0, 0 };						// Start point of render pass in pixels
+			RenderPassBeginInfo.renderArea.extent = ProcessedViewport->SwapExtent;				// Size of region to run render pass on (starting at offset)
 
-		// TODO: Support rework to not create identical index buffers
-		for (uint32_t j = 0; j < RenderInstance.DrawableObjectsCount; ++j)
-		{
-			VkBuffer VertexBuffers[] = { RenderInstance.DrawableObjects[j].VertexBuffer.Buffer };					// Buffers to bind
-			VkDeviceSize Offsets[] = { 0 };												// Offsets into buffers being bound
-			vkCmdBindVertexBuffers(RenderInstance.Viewport.CommandBuffers[ImageIndex], 0, 1, VertexBuffers, Offsets);
+			const uint32_t ClearValuesSize = 3;
+			VkClearValue ClearValues[ClearValuesSize];
+			// Todo: do not forget about position in array AttachmentDescriptions
+			ClearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
+			ClearValues[1].color = { 0.0f, 0.0f, 0.0f, 1.0f };
+			ClearValues[2].depthStencil.depth = 1.0f;
 
-			vkCmdBindIndexBuffer(RenderInstance.Viewport.CommandBuffers[ImageIndex], RenderInstance.DrawableObjects[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+			RenderPassBeginInfo.pClearValues = ClearValues;
+			RenderPassBeginInfo.clearValueCount = ClearValuesSize;
+
+			RenderPassBeginInfo.framebuffer = ProcessedViewport->SwapchainFramebuffers[ImageIndex];
+
+			VkResult Result = vkBeginCommandBuffer(ProcessedViewport->CommandBuffers[ImageIndex], &CommandBufferBeginInfo);
+			if (Result != VK_SUCCESS)
+			{
+				Util::Log().Error("vkBeginCommandBuffer result is {}", static_cast<int>(Result));
+				return false;
+			}
+
+			// Begin Render Pass
+			vkCmdBeginRenderPass(ProcessedViewport->CommandBuffers[ImageIndex], &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+			// Bind Pipeline to be used in render pass
+			vkCmdBindPipeline(ProcessedViewport->CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.GraphicsPipeline);
+
+			// TODO: Support rework to not create identical index buffers
+			for (uint32_t j = 0; j < RenderInstance.DrawableObjectsCount; ++j)
+			{
+				VkBuffer VertexBuffers[] = { RenderInstance.DrawableObjects[j].VertexBuffer.Buffer };					// Buffers to bind
+				VkDeviceSize Offsets[] = { 0 };												// Offsets into buffers being bound
+				vkCmdBindVertexBuffers(ProcessedViewport->CommandBuffers[ImageIndex], 0, 1, VertexBuffers, Offsets);
+
+				vkCmdBindIndexBuffer(ProcessedViewport->CommandBuffers[ImageIndex], RenderInstance.DrawableObjects[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+
+				// UNIFORM BUFFER SETUP CODE
+				//uint32_t DynamicOffset = RenderInstance.ModelUniformAlignment * j;
+
+				vkCmdPushConstants(ProcessedViewport->CommandBuffers[ImageIndex], RenderInstance.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
+					0, sizeof(Model), &RenderInstance.DrawableObjects[j].Model);
+
+				// Todo: do not record textureId on each frame?
+				const uint32_t DescriptorSetGroupCount = 2;
+				VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] = { ProcessedViewport->DescriptorSets[ImageIndex],
+					RenderInstance.SamplerDescriptorSets[RenderInstance.DrawableObjects[j].TextureId] };
+
+				vkCmdBindDescriptorSets(ProcessedViewport->CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.PipelineLayout,
+					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+
+				// Execute pipeline
+				//vkCmdDraw(ProcessedViewport->CommandBuffers[i], RenderInstance.DrawableObject.VerticesCount, 1, 0, 0);
+				vkCmdDrawIndexed(ProcessedViewport->CommandBuffers[ImageIndex], RenderInstance.DrawableObjects[j].IndicesCount, 1, 0, 0, 0);
+			}
+
+			vkCmdNextSubpass(ProcessedViewport->CommandBuffers[ImageIndex], VK_SUBPASS_CONTENTS_INLINE);
+
+			vkCmdBindPipeline(ProcessedViewport->CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.SecondPipeline);
+			vkCmdBindDescriptorSets(ProcessedViewport->CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.SecondPipelineLayout,
+				0, 1, &ProcessedViewport->InputDescriptorSets[ImageIndex], 0, nullptr);
+			vkCmdDraw(ProcessedViewport->CommandBuffers[ImageIndex], 3, 1, 0, 0); // 3 hardcoded indices for second "post processing" subpass
+
+			// End Render Pass
+			vkCmdEndRenderPass(ProcessedViewport->CommandBuffers[ImageIndex]);
+
+			Result = vkEndCommandBuffer(ProcessedViewport->CommandBuffers[ImageIndex]);
+			if (Result != VK_SUCCESS)
+			{
+				Util::Log().Error("vkBeginCommandBuffer result is {}", static_cast<int>(Result));
+				return false;
+			}
+			// Function end RecordCommands
+
+			//UpdateUniformBuffer
+			void* Data;
+			vkMapMemory(RenderInstance.LogicalDevice, ProcessedViewport->VpUniformBuffers[ImageIndex].BufferMemory, 0, sizeof(Core::ViewportInstence::UboViewProjection),
+				0, &Data);
+			std::memcpy(Data, &ProcessedViewport->ViewProjection, sizeof(Core::ViewportInstence::UboViewProjection));
+			vkUnmapMemory(RenderInstance.LogicalDevice, ProcessedViewport->VpUniformBuffers[ImageIndex].BufferMemory);
 
 			// UNIFORM BUFFER SETUP CODE
-			//uint32_t DynamicOffset = RenderInstance.ModelUniformAlignment * j;
+			//for (uint32_t i = 0; i < RenderInstance.DrawableObjectsCount; ++i)
+			//{
+			//	UboModel* ThisModel = (UboModel*)((uint64_t)RenderInstance.ModelTransferSpace + (i * RenderInstance.ModelUniformAlignment));
+			//	*ThisModel = RenderInstance.DrawableObjects[i].Model;
+			//}
 
-			vkCmdPushConstants(RenderInstance.Viewport.CommandBuffers[ImageIndex], RenderInstance.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-				0, sizeof(Model), &RenderInstance.DrawableObjects[j].Model);
+			//vkMapMemory(RenderInstance.LogicalDevice, RenderInstance.ModelDynamicUniformBuffers[ImageIndex].BufferMemory, 0,
+			//	RenderInstance.ModelUniformAlignment * RenderInstance.DrawableObjectsCount, 0, &Data);
 
-			// Todo: do not record textureId on each frame?
-			const uint32_t DescriptorSetGroupCount = 2;
-			VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] = { RenderInstance.Viewport.DescriptorSets[ImageIndex],
-				RenderInstance.SamplerDescriptorSets[RenderInstance.DrawableObjects[j].TextureId] };
+			//std::memcpy(Data, RenderInstance.ModelTransferSpace, RenderInstance.ModelUniformAlignment * RenderInstance.DrawableObjectsCount);
+			//vkUnmapMemory(RenderInstance.LogicalDevice, RenderInstance.ModelDynamicUniformBuffers[ImageIndex].BufferMemory);
 
-			vkCmdBindDescriptorSets(RenderInstance.Viewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.PipelineLayout,
-				0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+			// -- SUBMIT COMMAND BUFFER TO RENDER --
+			// Queue submission information
+			VkSubmitInfo submitInfo = {};
+			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submitInfo.waitSemaphoreCount = 1;										// Number of semaphores to wait on
+			submitInfo.pWaitSemaphores = &RenderInstance.ImageAvalible[RenderInstance.CurrentFrame];				// List of semaphores to wait on
+			VkPipelineStageFlags waitStages[] = {
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+			};
+			submitInfo.pWaitDstStageMask = waitStages;						// Stages to check semaphores at
+			submitInfo.commandBufferCount = 1;								// Number of command buffers to submit
+			submitInfo.pCommandBuffers = &ProcessedViewport->CommandBuffers[ImageIndex];		// Command buffer to submit
+			submitInfo.signalSemaphoreCount = 1;							// Number of semaphores to signal
+			submitInfo.pSignalSemaphores = &RenderInstance.RenderFinished[RenderInstance.CurrentFrame];	// Semaphores to signal when command buffer finishes
 
-			// Execute pipeline
-			//vkCmdDraw(RenderInstance.Viewport.CommandBuffers[i], RenderInstance.DrawableObject.VerticesCount, 1, 0, 0);
-			vkCmdDrawIndexed(RenderInstance.Viewport.CommandBuffers[ImageIndex], RenderInstance.DrawableObjects[j].IndicesCount, 1, 0, 0, 0);
-		}
+			// Submit command buffer to queue
+			Result = vkQueueSubmit(RenderInstance.GraphicsQueue, 1, &submitInfo, RenderInstance.DrawFences[RenderInstance.CurrentFrame]);
+			if (Result != VK_SUCCESS)
+			{
+				Util::Log().Error("vkQueueSubmit result is {}", static_cast<int>(Result));
+				return false;
+			}
 
-		vkCmdNextSubpass(RenderInstance.Viewport.CommandBuffers[ImageIndex], VK_SUBPASS_CONTENTS_INLINE);
+			// -- PRESENT RENDERED IMAGE TO SCREEN --
+			VkPresentInfoKHR presentInfo = {};
+			presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+			presentInfo.waitSemaphoreCount = 1;										// Number of semaphores to wait on
+			presentInfo.pWaitSemaphores = &RenderInstance.RenderFinished[RenderInstance.CurrentFrame];			// Semaphores to wait on
+			presentInfo.swapchainCount = 1;											// Number of swapchains to present to
+			presentInfo.pSwapchains = &ProcessedViewport->VulkanSwapchain;									// Swapchains to present images to
+			presentInfo.pImageIndices = &ImageIndex;								// Index of images in swapchains to present
 
-		vkCmdBindPipeline(RenderInstance.Viewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.SecondPipeline);
-		vkCmdBindDescriptorSets(RenderInstance.Viewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.SecondPipelineLayout,
-			0, 1, &RenderInstance.Viewport.InputDescriptorSets[ImageIndex], 0, nullptr);
-		vkCmdDraw(RenderInstance.Viewport.CommandBuffers[ImageIndex], 3, 1, 0, 0); // 3 hardcoded indices for second "post processing" subpass
+			// Present image
+			Result = vkQueuePresentKHR(RenderInstance.PresentationQueue, &presentInfo);
+			if (Result != VK_SUCCESS)
+			{
+				Util::Log().Error("vkQueuePresentKHR result is {}", static_cast<int>(Result));
+				return false;
+			}
 
-		// End Render Pass
-		vkCmdEndRenderPass(RenderInstance.Viewport.CommandBuffers[ImageIndex]);
-
-		Result = vkEndCommandBuffer(RenderInstance.Viewport.CommandBuffers[ImageIndex]);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkBeginCommandBuffer result is {}", static_cast<int>(Result));
-			return false;
-		}
-		// Function end RecordCommands
-
-		//UpdateUniformBuffer
-		void* Data;
-		vkMapMemory(RenderInstance.LogicalDevice, RenderInstance.Viewport.VpUniformBuffers[ImageIndex].BufferMemory, 0, sizeof(Core::ViewportInstence::UboViewProjection),
-			0, &Data);
-		std::memcpy(Data, &RenderInstance.Viewport.ViewProjection, sizeof(Core::ViewportInstence::UboViewProjection));
-		vkUnmapMemory(RenderInstance.LogicalDevice, RenderInstance.Viewport.VpUniformBuffers[ImageIndex].BufferMemory);
-
-		// UNIFORM BUFFER SETUP CODE
-		//for (uint32_t i = 0; i < RenderInstance.DrawableObjectsCount; ++i)
-		//{
-		//	UboModel* ThisModel = (UboModel*)((uint64_t)RenderInstance.ModelTransferSpace + (i * RenderInstance.ModelUniformAlignment));
-		//	*ThisModel = RenderInstance.DrawableObjects[i].Model;
-		//}
-
-		//vkMapMemory(RenderInstance.LogicalDevice, RenderInstance.ModelDynamicUniformBuffers[ImageIndex].BufferMemory, 0,
-		//	RenderInstance.ModelUniformAlignment * RenderInstance.DrawableObjectsCount, 0, &Data);
-
-		//std::memcpy(Data, RenderInstance.ModelTransferSpace, RenderInstance.ModelUniformAlignment * RenderInstance.DrawableObjectsCount);
-		//vkUnmapMemory(RenderInstance.LogicalDevice, RenderInstance.ModelDynamicUniformBuffers[ImageIndex].BufferMemory);
-
-		// -- SUBMIT COMMAND BUFFER TO RENDER --
-		// Queue submission information
-		VkSubmitInfo submitInfo = {};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		submitInfo.waitSemaphoreCount = 1;										// Number of semaphores to wait on
-		submitInfo.pWaitSemaphores = &RenderInstance.ImageAvalible[RenderInstance.CurrentFrame];				// List of semaphores to wait on
-		VkPipelineStageFlags waitStages[] = {
-			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-		};
-		submitInfo.pWaitDstStageMask = waitStages;						// Stages to check semaphores at
-		submitInfo.commandBufferCount = 1;								// Number of command buffers to submit
-		submitInfo.pCommandBuffers = &RenderInstance.Viewport.CommandBuffers[ImageIndex];		// Command buffer to submit
-		submitInfo.signalSemaphoreCount = 1;							// Number of semaphores to signal
-		submitInfo.pSignalSemaphores = &RenderInstance.RenderFinished[RenderInstance.CurrentFrame];	// Semaphores to signal when command buffer finishes
-
-		// Submit command buffer to queue
-		Result = vkQueueSubmit(RenderInstance.GraphicsQueue, 1, &submitInfo, RenderInstance.DrawFences[RenderInstance.CurrentFrame]);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkQueueSubmit result is {}", static_cast<int>(Result));
-			return false;
-		}
-
-		// -- PRESENT RENDERED IMAGE TO SCREEN --
-		VkPresentInfoKHR presentInfo = {};
-		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		presentInfo.waitSemaphoreCount = 1;										// Number of semaphores to wait on
-		presentInfo.pWaitSemaphores = &RenderInstance.RenderFinished[RenderInstance.CurrentFrame];			// Semaphores to wait on
-		presentInfo.swapchainCount = 1;											// Number of swapchains to present to
-		presentInfo.pSwapchains = &RenderInstance.Viewport.VulkanSwapchain;									// Swapchains to present images to
-		presentInfo.pImageIndices = &ImageIndex;								// Index of images in swapchains to present
-
-		// Present image
-		Result = vkQueuePresentKHR(RenderInstance.PresentationQueue, &presentInfo);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkQueuePresentKHR result is {}", static_cast<int>(Result));
-			return false;
+			ProcessedViewport = &RenderInstance.SecondTestViewport;
 		}
 
 		RenderInstance.CurrentFrame = (RenderInstance.CurrentFrame + 1) % RenderInstance.MaxFrameDraws;

@@ -129,7 +129,7 @@ namespace Core
 		GLFWwindow* Window = nullptr;
 		VkSurfaceKHR Surface = nullptr;
 
-		VkExtent2D SwapExtent;
+		VkExtent2D SwapExtent = {};
 		VkSwapchainKHR VulkanSwapchain = nullptr;
 
 		uint32_t SwapchainImagesCount = 0;
@@ -177,6 +177,9 @@ namespace Core
 		// Todo: pass as AddViewport params? 
 		VkFormat ColorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Todo: check if VK_FORMAT_R8G8B8A8_UNORM supported
 		VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
+		VkPresentModeKHR PresentationMode = VK_PRESENT_MODE_FIFO_KHR;
+		VkSurfaceFormatKHR SurfaceFormat = { VK_FORMAT_UNDEFINED, static_cast<VkColorSpaceKHR>(0) };
+		PhysicalDeviceIndices PhysicalDeviceIndices = { };
 
 		VkDescriptorPool SamplerDescriptorPool = nullptr;
 		VkDescriptorSetLayout SamplerSetLayout = nullptr;
@@ -222,6 +225,9 @@ namespace Core
 	void DeinitVulkanRenderInstance(VulkanRenderInstance& RenderInstance);
 	void CreateTexture(VulkanRenderInstance& RenderInstance, stbi_uc* TextureData, int Width, int Height, VkDeviceSize ImageSize);
 	bool AddViewport(VulkanRenderInstance& RenderInstance, GLFWwindow* Window);
+
+	bool InitViewport(VulkanRenderInstance& RenderInstance, const VkSurfaceCapabilitiesKHR& SurfaceCapabilities,
+		PhysicalDeviceIndices PhysicalDeviceIndices, ViewportInstence& OutViewport);
 
 	bool CreateGenericBuffer(const VulkanRenderInstance& RenderInstance, VkDeviceSize BufferSize,
 		VkBufferUsageFlags BufferUsage, VkMemoryPropertyFlags BufferProperties, GenericBuffer& OutBuffer);

@@ -201,6 +201,23 @@ int main()
 	const float RotationSpeed = 2.0f;
 	const float CameraSpeed = 10.0f;
 
+	GLFWwindow* Window2 = glfwCreateWindow(1600, 800, "BMEngine2", nullptr, nullptr);
+	if (Window == nullptr)
+	{
+		Util::Log::GlfwLogError();
+		glfwTerminate();
+		return -1;
+	}
+
+	Core::AddViewport(RenderInstance, Window2);
+
+	RenderInstance.SecondTestViewport.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
+		static_cast<float>(RenderInstance.Viewport.SwapExtent.width) / static_cast<float>(RenderInstance.SecondTestViewport.SwapExtent.height), 0.1f, 100.0f);
+
+	RenderInstance.SecondTestViewport.ViewProjection.Projection[1][1] *= -1;
+
+	RenderInstance.SecondTestViewport.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
 	while (!glfwWindowShouldClose(RenderInstance.Viewport.Window))
 	{
 		glfwPollEvents();
