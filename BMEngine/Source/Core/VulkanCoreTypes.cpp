@@ -716,9 +716,11 @@ namespace Core
 	bool InitVulkanRenderInstance(VulkanRenderInstance& RenderInstance, VkInstance VulkanInstance, GLFWwindow* Window)
 	{
 		RenderInstance.VulkanInstance = VulkanInstance;
-		RenderInstance.Viewport.Window = Window;
 
-		if (glfwCreateWindowSurface(RenderInstance.VulkanInstance, RenderInstance.Viewport.Window, nullptr, &RenderInstance.Viewport.Surface) != VK_SUCCESS)
+		ViewportInstence& Viewport = RenderInstance.Viewports[0];
+		Viewport.Window = Window;
+
+		if (glfwCreateWindowSurface(RenderInstance.VulkanInstance, Viewport.Window, nullptr, &Viewport.Surface) != VK_SUCCESS)
 		{
 			Util::Log().GlfwLogError();
 			return false;
@@ -742,7 +744,7 @@ namespace Core
 
 		for (uint32_t i = 0; i < DevicesCount; ++i)
 		{
-			if (!Core::InitVkPhysicalDeviceSetupData(VkPhysicalDeviceSetupData, DeviceList[i], RenderInstance.Viewport.Surface))
+			if (!Core::InitVkPhysicalDeviceSetupData(VkPhysicalDeviceSetupData, DeviceList[i], Viewport.Surface))
 			{
 				break;
 			}
@@ -752,7 +754,7 @@ namespace Core
 				break;
 			}
 
-			RenderInstance.PhysicalDeviceIndices = Core::GetPhysicalDeviceIndices(VkPhysicalDeviceSetupData, DeviceList[i], RenderInstance.Viewport.Surface);
+			RenderInstance.PhysicalDeviceIndices = Core::GetPhysicalDeviceIndices(VkPhysicalDeviceSetupData, DeviceList[i], Viewport.Surface);
 
 			if (RenderInstance.PhysicalDeviceIndices.GraphicsFamily < 0 || RenderInstance.PhysicalDeviceIndices.PresentationFamily < 0)
 			{
@@ -760,7 +762,7 @@ namespace Core
 				break;
 			}
 
-			VkResult Result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(DeviceList[i], RenderInstance.Viewport.Surface, &SurfaceCapabilities);
+			VkResult Result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(DeviceList[i], Viewport.Surface, &SurfaceCapabilities);
 			if (Result != VK_SUCCESS)
 			{
 				Util::Log().Warning("vkGetPhysicalDeviceSurfaceCapabilitiesKHR result is {}", static_cast<int>(Result));
@@ -1171,16 +1173,134 @@ namespace Core
 		}
 		// Function end CreateTextureSampler
 
-		InitViewport(RenderInstance, SurfaceCapabilities, RenderInstance.PhysicalDeviceIndices, RenderInstance.Viewport);
+		// Texture sampler pool
+		VkDescriptorPoolSize SamplerPoolSize = {};
+		// Todo: support VK_DESCRIPTOR_TYPE_SAMPLER and VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE separatly
+		SamplerPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		SamplerPoolSize.descriptorCount = RenderInstance.MaxObjects; // Todo: max objects or max textures?
+
+		VkDescriptorPoolCreateInfo SamplerPoolCreateInfo = {};
+		SamplerPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		SamplerPoolCreateInfo.maxSets = RenderInstance.MaxObjects;
+		SamplerPoolCreateInfo.poolSizeCount = 1;
+		SamplerPoolCreateInfo.pPoolSizes = &SamplerPoolSize;
+
+		Result = vkCreateDescriptorPool(RenderInstance.LogicalDevice, &SamplerPoolCreateInfo, nullptr, &RenderInstance.SamplerDescriptorPool);
+		if (Result != VK_SUCCESS)
+		{
+			return false;
+		}
+
+		// Function: CreateDescriptorSetLayout
+		VkDescriptorSetLayoutBinding VpLayoutBinding = {};
+		VpLayoutBinding.binding = 0;											// Binding point in shader (designated by binding number in shader)
+		VpLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;	// Type of descriptor (uniform, dynamic uniform, image sampler, etc)
+		VpLayoutBinding.descriptorCount = 1;									// Number of descriptors for binding
+		VpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;				// Shader stage to bind to
+		VpLayoutBinding.pImmutableSamplers = nullptr;							// For Texture: Can make sampler data unchangeable (immutable) by specifying in layout
+
+		// UNIFORM BUFFER SETUP CODE
+		//VkDescriptorSetLayoutBinding ModelLayoutBinding = {};
+		//ModelLayoutBinding.binding = 1;
+		//ModelLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		//ModelLayoutBinding.descriptorCount = 1;
+		//ModelLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		//ModelLayoutBinding.pImmutableSamplers = nullptr;
+
+		//const uint32_t BindingCount = 2;
+		//VkDescriptorSetLayoutBinding Bindings[BindingCount] = { VpLayoutBinding, ModelLayoutBinding };
+
+		const uint32_t BindingCount = 1;
+		VkDescriptorSetLayoutBinding Bindings[BindingCount] = { VpLayoutBinding };
+
+		// Create Descriptor Set Layout with given bindings
+		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = {};
+		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		LayoutCreateInfo.bindingCount = BindingCount;					// Number of binding infos
+		LayoutCreateInfo.pBindings = Bindings;		// Array of binding infos
+
+		Result = vkCreateDescriptorSetLayout(RenderInstance.LogicalDevice, &LayoutCreateInfo, nullptr, &RenderInstance.DescriptorSetLayout);
+		if (Result != VK_SUCCESS)
+		{
+			return false;
+		}
+
+		//Create input attachment image descriptor set layout
+// Colour Input Binding
+		VkDescriptorSetLayoutBinding ColourInputLayoutBinding = {};
+		ColourInputLayoutBinding.binding = 0;
+		ColourInputLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		ColourInputLayoutBinding.descriptorCount = 1;
+		ColourInputLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		// Depth Input Binding
+		VkDescriptorSetLayoutBinding DepthInputLayoutBinding = {};
+		DepthInputLayoutBinding.binding = 1;
+		DepthInputLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		DepthInputLayoutBinding.descriptorCount = 1;
+		DepthInputLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		// Array of input attachment bindings
+		const uint32_t InputBindingsCount = 2;
+		// Todo: do not copy InputBindings
+		VkDescriptorSetLayoutBinding InputBindings[InputBindingsCount] = { ColourInputLayoutBinding, DepthInputLayoutBinding };
+
+		// Create a descriptor set layout for input attachments
+		VkDescriptorSetLayoutCreateInfo InputLayoutCreateInfo = {};
+		InputLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		InputLayoutCreateInfo.bindingCount = InputBindingsCount;
+		InputLayoutCreateInfo.pBindings = InputBindings;
+
+		// Create Descriptor Set Layout
+		Result = vkCreateDescriptorSetLayout(RenderInstance.LogicalDevice, &InputLayoutCreateInfo, nullptr, &RenderInstance.InputSetLayout);
+		if (Result != VK_SUCCESS)
+		{
+			return false;
+		}
+
+		// Pipeline layout
+		const uint32_t DescriptorSetLayoutsCount = 2;
+		VkDescriptorSetLayout DescriptorSetLayouts[DescriptorSetLayoutsCount] = { RenderInstance.DescriptorSetLayout, RenderInstance.SamplerSetLayout };
+
+		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = {};
+		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		PipelineLayoutCreateInfo.setLayoutCount = DescriptorSetLayoutsCount;
+		PipelineLayoutCreateInfo.pSetLayouts = DescriptorSetLayouts;
+		PipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+		PipelineLayoutCreateInfo.pPushConstantRanges = &RenderInstance.PushConstantRange;
+
+		Result = vkCreatePipelineLayout(RenderInstance.LogicalDevice, &PipelineLayoutCreateInfo, nullptr, &RenderInstance.PipelineLayout);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkCreatePipelineLayout result is {}", static_cast<int>(Result));
+			return false;
+		}
+
+		// Create new pipeline layout
+		VkPipelineLayoutCreateInfo SecondPipelineLayoutCreateInfo = {};
+		SecondPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		SecondPipelineLayoutCreateInfo.setLayoutCount = 1;
+		SecondPipelineLayoutCreateInfo.pSetLayouts = &RenderInstance.InputSetLayout;
+		SecondPipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+		SecondPipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
+
+		Result = vkCreatePipelineLayout(RenderInstance.LogicalDevice, &SecondPipelineLayoutCreateInfo, nullptr, &RenderInstance.SecondPipelineLayout);
+		if (Result != VK_SUCCESS)
+		{
+			return -1;
+		}
+
+		InitViewport(RenderInstance, SurfaceCapabilities, RenderInstance.PhysicalDeviceIndices, Viewport);
 
 		return true;
 	}
 
 	bool AddViewport(VulkanRenderInstance& RenderInstance, GLFWwindow* Window)
 	{
-		RenderInstance.SecondTestViewport.Window = Window;
+		ViewportInstence& Viewport = RenderInstance.Viewports[1];
+		Viewport.Window = Window;
 
-		if (glfwCreateWindowSurface(RenderInstance.VulkanInstance, RenderInstance.SecondTestViewport.Window, nullptr, &RenderInstance.SecondTestViewport.Surface) != VK_SUCCESS)
+		if (glfwCreateWindowSurface(RenderInstance.VulkanInstance, Viewport.Window, nullptr, &Viewport.Surface) != VK_SUCCESS)
 		{
 			Util::Log().GlfwLogError();
 			return false;
@@ -1188,14 +1308,14 @@ namespace Core
 
 		VkSurfaceCapabilitiesKHR SurfaceCapabilities = { };
 
-		VkResult Result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(RenderInstance.PhysicalDevice, RenderInstance.SecondTestViewport.Surface, &SurfaceCapabilities);
+		VkResult Result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(RenderInstance.PhysicalDevice, Viewport.Surface, &SurfaceCapabilities);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Warning("vkGetPhysicalDeviceSurfaceCapabilitiesKHR result is {}", static_cast<int>(Result));
 			return false;
 		}
 
-		InitViewport(RenderInstance, SurfaceCapabilities, RenderInstance.PhysicalDeviceIndices, RenderInstance.SecondTestViewport);
+		InitViewport(RenderInstance, SurfaceCapabilities, RenderInstance.PhysicalDeviceIndices, Viewport);
 	}
 
 	bool InitViewport(VulkanRenderInstance& RenderInstance, const VkSurfaceCapabilitiesKHR& SurfaceCapabilities,
@@ -1299,73 +1419,6 @@ namespace Core
 
 		Util::Memory::Deallocate(Images);
 		// Function end: CreateSwapchain
-
-		// Function: CreateDescriptorSetLayout
-		VkDescriptorSetLayoutBinding VpLayoutBinding = {};
-		VpLayoutBinding.binding = 0;											// Binding point in shader (designated by binding number in shader)
-		VpLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;	// Type of descriptor (uniform, dynamic uniform, image sampler, etc)
-		VpLayoutBinding.descriptorCount = 1;									// Number of descriptors for binding
-		VpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;				// Shader stage to bind to
-		VpLayoutBinding.pImmutableSamplers = nullptr;							// For Texture: Can make sampler data unchangeable (immutable) by specifying in layout
-
-		// UNIFORM BUFFER SETUP CODE
-		//VkDescriptorSetLayoutBinding ModelLayoutBinding = {};
-		//ModelLayoutBinding.binding = 1;
-		//ModelLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		//ModelLayoutBinding.descriptorCount = 1;
-		//ModelLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-		//ModelLayoutBinding.pImmutableSamplers = nullptr;
-
-		//const uint32_t BindingCount = 2;
-		//VkDescriptorSetLayoutBinding Bindings[BindingCount] = { VpLayoutBinding, ModelLayoutBinding };
-
-		const uint32_t BindingCount = 1;
-		VkDescriptorSetLayoutBinding Bindings[BindingCount] = { VpLayoutBinding };
-
-		// Create Descriptor Set Layout with given bindings
-		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = {};
-		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = BindingCount;					// Number of binding infos
-		LayoutCreateInfo.pBindings = Bindings;		// Array of binding infos
-
-		Result = vkCreateDescriptorSetLayout(RenderInstance.LogicalDevice, &LayoutCreateInfo, nullptr, &OutViewport.DescriptorSetLayout);
-		if (Result != VK_SUCCESS)
-		{
-			return false;
-		}
-
-		//Create input attachment image descriptor set layout
-		// Colour Input Binding
-		VkDescriptorSetLayoutBinding ColourInputLayoutBinding = {};
-		ColourInputLayoutBinding.binding = 0;
-		ColourInputLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-		ColourInputLayoutBinding.descriptorCount = 1;
-		ColourInputLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		// Depth Input Binding
-		VkDescriptorSetLayoutBinding DepthInputLayoutBinding = {};
-		DepthInputLayoutBinding.binding = 1;
-		DepthInputLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-		DepthInputLayoutBinding.descriptorCount = 1;
-		DepthInputLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		// Array of input attachment bindings
-		const uint32_t InputBindingsCount = 2;
-		// Todo: do not copy InputBindings
-		VkDescriptorSetLayoutBinding InputBindings[InputBindingsCount] = { ColourInputLayoutBinding, DepthInputLayoutBinding };
-
-		// Create a descriptor set layout for input attachments
-		VkDescriptorSetLayoutCreateInfo InputLayoutCreateInfo = {};
-		InputLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		InputLayoutCreateInfo.bindingCount = InputBindingsCount;
-		InputLayoutCreateInfo.pBindings = InputBindings;
-
-		// Create Descriptor Set Layout
-		Result = vkCreateDescriptorSetLayout(RenderInstance.LogicalDevice, &InputLayoutCreateInfo, nullptr, &OutViewport.InputSetLayout);
-		if (Result != VK_SUCCESS)
-		{
-			return false;
-		}
 
 		// Function: CreateGraphicsPipeline
 // TODO FIX!!!
@@ -1532,24 +1585,6 @@ namespace Core
 		ColorBlendingCreateInfo.attachmentCount = 1;
 		ColorBlendingCreateInfo.pAttachments = &ColorBlendAttachmentState;
 
-		// Pipeline layout
-		const uint32_t DescriptorSetLayoutsCount = 2;
-		VkDescriptorSetLayout DescriptorSetLayouts[DescriptorSetLayoutsCount] = { OutViewport.DescriptorSetLayout, RenderInstance.SamplerSetLayout };
-
-		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = {};
-		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		PipelineLayoutCreateInfo.setLayoutCount = DescriptorSetLayoutsCount;
-		PipelineLayoutCreateInfo.pSetLayouts = DescriptorSetLayouts;
-		PipelineLayoutCreateInfo.pushConstantRangeCount = 1;
-		PipelineLayoutCreateInfo.pPushConstantRanges = &RenderInstance.PushConstantRange;
-
-		Result = vkCreatePipelineLayout(RenderInstance.LogicalDevice, &PipelineLayoutCreateInfo, nullptr, &RenderInstance.PipelineLayout);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkCreatePipelineLayout result is {}", static_cast<int>(Result));
-			return false;
-		}
-
 		// Depth stencil testing
 		VkPipelineDepthStencilStateCreateInfo DepthStencilCreateInfo = {};
 		DepthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
@@ -1582,7 +1617,7 @@ namespace Core
 		GraphicsPipelineCreateInfo.basePipelineIndex = -1;				// or index of pipeline being created to derive from (in case creating multiple at once)
 
 
-		Result = vkCreateGraphicsPipelines(RenderInstance.LogicalDevice, VK_NULL_HANDLE, GraphicsPipelineCreateInfosCount, &GraphicsPipelineCreateInfo, nullptr, &RenderInstance.GraphicsPipeline);
+		Result = vkCreateGraphicsPipelines(RenderInstance.LogicalDevice, VK_NULL_HANDLE, GraphicsPipelineCreateInfosCount, &GraphicsPipelineCreateInfo, nullptr, &OutViewport.GraphicsPipeline);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkCreateGraphicsPipelines result is {}", static_cast<int>(Result));
@@ -1640,27 +1675,13 @@ namespace Core
 		// Don't want to write to depth buffer
 		DepthStencilCreateInfo.depthWriteEnable = VK_FALSE;
 
-		// Create new pipeline layout
-		VkPipelineLayoutCreateInfo SecondPipelineLayoutCreateInfo = {};
-		SecondPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		SecondPipelineLayoutCreateInfo.setLayoutCount = 1;
-		SecondPipelineLayoutCreateInfo.pSetLayouts = &OutViewport.InputSetLayout;
-		SecondPipelineLayoutCreateInfo.pushConstantRangeCount = 0;
-		SecondPipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
-
-		Result = vkCreatePipelineLayout(RenderInstance.LogicalDevice, &SecondPipelineLayoutCreateInfo, nullptr, &RenderInstance.SecondPipelineLayout);
-		if (Result != VK_SUCCESS)
-		{
-			return -1;
-		}
-
 		GraphicsPipelineCreateInfo.pStages = SecondShaderStages;	// Update second shader stage list
 		GraphicsPipelineCreateInfo.layout = RenderInstance.SecondPipelineLayout;	// Change pipeline layout for input attachment descriptor sets
 		GraphicsPipelineCreateInfo.subpass = 1;						// Use second subpass
 
 		// Create second pipeline
 		// Todo: !!! Use one vkCreateGraphicsPipelines call to create pipelines
-		Result = vkCreateGraphicsPipelines(RenderInstance.LogicalDevice, VK_NULL_HANDLE, 1, &GraphicsPipelineCreateInfo, nullptr, &RenderInstance.SecondPipeline);
+		Result = vkCreateGraphicsPipelines(RenderInstance.LogicalDevice, VK_NULL_HANDLE, 1, &GraphicsPipelineCreateInfo, nullptr, &OutViewport.SecondPipeline);
 		if (Result != VK_SUCCESS)
 		{
 			return -1;
@@ -1796,24 +1817,6 @@ namespace Core
 			return false;
 		}
 
-		// Texture sampler pool
-		VkDescriptorPoolSize SamplerPoolSize = {};
-		// Todo: support VK_DESCRIPTOR_TYPE_SAMPLER and VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE separatly
-		SamplerPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		SamplerPoolSize.descriptorCount = RenderInstance.MaxObjects; // Todo: max objects or max textures?
-
-		VkDescriptorPoolCreateInfo SamplerPoolCreateInfo = {};
-		SamplerPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		SamplerPoolCreateInfo.maxSets = RenderInstance.MaxObjects;
-		SamplerPoolCreateInfo.poolSizeCount = 1;
-		SamplerPoolCreateInfo.pPoolSizes = &SamplerPoolSize;
-
-		Result = vkCreateDescriptorPool(RenderInstance.LogicalDevice, &SamplerPoolCreateInfo, nullptr, &RenderInstance.SamplerDescriptorPool);
-		if (Result != VK_SUCCESS)
-		{
-			return false;
-		}
-
 		// CREATE INPUT ATTACHMENT DESCRIPTOR POOL
 		VkDescriptorPoolSize ColourInputPoolSize = {};
 		ColourInputPoolSize.type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
@@ -1842,13 +1845,12 @@ namespace Core
 		// 
 		// Function CreateDescriptorSets
 		OutViewport.DescriptorSets = static_cast<VkDescriptorSet*>(Util::Memory::Allocate(OutViewport.SwapchainImagesCount * sizeof(VkDescriptorSet)));
-
 		OutViewport.InputDescriptorSets = static_cast<VkDescriptorSet*>(Util::Memory::Allocate(OutViewport.SwapchainImagesCount * sizeof(VkDescriptorSet)));
 
 		VkDescriptorSetLayout* SetLayouts = static_cast<VkDescriptorSetLayout*>(Util::Memory::Allocate(OutViewport.SwapchainImagesCount * sizeof(VkDescriptorSetLayout)));
 		for (uint32_t i = 0; i < OutViewport.SwapchainImagesCount; i++)
 		{
-			SetLayouts[i] = OutViewport.DescriptorSetLayout;
+			SetLayouts[i] = RenderInstance.DescriptorSetLayout;
 		}
 
 		// Descriptor Set Allocation Info
@@ -1912,7 +1914,7 @@ namespace Core
 
 		for (uint32_t i = 0; i < OutViewport.SwapchainImagesCount; i++)
 		{
-			SetLayouts[i] = OutViewport.InputSetLayout;
+			SetLayouts[i] = RenderInstance.InputSetLayout;
 		}
 
 		SetAllocInfo.descriptorPool = OutViewport.InputDescriptorPool;
@@ -1967,6 +1969,8 @@ namespace Core
 
 		Util::Memory::Deallocate(SetLayouts);
 		// Function end CreateDescriptorSets
+
+		++RenderInstance.ViewportsCount;
 		return true;
 	}
 
@@ -2021,16 +2025,12 @@ namespace Core
 
 	bool Draw(VulkanRenderInstance& RenderInstance)
 	{
-		ViewportInstence* ProcessedViewport = &RenderInstance.Viewport;
-
-		for (int test = 0; test < 2; ++test)
+		for (int ViewportIndex = 0; ViewportIndex < RenderInstance.ViewportsCount; ++ViewportIndex)
 		{
+			ViewportInstence* ProcessedViewport = &RenderInstance.Viewports[ViewportIndex];
 
-		vkWaitForFences(RenderInstance.LogicalDevice, 1, &RenderInstance.DrawFences[RenderInstance.CurrentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
-		vkResetFences(RenderInstance.LogicalDevice, 1, &RenderInstance.DrawFences[RenderInstance.CurrentFrame]);
-
-		
-
+			vkWaitForFences(RenderInstance.LogicalDevice, 1, &RenderInstance.DrawFences[RenderInstance.CurrentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
+			vkResetFences(RenderInstance.LogicalDevice, 1, &RenderInstance.DrawFences[RenderInstance.CurrentFrame]);
 
 			// Get index of next image to be drawn to, and signal semaphore when ready to be drawn to
 			uint32_t ImageIndex;
@@ -2070,7 +2070,7 @@ namespace Core
 			vkCmdBeginRenderPass(ProcessedViewport->CommandBuffers[ImageIndex], &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 			// Bind Pipeline to be used in render pass
-			vkCmdBindPipeline(ProcessedViewport->CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.GraphicsPipeline);
+			vkCmdBindPipeline(ProcessedViewport->CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, ProcessedViewport->GraphicsPipeline);
 
 			// TODO: Support rework to not create identical index buffers
 			for (uint32_t j = 0; j < RenderInstance.DrawableObjectsCount; ++j)
@@ -2102,7 +2102,7 @@ namespace Core
 
 			vkCmdNextSubpass(ProcessedViewport->CommandBuffers[ImageIndex], VK_SUBPASS_CONTENTS_INLINE);
 
-			vkCmdBindPipeline(ProcessedViewport->CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.SecondPipeline);
+			vkCmdBindPipeline(ProcessedViewport->CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, ProcessedViewport->SecondPipeline);
 			vkCmdBindDescriptorSets(ProcessedViewport->CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, RenderInstance.SecondPipelineLayout,
 				0, 1, &ProcessedViewport->InputDescriptorSets[ImageIndex], 0, nullptr);
 			vkCmdDraw(ProcessedViewport->CommandBuffers[ImageIndex], 3, 1, 0, 0); // 3 hardcoded indices for second "post processing" subpass
@@ -2177,8 +2177,6 @@ namespace Core
 				Util::Log().Error("vkQueuePresentKHR result is {}", static_cast<int>(Result));
 				return false;
 			}
-
-			ProcessedViewport = &RenderInstance.SecondTestViewport;
 		}
 
 		RenderInstance.CurrentFrame = (RenderInstance.CurrentFrame + 1) % RenderInstance.MaxFrameDraws;
@@ -2193,11 +2191,47 @@ namespace Core
 		// UNIFORM BUFFER SETUP CODE
 		//_aligned_free(RenderInstance.ModelTransferSpace);
 
-		vkDestroyDescriptorPool(RenderInstance.LogicalDevice, RenderInstance.Viewport.InputDescriptorPool, nullptr);
+		for (int ViewportIndex = 0; ViewportIndex < RenderInstance.ViewportsCount; ++ViewportIndex)
+		{
+			ViewportInstence* ProcessedViewport = &RenderInstance.Viewports[ViewportIndex];
+
+			for (uint32_t i = 0; i < ProcessedViewport->SwapchainImagesCount; ++i)
+			{
+				vkDestroyImageView(RenderInstance.LogicalDevice, ProcessedViewport->DepthBuffers[i].ImageView, nullptr);
+				vkDestroyImage(RenderInstance.LogicalDevice, ProcessedViewport->DepthBuffers[i].Image, nullptr);
+				vkFreeMemory(RenderInstance.LogicalDevice, ProcessedViewport->DepthBuffers[i].ImageMemory, nullptr);
+
+				vkDestroyImageView(RenderInstance.LogicalDevice, ProcessedViewport->ColorBuffers[i].ImageView, nullptr);
+				vkDestroyImage(RenderInstance.LogicalDevice, ProcessedViewport->ColorBuffers[i].Image, nullptr);
+				vkFreeMemory(RenderInstance.LogicalDevice, ProcessedViewport->ColorBuffers[i].ImageMemory, nullptr);
+
+				DestroyGenericBuffer(RenderInstance, ProcessedViewport->VpUniformBuffers[i]);
+				vkDestroyFramebuffer(RenderInstance.LogicalDevice, ProcessedViewport->SwapchainFramebuffers[i], nullptr);
+				vkDestroyImageView(RenderInstance.LogicalDevice, ProcessedViewport->ImageViews[i], nullptr);
+				// UNIFORM BUFFER SETUP CODE
+				//Core::DestroyGenericBuffer(RenderInstance, RenderInstance.ModelDynamicUniformBuffers[i]);
+			}
+
+			vkDestroyDescriptorPool(RenderInstance.LogicalDevice, ProcessedViewport->InputDescriptorPool, nullptr);
+			vkDestroyDescriptorPool(RenderInstance.LogicalDevice, ProcessedViewport->DescriptorPool, nullptr);
+
+			vkDestroySwapchainKHR(RenderInstance.LogicalDevice, ProcessedViewport->VulkanSwapchain, nullptr);
+			vkDestroySurfaceKHR(RenderInstance.VulkanInstance, ProcessedViewport->Surface, nullptr);
+
+			vkDestroyPipeline(RenderInstance.LogicalDevice, ProcessedViewport->SecondPipeline, nullptr);
+			vkDestroyPipeline(RenderInstance.LogicalDevice, ProcessedViewport->GraphicsPipeline, nullptr);
+
+			Util::Memory::Deallocate(ProcessedViewport->SwapchainFramebuffers);
+			Util::Memory::Deallocate(ProcessedViewport->DepthBuffers);
+			Util::Memory::Deallocate(ProcessedViewport->ColorBuffers);
+			Util::Memory::Deallocate(ProcessedViewport->DescriptorSets);
+			Util::Memory::Deallocate(ProcessedViewport->InputDescriptorSets);
+			Util::Memory::Deallocate(ProcessedViewport->VpUniformBuffers);
+			Util::Memory::Deallocate(ProcessedViewport->CommandBuffers);
+			Util::Memory::Deallocate(ProcessedViewport->ImageViews);
+		}
 
 		vkDestroySampler(RenderInstance.LogicalDevice, RenderInstance.TextureSampler, nullptr);
-
-		vkDestroyDescriptorSetLayout(RenderInstance.LogicalDevice, RenderInstance.Viewport.InputSetLayout, nullptr);
 
 		for (uint32_t i = 0; i < RenderInstance.TextureImagesCount; ++i)
 		{
@@ -2206,37 +2240,14 @@ namespace Core
 			vkFreeMemory(RenderInstance.LogicalDevice, RenderInstance.TextureImageBuffer[i].TextureImagesMemory, nullptr);
 		}
 
-		for (uint32_t i = 0; i < RenderInstance.Viewport.SwapchainImagesCount; ++i)
-		{
-			vkDestroyImageView(RenderInstance.LogicalDevice, RenderInstance.Viewport.DepthBuffers[i].ImageView, nullptr);
-			vkDestroyImage(RenderInstance.LogicalDevice, RenderInstance.Viewport.DepthBuffers[i].Image, nullptr);
-			vkFreeMemory(RenderInstance.LogicalDevice, RenderInstance.Viewport.DepthBuffers[i].ImageMemory, nullptr);
+		vkDestroyPipelineLayout(RenderInstance.LogicalDevice, RenderInstance.PipelineLayout, nullptr);
+		vkDestroyPipelineLayout(RenderInstance.LogicalDevice, RenderInstance.SecondPipelineLayout, nullptr);
 
-			vkDestroyImageView(RenderInstance.LogicalDevice, RenderInstance.Viewport.ColorBuffers[i].ImageView, nullptr);
-			vkDestroyImage(RenderInstance.LogicalDevice, RenderInstance.Viewport.ColorBuffers[i].Image, nullptr);
-			vkFreeMemory(RenderInstance.LogicalDevice, RenderInstance.Viewport.ColorBuffers[i].ImageMemory, nullptr);
-		}
-
-		Util::Memory::Deallocate(RenderInstance.Viewport.DepthBuffers);
-		Util::Memory::Deallocate(RenderInstance.Viewport.ColorBuffers);
-
-		Util::Memory::Deallocate(RenderInstance.SamplerDescriptorSets);
-		Util::Memory::Deallocate(RenderInstance.Viewport.DescriptorSets);
+		vkDestroyDescriptorSetLayout(RenderInstance.LogicalDevice, RenderInstance.DescriptorSetLayout, nullptr);
+		vkDestroyDescriptorSetLayout(RenderInstance.LogicalDevice, RenderInstance.InputSetLayout, nullptr);
 
 		vkDestroyDescriptorPool(RenderInstance.LogicalDevice, RenderInstance.SamplerDescriptorPool, nullptr);
-		vkDestroyDescriptorPool(RenderInstance.LogicalDevice, RenderInstance.Viewport.DescriptorPool, nullptr);
-
 		vkDestroyDescriptorSetLayout(RenderInstance.LogicalDevice, RenderInstance.SamplerSetLayout, nullptr);
-		vkDestroyDescriptorSetLayout(RenderInstance.LogicalDevice, RenderInstance.Viewport.DescriptorSetLayout, nullptr);
-		
-		for (uint32_t i = 0; i < RenderInstance.Viewport.SwapchainImagesCount; i++)
-		{
-			Core::DestroyGenericBuffer(RenderInstance, RenderInstance.Viewport.VpUniformBuffers[i]);
-			// UNIFORM BUFFER SETUP CODE
-			//Core::DestroyGenericBuffer(RenderInstance, RenderInstance.ModelDynamicUniformBuffers[i]);
-		}
-
-		Util::Memory::Deallocate(RenderInstance.Viewport.VpUniformBuffers);
 		// UNIFORM BUFFER SETUP CODE
 		//Util::Memory::Deallocate(RenderInstance.ModelDynamicUniformBuffers);
 
@@ -2253,37 +2264,13 @@ namespace Core
 			vkDestroyFence(RenderInstance.LogicalDevice, RenderInstance.DrawFences[i], nullptr);
 		}
 
+		vkDestroyCommandPool(RenderInstance.LogicalDevice, RenderInstance.GraphicsCommandPool, nullptr);
+		vkDestroyRenderPass(RenderInstance.LogicalDevice, RenderInstance.RenderPass, nullptr);
+		vkDestroyDevice(RenderInstance.LogicalDevice, nullptr);
+
+		Util::Memory::Deallocate(RenderInstance.SamplerDescriptorSets);
 		Util::Memory::Deallocate(RenderInstance.DrawFences);
 		Util::Memory::Deallocate(RenderInstance.RenderFinished);
 		Util::Memory::Deallocate(RenderInstance.ImageAvalible);
-
-		Util::Memory::Deallocate(RenderInstance.Viewport.CommandBuffers);
-
-		vkDestroyCommandPool(RenderInstance.LogicalDevice, RenderInstance.GraphicsCommandPool, nullptr);
-
-		for (uint32_t i = 0; i < RenderInstance.Viewport.SwapchainImagesCount; i++)
-		{
-			vkDestroyFramebuffer(RenderInstance.LogicalDevice, RenderInstance.Viewport.SwapchainFramebuffers[i], nullptr);
-		}
-
-		Util::Memory::Deallocate(RenderInstance.Viewport.SwapchainFramebuffers);
-
-		vkDestroyPipeline(RenderInstance.LogicalDevice, RenderInstance.SecondPipeline, nullptr);
-		vkDestroyPipelineLayout(RenderInstance.LogicalDevice, RenderInstance.SecondPipelineLayout, nullptr);
-
-		vkDestroyPipeline(RenderInstance.LogicalDevice, RenderInstance.GraphicsPipeline, nullptr);
-		vkDestroyPipelineLayout(RenderInstance.LogicalDevice, RenderInstance.PipelineLayout, nullptr);
-		vkDestroyRenderPass(RenderInstance.LogicalDevice, RenderInstance.RenderPass, nullptr);
-
-		for (uint32_t i = 0; i < RenderInstance.Viewport.SwapchainImagesCount; ++i)
-		{
-			vkDestroyImageView(RenderInstance.LogicalDevice, RenderInstance.Viewport.ImageViews[i], nullptr);
-		}
-
-		Util::Memory::Deallocate(RenderInstance.Viewport.ImageViews);
-
-		vkDestroySwapchainKHR(RenderInstance.LogicalDevice, RenderInstance.Viewport.VulkanSwapchain, nullptr);
-		vkDestroySurfaceKHR(RenderInstance.VulkanInstance, RenderInstance.Viewport.Surface, nullptr);
-		vkDestroyDevice(RenderInstance.LogicalDevice, nullptr);
 	}
 }
