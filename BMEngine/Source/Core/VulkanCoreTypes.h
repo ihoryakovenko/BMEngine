@@ -124,11 +124,46 @@ namespace Core
 	bool InitMainInstance(MainInstance& Instance, bool IsValidationLayersEnabled);
 	void DeinitMainInstance(MainInstance& Instance);
 
-	struct VulkanRenderInstance
+	struct ViewportInstence
 	{
 		GLFWwindow* Window = nullptr;
+		VkSurfaceKHR Surface = nullptr;
 
+		VkExtent2D SwapExtent = {};
+		VkSwapchainKHR VulkanSwapchain = nullptr;
+
+		uint32_t SwapchainImagesCount = 0;
+		VkImageView* ImageViews = nullptr;
+
+		VkFramebuffer* SwapchainFramebuffers = nullptr;
+		VkCommandBuffer* CommandBuffers = nullptr;
+		GenericImageBuffer* ColorBuffers = nullptr;
+		GenericImageBuffer* DepthBuffers = nullptr;
+
+		VkDescriptorPool DescriptorPool = nullptr;
+		VkDescriptorPool InputDescriptorPool = nullptr;
+		VkDescriptorSet* DescriptorSets = nullptr;
+		VkDescriptorSet* InputDescriptorSets = nullptr;
+
+		VkPipeline GraphicsPipeline = nullptr;
+		VkPipeline SecondPipeline = nullptr;
+		
+		GenericBuffer* VpUniformBuffers = nullptr;
+
+		struct UboViewProjection
+		{
+			glm::mat4 View;
+			glm::mat4 Projection;
+		} ViewProjection;
+	};
+
+	struct VulkanRenderInstance
+	{
 		VkInstance VulkanInstance = nullptr;
+
+		uint32_t ViewportsCount = 0;
+		ViewportInstence* Viewports[2];
+		ViewportInstence MainViewport;
 
 		VkPhysicalDeviceProperties PhysicalDeviceProperties;
 		VkPhysicalDevice PhysicalDevice = nullptr;
@@ -136,50 +171,33 @@ namespace Core
 
 		VkQueue GraphicsQueue = nullptr;
 		VkQueue PresentationQueue = nullptr;
-		VkSurfaceKHR Surface = nullptr;
-		VkExtent2D SwapExtent;
-		VkSwapchainKHR VulkanSwapchain = nullptr;
 
-		uint32_t SwapchainImagesCount = 0;
-		VkImageView* ImageViews = nullptr;
-		VkFramebuffer* SwapchainFramebuffers = nullptr;
-		VkCommandBuffer* CommandBuffers = nullptr;
-
-		GenericImageBuffer* ColorBuffers = nullptr;
-
+		// Todo: pass as AddViewport params? 
+		VkFormat ColorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Todo: check if VK_FORMAT_R8G8B8A8_UNORM supported
 		VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
-		GenericImageBuffer* DepthBuffers = nullptr;
-
-		VkDescriptorSetLayout DescriptorSetLayout = nullptr;
-		VkDescriptorSetLayout SamplerSetLayout = nullptr;
-		VkDescriptorSetLayout InputSetLayout = nullptr; // Set for diferent pipeline, goes to diferent shader
-		VkPushConstantRange PushConstantRange;
+		VkPresentModeKHR PresentationMode = VK_PRESENT_MODE_FIFO_KHR;
+		VkSurfaceFormatKHR SurfaceFormat = { VK_FORMAT_UNDEFINED, static_cast<VkColorSpaceKHR>(0) };
+		PhysicalDeviceIndices PhysicalDeviceIndices = { };
 
 		// Todo: put textures in DescriptorSets to use only one descriptor set and pool?
-		VkDescriptorPool DescriptorPool = nullptr;
 		VkDescriptorPool SamplerDescriptorPool = nullptr;
-		VkDescriptorPool InputDescriptorPool = nullptr;
-		VkDescriptorSet* DescriptorSets = nullptr;
+		VkDescriptorSetLayout SamplerSetLayout = nullptr;
 		VkDescriptorSet* SamplerDescriptorSets = nullptr;
-		VkDescriptorSet* InputDescriptorSets = nullptr;
+		
+		VkPushConstantRange PushConstantRange;
 
-		GenericBuffer* VpUniformBuffers = nullptr;
+		VkDescriptorSetLayout DescriptorSetLayout = nullptr;
+		VkDescriptorSetLayout InputSetLayout = nullptr; // Set for diferent pipeline, goes to diferent shader
+
+		VkPipelineLayout PipelineLayout = nullptr;
+		VkPipelineLayout SecondPipelineLayout = nullptr;
+		
 		//GenericBuffer* ModelDynamicUniformBuffers = nullptr;
 
 		//uint32_t ModelUniformAlignment = 0;
 		//UboModel* ModelTransferSpace = nullptr;
 
-		VkPipeline GraphicsPipeline = nullptr;
-		VkPipelineLayout PipelineLayout = nullptr;
-		VkPipeline SecondPipeline = nullptr;
-		VkPipelineLayout SecondPipelineLayout = nullptr;
 		VkRenderPass RenderPass = nullptr;
-
-		struct UboViewProjection
-		{
-			glm::mat4 View;
-			glm::mat4 Projection;
-		} ViewProjection;
 
 		const uint32_t MaxObjects = 528;
 		uint32_t DrawableObjectsCount = 0;
@@ -206,16 +224,18 @@ namespace Core
 	bool Draw(VulkanRenderInstance& RenderInstance);
 	void DeinitVulkanRenderInstance(VulkanRenderInstance& RenderInstance);
 	void CreateTexture(VulkanRenderInstance& RenderInstance, stbi_uc* TextureData, int Width, int Height, VkDeviceSize ImageSize);
+	bool AddViewport(VulkanRenderInstance& RenderInstance, GLFWwindow* Window);
+	void RemoveViewport(VulkanRenderInstance& RenderInstance, GLFWwindow* Window);
+
+	bool InitViewport(const VulkanRenderInstance& RenderInstance, GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstence* OutViewport);
+	void DeinitViewport(const VulkanRenderInstance& RenderInstance, ViewportInstence* Viewport);
 
 	bool CreateGenericBuffer(const VulkanRenderInstance& RenderInstance, VkDeviceSize BufferSize,
 		VkBufferUsageFlags BufferUsage, VkMemoryPropertyFlags BufferProperties, GenericBuffer& OutBuffer);
-
 	void DestroyGenericBuffer(const VulkanRenderInstance& RenderInstance, GenericBuffer& Buffer);
-
 	// Todo: Refactor CopyBuffer and CopyBufferToImage?
 	void CopyBuffer(const VulkanRenderInstance& RenderInstance, VkBuffer SourceBuffer,
 		VkBuffer DstinationBuffer, VkDeviceSize BufferSize);
-
 	void CopyBufferToImage(const VulkanRenderInstance& RenderInstance, VkBuffer SourceBuffer,
 		VkImage Image, uint32_t Width, uint32_t Height);
 
