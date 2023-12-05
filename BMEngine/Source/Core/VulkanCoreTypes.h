@@ -162,7 +162,8 @@ namespace Core
 		VkInstance VulkanInstance = nullptr;
 
 		uint32_t ViewportsCount = 0;
-		ViewportInstence Viewports[2];
+		ViewportInstence* Viewports[2];
+		ViewportInstence MainViewport;
 
 		VkPhysicalDeviceProperties PhysicalDeviceProperties;
 		VkPhysicalDevice PhysicalDevice = nullptr;
@@ -224,10 +225,10 @@ namespace Core
 	void DeinitVulkanRenderInstance(VulkanRenderInstance& RenderInstance);
 	void CreateTexture(VulkanRenderInstance& RenderInstance, stbi_uc* TextureData, int Width, int Height, VkDeviceSize ImageSize);
 	bool AddViewport(VulkanRenderInstance& RenderInstance, GLFWwindow* Window);
+	void RemoveViewport(VulkanRenderInstance& RenderInstance, GLFWwindow* Window);
 
-
-	bool InitViewport(VulkanRenderInstance& RenderInstance, const VkSurfaceCapabilitiesKHR& SurfaceCapabilities,
-		PhysicalDeviceIndices PhysicalDeviceIndices, ViewportInstence& OutViewport);
+	bool InitViewport(const VulkanRenderInstance& RenderInstance, GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstence* OutViewport);
+	void DeinitViewport(const VulkanRenderInstance& RenderInstance, ViewportInstence* Viewport);
 
 	bool CreateGenericBuffer(const VulkanRenderInstance& RenderInstance, VkDeviceSize BufferSize,
 		VkBufferUsageFlags BufferUsage, VkMemoryPropertyFlags BufferProperties, GenericBuffer& OutBuffer);
