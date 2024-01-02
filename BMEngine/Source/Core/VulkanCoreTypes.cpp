@@ -7,6 +7,29 @@
 
 namespace Core
 {
+	PhysicalDeviceIndices GetPhysicalDeviceIndices(const VkPhysicalDeviceSetupData& Data, VkPhysicalDevice PhysicalDevice,
+		VkSurfaceKHR Surface);
+
+	bool InitViewport(const VulkanRenderInstance& RenderInstance, GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstence* OutViewport);
+	void DeinitViewport(const VulkanRenderInstance& RenderInstance, ViewportInstence* Viewport);
+
+	bool CreateGenericBuffer(const VulkanRenderInstance& RenderInstance, VkDeviceSize BufferSize,
+		VkBufferUsageFlags BufferUsage, VkMemoryPropertyFlags BufferProperties, GenericBuffer& OutBuffer);
+	void DestroyGenericBuffer(const VulkanRenderInstance& RenderInstance, GenericBuffer& Buffer);
+	// Todo: Refactor CopyBuffer and CopyBufferToImage?
+	void CopyBuffer(const VulkanRenderInstance& RenderInstance, VkBuffer SourceBuffer,
+		VkBuffer DstinationBuffer, VkDeviceSize BufferSize);
+	void CopyBufferToImage(const VulkanRenderInstance& RenderInstance, VkBuffer SourceBuffer,
+		VkImage Image, uint32_t Width, uint32_t Height);
+
+	VkImage CreateImage(const VulkanRenderInstance& RenderInstance, uint32_t Width, uint32_t Height,
+		VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags,
+		VkDeviceMemory* OutImageMemory);
+
+	uint32_t FindMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, uint32_t AllowedTypes, VkMemoryPropertyFlags Properties);
+
+	VkImageView CreateImageView(const VulkanRenderInstance& RenderInstance, VkImage Image, VkFormat Format, VkImageAspectFlags AspectFlags);
+
 	bool InitVkInstanceCreateInfoSetupData(VkInstanceCreateInfoSetupData& Data, const char** ValidationExtensions,
 		uint32_t ValidationExtensionsCount, bool EnumerateInstanceLayerProperties)
 	{

@@ -24,15 +24,6 @@ namespace Core
 		VkLayerProperties* AvalibleValidationLayers = nullptr;
 	};
 
-	bool InitVkInstanceCreateInfoSetupData(VkInstanceCreateInfoSetupData& Data,
-		const char** ValidationExtensions, uint32_t ValidationExtensionsSize, bool EnumerateInstanceLayerProperties);
-
-	void DeinitVkInstanceCreateInfoSetupData(VkInstanceCreateInfoSetupData& Data);
-
-	bool CheckRequiredInstanceExtensionsSupport(const VkInstanceCreateInfoSetupData& Data);
-	bool CheckValidationLayersSupport(const VkInstanceCreateInfoSetupData& Data, const char** ValidationLeyersToCheck,
-		uint32_t ValidationLeyersToCheckSize);
-
 	// Deinit if InitVkPhysicalDeviceSetupData returns true
 	struct VkPhysicalDeviceSetupData
 	{
@@ -49,20 +40,11 @@ namespace Core
 		VkPresentModeKHR* PresentModes = nullptr;
 	};
 
-	bool InitVkPhysicalDeviceSetupData(VkPhysicalDeviceSetupData& Data, VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
-	void DeinitVkPhysicalDeviceSetupData(VkPhysicalDeviceSetupData& Data);
-
-	bool CheckDeviceExtensionsSupport(const VkPhysicalDeviceSetupData& Data, const char** ExtensionsToCheck,
-		uint32_t ExtensionsToCheckSize);
-
 	struct PhysicalDeviceIndices
 	{
 		int GraphicsFamily = -1;
 		int PresentationFamily = -1;
 	};
-
-	PhysicalDeviceIndices GetPhysicalDeviceIndices(const VkPhysicalDeviceSetupData& Data, VkPhysicalDevice PhysicalDevice,
-		VkSurfaceKHR Surface);
 
 	struct Vertex
 	{
@@ -121,9 +103,6 @@ namespace Core
 		VkDebugUtilsMessengerEXT DebugMessenger = nullptr;
 	};
 
-	bool InitMainInstance(MainInstance& Instance, bool IsValidationLayersEnabled);
-	void DeinitMainInstance(MainInstance& Instance);
-
 	struct ViewportInstence
 	{
 		GLFWwindow* Window = nullptr;
@@ -147,7 +126,7 @@ namespace Core
 
 		VkPipeline GraphicsPipeline = nullptr;
 		VkPipeline SecondPipeline = nullptr;
-		
+
 		GenericBuffer* VpUniformBuffers = nullptr;
 
 		struct UboViewProjection
@@ -183,7 +162,7 @@ namespace Core
 		VkDescriptorPool SamplerDescriptorPool = nullptr;
 		VkDescriptorSetLayout SamplerSetLayout = nullptr;
 		VkDescriptorSet* SamplerDescriptorSets = nullptr;
-		
+
 		VkPushConstantRange PushConstantRange;
 
 		VkDescriptorSetLayout DescriptorSetLayout = nullptr;
@@ -191,7 +170,7 @@ namespace Core
 
 		VkPipelineLayout PipelineLayout = nullptr;
 		VkPipelineLayout SecondPipelineLayout = nullptr;
-		
+
 		//GenericBuffer* ModelDynamicUniformBuffers = nullptr;
 
 		//uint32_t ModelUniformAlignment = 0;
@@ -204,7 +183,7 @@ namespace Core
 		DrawableObject DrawableObjects[528];
 		const int MaxFrameDraws = 2;
 		int CurrentFrame = 0;
-		
+
 		VkCommandPool GraphicsCommandPool = nullptr;
 
 		VkSemaphore* ImageAvalible = nullptr;
@@ -219,6 +198,25 @@ namespace Core
 		ImageBuffer TextureImageBuffer[64];
 	};
 
+	// VkInstanceCreateInfoSetupData
+	bool InitVkInstanceCreateInfoSetupData(VkInstanceCreateInfoSetupData& Data,
+		const char** ValidationExtensions, uint32_t ValidationExtensionsSize, bool EnumerateInstanceLayerProperties);
+	void DeinitVkInstanceCreateInfoSetupData(VkInstanceCreateInfoSetupData& Data);
+	bool CheckRequiredInstanceExtensionsSupport(const VkInstanceCreateInfoSetupData& Data);
+	bool CheckValidationLayersSupport(const VkInstanceCreateInfoSetupData& Data, const char** ValidationLeyersToCheck,
+		uint32_t ValidationLeyersToCheckSize);
+
+	// VkPhysicalDeviceSetupData
+	bool InitVkPhysicalDeviceSetupData(VkPhysicalDeviceSetupData& Data, VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
+	void DeinitVkPhysicalDeviceSetupData(VkPhysicalDeviceSetupData& Data);
+	bool CheckDeviceExtensionsSupport(const VkPhysicalDeviceSetupData& Data, const char** ExtensionsToCheck,
+		uint32_t ExtensionsToCheckSize);
+	
+	// MainInstance
+	bool InitMainInstance(MainInstance& Instance, bool IsValidationLayersEnabled);
+	void DeinitMainInstance(MainInstance& Instance);
+
+	// VulkanRenderInstance
 	bool InitVulkanRenderInstance(VulkanRenderInstance& RenderInstance, VkInstance VulkanInstance, GLFWwindow* Window);
 	bool LoadMesh(VulkanRenderInstance& RenderInstance, Mesh Mesh);
 	bool Draw(VulkanRenderInstance& RenderInstance);
@@ -226,24 +224,4 @@ namespace Core
 	void CreateTexture(VulkanRenderInstance& RenderInstance, stbi_uc* TextureData, int Width, int Height, VkDeviceSize ImageSize);
 	bool AddViewport(VulkanRenderInstance& RenderInstance, GLFWwindow* Window);
 	void RemoveViewport(VulkanRenderInstance& RenderInstance, GLFWwindow* Window);
-
-	bool InitViewport(const VulkanRenderInstance& RenderInstance, GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstence* OutViewport);
-	void DeinitViewport(const VulkanRenderInstance& RenderInstance, ViewportInstence* Viewport);
-
-	bool CreateGenericBuffer(const VulkanRenderInstance& RenderInstance, VkDeviceSize BufferSize,
-		VkBufferUsageFlags BufferUsage, VkMemoryPropertyFlags BufferProperties, GenericBuffer& OutBuffer);
-	void DestroyGenericBuffer(const VulkanRenderInstance& RenderInstance, GenericBuffer& Buffer);
-	// Todo: Refactor CopyBuffer and CopyBufferToImage?
-	void CopyBuffer(const VulkanRenderInstance& RenderInstance, VkBuffer SourceBuffer,
-		VkBuffer DstinationBuffer, VkDeviceSize BufferSize);
-	void CopyBufferToImage(const VulkanRenderInstance& RenderInstance, VkBuffer SourceBuffer,
-		VkImage Image, uint32_t Width, uint32_t Height);
-
-	VkImage CreateImage(const VulkanRenderInstance& RenderInstance, uint32_t Width, uint32_t Height,
-		VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags,
-		VkDeviceMemory* OutImageMemory);
-
-	uint32_t FindMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, uint32_t AllowedTypes, VkMemoryPropertyFlags Properties);
-
-	VkImageView CreateImageView(const VulkanRenderInstance& RenderInstance, VkImage Image, VkFormat Format, VkImageAspectFlags AspectFlags);
 }
