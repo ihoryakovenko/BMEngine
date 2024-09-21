@@ -8,43 +8,53 @@
 
 namespace Core
 {
-	// Deinit if InitVkInstanceCreateInfoSetupData returns true
-	struct VkInstanceCreateInfoSetupData
+	struct RequiredInstanceExtensionsData
 	{
-		uint32_t RequiredExtensionsCount = 0;
-		const char** RequiredInstanceExtensions = nullptr;
-
-		const char** RequiredAndValidationExtensions = nullptr;
-		uint32_t RequiredAndValidationExtensionsCount = 0;
-
-		uint32_t AvalibleExtensionsCount = 0;
-		VkExtensionProperties* AvalibleExtensions = nullptr;
-
-		uint32_t AvalibleValidationLayersCount = 0;
-		VkLayerProperties* AvalibleValidationLayers = nullptr;
+		uint32_t Count = 0;
+		const char** Extensions = nullptr;
+		uint32_t ValidationExtensionsCount = 0;
 	};
 
-	// Deinit if InitVkPhysicalDeviceSetupData returns true
-	struct VkPhysicalDeviceSetupData
+	struct ExtensionPropertiesData
 	{
-		uint32_t AvalibleDeviceExtensionsCount = 0;
-		VkExtensionProperties* AvalibleDeviceExtensions = nullptr;
+		uint32_t Count = 0;
+		VkExtensionProperties* ExtensionProperties = nullptr;
+	};
 
-		uint32_t FamilyPropertiesCount = 0;
-		VkQueueFamilyProperties* FamilyProperties = nullptr;
+	struct AvailableInstanceLayerPropertiesData
+	{
+		uint32_t Count = 0;
+		VkLayerProperties* Properties = nullptr;
+	};
 
-		uint32_t SurfaceFormatsCount = 0;
+	struct QueueFamilyPropertiesData
+	{
+		uint32_t Count = 0;
+		VkQueueFamilyProperties* Properties = nullptr;
+	};
+
+	struct SurfaceFormatsData
+	{
+		uint32_t Count = 0;
 		VkSurfaceFormatKHR* SurfaceFormats = nullptr;
+	};
 
-		uint32_t PresentModesCount = 0;
+	struct PresentModeData
+	{
+		uint32_t Count = 0;
 		VkPresentModeKHR* PresentModes = nullptr;
 	};
+
 
 	struct PhysicalDeviceIndices
 	{
 		int GraphicsFamily = -1;
 		int PresentationFamily = -1;
 	};
+
+	 
+
+
 
 	struct Vertex
 	{
@@ -198,23 +208,51 @@ namespace Core
 		ImageBuffer TextureImageBuffer[64];
 	};
 
-	// VkInstanceCreateInfoSetupData
-	bool InitVkInstanceCreateInfoSetupData(VkInstanceCreateInfoSetupData& Data,
-		const char** ValidationExtensions, uint32_t ValidationExtensionsSize, bool EnumerateInstanceLayerProperties);
-	void DeinitVkInstanceCreateInfoSetupData(VkInstanceCreateInfoSetupData& Data);
-	bool CheckRequiredInstanceExtensionsSupport(const VkInstanceCreateInfoSetupData& Data);
-	bool CheckValidationLayersSupport(const VkInstanceCreateInfoSetupData& Data, const char** ValidationLeyersToCheck,
-		uint32_t ValidationLeyersToCheckSize);
+	RequiredInstanceExtensionsData CreateRequiredInstanceExtensionsData(const char** ValidationExtensions, uint32_t ValidationExtensionsCount);
+	void DestroyRequiredInstanceExtensionsData(RequiredInstanceExtensionsData& Data);
 
-	// VkPhysicalDeviceSetupData
-	bool InitVkPhysicalDeviceSetupData(VkPhysicalDeviceSetupData& Data, VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
-	void DeinitVkPhysicalDeviceSetupData(VkPhysicalDeviceSetupData& Data);
-	bool CheckDeviceExtensionsSupport(const VkPhysicalDeviceSetupData& Data, const char** ExtensionsToCheck,
+	ExtensionPropertiesData CreateAvailableExtensionPropertiesData();
+	ExtensionPropertiesData CreateDeviceExtensionPropertiesData(VkPhysicalDevice PhysicalDevice);
+	void DestroyExtensionPropertiesData(ExtensionPropertiesData& Data);
+
+	AvailableInstanceLayerPropertiesData CreateAvailableInstanceLayerPropertiesData();
+	void DestroyAvailableInstanceLayerPropertiesData(AvailableInstanceLayerPropertiesData& Data);
+
+	QueueFamilyPropertiesData CreateQueueFamilyPropertiesData(VkPhysicalDevice PhysicalDevice);
+	void DestroyQueueFamilyPropertiesData(QueueFamilyPropertiesData& Data);
+
+	SurfaceFormatsData CreateSurfaceFormatsData(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
+	void DestroySurfaceFormatsData(SurfaceFormatsData& Data);
+
+	PresentModeData CreatePresentModeData(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
+	void DestroyPresentModeData(PresentModeData& Data);
+
+
+
+	MainInstance CreateMainInstance(RequiredInstanceExtensionsData RequiredExtensions,
+		bool IsValidationLayersEnabled, const char* ValidationLayers[], uint32_t ValidationLayersSize);
+	void DestroyMainInstance(MainInstance& Instance);
+
+
+
+
+	PhysicalDeviceIndices GetPhysicalDeviceIndices(QueueFamilyPropertiesData Data, VkPhysicalDevice PhysicalDevice,
+		VkSurfaceKHR Surface);
+
+
+	bool CheckRequiredInstanceExtensionsSupport(ExtensionPropertiesData AvailableExtensions,
+		RequiredInstanceExtensionsData RequiredExtensions);
+	bool CheckValidationLayersSupport(AvailableInstanceLayerPropertiesData& Data,
+		const char** ValidationLeyersToCheck, uint32_t ValidationLeyersToCheckSize);
+	bool CheckDeviceExtensionsSupport(ExtensionPropertiesData Data, const char** ExtensionsToCheck,
 		uint32_t ExtensionsToCheckSize);
-	
-	// MainInstance
-	bool InitMainInstance(MainInstance& Instance, bool IsValidationLayersEnabled);
-	void DeinitMainInstance(MainInstance& Instance);
+
+
+
+
+
+
+
 
 	// VulkanRenderInstance
 	bool InitVulkanRenderInstance(VulkanRenderInstance& RenderInstance, VkInstance VulkanInstance, GLFWwindow* Window);

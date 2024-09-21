@@ -17,7 +17,7 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "Core/VulkanCoreTypes.h"
+#include "Core/VulkanRenderingSystem.h"
 
 #include <tiny_obj_loader.h>
 
@@ -105,11 +105,11 @@ int main()
 		return -1;
 	}
 
-	Core::MainInstance Instance;
-	Core::InitMainInstance(Instance, Util::EnableValidationLayers);
+	Core::VulkanRenderingSystem RenderingSystem;
+	RenderingSystem.Init();
 
 	
-	Core::InitVulkanRenderInstance(RenderInstance, Instance.VulkanInstance, Window);
+	Core::InitVulkanRenderInstance(RenderInstance, RenderingSystem.Instance.VulkanInstance, Window);
 
 	RenderInstance.Viewports[0]->ViewProjection.Projection = glm::perspective(glm::radians(45.f),
 		static_cast<float>(RenderInstance.Viewports[0]->SwapExtent.width) / static_cast<float>(RenderInstance.Viewports[0]->SwapExtent.height), 0.1f, 100.0f);
@@ -309,7 +309,9 @@ int main()
 	}
 
 	Core::DeinitVulkanRenderInstance(RenderInstance);
-	Core::DeinitMainInstance(Instance);
+
+	RenderingSystem.DeInit();
+
 
 	glfwDestroyWindow(Window);
 

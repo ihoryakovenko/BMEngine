@@ -1,14 +1,360 @@
 #include "VulkanCoreTypes.h"
 
 #include "Util/Util.h"
+
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
 
 namespace Core
 {
-	PhysicalDeviceIndices GetPhysicalDeviceIndices(const VkPhysicalDeviceSetupData& Data, VkPhysicalDevice PhysicalDevice,
-		VkSurfaceKHR Surface);
+	RequiredInstanceExtensionsData Core::CreateRequiredInstanceExtensionsData(const char** ValidationExtensions,
+		uint32_t ValidationExtensionsCount)
+	{
+		uint32_t RequiredExtensionsCount = 0;
+		const char** RequiredInstanceExtensions = glfwGetRequiredInstanceExtensions(&RequiredExtensionsCount);
+		if (RequiredExtensionsCount == 0)
+		{
+			Util::Log().GlfwLogError();
+			assert(false);
+		}
+
+		RequiredInstanceExtensionsData Data;
+		Data.ValidationExtensionsCount = ValidationExtensionsCount;
+		Data.Count = RequiredExtensionsCount + Data.ValidationExtensionsCount;
+
+		if (Data.ValidationExtensionsCount == 0)
+		{
+			Data.Extensions = RequiredInstanceExtensions;
+			return Data;
+		}
+
+		Data.Extensions = static_cast<const char**>(Util::Memory::Allocate(Data.Count * sizeof(const char**)));
+
+		for (uint32_t i = 0; i < RequiredExtensionsCount; ++i)
+		{
+			Data.Extensions[i] = RequiredInstanceExtensions[i];
+			Util::Log().Info("Requested {} extension", Data.Extensions[i]);
+		}
+
+		for (uint32_t i = 0; i < Data.ValidationExtensionsCount; ++i)
+		{
+			Data.Extensions[i + RequiredExtensionsCount] = ValidationExtensions[i];
+			Util::Log().Info("Requested {} extension", Data.Extensions[i]);
+		}
+
+		return Data;
+	}
+
+	void Core::DestroyRequiredInstanceExtensionsData(RequiredInstanceExtensionsData& Data)
+	{
+		if (Data.ValidationExtensionsCount > 0)
+		{
+			Util::Memory::Deallocate(Data.Extensions);
+		}
+	}
+
+	ExtensionPropertiesData Core::CreateAvailableExtensionPropertiesData()
+	{
+		ExtensionPropertiesData Data;
+
+		const VkResult Result = vkEnumerateInstanceExtensionProperties(nullptr, &Data.Count, nullptr);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkEnumerateInstanceExtensionProperties result is {}", static_cast<int>(Result));
+			assert(false);
+		}
+
+		Data.ExtensionProperties = static_cast<VkExtensionProperties*>(Util::Memory::Allocate(Data.Count * sizeof(VkExtensionProperties)));
+		vkEnumerateInstanceExtensionProperties(nullptr, &Data.Count, Data.ExtensionProperties);
+
+		return Data;
+	}
+
+	ExtensionPropertiesData CreateDeviceExtensionPropertiesData(VkPhysicalDevice PhysicalDevice)
+	{
+		ExtensionPropertiesData Data;
+
+		const VkResult Result = vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &Data.Count, nullptr);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkEnumerateDeviceExtensionProperties result is {}", static_cast<int>(Result));
+			assert(false);
+		}
+
+		Data.ExtensionProperties = static_cast<VkExtensionProperties*>(Util::Memory::Allocate(Data.Count * sizeof(VkExtensionProperties)));
+		vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &Data.Count, Data.ExtensionProperties);
+
+		return Data;
+	}
+
+	void Core::DestroyExtensionPropertiesData(Core::ExtensionPropertiesData& Data)
+	{
+		Util::Memory::Deallocate(Data.ExtensionProperties);
+	}
+
+	AvailableInstanceLayerPropertiesData Core::CreateAvailableInstanceLayerPropertiesData()
+	{
+		AvailableInstanceLayerPropertiesData Data;
+
+		const VkResult Result = vkEnumerateInstanceLayerProperties(&Data.Count, nullptr);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkEnumerateInstanceLayerProperties result is {}", static_cast<int>(Result));
+			assert(false);
+		}
+
+		Data.Properties = static_cast<VkLayerProperties*>(Util::Memory::Allocate(Data.Count * sizeof(VkLayerProperties)));
+		vkEnumerateInstanceLayerProperties(&Data.Count, Data.Properties);
+
+		return Data;
+	}
+
+	void Core::DestroyAvailableInstanceLayerPropertiesData(AvailableInstanceLayerPropertiesData& Data)
+	{
+		Util::Memory::Deallocate(Data.Properties);
+	}
+
+	QueueFamilyPropertiesData CreateQueueFamilyPropertiesData(VkPhysicalDevice PhysicalDevice)
+	{
+		QueueFamilyPropertiesData Data;
+		vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &Data.Count, nullptr);
+		Data.Properties = static_cast<VkQueueFamilyProperties*>(Util::Memory::Allocate(Data.Count * sizeof(VkQueueFamilyProperties)));
+		vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &Data.Count, Data.Properties);
+		return Data;
+	}
+
+	void DestroyQueueFamilyPropertiesData(QueueFamilyPropertiesData& Data)
+	{
+		Util::Memory::Deallocate(Data.Properties);
+	}
+
+	SurfaceFormatsData CreateSurfaceFormatsData(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
+	{
+		SurfaceFormatsData Data;
+
+		const VkResult Result = vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, Surface, &Data.Count, nullptr);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkGetPhysicalDeviceSurfaceFormatsKHR result is {}", static_cast<int>(Result));
+			assert(false);
+		}
+
+		Data.SurfaceFormats = static_cast<VkSurfaceFormatKHR*>(Util::Memory::Allocate(Data.Count * sizeof(VkSurfaceFormatKHR)));
+		vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, Surface, &Data.Count, Data.SurfaceFormats);
+		
+		return Data;
+	}
+
+	void DestroySurfaceFormatsData(SurfaceFormatsData& Data)
+	{
+		Util::Memory::Deallocate(Data.SurfaceFormats);
+	}
+
+	PresentModeData CreatePresentModeData(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
+	{
+		PresentModeData Data;
+
+		const VkResult Result = vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Data.Count, nullptr);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkGetPhysicalDeviceSurfacePresentModesKHR result is {}", static_cast<int>(Result));
+			assert(false);
+		}
+
+		Data.PresentModes = static_cast<VkPresentModeKHR*>(Util::Memory::Allocate(Data.Count * sizeof(VkPresentModeKHR)));
+		vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Data.Count, Data.PresentModes);
+
+		return Data;
+	}
+
+	void DestroyPresentModeData(PresentModeData& Data)
+	{
+		Util::Memory::Deallocate(Data.PresentModes);
+	}
+
+	bool Core::CheckRequiredInstanceExtensionsSupport(ExtensionPropertiesData AvailableExtensions, RequiredInstanceExtensionsData RequiredExtensions)
+	{
+		for (uint32_t i = 0; i < RequiredExtensions.Count; ++i)
+		{
+			bool IsExtensionSupported = false;
+			for (uint32_t j = 0; j < AvailableExtensions.Count; ++j)
+			{
+				if (std::strcmp(RequiredExtensions.Extensions[i], AvailableExtensions.ExtensionProperties[j].extensionName) == 0)
+				{
+					IsExtensionSupported = true;
+					break;
+				}
+			}
+
+			if (!IsExtensionSupported)
+			{
+				Util::Log().Error("Extension {} unsupported", RequiredExtensions.Extensions[i]);
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	bool Core::CheckValidationLayersSupport(AvailableInstanceLayerPropertiesData& Data, const char** ValidationLeyersToCheck, uint32_t ValidationLeyersToCheckSize)
+	{
+		for (uint32_t i = 0; i < ValidationLeyersToCheckSize; ++i)
+		{
+			bool IsLayerAvalible = false;
+			for (uint32_t j = 0; j < Data.Count; ++j)
+			{
+				if (std::strcmp(ValidationLeyersToCheck[i], Data.Properties[j].layerName) == 0)
+				{
+					IsLayerAvalible = true;
+					break;
+				}
+			}
+
+			if (!IsLayerAvalible)
+			{
+				Util::Log().Error("Validation layer {} unsupported", ValidationLeyersToCheck[i]);
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	MainInstance CreateMainInstance(RequiredInstanceExtensionsData RequiredExtensions,
+		bool IsValidationLayersEnabled, const char* ValidationLayers[], uint32_t ValidationLayersSize)
+	{
+		VkApplicationInfo ApplicationInfo = { };
+		ApplicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+		ApplicationInfo.pApplicationName = "Blank App";
+		ApplicationInfo.applicationVersion = VK_MAKE_VERSION(0, 1, 0); // todo set from settings
+		ApplicationInfo.pEngineName = "BMEngine";
+		ApplicationInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0); // todo set from settings
+		ApplicationInfo.apiVersion = VK_API_VERSION_1_3;
+
+		VkInstanceCreateInfo CreateInfo = { };
+		CreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+		CreateInfo.pApplicationInfo = &ApplicationInfo;
+
+		VkDebugUtilsMessengerCreateInfoEXT MessengerCreateInfo = { };
+		CreateInfo.enabledExtensionCount = RequiredExtensions.Count;
+		CreateInfo.ppEnabledExtensionNames = RequiredExtensions.Extensions;
+
+		if (IsValidationLayersEnabled)
+		{
+			MessengerCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+			MessengerCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
+				| VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+
+			MessengerCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
+				| VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+
+			MessengerCreateInfo.pfnUserCallback = Util::MessengerDebugCallback;
+			MessengerCreateInfo.pUserData = nullptr;
+
+			CreateInfo.pNext = &MessengerCreateInfo;
+			CreateInfo.enabledLayerCount = ValidationLayersSize;
+			CreateInfo.ppEnabledLayerNames = ValidationLayers;
+		}
+		else
+		{
+			CreateInfo.ppEnabledLayerNames = nullptr;
+			CreateInfo.enabledLayerCount = 0;
+			CreateInfo.pNext = nullptr;
+		}
+
+		MainInstance Instance;
+		VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &Instance.VulkanInstance);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkCreateInstance result is {}", static_cast<int>(Result));
+			assert(false);
+		}
+
+		if (IsValidationLayersEnabled)
+		{
+			const bool Result = Util::CreateDebugUtilsMessengerEXT(Instance.VulkanInstance, &MessengerCreateInfo, nullptr, &Instance.DebugMessenger);
+			assert(Result);
+		}
+
+		return Instance;
+	}
+
+	void DestroyMainInstance(MainInstance& Instance)
+	{
+		if (Instance.DebugMessenger != nullptr)
+		{
+			Util::DestroyDebugMessenger(Instance.VulkanInstance, Instance.DebugMessenger, nullptr);
+		}
+
+		vkDestroyInstance(Instance.VulkanInstance, nullptr);
+	}
+
+	bool CheckDeviceExtensionsSupport(ExtensionPropertiesData Data, const char** ExtensionsToCheck, uint32_t ExtensionsToCheckSize)
+	{
+		for (uint32_t i = 0; i < ExtensionsToCheckSize; ++i)
+		{
+			bool IsDeviceExtensionSupported = false;
+			for (uint32_t j = 0; j < Data.Count; ++j)
+			{
+				if (std::strcmp(ExtensionsToCheck[i], Data.ExtensionProperties[j].extensionName) == 0)
+				{
+					IsDeviceExtensionSupported = true;
+					break;
+				}
+			}
+
+			if (!IsDeviceExtensionSupported)
+			{
+				Util::Log().Error("Device extension {} unsupported", ExtensionsToCheck[i]);
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	// TODO check function
+	// In current realization if GraphicsFamily is valid but if PresentationFamily is not valid
+	// GraphicsFamily could be overridden on next iteration even when it is valid
+	PhysicalDeviceIndices GetPhysicalDeviceIndices(QueueFamilyPropertiesData Data, VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
+	{
+		PhysicalDeviceIndices Indices;
+
+		for (uint32_t i = 0; i < Data.Count; ++i)
+		{
+			// check if Queue is graphics type
+			if (Data.Properties[i].queueCount > 0 && Data.Properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			{
+				// if we QueueFamily[i] graphics type but not presentation type
+				// and QueueFamily[i + 1] graphics type and presentation type
+				// then we rewrite GraphicsFamily
+				// toto check what is better rewrite or have different QueueFamilys
+				Indices.GraphicsFamily = i;
+			}
+
+			// check if Queue is presentation type (can be graphics and presentation)
+			VkBool32 PresentationSupport = false;
+			vkGetPhysicalDeviceSurfaceSupportKHR(PhysicalDevice, i, Surface, &PresentationSupport);
+			if (Data.Properties[i].queueCount > 0 && PresentationSupport)
+			{
+				Indices.PresentationFamily = i;
+			}
+
+			if (Indices.GraphicsFamily >= 0 && Indices.PresentationFamily >= 0)
+			{
+				break;
+			}
+		}
+
+		return Indices;
+	}
+
+
+
+
+
+
 
 	bool InitViewport(const VulkanRenderInstance& RenderInstance, GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstence* OutViewport);
 	void DeinitViewport(const VulkanRenderInstance& RenderInstance, ViewportInstence* Viewport);
@@ -30,224 +376,9 @@ namespace Core
 
 	VkImageView CreateImageView(const VulkanRenderInstance& RenderInstance, VkImage Image, VkFormat Format, VkImageAspectFlags AspectFlags);
 
-	bool InitVkInstanceCreateInfoSetupData(VkInstanceCreateInfoSetupData& Data, const char** ValidationExtensions,
-		uint32_t ValidationExtensionsCount, bool EnumerateInstanceLayerProperties)
-	{
-		// Get count part
-		const char** RequiredInstanceExtensions = glfwGetRequiredInstanceExtensions(&Data.RequiredExtensionsCount);
-		if (Data.RequiredExtensionsCount == 0)
-		{
-			Util::Log().GlfwLogError();
-			return false;
-		}
 
-		VkResult Result = vkEnumerateInstanceExtensionProperties(nullptr, &Data.AvalibleExtensionsCount, nullptr);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkEnumerateInstanceExtensionProperties result is {}", static_cast<int>(Result));
-			return false;
-		}
 
-		if (EnumerateInstanceLayerProperties)
-		{
-			Result = vkEnumerateInstanceLayerProperties(&Data.AvalibleValidationLayersCount, nullptr);
-			if (Result != VK_SUCCESS)
-			{
-				Util::Log().Error("vkEnumerateInstanceLayerProperties result is {}", static_cast<int>(Result));
-				return false;
-			}
-		}
 
-		// Allocation part
-		Data.RequiredAndValidationExtensions = static_cast<const char**>(Util::Memory::Allocate((ValidationExtensionsCount + Data.RequiredExtensionsCount) * sizeof(const char**)));
-		Data.AvalibleExtensions = static_cast<VkExtensionProperties*>(Util::Memory::Allocate(Data.AvalibleExtensionsCount * sizeof(VkExtensionProperties)));
-		Data.AvalibleValidationLayers = static_cast<VkLayerProperties*>(Util::Memory::Allocate(Data.AvalibleValidationLayersCount * sizeof(VkLayerProperties)));
-
-		// Data structuring part
-		Data.RequiredAndValidationExtensionsCount = Data.RequiredExtensionsCount + ValidationExtensionsCount;
-		Data.RequiredInstanceExtensions = Data.RequiredAndValidationExtensions + ValidationExtensionsCount;
-
-		// Data assignment part
-		for (uint32_t i = 0; i < ValidationExtensionsCount; ++i)
-		{
-			Data.RequiredAndValidationExtensions[i] = ValidationExtensions[i];
-		}
-
-		for (uint32_t i = 0; i < Data.RequiredExtensionsCount; ++i)
-		{
-			Data.RequiredInstanceExtensions[i] = RequiredInstanceExtensions[i];
-		}
-
-		vkEnumerateInstanceExtensionProperties(nullptr, &Data.AvalibleExtensionsCount, Data.AvalibleExtensions);
-		vkEnumerateInstanceLayerProperties(&Data.AvalibleValidationLayersCount, Data.AvalibleValidationLayers);
-
-		return true;
-	}
-
-	void DeinitVkInstanceCreateInfoSetupData(VkInstanceCreateInfoSetupData& Data)
-	{
-		Util::Memory::Deallocate(Data.RequiredAndValidationExtensions);
-		Util::Memory::Deallocate(Data.AvalibleExtensions);
-		Util::Memory::Deallocate(Data.AvalibleValidationLayers);
-	}
-
-	bool CheckRequiredInstanceExtensionsSupport(const VkInstanceCreateInfoSetupData& Data)
-	{
-		for (uint32_t i = 0; i < Data.RequiredAndValidationExtensionsCount; ++i)
-		{
-			bool IsExtensionSupported = false;
-			for (uint32_t j = 0; j < Data.AvalibleExtensionsCount; ++j)
-			{
-				if (std::strcmp(Data.RequiredAndValidationExtensions[i], Data.AvalibleExtensions[j].extensionName) == 0)
-				{
-					IsExtensionSupported = true;
-					break;
-				}
-			}
-
-			if (!IsExtensionSupported)
-			{
-				Util::Log().Error("Extension {} unsupported", Data.RequiredAndValidationExtensions[i]);
-				return false;
-			}
-		}
-
-		return true;
-	}
-
-	bool CheckValidationLayersSupport(const VkInstanceCreateInfoSetupData& Data, const char** ValidationLeyersToCheck,
-		uint32_t ValidationLeyersToCheckSize)
-	{
-		for (uint32_t i = 0; i < ValidationLeyersToCheckSize; ++i)
-		{
-			bool IsLayerAvalible = false;
-			for (uint32_t j = 0; j < Data.AvalibleValidationLayersCount; ++j)
-			{
-				if (std::strcmp(ValidationLeyersToCheck[i], Data.AvalibleValidationLayers[j].layerName) == 0)
-				{
-					IsLayerAvalible = true;
-					break;
-				}
-			}
-
-			if (!IsLayerAvalible)
-			{
-				Util::Log().Error("Validation layer {} unsupported", ValidationLeyersToCheck[i]);
-				return false;
-			}
-		}
-
-		return true;
-	}
-
-	bool InitVkPhysicalDeviceSetupData(VkPhysicalDeviceSetupData& Data, VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
-	{
-		// Get count part
-		VkResult Result = vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &Data.AvalibleDeviceExtensionsCount, nullptr);
-		if (Data.AvalibleDeviceExtensionsCount == 0)
-		{
-			Util::Log().Error("vkEnumerateDeviceExtensionProperties result is {}", static_cast<int>(Result));
-			return false;
-		}
-
-		vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &Data.FamilyPropertiesCount, nullptr);
-
-		Result = vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, Surface, &Data.SurfaceFormatsCount, nullptr);
-		if (Data.SurfaceFormatsCount == 0)
-		{
-			Util::Log().Error("vkGetPhysicalDeviceSurfaceFormatsKHR result is {}", static_cast<int>(Result));
-			return false;
-		}
-
-		Result = vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Data.PresentModesCount, nullptr);
-		if (Data.PresentModesCount == 0)
-		{
-			Util::Log().Error("vkGetPhysicalDeviceSurfacePresentModesKHR result is {}", static_cast<int>(Result));
-			return false;
-		}
-
-		// Allocation part
-		Data.AvalibleDeviceExtensions = static_cast<VkExtensionProperties*>(Util::Memory::Allocate(Data.AvalibleDeviceExtensionsCount * sizeof(VkExtensionProperties)));
-		Data.FamilyProperties = static_cast<VkQueueFamilyProperties*>(Util::Memory::Allocate(Data.FamilyPropertiesCount * sizeof(VkQueueFamilyProperties)));
-		Data.SurfaceFormats = static_cast<VkSurfaceFormatKHR*>(Util::Memory::Allocate(Data.SurfaceFormatsCount * sizeof(VkSurfaceFormatKHR)));
-		Data.PresentModes = static_cast<VkPresentModeKHR*>(Util::Memory::Allocate(Data.PresentModesCount * sizeof(VkPresentModeKHR)));
-
-		// Data assignment part
-		vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &Data.AvalibleDeviceExtensionsCount, Data.AvalibleDeviceExtensions);
-		vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &Data.FamilyPropertiesCount, Data.FamilyProperties);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, Surface, &Data.SurfaceFormatsCount, Data.SurfaceFormats);
-		vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Data.PresentModesCount, Data.PresentModes);
-
-		return true;
-	}
-
-	void DeinitVkPhysicalDeviceSetupData(VkPhysicalDeviceSetupData& Data)
-	{
-		Util::Memory::Deallocate(Data.AvalibleDeviceExtensions);
-		Util::Memory::Deallocate(Data.FamilyProperties);
-		Util::Memory::Deallocate(Data.SurfaceFormats);
-		Util::Memory::Deallocate(Data.PresentModes);
-	}
-
-	bool CheckDeviceExtensionsSupport(const VkPhysicalDeviceSetupData& Data, const char** ExtensionsToCheck, uint32_t ExtensionsToCheckSize)
-	{
-		for (uint32_t i = 0; i < ExtensionsToCheckSize; ++i)
-		{
-			bool IsDeviceExtensionSupported = false;
-			for (uint32_t j = 0; j < Data.AvalibleDeviceExtensionsCount; ++j)
-			{
-				if (std::strcmp(ExtensionsToCheck[i], Data.AvalibleDeviceExtensions[j].extensionName) == 0)
-				{
-					IsDeviceExtensionSupported = true;
-					break;
-				}
-			}
-
-			if (!IsDeviceExtensionSupported)
-			{
-				Util::Log().Error("Device extension {} unsupported", ExtensionsToCheck[i]);
-				return false;
-			}
-		}
-
-		return true;
-	}
-
-	// TODO check function
-	// In current realization if GraphicsFamily is valid but if PresentationFamily is not valid
-	// GraphicsFamily could be overridden on next iteration even when it is valid
-	PhysicalDeviceIndices GetPhysicalDeviceIndices(const VkPhysicalDeviceSetupData& Data, VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
-	{
-		PhysicalDeviceIndices Indices;
-
-		for (uint32_t i = 0; i < Data.FamilyPropertiesCount; ++i)
-		{
-			// check if Queue is graphics type
-			if (Data.FamilyProperties[i].queueCount > 0 && Data.FamilyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
-			{
-				// if we QueueFamily[i] graphics type but not presentation type
-				// and QueueFamily[i + 1] graphics type and presentation type
-				// then we rewrite GraphicsFamily
-				// toto check what is better rewrite or have different QueueFamilys
-				Indices.GraphicsFamily = i;
-			}
-
-			// check if Queue is presentation type (can be graphics and presentation)
-			VkBool32 PresentationSupport = false;
-			vkGetPhysicalDeviceSurfaceSupportKHR(PhysicalDevice, i, Surface, &PresentationSupport);
-			if (Data.FamilyProperties[i].queueCount > 0 && PresentationSupport)
-			{
-				Indices.PresentationFamily = i;
-			}
-
-			if (Indices.GraphicsFamily >= 0 && Indices.PresentationFamily >= 0)
-			{
-				break;
-			}
-		}
-
-		return Indices;
-	}
 
 	bool CreateGenericBuffer(const VulkanRenderInstance& RenderInstance, VkDeviceSize BufferSize,
 		VkBufferUsageFlags BufferUsage, VkMemoryPropertyFlags BufferProperties, GenericBuffer& OutBuffer)
@@ -639,102 +770,7 @@ namespace Core
 		return Image;
 	}
 
-	bool InitMainInstance(MainInstance& Instance, bool IsValidationLayersEnabled)
-	{
-		const char* ValidationExtensions[] = {
-		VK_EXT_DEBUG_UTILS_EXTENSION_NAME
-		};
-
-		const uint32_t ValidationExtensionsSize = IsValidationLayersEnabled ? sizeof(ValidationExtensions) / sizeof(ValidationExtensions[0]) : 0;
-
-		Core::VkInstanceCreateInfoSetupData InstanceCreateInfoData;
-		if (!Core::InitVkInstanceCreateInfoSetupData(InstanceCreateInfoData, ValidationExtensions, ValidationExtensionsSize, IsValidationLayersEnabled))
-		{
-			return false;
-		}
-
-		if (!Core::CheckRequiredInstanceExtensionsSupport(InstanceCreateInfoData))
-		{
-			Core::DeinitVkInstanceCreateInfoSetupData(InstanceCreateInfoData);
-			return false;
-		}
-
-		VkApplicationInfo ApplicationInfo = { };
-		ApplicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-		ApplicationInfo.pApplicationName = "Blank App";
-		ApplicationInfo.applicationVersion = VK_MAKE_VERSION(0, 1, 0); // todo set from settings
-		ApplicationInfo.pEngineName = "BMEngine";
-		ApplicationInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0); // todo set from settings
-		ApplicationInfo.apiVersion = VK_API_VERSION_1_3;
-
-		VkInstanceCreateInfo CreateInfo = { };
-		CreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-		CreateInfo.pApplicationInfo = &ApplicationInfo;
-
-		VkDebugUtilsMessengerCreateInfoEXT MessengerCreateInfo = { };
-
-		if (IsValidationLayersEnabled)
-		{
-			MessengerCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-			MessengerCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
-				| VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-
-			MessengerCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
-				| VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-
-			MessengerCreateInfo.pfnUserCallback = Util::MessengerDebugCallback;
-			MessengerCreateInfo.pUserData = nullptr;
-
-			const char* ValidationLayers[] = {
-				"VK_LAYER_KHRONOS_validation"
-			};
-			const uint32_t ValidationLayersSize = sizeof(ValidationLayers) / sizeof(ValidationLayers[0]);
-
-			Core::CheckValidationLayersSupport(InstanceCreateInfoData, ValidationLayers, ValidationLayersSize);
-
-			CreateInfo.enabledExtensionCount = InstanceCreateInfoData.RequiredAndValidationExtensionsCount;
-			CreateInfo.ppEnabledExtensionNames = InstanceCreateInfoData.RequiredAndValidationExtensions;
-			CreateInfo.pNext = &MessengerCreateInfo;
-			CreateInfo.enabledLayerCount = ValidationLayersSize;
-			CreateInfo.ppEnabledLayerNames = ValidationLayers;
-		}
-		else
-		{
-			CreateInfo.enabledExtensionCount = InstanceCreateInfoData.RequiredExtensionsCount;
-			CreateInfo.ppEnabledExtensionNames = InstanceCreateInfoData.RequiredInstanceExtensions;
-			CreateInfo.ppEnabledLayerNames = nullptr;
-			CreateInfo.enabledLayerCount = 0;
-			CreateInfo.pNext = nullptr;
-		}
-
-		VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &Instance.VulkanInstance);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkCreateInstance result is {}", static_cast<int>(Result));
-			Core::DeinitVkInstanceCreateInfoSetupData(InstanceCreateInfoData);
-
-			return false;
-		}
-
-		Core::DeinitVkInstanceCreateInfoSetupData(InstanceCreateInfoData);
-
-		if (IsValidationLayersEnabled)
-		{
-			Util::CreateDebugUtilsMessengerEXT(Instance.VulkanInstance, &MessengerCreateInfo, nullptr, &Instance.DebugMessenger);
-		}
-
-		return true;
-	}
-
-	void DeinitMainInstance(MainInstance& Instance)
-	{
-		if (Instance.DebugMessenger != nullptr)
-		{
-			Util::DestroyDebugMessenger(Instance.VulkanInstance, Instance.DebugMessenger, nullptr);
-		}
-
-		vkDestroyInstance(Instance.VulkanInstance, nullptr);
-	}
+	
 
 	bool InitVulkanRenderInstance(VulkanRenderInstance& RenderInstance, VkInstance VulkanInstance, GLFWwindow* Window)
 	{
@@ -754,8 +790,6 @@ namespace Core
 		VkPhysicalDevice* DeviceList = static_cast<VkPhysicalDevice*>(Util::Memory::Allocate(DevicesCount * sizeof(VkPhysicalDevice)));
 		vkEnumeratePhysicalDevices(RenderInstance.VulkanInstance, &DevicesCount, DeviceList);
 
-		VkPhysicalDeviceSetupData VkPhysicalDeviceSetupData;
-
 		const char* DeviceExtensions[] = {
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME
 		};
@@ -763,17 +797,16 @@ namespace Core
 
 		for (uint32_t i = 0; i < DevicesCount; ++i)
 		{
-			if (!Core::InitVkPhysicalDeviceSetupData(VkPhysicalDeviceSetupData, DeviceList[i], Surface))
+			// TODO: delete
+			ExtensionPropertiesData DeviceExtension = CreateDeviceExtensionPropertiesData(DeviceList[i]);
+			if (!Core::CheckDeviceExtensionsSupport(DeviceExtension, DeviceExtensions, DeviceExtensionsSize))
 			{
 				break;
 			}
 
-			if (!Core::CheckDeviceExtensionsSupport(VkPhysicalDeviceSetupData, DeviceExtensions, DeviceExtensionsSize))
-			{
-				break;
-			}
-
-			RenderInstance.PhysicalDeviceIndices = Core::GetPhysicalDeviceIndices(VkPhysicalDeviceSetupData, DeviceList[i], Surface);
+			// TODO: delete
+			QueueFamilyPropertiesData FamilyPropertiesData = CreateQueueFamilyPropertiesData(DeviceList[i]);
+			RenderInstance.PhysicalDeviceIndices = Core::GetPhysicalDeviceIndices(FamilyPropertiesData, DeviceList[i], Surface);
 
 			if (RenderInstance.PhysicalDeviceIndices.GraphicsFamily < 0 || RenderInstance.PhysicalDeviceIndices.PresentationFamily < 0)
 			{
@@ -802,7 +835,6 @@ namespace Core
 
 		if (RenderInstance.PhysicalDevice == nullptr)
 		{
-			Core::DeinitVkPhysicalDeviceSetupData(VkPhysicalDeviceSetupData);
 			Util::Log().Error("No physical devices found");
 			return false;
 		}
@@ -855,15 +887,18 @@ namespace Core
 		// Return most common format
 		RenderInstance.SurfaceFormat = { VK_FORMAT_UNDEFINED, static_cast<VkColorSpaceKHR>(0) };
 		// All formats avalible
-		if (VkPhysicalDeviceSetupData.SurfaceFormatsCount == 1 && VkPhysicalDeviceSetupData.SurfaceFormats[0].format == VK_FORMAT_UNDEFINED)
+
+		// TODO: DELETE
+		SurfaceFormatsData FormatsData = CreateSurfaceFormatsData(RenderInstance.PhysicalDevice, Surface);
+		if (FormatsData.Count == 1 && FormatsData.SurfaceFormats[0].format == VK_FORMAT_UNDEFINED)
 		{
 			RenderInstance.SurfaceFormat = { VK_FORMAT_R8G8B8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
 		}
 		else
 		{
-			for (uint32_t i = 0; i < VkPhysicalDeviceSetupData.SurfaceFormatsCount; ++i)
+			for (uint32_t i = 0; i < FormatsData.Count; ++i)
 			{
-				VkSurfaceFormatKHR Format = VkPhysicalDeviceSetupData.SurfaceFormats[i];
+				VkSurfaceFormatKHR Format = FormatsData.SurfaceFormats[i];
 				if ((Format.format == VK_FORMAT_R8G8B8_UNORM || Format.format == VK_FORMAT_B8G8R8A8_UNORM)
 					&& Format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 				{
@@ -881,16 +916,18 @@ namespace Core
 
 		// Function: GetBestPresentationMode
 		// Optimal presentation mode
+
+		// TODO DELETE
+		PresentModeData PresentMode = CreatePresentModeData(RenderInstance.PhysicalDevice, Surface);
+
 		RenderInstance.PresentationMode = VK_PRESENT_MODE_FIFO_KHR;
-		for (uint32_t i = 0; i < VkPhysicalDeviceSetupData.PresentModesCount; ++i)
+		for (uint32_t i = 0; i < PresentMode.Count; ++i)
 		{
-			if (VkPhysicalDeviceSetupData.PresentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR)
+			if (PresentMode.PresentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR)
 			{
 				RenderInstance.PresentationMode = VK_PRESENT_MODE_MAILBOX_KHR;
 			}
 		}
-
-		Core::DeinitVkPhysicalDeviceSetupData(VkPhysicalDeviceSetupData);
 
 		// Has to be present by spec
 		if (RenderInstance.PresentationMode != VK_PRESENT_MODE_MAILBOX_KHR)
