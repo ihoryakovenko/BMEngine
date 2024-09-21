@@ -6,6 +6,8 @@
 
 #include <stb_image.h>
 
+#include <vector>
+
 namespace Core
 {
 	struct RequiredInstanceExtensionsData
@@ -45,6 +47,11 @@ namespace Core
 		VkPresentModeKHR* PresentModes = nullptr;
 	};
 
+	struct PhysicalDevicesData
+	{
+		uint32_t Count = 0;
+		VkPhysicalDevice* DeviceList = nullptr;
+	};
 
 	struct PhysicalDeviceIndices
 	{
@@ -52,9 +59,12 @@ namespace Core
 		int PresentationFamily = -1;
 	};
 
-	 
-
-
+	struct GPUBuffer
+	{
+		VkBuffer Buffer = 0;
+		VkDeviceMemory Memory = 0;
+		VkDeviceSize Size = 0;
+	};
 
 	struct Vertex
 	{
@@ -72,12 +82,6 @@ namespace Core
 		uint32_t* MeshIndices = nullptr;
 	};
 
-	struct GenericBuffer
-	{
-		VkBuffer Buffer = nullptr;
-		VkDeviceMemory BufferMemory = nullptr;
-	};
-
 	struct ImageBuffer
 	{
 		VkImage TextureImage = nullptr;
@@ -90,10 +94,10 @@ namespace Core
 	struct DrawableObject
 	{
 		uint32_t VerticesCount = 0;
-		GenericBuffer VertexBuffer;
+		GPUBuffer VertexBuffer;
 
 		uint32_t IndicesCount = 0;
-		GenericBuffer IndexBuffer;
+		GPUBuffer IndexBuffer;
 
 		Model Model;
 
@@ -113,7 +117,15 @@ namespace Core
 		VkDebugUtilsMessengerEXT DebugMessenger = nullptr;
 	};
 
-	struct ViewportInstence
+	struct DeviceInstance
+	{
+		VkPhysicalDevice PhysicalDevice = nullptr;
+		PhysicalDeviceIndices Indices;
+		VkPhysicalDeviceProperties Properties;
+		VkPhysicalDeviceFeatures AvailableFeatures;
+	};
+
+	struct ViewportInstance
 	{
 		GLFWwindow* Window = nullptr;
 		VkSurfaceKHR Surface = nullptr;
@@ -137,7 +149,7 @@ namespace Core
 		VkPipeline GraphicsPipeline = nullptr;
 		VkPipeline SecondPipeline = nullptr;
 
-		GenericBuffer* VpUniformBuffers = nullptr;
+		GPUBuffer* VpUniformBuffers = nullptr;
 
 		struct UboViewProjection
 		{
@@ -151,11 +163,10 @@ namespace Core
 		VkInstance VulkanInstance = nullptr;
 
 		uint32_t ViewportsCount = 0;
-		ViewportInstence* Viewports[2];
-		ViewportInstence MainViewport;
+		ViewportInstance* Viewports[2];
+		ViewportInstance MainViewport;
 
-		VkPhysicalDeviceProperties PhysicalDeviceProperties;
-		VkPhysicalDevice PhysicalDevice = nullptr;
+		DeviceInstance Device;
 		VkDevice LogicalDevice = nullptr;
 
 		VkQueue GraphicsQueue = nullptr;
@@ -166,7 +177,7 @@ namespace Core
 		VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
 		VkPresentModeKHR PresentationMode = VK_PRESENT_MODE_FIFO_KHR;
 		VkSurfaceFormatKHR SurfaceFormat = { VK_FORMAT_UNDEFINED, static_cast<VkColorSpaceKHR>(0) };
-		PhysicalDeviceIndices PhysicalDeviceIndices = { };
+		
 
 		// Todo: put textures in DescriptorSets to use only one descriptor set and pool?
 		VkDescriptorPool SamplerDescriptorPool = nullptr;
@@ -176,7 +187,7 @@ namespace Core
 		VkPushConstantRange PushConstantRange;
 
 		VkDescriptorSetLayout DescriptorSetLayout = nullptr;
-		VkDescriptorSetLayout InputSetLayout = nullptr; // Set for diferent pipeline, goes to diferent shader
+		VkDescriptorSetLayout InputSetLayout = nullptr; // Set for different pipeline, goes to different shader
 
 		VkPipelineLayout PipelineLayout = nullptr;
 		VkPipelineLayout SecondPipelineLayout = nullptr;
@@ -196,7 +207,7 @@ namespace Core
 
 		VkCommandPool GraphicsCommandPool = nullptr;
 
-		VkSemaphore* ImageAvalible = nullptr;
+		VkSemaphore* ImageAvailable = nullptr;
 		VkSemaphore* RenderFinished = nullptr;
 		VkFence* DrawFences = nullptr;
 
@@ -227,18 +238,15 @@ namespace Core
 	PresentModeData CreatePresentModeData(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
 	void DestroyPresentModeData(PresentModeData& Data);
 
-
+	PhysicalDevicesData CreatePhysicalDevicesData(VkInstance Instance);
+	void DestroyPhysicalDevicesData(PhysicalDevicesData& Data);
 
 	MainInstance CreateMainInstance(RequiredInstanceExtensionsData RequiredExtensions,
 		bool IsValidationLayersEnabled, const char* ValidationLayers[], uint32_t ValidationLayersSize);
 	void DestroyMainInstance(MainInstance& Instance);
 
-
-
-
 	PhysicalDeviceIndices GetPhysicalDeviceIndices(QueueFamilyPropertiesData Data, VkPhysicalDevice PhysicalDevice,
 		VkSurfaceKHR Surface);
-
 
 	bool CheckRequiredInstanceExtensionsSupport(ExtensionPropertiesData AvailableExtensions,
 		RequiredInstanceExtensionsData RequiredExtensions);
@@ -246,20 +254,51 @@ namespace Core
 		const char** ValidationLeyersToCheck, uint32_t ValidationLeyersToCheckSize);
 	bool CheckDeviceExtensionsSupport(ExtensionPropertiesData Data, const char** ExtensionsToCheck,
 		uint32_t ExtensionsToCheckSize);
+	bool CheckDeviceSuitability(const DeviceInstance& Device, const char* DeviceExtensions[], uint32_t DeviceExtensionsSize,
+		ExtensionPropertiesData DeviceExtensionsData, VkSurfaceKHR Surface);
+	uint32_t FindMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, uint32_t AllowedTypes, VkMemoryPropertyFlags Properties);
 
+	GPUBuffer CreateVertexBuffer(VkPhysicalDevice PhysicalDevice, VkDevice device,
+		VkQueue transferQueue, VkCommandPool transferCommandPool, Vertex* Vertices, uint32_t VerticesCount);
 
+	GPUBuffer CreateIndexBuffer(VkPhysicalDevice PhysicalDevice, VkDevice Device,
+		VkQueue TransferQueue, VkCommandPool TransferCommandPool, uint32_t* Indices, uint32_t IndicesCount);
+	
+	GPUBuffer CreateUniformBuffer(VkPhysicalDevice PhysicalDevice, VkDevice device, VkDeviceSize bufferSize);
+	
+	GPUBuffer CreateIndirectBuffer(VkPhysicalDevice PhysicalDevice, VkDevice device,
+		VkQueue transferQueue, VkCommandPool transferCommandPool,
+		const std::vector<VkDrawIndexedIndirectCommand>& drawCommands);
+	
+	GPUBuffer CreateGPUBuffer(VkPhysicalDevice PhysicalDevice, VkDevice device, VkDeviceSize bufferSize, VkBufferUsageFlags bufferUsage,
+		VkMemoryPropertyFlags bufferProperties);
+	
+	void DestroyGPUBuffer(VkDevice device, GPUBuffer& buffer);
+	
+	void CopyGPUBuffer(VkDevice device, VkQueue transferQueue, VkCommandPool transferCommandPool,
+		const GPUBuffer& srcBuffer, GPUBuffer& dstBuffer);
+	
+	void CopyBufferToImage(const VulkanRenderInstance& RenderInstance, VkBuffer SourceBuffer,
+		VkImage Image, uint32_t Width, uint32_t Height);
 
+	
+	VkImageView CreateImageView(VkDevice LogicalDevice, VkImage Image, VkFormat Format, VkImageAspectFlags AspectFlags);
+	
+	VkImage CreateImage(const VulkanRenderInstance& RenderInstance, uint32_t Width, uint32_t Height,
+		VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags,
+		VkDeviceMemory* OutImageMemory);
 
-
+	VkDevice CreateLogicalDevice(VkPhysicalDevice PhysicalDevice, PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
+		uint32_t DeviceExtensionsSize);
 
 
 
 	// VulkanRenderInstance
-	bool InitVulkanRenderInstance(VulkanRenderInstance& RenderInstance, VkInstance VulkanInstance, GLFWwindow* Window);
+	bool InitVulkanRenderInstance(VulkanRenderInstance& RenderInstance, VkSurfaceKHR Surface, GLFWwindow* Window);
 	bool LoadMesh(VulkanRenderInstance& RenderInstance, Mesh Mesh);
 	bool Draw(VulkanRenderInstance& RenderInstance);
 	void DeinitVulkanRenderInstance(VulkanRenderInstance& RenderInstance);
-	void CreateTexture(VulkanRenderInstance& RenderInstance, stbi_uc* TextureData, int Width, int Height, VkDeviceSize ImageSize);
+	void CreateImageBuffer(VulkanRenderInstance& RenderInstance, stbi_uc* TextureData, int Width, int Height, VkDeviceSize ImageSize);
 	bool AddViewport(VulkanRenderInstance& RenderInstance, GLFWwindow* Window);
 	void RemoveViewport(VulkanRenderInstance& RenderInstance, GLFWwindow* Window);
 }
