@@ -8,6 +8,8 @@
 
 #include <vector>
 
+#include "MainRenderPass.h"
+
 namespace Core
 {
 	struct RequiredInstanceExtensionsData
@@ -84,9 +86,9 @@ namespace Core
 
 	struct ImageBuffer
 	{
-		VkImage TextureImage = nullptr;
-		VkDeviceMemory TextureImagesMemory = nullptr;
-		VkImageView TextureImageView = nullptr;
+		VkImage Image = nullptr;
+		VkDeviceMemory Memory = nullptr;
+		VkImageView ImageView = nullptr;
 	};
 
 	typedef glm::mat4 Model;
@@ -104,19 +106,13 @@ namespace Core
 		uint32_t TextureId = 0;
 	};
 
-	struct GenericImageBuffer
-	{
-		VkImage Image = nullptr;
-		VkDeviceMemory ImageMemory = nullptr;
-		VkImageView ImageView = nullptr;
-	};
-
 	struct MainInstance
 	{
 		VkInstance VulkanInstance = nullptr;
 		VkDebugUtilsMessengerEXT DebugMessenger = nullptr;
 	};
 
+	// TODO: Remove Indices Properties AvailableFeatures?
 	struct DeviceInstance
 	{
 		VkPhysicalDevice PhysicalDevice = nullptr;
@@ -138,16 +134,15 @@ namespace Core
 
 		VkFramebuffer* SwapchainFramebuffers = nullptr;
 		VkCommandBuffer* CommandBuffers = nullptr;
-		GenericImageBuffer* ColorBuffers = nullptr;
-		GenericImageBuffer* DepthBuffers = nullptr;
+		ImageBuffer* ColorBuffers = nullptr;
+		ImageBuffer* DepthBuffers = nullptr;
 
 		VkDescriptorPool DescriptorPool = nullptr;
 		VkDescriptorPool InputDescriptorPool = nullptr;
 		VkDescriptorSet* DescriptorSets = nullptr;
 		VkDescriptorSet* InputDescriptorSets = nullptr;
 
-		VkPipeline GraphicsPipeline = nullptr;
-		VkPipeline SecondPipeline = nullptr;
+
 
 		GPUBuffer* VpUniformBuffers = nullptr;
 
@@ -166,9 +161,6 @@ namespace Core
 		ViewportInstance* Viewports[2];
 		ViewportInstance MainViewport;
 
-		DeviceInstance Device;
-		VkDevice LogicalDevice = nullptr;
-
 		VkQueue GraphicsQueue = nullptr;
 		VkQueue PresentationQueue = nullptr;
 
@@ -179,25 +171,20 @@ namespace Core
 		VkSurfaceFormatKHR SurfaceFormat = { VK_FORMAT_UNDEFINED, static_cast<VkColorSpaceKHR>(0) };
 		
 
-		// Todo: put textures in DescriptorSets to use only one descriptor set and pool?
+
+		VkSampler TextureSampler = nullptr;
 		VkDescriptorPool SamplerDescriptorPool = nullptr;
-		VkDescriptorSetLayout SamplerSetLayout = nullptr;
 		VkDescriptorSet* SamplerDescriptorSets = nullptr;
+		
 
-		VkPushConstantRange PushConstantRange;
 
-		VkDescriptorSetLayout DescriptorSetLayout = nullptr;
-		VkDescriptorSetLayout InputSetLayout = nullptr; // Set for different pipeline, goes to different shader
 
-		VkPipelineLayout PipelineLayout = nullptr;
-		VkPipelineLayout SecondPipelineLayout = nullptr;
+
 
 		//GenericBuffer* ModelDynamicUniformBuffers = nullptr;
 
 		//uint32_t ModelUniformAlignment = 0;
 		//UboModel* ModelTransferSpace = nullptr;
-
-		VkRenderPass RenderPass = nullptr;
 
 		const uint32_t MaxObjects = 528;
 		uint32_t DrawableObjectsCount = 0;
@@ -205,13 +192,11 @@ namespace Core
 		const int MaxFrameDraws = 2;
 		int CurrentFrame = 0;
 
-		VkCommandPool GraphicsCommandPool = nullptr;
+		
 
-		VkSemaphore* ImageAvailable = nullptr;
-		VkSemaphore* RenderFinished = nullptr;
-		VkFence* DrawFences = nullptr;
 
-		VkSampler TextureSampler = nullptr;
+
+		
 		// Todo: put all textures in atlases or texture layers
 		const uint32_t MaxTextures = 64;
 		uint32_t TextureImagesCount = 0;
@@ -219,86 +204,35 @@ namespace Core
 		ImageBuffer TextureImageBuffer[64];
 	};
 
+	bool CheckRequiredInstanceExtensionsSupport(ExtensionPropertiesData AvailableExtensions,
+		RequiredInstanceExtensionsData RequiredExtensions);
+
+	bool CheckValidationLayersSupport(AvailableInstanceLayerPropertiesData& Data,
+		const char** ValidationLeyersToCheck, uint32_t ValidationLeyersToCheckSize);
+
+	bool CheckDeviceExtensionsSupport(ExtensionPropertiesData Data, const char** ExtensionsToCheck,
+		uint32_t ExtensionsToCheckSize);
+
+
+
+
 	RequiredInstanceExtensionsData CreateRequiredInstanceExtensionsData(const char** ValidationExtensions, uint32_t ValidationExtensionsCount);
 	void DestroyRequiredInstanceExtensionsData(RequiredInstanceExtensionsData& Data);
 
 	ExtensionPropertiesData CreateAvailableExtensionPropertiesData();
-	ExtensionPropertiesData CreateDeviceExtensionPropertiesData(VkPhysicalDevice PhysicalDevice);
-	void DestroyExtensionPropertiesData(ExtensionPropertiesData& Data);
+
 
 	AvailableInstanceLayerPropertiesData CreateAvailableInstanceLayerPropertiesData();
 	void DestroyAvailableInstanceLayerPropertiesData(AvailableInstanceLayerPropertiesData& Data);
 
-	QueueFamilyPropertiesData CreateQueueFamilyPropertiesData(VkPhysicalDevice PhysicalDevice);
-	void DestroyQueueFamilyPropertiesData(QueueFamilyPropertiesData& Data);
 
-	SurfaceFormatsData CreateSurfaceFormatsData(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
-	void DestroySurfaceFormatsData(SurfaceFormatsData& Data);
-
-	PresentModeData CreatePresentModeData(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
-	void DestroyPresentModeData(PresentModeData& Data);
-
-	PhysicalDevicesData CreatePhysicalDevicesData(VkInstance Instance);
-	void DestroyPhysicalDevicesData(PhysicalDevicesData& Data);
+	PhysicalDeviceIndices GetPhysicalDeviceIndices(QueueFamilyPropertiesData Data, VkPhysicalDevice PhysicalDevice,
+		VkSurfaceKHR Surface);
 
 	MainInstance CreateMainInstance(RequiredInstanceExtensionsData RequiredExtensions,
 		bool IsValidationLayersEnabled, const char* ValidationLayers[], uint32_t ValidationLayersSize);
 	void DestroyMainInstance(MainInstance& Instance);
 
-	PhysicalDeviceIndices GetPhysicalDeviceIndices(QueueFamilyPropertiesData Data, VkPhysicalDevice PhysicalDevice,
-		VkSurfaceKHR Surface);
 
-	bool CheckRequiredInstanceExtensionsSupport(ExtensionPropertiesData AvailableExtensions,
-		RequiredInstanceExtensionsData RequiredExtensions);
-	bool CheckValidationLayersSupport(AvailableInstanceLayerPropertiesData& Data,
-		const char** ValidationLeyersToCheck, uint32_t ValidationLeyersToCheckSize);
-	bool CheckDeviceExtensionsSupport(ExtensionPropertiesData Data, const char** ExtensionsToCheck,
-		uint32_t ExtensionsToCheckSize);
-	bool CheckDeviceSuitability(const DeviceInstance& Device, const char* DeviceExtensions[], uint32_t DeviceExtensionsSize,
-		ExtensionPropertiesData DeviceExtensionsData, VkSurfaceKHR Surface);
-	uint32_t FindMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, uint32_t AllowedTypes, VkMemoryPropertyFlags Properties);
-
-	GPUBuffer CreateVertexBuffer(VkPhysicalDevice PhysicalDevice, VkDevice device,
-		VkQueue transferQueue, VkCommandPool transferCommandPool, Vertex* Vertices, uint32_t VerticesCount);
-
-	GPUBuffer CreateIndexBuffer(VkPhysicalDevice PhysicalDevice, VkDevice Device,
-		VkQueue TransferQueue, VkCommandPool TransferCommandPool, uint32_t* Indices, uint32_t IndicesCount);
-	
-	GPUBuffer CreateUniformBuffer(VkPhysicalDevice PhysicalDevice, VkDevice device, VkDeviceSize bufferSize);
-	
-	GPUBuffer CreateIndirectBuffer(VkPhysicalDevice PhysicalDevice, VkDevice device,
-		VkQueue transferQueue, VkCommandPool transferCommandPool,
-		const std::vector<VkDrawIndexedIndirectCommand>& drawCommands);
-	
-	GPUBuffer CreateGPUBuffer(VkPhysicalDevice PhysicalDevice, VkDevice device, VkDeviceSize bufferSize, VkBufferUsageFlags bufferUsage,
-		VkMemoryPropertyFlags bufferProperties);
-	
-	void DestroyGPUBuffer(VkDevice device, GPUBuffer& buffer);
-	
-	void CopyGPUBuffer(VkDevice device, VkQueue transferQueue, VkCommandPool transferCommandPool,
-		const GPUBuffer& srcBuffer, GPUBuffer& dstBuffer);
-	
-	void CopyBufferToImage(const VulkanRenderInstance& RenderInstance, VkBuffer SourceBuffer,
-		VkImage Image, uint32_t Width, uint32_t Height);
-
-	
-	VkImageView CreateImageView(VkDevice LogicalDevice, VkImage Image, VkFormat Format, VkImageAspectFlags AspectFlags);
-	
-	VkImage CreateImage(const VulkanRenderInstance& RenderInstance, uint32_t Width, uint32_t Height,
-		VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags,
-		VkDeviceMemory* OutImageMemory);
-
-	VkDevice CreateLogicalDevice(VkPhysicalDevice PhysicalDevice, PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
-		uint32_t DeviceExtensionsSize);
-
-
-
-	// VulkanRenderInstance
-	bool InitVulkanRenderInstance(VulkanRenderInstance& RenderInstance, VkSurfaceKHR Surface, GLFWwindow* Window);
-	bool LoadMesh(VulkanRenderInstance& RenderInstance, Mesh Mesh);
-	bool Draw(VulkanRenderInstance& RenderInstance);
-	void DeinitVulkanRenderInstance(VulkanRenderInstance& RenderInstance);
-	void CreateImageBuffer(VulkanRenderInstance& RenderInstance, stbi_uc* TextureData, int Width, int Height, VkDeviceSize ImageSize);
-	bool AddViewport(VulkanRenderInstance& RenderInstance, GLFWwindow* Window);
-	void RemoveViewport(VulkanRenderInstance& RenderInstance, GLFWwindow* Window);
+	VkExtent2D GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities, GLFWwindow* Window);
 }

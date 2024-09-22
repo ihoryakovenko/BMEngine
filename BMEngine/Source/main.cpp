@@ -60,7 +60,7 @@ struct Camera
 	glm::vec3 CameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 };
 
-void AddTexture(Core::VulkanRenderInstance& RenderInstance, const char* TexturePath)
+void AddTexture(Core::VulkanRenderingSystem& RenderingSystem, const char* TexturePath)
 {
 	int Width, Height;
 	uint64_t ImageSize; // Todo: DeviceSize?
@@ -75,15 +75,15 @@ void AddTexture(Core::VulkanRenderInstance& RenderInstance, const char* TextureP
 
 	ImageSize = Width * Height * 4;
 
-	Core::CreateImageBuffer(RenderInstance, ImageData, Width, Height, ImageSize);
+	RenderingSystem.CreateImageBuffer(ImageData, Width, Height, ImageSize);
 
 	stbi_image_free(ImageData);
 }
 
-Core::VulkanRenderInstance* ins;
+Core::VulkanRenderingSystem* ins;
 void WindowCloseCallback(GLFWwindow* Window)
 {
-	Core::RemoveViewport(*ins, Window);
+	ins->RemoveViewport(Window);
 	glfwDestroyWindow(Window);
 }
 
@@ -106,10 +106,18 @@ int main()
 		return -1;
 	}
 
-	Core::VulkanRenderingSystem RenderingSystem;
-	RenderingSystem.Init(Window);
+	GLFWwindow* Window2 = glfwCreateWindow(1600, 800, "BMEngine2", nullptr, nullptr);
+	if (Window2 == nullptr)
+	{
+		Util::Log::GlfwLogError();
+		glfwTerminate();
+		return -1;
+	}
 
-	ins = &RenderingSystem.RenderInstance;
+	Core::VulkanRenderingSystem RenderingSystem;
+	RenderingSystem.Init(Window, Window2);
+
+	ins = &RenderingSystem;
 	
 
 
@@ -121,7 +129,7 @@ int main()
 	RenderingSystem.RenderInstance.Viewports[0]->ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	const char* TestTexture = "./Resources/Textures/giraffe.jpg";
-	AddTexture(RenderingSystem.RenderInstance, TestTexture);
+	AddTexture(RenderingSystem, TestTexture);
 
 	const char* Modelpath = "./Resources/Models/uh60.obj";
 	const char* BaseDir = "./Resources/Models/";
@@ -148,7 +156,7 @@ int main()
 			std::string FileName = "./Resources/Textures/" + Material.diffuse_texname.substr(Idx + 1);
 
 			MaterialToTexture[i] = RenderingSystem.RenderInstance.TextureImagesCount;
-			AddTexture(RenderingSystem.RenderInstance, FileName.c_str());
+			AddTexture(RenderingSystem, FileName.c_str());
 		}
 	}
 
@@ -204,7 +212,7 @@ int main()
 		m.MeshIndices = ModelMeshes[i].indices.data();
 		m.MeshIndicesCount = ModelMeshes[i].indices.size();
 
-		Core::LoadMesh(RenderingSystem.RenderInstance, m);
+		RenderingSystem.LoadMesh(m);
 		RenderingSystem.RenderInstance.DrawableObjects[RenderingSystem.RenderInstance.DrawableObjectsCount - 1].TextureId = ModelMeshes[i].TextureId;
 	}
 
@@ -214,16 +222,6 @@ int main()
 
 	const float RotationSpeed = 2.0f;
 	const float CameraSpeed = 10.0f;
-
-	GLFWwindow* Window2 = glfwCreateWindow(1600, 800, "BMEngine2", nullptr, nullptr);
-	if (Window2 == nullptr)
-	{
-		Util::Log::GlfwLogError();
-		glfwTerminate();
-		return -1;
-	}
-
-	Core::AddViewport(RenderingSystem.RenderInstance, Window2);
 
 	RenderingSystem.RenderInstance.Viewports[1]->ViewProjection.Projection = glm::perspective(glm::radians(45.f),
 		static_cast<float>(RenderingSystem.RenderInstance.Viewports[1]->SwapExtent.width) / static_cast<float>(RenderingSystem.RenderInstance.Viewports[1]->SwapExtent.height), 0.1f, 100.0f);
@@ -307,7 +305,7 @@ int main()
 		//	RenderInstance.DrawableObjects[i].Model = TestMat;
 		//}
 
-		Core::Draw(RenderingSystem.RenderInstance);
+		RenderingSystem.Draw();
 	}
 
 	RenderingSystem.DeInit();
