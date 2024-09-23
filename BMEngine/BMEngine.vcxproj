@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Core\MainRenderPass.cpp" />
+    <ClCompile Include="Source\Core\VulkanHelper.cpp" />
     <ClCompile Include="Source\Core\VulkanCoreTypes.cpp" />
     <ClCompile Include="Source\Core\VulkanRenderingSystem.cpp" />
     <ClCompile Include="Source\main.cpp" />
@@ -28,6 +29,7 @@
   <ItemGroup>
     <ClInclude Include="Source\Core\MainRenderPass.h" />
     <ClInclude Include="Source\Core\VulkanCoreTypes.h" />
+    <ClInclude Include="Source\Core\VulkanHelper.h" />
     <ClInclude Include="Source\Core\VulkanRenderingSystem.h" />
     <ClInclude Include="Source\Util\stb_image.h" />
     <ClInclude Include="Source\Util\Util.h" />

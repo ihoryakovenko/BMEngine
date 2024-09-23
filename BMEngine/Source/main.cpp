@@ -121,12 +121,12 @@ int main()
 	
 
 
-	RenderingSystem.RenderInstance.Viewports[0]->ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-		static_cast<float>(RenderingSystem.RenderInstance.Viewports[0]->SwapExtent.width) / static_cast<float>(RenderingSystem.RenderInstance.Viewports[0]->SwapExtent.height), 0.1f, 100.0f);
+	RenderingSystem.Viewports[0]->ViewProjection.Projection = glm::perspective(glm::radians(45.f),
+		static_cast<float>(RenderingSystem.Viewports[0]->SwapExtent.width) / static_cast<float>(RenderingSystem.Viewports[0]->SwapExtent.height), 0.1f, 100.0f);
 
-	RenderingSystem.RenderInstance.Viewports[0]->ViewProjection.Projection[1][1] *= -1;
+	RenderingSystem.Viewports[0]->ViewProjection.Projection[1][1] *= -1;
 
-	RenderingSystem.RenderInstance.Viewports[0]->ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	RenderingSystem.Viewports[0]->ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	const char* TestTexture = "./Resources/Textures/giraffe.jpg";
 	AddTexture(RenderingSystem, TestTexture);
@@ -155,7 +155,7 @@ int main()
 			int Idx = Material.diffuse_texname.rfind("\\");
 			std::string FileName = "./Resources/Textures/" + Material.diffuse_texname.substr(Idx + 1);
 
-			MaterialToTexture[i] = RenderingSystem.RenderInstance.TextureImagesCount;
+			MaterialToTexture[i] = RenderingSystem.TextureImagesCount;
 			AddTexture(RenderingSystem, FileName.c_str());
 		}
 	}
@@ -213,7 +213,7 @@ int main()
 		m.MeshIndicesCount = ModelMeshes[i].indices.size();
 
 		RenderingSystem.LoadMesh(m);
-		RenderingSystem.RenderInstance.DrawableObjects[RenderingSystem.RenderInstance.DrawableObjectsCount - 1].TextureId = ModelMeshes[i].TextureId;
+		RenderingSystem.DrawableObjects[RenderingSystem.DrawableObjectsCount - 1].TextureId = ModelMeshes[i].TextureId;
 	}
 
 	float Angle = 0.0f;
@@ -223,16 +223,16 @@ int main()
 	const float RotationSpeed = 2.0f;
 	const float CameraSpeed = 10.0f;
 
-	RenderingSystem.RenderInstance.Viewports[1]->ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-		static_cast<float>(RenderingSystem.RenderInstance.Viewports[1]->SwapExtent.width) / static_cast<float>(RenderingSystem.RenderInstance.Viewports[1]->SwapExtent.height), 0.1f, 100.0f);
-	RenderingSystem.RenderInstance.Viewports[1]->ViewProjection.Projection[1][1] *= -1;
-	RenderingSystem.RenderInstance.Viewports[1]->ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	RenderingSystem.Viewports[1]->ViewProjection.Projection = glm::perspective(glm::radians(45.f),
+		static_cast<float>(RenderingSystem.Viewports[1]->SwapExtent.width) / static_cast<float>(RenderingSystem.Viewports[1]->SwapExtent.height), 0.1f, 100.0f);
+	RenderingSystem.Viewports[1]->ViewProjection.Projection[1][1] *= -1;
+	RenderingSystem.Viewports[1]->ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	Camera Cameras[2];
 
 	glfwSetWindowCloseCallback(Window2, WindowCloseCallback);
 
-	while (!glfwWindowShouldClose(RenderingSystem.RenderInstance.Viewports[0]->Window))
+	while (!glfwWindowShouldClose(RenderingSystem.Viewports[0]->Window))
 	{
 		glfwPollEvents();
 
@@ -243,9 +243,9 @@ int main()
 		float CameraDeltaSpeed = CameraSpeed * DeltaTime;
 		float CameraDeltaRotationSpeed = RotationSpeed * DeltaTime;
 
-		for (int ViewportIndex = 0; ViewportIndex < RenderingSystem.RenderInstance.ViewportsCount; ++ViewportIndex)
+		for (int ViewportIndex = 0; ViewportIndex < RenderingSystem.ViewportsCount; ++ViewportIndex)
 		{
-			Core::ViewportInstance* ProcessedViewport = RenderingSystem.RenderInstance.Viewports[ViewportIndex];
+			Core::ViewportInstance* ProcessedViewport = RenderingSystem.Viewports[ViewportIndex];
 
 			if (glfwGetKey(ProcessedViewport->Window, GLFW_KEY_W) == GLFW_PRESS)
 			{
@@ -300,9 +300,9 @@ int main()
 
 		//glm::mat4 TestMat = glm::rotate(glm::mat4(1.0f), glm::radians(Angle), glm::vec3(0.0f, 1.0f, 0.0f));
 
-		//for (int i = 0; i < RenderInstance.DrawableObjectsCount; ++i)
+		//for (int i = 0; i < DrawableObjectsCount; ++i)
 		//{
-		//	RenderInstance.DrawableObjects[i].Model = TestMat;
+		//	DrawableObjects[i].Model = TestMat;
 		//}
 
 		RenderingSystem.Draw();

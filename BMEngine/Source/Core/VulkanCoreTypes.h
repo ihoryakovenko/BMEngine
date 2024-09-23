@@ -12,47 +12,10 @@
 
 namespace Core
 {
-	struct RequiredInstanceExtensionsData
+	struct UboViewProjection
 	{
-		uint32_t Count = 0;
-		const char** Extensions = nullptr;
-		uint32_t ValidationExtensionsCount = 0;
-	};
-
-	struct ExtensionPropertiesData
-	{
-		uint32_t Count = 0;
-		VkExtensionProperties* ExtensionProperties = nullptr;
-	};
-
-	struct AvailableInstanceLayerPropertiesData
-	{
-		uint32_t Count = 0;
-		VkLayerProperties* Properties = nullptr;
-	};
-
-	struct QueueFamilyPropertiesData
-	{
-		uint32_t Count = 0;
-		VkQueueFamilyProperties* Properties = nullptr;
-	};
-
-	struct SurfaceFormatsData
-	{
-		uint32_t Count = 0;
-		VkSurfaceFormatKHR* SurfaceFormats = nullptr;
-	};
-
-	struct PresentModeData
-	{
-		uint32_t Count = 0;
-		VkPresentModeKHR* PresentModes = nullptr;
-	};
-
-	struct PhysicalDevicesData
-	{
-		uint32_t Count = 0;
-		VkPhysicalDevice* DeviceList = nullptr;
+		glm::mat4 View;
+		glm::mat4 Projection;
 	};
 
 	struct PhysicalDeviceIndices
@@ -108,13 +71,30 @@ namespace Core
 
 	struct MainInstance
 	{
+		static MainInstance CreateMainInstance(const char** RequiredExtensions, uint32_t RequiredExtensionsCount,
+			bool IsValidationLayersEnabled, const char* ValidationLayers[], uint32_t ValidationLayersSize);
+		static void DestroyMainInstance(MainInstance& Instance);
+
 		VkInstance VulkanInstance = nullptr;
 		VkDebugUtilsMessengerEXT DebugMessenger = nullptr;
 	};
 
-	// TODO: Remove Indices Properties AvailableFeatures?
 	struct DeviceInstance
 	{
+		void Init(VkInstance VulkanInstance, VkSurfaceKHR Surface, const char** DeviceExtensions,
+			uint32_t DeviceExtensionsSize);
+
+		static void GetPhysicalDeviceList(VkInstance VulkanInstance, std::vector<VkPhysicalDevice>& DeviceList);
+		static void GetDeviceExtensionProperties(VkPhysicalDevice PhysicalDevice, std::vector<VkExtensionProperties>& Data);
+		static void GetQueueFamilyProperties(VkPhysicalDevice PhysicalDevice, std::vector<VkQueueFamilyProperties>& Data);
+		static PhysicalDeviceIndices GetPhysicalDeviceIndices(const std::vector<VkQueueFamilyProperties>& Properties,
+			VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
+		static bool CheckDeviceSuitability(const char* DeviceExtensions[], uint32_t DeviceExtensionsSize,
+			VkExtensionProperties* ExtensionProperties, uint32_t ExtensionPropertiesCount, PhysicalDeviceIndices Indices,
+			VkPhysicalDeviceFeatures AvailableFeatures);
+		static bool CheckDeviceExtensionsSupport(VkExtensionProperties* ExtensionProperties, uint32_t ExtensionPropertiesCount,
+			const char** ExtensionsToCheck, uint32_t ExtensionsToCheckSize);
+
 		VkPhysicalDevice PhysicalDevice = nullptr;
 		PhysicalDeviceIndices Indices;
 		VkPhysicalDeviceProperties Properties;
@@ -142,97 +122,49 @@ namespace Core
 		VkDescriptorSet* DescriptorSets = nullptr;
 		VkDescriptorSet* InputDescriptorSets = nullptr;
 
-
-
 		GPUBuffer* VpUniformBuffers = nullptr;
 
-		struct UboViewProjection
-		{
-			glm::mat4 View;
-			glm::mat4 Projection;
-		} ViewProjection;
+		UboViewProjection ViewProjection;
 	};
 
-	struct VulkanRenderInstance
+	struct MainRenderPass
 	{
-		VkInstance VulkanInstance = nullptr;
+		void Init(VkDevice LogicalDevice, VkFormat ColorFormat, VkFormat DepthFormat,
+			VkSurfaceFormatKHR SurfaceFormat, int GraphicsFamily, uint32_t MaxDrawFrames,
+			VkExtent2D* SwapExtents, uint32_t SwapExtentsCount);
 
-		uint32_t ViewportsCount = 0;
-		ViewportInstance* Viewports[2];
-		ViewportInstance MainViewport;
+		void DeInit(VkDevice LogicalDevice);
 
-		VkQueue GraphicsQueue = nullptr;
-		VkQueue PresentationQueue = nullptr;
+		VkRenderPass RenderPass = nullptr;
 
-		// Todo: pass as AddViewport params? 
-		VkFormat ColorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Todo: check if VK_FORMAT_R8G8B8A8_UNORM supported
-		VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
-		VkPresentModeKHR PresentationMode = VK_PRESENT_MODE_FIFO_KHR;
-		VkSurfaceFormatKHR SurfaceFormat = { VK_FORMAT_UNDEFINED, static_cast<VkColorSpaceKHR>(0) };
-		
+		uint32_t MaxFrameDrawsCounter = 0;
+		VkSemaphore* ImageAvailable = nullptr;
+		VkSemaphore* RenderFinished = nullptr;
+		VkFence* DrawFences = nullptr;
 
+		VkPushConstantRange PushConstantRange;
+		VkDescriptorSetLayout SamplerSetLayout = nullptr;
+		VkDescriptorSetLayout DescriptorSetLayout = nullptr;
+		VkDescriptorSetLayout InputSetLayout = nullptr; // Set for different pipeline, goes to different shader
 
-		VkSampler TextureSampler = nullptr;
-		VkDescriptorPool SamplerDescriptorPool = nullptr;
-		VkDescriptorSet* SamplerDescriptorSets = nullptr;
-		
+		VkPipelineLayout PipelineLayout = nullptr;
+		VkPipelineLayout SecondPipelineLayout = nullptr;
 
+		VkPipeline GraphicsPipeline = nullptr;
+		VkPipeline SecondPipeline = nullptr;
 
+		VkCommandPool GraphicsCommandPool = nullptr;
 
-
-
-		//GenericBuffer* ModelDynamicUniformBuffers = nullptr;
-
-		//uint32_t ModelUniformAlignment = 0;
-		//UboModel* ModelTransferSpace = nullptr;
-
-		const uint32_t MaxObjects = 528;
-		uint32_t DrawableObjectsCount = 0;
-		DrawableObject DrawableObjects[528];
-		const int MaxFrameDraws = 2;
-		int CurrentFrame = 0;
-
-		
-
-
-
-		
-		// Todo: put all textures in atlases or texture layers
-		const uint32_t MaxTextures = 64;
-		uint32_t TextureImagesCount = 0;
-		// Todo: have single TextureImagesMemory and VkImage offset references in it
-		ImageBuffer TextureImageBuffer[64];
+	private:
+		void CreateVulkanPass(VkDevice LogicalDevice, VkFormat ColorFormat, VkFormat DepthFormat,
+			VkSurfaceFormatKHR SurfaceFormat);
+		void CreateSamplerSetLayout(VkDevice LogicalDevice);
+		void CreateCommandPool(VkDevice LogicalDevice, uint32_t FamilyIndex);
+		void CreateSynchronisation(VkDevice LogicalDevice, uint32_t MaxFrameDraws);
+		void DestroySynchronisation(VkDevice LogicalDevice);
+		void CreateDescriptorSetLayout(VkDevice LogicalDevice);
+		void CreateInputSetLayout(VkDevice LogicalDevice);
+		void CreatePipelineLayouts(VkDevice LogicalDevice);
+		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D* SwapExtents, uint32_t SwapExtentsCount);
 	};
-
-	bool CheckRequiredInstanceExtensionsSupport(ExtensionPropertiesData AvailableExtensions,
-		RequiredInstanceExtensionsData RequiredExtensions);
-
-	bool CheckValidationLayersSupport(AvailableInstanceLayerPropertiesData& Data,
-		const char** ValidationLeyersToCheck, uint32_t ValidationLeyersToCheckSize);
-
-	bool CheckDeviceExtensionsSupport(ExtensionPropertiesData Data, const char** ExtensionsToCheck,
-		uint32_t ExtensionsToCheckSize);
-
-
-
-
-	RequiredInstanceExtensionsData CreateRequiredInstanceExtensionsData(const char** ValidationExtensions, uint32_t ValidationExtensionsCount);
-	void DestroyRequiredInstanceExtensionsData(RequiredInstanceExtensionsData& Data);
-
-	ExtensionPropertiesData CreateAvailableExtensionPropertiesData();
-
-
-	AvailableInstanceLayerPropertiesData CreateAvailableInstanceLayerPropertiesData();
-	void DestroyAvailableInstanceLayerPropertiesData(AvailableInstanceLayerPropertiesData& Data);
-
-
-	PhysicalDeviceIndices GetPhysicalDeviceIndices(QueueFamilyPropertiesData Data, VkPhysicalDevice PhysicalDevice,
-		VkSurfaceKHR Surface);
-
-	MainInstance CreateMainInstance(RequiredInstanceExtensionsData RequiredExtensions,
-		bool IsValidationLayersEnabled, const char* ValidationLayers[], uint32_t ValidationLayersSize);
-	void DestroyMainInstance(MainInstance& Instance);
-
-
-	VkExtent2D GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities, GLFWwindow* Window);
 }
