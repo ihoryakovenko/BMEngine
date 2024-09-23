@@ -17,11 +17,13 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "Core/VulkanCoreTypes.h"
+#include "Core/VulkanRenderingSystem.h"
 
 #include <tiny_obj_loader.h>
 
 #include <unordered_map>
+
+#include "Core/VulkanCoreTypes.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
@@ -58,7 +60,7 @@ struct Camera
 	glm::vec3 CameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 };
 
-void AddTexture(Core::VulkanRenderInstance& RenderInstance, const char* TexturePath)
+void AddTexture(Core::VulkanRenderingSystem& RenderingSystem, const char* TexturePath)
 {
 	int Width, Height;
 	uint64_t ImageSize; // Todo: DeviceSize?
@@ -73,16 +75,15 @@ void AddTexture(Core::VulkanRenderInstance& RenderInstance, const char* TextureP
 
 	ImageSize = Width * Height * 4;
 
-	Core::CreateTexture(RenderInstance, ImageData, Width, Height, ImageSize);
+	RenderingSystem.CreateImageBuffer(ImageData, Width, Height, ImageSize);
 
 	stbi_image_free(ImageData);
 }
 
-Core::VulkanRenderInstance RenderInstance;
-
+Core::VulkanRenderingSystem* ins;
 void WindowCloseCallback(GLFWwindow* Window)
 {
-	Core::RemoveViewport(RenderInstance, Window);
+	ins->RemoveViewport(Window);
 	glfwDestroyWindow(Window);
 }
 
@@ -105,21 +106,30 @@ int main()
 		return -1;
 	}
 
-	Core::MainInstance Instance;
-	Core::InitMainInstance(Instance, Util::EnableValidationLayers);
+	GLFWwindow* Window2 = glfwCreateWindow(1600, 800, "BMEngine2", nullptr, nullptr);
+	if (Window2 == nullptr)
+	{
+		Util::Log::GlfwLogError();
+		glfwTerminate();
+		return -1;
+	}
 
+	Core::VulkanRenderingSystem RenderingSystem;
+	RenderingSystem.Init(Window, Window2);
+
+	ins = &RenderingSystem;
 	
-	Core::InitVulkanRenderInstance(RenderInstance, Instance.VulkanInstance, Window);
 
-	RenderInstance.Viewports[0]->ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-		static_cast<float>(RenderInstance.Viewports[0]->SwapExtent.width) / static_cast<float>(RenderInstance.Viewports[0]->SwapExtent.height), 0.1f, 100.0f);
 
-	RenderInstance.Viewports[0]->ViewProjection.Projection[1][1] *= -1;
+	RenderingSystem.Viewports[0]->ViewProjection.Projection = glm::perspective(glm::radians(45.f),
+		static_cast<float>(RenderingSystem.Viewports[0]->SwapExtent.width) / static_cast<float>(RenderingSystem.Viewports[0]->SwapExtent.height), 0.1f, 100.0f);
 
-	RenderInstance.Viewports[0]->ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	RenderingSystem.Viewports[0]->ViewProjection.Projection[1][1] *= -1;
+
+	RenderingSystem.Viewports[0]->ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	const char* TestTexture = "./Resources/Textures/giraffe.jpg";
-	AddTexture(RenderInstance, TestTexture);
+	AddTexture(RenderingSystem, TestTexture);
 
 	const char* Modelpath = "./Resources/Models/uh60.obj";
 	const char* BaseDir = "./Resources/Models/";
@@ -145,8 +155,8 @@ int main()
 			int Idx = Material.diffuse_texname.rfind("\\");
 			std::string FileName = "./Resources/Textures/" + Material.diffuse_texname.substr(Idx + 1);
 
-			MaterialToTexture[i] = RenderInstance.TextureImagesCount;
-			AddTexture(RenderInstance, FileName.c_str());
+			MaterialToTexture[i] = RenderingSystem.TextureImagesCount;
+			AddTexture(RenderingSystem, FileName.c_str());
 		}
 	}
 
@@ -202,8 +212,8 @@ int main()
 		m.MeshIndices = ModelMeshes[i].indices.data();
 		m.MeshIndicesCount = ModelMeshes[i].indices.size();
 
-		Core::LoadMesh(RenderInstance, m);
-		RenderInstance.DrawableObjects[RenderInstance.DrawableObjectsCount - 1].TextureId = ModelMeshes[i].TextureId;
+		RenderingSystem.LoadMesh(m);
+		RenderingSystem.DrawableObjects[RenderingSystem.DrawableObjectsCount - 1].TextureId = ModelMeshes[i].TextureId;
 	}
 
 	float Angle = 0.0f;
@@ -213,26 +223,16 @@ int main()
 	const float RotationSpeed = 2.0f;
 	const float CameraSpeed = 10.0f;
 
-	GLFWwindow* Window2 = glfwCreateWindow(1600, 800, "BMEngine2", nullptr, nullptr);
-	if (Window2 == nullptr)
-	{
-		Util::Log::GlfwLogError();
-		glfwTerminate();
-		return -1;
-	}
-
-	Core::AddViewport(RenderInstance, Window2);
-
-	RenderInstance.Viewports[1]->ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-		static_cast<float>(RenderInstance.Viewports[1]->SwapExtent.width) / static_cast<float>(RenderInstance.Viewports[1]->SwapExtent.height), 0.1f, 100.0f);
-	RenderInstance.Viewports[1]->ViewProjection.Projection[1][1] *= -1;
-	RenderInstance.Viewports[1]->ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	RenderingSystem.Viewports[1]->ViewProjection.Projection = glm::perspective(glm::radians(45.f),
+		static_cast<float>(RenderingSystem.Viewports[1]->SwapExtent.width) / static_cast<float>(RenderingSystem.Viewports[1]->SwapExtent.height), 0.1f, 100.0f);
+	RenderingSystem.Viewports[1]->ViewProjection.Projection[1][1] *= -1;
+	RenderingSystem.Viewports[1]->ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	Camera Cameras[2];
 
 	glfwSetWindowCloseCallback(Window2, WindowCloseCallback);
 
-	while (!glfwWindowShouldClose(RenderInstance.Viewports[0]->Window))
+	while (!glfwWindowShouldClose(RenderingSystem.Viewports[0]->Window))
 	{
 		glfwPollEvents();
 
@@ -243,9 +243,9 @@ int main()
 		float CameraDeltaSpeed = CameraSpeed * DeltaTime;
 		float CameraDeltaRotationSpeed = RotationSpeed * DeltaTime;
 
-		for (int ViewportIndex = 0; ViewportIndex < RenderInstance.ViewportsCount; ++ViewportIndex)
+		for (int ViewportIndex = 0; ViewportIndex < RenderingSystem.ViewportsCount; ++ViewportIndex)
 		{
-			Core::ViewportInstence* ProcessedViewport = RenderInstance.Viewports[ViewportIndex];
+			Core::ViewportInstance* ProcessedViewport = RenderingSystem.Viewports[ViewportIndex];
 
 			if (glfwGetKey(ProcessedViewport->Window, GLFW_KEY_W) == GLFW_PRESS)
 			{
@@ -300,16 +300,16 @@ int main()
 
 		//glm::mat4 TestMat = glm::rotate(glm::mat4(1.0f), glm::radians(Angle), glm::vec3(0.0f, 1.0f, 0.0f));
 
-		//for (int i = 0; i < RenderInstance.DrawableObjectsCount; ++i)
+		//for (int i = 0; i < DrawableObjectsCount; ++i)
 		//{
-		//	RenderInstance.DrawableObjects[i].Model = TestMat;
+		//	DrawableObjects[i].Model = TestMat;
 		//}
 
-		Core::Draw(RenderInstance);
+		RenderingSystem.Draw();
 	}
 
-	Core::DeinitVulkanRenderInstance(RenderInstance);
-	Core::DeinitMainInstance(Instance);
+	RenderingSystem.DeInit();
+
 
 	glfwDestroyWindow(Window);
 
