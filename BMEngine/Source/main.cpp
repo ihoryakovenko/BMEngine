@@ -122,7 +122,7 @@ int main()
 
 
 	RenderingSystem.Viewports[0]->ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-		static_cast<float>(RenderingSystem.Viewports[0]->SwapExtent.width) / static_cast<float>(RenderingSystem.Viewports[0]->SwapExtent.height), 0.1f, 100.0f);
+		static_cast<float>(RenderingSystem.Viewports[0]->ViewportSwapchain.SwapExtent.width) / static_cast<float>(RenderingSystem.Viewports[0]->ViewportSwapchain.SwapExtent.height), 0.1f, 100.0f);
 
 	RenderingSystem.Viewports[0]->ViewProjection.Projection[1][1] *= -1;
 
@@ -224,7 +224,7 @@ int main()
 	const float CameraSpeed = 10.0f;
 
 	RenderingSystem.Viewports[1]->ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-		static_cast<float>(RenderingSystem.Viewports[1]->SwapExtent.width) / static_cast<float>(RenderingSystem.Viewports[1]->SwapExtent.height), 0.1f, 100.0f);
+		static_cast<float>(RenderingSystem.Viewports[1]->ViewportSwapchain.SwapExtent.width) / static_cast<float>(RenderingSystem.Viewports[1]->ViewportSwapchain.SwapExtent.height), 0.1f, 100.0f);
 	RenderingSystem.Viewports[1]->ViewProjection.Projection[1][1] *= -1;
 	RenderingSystem.Viewports[1]->ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 

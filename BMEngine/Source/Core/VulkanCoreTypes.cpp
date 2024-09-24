@@ -833,4 +833,164 @@ namespace Core
 
 		return true;
 	}
+
+	SwapchainInstance SwapchainInstance::CreateSwapchainInstance(VkPhysicalDevice PhysicalDevice,
+		PhysicalDeviceIndices Indices, VkDevice LogicalDevice, VkSurfaceKHR Surface,
+		VkSurfaceFormatKHR SurfaceFormat, VkExtent2D Extent)
+	{
+		SwapchainInstance Instance;
+
+		Instance.SwapExtent = Extent;
+
+		VkSurfaceCapabilitiesKHR SurfaceCapabilities = { };
+		VkResult Result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(PhysicalDevice, Surface, &SurfaceCapabilities);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Warning("vkGetPhysicalDeviceSurfaceCapabilitiesKHR result is {}", static_cast<int>(Result));
+			assert(false);
+		}
+
+		VkPresentModeKHR PresentationMode = GetBestPresentationMode(PhysicalDevice, Surface);
+
+		Instance.VulkanSwapchain = CreateSwapchain(LogicalDevice, SurfaceCapabilities, Surface, SurfaceFormat, Instance.SwapExtent,
+			PresentationMode, Indices);
+
+		std::vector<VkImage> Images;
+		GetSwapchainImages(LogicalDevice, Instance.VulkanSwapchain, Images);
+
+		Instance.ImagesCount = Images.size();
+		Instance.ImageViews = static_cast<VkImageView*>(Util::Memory::Allocate(Instance.ImagesCount * sizeof(VkImageView)));
+
+		for (uint32_t i = 0; i < Instance.ImagesCount; ++i)
+		{
+			VkImageView ImageView = CreateImageView(LogicalDevice, Images[i], SurfaceFormat.format, VK_IMAGE_ASPECT_COLOR_BIT);
+			if (ImageView == nullptr)
+			{
+				assert(false);
+			}
+
+			Instance.ImageViews[i] = ImageView;
+		}
+
+		return Instance;
+	}
+
+	void SwapchainInstance::DestroySwapchainInstance(VkDevice LogicalDevice, SwapchainInstance& Instance)
+	{
+		for (uint32_t i = 0; i < Instance.ImagesCount; ++i)
+		{
+			vkDestroyImageView(LogicalDevice, Instance.ImageViews[i], nullptr);
+		}
+
+		vkDestroySwapchainKHR(LogicalDevice, Instance.VulkanSwapchain, nullptr);
+		Util::Memory::Deallocate(Instance.ImageViews);
+	}
+
+	VkSwapchainKHR SwapchainInstance::CreateSwapchain(VkDevice LogicalDevice, const VkSurfaceCapabilitiesKHR& SurfaceCapabilities,
+		VkSurfaceKHR Surface, VkSurfaceFormatKHR SurfaceFormat, VkExtent2D SwapExtent, VkPresentModeKHR PresentationMode,
+		PhysicalDeviceIndices DeviceIndices)
+	{
+		// How many images are in the swap chain
+		// Get 1 more then the minimum to allow triple buffering
+		uint32_t ImageCount = SurfaceCapabilities.minImageCount + 1;
+
+		// If maxImageCount > 0, then limitless
+		if (SurfaceCapabilities.maxImageCount > 0
+			&& SurfaceCapabilities.maxImageCount < ImageCount)
+		{
+			ImageCount = SurfaceCapabilities.maxImageCount;
+		}
+
+		VkSwapchainCreateInfoKHR SwapchainCreateInfo = { };
+		SwapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+		SwapchainCreateInfo.surface = Surface;
+		SwapchainCreateInfo.imageFormat = SurfaceFormat.format;
+		SwapchainCreateInfo.imageColorSpace = SurfaceFormat.colorSpace;
+		SwapchainCreateInfo.presentMode = PresentationMode;
+		SwapchainCreateInfo.imageExtent = SwapExtent;
+		SwapchainCreateInfo.minImageCount = ImageCount;
+		SwapchainCreateInfo.imageArrayLayers = 1;
+		SwapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		SwapchainCreateInfo.preTransform = SurfaceCapabilities.currentTransform;
+		SwapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // How to handle windows blending
+		SwapchainCreateInfo.clipped = VK_TRUE;
+
+		uint32_t Indices[] = {
+			static_cast<uint32_t>(DeviceIndices.GraphicsFamily),
+			static_cast<uint32_t>(DeviceIndices.PresentationFamily)
+		};
+
+		if (DeviceIndices.GraphicsFamily != DeviceIndices.PresentationFamily)
+		{
+			// Less efficient mode
+			SwapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+			SwapchainCreateInfo.queueFamilyIndexCount = 2;
+			SwapchainCreateInfo.pQueueFamilyIndices = Indices;
+		}
+		else
+		{
+			SwapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			SwapchainCreateInfo.queueFamilyIndexCount = 0;
+			SwapchainCreateInfo.pQueueFamilyIndices = nullptr;
+		}
+
+		// Used if old cwap chain been destroyed and this one replaces it
+		SwapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
+
+		VkSwapchainKHR Swapchain;
+		VkResult Result = vkCreateSwapchainKHR(LogicalDevice, &SwapchainCreateInfo, nullptr, &Swapchain);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkCreateSwapchainKHR result is {}", static_cast<int>(Result));
+			assert(false);
+		}
+
+		return Swapchain;
+	}
+
+	VkPresentModeKHR SwapchainInstance::GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
+	{
+		std::vector<VkPresentModeKHR> PresentModes;
+		GetAvailablePresentModes(PhysicalDevice, Surface, PresentModes);
+
+		VkPresentModeKHR Mode = VK_PRESENT_MODE_FIFO_KHR;
+		for (uint32_t i = 0; i < PresentModes.size(); ++i)
+		{
+			if (PresentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR)
+			{
+				Mode = VK_PRESENT_MODE_MAILBOX_KHR;
+			}
+		}
+
+		// Has to be present by spec
+		if (Mode != VK_PRESENT_MODE_MAILBOX_KHR)
+		{
+			Util::Log().Warning("Using default VK_PRESENT_MODE_FIFO_KHR");
+		}
+
+		return Mode;
+	}
+
+	void SwapchainInstance::GetAvailablePresentModes(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface, std::vector<VkPresentModeKHR>& PresentModes)
+	{
+		uint32_t Count;
+		const VkResult Result = vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Count, nullptr);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkGetPhysicalDeviceSurfacePresentModesKHR result is {}", static_cast<int>(Result));
+			assert(false);
+		}
+
+		PresentModes.resize(Count);
+		vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Count, PresentModes.data());
+	}
+
+	void SwapchainInstance::GetSwapchainImages(VkDevice LogicalDevice, VkSwapchainKHR VulkanSwapchain, std::vector<VkImage>& Images)
+	{
+		uint32_t Count;
+		vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &Count, nullptr);
+
+		Images.resize(Count);
+		vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &Count, Images.data());
+	}
 }

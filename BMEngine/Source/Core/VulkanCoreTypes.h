@@ -79,6 +79,27 @@ namespace Core
 		VkDebugUtilsMessengerEXT DebugMessenger = nullptr;
 	};
 
+	struct SwapchainInstance
+	{
+		static SwapchainInstance CreateSwapchainInstance(VkPhysicalDevice PhysicalDevice,
+			PhysicalDeviceIndices Indices, VkDevice LogicalDevice, VkSurfaceKHR Surface,
+			VkSurfaceFormatKHR SurfaceFormat, VkExtent2D Extent);
+
+		static void DestroySwapchainInstance(VkDevice LogicalDevice, SwapchainInstance& Instance);
+
+		static VkSwapchainKHR CreateSwapchain(VkDevice LogicalDevice, const VkSurfaceCapabilitiesKHR& SurfaceCapabilities,
+			VkSurfaceKHR Surface, VkSurfaceFormatKHR SurfaceFormat, VkExtent2D SwapExtent, VkPresentModeKHR PresentationMode,
+			PhysicalDeviceIndices DeviceIndices);
+		static VkPresentModeKHR GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
+		static void GetAvailablePresentModes(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface, std::vector<VkPresentModeKHR>& PresentModes);
+		static void GetSwapchainImages(VkDevice LogicalDevice, VkSwapchainKHR VulkanSwapchain, std::vector<VkImage>& Images);
+
+		VkSwapchainKHR VulkanSwapchain = nullptr;
+		uint32_t ImagesCount = 0;
+		VkImageView* ImageViews = nullptr;
+		VkExtent2D SwapExtent = { };
+	};
+
 	struct DeviceInstance
 	{
 		void Init(VkInstance VulkanInstance, VkSurfaceKHR Surface, const char** DeviceExtensions,
@@ -106,24 +127,18 @@ namespace Core
 		GLFWwindow* Window = nullptr;
 		VkSurfaceKHR Surface = nullptr;
 
-		VkExtent2D SwapExtent = {};
-		VkSwapchainKHR VulkanSwapchain = nullptr;
-
-		uint32_t SwapchainImagesCount = 0;
-		VkImageView* ImageViews = nullptr;
+		SwapchainInstance ViewportSwapchain;
 
 		VkFramebuffer* SwapchainFramebuffers = nullptr;
 		VkCommandBuffer* CommandBuffers = nullptr;
 		ImageBuffer* ColorBuffers = nullptr;
 		ImageBuffer* DepthBuffers = nullptr;
 
-		VkDescriptorPool DescriptorPool = nullptr;
-		VkDescriptorPool InputDescriptorPool = nullptr;
+		// TDOD: Move to renderpass
 		VkDescriptorSet* DescriptorSets = nullptr;
 		VkDescriptorSet* InputDescriptorSets = nullptr;
 
 		GPUBuffer* VpUniformBuffers = nullptr;
-
 		UboViewProjection ViewProjection;
 	};
 

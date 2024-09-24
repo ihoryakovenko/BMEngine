@@ -13,7 +13,8 @@ namespace Core
 
 		// VulkanRenderInstance
 		void CreateImageBuffer(stbi_uc* TextureData, int Width, int Height, VkDeviceSize ImageSize);
-		void InitViewport(GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstance* OutViewport, VkExtent2D SwapExtent);
+		void InitViewport(GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstance* OutViewport,
+			VkDescriptorPool DescriptorPool, SwapchainInstance SwapInstance);
 		void DeinitViewport(ViewportInstance* Viewport);
 		bool LoadMesh(Mesh Mesh);
 		bool Draw();
@@ -25,9 +26,7 @@ namespace Core
 		void GetRequiredInstanceExtensions(const char** ValidationExtensions,
 			uint32_t ValidationExtensionsCount, std::vector<const char*>& Data);
 		void GetSurfaceFormats(VkSurfaceKHR Surface, std::vector<VkSurfaceFormatKHR>& SurfaceFormats);
-		void GetAvailablePresentModes(VkSurfaceKHR Surface, std::vector<VkPresentModeKHR>& PresentModes);
 		
-		void GetSwapchainImages(VkSwapchainKHR VulkanSwapchain, std::vector<VkImage>& Images);
 		VkExtent2D GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities, GLFWwindow* Window);
 		uint32_t GetMemoryTypeIndex(uint32_t AllowedTypes, VkMemoryPropertyFlags Properties);
 
@@ -36,7 +35,7 @@ namespace Core
 		bool CheckValidationLayersSupport(VkLayerProperties* Properties, uint32_t PropertiesSize,
 			const char** ValidationLeyersToCheck, uint32_t ValidationLeyersToCheckSize);
 		VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface);
-		VkPresentModeKHR GetBestPresentationMode(VkSurfaceKHR Surface);
+		
 
 		GPUBuffer CreateVertexBuffer(Vertex* Vertices, uint32_t VerticesCount);
 		GPUBuffer CreateIndexBuffer(uint32_t* Indices, uint32_t IndicesCount);
@@ -47,21 +46,15 @@ namespace Core
 		void CopyGPUBuffer(const GPUBuffer& srcBuffer, GPUBuffer& dstBuffer);
 		void CopyBufferToImage(VkBuffer SourceBuffer, VkImage Image, uint32_t Width, uint32_t Height);
 
-		VkImageView CreateImageView(VkImage Image, VkFormat Format, VkImageAspectFlags AspectFlags);
 		VkImage CreateImage(uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling,
 			VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkDeviceMemory* OutImageMemory);
 		VkDevice CreateLogicalDevice(PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
 			uint32_t DeviceExtensionsSize);
-		VkSwapchainKHR CreateSwapchain(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities, VkSurfaceKHR Surface,
-			VkSurfaceFormatKHR SurfaceFormat, VkExtent2D SwapExtent, VkPresentModeKHR PresentationMode,
-			PhysicalDeviceIndices DeviceIndices);
 		VkDescriptorPool CreateSamplerDescriptorPool(uint32_t Count);
 		VkSampler CreateTextureSampler();
 
 		bool SetupQueues();
 		bool IsFormatSupported(VkFormat Format, VkImageTiling Tiling, VkFormatFeatureFlags FeatureFlags);
-
-		void InitImageView(ViewportInstance* OutViewport, const std::vector<VkImage>& Images);
 
 	public:
 		MainInstance Instance;
@@ -79,12 +72,12 @@ namespace Core
 		// Todo: pass as AddViewport params? 
 		VkFormat ColorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Todo: check if VK_FORMAT_R8G8B8A8_UNORM supported
 		VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
-		VkPresentModeKHR PresentationMode = VK_PRESENT_MODE_FIFO_KHR;
-		VkSurfaceFormatKHR SurfaceFormat = { VK_FORMAT_UNDEFINED, static_cast<VkColorSpaceKHR>(0) };
 
 		VkSampler TextureSampler = nullptr;
 		VkDescriptorPool SamplerDescriptorPool = nullptr;
 		VkDescriptorSet* SamplerDescriptorSets = nullptr;
+
+		VkDescriptorPool DescriptorPool = nullptr;
 
 		//GenericBuffer* ModelDynamicUniformBuffers = nullptr;
 
