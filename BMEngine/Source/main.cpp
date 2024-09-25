@@ -83,7 +83,6 @@ void AddTexture(Core::VulkanRenderingSystem& RenderingSystem, const char* Textur
 Core::VulkanRenderingSystem* ins;
 void WindowCloseCallback(GLFWwindow* Window)
 {
-	ins->RemoveViewport(Window);
 	glfwDestroyWindow(Window);
 }
 
@@ -106,27 +105,19 @@ int main()
 		return -1;
 	}
 
-	GLFWwindow* Window2 = glfwCreateWindow(1600, 800, "BMEngine2", nullptr, nullptr);
-	if (Window2 == nullptr)
-	{
-		Util::Log::GlfwLogError();
-		glfwTerminate();
-		return -1;
-	}
-
 	Core::VulkanRenderingSystem RenderingSystem;
-	RenderingSystem.Init(Window, Window2);
+	RenderingSystem.Init(Window);
 
 	ins = &RenderingSystem;
 	
 
 
-	RenderingSystem.Viewports[0]->ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-		static_cast<float>(RenderingSystem.Viewports[0]->ViewportSwapchain.SwapExtent.width) / static_cast<float>(RenderingSystem.Viewports[0]->ViewportSwapchain.SwapExtent.height), 0.1f, 100.0f);
+	RenderingSystem.MainViewport.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
+		static_cast<float>(RenderingSystem.MainViewport.ViewportSwapchain.SwapExtent.width) / static_cast<float>(RenderingSystem.MainViewport.ViewportSwapchain.SwapExtent.height), 0.1f, 100.0f);
 
-	RenderingSystem.Viewports[0]->ViewProjection.Projection[1][1] *= -1;
+	RenderingSystem.MainViewport.ViewProjection.Projection[1][1] *= -1;
 
-	RenderingSystem.Viewports[0]->ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	RenderingSystem.MainViewport.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	const char* TestTexture = "./Resources/Textures/giraffe.jpg";
 	AddTexture(RenderingSystem, TestTexture);
@@ -223,16 +214,9 @@ int main()
 	const float RotationSpeed = 2.0f;
 	const float CameraSpeed = 10.0f;
 
-	RenderingSystem.Viewports[1]->ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-		static_cast<float>(RenderingSystem.Viewports[1]->ViewportSwapchain.SwapExtent.width) / static_cast<float>(RenderingSystem.Viewports[1]->ViewportSwapchain.SwapExtent.height), 0.1f, 100.0f);
-	RenderingSystem.Viewports[1]->ViewProjection.Projection[1][1] *= -1;
-	RenderingSystem.Viewports[1]->ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	Camera MainCamera;
 
-	Camera Cameras[2];
-
-	glfwSetWindowCloseCallback(Window2, WindowCloseCallback);
-
-	while (!glfwWindowShouldClose(RenderingSystem.Viewports[0]->Window))
+	while (!glfwWindowShouldClose(RenderingSystem.MainViewport.Window))
 	{
 		glfwPollEvents();
 
@@ -243,54 +227,49 @@ int main()
 		float CameraDeltaSpeed = CameraSpeed * DeltaTime;
 		float CameraDeltaRotationSpeed = RotationSpeed * DeltaTime;
 
-		for (int ViewportIndex = 0; ViewportIndex < RenderingSystem.ViewportsCount; ++ViewportIndex)
+		if (glfwGetKey(RenderingSystem.MainViewport.Window, GLFW_KEY_W) == GLFW_PRESS)
 		{
-			Core::ViewportInstance* ProcessedViewport = RenderingSystem.Viewports[ViewportIndex];
-
-			if (glfwGetKey(ProcessedViewport->Window, GLFW_KEY_W) == GLFW_PRESS)
-			{
-				Cameras[ViewportIndex].CameraPosition += CameraDeltaSpeed * Cameras[ViewportIndex].CameraFront;
-			}
-
-			if (glfwGetKey(ProcessedViewport->Window, GLFW_KEY_S) == GLFW_PRESS)
-			{
-				Cameras[ViewportIndex].CameraPosition -= CameraDeltaSpeed * Cameras[ViewportIndex].CameraFront;
-			}
-
-			if (glfwGetKey(ProcessedViewport->Window, GLFW_KEY_A) == GLFW_PRESS)
-			{
-				Cameras[ViewportIndex].CameraPosition -= glm::normalize(glm::cross(Cameras[ViewportIndex].CameraFront, Cameras[ViewportIndex].CameraUp)) * CameraDeltaSpeed;
-			}
-
-			if (glfwGetKey(ProcessedViewport->Window, GLFW_KEY_D) == GLFW_PRESS)
-			{
-				Cameras[ViewportIndex].CameraPosition += glm::normalize(glm::cross(Cameras[ViewportIndex].CameraFront, Cameras[ViewportIndex].CameraUp)) * CameraDeltaSpeed;
-			}
-
-			if (glfwGetKey(ProcessedViewport->Window, GLFW_KEY_SPACE) == GLFW_PRESS)
-			{
-				Cameras[ViewportIndex].CameraPosition += CameraDeltaSpeed * Cameras[ViewportIndex].CameraUp;
-			}
-
-			if (glfwGetKey(ProcessedViewport->Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
-			{
-				Cameras[ViewportIndex].CameraPosition -= CameraDeltaSpeed * Cameras[ViewportIndex].CameraUp;
-			}
-
-			if (glfwGetKey(ProcessedViewport->Window, GLFW_KEY_Q) == GLFW_PRESS)
-			{
-				glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), CameraDeltaRotationSpeed, Cameras[ViewportIndex].CameraUp);
-				Cameras[ViewportIndex].CameraFront = glm::mat3(rotation) * Cameras[ViewportIndex].CameraFront;
-			}
-
-			if (glfwGetKey(ProcessedViewport->Window, GLFW_KEY_E) == GLFW_PRESS)
-			{
-				glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), -CameraDeltaRotationSpeed, Cameras[ViewportIndex].CameraUp);
-				Cameras[ViewportIndex].CameraFront = glm::mat3(rotation) * Cameras[ViewportIndex].CameraFront;
-			}
-
-			ProcessedViewport->ViewProjection.View = glm::lookAt(Cameras[ViewportIndex].CameraPosition, Cameras[ViewportIndex].CameraPosition + Cameras[ViewportIndex].CameraFront, Cameras[ViewportIndex].CameraUp);
+			MainCamera.CameraPosition += CameraDeltaSpeed * MainCamera.CameraFront;
 		}
+
+		if (glfwGetKey(RenderingSystem.MainViewport.Window, GLFW_KEY_S) == GLFW_PRESS)
+		{
+			MainCamera.CameraPosition -= CameraDeltaSpeed * MainCamera.CameraFront;
+		}
+
+		if (glfwGetKey(RenderingSystem.MainViewport.Window, GLFW_KEY_A) == GLFW_PRESS)
+		{
+			MainCamera.CameraPosition -= glm::normalize(glm::cross(MainCamera.CameraFront, MainCamera.CameraUp)) * CameraDeltaSpeed;
+		}
+
+		if (glfwGetKey(RenderingSystem.MainViewport.Window, GLFW_KEY_D) == GLFW_PRESS)
+		{
+			MainCamera.CameraPosition += glm::normalize(glm::cross(MainCamera.CameraFront, MainCamera.CameraUp)) * CameraDeltaSpeed;
+		}
+
+		if (glfwGetKey(RenderingSystem.MainViewport.Window, GLFW_KEY_SPACE) == GLFW_PRESS)
+		{
+			MainCamera.CameraPosition += CameraDeltaSpeed * MainCamera.CameraUp;
+		}
+
+		if (glfwGetKey(RenderingSystem.MainViewport.Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+		{
+			MainCamera.CameraPosition -= CameraDeltaSpeed * MainCamera.CameraUp;
+		}
+
+		if (glfwGetKey(RenderingSystem.MainViewport.Window, GLFW_KEY_Q) == GLFW_PRESS)
+		{
+			glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), CameraDeltaRotationSpeed, MainCamera.CameraUp);
+			MainCamera.CameraFront = glm::mat3(rotation) * MainCamera.CameraFront;
+		}
+
+		if (glfwGetKey(RenderingSystem.MainViewport.Window, GLFW_KEY_E) == GLFW_PRESS)
+		{
+			glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), -CameraDeltaRotationSpeed, MainCamera.CameraUp);
+			MainCamera.CameraFront = glm::mat3(rotation) * MainCamera.CameraFront;
+		}
+
+		RenderingSystem.MainViewport.ViewProjection.View = glm::lookAt(MainCamera.CameraPosition, MainCamera.CameraPosition + MainCamera.CameraFront, MainCamera.CameraUp);
 
 		//Angle += 30.0f * static_cast<float>(DeltaTime);
 		//if (Angle > 360.0f)

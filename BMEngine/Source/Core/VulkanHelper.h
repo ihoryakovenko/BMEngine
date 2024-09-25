@@ -13,4 +13,13 @@ namespace Core
 
 	VkDescriptorPool CreateDescriptorPool(VkDevice LogicalDevice, VkDescriptorPoolSize* PoolSizes,
 		uint32_t PoolSizeCount, uint32_t MaxDescriptorCount);
+
+	uint32_t GetMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, uint32_t AllowedTypes, VkMemoryPropertyFlags Properties);
+
+	VkImage CreateImage(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, uint32_t Width, uint32_t Height,
+		VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags,
+		VkDeviceMemory* OutImageMemory);
+
+	void CreateDescriptorSets(VkDevice LogicalDevice, VkDescriptorPool DescriptorPool, VkDescriptorSetLayout* Layouts,
+		uint32_t DescriptorSetCount, VkDescriptorSet* OutSets);
 }

@@ -5,6 +5,169 @@
 
 namespace Core
 {
+	GPUBuffer GPUBuffer::CreateVertexBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
+		VkCommandPool TransferCommandPool, VkQueue TransferQueue, Vertex* Vertices, uint32_t VerticesCount)
+	{
+		const VkDeviceSize BufferSize = sizeof(Vertex) * VerticesCount;
+
+		GPUBuffer StagingBuffer = CreateGPUBuffer(PhysicalDevice, LogicalDevice, BufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+		void* Data;
+		vkMapMemory(LogicalDevice, StagingBuffer.Memory, 0, BufferSize, 0, &Data);
+		memcpy(Data, Vertices, (size_t)BufferSize);
+		vkUnmapMemory(LogicalDevice, StagingBuffer.Memory);
+
+		GPUBuffer vertexBuffer = CreateGPUBuffer(PhysicalDevice, LogicalDevice, BufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+		// Copy staging buffer to vertex buffer on GPU;
+		GPUBuffer::CopyGPUBuffer(LogicalDevice, TransferCommandPool, TransferQueue, StagingBuffer, vertexBuffer);
+		GPUBuffer::DestroyGPUBuffer(LogicalDevice, StagingBuffer);
+
+		return vertexBuffer;
+	}
+
+	GPUBuffer GPUBuffer::CreateIndexBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
+		VkCommandPool TransferCommandPool, VkQueue TransferQueue, uint32_t* Indices, uint32_t IndicesCount)
+	{
+		const VkDeviceSize BufferSize = sizeof(uint32_t) * IndicesCount;
+
+		GPUBuffer StagingBuffer = CreateGPUBuffer(PhysicalDevice, LogicalDevice, BufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+		void* Data;
+		vkMapMemory(LogicalDevice, StagingBuffer.Memory, 0, BufferSize, 0, &Data);
+		memcpy(Data, Indices, (size_t)BufferSize);
+		vkUnmapMemory(LogicalDevice, StagingBuffer.Memory);
+
+		// Create buffer for INDEX data on GPU access only area
+		GPUBuffer indexBuffer = CreateGPUBuffer(PhysicalDevice, LogicalDevice, BufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+		// Copy from staging buffer to GPU access buffer
+		GPUBuffer::CopyGPUBuffer(LogicalDevice, TransferCommandPool, TransferQueue, StagingBuffer, indexBuffer);
+		GPUBuffer::DestroyGPUBuffer(LogicalDevice, StagingBuffer);
+
+		return indexBuffer;
+	}
+
+	GPUBuffer GPUBuffer::CreateUniformBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, VkDeviceSize BufferSize)
+	{
+		GPUBuffer uniformBuffer = CreateGPUBuffer(PhysicalDevice, LogicalDevice, BufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		return uniformBuffer;
+	}
+
+	GPUBuffer GPUBuffer::CreateIndirectBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
+		VkCommandPool TransferCommandPool, VkQueue TransferQueue, const std::vector<VkDrawIndexedIndirectCommand>& DrawCommands)
+	{
+		const VkDeviceSize BufferSize = sizeof(VkDrawIndexedIndirectCommand) * DrawCommands.size();
+
+		GPUBuffer StagingBuffer = CreateGPUBuffer(PhysicalDevice, LogicalDevice, BufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+		void* Data;
+		vkMapMemory(LogicalDevice, StagingBuffer.Memory, 0, BufferSize, 0, &Data);
+		memcpy(Data, DrawCommands.data(), (size_t)BufferSize);
+		vkUnmapMemory(LogicalDevice, StagingBuffer.Memory);
+
+		GPUBuffer indirectBuffer = CreateGPUBuffer(PhysicalDevice, LogicalDevice, BufferSize, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+		// Copy from staging buffer to GPU access buffer
+		GPUBuffer::CopyGPUBuffer(LogicalDevice, TransferCommandPool, TransferQueue, StagingBuffer, indirectBuffer);
+		GPUBuffer::DestroyGPUBuffer(LogicalDevice, StagingBuffer);
+
+		return indirectBuffer;
+	}
+
+	GPUBuffer GPUBuffer::CreateGPUBuffer(VkPhysicalDevice PhysicalDevice,  VkDevice LogicalDevice, VkDeviceSize BufferSize, VkBufferUsageFlags bufferUsage, VkMemoryPropertyFlags bufferProperties)
+	{
+		assert(BufferSize > 0);
+
+		GPUBuffer Buffer;
+		Buffer.Size = BufferSize;
+
+		VkBufferCreateInfo bufferInfo = { };
+		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		bufferInfo.size = Buffer.Size;
+		bufferInfo.usage = bufferUsage;
+		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		VkResult Result = vkCreateBuffer(LogicalDevice, &bufferInfo, nullptr, &Buffer.Buffer);
+		if (Result != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to create a Vertex Buffer!");
+		}
+
+		VkMemoryRequirements memRequirements;
+		vkGetBufferMemoryRequirements(LogicalDevice, Buffer.Buffer, &memRequirements);
+
+		VkMemoryAllocateInfo memoryAllocInfo = { };
+		memoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		memoryAllocInfo.allocationSize = memRequirements.size;
+		memoryAllocInfo.memoryTypeIndex = GetMemoryTypeIndex(PhysicalDevice, memRequirements.memoryTypeBits,		// Index of memory type on Physical Device that has required bit flags
+			bufferProperties);																						// VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT	: CPU can interact with memory
+		// VK_MEMORY_PROPERTY_HOST_COHERENT_BIT	: Allows placement of data straight into buffer after mapping (otherwise would have to specify manually)
+		Result = vkAllocateMemory(LogicalDevice, &memoryAllocInfo, nullptr, &Buffer.Memory);
+		if (Result != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to allocate Vertex Buffer Memory!");
+		}
+
+		vkBindBufferMemory(LogicalDevice, Buffer.Buffer, Buffer.Memory, 0);
+
+		return Buffer;
+	}
+
+	void GPUBuffer::CopyGPUBuffer(VkDevice LogicalDevice, VkCommandPool TransferCommandPool, VkQueue TransferQueue,
+		const GPUBuffer& srcBuffer, GPUBuffer& dstBuffer)
+	{
+		assert(srcBuffer.Size <= dstBuffer.Size);
+
+		VkCommandBuffer transferCommandBuffer;
+
+		VkCommandBufferAllocateInfo allocInfo = { };
+		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		allocInfo.commandPool = TransferCommandPool;
+		allocInfo.commandBufferCount = 1;
+
+		vkAllocateCommandBuffers(LogicalDevice, &allocInfo, &transferCommandBuffer);
+
+		VkCommandBufferBeginInfo beginInfo = { };
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		// We're only using the command buffer once, so set up for one time submit
+		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+		vkBeginCommandBuffer(transferCommandBuffer, &beginInfo);
+
+		VkBufferCopy bufferCopyRegion = { };
+		bufferCopyRegion.srcOffset = 0;
+		bufferCopyRegion.dstOffset = 0;
+		bufferCopyRegion.size = srcBuffer.Size;
+
+		vkCmdCopyBuffer(transferCommandBuffer, srcBuffer.Buffer, dstBuffer.Buffer, 1, &bufferCopyRegion);
+		vkEndCommandBuffer(transferCommandBuffer);
+
+		VkSubmitInfo submitInfo = { };
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &transferCommandBuffer;
+
+		vkQueueSubmit(TransferQueue, 1, &submitInfo, VK_NULL_HANDLE);
+		vkQueueWaitIdle(TransferQueue);
+
+		vkFreeCommandBuffers(LogicalDevice, TransferCommandPool, 1, &transferCommandBuffer);
+	}
+
+	void GPUBuffer::DestroyGPUBuffer(VkDevice LogicalDevice, GPUBuffer& buffer)
+	{
+		vkDestroyBuffer(LogicalDevice, buffer.Buffer, nullptr);
+		vkFreeMemory(LogicalDevice, buffer.Memory, nullptr);
+	}
+
 	MainInstance MainInstance::CreateMainInstance(const char** RequiredExtensions, uint32_t RequiredExtensionsCount,
 		bool IsValidationLayersEnabled, const char* ValidationLayers[], uint32_t ValidationLayersSize)
 	{
@@ -74,39 +237,42 @@ namespace Core
 		vkDestroyInstance(Instance.VulkanInstance, nullptr);
 	}
 
-	void MainRenderPass::Init(VkDevice LogicalDevice, VkFormat ColorFormat, VkFormat DepthFormat,
-		VkSurfaceFormatKHR SurfaceFormat, int GraphicsFamily, uint32_t MaxDrawFrames,
-		VkExtent2D* SwapExtents, uint32_t SwapExtentsCount)
+	void MainRenderPass::GetPoolSizes(uint32_t TotalImagesCount, std::vector<VkDescriptorPoolSize>& TotalPassPoolSizes,
+		uint32_t& TotalDescriptorCount)
 	{
-		CreateVulkanPass(LogicalDevice, ColorFormat, DepthFormat, SurfaceFormat);
+		TotalPassPoolSizes.reserve(3);
+		TotalPassPoolSizes.push_back({ .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = TotalImagesCount });
+		TotalPassPoolSizes.push_back({ .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = TotalImagesCount });
+		TotalPassPoolSizes.push_back({ .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = TotalImagesCount });
 
-		PushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-		PushConstantRange.offset = 0;
-		// Todo: check constant and model size?
-		PushConstantRange.size = sizeof(Model);
-
-		CreateSamplerSetLayout(LogicalDevice);
-		CreateCommandPool(LogicalDevice, GraphicsFamily);
-		CreateSynchronisation(LogicalDevice, MaxDrawFrames);
-		CreateDescriptorSetLayout(LogicalDevice);
-		CreateInputSetLayout(LogicalDevice);
-		CreatePipelineLayouts(LogicalDevice);
-		CreatePipelines(LogicalDevice, SwapExtents, SwapExtentsCount);
+		uint32_t TotalDescriptorLayouts = 2;
+		TotalDescriptorCount = TotalDescriptorLayouts * TotalImagesCount;
 	}
 
-	void MainRenderPass::DeInit(VkDevice LogicalDevice)
+	void MainRenderPass::ClearResources(VkDevice LogicalDevice, uint32_t ImagesCount)
 	{
-		//TODO: FIX
-		//vkDestroyPipeline(LogicalDevice, Instance.GraphicsPipeline, nullptr);
-		//vkDestroyPipeline(LogicalDevice, Instance.GraphicsPipeline, nullptr);
-		DestroySynchronisation(LogicalDevice);
-		vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
-		vkDestroyPipelineLayout(LogicalDevice, SecondPipelineLayout, nullptr);
-		vkDestroyDescriptorSetLayout(LogicalDevice, DescriptorSetLayout, nullptr);
-		vkDestroyDescriptorSetLayout(LogicalDevice, InputSetLayout, nullptr);
+		for (uint32_t i = 0; i < ImagesCount; ++i)
+		{
+			vkDestroyImageView(LogicalDevice, DepthBuffers[i].ImageView, nullptr);
+			vkDestroyImage(LogicalDevice, DepthBuffers[i].Image, nullptr);
+			vkFreeMemory(LogicalDevice, DepthBuffers[i].Memory, nullptr);
+
+			vkDestroyImageView(LogicalDevice, ColorBuffers[i].ImageView, nullptr);
+			vkDestroyImage(LogicalDevice, ColorBuffers[i].Image, nullptr);
+			vkFreeMemory(LogicalDevice, ColorBuffers[i].Memory, nullptr);
+
+			GPUBuffer::GPUBuffer::DestroyGPUBuffer(LogicalDevice, VpUniformBuffers[i]);
+		}
+
+		DeferredPass.ClearResources(LogicalDevice);
+		EntityPass.ClearResources(LogicalDevice);
+
 		vkDestroyCommandPool(LogicalDevice, GraphicsCommandPool, nullptr);
-		vkDestroyDescriptorSetLayout(LogicalDevice, SamplerSetLayout, nullptr);
 		vkDestroyRenderPass(LogicalDevice, RenderPass, nullptr);
+
+		Util::Memory::Deallocate(DepthBuffers);
+		Util::Memory::Deallocate(ColorBuffers);
+		Util::Memory::Deallocate(VpUniformBuffers);
 	}
 
 	void MainRenderPass::CreateVulkanPass(VkDevice LogicalDevice, VkFormat ColorFormat, VkFormat DepthFormat, VkSurfaceFormatKHR SurfaceFormat)
@@ -245,6 +411,14 @@ namespace Core
 		}
 	}
 
+	void MainRenderPass::SetupPushConstants()
+	{
+		EntityPass.PushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		EntityPass.PushConstantRange.offset = 0;
+		// Todo: check constant and model size?
+		EntityPass.PushConstantRange.size = sizeof(Model);
+	}
+
 	void MainRenderPass::CreateSamplerSetLayout(VkDevice LogicalDevice)
 	{
 		VkDescriptorSetLayoutBinding SamplerLayoutBinding = { };
@@ -260,7 +434,8 @@ namespace Core
 		TextureLayoutCreateInfo.bindingCount = 1;
 		TextureLayoutCreateInfo.pBindings = &SamplerLayoutBinding;
 
-		const VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &TextureLayoutCreateInfo, nullptr, &SamplerSetLayout);
+		const VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &TextureLayoutCreateInfo,
+			nullptr, &EntityPass.SamplerSetLayout);
 		if (Result != VK_SUCCESS)
 		{
 			// TODO LOG
@@ -283,42 +458,6 @@ namespace Core
 		}
 	}
 
-	void MainRenderPass::CreateSynchronisation(VkDevice LogicalDevice, uint32_t MaxFrameDraws)
-	{
-		MaxFrameDrawsCounter = MaxFrameDraws;
-		ImageAvailable = static_cast<VkSemaphore*>(Util::Memory::Allocate(MaxFrameDraws * sizeof(VkSemaphore)));
-		RenderFinished = static_cast<VkSemaphore*>(Util::Memory::Allocate(MaxFrameDraws * sizeof(VkSemaphore)));
-		DrawFences = static_cast<VkFence*>(Util::Memory::Allocate(MaxFrameDraws * sizeof(VkFence)));
-
-		VkSemaphoreCreateInfo SemaphoreCreateInfo = { };
-		SemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-		// Fence creation information
-		VkFenceCreateInfo FenceCreateInfo = { };
-		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-		FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-		for (size_t i = 0; i < MaxFrameDraws; i++)
-		{
-			if (vkCreateSemaphore(LogicalDevice, &SemaphoreCreateInfo, nullptr, &ImageAvailable[i]) != VK_SUCCESS ||
-				vkCreateSemaphore(LogicalDevice, &SemaphoreCreateInfo, nullptr, &RenderFinished[i]) != VK_SUCCESS ||
-				vkCreateFence(LogicalDevice, &FenceCreateInfo, nullptr, &DrawFences[i]) != VK_SUCCESS)
-			{
-				Util::Log().Error("CreateSynchronisation error");
-				assert(false);
-			}
-		}
-	}
-
-	void MainRenderPass::DestroySynchronisation(VkDevice LogicalDevice)
-	{
-		for (size_t i = 0; i < MaxFrameDrawsCounter; i++)
-		{
-			vkDestroySemaphore(LogicalDevice, RenderFinished[i], nullptr);
-			vkDestroySemaphore(LogicalDevice, ImageAvailable[i], nullptr);
-			vkDestroyFence(LogicalDevice, DrawFences[i], nullptr);
-		}
-	}
 	void MainRenderPass::CreateDescriptorSetLayout(VkDevice LogicalDevice)
 	{
 		VkDescriptorSetLayoutBinding VpLayoutBinding = { };
@@ -337,7 +476,8 @@ namespace Core
 		LayoutCreateInfo.bindingCount = BindingCount;					// Number of binding infos
 		LayoutCreateInfo.pBindings = Bindings;		// Array of binding infos
 
-		VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo, nullptr, &DescriptorSetLayout);
+		VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo,
+			nullptr, &EntityPass.EntitySetLayout);
 		if (Result != VK_SUCCESS)
 		{
 			//TODO LOG
@@ -374,7 +514,8 @@ namespace Core
 		InputLayoutCreateInfo.pBindings = InputBindings;
 
 		// Create Descriptor Set Layout
-		const VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &InputLayoutCreateInfo, nullptr, &InputSetLayout);
+		const VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &InputLayoutCreateInfo,
+			nullptr, &DeferredPass.DefferedLayout);
 		if (Result != VK_SUCCESS)
 		{
 			// TODO LOG
@@ -386,16 +527,18 @@ namespace Core
 	{
 		// Pipeline layout
 		const uint32_t DescriptorSetLayoutsCount = 2;
-		VkDescriptorSetLayout DescriptorSetLayouts[DescriptorSetLayoutsCount] = { DescriptorSetLayout, SamplerSetLayout };
+		VkDescriptorSetLayout DescriptorSetLayouts[DescriptorSetLayoutsCount] = {
+			EntityPass.EntitySetLayout, EntityPass.SamplerSetLayout
+		};
 
 		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
 		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		PipelineLayoutCreateInfo.setLayoutCount = DescriptorSetLayoutsCount;
 		PipelineLayoutCreateInfo.pSetLayouts = DescriptorSetLayouts;
 		PipelineLayoutCreateInfo.pushConstantRangeCount = 1;
-		PipelineLayoutCreateInfo.pPushConstantRanges = &PushConstantRange;
+		PipelineLayoutCreateInfo.pPushConstantRanges = &EntityPass.PushConstantRange;
 
-		VkResult Result = vkCreatePipelineLayout(LogicalDevice, &PipelineLayoutCreateInfo, nullptr, &PipelineLayout);
+		VkResult Result = vkCreatePipelineLayout(LogicalDevice, &PipelineLayoutCreateInfo, nullptr, &EntityPass.PipelineLayout);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkCreatePipelineLayout result is {}", static_cast<int>(Result));
@@ -406,11 +549,11 @@ namespace Core
 		VkPipelineLayoutCreateInfo SecondPipelineLayoutCreateInfo = { };
 		SecondPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		SecondPipelineLayoutCreateInfo.setLayoutCount = 1;
-		SecondPipelineLayoutCreateInfo.pSetLayouts = &InputSetLayout;
+		SecondPipelineLayoutCreateInfo.pSetLayouts = &DeferredPass.DefferedLayout;
 		SecondPipelineLayoutCreateInfo.pushConstantRangeCount = 0;
 		SecondPipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
 
-		Result = vkCreatePipelineLayout(LogicalDevice, &SecondPipelineLayoutCreateInfo, nullptr, &SecondPipelineLayout);
+		Result = vkCreatePipelineLayout(LogicalDevice, &SecondPipelineLayoutCreateInfo, nullptr, &DeferredPass.PipelineLayout);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkCreatePipelineLayout result is {}", static_cast<int>(Result));
@@ -418,7 +561,7 @@ namespace Core
 		}
 	}
 
-	void MainRenderPass::CreatePipelines(VkDevice LogicalDevice, VkExtent2D* SwapExtents, uint32_t SwapExtentsCount)
+	void MainRenderPass::CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent)
 	{
 		// TODO FIX!!!
 		// Todo: move to function to avoid code duplication?
@@ -426,28 +569,25 @@ namespace Core
 // TODO FIX!!!
 
 				// Viewport and scissor
-		VkViewport Viewports[4]; //TODO: CHECK 4
-		VkRect2D Scissors[4];
+		VkViewport Viewport; //TODO: CHECK 4
+		VkRect2D Scissor;
 
-		for (int i = 0; i < SwapExtentsCount; ++i)
-		{
-			Viewports[i].x = 0.0f;
-			Viewports[i].y = 0.0f;
-			Viewports[i].width = static_cast<float>(SwapExtents[i].width);
-			Viewports[i].height = static_cast<float>(SwapExtents[i].height);
-			Viewports[i].minDepth = 0.0f;
-			Viewports[i].maxDepth = 1.0f;
+		Viewport.x = 0.0f;
+		Viewport.y = 0.0f;
+		Viewport.width = static_cast<float>(SwapExtent.width);
+		Viewport.height = static_cast<float>(SwapExtent.height);
+		Viewport.minDepth = 0.0f;
+		Viewport.maxDepth = 1.0f;
 
-			Scissors[i].offset = { 0, 0 };
-			Scissors[i].extent = SwapExtents[i];
-		}
+		Scissor.offset = { 0, 0 };
+		Scissor.extent = SwapExtent;
 
 		VkPipelineViewportStateCreateInfo ViewportStateCreateInfo = { };
 		ViewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-		ViewportStateCreateInfo.viewportCount = SwapExtentsCount;
-		ViewportStateCreateInfo.pViewports = Viewports;
-		ViewportStateCreateInfo.scissorCount = SwapExtentsCount;
-		ViewportStateCreateInfo.pScissors = Scissors;
+		ViewportStateCreateInfo.viewportCount = 1;
+		ViewportStateCreateInfo.pViewports = &Viewport;
+		ViewportStateCreateInfo.scissorCount = 1;
+		ViewportStateCreateInfo.pScissors = &Scissor;
 
 		std::vector<char> VertexShaderCode;
 		std::vector<char> FragmentShaderCode;
@@ -640,7 +780,7 @@ namespace Core
 		GraphicsPipelineCreateInfos[0].pMultisampleState = &MultisampleStateCreateInfo;
 		GraphicsPipelineCreateInfos[0].pColorBlendState = &ColorBlendingCreateInfo;
 		GraphicsPipelineCreateInfos[0].pDepthStencilState = &DepthStencilCreateInfo;
-		GraphicsPipelineCreateInfos[0].layout = PipelineLayout;							// Pipeline Layout pipeline should use
+		GraphicsPipelineCreateInfos[0].layout = EntityPass.PipelineLayout;							// Pipeline Layout pipeline should use
 		GraphicsPipelineCreateInfos[0].renderPass = RenderPass;							// Render pass description the pipeline is compatible with
 		GraphicsPipelineCreateInfos[0].subpass = 0;										// Subpass of render pass to use with pipeline
 
@@ -652,7 +792,7 @@ namespace Core
 		GraphicsPipelineCreateInfos[1].pDepthStencilState = &SecondDepthStencilCreateInfo;
 		GraphicsPipelineCreateInfos[1].pVertexInputState = &SecondVertexInputCreateInfo;
 		GraphicsPipelineCreateInfos[1].pStages = SecondShaderStages;	// Update second shader stage list
-		GraphicsPipelineCreateInfos[1].layout = SecondPipelineLayout;	// Change pipeline layout for input attachment descriptor sets
+		GraphicsPipelineCreateInfos[1].layout = DeferredPass.PipelineLayout;	// Change pipeline layout for input attachment descriptor sets
 		GraphicsPipelineCreateInfos[1].subpass = 1;						// Use second subpass
 
 		VkPipeline Pipelines[2];
@@ -666,13 +806,140 @@ namespace Core
 			assert(false);
 		}
 
-		GraphicsPipeline = Pipelines[0];
-		SecondPipeline = Pipelines[1];
+		EntityPass.Pipeline = Pipelines[0];
+		DeferredPass.Pipeline = Pipelines[1];
 
 		vkDestroyShaderModule(LogicalDevice, FragmentShaderModule, nullptr);
 		vkDestroyShaderModule(LogicalDevice, VertexShaderModule, nullptr);
 		vkDestroyShaderModule(LogicalDevice, SecondFragmentShaderModule, nullptr);
 		vkDestroyShaderModule(LogicalDevice, SecondVertexShaderModule, nullptr);
+	}
+
+	void MainRenderPass::CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, uint32_t ImagesCount, VkExtent2D SwapExtent,
+		VkFormat DepthFormat, VkFormat ColorFormat)
+	{
+		DepthBuffers = static_cast<ImageBuffer*>(Util::Memory::Allocate(ImagesCount * sizeof(ImageBuffer)));
+		ColorBuffers = static_cast<ImageBuffer*>(Util::Memory::Allocate(ImagesCount * sizeof(ImageBuffer)));
+
+		for (uint32_t i = 0; i < ImagesCount; ++i)
+		{
+			DepthBuffers[i].Image = CreateImage(PhysicalDevice, LogicalDevice, SwapExtent.width, SwapExtent.height,
+				DepthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+				&DepthBuffers[i].Memory);
+
+			DepthBuffers[i].ImageView = CreateImageView(LogicalDevice, DepthBuffers[i].Image, DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+			// VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT says that image can be used only as attachment. Used only for sub pass
+			ColorBuffers[i].Image = CreateImage(PhysicalDevice, LogicalDevice, SwapExtent.width, SwapExtent.height,
+				ColorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+				&ColorBuffers[i].Memory);
+
+			ColorBuffers[i].ImageView = CreateImageView(LogicalDevice, ColorBuffers[i].Image, ColorFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+		}
+	}
+
+	void MainRenderPass::CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
+		uint32_t ImagesCount)
+	{
+		const VkDeviceSize VpBufferSize = sizeof(UboViewProjection);
+
+		VpUniformBuffers = static_cast<GPUBuffer*>(Util::Memory::Allocate(ImagesCount * sizeof(GPUBuffer)));
+		for (uint32_t i = 0; i < ImagesCount; i++)
+		{
+			VpUniformBuffers[i] = GPUBuffer::CreateUniformBuffer(PhysicalDevice, LogicalDevice, VpBufferSize);
+		}
+	}
+
+	void MainRenderPass::CreateSets(VkDevice LogicalDevice, VkDescriptorPool DescriptorPool, uint32_t ImagesCount)
+	{
+		EntityPass.EntitySets = static_cast<VkDescriptorSet*>(Util::Memory::Allocate(ImagesCount * sizeof(VkDescriptorSet)));
+		DeferredPass.DefferedSets = static_cast<VkDescriptorSet*>(Util::Memory::Allocate(ImagesCount * sizeof(VkDescriptorSet)));
+
+		VkDescriptorSetLayout* SetLayouts = static_cast<VkDescriptorSetLayout*>(Util::Memory::Allocate(ImagesCount * sizeof(VkDescriptorSetLayout)));
+		for (uint32_t i = 0; i < ImagesCount; i++)
+		{
+			SetLayouts[i] = EntityPass.EntitySetLayout;
+		}
+
+		CreateDescriptorSets(LogicalDevice, DescriptorPool, SetLayouts, ImagesCount, EntityPass.EntitySets);
+
+		VkDescriptorBufferInfo VpBufferInfo = { };
+		// UNIFORM BUFFER SETUP CODE
+		//VkDescriptorBufferInfo ModelBufferInfo = {};
+		// Update all of descriptor set buffer bindings
+		for (uint32_t i = 0; i < ImagesCount; i++)
+		{
+			// Todo: validate
+			VpBufferInfo.buffer = VpUniformBuffers[i].Buffer;
+			VpBufferInfo.offset = 0;
+			VpBufferInfo.range = sizeof(UboViewProjection);
+
+			VkWriteDescriptorSet VpSetWrite = { };
+			VpSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			VpSetWrite.dstSet = EntityPass.EntitySets[i];
+			VpSetWrite.dstBinding = 0;
+			VpSetWrite.dstArrayElement = 0;
+			VpSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			VpSetWrite.descriptorCount = 1;
+			VpSetWrite.pBufferInfo = &VpBufferInfo;
+
+			const uint32_t WriteSetsCount = 1;
+			// Todo: do not copy
+			VkWriteDescriptorSet WriteSets[WriteSetsCount] = { VpSetWrite };
+
+			// Todo: use one vkUpdateDescriptorSets call to update all descriptors
+			vkUpdateDescriptorSets(LogicalDevice, WriteSetsCount, WriteSets, 0, nullptr);
+		}
+
+		for (uint32_t i = 0; i < ImagesCount; i++)
+		{
+			SetLayouts[i] = DeferredPass.DefferedLayout;
+		}
+
+		CreateDescriptorSets(LogicalDevice, DescriptorPool, SetLayouts, ImagesCount, DeferredPass.DefferedSets);
+
+		// Todo: move this and previus loop to function?
+		for (size_t i = 0; i < ImagesCount; i++)
+		{
+			// Todo: move from loop?
+			VkDescriptorImageInfo ColourAttachmentDescriptor = { };
+			ColourAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			ColourAttachmentDescriptor.imageView = ColorBuffers[i].ImageView;
+			ColourAttachmentDescriptor.sampler = VK_NULL_HANDLE;
+
+			VkWriteDescriptorSet ColourWrite = { };
+			ColourWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			ColourWrite.dstSet = DeferredPass.DefferedSets[i];
+			ColourWrite.dstBinding = 0;
+			ColourWrite.dstArrayElement = 0;
+			ColourWrite.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+			ColourWrite.descriptorCount = 1;
+			ColourWrite.pImageInfo = &ColourAttachmentDescriptor;
+
+			VkDescriptorImageInfo DepthAttachmentDescriptor = { };
+			DepthAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			DepthAttachmentDescriptor.imageView = DepthBuffers[i].ImageView;
+			DepthAttachmentDescriptor.sampler = VK_NULL_HANDLE;
+
+			VkWriteDescriptorSet DepthWrite = { };
+			DepthWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			DepthWrite.dstSet = DeferredPass.DefferedSets[i];
+			DepthWrite.dstBinding = 1;
+			DepthWrite.dstArrayElement = 0;
+			DepthWrite.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+			DepthWrite.descriptorCount = 1;
+			DepthWrite.pImageInfo = &DepthAttachmentDescriptor;
+
+
+			// Todo: do not copy
+			const uint32_t CetWritesCount = 2;
+			VkWriteDescriptorSet SetWrites[CetWritesCount] = { ColourWrite, DepthWrite };
+
+			// Update descriptor sets
+			vkUpdateDescriptorSets(LogicalDevice, CetWritesCount, SetWrites, 0, nullptr);
+		}
+
+		Util::Memory::Deallocate(SetLayouts);
 	}
 
 	void DeviceInstance::Init(VkInstance VulkanInstance, VkSurfaceKHR Surface, const char** DeviceExtensions,
@@ -992,5 +1259,29 @@ namespace Core
 
 		Images.resize(Count);
 		vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &Count, Images.data());
+	}
+
+	void EntitySubpass::ClearResources(VkDevice LogicalDevice)
+	{
+		
+		vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
+		vkDestroyPipeline(LogicalDevice, Pipeline, nullptr);
+		vkDestroyDescriptorSetLayout(LogicalDevice, EntitySetLayout, nullptr);
+		vkDestroyDescriptorSetLayout(LogicalDevice, SamplerSetLayout, nullptr);
+
+		Util::Memory::Deallocate(EntitySets);
+	}
+
+	void DeferredSubpass::ClearResources(VkDevice LogicalDevice)
+	{
+		vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
+		vkDestroyPipeline(LogicalDevice, Pipeline, nullptr);
+		vkDestroyDescriptorSetLayout(LogicalDevice, DefferedLayout, nullptr);
+
+		Util::Memory::Deallocate(DefferedSets);
+	}
+
+	void TerrainSubpass::ClearResources(VkDevice LogicalDevice)
+	{
 	}
 }

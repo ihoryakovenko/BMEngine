@@ -8,17 +8,16 @@ namespace Core
 	class VulkanRenderingSystem
 	{
 	public:
-		bool Init(GLFWwindow* Window, GLFWwindow* Window2);
+		bool Init(GLFWwindow* Window);
 		void DeInit();
 
 		// VulkanRenderInstance
 		void CreateImageBuffer(stbi_uc* TextureData, int Width, int Height, VkDeviceSize ImageSize);
 		void InitViewport(GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstance* OutViewport,
-			VkDescriptorPool DescriptorPool, SwapchainInstance SwapInstance);
+			VkDescriptorPool DescriptorPool, SwapchainInstance SwapInstance, ImageBuffer* ColorBuffers, ImageBuffer* DepthBuffers);
 		void DeinitViewport(ViewportInstance* Viewport);
 		bool LoadMesh(Mesh Mesh);
 		bool Draw();
-		void RemoveViewport(GLFWwindow* Window);
 
 	private:
 		void GetAvailableExtensionProperties(std::vector<VkExtensionProperties>& Data);
@@ -28,7 +27,6 @@ namespace Core
 		void GetSurfaceFormats(VkSurfaceKHR Surface, std::vector<VkSurfaceFormatKHR>& SurfaceFormats);
 		
 		VkExtent2D GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities, GLFWwindow* Window);
-		uint32_t GetMemoryTypeIndex(uint32_t AllowedTypes, VkMemoryPropertyFlags Properties);
 
 		bool CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, uint32_t AvailableExtensionsCount,
 			const char** RequiredExtensions, uint32_t RequiredExtensionsCount);
@@ -36,18 +34,8 @@ namespace Core
 			const char** ValidationLeyersToCheck, uint32_t ValidationLeyersToCheckSize);
 		VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface);
 		
-
-		GPUBuffer CreateVertexBuffer(Vertex* Vertices, uint32_t VerticesCount);
-		GPUBuffer CreateIndexBuffer(uint32_t* Indices, uint32_t IndicesCount);
-		GPUBuffer CreateUniformBuffer(VkDeviceSize bufferSize);
-		GPUBuffer CreateIndirectBuffer(const std::vector<VkDrawIndexedIndirectCommand>& drawCommands);
-		GPUBuffer CreateGPUBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags bufferUsage, VkMemoryPropertyFlags bufferProperties);
-		void DestroyGPUBuffer(GPUBuffer& buffer);
-		void CopyGPUBuffer(const GPUBuffer& srcBuffer, GPUBuffer& dstBuffer);
 		void CopyBufferToImage(VkBuffer SourceBuffer, VkImage Image, uint32_t Width, uint32_t Height);
 
-		VkImage CreateImage(uint32_t Width, uint32_t Height, VkFormat Format, VkImageTiling Tiling,
-			VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags, VkDeviceMemory* OutImageMemory);
 		VkDevice CreateLogicalDevice(PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
 			uint32_t DeviceExtensionsSize);
 		VkDescriptorPool CreateSamplerDescriptorPool(uint32_t Count);
@@ -56,14 +44,15 @@ namespace Core
 		bool SetupQueues();
 		bool IsFormatSupported(VkFormat Format, VkImageTiling Tiling, VkFormatFeatureFlags FeatureFlags);
 
+		void CreateSynchronisation();
+		void DestroySynchronisation();
+
 	public:
 		MainInstance Instance;
 		VkDevice LogicalDevice = nullptr;
 		DeviceInstance Device;
 		MainRenderPass MainPass;
 
-		uint32_t ViewportsCount = 0;
-		ViewportInstance* Viewports[2];
 		ViewportInstance MainViewport;
 
 		VkQueue GraphicsQueue = nullptr;
@@ -83,6 +72,10 @@ namespace Core
 
 		//uint32_t ModelUniformAlignment = 0;
 		//UboModel* ModelTransferSpace = nullptr;
+
+		VkSemaphore* ImageAvailable = nullptr;
+		VkSemaphore* RenderFinished = nullptr;
+		VkFence* DrawFences = nullptr;
 
 		const uint32_t MaxObjects = 528;
 		uint32_t DrawableObjectsCount = 0;

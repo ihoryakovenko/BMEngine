@@ -24,18 +24,31 @@ namespace Core
 		int PresentationFamily = -1;
 	};
 
-	struct GPUBuffer
-	{
-		VkBuffer Buffer = 0;
-		VkDeviceMemory Memory = 0;
-		VkDeviceSize Size = 0;
-	};
-
 	struct Vertex
 	{
 		glm::vec3 Position;
 		glm::vec3 Color;
 		glm::vec2 TextureCoords;
+	};
+
+	struct GPUBuffer
+	{
+		static void DestroyGPUBuffer(VkDevice LogicalDevice, GPUBuffer& buffer);
+		static GPUBuffer CreateVertexBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
+			VkCommandPool TransferCommandPool, VkQueue TransferQueue, Vertex* Vertices, uint32_t VerticesCount);
+		static GPUBuffer CreateIndexBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
+			VkCommandPool TransferCommandPool, VkQueue TransferQueue, uint32_t* Indices, uint32_t IndicesCount);
+		static GPUBuffer CreateUniformBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, VkDeviceSize bufferSize);
+		static GPUBuffer CreateIndirectBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
+			VkCommandPool TransferCommandPool, VkQueue TransferQueue, const std::vector<VkDrawIndexedIndirectCommand>& DrawCommands);
+		static GPUBuffer CreateGPUBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, VkDeviceSize bufferSize, VkBufferUsageFlags bufferUsage, VkMemoryPropertyFlags bufferProperties);
+
+		static void CopyGPUBuffer(VkDevice LogicalDevice, VkCommandPool TransferCommandPool, VkQueue TransferQueue,
+			const GPUBuffer& srcBuffer, GPUBuffer& dstBuffer);
+
+		VkBuffer Buffer = 0;
+		VkDeviceMemory Memory = 0;
+		VkDeviceSize Size = 0;
 	};
 
 	struct Mesh
@@ -131,55 +144,72 @@ namespace Core
 
 		VkFramebuffer* SwapchainFramebuffers = nullptr;
 		VkCommandBuffer* CommandBuffers = nullptr;
-		ImageBuffer* ColorBuffers = nullptr;
-		ImageBuffer* DepthBuffers = nullptr;
-
-		// TDOD: Move to renderpass
-		VkDescriptorSet* DescriptorSets = nullptr;
-		VkDescriptorSet* InputDescriptorSets = nullptr;
-
-		GPUBuffer* VpUniformBuffers = nullptr;
 		UboViewProjection ViewProjection;
+	};
+
+	struct TerrainSubpass
+	{
+		void ClearResources(VkDevice LogicalDevice);
+
+		VkPipelineLayout PipelineLayout = nullptr;
+		VkPipeline Pipeline = nullptr;
+	};
+
+	struct EntitySubpass
+	{
+		void ClearResources(VkDevice LogicalDevice);
+
+		VkPipelineLayout PipelineLayout = nullptr;
+		VkPipeline Pipeline = nullptr;
+
+		VkPushConstantRange PushConstantRange;
+		VkDescriptorSetLayout SamplerSetLayout = nullptr;
+		VkDescriptorSetLayout EntitySetLayout = nullptr;
+		VkDescriptorSet* EntitySets = nullptr;
+	};
+
+	struct DeferredSubpass
+	{
+		void ClearResources(VkDevice LogicalDevice);
+
+		VkPipelineLayout PipelineLayout = nullptr;
+		VkPipeline Pipeline = nullptr;
+
+		VkDescriptorSetLayout DefferedLayout = nullptr;
+		VkDescriptorSet* DefferedSets = nullptr;
 	};
 
 	struct MainRenderPass
 	{
-		void Init(VkDevice LogicalDevice, VkFormat ColorFormat, VkFormat DepthFormat,
-			VkSurfaceFormatKHR SurfaceFormat, int GraphicsFamily, uint32_t MaxDrawFrames,
-			VkExtent2D* SwapExtents, uint32_t SwapExtentsCount);
+		static void GetPoolSizes(uint32_t TotalImagesCount, std::vector<VkDescriptorPoolSize>& TotalPassPoolSizes,
+			uint32_t& TotalDescriptorCount);
 
-		void DeInit(VkDevice LogicalDevice);
+		void ClearResources(VkDevice LogicalDevice, uint32_t ImagesCount);
 
-		VkRenderPass RenderPass = nullptr;
-
-		uint32_t MaxFrameDrawsCounter = 0;
-		VkSemaphore* ImageAvailable = nullptr;
-		VkSemaphore* RenderFinished = nullptr;
-		VkFence* DrawFences = nullptr;
-
-		VkPushConstantRange PushConstantRange;
-		VkDescriptorSetLayout SamplerSetLayout = nullptr;
-		VkDescriptorSetLayout DescriptorSetLayout = nullptr;
-		VkDescriptorSetLayout InputSetLayout = nullptr; // Set for different pipeline, goes to different shader
-
-		VkPipelineLayout PipelineLayout = nullptr;
-		VkPipelineLayout SecondPipelineLayout = nullptr;
-
-		VkPipeline GraphicsPipeline = nullptr;
-		VkPipeline SecondPipeline = nullptr;
-
-		VkCommandPool GraphicsCommandPool = nullptr;
-
-	private:
 		void CreateVulkanPass(VkDevice LogicalDevice, VkFormat ColorFormat, VkFormat DepthFormat,
 			VkSurfaceFormatKHR SurfaceFormat);
+		void SetupPushConstants();
 		void CreateSamplerSetLayout(VkDevice LogicalDevice);
 		void CreateCommandPool(VkDevice LogicalDevice, uint32_t FamilyIndex);
-		void CreateSynchronisation(VkDevice LogicalDevice, uint32_t MaxFrameDraws);
-		void DestroySynchronisation(VkDevice LogicalDevice);
 		void CreateDescriptorSetLayout(VkDevice LogicalDevice);
 		void CreateInputSetLayout(VkDevice LogicalDevice);
 		void CreatePipelineLayouts(VkDevice LogicalDevice);
-		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D* SwapExtents, uint32_t SwapExtentsCount);
+		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent);
+		void CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, uint32_t ImagesCount, VkExtent2D SwapExtent,
+			VkFormat DepthFormat, VkFormat ColorFormat);
+		void CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
+			uint32_t ImagesCount);
+		void CreateSets(VkDevice LogicalDevice, VkDescriptorPool DescriptorPool, uint32_t ImagesCount);
+
+		VkRenderPass RenderPass = nullptr;
+
+		EntitySubpass EntityPass;
+		DeferredSubpass DeferredPass;
+
+		VkCommandPool GraphicsCommandPool = nullptr;
+
+		ImageBuffer* ColorBuffers = nullptr;
+		ImageBuffer* DepthBuffers = nullptr;
+		GPUBuffer* VpUniformBuffers = nullptr;
 	};
 }
