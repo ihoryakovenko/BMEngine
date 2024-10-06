@@ -17,6 +17,7 @@ namespace Core
 			VkDescriptorPool DescriptorPool, SwapchainInstance SwapInstance, ImageBuffer* ColorBuffers, ImageBuffer* DepthBuffers);
 		void DeinitViewport(ViewportInstance* Viewport);
 		bool LoadMesh(Mesh Mesh);
+		bool LoadTerrain();
 		bool Draw();
 
 	private:
@@ -68,11 +69,6 @@ namespace Core
 
 		VkDescriptorPool DescriptorPool = nullptr;
 
-		//GenericBuffer* ModelDynamicUniformBuffers = nullptr;
-
-		//uint32_t ModelUniformAlignment = 0;
-		//UboModel* ModelTransferSpace = nullptr;
-
 		VkSemaphore* ImageAvailable = nullptr;
 		VkSemaphore* RenderFinished = nullptr;
 		VkFence* DrawFences = nullptr;
@@ -88,5 +84,12 @@ namespace Core
 		uint32_t TextureImagesCount = 0;
 		// Todo: have single TextureImagesMemory and VkImage offset references in it
 		ImageBuffer TextureImageBuffer[64];
+
+
+		uint32_t TerrainVerticesCount = 0;
+		GPUBuffer TerrainVertexBuffer;
+
+		uint32_t TerrainIndicesCount = 0;
+		GPUBuffer TerrainIndexBuffer;
 	};
 }

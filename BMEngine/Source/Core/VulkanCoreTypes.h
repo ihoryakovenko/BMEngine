@@ -39,8 +39,6 @@ namespace Core
 	struct GPUBuffer
 	{
 		static void DestroyGPUBuffer(VkDevice LogicalDevice, GPUBuffer& buffer);
-		static GPUBuffer CreateVertexBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
-			VkCommandPool TransferCommandPool, VkQueue TransferQueue, Vertex* Vertices, uint32_t VerticesCount);
 		static GPUBuffer CreateIndexBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
 			VkCommandPool TransferCommandPool, VkQueue TransferQueue, uint32_t* Indices, uint32_t IndicesCount);
 		static GPUBuffer CreateUniformBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, VkDeviceSize bufferSize);
@@ -50,6 +48,30 @@ namespace Core
 
 		static void CopyGPUBuffer(VkDevice LogicalDevice, VkCommandPool TransferCommandPool, VkQueue TransferQueue,
 			const GPUBuffer& srcBuffer, GPUBuffer& dstBuffer);
+
+		template <typename T>
+		static GPUBuffer CreateVertexBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
+			VkCommandPool TransferCommandPool, VkQueue TransferQueue, T* Vertices, uint32_t VerticesCount)
+		{
+			const VkDeviceSize BufferSize = sizeof(T) * VerticesCount;
+
+			GPUBuffer StagingBuffer = CreateGPUBuffer(PhysicalDevice, LogicalDevice, BufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+			void* Data;
+			vkMapMemory(LogicalDevice, StagingBuffer.Memory, 0, BufferSize, 0, &Data);
+			memcpy(Data, Vertices, (size_t)BufferSize);
+			vkUnmapMemory(LogicalDevice, StagingBuffer.Memory);
+
+			GPUBuffer vertexBuffer = CreateGPUBuffer(PhysicalDevice, LogicalDevice, BufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+			// Copy staging buffer to vertex buffer on GPU;
+			GPUBuffer::CopyGPUBuffer(LogicalDevice, TransferCommandPool, TransferQueue, StagingBuffer, vertexBuffer);
+			GPUBuffer::DestroyGPUBuffer(LogicalDevice, StagingBuffer);
+
+			return vertexBuffer;
+		}
 
 		VkBuffer Buffer = 0;
 		VkDeviceMemory Memory = 0;

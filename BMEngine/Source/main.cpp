@@ -207,6 +207,8 @@ int main()
 		RenderingSystem.DrawableObjects[RenderingSystem.DrawableObjectsCount - 1].TextureId = ModelMeshes[i].TextureId;
 	}
 
+	RenderingSystem.LoadTerrain();
+
 	float Angle = 0.0f;
 	double DeltaTime = 0.0f;
 	double LastTime = 0.0f;

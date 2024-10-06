@@ -5,29 +5,6 @@
 
 namespace Core
 {
-	GPUBuffer GPUBuffer::CreateVertexBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
-		VkCommandPool TransferCommandPool, VkQueue TransferQueue, Vertex* Vertices, uint32_t VerticesCount)
-	{
-		const VkDeviceSize BufferSize = sizeof(Vertex) * VerticesCount;
-
-		GPUBuffer StagingBuffer = CreateGPUBuffer(PhysicalDevice, LogicalDevice, BufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-		void* Data;
-		vkMapMemory(LogicalDevice, StagingBuffer.Memory, 0, BufferSize, 0, &Data);
-		memcpy(Data, Vertices, (size_t)BufferSize);
-		vkUnmapMemory(LogicalDevice, StagingBuffer.Memory);
-
-		GPUBuffer vertexBuffer = CreateGPUBuffer(PhysicalDevice, LogicalDevice, BufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-		// Copy staging buffer to vertex buffer on GPU;
-		GPUBuffer::CopyGPUBuffer(LogicalDevice, TransferCommandPool, TransferQueue, StagingBuffer, vertexBuffer);
-		GPUBuffer::DestroyGPUBuffer(LogicalDevice, StagingBuffer);
-
-		return vertexBuffer;
-	}
-
 	GPUBuffer GPUBuffer::CreateIndexBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
 		VkCommandPool TransferCommandPool, VkQueue TransferQueue, uint32_t* Indices, uint32_t IndicesCount)
 	{
@@ -265,6 +242,7 @@ namespace Core
 			GPUBuffer::GPUBuffer::DestroyGPUBuffer(LogicalDevice, VpUniformBuffers[i]);
 		}
 
+		TerrainPass.ClearResources(LogicalDevice);
 		DeferredPass.ClearResources(LogicalDevice);
 		EntityPass.ClearResources(LogicalDevice);
 
@@ -422,43 +400,6 @@ namespace Core
 		SubpassDependencies[ExitDependenciesIndex].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 		SubpassDependencies[ExitDependenciesIndex].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
 		SubpassDependencies[ExitDependenciesIndex].dependencyFlags = 0;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-		//// Subpass 1 layout (colour/depth) to Subpass 2 layout (shader read)
-		//SubpassDependencies[1].srcSubpass = 0;
-		//SubpassDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		//SubpassDependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		//SubpassDependencies[1].dstSubpass = 1;
-		//SubpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-		//SubpassDependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-		//SubpassDependencies[1].dependencyFlags = 0;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 		// Create the render pass
 		VkRenderPassCreateInfo RenderPassCreateInfo = { };
@@ -1057,7 +998,8 @@ namespace Core
 
 			//TODO FIX
 			VpSetWrite.dstSet = TerrainPass.TerrainSets[i];
-			vkUpdateDescriptorSets(LogicalDevice, WriteSetsCount, WriteSets, 0, nullptr);
+			VkWriteDescriptorSet WriteSets2[WriteSetsCount] = { VpSetWrite };
+			vkUpdateDescriptorSets(LogicalDevice, WriteSetsCount, WriteSets2, 0, nullptr);
 		}
 
 		for (uint32_t i = 0; i < ImagesCount; i++)
@@ -1452,5 +1394,10 @@ namespace Core
 
 	void TerrainSubpass::ClearResources(VkDevice LogicalDevice)
 	{
+		vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
+		vkDestroyPipeline(LogicalDevice, Pipeline, nullptr);
+		vkDestroyDescriptorSetLayout(LogicalDevice, TerrainSetLayout, nullptr);
+
+		Util::Memory::Deallocate(TerrainSets);
 	}
 }

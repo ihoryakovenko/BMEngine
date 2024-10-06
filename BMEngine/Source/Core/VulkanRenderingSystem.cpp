@@ -5,6 +5,39 @@
 #include "VulkanHelper.h"
 #include "Util/Util.h"
 
+Core::TerrainVertex TerrainVerticesData[30][30] = {
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
+	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 }
+};
+
 namespace Core
 {
 	bool VulkanRenderingSystem::Init(GLFWwindow* Window)
@@ -152,9 +185,6 @@ namespace Core
 
 		vkDestroyDescriptorPool(LogicalDevice, SamplerDescriptorPool, nullptr);
 		vkDestroyDescriptorPool(LogicalDevice, DescriptorPool, nullptr);
-
-		// UNIFORM BUFFER SETUP CODE
-		//Util::Memory::Deallocate(ModelDynamicUniformBuffers);
 
 		for (uint32_t i = 0; i < DrawableObjectsCount; ++i)
 		{
@@ -381,6 +411,7 @@ namespace Core
 		}
 
 		VkPhysicalDeviceFeatures DeviceFeatures = { };
+		DeviceFeatures.fillModeNonSolid = VK_TRUE; // Todo: get from configs
 		DeviceFeatures.samplerAnisotropy = VK_TRUE; // Todo: get from configs
 		DeviceFeatures.multiViewport = VK_TRUE; // Todo: get from configs
 
@@ -533,6 +564,48 @@ namespace Core
 		return true;
 	}
 
+	bool VulkanRenderingSystem::LoadTerrain()
+	{
+		TerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
+		TerrainVerticesCount = 30 * 30;
+
+		TerrainVertexBuffer = GPUBuffer::CreateVertexBuffer(Device.PhysicalDevice, LogicalDevice,
+			MainPass.GraphicsCommandPool, GraphicsQueue, TerrainVerticesDataPointer, TerrainVerticesCount);
+
+		const int numRows = 30;
+		const int numCols = 30;
+
+		std::vector<uint32_t> indices;
+
+		for (int row = 0; row < numRows - 1; ++row)
+		{
+			for (int col = 0; col < numCols - 1; ++col)
+			{
+				// Get indices of the four vertices that make up a quad
+				uint32_t topLeft = row * numCols + col;
+				uint32_t topRight = topLeft + 1;
+				uint32_t bottomLeft = (row + 1) * numCols + col;
+				uint32_t bottomRight = bottomLeft + 1;
+
+				// First triangle (Top-left, Bottom-left, Bottom-right)
+				indices.push_back(topLeft);
+				indices.push_back(bottomLeft);
+				indices.push_back(bottomRight);
+
+				// Second triangle (Top-left, Bottom-right, Top-right)
+				indices.push_back(topLeft);
+				indices.push_back(bottomRight);
+				indices.push_back(topRight);
+			}
+		}
+
+		TerrainIndicesCount = indices.size();
+		TerrainIndexBuffer = GPUBuffer::CreateIndexBuffer(Device.PhysicalDevice, LogicalDevice,
+			MainPass.GraphicsCommandPool, GraphicsQueue, indices.data(), TerrainIndicesCount);
+
+		return true;
+	}
+
 	void VulkanRenderingSystem::CreateSynchronisation()
 	{
 		ImageAvailable = static_cast<VkSemaphore*>(Util::Memory::Allocate(MaxFrameDraws * sizeof(VkSemaphore)));
@@ -583,7 +656,7 @@ namespace Core
 
 		VkRenderPassBeginInfo RenderPassBeginInfo = { };
 		RenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		RenderPassBeginInfo.renderPass = MainPass.RenderPass;							// Render Pass to begin
+		RenderPassBeginInfo.renderPass = MainPass.RenderPass; // Render Pass to begin
 		RenderPassBeginInfo.renderArea.offset = { 0, 0 };
 		RenderPassBeginInfo.pClearValues = ClearValues;
 		RenderPassBeginInfo.clearValueCount = ClearValuesSize;
@@ -601,7 +674,7 @@ namespace Core
 			ImageAvailable[CurrentFrame], VK_NULL_HANDLE, &ImageIndex);
 
 		// Start point of render pass in pixels
-		RenderPassBeginInfo.renderArea.extent = MainViewport.ViewportSwapchain.SwapExtent;				// Size of region to run render pass on (starting at offset)
+		RenderPassBeginInfo.renderArea.extent = MainViewport.ViewportSwapchain.SwapExtent; // Size of region to run render pass on (starting at offset)
 		RenderPassBeginInfo.framebuffer = MainViewport.SwapchainFramebuffers[ImageIndex];
 
 		VkResult Result = vkBeginCommandBuffer(MainViewport.CommandBuffers[ImageIndex], &CommandBufferBeginInfo);
@@ -613,46 +686,55 @@ namespace Core
 
 		vkCmdBeginRenderPass(MainViewport.CommandBuffers[ImageIndex], &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-		// TEST Skip terrain pipeline
-		vkCmdNextSubpass(MainViewport.CommandBuffers[ImageIndex], VK_SUBPASS_CONTENTS_INLINE);
+		{
+			vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.TerrainPass.Pipeline);
 
+			VkBuffer TerrainVertexBuffers[] = { TerrainVertexBuffer.Buffer };
+			VkDeviceSize TerrainBuffersOffsets[] = { 0 };
+
+			const uint32_t TerrainDescriptorSetGroupCount = 1;
+			VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = { MainPass.TerrainPass.TerrainSets[ImageIndex] };
+
+			vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.TerrainPass.PipelineLayout,
+				0, TerrainDescriptorSetGroupCount, TerrainDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+
+			vkCmdBindVertexBuffers(MainViewport.CommandBuffers[ImageIndex], 0, 1, TerrainVertexBuffers, TerrainBuffersOffsets);
+			vkCmdBindIndexBuffer(MainViewport.CommandBuffers[ImageIndex], TerrainIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(MainViewport.CommandBuffers[ImageIndex], TerrainIndicesCount, 1, 0, 0, 0);
+		}
+
+		vkCmdNextSubpass(MainViewport.CommandBuffers[ImageIndex], VK_SUBPASS_CONTENTS_INLINE);
 		vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.EntityPass.Pipeline);
 
 		// TODO: Support rework to not create identical index buffers
 		for (uint32_t j = 0; j < DrawableObjectsCount; ++j)
 		{
-			VkBuffer VertexBuffers[] = { DrawableObjects[j].VertexBuffer.Buffer };					// Buffers to bind
-			VkDeviceSize Offsets[] = { 0 };												// Offsets into buffers being bound
-			vkCmdBindVertexBuffers(MainViewport.CommandBuffers[ImageIndex], 0, 1, VertexBuffers, Offsets);
-			vkCmdBindIndexBuffer(MainViewport.CommandBuffers[ImageIndex], DrawableObjects[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-
-			// UNIFORM BUFFER SETUP CODE
-			//uint32_t DynamicOffset = ModelUniformAlignment * j;
-
-			vkCmdPushConstants(MainViewport.CommandBuffers[ImageIndex], MainPass.EntityPass.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-				0, sizeof(Model), &DrawableObjects[j].Model);
+			VkBuffer VertexBuffers[] = { DrawableObjects[j].VertexBuffer.Buffer };
+			VkDeviceSize Offsets[] = { 0 };
 
 			// Todo: do not record textureId on each frame?
 			const uint32_t DescriptorSetGroupCount = 2;
 			VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] = { MainPass.EntityPass.EntitySets[ImageIndex],
 				SamplerDescriptorSets[DrawableObjects[j].TextureId] };
 
+			vkCmdPushConstants(MainViewport.CommandBuffers[ImageIndex], MainPass.EntityPass.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
+				0, sizeof(Model), &DrawableObjects[j].Model);
 			vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.EntityPass.PipelineLayout,
 				0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
 
-			// Execute pipeline
-			//vkCmdDraw(MainViewport.CommandBuffers[i], DrawableObject.VerticesCount, 1, 0, 0);
+			vkCmdBindVertexBuffers(MainViewport.CommandBuffers[ImageIndex], 0, 1, VertexBuffers, Offsets);
+			vkCmdBindIndexBuffer(MainViewport.CommandBuffers[ImageIndex], DrawableObjects[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 			vkCmdDrawIndexed(MainViewport.CommandBuffers[ImageIndex], DrawableObjects[j].IndicesCount, 1, 0, 0, 0);
 		}
 
 		vkCmdNextSubpass(MainViewport.CommandBuffers[ImageIndex], VK_SUBPASS_CONTENTS_INLINE);
-
 		vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.DeferredPass.Pipeline);
+		
 		vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.DeferredPass.PipelineLayout,
 			0, 1, &MainPass.DeferredPass.DeferredSets[ImageIndex], 0, nullptr);
+
 		vkCmdDraw(MainViewport.CommandBuffers[ImageIndex], 3, 1, 0, 0); // 3 hardcoded Indices for second "post processing" subpass
 
-		// End Render Pass
 		vkCmdEndRenderPass(MainViewport.CommandBuffers[ImageIndex]);
 
 		Result = vkEndCommandBuffer(MainViewport.CommandBuffers[ImageIndex]);
