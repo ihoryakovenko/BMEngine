@@ -31,6 +31,11 @@ namespace Core
 		glm::vec2 TextureCoords;
 	};
 
+	struct TerrainVertex
+	{
+		float altitude;
+	};
+
 	struct GPUBuffer
 	{
 		static void DestroyGPUBuffer(VkDevice LogicalDevice, GPUBuffer& buffer);
@@ -153,6 +158,9 @@ namespace Core
 
 		VkPipelineLayout PipelineLayout = nullptr;
 		VkPipeline Pipeline = nullptr;
+
+		VkDescriptorSetLayout TerrainSetLayout = nullptr;
+		VkDescriptorSet* TerrainSets = nullptr;
 	};
 
 	struct EntitySubpass
@@ -175,8 +183,8 @@ namespace Core
 		VkPipelineLayout PipelineLayout = nullptr;
 		VkPipeline Pipeline = nullptr;
 
-		VkDescriptorSetLayout DefferedLayout = nullptr;
-		VkDescriptorSet* DefferedSets = nullptr;
+		VkDescriptorSetLayout DeferredLayout = nullptr;
+		VkDescriptorSet* DeferredSets = nullptr;
 	};
 
 	struct MainRenderPass
@@ -191,8 +199,9 @@ namespace Core
 		void SetupPushConstants();
 		void CreateSamplerSetLayout(VkDevice LogicalDevice);
 		void CreateCommandPool(VkDevice LogicalDevice, uint32_t FamilyIndex);
-		void CreateDescriptorSetLayout(VkDevice LogicalDevice);
-		void CreateInputSetLayout(VkDevice LogicalDevice);
+		void CreateTerrainSetLayout(VkDevice LogicalDevice);
+		void CreateEntitySetLayout(VkDevice LogicalDevice);
+		void CreateDeferredSetLayout(VkDevice LogicalDevice);
 		void CreatePipelineLayouts(VkDevice LogicalDevice);
 		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent);
 		void CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, uint32_t ImagesCount, VkExtent2D SwapExtent,
@@ -203,6 +212,7 @@ namespace Core
 
 		VkRenderPass RenderPass = nullptr;
 
+		TerrainSubpass TerrainPass;
 		EntitySubpass EntityPass;
 		DeferredSubpass DeferredPass;
 

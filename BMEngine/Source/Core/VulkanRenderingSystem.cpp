@@ -116,8 +116,9 @@ namespace Core
 		MainPass.SetupPushConstants();
 		MainPass.CreateSamplerSetLayout(LogicalDevice);
 		MainPass.CreateCommandPool(LogicalDevice, Device.Indices.GraphicsFamily);
-		MainPass.CreateDescriptorSetLayout(LogicalDevice);
-		MainPass.CreateInputSetLayout(LogicalDevice);
+		MainPass.CreateTerrainSetLayout(LogicalDevice);
+		MainPass.CreateEntitySetLayout(LogicalDevice);
+		MainPass.CreateDeferredSetLayout(LogicalDevice);
 		MainPass.CreatePipelineLayouts(LogicalDevice);
 		MainPass.CreatePipelines(LogicalDevice, Extent1);
 		MainPass.CreateAttachments(Device.PhysicalDevice, LogicalDevice, SwapInstance1.ImagesCount, Extent1, DepthFormat, ColorFormat);
@@ -611,6 +612,10 @@ namespace Core
 		}
 
 		vkCmdBeginRenderPass(MainViewport.CommandBuffers[ImageIndex], &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+		// TEST Skip terrain pipeline
+		vkCmdNextSubpass(MainViewport.CommandBuffers[ImageIndex], VK_SUBPASS_CONTENTS_INLINE);
+
 		vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.EntityPass.Pipeline);
 
 		// TODO: Support rework to not create identical index buffers
@@ -644,7 +649,7 @@ namespace Core
 
 		vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.DeferredPass.Pipeline);
 		vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.DeferredPass.PipelineLayout,
-			0, 1, &MainPass.DeferredPass.DefferedSets[ImageIndex], 0, nullptr);
+			0, 1, &MainPass.DeferredPass.DeferredSets[ImageIndex], 0, nullptr);
 		vkCmdDraw(MainViewport.CommandBuffers[ImageIndex], 3, 1, 0, 0); // 3 hardcoded Indices for second "post processing" subpass
 
 		// End Render Pass
