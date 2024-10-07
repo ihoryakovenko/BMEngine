@@ -143,7 +143,7 @@ namespace Core
 		uint32_t TotalDescriptorCount;
 		MainRenderPass::GetPoolSizes(SwapInstance1.ImagesCount, TotalPassPoolSizes, TotalDescriptorCount);
 
-		DescriptorPool = CreateDescriptorPool(LogicalDevice, TotalPassPoolSizes.data(), TotalPassPoolSizes.size(), TotalDescriptorCount);
+		StaticPool = CreateDescriptorPool(LogicalDevice, TotalPassPoolSizes.data(), TotalPassPoolSizes.size(), TotalDescriptorCount);
 
 		MainPass.CreateVulkanPass(LogicalDevice, ColorFormat, DepthFormat, SurfaceFormat);
 		MainPass.SetupPushConstants();
@@ -156,14 +156,9 @@ namespace Core
 		MainPass.CreatePipelines(LogicalDevice, Extent1);
 		MainPass.CreateAttachments(Device.PhysicalDevice, LogicalDevice, SwapInstance1.ImagesCount, Extent1, DepthFormat, ColorFormat);
 		MainPass.CreateUniformBuffers(Device.PhysicalDevice, LogicalDevice, SwapInstance1.ImagesCount);
-		MainPass.CreateSets(LogicalDevice, DescriptorPool, SwapInstance1.ImagesCount);
+		MainPass.CreateSets(LogicalDevice, StaticPool, SwapInstance1.ImagesCount);
 
-
-		TextureSampler = CreateTextureSampler();
-		SamplerDescriptorSets = static_cast<VkDescriptorSet*>(Util::Memory::Allocate(MaxTextures * sizeof(VkDescriptorSet)));
-		SamplerDescriptorPool = CreateSamplerDescriptorPool(528); // TODO: Check 528
-
-		InitViewport(Window, Surface, &MainViewport, DescriptorPool, SwapInstance1, MainPass.ColorBuffers, MainPass.DepthBuffers);
+		InitViewport(Window, Surface, &MainViewport, StaticPool, SwapInstance1, MainPass.ColorBuffers, MainPass.DepthBuffers);
 
 		return true;
 	}
@@ -174,17 +169,17 @@ namespace Core
 		
 		DestroySynchronisation();
 
-		vkDestroySampler(LogicalDevice, TextureSampler, nullptr);
+		vkDestroySampler(LogicalDevice, TextureUnit.TextureSampler, nullptr);
 
-		for (uint32_t i = 0; i < TextureImagesCount; ++i)
+		for (uint32_t i = 0; i < TextureUnit.ImagesCount; ++i)
 		{
-			vkDestroyImageView(LogicalDevice, TextureImageBuffer[i].ImageView, nullptr);
-			vkDestroyImage(LogicalDevice, TextureImageBuffer[i].Image, nullptr);
-			vkFreeMemory(LogicalDevice, TextureImageBuffer[i].Memory, nullptr);
+			vkDestroyImageView(LogicalDevice, TextureUnit.ImageViews[i], nullptr);
+			vkDestroyImage(LogicalDevice, TextureUnit.Images[i], nullptr);
+			vkFreeMemory(LogicalDevice, TextureUnit.TextureImagesMemory, nullptr);
 		}
 
-		vkDestroyDescriptorPool(LogicalDevice, SamplerDescriptorPool, nullptr);
-		vkDestroyDescriptorPool(LogicalDevice, DescriptorPool, nullptr);
+		vkDestroyDescriptorPool(LogicalDevice, TextureUnit.SamplerDescriptorPool, nullptr);
+		vkDestroyDescriptorPool(LogicalDevice, StaticPool, nullptr);
 
 		for (uint32_t i = 0; i < DrawableObjectsCount; ++i)
 		{
@@ -198,8 +193,235 @@ namespace Core
 
 		vkDestroyDevice(LogicalDevice, nullptr);
 
-		Util::Memory::Deallocate(SamplerDescriptorSets);
+		Util::Memory::Deallocate(TextureUnit.SamplerDescriptorSets);
+		Util::Memory::Deallocate(TextureUnit.Images);
+		Util::Memory::Deallocate(TextureUnit.ImageViews);
 		MainInstance::DestroyMainInstance(Instance);
+	}
+
+	void VulkanRenderingSystem::LoadTextures(stbi_uc* TexturesData, TextureInfo* Infos, uint32_t TexturesCount)
+	{
+		assert(TexturesCount > 0);
+		assert(TextureUnit.ImagesCount == 0);
+
+		TextureUnit.TextureSampler = CreateTextureSampler();
+		// TODO: Use helper?
+		TextureUnit.SamplerDescriptorPool = CreateSamplerDescriptorPool(TexturesCount);
+		TextureUnit.ImagesCount = TexturesCount;
+		TextureUnit.Images = static_cast<VkImage*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkImage)));
+		TextureUnit.ImageViews = static_cast<VkImageView*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkImageView)));
+		TextureUnit.SamplerDescriptorSets = static_cast<VkDescriptorSet*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkDescriptorSet)));
+		VkImageMemoryBarrier* Barriers = static_cast<VkImageMemoryBarrier*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkImageMemoryBarrier)));
+		VkWriteDescriptorSet* WriteData = static_cast<VkWriteDescriptorSet*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkWriteDescriptorSet)));
+		VkDescriptorImageInfo* ImageInfos = static_cast<VkDescriptorImageInfo*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkDescriptorImageInfo)));
+		VkDescriptorSetLayout* layouts = static_cast<VkDescriptorSetLayout*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkDescriptorSetLayout)));
+
+		VkDeviceSize TotalSize = Infos[0].Width * Infos[0].Height * Infos[0].Format;
+
+		for (uint32_t i = 1; i < TexturesCount; ++i)
+		{
+			TotalSize += Infos[i].Width * Infos[i].Height * Infos[i].Format;
+		}
+
+		GPUBuffer StagingBuffer = GPUBuffer::CreateGPUBuffer(Device.PhysicalDevice, LogicalDevice, TotalSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+		void* Data;
+		vkMapMemory(LogicalDevice, StagingBuffer.Memory, 0, TotalSize, 0, &Data);
+		memcpy(Data, TexturesData, static_cast<size_t>(TotalSize));
+		vkUnmapMemory(LogicalDevice, StagingBuffer.Memory);
+
+		VkDeviceSize TotalAllocationSize = 0;
+		uint32_t MemoryTypeIndex = 0;
+
+		for (uint32_t i = 0; i < TextureUnit.ImagesCount; ++i)
+		{
+			// TODO: use different VkImageCreateInfo params depending on TextureInfo
+			VkImageCreateInfo ImageCreateInfo = { };
+			ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+			ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D; // Type of image (1D, 2D, or 3D)
+			ImageCreateInfo.extent.width = Infos[i].Width;
+			ImageCreateInfo.extent.height = Infos[i].Height;
+			ImageCreateInfo.extent.depth = 1; // Depth of image (just 1, no 3D aspect)
+			ImageCreateInfo.mipLevels = 1;
+			ImageCreateInfo.arrayLayers = 1; // Number of levels in image array
+			ImageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM; // Format type of image
+			ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL; // How image data should be "tiled" (arranged for optimal reading)
+			ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Layout of image data on creation
+			ImageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT; // Bit flags defining what image will be used for
+			ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT; // Number of samples for multi-sampling
+			ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // Whether image can be shared between queues
+
+			VkResult Result = vkCreateImage(LogicalDevice, &ImageCreateInfo, nullptr, &(TextureUnit.Images[i]));
+			if (Result != VK_SUCCESS)
+			{
+				assert(false);
+			}
+
+			VkMemoryRequirements MemoryRequirements;
+			vkGetImageMemoryRequirements(LogicalDevice, TextureUnit.Images[i], &MemoryRequirements);
+
+			TotalAllocationSize += MemoryRequirements.size;
+
+			// Trick for now
+			// TODO: Create map off VkDeviceMemory for each MemoryTypeIndex?
+			if (MemoryTypeIndex == 0)
+			{
+				MemoryTypeIndex = GetMemoryTypeIndex(Device.PhysicalDevice, MemoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			}
+			else
+			{
+				if (MemoryTypeIndex != GetMemoryTypeIndex(Device.PhysicalDevice, MemoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+				{
+					assert(false);
+				}
+			}
+		}
+
+		VkMemoryAllocateInfo MemoryAllocInfo = { };
+		MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		MemoryAllocInfo.allocationSize = TotalAllocationSize;
+		MemoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;
+
+		VkResult Result = vkAllocateMemory(LogicalDevice, &MemoryAllocInfo, nullptr, &TextureUnit.TextureImagesMemory);
+		if (Result != VK_SUCCESS)
+		{
+			assert(false);
+		}
+
+		VkDeviceSize Offset = 0;
+
+		for (uint32_t i = 0; i < TextureUnit.ImagesCount; ++i)
+		{
+			VkMemoryRequirements MemoryRequirements;
+			vkGetImageMemoryRequirements(LogicalDevice, TextureUnit.Images[i], &MemoryRequirements);
+
+			Offset = (Offset + MemoryRequirements.alignment - 1) & ~(MemoryRequirements.alignment - 1);
+			std::cout << "Offset: " << Offset << '\n';
+
+			vkBindImageMemory(LogicalDevice, TextureUnit.Images[i], TextureUnit.TextureImagesMemory, Offset);
+
+			Offset += MemoryRequirements.size;
+		}
+
+		// Todo: Create beginCommandBuffer function?
+		VkCommandBuffer CommandBuffer;
+
+		VkCommandBufferAllocateInfo AllocInfo = { };
+		AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		AllocInfo.commandPool = MainPass.GraphicsCommandPool;
+		AllocInfo.commandBufferCount = 1;
+
+		vkAllocateCommandBuffers(LogicalDevice, &AllocInfo, &CommandBuffer);
+
+		VkCommandBufferBeginInfo BeginInfo = { };
+		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+		vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
+
+		for (uint32_t i = 0; i < TextureUnit.ImagesCount; ++i)
+		{
+			Barriers[i] = { };
+			Barriers[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			Barriers[i].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;									// Layout to transition from
+			Barriers[i].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;									// Layout to transition to
+			Barriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition from
+			Barriers[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition to
+			Barriers[i].image = TextureUnit.Images[i];											// Image being accessed and modified as part of barrier
+			Barriers[i].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;	// Aspect of image being altered
+			Barriers[i].subresourceRange.baseMipLevel = 0;						// First mip level to start alterations on
+			Barriers[i].subresourceRange.levelCount = 1;							// Number of mip levels to alter starting from baseMipLevel
+			Barriers[i].subresourceRange.baseArrayLayer = 0;						// First layer to start alterations on
+			Barriers[i].subresourceRange.layerCount = 1;							// Number of layers to alter starting from baseArrayLayer
+
+			Barriers[i].srcAccessMask = 0;								// Memory access stage transition must after...
+			Barriers[i].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;		// Memory access stage transition must before...
+		}
+
+		VkPipelineStageFlags SrcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		VkPipelineStageFlags DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+
+		vkCmdPipelineBarrier(
+			CommandBuffer,
+			SrcStage, DstStage,		// Pipeline stages (match to src and dst AccessMasks)
+			0,						// Dependency flags
+			0, nullptr,				// Memory Barrier count + data
+			0, nullptr,				// Buffer Memory Barrier count + data
+			TextureUnit.ImagesCount, Barriers	// Image Memory Barrier count + data
+		);
+
+		vkEndCommandBuffer(CommandBuffer);
+
+		VkSubmitInfo SubmitInfo = { };
+		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		SubmitInfo.commandBufferCount = 1;
+		SubmitInfo.pCommandBuffers = &CommandBuffer;
+
+		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
+		vkQueueWaitIdle(GraphicsQueue);
+
+		// Copy image data
+		for (uint32_t i = 0; i < TextureUnit.ImagesCount; ++i)
+		{
+			CopyBufferToImage(StagingBuffer.Buffer, TextureUnit.Images[i], Infos[i].Width, Infos[i].Height);
+
+			Barriers[i].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;									// Layout to transition from
+			Barriers[i].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			Barriers[i].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			Barriers[i].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		}
+
+		SrcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		DstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+
+		vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
+
+		vkCmdPipelineBarrier(CommandBuffer, SrcStage, DstStage, 0, 0, nullptr, 0, nullptr, TextureUnit.ImagesCount, Barriers);
+
+		vkEndCommandBuffer(CommandBuffer);
+
+		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
+		vkQueueWaitIdle(GraphicsQueue);
+
+		vkFreeCommandBuffers(LogicalDevice, MainPass.GraphicsCommandPool, 1, &CommandBuffer);
+		GPUBuffer::DestroyGPUBuffer(LogicalDevice, StagingBuffer);
+
+		for (uint32_t i = 0; i < TextureUnit.ImagesCount; ++i)
+		{
+			layouts[i] = MainPass.EntityPass.SamplerSetLayout;
+		}
+
+		CreateDescriptorSets(LogicalDevice, TextureUnit.SamplerDescriptorPool, layouts,
+			TextureUnit.ImagesCount, TextureUnit.SamplerDescriptorSets);
+
+		for (uint32_t i = 0; i < TextureUnit.ImagesCount; ++i)
+		{
+			TextureUnit.ImageViews[i] = CreateImageView(LogicalDevice, TextureUnit.Images[i],
+				VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+		
+			ImageInfos[i] = { };
+			ImageInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			ImageInfos[i].imageView = TextureUnit.ImageViews[i];
+			ImageInfos[i].sampler = TextureUnit.TextureSampler;
+
+			WriteData[i] = { };
+			WriteData[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			WriteData[i].dstSet = TextureUnit.SamplerDescriptorSets[i];
+			WriteData[i].dstBinding = 0;
+			WriteData[i].dstArrayElement = 0;
+			WriteData[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			WriteData[i].descriptorCount = 1;
+			WriteData[i].pImageInfo = &ImageInfos[i];
+		}
+
+		vkUpdateDescriptorSets(LogicalDevice, TextureUnit.ImagesCount, WriteData, 0, nullptr);
+
+		Util::Memory::Deallocate(ImageInfos);
+		Util::Memory::Deallocate(WriteData);
+		Util::Memory::Deallocate(Barriers);
+		Util::Memory::Deallocate(layouts);
 	}
 
 	bool VulkanRenderingSystem::CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, uint32_t AvailableExtensionsCount,
@@ -715,7 +937,7 @@ namespace Core
 			// Todo: do not record textureId on each frame?
 			const uint32_t DescriptorSetGroupCount = 2;
 			VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] = { MainPass.EntityPass.EntitySets[ImageIndex],
-				SamplerDescriptorSets[DrawableObjects[j].TextureId] };
+				TextureUnit.SamplerDescriptorSets[DrawableObjects[j].TextureId] };
 
 			vkCmdPushConstants(MainViewport.CommandBuffers[ImageIndex], MainPass.EntityPass.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
 				0, sizeof(Model), &DrawableObjects[j].Model);
@@ -804,139 +1026,6 @@ namespace Core
 
 		Util::Memory::Deallocate(Viewport->SwapchainFramebuffers);
 		Util::Memory::Deallocate(Viewport->CommandBuffers);
-	}
-
-	// TODO: CHECK
-	void VulkanRenderingSystem::CreateImageBuffer(stbi_uc* TextureData, int Width, int Height, VkDeviceSize ImageSize)
-	{
-		assert(TextureImagesCount < MaxTextures);
-
-		GPUBuffer StagingBuffer = GPUBuffer::CreateGPUBuffer(Device.PhysicalDevice, LogicalDevice, ImageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-		void* Data;
-		vkMapMemory(LogicalDevice, StagingBuffer.Memory, 0, ImageSize, 0, &Data);
-		memcpy(Data, TextureData, static_cast<size_t>(ImageSize));
-		vkUnmapMemory(LogicalDevice, StagingBuffer.Memory);
-
-		ImageBuffer ImageBuffeObject;
-		ImageBuffeObject.Image = CreateImage(Device.PhysicalDevice, LogicalDevice, Width, Height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-			VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &ImageBuffeObject.Memory);
-
-		// Todo: Create beginCommandBuffer function?
-		VkCommandBuffer CommandBuffer;
-
-		VkCommandBufferAllocateInfo AllocInfo = { };
-		AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		AllocInfo.commandPool = MainPass.GraphicsCommandPool;
-		AllocInfo.commandBufferCount = 1;
-
-		vkAllocateCommandBuffers(LogicalDevice, &AllocInfo, &CommandBuffer);
-
-		VkCommandBufferBeginInfo BeginInfo = { };
-		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-		vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
-
-		VkImageMemoryBarrier ImageMemoryBarrier = { };
-		ImageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		ImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;									// Layout to transition from
-		ImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;									// Layout to transition to
-		ImageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition from
-		ImageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition to
-		ImageMemoryBarrier.image = ImageBuffeObject.Image;											// Image being accessed and modified as part of barrier
-		ImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;	// Aspect of image being altered
-		ImageMemoryBarrier.subresourceRange.baseMipLevel = 0;						// First mip level to start alterations on
-		ImageMemoryBarrier.subresourceRange.levelCount = 1;							// Number of mip levels to alter starting from baseMipLevel
-		ImageMemoryBarrier.subresourceRange.baseArrayLayer = 0;						// First layer to start alterations on
-		ImageMemoryBarrier.subresourceRange.layerCount = 1;							// Number of layers to alter starting from baseArrayLayer
-
-		ImageMemoryBarrier.srcAccessMask = 0;								// Memory access stage transition must after...
-		ImageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;		// Memory access stage transition must before...
-
-		VkPipelineStageFlags SrcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-		VkPipelineStageFlags DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-
-		vkCmdPipelineBarrier(
-			CommandBuffer,
-			SrcStage, DstStage,		// Pipeline stages (match to src and dst AccessMasks)
-			0,						// Dependency flags
-			0, nullptr,				// Memory Barrier count + data
-			0, nullptr,				// Buffer Memory Barrier count + data
-			1, &ImageMemoryBarrier	// Image Memory Barrier count + data
-		);
-
-		vkEndCommandBuffer(CommandBuffer);
-
-		VkSubmitInfo SubmitInfo = { };
-		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.commandBufferCount = 1;
-		SubmitInfo.pCommandBuffers = &CommandBuffer;
-
-		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
-		vkQueueWaitIdle(GraphicsQueue);
-
-		// Copy image data
-		CopyBufferToImage(StagingBuffer.Buffer, ImageBuffeObject.Image, Width, Height);
-
-		ImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;									// Layout to transition from
-		ImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		ImageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		ImageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-		SrcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-		DstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-
-		vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
-
-		vkCmdPipelineBarrier(CommandBuffer, SrcStage, DstStage, 0, 0, nullptr, 0, nullptr, 1, &ImageMemoryBarrier);
-
-		vkEndCommandBuffer(CommandBuffer);
-
-		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
-		vkQueueWaitIdle(GraphicsQueue);
-
-		vkFreeCommandBuffers(LogicalDevice, MainPass.GraphicsCommandPool, 1, &CommandBuffer);
-		GPUBuffer::DestroyGPUBuffer(LogicalDevice, StagingBuffer);
-
-		//CreateImageView
-		ImageBuffeObject.ImageView = CreateImageView(LogicalDevice, ImageBuffeObject.Image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-
-		//CreateTextureDescriptor
-		VkDescriptorSetAllocateInfo SetAllocInfo = { };
-		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		SetAllocInfo.descriptorPool = SamplerDescriptorPool;
-		SetAllocInfo.descriptorSetCount = 1;
-		SetAllocInfo.pSetLayouts = &MainPass.EntityPass.SamplerSetLayout;
-
-		VkResult result = vkAllocateDescriptorSets(LogicalDevice, &SetAllocInfo, &SamplerDescriptorSets[TextureImagesCount]);
-		if (result != VK_SUCCESS)
-		{
-			//return -1
-		}
-
-		VkDescriptorImageInfo ImageInfo = { };
-		ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;	// Image layout when in use
-		ImageInfo.imageView = ImageBuffeObject.ImageView;									// Image to bind to set
-		ImageInfo.sampler = TextureSampler;									// Sampler to use for set
-
-		// Descriptor Write Info
-		VkWriteDescriptorSet DescriptorWrite = { };
-		DescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		DescriptorWrite.dstSet = SamplerDescriptorSets[TextureImagesCount];
-		DescriptorWrite.dstBinding = 0;
-		DescriptorWrite.dstArrayElement = 0;
-		DescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		DescriptorWrite.descriptorCount = 1;
-		DescriptorWrite.pImageInfo = &ImageInfo;
-
-		// Todo: create descriptor sets for multiple textures?
-		vkUpdateDescriptorSets(LogicalDevice, 1, &DescriptorWrite, 0, nullptr);
-
-		TextureImageBuffer[TextureImagesCount] = ImageBuffeObject;
-		++TextureImagesCount;
 	}
 
 	void VulkanRenderingSystem::InitViewport(GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstance* OutViewport,

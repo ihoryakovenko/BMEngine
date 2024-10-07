@@ -33,7 +33,7 @@ namespace Core
 
 	struct TerrainVertex
 	{
-		float altitude;
+		float Altitude;
 	};
 
 	struct GPUBuffer

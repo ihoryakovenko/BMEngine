@@ -60,7 +60,11 @@ struct Camera
 	glm::vec3 CameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 };
 
-void AddTexture(Core::VulkanRenderingSystem& RenderingSystem, const char* TexturePath)
+int TexturesCount = 0;
+std::vector<stbi_uc> TexturesData;
+std::vector<Core::TextureInfo> TexturesInfo;
+
+void AddTexture(const char* TexturePath)
 {
 	int Width, Height;
 	uint64_t ImageSize; // Todo: DeviceSize?
@@ -70,17 +74,22 @@ void AddTexture(Core::VulkanRenderingSystem& RenderingSystem, const char* Textur
 
 	if (ImageData == nullptr)
 	{
-		return;
+		assert(false);
 	}
 
-	ImageSize = Width * Height * 4;
+	ImageSize = Width * Height * STBI_rgb_alpha;
 
-	RenderingSystem.CreateImageBuffer(ImageData, Width, Height, ImageSize);
+	size_t OldSize = TexturesData.size();
+	TexturesData.resize(OldSize + ImageSize);
+	std::memcpy(TexturesData.data() + OldSize, ImageData, ImageSize);
+
+	TexturesInfo.push_back({ .Width =  Width, .Height = Height, .Format = STBI_rgb_alpha });
+
+	++TexturesCount;
 
 	stbi_image_free(ImageData);
 }
 
-Core::VulkanRenderingSystem* ins;
 void WindowCloseCallback(GLFWwindow* Window)
 {
 	glfwDestroyWindow(Window);
@@ -108,7 +117,6 @@ int main()
 	Core::VulkanRenderingSystem RenderingSystem;
 	RenderingSystem.Init(Window);
 
-	ins = &RenderingSystem;
 	
 
 
@@ -120,7 +128,7 @@ int main()
 	RenderingSystem.MainViewport.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	const char* TestTexture = "./Resources/Textures/giraffe.jpg";
-	AddTexture(RenderingSystem, TestTexture);
+	AddTexture(TestTexture);
 
 	const char* Modelpath = "./Resources/Models/uh60.obj";
 	const char* BaseDir = "./Resources/Models/";
@@ -135,6 +143,8 @@ int main()
 		return -1;
 	}
 
+	// TODO: -_-
+	int TextureIndex = 1;
 	std::vector<int> MaterialToTexture(Materials.size());
 
 	for (size_t i = 0; i < Materials.size(); i++)
@@ -146,15 +156,18 @@ int main()
 			int Idx = Material.diffuse_texname.rfind("\\");
 			std::string FileName = "./Resources/Textures/" + Material.diffuse_texname.substr(Idx + 1);
 
-			MaterialToTexture[i] = RenderingSystem.TextureImagesCount;
-			AddTexture(RenderingSystem, FileName.c_str());
+			MaterialToTexture[i] = TextureIndex;
+			AddTexture(FileName.c_str());
+			++TextureIndex;
 		}
 	}
+
+	RenderingSystem.LoadTextures(TexturesData.data(), TexturesInfo.data(), TexturesCount);
 
 	std::vector<TestMesh> ModelMeshes;
 	ModelMeshes.reserve(Shapes.size());
 
-	std::unordered_map < Core::Vertex, uint32_t, std::hash<Core::Vertex>, VertexEqual> uniqueVertices{};
+	std::unordered_map<Core::Vertex, uint32_t, std::hash<Core::Vertex>, VertexEqual> uniqueVertices{};
 
 	for (const auto& Shape : Shapes)
 	{

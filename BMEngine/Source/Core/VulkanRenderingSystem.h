@@ -5,14 +5,22 @@
 
 namespace Core
 {
+	struct TextureInfo
+	{
+		int Width = 0;
+		int Height = 0;
+		int Format = 0;
+	};
+
 	class VulkanRenderingSystem
 	{
 	public:
 		bool Init(GLFWwindow* Window);
 		void DeInit();
 
+		void LoadTextures(stbi_uc* Data, TextureInfo* Infos, uint32_t TexturesCount);
+
 		// VulkanRenderInstance
-		void CreateImageBuffer(stbi_uc* TextureData, int Width, int Height, VkDeviceSize ImageSize);
 		void InitViewport(GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstance* OutViewport,
 			VkDescriptorPool DescriptorPool, SwapchainInstance SwapInstance, ImageBuffer* ColorBuffers, ImageBuffer* DepthBuffers);
 		void DeinitViewport(ViewportInstance* Viewport);
@@ -63,11 +71,7 @@ namespace Core
 		VkFormat ColorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Todo: check if VK_FORMAT_R8G8B8A8_UNORM supported
 		VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
 
-		VkSampler TextureSampler = nullptr;
-		VkDescriptorPool SamplerDescriptorPool = nullptr;
-		VkDescriptorSet* SamplerDescriptorSets = nullptr;
-
-		VkDescriptorPool DescriptorPool = nullptr;
+		VkDescriptorPool StaticPool = nullptr;
 
 		VkSemaphore* ImageAvailable = nullptr;
 		VkSemaphore* RenderFinished = nullptr;
@@ -79,11 +83,18 @@ namespace Core
 		const int MaxFrameDraws = 2;
 		int CurrentFrame = 0;
 
-		// Todo: put all textures in atlases or texture layers
-		const uint32_t MaxTextures = 64;
-		uint32_t TextureImagesCount = 0;
-		// Todo: have single TextureImagesMemory and VkImage offset references in it
-		ImageBuffer TextureImageBuffer[64];
+		// Todo: put all textures in atlases or texture layers?
+		struct
+		{
+			VkSampler TextureSampler = nullptr;
+			VkDescriptorPool SamplerDescriptorPool = nullptr;
+			VkDescriptorSet* SamplerDescriptorSets = nullptr;
+
+			VkDeviceMemory TextureImagesMemory = nullptr;
+			VkImage* Images = nullptr;
+			VkImageView* ImageViews = nullptr;
+			uint32_t ImagesCount = 0;
+		} TextureUnit;
 
 
 		uint32_t TerrainVerticesCount = 0;
