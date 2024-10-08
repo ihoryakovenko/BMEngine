@@ -60,16 +60,15 @@ struct Camera
 	glm::vec3 CameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 };
 
-int TexturesCount = 0;
-std::vector<stbi_uc> TexturesData;
 std::vector<Core::TextureInfo> TexturesInfo;
 
 void AddTexture(const char* TexturePath)
 {
-	int Width, Height;
-	uint64_t ImageSize; // Todo: DeviceSize?
+	int Width;
+	int Height;
 	int Channels;
 
+	// TODO: delete
 	stbi_uc* ImageData = stbi_load(TexturePath, &Width, &Height, &Channels, STBI_rgb_alpha);
 
 	if (ImageData == nullptr)
@@ -77,17 +76,7 @@ void AddTexture(const char* TexturePath)
 		assert(false);
 	}
 
-	ImageSize = Width * Height * STBI_rgb_alpha;
-
-	size_t OldSize = TexturesData.size();
-	TexturesData.resize(OldSize + ImageSize);
-	std::memcpy(TexturesData.data() + OldSize, ImageData, ImageSize);
-
-	TexturesInfo.push_back({ .Width =  Width, .Height = Height, .Format = STBI_rgb_alpha });
-
-	++TexturesCount;
-
-	stbi_image_free(ImageData);
+	TexturesInfo.push_back({ .Width =  Width, .Height = Height, .Format = STBI_rgb_alpha, .Data = ImageData });
 }
 
 void WindowCloseCallback(GLFWwindow* Window)
@@ -155,14 +144,14 @@ int main()
 		{
 			int Idx = Material.diffuse_texname.rfind("\\");
 			std::string FileName = "./Resources/Textures/" + Material.diffuse_texname.substr(Idx + 1);
-
+			//FileName = TestTexture;
 			MaterialToTexture[i] = TextureIndex;
 			AddTexture(FileName.c_str());
 			++TextureIndex;
 		}
 	}
 
-	RenderingSystem.LoadTextures(TexturesData.data(), TexturesInfo.data(), TexturesCount);
+	RenderingSystem.LoadTextures(TexturesInfo.data(), TexturesInfo.size());
 
 	std::vector<TestMesh> ModelMeshes;
 	ModelMeshes.reserve(Shapes.size());

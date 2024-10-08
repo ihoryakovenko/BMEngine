@@ -10,6 +10,7 @@ namespace Core
 		int Width = 0;
 		int Height = 0;
 		int Format = 0;
+		stbi_uc* Data = nullptr;
 	};
 
 	class VulkanRenderingSystem
@@ -18,7 +19,7 @@ namespace Core
 		bool Init(GLFWwindow* Window);
 		void DeInit();
 
-		void LoadTextures(stbi_uc* Data, TextureInfo* Infos, uint32_t TexturesCount);
+		void LoadTextures(TextureInfo* Infos, uint32_t TexturesCount);
 
 		// VulkanRenderInstance
 		void InitViewport(GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstance* OutViewport,
@@ -43,7 +44,7 @@ namespace Core
 			const char** ValidationLeyersToCheck, uint32_t ValidationLeyersToCheckSize);
 		VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface);
 		
-		void CopyBufferToImage(VkBuffer SourceBuffer, VkImage Image, uint32_t Width, uint32_t Height);
+		void CopyBufferToImage(VkBuffer SourceBuffer, VkDeviceSize bufferOffset, VkImage Image, uint32_t Width, uint32_t Height);
 
 		VkDevice CreateLogicalDevice(PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
 			uint32_t DeviceExtensionsSize);

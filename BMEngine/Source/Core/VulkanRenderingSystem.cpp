@@ -199,7 +199,7 @@ namespace Core
 		MainInstance::DestroyMainInstance(Instance);
 	}
 
-	void VulkanRenderingSystem::LoadTextures(stbi_uc* TexturesData, TextureInfo* Infos, uint32_t TexturesCount)
+	void VulkanRenderingSystem::LoadTextures(TextureInfo* Infos, uint32_t TexturesCount)
 	{
 		assert(TexturesCount > 0);
 		assert(TextureUnit.ImagesCount == 0);
@@ -215,27 +215,15 @@ namespace Core
 		VkWriteDescriptorSet* WriteData = static_cast<VkWriteDescriptorSet*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkWriteDescriptorSet)));
 		VkDescriptorImageInfo* ImageInfos = static_cast<VkDescriptorImageInfo*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkDescriptorImageInfo)));
 		VkDescriptorSetLayout* layouts = static_cast<VkDescriptorSetLayout*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkDescriptorSetLayout)));
-
-		VkDeviceSize TotalSize = Infos[0].Width * Infos[0].Height * Infos[0].Format;
-
-		for (uint32_t i = 1; i < TexturesCount; ++i)
-		{
-			TotalSize += Infos[i].Width * Infos[i].Height * Infos[i].Format;
-		}
-
-		GPUBuffer StagingBuffer = GPUBuffer::CreateGPUBuffer(Device.PhysicalDevice, LogicalDevice, TotalSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-		void* Data;
-		vkMapMemory(LogicalDevice, StagingBuffer.Memory, 0, TotalSize, 0, &Data);
-		memcpy(Data, TexturesData, static_cast<size_t>(TotalSize));
-		vkUnmapMemory(LogicalDevice, StagingBuffer.Memory);
+		VkMemoryRequirements* TextureMemoryRequirements = static_cast<VkMemoryRequirements*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkMemoryRequirements)));
 
 		VkDeviceSize TotalAllocationSize = 0;
 		uint32_t MemoryTypeIndex = 0;
 
 		for (uint32_t i = 0; i < TextureUnit.ImagesCount; ++i)
 		{
+			// TODO: check on different texture sizes, what if texture less then MemoryRequirements.alignment?
+			// Is it possible to store 2 small textures in one MemoryRequirements.alignment segment?
 			// TODO: use different VkImageCreateInfo params depending on TextureInfo
 			VkImageCreateInfo ImageCreateInfo = { };
 			ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -258,25 +246,47 @@ namespace Core
 				assert(false);
 			}
 
-			VkMemoryRequirements MemoryRequirements;
-			vkGetImageMemoryRequirements(LogicalDevice, TextureUnit.Images[i], &MemoryRequirements);
+			vkGetImageMemoryRequirements(LogicalDevice, TextureUnit.Images[i], &TextureMemoryRequirements[i]);
 
-			TotalAllocationSize += MemoryRequirements.size;
+			TotalAllocationSize += TextureMemoryRequirements[i].size;
 
 			// Trick for now
 			// TODO: Create map off VkDeviceMemory for each MemoryTypeIndex?
 			if (MemoryTypeIndex == 0)
 			{
-				MemoryTypeIndex = GetMemoryTypeIndex(Device.PhysicalDevice, MemoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+				MemoryTypeIndex = GetMemoryTypeIndex(Device.PhysicalDevice, TextureMemoryRequirements[i].memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			}
 			else
 			{
-				if (MemoryTypeIndex != GetMemoryTypeIndex(Device.PhysicalDevice, MemoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+				if (MemoryTypeIndex != GetMemoryTypeIndex(Device.PhysicalDevice, TextureMemoryRequirements[i].memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
 				{
 					assert(false);
 				}
 			}
 		}
+
+		stbi_uc* TexturesData = static_cast<stbi_uc*>(Util::Memory::Allocate(TotalAllocationSize * sizeof(stbi_uc)));
+		stbi_uc* CopyPointer = TexturesData;
+
+		for (uint32_t i = 0; i < TexturesCount; ++i)
+		{
+			int TextureSize = Infos[i].Width * Infos[i].Height * Infos[i].Format;
+			std::memcpy(CopyPointer, Infos[i].Data, TextureSize);
+			CopyPointer += TextureMemoryRequirements[i].size; // size is aligned
+
+			// TODO: Check
+			//VkDeviceSize Alignment = TextureMemoryRequirements[i].alignment;
+			//CopyPointer += TextureSize;
+			//CopyPointer = reinterpret_cast<stbi_uc*>((reinterpret_cast<uintptr_t>(CopyPointer) + Alignment - 1) & ~(Alignment - 1));
+		}
+
+		GPUBuffer StagingBuffer = GPUBuffer::CreateGPUBuffer(Device.PhysicalDevice, LogicalDevice, TotalAllocationSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+		void* Data;
+		vkMapMemory(LogicalDevice, StagingBuffer.Memory, 0, TotalAllocationSize, 0, &Data);
+		memcpy(Data, TexturesData, static_cast<size_t>(TotalAllocationSize));
+		vkUnmapMemory(LogicalDevice, StagingBuffer.Memory);
 
 		VkMemoryAllocateInfo MemoryAllocInfo = { };
 		MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -290,18 +300,10 @@ namespace Core
 		}
 
 		VkDeviceSize Offset = 0;
-
 		for (uint32_t i = 0; i < TextureUnit.ImagesCount; ++i)
 		{
-			VkMemoryRequirements MemoryRequirements;
-			vkGetImageMemoryRequirements(LogicalDevice, TextureUnit.Images[i], &MemoryRequirements);
-
-			Offset = (Offset + MemoryRequirements.alignment - 1) & ~(MemoryRequirements.alignment - 1);
-			std::cout << "Offset: " << Offset << '\n';
-
 			vkBindImageMemory(LogicalDevice, TextureUnit.Images[i], TextureUnit.TextureImagesMemory, Offset);
-
-			Offset += MemoryRequirements.size;
+			Offset += TextureMemoryRequirements[i].size;
 		}
 
 		// Todo: Create beginCommandBuffer function?
@@ -363,11 +365,13 @@ namespace Core
 		vkQueueWaitIdle(GraphicsQueue);
 
 		// Copy image data
+		VkDeviceSize CopyOffset = 0;
 		for (uint32_t i = 0; i < TextureUnit.ImagesCount; ++i)
 		{
-			CopyBufferToImage(StagingBuffer.Buffer, TextureUnit.Images[i], Infos[i].Width, Infos[i].Height);
+			CopyBufferToImage(StagingBuffer.Buffer, CopyOffset, TextureUnit.Images[i], Infos[i].Width, Infos[i].Height);
+			CopyOffset += TextureMemoryRequirements[i].size;
 
-			Barriers[i].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;									// Layout to transition from
+			Barriers[i].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL; // Layout to transition from
 			Barriers[i].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			Barriers[i].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 			Barriers[i].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
@@ -422,6 +426,8 @@ namespace Core
 		Util::Memory::Deallocate(WriteData);
 		Util::Memory::Deallocate(Barriers);
 		Util::Memory::Deallocate(layouts);
+		Util::Memory::Deallocate(TexturesData);
+		Util::Memory::Deallocate(TextureMemoryRequirements);
 	}
 
 	bool VulkanRenderingSystem::CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, uint32_t AvailableExtensionsCount,
@@ -561,7 +567,7 @@ namespace Core
 		vkGetPhysicalDeviceSurfaceFormatsKHR(Device.PhysicalDevice, Surface, &Count, SurfaceFormats.data());
 	}
 
-	void VulkanRenderingSystem::CopyBufferToImage(VkBuffer SourceBuffer, VkImage Image, uint32_t Width, uint32_t Height)
+	void VulkanRenderingSystem::CopyBufferToImage(VkBuffer SourceBuffer, VkDeviceSize bufferOffset, VkImage Image, uint32_t Width, uint32_t Height)
 	{
 		// Todo: Use 1 CommandBuffer for all copy operations?
 		VkCommandBuffer TransferCommandBuffer;
@@ -581,7 +587,7 @@ namespace Core
 		vkBeginCommandBuffer(TransferCommandBuffer, &BeginInfo);
 
 		VkBufferImageCopy ImageRegion = { };
-		ImageRegion.bufferOffset = 0;
+		ImageRegion.bufferOffset = bufferOffset;
 		ImageRegion.bufferRowLength = 0;
 		ImageRegion.bufferImageHeight = 0;
 		ImageRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
