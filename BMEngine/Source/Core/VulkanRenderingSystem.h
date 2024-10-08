@@ -48,7 +48,6 @@ namespace Core
 
 		VkDevice CreateLogicalDevice(PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
 			uint32_t DeviceExtensionsSize);
-		VkDescriptorPool CreateSamplerDescriptorPool(uint32_t Count);
 		VkSampler CreateTextureSampler();
 
 		bool SetupQueues();

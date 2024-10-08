@@ -175,8 +175,9 @@ namespace Core
 		{
 			vkDestroyImageView(LogicalDevice, TextureUnit.ImageViews[i], nullptr);
 			vkDestroyImage(LogicalDevice, TextureUnit.Images[i], nullptr);
-			vkFreeMemory(LogicalDevice, TextureUnit.TextureImagesMemory, nullptr);
 		}
+
+		vkFreeMemory(LogicalDevice, TextureUnit.TextureImagesMemory, nullptr);
 
 		vkDestroyDescriptorPool(LogicalDevice, TextureUnit.SamplerDescriptorPool, nullptr);
 		vkDestroyDescriptorPool(LogicalDevice, StaticPool, nullptr);
@@ -204,9 +205,13 @@ namespace Core
 		assert(TexturesCount > 0);
 		assert(TextureUnit.ImagesCount == 0);
 
+		VkDescriptorPoolSize SamplerPoolSize = { };
+		// Todo: support VK_DESCRIPTOR_TYPE_SAMPLER and VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE separately
+		SamplerPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		SamplerPoolSize.descriptorCount = TexturesCount;
+
+		TextureUnit.SamplerDescriptorPool = CreateDescriptorPool(LogicalDevice, &SamplerPoolSize, 1, TexturesCount);
 		TextureUnit.TextureSampler = CreateTextureSampler();
-		// TODO: Use helper?
-		TextureUnit.SamplerDescriptorPool = CreateSamplerDescriptorPool(TexturesCount);
 		TextureUnit.ImagesCount = TexturesCount;
 		TextureUnit.Images = static_cast<VkImage*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkImage)));
 		TextureUnit.ImageViews = static_cast<VkImageView*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkImageView)));
@@ -304,6 +309,22 @@ namespace Core
 		{
 			vkBindImageMemory(LogicalDevice, TextureUnit.Images[i], TextureUnit.TextureImagesMemory, Offset);
 			Offset += TextureMemoryRequirements[i].size;
+
+			Barriers[i] = { };
+			Barriers[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			Barriers[i].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;									// Layout to transition from
+			Barriers[i].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;									// Layout to transition to
+			Barriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition from
+			Barriers[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition to
+			Barriers[i].image = TextureUnit.Images[i];											// Image being accessed and modified as part of barrier
+			Barriers[i].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;	// Aspect of image being altered
+			Barriers[i].subresourceRange.baseMipLevel = 0;						// First mip level to start alterations on
+			Barriers[i].subresourceRange.levelCount = 1;							// Number of mip levels to alter starting from baseMipLevel
+			Barriers[i].subresourceRange.baseArrayLayer = 0;						// First layer to start alterations on
+			Barriers[i].subresourceRange.layerCount = 1;							// Number of layers to alter starting from baseArrayLayer
+
+			Barriers[i].srcAccessMask = 0;								// Memory access stage transition must after...
+			Barriers[i].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;		// Memory access stage transition must before...
 		}
 
 		// Todo: Create beginCommandBuffer function?
@@ -322,25 +343,6 @@ namespace Core
 		BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
 		vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
-
-		for (uint32_t i = 0; i < TextureUnit.ImagesCount; ++i)
-		{
-			Barriers[i] = { };
-			Barriers[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-			Barriers[i].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;									// Layout to transition from
-			Barriers[i].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;									// Layout to transition to
-			Barriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition from
-			Barriers[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition to
-			Barriers[i].image = TextureUnit.Images[i];											// Image being accessed and modified as part of barrier
-			Barriers[i].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;	// Aspect of image being altered
-			Barriers[i].subresourceRange.baseMipLevel = 0;						// First mip level to start alterations on
-			Barriers[i].subresourceRange.levelCount = 1;							// Number of mip levels to alter starting from baseMipLevel
-			Barriers[i].subresourceRange.baseArrayLayer = 0;						// First layer to start alterations on
-			Barriers[i].subresourceRange.layerCount = 1;							// Number of layers to alter starting from baseArrayLayer
-
-			Barriers[i].srcAccessMask = 0;								// Memory access stage transition must after...
-			Barriers[i].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;		// Memory access stage transition must before...
-		}
 
 		VkPipelineStageFlags SrcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 		VkPipelineStageFlags DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
@@ -375,7 +377,11 @@ namespace Core
 			Barriers[i].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			Barriers[i].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 			Barriers[i].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+			layouts[i] = MainPass.EntityPass.SamplerSetLayout;
 		}
+
+		GPUBuffer::DestroyGPUBuffer(LogicalDevice, StagingBuffer);
 
 		SrcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 		DstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
@@ -390,12 +396,6 @@ namespace Core
 		vkQueueWaitIdle(GraphicsQueue);
 
 		vkFreeCommandBuffers(LogicalDevice, MainPass.GraphicsCommandPool, 1, &CommandBuffer);
-		GPUBuffer::DestroyGPUBuffer(LogicalDevice, StagingBuffer);
-
-		for (uint32_t i = 0; i < TextureUnit.ImagesCount; ++i)
-		{
-			layouts[i] = MainPass.EntityPass.SamplerSetLayout;
-		}
 
 		CreateDescriptorSets(LogicalDevice, TextureUnit.SamplerDescriptorPool, layouts,
 			TextureUnit.ImagesCount, TextureUnit.SamplerDescriptorSets);
@@ -661,30 +661,6 @@ namespace Core
 		}
 
 		return LogicalDevice;
-	}
-
-	VkDescriptorPool VulkanRenderingSystem::CreateSamplerDescriptorPool(uint32_t Count)
-	{
-		VkDescriptorPoolSize SamplerPoolSize = { };
-		// Todo: support VK_DESCRIPTOR_TYPE_SAMPLER and VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE separately
-		SamplerPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		SamplerPoolSize.descriptorCount = Count; // Todo: max objects or max textures?
-
-		VkDescriptorPoolCreateInfo SamplerPoolCreateInfo = { };
-		SamplerPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		SamplerPoolCreateInfo.maxSets = Count;
-		SamplerPoolCreateInfo.poolSizeCount = 1;
-		SamplerPoolCreateInfo.pPoolSizes = &SamplerPoolSize;
-
-		VkDescriptorPool Pool;
-		const VkResult Result = vkCreateDescriptorPool(LogicalDevice, &SamplerPoolCreateInfo, nullptr, &Pool);
-		if (Result != VK_SUCCESS)
-		{
-			//TODO: LOG
-			assert(false);
-		}
-
-		return Pool;
 	}
 
 	VkSurfaceFormatKHR VulkanRenderingSystem::GetBestSurfaceFormat(VkSurfaceKHR Surface)
