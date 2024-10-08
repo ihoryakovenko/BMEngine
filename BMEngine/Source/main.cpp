@@ -60,27 +60,25 @@ struct Camera
 	glm::vec3 CameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 };
 
-void AddTexture(Core::VulkanRenderingSystem& RenderingSystem, const char* TexturePath)
+std::vector<Core::TextureInfo> TexturesInfo;
+
+void AddTexture(const char* TexturePath)
 {
-	int Width, Height;
-	uint64_t ImageSize; // Todo: DeviceSize?
+	int Width;
+	int Height;
 	int Channels;
 
+	// TODO: delete
 	stbi_uc* ImageData = stbi_load(TexturePath, &Width, &Height, &Channels, STBI_rgb_alpha);
 
 	if (ImageData == nullptr)
 	{
-		return;
+		assert(false);
 	}
 
-	ImageSize = Width * Height * 4;
-
-	RenderingSystem.CreateImageBuffer(ImageData, Width, Height, ImageSize);
-
-	stbi_image_free(ImageData);
+	TexturesInfo.push_back({ .Width =  Width, .Height = Height, .Format = STBI_rgb_alpha, .Data = ImageData });
 }
 
-Core::VulkanRenderingSystem* ins;
 void WindowCloseCallback(GLFWwindow* Window)
 {
 	glfwDestroyWindow(Window);
@@ -108,7 +106,6 @@ int main()
 	Core::VulkanRenderingSystem RenderingSystem;
 	RenderingSystem.Init(Window);
 
-	ins = &RenderingSystem;
 	
 
 
@@ -120,7 +117,7 @@ int main()
 	RenderingSystem.MainViewport.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	const char* TestTexture = "./Resources/Textures/giraffe.jpg";
-	AddTexture(RenderingSystem, TestTexture);
+	AddTexture(TestTexture);
 
 	const char* Modelpath = "./Resources/Models/uh60.obj";
 	const char* BaseDir = "./Resources/Models/";
@@ -135,6 +132,8 @@ int main()
 		return -1;
 	}
 
+	// TODO: -_-
+	int TextureIndex = 1;
 	std::vector<int> MaterialToTexture(Materials.size());
 
 	for (size_t i = 0; i < Materials.size(); i++)
@@ -145,16 +144,19 @@ int main()
 		{
 			int Idx = Material.diffuse_texname.rfind("\\");
 			std::string FileName = "./Resources/Textures/" + Material.diffuse_texname.substr(Idx + 1);
-
-			MaterialToTexture[i] = RenderingSystem.TextureImagesCount;
-			AddTexture(RenderingSystem, FileName.c_str());
+			//FileName = TestTexture;
+			MaterialToTexture[i] = TextureIndex;
+			AddTexture(FileName.c_str());
+			++TextureIndex;
 		}
 	}
+
+	RenderingSystem.LoadTextures(TexturesInfo.data(), TexturesInfo.size());
 
 	std::vector<TestMesh> ModelMeshes;
 	ModelMeshes.reserve(Shapes.size());
 
-	std::unordered_map < Core::Vertex, uint32_t, std::hash<Core::Vertex>, VertexEqual> uniqueVertices{};
+	std::unordered_map<Core::Vertex, uint32_t, std::hash<Core::Vertex>, VertexEqual> uniqueVertices{};
 
 	for (const auto& Shape : Shapes)
 	{
