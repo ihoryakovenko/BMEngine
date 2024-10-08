@@ -8,10 +8,10 @@
 
 #include <vector>
 
-#include "MainRenderPass.h"
-
 namespace Core
 {
+	typedef glm::mat4 Model;
+
 	struct UboViewProjection
 	{
 		glm::mat4 View;
@@ -85,6 +85,8 @@ namespace Core
 
 		uint32_t MeshIndicesCount = 0;
 		uint32_t* MeshIndices = nullptr;
+
+		Model Model = glm::mat4(1.0f);
 	};
 
 	struct ImageBuffer
@@ -94,9 +96,7 @@ namespace Core
 		VkImageView ImageView = nullptr;
 	};
 
-	typedef glm::mat4 Model;
-
-	struct DrawableObject
+	struct DrawEntity
 	{
 		uint32_t VerticesCount = 0;
 		GPUBuffer VertexBuffer;
@@ -109,6 +109,31 @@ namespace Core
 		uint32_t TextureId = 0;
 	};
 
+	struct DrawTerrainEntity
+	{
+		uint32_t VerticesCount = 0;
+		GPUBuffer VertexBuffer;
+	};
+
+	struct TextureInfo
+	{
+		int Width = 0;
+		int Height = 0;
+		int Format = 0;
+		stbi_uc* Data = nullptr;
+	};
+
+	struct DrawScene
+	{
+		UboViewProjection ViewProjection;
+
+		DrawEntity* DrawEntities;
+		uint32_t DrawEntitiesCount;
+
+		DrawTerrainEntity* DrawTerrainEntities;
+		uint32_t DrawTerrainEntitiesCount;
+	};
+	
 	struct MainInstance
 	{
 		static MainInstance CreateMainInstance(const char** RequiredExtensions, uint32_t RequiredExtensionsCount,
@@ -171,7 +196,6 @@ namespace Core
 
 		VkFramebuffer* SwapchainFramebuffers = nullptr;
 		VkCommandBuffer* CommandBuffers = nullptr;
-		UboViewProjection ViewProjection;
 	};
 
 	struct TerrainSubpass

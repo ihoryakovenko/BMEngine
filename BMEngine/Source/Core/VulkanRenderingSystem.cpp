@@ -1,42 +1,10 @@
 #include "VulkanRenderingSystem.h"
 
 #include <algorithm>
+#include <vector>
 
 #include "VulkanHelper.h"
 #include "Util/Util.h"
-
-Core::TerrainVertex TerrainVerticesData[30][30] = {
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 },
-	{ 0.0, 5.5, 12.3, 15.7, 20.0, 25.4, 30.2, 35.7, 40.8, 45.0, 50.6, 55.8, 60.4, 65.9, 70.0, 65.5, 50.6, 45.6, 40.1, 45.4, 41.8, 35.9, 32.3, 31.6, 29.9, 26.4, 11.8, 5.9, 3.3, 0.7 }
-};
 
 namespace Core
 {
@@ -177,16 +145,12 @@ namespace Core
 			vkDestroyImage(LogicalDevice, TextureUnit.Images[i], nullptr);
 		}
 
+		GPUBuffer::DestroyGPUBuffer(LogicalDevice, TerrainIndexBuffer);
+
 		vkFreeMemory(LogicalDevice, TextureUnit.TextureImagesMemory, nullptr);
 
 		vkDestroyDescriptorPool(LogicalDevice, TextureUnit.SamplerDescriptorPool, nullptr);
 		vkDestroyDescriptorPool(LogicalDevice, StaticPool, nullptr);
-
-		for (uint32_t i = 0; i < DrawableObjectsCount; ++i)
-		{
-			GPUBuffer::DestroyGPUBuffer(LogicalDevice, DrawableObjects[i].VertexBuffer);
-			GPUBuffer::DestroyGPUBuffer(LogicalDevice, DrawableObjects[i].IndexBuffer);
-		}
 
 		MainPass.ClearResources(LogicalDevice, MainViewport.ViewportSwapchain.ImagesCount);
 
@@ -751,63 +715,41 @@ namespace Core
 		}
 	}
 
-	bool VulkanRenderingSystem::LoadMesh(Mesh Mesh)
+	void VulkanRenderingSystem::CreateDrawEntity(Mesh Mesh, DrawEntity& OutEntity)
 	{
-		assert(DrawableObjectsCount < MaxObjects);
+		OutEntity.VertexBuffer = GPUBuffer::CreateVertexBuffer(Device.PhysicalDevice, LogicalDevice, MainPass.GraphicsCommandPool, GraphicsQueue, Mesh.MeshVertices, Mesh.MeshVerticesCount);
+		OutEntity.VerticesCount = Mesh.MeshVerticesCount;
 
-		DrawableObjects[DrawableObjectsCount].VertexBuffer = GPUBuffer::CreateVertexBuffer(Device.PhysicalDevice, LogicalDevice, MainPass.GraphicsCommandPool, GraphicsQueue, Mesh.MeshVertices, Mesh.MeshVerticesCount);
-		DrawableObjects[DrawableObjectsCount].VerticesCount = Mesh.MeshVerticesCount;
+		OutEntity.IndexBuffer = GPUBuffer::CreateIndexBuffer(Device.PhysicalDevice, LogicalDevice, MainPass.GraphicsCommandPool, GraphicsQueue, Mesh.MeshIndices, Mesh.MeshIndicesCount);
+		OutEntity.IndicesCount = Mesh.MeshIndicesCount;
 
-		DrawableObjects[DrawableObjectsCount].IndexBuffer = GPUBuffer::CreateIndexBuffer(Device.PhysicalDevice, LogicalDevice, MainPass.GraphicsCommandPool, GraphicsQueue, Mesh.MeshIndices, Mesh.MeshIndicesCount);
-		DrawableObjects[DrawableObjectsCount].IndicesCount = Mesh.MeshIndicesCount;
-
-		DrawableObjects[DrawableObjectsCount].Model = glm::mat4(1.0f);
-
-		++DrawableObjectsCount;
-
-		return true;
+		OutEntity.Model = Mesh.Model;
 	}
 
-	bool VulkanRenderingSystem::LoadTerrain()
+	void VulkanRenderingSystem::DestroyDrawEntity(DrawEntity& Entity)
 	{
-		TerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
-		TerrainVerticesCount = 30 * 30;
+		GPUBuffer::DestroyGPUBuffer(LogicalDevice, Entity.VertexBuffer);
+		GPUBuffer::DestroyGPUBuffer(LogicalDevice, Entity.IndexBuffer);
+	}
 
-		TerrainVertexBuffer = GPUBuffer::CreateVertexBuffer(Device.PhysicalDevice, LogicalDevice,
-			MainPass.GraphicsCommandPool, GraphicsQueue, TerrainVerticesDataPointer, TerrainVerticesCount);
-
-		const int numRows = 30;
-		const int numCols = 30;
-
-		std::vector<uint32_t> indices;
-
-		for (int row = 0; row < numRows - 1; ++row)
-		{
-			for (int col = 0; col < numCols - 1; ++col)
-			{
-				// Get indices of the four vertices that make up a quad
-				uint32_t topLeft = row * numCols + col;
-				uint32_t topRight = topLeft + 1;
-				uint32_t bottomLeft = (row + 1) * numCols + col;
-				uint32_t bottomRight = bottomLeft + 1;
-
-				// First triangle (Top-left, Bottom-left, Bottom-right)
-				indices.push_back(topLeft);
-				indices.push_back(bottomLeft);
-				indices.push_back(bottomRight);
-
-				// Second triangle (Top-left, Bottom-right, Top-right)
-				indices.push_back(topLeft);
-				indices.push_back(bottomRight);
-				indices.push_back(topRight);
-			}
-		}
-
-		TerrainIndicesCount = indices.size();
+	void VulkanRenderingSystem::CreateTerrainIndices(uint32_t* Indices, uint32_t IndicesCount)
+	{
+		assert(TerrainIndicesCount == 0);
+		TerrainIndicesCount = IndicesCount;
 		TerrainIndexBuffer = GPUBuffer::CreateIndexBuffer(Device.PhysicalDevice, LogicalDevice,
-			MainPass.GraphicsCommandPool, GraphicsQueue, indices.data(), TerrainIndicesCount);
+			MainPass.GraphicsCommandPool, GraphicsQueue, Indices, TerrainIndicesCount);
+	}
 
-		return true;
+	void VulkanRenderingSystem::CreateTerrainDrawEntity(TerrainVertex* TerrainVertices, uint32_t TerrainVerticesCount, DrawTerrainEntity& OutTerrain)
+	{
+		OutTerrain.VerticesCount = TerrainVerticesCount;
+		OutTerrain.VertexBuffer = GPUBuffer::CreateVertexBuffer(Device.PhysicalDevice, LogicalDevice,
+			MainPass.GraphicsCommandPool, GraphicsQueue, TerrainVertices, TerrainVerticesCount);
+	}
+
+	void VulkanRenderingSystem::DestroyTerrainDrawEntity(DrawTerrainEntity& Entity)
+	{
+		GPUBuffer::DestroyGPUBuffer(LogicalDevice, Entity.VertexBuffer);
 	}
 
 	void VulkanRenderingSystem::CreateSynchronisation()
@@ -846,7 +788,7 @@ namespace Core
 		}
 	}
 
-	bool VulkanRenderingSystem::Draw()
+	void VulkanRenderingSystem::Draw(const DrawScene& Scene)
 	{
 		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
 		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -893,7 +835,8 @@ namespace Core
 		{
 			vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.TerrainPass.Pipeline);
 
-			VkBuffer TerrainVertexBuffers[] = { TerrainVertexBuffer.Buffer };
+			//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			VkBuffer TerrainVertexBuffers[] = { Scene.DrawTerrainEntities[0].VertexBuffer.Buffer };
 			VkDeviceSize TerrainBuffersOffsets[] = { 0 };
 
 			const uint32_t TerrainDescriptorSetGroupCount = 1;
@@ -911,24 +854,24 @@ namespace Core
 		vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.EntityPass.Pipeline);
 
 		// TODO: Support rework to not create identical index buffers
-		for (uint32_t j = 0; j < DrawableObjectsCount; ++j)
+		for (uint32_t j = 0; j < Scene.DrawEntitiesCount; ++j)
 		{
-			VkBuffer VertexBuffers[] = { DrawableObjects[j].VertexBuffer.Buffer };
+			VkBuffer VertexBuffers[] = { Scene.DrawEntities[j].VertexBuffer.Buffer };
 			VkDeviceSize Offsets[] = { 0 };
 
 			// Todo: do not record textureId on each frame?
 			const uint32_t DescriptorSetGroupCount = 2;
 			VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] = { MainPass.EntityPass.EntitySets[ImageIndex],
-				TextureUnit.SamplerDescriptorSets[DrawableObjects[j].TextureId] };
+				TextureUnit.SamplerDescriptorSets[Scene.DrawEntities[j].TextureId] };
 
 			vkCmdPushConstants(MainViewport.CommandBuffers[ImageIndex], MainPass.EntityPass.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-				0, sizeof(Model), &DrawableObjects[j].Model);
+				0, sizeof(Model), &Scene.DrawEntities[j].Model);
 			vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.EntityPass.PipelineLayout,
 				0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
 
 			vkCmdBindVertexBuffers(MainViewport.CommandBuffers[ImageIndex], 0, 1, VertexBuffers, Offsets);
-			vkCmdBindIndexBuffer(MainViewport.CommandBuffers[ImageIndex], DrawableObjects[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(MainViewport.CommandBuffers[ImageIndex], DrawableObjects[j].IndicesCount, 1, 0, 0, 0);
+			vkCmdBindIndexBuffer(MainViewport.CommandBuffers[ImageIndex], Scene.DrawEntities[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(MainViewport.CommandBuffers[ImageIndex], Scene.DrawEntities[j].IndicesCount, 1, 0, 0, 0);
 		}
 
 		vkCmdNextSubpass(MainViewport.CommandBuffers[ImageIndex], VK_SUBPASS_CONTENTS_INLINE);
@@ -945,7 +888,6 @@ namespace Core
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkBeginCommandBuffer result is {}", static_cast<int>(Result));
-			return false;
 		}
 		// Function end RecordCommands
 
@@ -953,7 +895,7 @@ namespace Core
 		void* Data;
 		vkMapMemory(LogicalDevice, MainPass.VpUniformBuffers[ImageIndex].Memory, 0, sizeof(UboViewProjection),
 			0, &Data);
-		std::memcpy(Data, &MainViewport.ViewProjection, sizeof(UboViewProjection));
+		std::memcpy(Data, &Scene.ViewProjection, sizeof(UboViewProjection));
 		vkUnmapMemory(LogicalDevice, MainPass.VpUniformBuffers[ImageIndex].Memory);
 
 		// Submit command buffer to queue
@@ -970,7 +912,6 @@ namespace Core
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkQueueSubmit result is {}", static_cast<int>(Result));
-			return false;
 		}
 
 		// -- PRESENT RENDERED IMAGE TO SCREEN --
@@ -989,8 +930,6 @@ namespace Core
 		}
 
 		CurrentFrame = (CurrentFrame + 1) % MaxFrameDraws;
-
-		return true;
 	}
 
 	void VulkanRenderingSystem::DeinitViewport(ViewportInstance* Viewport)

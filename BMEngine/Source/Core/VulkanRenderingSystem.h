@@ -5,14 +5,6 @@
 
 namespace Core
 {
-	struct TextureInfo
-	{
-		int Width = 0;
-		int Height = 0;
-		int Format = 0;
-		stbi_uc* Data = nullptr;
-	};
-
 	class VulkanRenderingSystem
 	{
 	public:
@@ -21,13 +13,14 @@ namespace Core
 
 		void LoadTextures(TextureInfo* Infos, uint32_t TexturesCount);
 
-		// VulkanRenderInstance
-		void InitViewport(GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstance* OutViewport,
-			VkDescriptorPool DescriptorPool, SwapchainInstance SwapInstance, ImageBuffer* ColorBuffers, ImageBuffer* DepthBuffers);
-		void DeinitViewport(ViewportInstance* Viewport);
-		bool LoadMesh(Mesh Mesh);
-		bool LoadTerrain();
-		bool Draw();
+		void CreateDrawEntity(Mesh Mesh, DrawEntity& OutEntity);
+		void DestroyDrawEntity(DrawEntity& Entity);
+
+		void CreateTerrainIndices(uint32_t* Indices, uint32_t IndicesCount);
+		void CreateTerrainDrawEntity(TerrainVertex* TerrainVertices, uint32_t TerrainVerticesCount, DrawTerrainEntity& OutTerrain);
+		void DestroyTerrainDrawEntity(DrawTerrainEntity& Entity);
+
+		void Draw(const DrawScene& Scene);
 
 	private:
 		void GetAvailableExtensionProperties(std::vector<VkExtensionProperties>& Data);
@@ -56,7 +49,11 @@ namespace Core
 		void CreateSynchronisation();
 		void DestroySynchronisation();
 
-	public:
+		void InitViewport(GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstance* OutViewport,
+			VkDescriptorPool DescriptorPool, SwapchainInstance SwapInstance, ImageBuffer* ColorBuffers, ImageBuffer* DepthBuffers);
+		void DeinitViewport(ViewportInstance* Viewport);
+
+	private:
 		MainInstance Instance;
 		VkDevice LogicalDevice = nullptr;
 		DeviceInstance Device;
@@ -77,9 +74,6 @@ namespace Core
 		VkSemaphore* RenderFinished = nullptr;
 		VkFence* DrawFences = nullptr;
 
-		const uint32_t MaxObjects = 528;
-		uint32_t DrawableObjectsCount = 0;
-		DrawableObject DrawableObjects[528];
 		const int MaxFrameDraws = 2;
 		int CurrentFrame = 0;
 
@@ -95,10 +89,6 @@ namespace Core
 			VkImageView* ImageViews = nullptr;
 			uint32_t ImagesCount = 0;
 		} TextureUnit;
-
-
-		uint32_t TerrainVerticesCount = 0;
-		GPUBuffer TerrainVertexBuffer;
 
 		uint32_t TerrainIndicesCount = 0;
 		GPUBuffer TerrainIndexBuffer;

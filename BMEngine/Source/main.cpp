@@ -25,8 +25,81 @@
 
 #include "Core/VulkanCoreTypes.h"
 
+#include <random>
+
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
+
+const uint32_t NumRows = 600;
+const uint32_t NumCols = 600;
+
+Core::TerrainVertex TerrainVerticesData[NumRows][NumCols] = {
+	{ 0.0, 0.0, 0.0, 0.0, 0.0 },
+	{ 0.0, 1.0, 1.0, 1.0, 0.0 },
+	{ 0.0, 1.0, 2.0, 1.0, 0.0 },
+	{ 0.0, 1.0, 1.0, 1.0, 0.0 },
+	{ 0.0, 0.0, 0.0, 0.0, 0.0 },
+};
+
+void GenerateTerrain()
+{
+	const float MaxAltitude = 10.0f;
+	const float MinAltitude = 0.0f;
+	const float SmoothMin = 7.0f;
+	const float SmoothMax = 3.0f;
+	const float SmoothFactor = 0.5f;
+	const float ScaleFactor = 0.2f;
+
+	std::mt19937 Gen(1);
+	std::uniform_real_distribution<float> Dist(MinAltitude, MaxAltitude);
+
+	bool UpFactor = false;
+	bool DownFactor = false;
+
+	for (int i = 0; i < NumRows; ++i)
+	{
+		for (int j = 0; j < NumCols; ++j)
+		{
+			const float RandomAltitude = Dist(Gen);
+			const float Probability = (RandomAltitude - MinAltitude) / (MaxAltitude - MinAltitude);
+
+			const float PreviousCornerAltitude = i > 0 && j > 0 ? TerrainVerticesData[i - 1][j - 1].Altitude : 5.0f;
+			const float PreviousIAltitude = i > 0 ? TerrainVerticesData[i - 1][j].Altitude : 5.0f;
+			const float PreviousJAltitude = j > 0 ? TerrainVerticesData[i][j - 1].Altitude : 5.0f;
+
+			const float PreviousAverageAltitude = (PreviousCornerAltitude + PreviousIAltitude + PreviousJAltitude) / 3.0f;
+
+			float NormalizedAltitude = (PreviousAverageAltitude - MinAltitude) / (MaxAltitude - MinAltitude);
+
+			const float Smooth = (PreviousAverageAltitude <= SmoothMin || PreviousAverageAltitude >= SmoothMax) ? SmoothFactor : 1.0f;
+
+			if (UpFactor)
+			{
+				NormalizedAltitude *= ScaleFactor;
+			}
+			else if (DownFactor)
+			{
+				NormalizedAltitude /= ScaleFactor;
+			}
+
+			if (NormalizedAltitude > Probability)
+			{
+				TerrainVerticesData[i][j].Altitude = PreviousAverageAltitude - Probability * Smooth;
+				UpFactor = false;
+				DownFactor = true;
+			}
+			else
+			{
+				TerrainVerticesData[i][j].Altitude = PreviousAverageAltitude + Probability * Smooth;
+				UpFactor = true;
+				DownFactor = false;
+			}
+		}
+	}
+}
+
+Core::TerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
+uint32_t TerrainVerticesCount = NumRows * NumCols;
 
 struct TestMesh
 {
@@ -95,6 +168,8 @@ int main()
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
+	GenerateTerrain();
+
 	GLFWwindow* Window = glfwCreateWindow(1600, 800, "BMEngine", nullptr, nullptr);
 	if (Window == nullptr)
 	{
@@ -103,22 +178,7 @@ int main()
 		return -1;
 	}
 
-	Core::VulkanRenderingSystem RenderingSystem;
-	RenderingSystem.Init(Window);
-
-	
-
-
-	RenderingSystem.MainViewport.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-		static_cast<float>(RenderingSystem.MainViewport.ViewportSwapchain.SwapExtent.width) / static_cast<float>(RenderingSystem.MainViewport.ViewportSwapchain.SwapExtent.height), 0.1f, 100.0f);
-
-	RenderingSystem.MainViewport.ViewProjection.Projection[1][1] *= -1;
-
-	RenderingSystem.MainViewport.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
 	const char* TestTexture = "./Resources/Textures/giraffe.jpg";
-	AddTexture(TestTexture);
-
 	const char* Modelpath = "./Resources/Models/uh60.obj";
 	const char* BaseDir = "./Resources/Models/";
 
@@ -136,6 +196,19 @@ int main()
 	int TextureIndex = 1;
 	std::vector<int> MaterialToTexture(Materials.size());
 
+	Core::VulkanRenderingSystem RenderingSystem;
+	RenderingSystem.Init(Window);
+
+	Core::DrawScene Scene;
+
+	Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
+		static_cast<float>(1600) / static_cast<float>(800), 0.1f, 100.0f);
+	Scene.ViewProjection.Projection[1][1] *= -1;
+	Scene.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+	
+	AddTexture(TestTexture);
+
 	for (size_t i = 0; i < Materials.size(); i++)
 	{
 		MaterialToTexture[i] = 0;
@@ -144,14 +217,12 @@ int main()
 		{
 			int Idx = Material.diffuse_texname.rfind("\\");
 			std::string FileName = "./Resources/Textures/" + Material.diffuse_texname.substr(Idx + 1);
-			//FileName = TestTexture;
+
 			MaterialToTexture[i] = TextureIndex;
 			AddTexture(FileName.c_str());
 			++TextureIndex;
 		}
 	}
-
-	RenderingSystem.LoadTextures(TexturesInfo.data(), TexturesInfo.size());
 
 	std::vector<TestMesh> ModelMeshes;
 	ModelMeshes.reserve(Shapes.size());
@@ -195,6 +266,8 @@ int main()
 		ModelMeshes.push_back(Tm);
 	}
 
+	std::vector<Core::DrawEntity> DrawEntities(ModelMeshes.size());
+
 	for (int i = 0; i < ModelMeshes.size(); ++i)
 	{
 		Core::Mesh m;
@@ -205,11 +278,47 @@ int main()
 		m.MeshIndices = ModelMeshes[i].indices.data();
 		m.MeshIndicesCount = ModelMeshes[i].indices.size();
 
-		RenderingSystem.LoadMesh(m);
-		RenderingSystem.DrawableObjects[RenderingSystem.DrawableObjectsCount - 1].TextureId = ModelMeshes[i].TextureId;
+		RenderingSystem.CreateDrawEntity(m, DrawEntities[i]);
+		DrawEntities[i].TextureId = ModelMeshes[i].TextureId;
 	}
 
-	RenderingSystem.LoadTerrain();
+	std::vector<uint32_t> indices;
+
+	for (int row = 0; row < NumRows - 1; ++row)
+	{
+		for (int col = 0; col < NumCols - 1; ++col)
+		{
+			uint32_t topLeft = row * NumCols + col;
+			uint32_t topRight = topLeft + 1;
+			uint32_t bottomLeft = (row + 1) * NumCols + col;
+			uint32_t bottomRight = bottomLeft + 1;
+
+			// First triangle (Top-left, Bottom-left, Bottom-right)
+			indices.push_back(topLeft);
+			indices.push_back(bottomLeft);
+			indices.push_back(bottomRight);
+
+			// Second triangle (Top-left, Bottom-right, Top-right)
+			indices.push_back(topLeft);
+			indices.push_back(bottomRight);
+			indices.push_back(topRight);
+		}
+	}
+
+	Core::DrawTerrainEntity TestDrawTerrainEntity;
+
+	RenderingSystem.CreateTerrainDrawEntity(&TerrainVerticesData[0][0], NumRows * NumCols, TestDrawTerrainEntity);
+
+	RenderingSystem.LoadTextures(TexturesInfo.data(), TexturesInfo.size());
+	RenderingSystem.CreateTerrainIndices(indices.data(), indices.size());
+
+	Scene.DrawTerrainEntities = &TestDrawTerrainEntity;
+	Scene.DrawTerrainEntitiesCount = 1;
+
+	Scene.DrawEntities = DrawEntities.data();
+	Scene.DrawEntitiesCount = DrawEntities.size();
+
+	
 
 	float Angle = 0.0f;
 	double DeltaTime = 0.0f;
@@ -220,7 +329,7 @@ int main()
 
 	Camera MainCamera;
 
-	while (!glfwWindowShouldClose(RenderingSystem.MainViewport.Window))
+	while (!glfwWindowShouldClose(Window))
 	{
 		glfwPollEvents();
 
@@ -231,64 +340,51 @@ int main()
 		float CameraDeltaSpeed = CameraSpeed * DeltaTime;
 		float CameraDeltaRotationSpeed = RotationSpeed * DeltaTime;
 
-		if (glfwGetKey(RenderingSystem.MainViewport.Window, GLFW_KEY_W) == GLFW_PRESS)
+		if (glfwGetKey(Window, GLFW_KEY_W) == GLFW_PRESS)
 		{
 			MainCamera.CameraPosition += CameraDeltaSpeed * MainCamera.CameraFront;
 		}
 
-		if (glfwGetKey(RenderingSystem.MainViewport.Window, GLFW_KEY_S) == GLFW_PRESS)
+		if (glfwGetKey(Window, GLFW_KEY_S) == GLFW_PRESS)
 		{
 			MainCamera.CameraPosition -= CameraDeltaSpeed * MainCamera.CameraFront;
 		}
 
-		if (glfwGetKey(RenderingSystem.MainViewport.Window, GLFW_KEY_A) == GLFW_PRESS)
+		if (glfwGetKey(Window, GLFW_KEY_A) == GLFW_PRESS)
 		{
 			MainCamera.CameraPosition -= glm::normalize(glm::cross(MainCamera.CameraFront, MainCamera.CameraUp)) * CameraDeltaSpeed;
 		}
 
-		if (glfwGetKey(RenderingSystem.MainViewport.Window, GLFW_KEY_D) == GLFW_PRESS)
+		if (glfwGetKey(Window, GLFW_KEY_D) == GLFW_PRESS)
 		{
 			MainCamera.CameraPosition += glm::normalize(glm::cross(MainCamera.CameraFront, MainCamera.CameraUp)) * CameraDeltaSpeed;
 		}
 
-		if (glfwGetKey(RenderingSystem.MainViewport.Window, GLFW_KEY_SPACE) == GLFW_PRESS)
+		if (glfwGetKey(Window, GLFW_KEY_SPACE) == GLFW_PRESS)
 		{
 			MainCamera.CameraPosition += CameraDeltaSpeed * MainCamera.CameraUp;
 		}
 
-		if (glfwGetKey(RenderingSystem.MainViewport.Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+		if (glfwGetKey(Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
 		{
 			MainCamera.CameraPosition -= CameraDeltaSpeed * MainCamera.CameraUp;
 		}
 
-		if (glfwGetKey(RenderingSystem.MainViewport.Window, GLFW_KEY_Q) == GLFW_PRESS)
+		if (glfwGetKey(Window, GLFW_KEY_Q) == GLFW_PRESS)
 		{
 			glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), CameraDeltaRotationSpeed, MainCamera.CameraUp);
 			MainCamera.CameraFront = glm::mat3(rotation) * MainCamera.CameraFront;
 		}
 
-		if (glfwGetKey(RenderingSystem.MainViewport.Window, GLFW_KEY_E) == GLFW_PRESS)
+		if (glfwGetKey(Window, GLFW_KEY_E) == GLFW_PRESS)
 		{
 			glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), -CameraDeltaRotationSpeed, MainCamera.CameraUp);
 			MainCamera.CameraFront = glm::mat3(rotation) * MainCamera.CameraFront;
 		}
 
-		RenderingSystem.MainViewport.ViewProjection.View = glm::lookAt(MainCamera.CameraPosition, MainCamera.CameraPosition + MainCamera.CameraFront, MainCamera.CameraUp);
+		Scene.ViewProjection.View = glm::lookAt(MainCamera.CameraPosition, MainCamera.CameraPosition + MainCamera.CameraFront, MainCamera.CameraUp);
 
-		//Angle += 30.0f * static_cast<float>(DeltaTime);
-		//if (Angle > 360.0f)
-		//{
-		//	Angle -= 360.0f;
-		//}
-
-		//glm::mat4 TestMat = glm::rotate(glm::mat4(1.0f), glm::radians(Angle), glm::vec3(0.0f, 1.0f, 0.0f));
-
-		//for (int i = 0; i < DrawableObjectsCount; ++i)
-		//{
-		//	DrawableObjects[i].Model = TestMat;
-		//}
-
-		RenderingSystem.Draw();
+		RenderingSystem.Draw(Scene);
 	}
 
 	RenderingSystem.DeInit();
