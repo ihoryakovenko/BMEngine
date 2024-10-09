@@ -83,18 +83,22 @@ namespace Util
 	{
 		static inline int AllocateCounter = 0;
 
-		static void* Allocate(size_t Size)
+		template <typename T>
+		static T* Allocate(size_t Count = 1)
 		{
 #ifndef NDEBUG
 			++AllocateCounter;
 #endif
-			return std::malloc(Size);
+			return static_cast<T*>(std::malloc(Count * sizeof(T)));
 		}
 
 		static void Deallocate(void* Ptr)
 		{
 #ifndef NDEBUG
-			--AllocateCounter;
+			if (Ptr != nullptr)
+			{
+				--AllocateCounter;
+			}
 #endif
 			std::free(Ptr);
 		}

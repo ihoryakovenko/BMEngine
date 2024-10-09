@@ -157,6 +157,87 @@ void WindowCloseCallback(GLFWwindow* Window)
 	glfwDestroyWindow(Window);
 }
 
+bool Close = false;
+
+static bool FirstMouse = true;
+static float LastX = 400, LastY = 300;
+float Yaw = -90.0f;
+float Pitch = 0.0f;
+
+void MoveCamera(GLFWwindow* Window, float DeltaTime, Camera& MainCamera)
+{
+	const float RotationSpeed = 0.1f;
+	const float CameraSpeed = 10.0f;
+
+	float CameraDeltaSpeed = CameraSpeed * DeltaTime;
+
+	// Handle camera movement with keys
+	if (glfwGetKey(Window, GLFW_KEY_W) == GLFW_PRESS)
+	{
+		MainCamera.CameraPosition += CameraDeltaSpeed * MainCamera.CameraFront;
+	}
+
+	if (glfwGetKey(Window, GLFW_KEY_S) == GLFW_PRESS)
+	{
+		MainCamera.CameraPosition -= CameraDeltaSpeed * MainCamera.CameraFront;
+	}
+
+	if (glfwGetKey(Window, GLFW_KEY_A) == GLFW_PRESS)
+	{
+		MainCamera.CameraPosition -= glm::normalize(glm::cross(MainCamera.CameraFront, MainCamera.CameraUp)) * CameraDeltaSpeed;
+	}
+
+	if (glfwGetKey(Window, GLFW_KEY_D) == GLFW_PRESS)
+	{
+		MainCamera.CameraPosition += glm::normalize(glm::cross(MainCamera.CameraFront, MainCamera.CameraUp)) * CameraDeltaSpeed;
+	}
+
+	if (glfwGetKey(Window, GLFW_KEY_SPACE) == GLFW_PRESS)
+	{
+		MainCamera.CameraPosition += CameraDeltaSpeed * MainCamera.CameraUp;
+	}
+
+	if (glfwGetKey(Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+	{
+		MainCamera.CameraPosition -= CameraDeltaSpeed * MainCamera.CameraUp;
+	}
+
+	if (glfwGetKey(Window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+	{
+		Close = true;
+	}
+
+	double MouseX, MouseY;
+	glfwGetCursorPos(Window, &MouseX, &MouseY);
+
+	if (FirstMouse)
+	{
+		LastX = MouseX;
+		LastY = MouseY;
+		FirstMouse = false;
+	}
+
+	float OffsetX = MouseX - LastX;
+	float OffsetY = LastY - MouseY;
+	LastX = MouseX;
+	LastY = MouseY;
+
+	OffsetX *= RotationSpeed;
+	OffsetY *= RotationSpeed;
+
+	Yaw += OffsetX;
+	Pitch += OffsetY;
+
+	if (Pitch > 89.0f) Pitch = 89.0f;
+	if (Pitch < -89.0f) Pitch = -89.0f;
+
+	glm::vec3 Front;
+	Front.x = cos(glm::radians(Yaw)) * cos(glm::radians(Pitch));
+	Front.y = sin(glm::radians(Pitch));
+	Front.z = sin(glm::radians(Yaw)) * cos(glm::radians(Pitch));
+	MainCamera.CameraFront = glm::normalize(Front);
+}
+
 int main()
 {
 	if (glfwInit() == GL_FALSE)
@@ -177,6 +258,8 @@ int main()
 		glfwTerminate();
 		return -1;
 	}
+
+	glfwSetInputMode(Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	const char* TestTexture = "./Resources/Textures/giraffe.jpg";
 	const char* Modelpath = "./Resources/Models/uh60.obj";
@@ -324,12 +407,9 @@ int main()
 	double DeltaTime = 0.0f;
 	double LastTime = 0.0f;
 
-	const float RotationSpeed = 2.0f;
-	const float CameraSpeed = 10.0f;
-
 	Camera MainCamera;
 
-	while (!glfwWindowShouldClose(Window))
+	while (!glfwWindowShouldClose(Window) && !Close)
 	{
 		glfwPollEvents();
 
@@ -337,56 +417,19 @@ int main()
 		DeltaTime = CurrentTime - LastTime;
 		LastTime = static_cast<float>(CurrentTime);
 
-		float CameraDeltaSpeed = CameraSpeed * DeltaTime;
-		float CameraDeltaRotationSpeed = RotationSpeed * DeltaTime;
-
-		if (glfwGetKey(Window, GLFW_KEY_W) == GLFW_PRESS)
-		{
-			MainCamera.CameraPosition += CameraDeltaSpeed * MainCamera.CameraFront;
-		}
-
-		if (glfwGetKey(Window, GLFW_KEY_S) == GLFW_PRESS)
-		{
-			MainCamera.CameraPosition -= CameraDeltaSpeed * MainCamera.CameraFront;
-		}
-
-		if (glfwGetKey(Window, GLFW_KEY_A) == GLFW_PRESS)
-		{
-			MainCamera.CameraPosition -= glm::normalize(glm::cross(MainCamera.CameraFront, MainCamera.CameraUp)) * CameraDeltaSpeed;
-		}
-
-		if (glfwGetKey(Window, GLFW_KEY_D) == GLFW_PRESS)
-		{
-			MainCamera.CameraPosition += glm::normalize(glm::cross(MainCamera.CameraFront, MainCamera.CameraUp)) * CameraDeltaSpeed;
-		}
-
-		if (glfwGetKey(Window, GLFW_KEY_SPACE) == GLFW_PRESS)
-		{
-			MainCamera.CameraPosition += CameraDeltaSpeed * MainCamera.CameraUp;
-		}
-
-		if (glfwGetKey(Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
-		{
-			MainCamera.CameraPosition -= CameraDeltaSpeed * MainCamera.CameraUp;
-		}
-
-		if (glfwGetKey(Window, GLFW_KEY_Q) == GLFW_PRESS)
-		{
-			glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), CameraDeltaRotationSpeed, MainCamera.CameraUp);
-			MainCamera.CameraFront = glm::mat3(rotation) * MainCamera.CameraFront;
-		}
-
-		if (glfwGetKey(Window, GLFW_KEY_E) == GLFW_PRESS)
-		{
-			glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), -CameraDeltaRotationSpeed, MainCamera.CameraUp);
-			MainCamera.CameraFront = glm::mat3(rotation) * MainCamera.CameraFront;
-		}
-
+		MoveCamera(Window, DeltaTime, MainCamera);
 		Scene.ViewProjection.View = glm::lookAt(MainCamera.CameraPosition, MainCamera.CameraPosition + MainCamera.CameraFront, MainCamera.CameraUp);
 
 		RenderingSystem.Draw(Scene);
 	}
 
+	for (int i = 0; i < DrawEntities.size(); ++i)
+	{
+		RenderingSystem.DestroyDrawEntity(DrawEntities[i]);
+	}
+
+	RenderingSystem.DestroyTerrainDrawEntity(TestDrawTerrainEntity);
+	
 	RenderingSystem.DeInit();
 
 

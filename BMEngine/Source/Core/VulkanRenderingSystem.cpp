@@ -158,10 +158,11 @@ namespace Core
 
 		vkDestroyDevice(LogicalDevice, nullptr);
 
+		MainInstance::DestroyMainInstance(Instance);
+
 		Util::Memory::Deallocate(TextureUnit.SamplerDescriptorSets);
 		Util::Memory::Deallocate(TextureUnit.Images);
 		Util::Memory::Deallocate(TextureUnit.ImageViews);
-		MainInstance::DestroyMainInstance(Instance);
 	}
 
 	void VulkanRenderingSystem::LoadTextures(TextureInfo* Infos, uint32_t TexturesCount)
@@ -177,14 +178,14 @@ namespace Core
 		TextureUnit.SamplerDescriptorPool = CreateDescriptorPool(LogicalDevice, &SamplerPoolSize, 1, TexturesCount);
 		TextureUnit.TextureSampler = CreateTextureSampler();
 		TextureUnit.ImagesCount = TexturesCount;
-		TextureUnit.Images = static_cast<VkImage*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkImage)));
-		TextureUnit.ImageViews = static_cast<VkImageView*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkImageView)));
-		TextureUnit.SamplerDescriptorSets = static_cast<VkDescriptorSet*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkDescriptorSet)));
-		VkImageMemoryBarrier* Barriers = static_cast<VkImageMemoryBarrier*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkImageMemoryBarrier)));
-		VkWriteDescriptorSet* WriteData = static_cast<VkWriteDescriptorSet*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkWriteDescriptorSet)));
-		VkDescriptorImageInfo* ImageInfos = static_cast<VkDescriptorImageInfo*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkDescriptorImageInfo)));
-		VkDescriptorSetLayout* layouts = static_cast<VkDescriptorSetLayout*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkDescriptorSetLayout)));
-		VkMemoryRequirements* TextureMemoryRequirements = static_cast<VkMemoryRequirements*>(Util::Memory::Allocate(TextureUnit.ImagesCount * sizeof(VkMemoryRequirements)));
+		TextureUnit.Images = Util::Memory::Allocate<VkImage>(TextureUnit.ImagesCount);
+		TextureUnit.ImageViews = Util::Memory::Allocate<VkImageView>(TextureUnit.ImagesCount);
+		TextureUnit.SamplerDescriptorSets = Util::Memory::Allocate<VkDescriptorSet>(TextureUnit.ImagesCount);
+		VkImageMemoryBarrier* Barriers = Util::Memory::Allocate<VkImageMemoryBarrier>(TextureUnit.ImagesCount);
+		VkWriteDescriptorSet* WriteData = Util::Memory::Allocate<VkWriteDescriptorSet>(TextureUnit.ImagesCount);
+		VkDescriptorImageInfo* ImageInfos = Util::Memory::Allocate<VkDescriptorImageInfo>(TextureUnit.ImagesCount);
+		VkDescriptorSetLayout* layouts = Util::Memory::Allocate<VkDescriptorSetLayout>(TextureUnit.ImagesCount);
+		VkMemoryRequirements* TextureMemoryRequirements = Util::Memory::Allocate<VkMemoryRequirements>(TextureUnit.ImagesCount);
 
 		VkDeviceSize TotalAllocationSize = 0;
 		uint32_t MemoryTypeIndex = 0;
@@ -234,7 +235,7 @@ namespace Core
 			}
 		}
 
-		stbi_uc* TexturesData = static_cast<stbi_uc*>(Util::Memory::Allocate(TotalAllocationSize * sizeof(stbi_uc)));
+		stbi_uc* TexturesData = Util::Memory::Allocate<stbi_uc>(TotalAllocationSize);
 		stbi_uc* CopyPointer = TexturesData;
 
 		for (uint32_t i = 0; i < TexturesCount; ++i)
@@ -728,6 +729,8 @@ namespace Core
 
 	void VulkanRenderingSystem::DestroyDrawEntity(DrawEntity& Entity)
 	{
+		// TODO: Mark object to for delete and delete it after draw
+		vkWaitForFences(LogicalDevice, MaxFrameDraws, DrawFences, VK_TRUE, std::numeric_limits<uint64_t>::max());
 		GPUBuffer::DestroyGPUBuffer(LogicalDevice, Entity.VertexBuffer);
 		GPUBuffer::DestroyGPUBuffer(LogicalDevice, Entity.IndexBuffer);
 	}
@@ -754,9 +757,9 @@ namespace Core
 
 	void VulkanRenderingSystem::CreateSynchronisation()
 	{
-		ImageAvailable = static_cast<VkSemaphore*>(Util::Memory::Allocate(MaxFrameDraws * sizeof(VkSemaphore)));
-		RenderFinished = static_cast<VkSemaphore*>(Util::Memory::Allocate(MaxFrameDraws * sizeof(VkSemaphore)));
-		DrawFences = static_cast<VkFence*>(Util::Memory::Allocate(MaxFrameDraws * sizeof(VkFence)));
+		ImageAvailable = Util::Memory::Allocate<VkSemaphore>(MaxFrameDraws);
+		RenderFinished = Util::Memory::Allocate<VkSemaphore>(MaxFrameDraws);
+		DrawFences = Util::Memory::Allocate<VkFence>(MaxFrameDraws);
 
 		VkSemaphoreCreateInfo SemaphoreCreateInfo = { };
 		SemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -786,6 +789,10 @@ namespace Core
 			vkDestroySemaphore(LogicalDevice, ImageAvailable[i], nullptr);
 			vkDestroyFence(LogicalDevice, DrawFences[i], nullptr);
 		}
+
+		Util::Memory::Deallocate(RenderFinished);
+		Util::Memory::Deallocate(ImageAvailable);
+		Util::Memory::Deallocate(DrawFences);
 	}
 
 	void VulkanRenderingSystem::Draw(const DrawScene& Scene)
@@ -934,16 +941,13 @@ namespace Core
 
 	void VulkanRenderingSystem::DeinitViewport(ViewportInstance* Viewport)
 	{
-		vkDeviceWaitIdle(LogicalDevice);
-
 		for (uint32_t i = 0; i < Viewport->ViewportSwapchain.ImagesCount; ++i)
 		{
 			vkDestroyFramebuffer(LogicalDevice, Viewport->SwapchainFramebuffers[i], nullptr);
-			// UNIFORM BUFFER SETUP CODE
-			//Core::DestroyGenericBuffer(RenderInstance, ModelDynamicUniformBuffers[i]);
 		}
 
 		SwapchainInstance::DestroySwapchainInstance(LogicalDevice, Viewport->ViewportSwapchain);
+		vkDestroySurfaceKHR(Instance.VulkanInstance, Viewport->Surface, nullptr);
 
 		Util::Memory::Deallocate(Viewport->SwapchainFramebuffers);
 		Util::Memory::Deallocate(Viewport->CommandBuffers);
@@ -956,7 +960,7 @@ namespace Core
 		OutViewport->Surface = Surface;
 		OutViewport->ViewportSwapchain = SwapInstance;
 
-		OutViewport->SwapchainFramebuffers = static_cast<VkFramebuffer*>(Util::Memory::Allocate(OutViewport->ViewportSwapchain.ImagesCount * sizeof(VkFramebuffer)));
+		OutViewport->SwapchainFramebuffers = Util::Memory::Allocate<VkFramebuffer>(OutViewport->ViewportSwapchain.ImagesCount);
 
 		// Function CreateFrameBuffers
 		// Create a framebuffer for each swap chain image
@@ -997,7 +1001,7 @@ namespace Core
 		CommandBufferAllocateInfo.commandBufferCount = static_cast<uint32_t>(OutViewport->ViewportSwapchain.ImagesCount);
 
 		// Allocate command buffers and place handles in array of buffers
-		OutViewport->CommandBuffers = static_cast<VkCommandBuffer*>(Util::Memory::Allocate(OutViewport->ViewportSwapchain.ImagesCount * sizeof(VkCommandBuffer)));
+		OutViewport->CommandBuffers = Util::Memory::Allocate<VkCommandBuffer>(OutViewport->ViewportSwapchain.ImagesCount);
 		VkResult Result = vkAllocateCommandBuffers(LogicalDevice, &CommandBufferAllocateInfo, OutViewport->CommandBuffers);
 		if (Result != VK_SUCCESS)
 		{

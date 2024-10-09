@@ -104,11 +104,15 @@
     <LinkIncremental>true</LinkIncremental>
     <SourcePath>$(VC_SourcePath)</SourcePath>
     <IncludePath>$(IncludePath)</IncludePath>
+    <CustomBuildAfterTargets>PrepareForBuild</CustomBuildAfterTargets>
+    <CustomBuildBeforeTargets>PrepareForRun</CustomBuildBeforeTargets>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <SourcePath>$(VC_SourcePath)</SourcePath>
     <IncludePath>$(IncludePath)</IncludePath>
+    <CustomBuildAfterTargets>PrepareForBuild</CustomBuildAfterTargets>
+    <CustomBuildBeforeTargets>PrepareForRun</CustomBuildBeforeTargets>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -164,6 +168,18 @@
       <AdditionalLibraryDirectories>$(SolutionDir)External\GLFW\lib-vc2022;$(VULKAN_SDK)\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+    <CustomBuildStep>
+      <Command>call $(SolutionDir)$(ProjectName)\Resources\Shaders\CompileShaders.bat</Command>
+      <Outputs>1</Outputs>
+    </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -185,6 +201,18 @@
       <AdditionalLibraryDirectories>$(SolutionDir)External\GLFW\lib-vc2022;$(VULKAN_SDK)\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+    <CustomBuildStep>
+      <Command>call $(SolutionDir)$(ProjectName)\Resources\Shaders\CompileShaders.bat</Command>
+      <Outputs>1</Outputs>
+    </CustomBuildStep>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
