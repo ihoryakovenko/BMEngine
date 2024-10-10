@@ -9,5 +9,6 @@ layout(location = 0) out vec4 OutColour;
 
 void main()
 {
-	OutColour = texture(TextureSampler, FragmentTexture);
+	OutColour = texture(TextureSampler, FragmentTexture) * vec4(FragmentColor, 1.0);
+	//OutColour = vec4(FragmentColor, 1.0);
 }

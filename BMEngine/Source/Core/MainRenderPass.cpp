@@ -2,6 +2,7 @@
 
 #include "Util/Util.h"
 #include "VulkanHelper.h"
+#include "Memory/MemoryManagmentSystem.h"
 
 namespace Core
 {
@@ -45,9 +46,9 @@ namespace Core
 		vkDestroyCommandPool(LogicalDevice, GraphicsCommandPool, nullptr);
 		vkDestroyRenderPass(LogicalDevice, RenderPass, nullptr);
 
-		Util::Memory::Deallocate(DepthBuffers);
-		Util::Memory::Deallocate(ColorBuffers);
-		Util::Memory::Deallocate(VpUniformBuffers);
+		Memory::MemoryManagementSystem::Deallocate(DepthBuffers);
+		Memory::MemoryManagementSystem::Deallocate(ColorBuffers);
+		Memory::MemoryManagementSystem::Deallocate(VpUniformBuffers);
 	}
 
 	void MainRenderPass::CreateVulkanPass(VkDevice LogicalDevice, VkFormat ColorFormat, VkFormat DepthFormat, VkSurfaceFormatKHR SurfaceFormat)
@@ -670,8 +671,8 @@ namespace Core
 	void MainRenderPass::CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, uint32_t ImagesCount, VkExtent2D SwapExtent,
 		VkFormat DepthFormat, VkFormat ColorFormat)
 	{
-		DepthBuffers = Util::Memory::Allocate<ImageBuffer>(ImagesCount);
-		ColorBuffers = Util::Memory::Allocate<ImageBuffer>(ImagesCount);
+		DepthBuffers = Memory::MemoryManagementSystem::Allocate<ImageBuffer>(ImagesCount);
+		ColorBuffers = Memory::MemoryManagementSystem::Allocate<ImageBuffer>(ImagesCount);
 
 		for (uint32_t i = 0; i < ImagesCount; ++i)
 		{
@@ -695,7 +696,7 @@ namespace Core
 	{
 		const VkDeviceSize VpBufferSize = sizeof(UboViewProjection);
 
-		VpUniformBuffers = Util::Memory::Allocate<GPUBuffer>(ImagesCount);
+		VpUniformBuffers = Memory::MemoryManagementSystem::Allocate<GPUBuffer>(ImagesCount);
 		for (uint32_t i = 0; i < ImagesCount; i++)
 		{
 			VpUniformBuffers[i] = GPUBuffer::CreateUniformBuffer(PhysicalDevice, LogicalDevice, VpBufferSize);
@@ -704,11 +705,11 @@ namespace Core
 
 	void MainRenderPass::CreateSets(VkDevice LogicalDevice, VkDescriptorPool DescriptorPool, uint32_t ImagesCount)
 	{
-		TerrainPass.TerrainSets = Util::Memory::Allocate<VkDescriptorSet>(ImagesCount);
-		EntityPass.EntitySets = Util::Memory::Allocate<VkDescriptorSet>(ImagesCount);
-		DeferredPass.DeferredSets = Util::Memory::Allocate<VkDescriptorSet>(ImagesCount);
+		TerrainPass.TerrainSets = Memory::MemoryManagementSystem::Allocate<VkDescriptorSet>(ImagesCount);
+		EntityPass.EntitySets = Memory::MemoryManagementSystem::Allocate<VkDescriptorSet>(ImagesCount);
+		DeferredPass.DeferredSets = Memory::MemoryManagementSystem::Allocate<VkDescriptorSet>(ImagesCount);
 
-		VkDescriptorSetLayout* SetLayouts = Util::Memory::Allocate<VkDescriptorSetLayout>(ImagesCount);
+		VkDescriptorSetLayout* SetLayouts = Memory::MemoryManagementSystem::Get().FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
 		for (uint32_t i = 0; i < ImagesCount; i++)
 		{
 			SetLayouts[i] = EntityPass.EntitySetLayout;
@@ -797,8 +798,6 @@ namespace Core
 			// Update descriptor sets
 			vkUpdateDescriptorSets(LogicalDevice, CetWritesCount, SetWrites, 0, nullptr);
 		}
-
-		Util::Memory::Deallocate(SetLayouts);
 	}
 
 	void EntitySubpass::ClearResources(VkDevice LogicalDevice)
@@ -808,7 +807,7 @@ namespace Core
 		vkDestroyPipeline(LogicalDevice, Pipeline, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, EntitySetLayout, nullptr);
 
-		Util::Memory::Deallocate(EntitySets);
+		Memory::MemoryManagementSystem::Deallocate(EntitySets);
 	}
 
 	void DeferredSubpass::ClearResources(VkDevice LogicalDevice)
@@ -817,7 +816,7 @@ namespace Core
 		vkDestroyPipeline(LogicalDevice, Pipeline, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, DeferredLayout, nullptr);
 
-		Util::Memory::Deallocate(DeferredSets);
+		Memory::MemoryManagementSystem::Deallocate(DeferredSets);
 	}
 
 	void TerrainSubpass::ClearResources(VkDevice LogicalDevice)
@@ -826,7 +825,7 @@ namespace Core
 		vkDestroyPipeline(LogicalDevice, Pipeline, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, TerrainSetLayout, nullptr);
 
-		Util::Memory::Deallocate(TerrainSets);
+		Memory::MemoryManagementSystem::Deallocate(TerrainSets);
 	}
 
 	VkShaderModule ShaderInput::FindShaderModuleByName(Core::ShaderName Name, ShaderInput* ShaderInputs, uint32_t ShaderInputsCount)

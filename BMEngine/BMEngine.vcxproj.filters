@@ -13,6 +13,7 @@
     <ClCompile Include="Source\Core\MainRenderPass.cpp" />
     <ClCompile Include="Source\Core\VulkanHelper.cpp" />
     <ClCompile Include="Source\Core\VulkanCoreTypes.cpp" />
+    <ClCompile Include="Source\Core\VulkanMemoryManagementSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Core\VulkanCoreTypes.h" />
@@ -21,6 +22,8 @@
     <ClInclude Include="Source\Core\VulkanRenderingSystem.h" />
     <ClInclude Include="Source\Core\MainRenderPass.h" />
     <ClInclude Include="Source\Core\VulkanHelper.h" />
+    <ClInclude Include="Source\Core\VulkanMemoryManagementSystem.h" />
+    <ClInclude Include="Source\Memory\MemoryManagmentSystem.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />

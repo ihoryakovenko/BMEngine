@@ -8,6 +8,8 @@
 
 #include <vector>
 
+#include <Memory/MemoryManagmentSystem.h>
+
 namespace Core
 {
 	using ShaderName = const char*;
@@ -182,8 +184,9 @@ namespace Core
 			VkSurfaceKHR Surface, VkSurfaceFormatKHR SurfaceFormat, VkExtent2D SwapExtent, VkPresentModeKHR PresentationMode,
 			PhysicalDeviceIndices DeviceIndices);
 		static VkPresentModeKHR GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
-		static void GetAvailablePresentModes(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface, std::vector<VkPresentModeKHR>& PresentModes);
-		static void GetSwapchainImages(VkDevice LogicalDevice, VkSwapchainKHR VulkanSwapchain, std::vector<VkImage>& Images);
+		static Memory::FramePointer<VkPresentModeKHR> GetAvailablePresentModes(VkPhysicalDevice PhysicalDevice,
+			VkSurfaceKHR Surface, uint32_t& Count);
+		static Memory::FramePointer<VkImage> GetSwapchainImages(VkDevice LogicalDevice, VkSwapchainKHR VulkanSwapchain, uint32_t& Count);
 
 		VkSwapchainKHR VulkanSwapchain = nullptr;
 		uint32_t ImagesCount = 0;
@@ -196,10 +199,10 @@ namespace Core
 		void Init(VkInstance VulkanInstance, VkSurfaceKHR Surface, const char** DeviceExtensions,
 			uint32_t DeviceExtensionsSize);
 
-		static void GetPhysicalDeviceList(VkInstance VulkanInstance, std::vector<VkPhysicalDevice>& DeviceList);
-		static void GetDeviceExtensionProperties(VkPhysicalDevice PhysicalDevice, std::vector<VkExtensionProperties>& Data);
-		static void GetQueueFamilyProperties(VkPhysicalDevice PhysicalDevice, std::vector<VkQueueFamilyProperties>& Data);
-		static PhysicalDeviceIndices GetPhysicalDeviceIndices(const std::vector<VkQueueFamilyProperties>& Properties,
+		static Memory::FramePointer<VkPhysicalDevice> GetPhysicalDeviceList(VkInstance VulkanInstance, uint32_t& Count);
+		static Memory::FramePointer<VkExtensionProperties> GetDeviceExtensionProperties(VkPhysicalDevice PhysicalDevice, uint32_t& Count);
+		static Memory::FramePointer<VkQueueFamilyProperties> GetQueueFamilyProperties(VkPhysicalDevice PhysicalDevice, uint32_t& Count);
+		static PhysicalDeviceIndices GetPhysicalDeviceIndices(VkQueueFamilyProperties* Properties, uint32_t PropertiesCount,
 			VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
 		static bool CheckDeviceSuitability(const char* DeviceExtensions[], uint32_t DeviceExtensionsSize,
 			VkExtensionProperties* ExtensionProperties, uint32_t ExtensionPropertiesCount, PhysicalDeviceIndices Indices,

@@ -7,8 +7,8 @@ if "%VULKAN_SDK%" == "" (
 
 set SHADER_PATH=%~dp0
 
-%VULKAN_SDK%/Bin/glslangValidator.exe -V %SHADER_PATH%Shader.vert
-%VULKAN_SDK%/Bin/glslangValidator.exe -V %SHADER_PATH%Shader.frag
+%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%vert.spv -V %SHADER_PATH%Shader.vert
+%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%frag.spv -V %SHADER_PATH%Shader.frag
 
 %VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%second_vert.spv -V %SHADER_PATH%Second.vert
 %VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%second_frag.spv -V %SHADER_PATH%Second.frag

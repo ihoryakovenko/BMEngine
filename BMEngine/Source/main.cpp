@@ -11,21 +11,15 @@
 #include <GLFW/glfw3.h>
 
 #include "Util/Util.h"
-
 #include <cassert>
 #include <algorithm>
-
 #include <glm/gtc/matrix_transform.hpp>
-
 #include "Core/VulkanRenderingSystem.h"
-
 #include <tiny_obj_loader.h>
-
 #include <unordered_map>
-
 #include "Core/VulkanCoreTypes.h"
-
 #include <random>
+#include "Memory/MemoryManagmentSystem.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
@@ -34,6 +28,12 @@ const uint32_t NumRows = 600;
 const uint32_t NumCols = 600;
 
 Core::TerrainVertex TerrainVerticesData[NumRows][NumCols];
+
+std::vector<Core::DrawEntity> DrawEntities;
+Core::ShaderCodeDescription ShaderCodeDescriptions[Core::ShaderNames::ShadersCount];
+std::vector<std::vector<char>> ShaderCodes(Core::ShaderNames::ShadersCount);
+
+Core::VulkanRenderingSystem RenderingSystem;
 
 void GenerateTerrain()
 {
@@ -101,6 +101,56 @@ struct TestMesh
 	std::vector<uint32_t> indices;
 	int TextureId;
 };
+
+TestMesh CreateCubeMesh()
+{
+	TestMesh cube;
+
+	// Define the 8 unique vertices for the cube with positions, colors, and texture coordinates
+	glm::vec3 red = { 1.0f, 0.0f, 0.0f };
+	glm::vec3 green = { 0.0f, 1.0f, 0.0f };
+	glm::vec3 blue = { 0.0f, 0.0f, 1.0f };
+	glm::vec3 white = { 1.0f, 1.0f, 1.0f };
+	glm::vec3 yellow = { 1.0f, 1.0f, 0.0f };
+	glm::vec3 cyan = { 0.0f, 1.0f, 1.0f };
+	glm::vec3 magenta = { 1.0f, 0.0f, 1.0f };
+	glm::vec3 black = { 0.0f, 0.0f, 0.0f };
+
+	cube.vertices = {
+		// Front face
+		{ { -1.0f, -1.0f, 1.0f }, red, { 0.0f, 0.0f } }, // 0: Bottom-left
+		{ { 1.0f, -1.0f, 1.0f }, green, { 1.0f, 0.0f } }, // 1: Bottom-right
+		{ { 1.0f, 1.0f, 1.0f }, blue, { 1.0f, 1.0f } }, // 2: Top-right
+		{ { -1.0f, 1.0f, 1.0f }, white, { 0.0f, 1.0f } }, // 3: Top-left
+
+		// Back face
+		{ { -1.0f, -1.0f, -1.0f }, yellow, { 1.0f, 0.0f } }, // 4: Bottom-left
+		{ { 1.0f, -1.0f, -1.0f }, cyan, { 0.0f, 0.0f } }, // 5: Bottom-right
+		{ { 1.0f, 1.0f, -1.0f }, magenta, { 0.0f, 1.0f } }, // 6: Top-right
+		{ { -1.0f, 1.0f, -1.0f }, black, { 1.0f, 1.0f } }, // 7: Top-left
+	};
+
+	// Define the indices for the cube (2 triangles per face, 6 faces total)
+	cube.indices = {
+		// Front face
+		0, 1, 2, 2, 3, 0,
+		// Right face
+		1, 5, 6, 6, 2, 1,
+		// Back face
+		5, 4, 7, 7, 6, 5,
+		// Left face
+		4, 0, 3, 3, 7, 4,
+		// Top face
+		3, 2, 6, 6, 7, 3,
+		// Bottom face
+		4, 5, 1, 1, 0, 4
+	};
+
+	// Set the texture ID (if needed)
+	cube.TextureId = 0;
+
+	return cube;
+}
 
 template<> struct std::hash<Core::EntityVertex>
 {
@@ -232,29 +282,8 @@ void MoveCamera(GLFWwindow* Window, float DeltaTime, Camera& MainCamera)
 	MainCamera.CameraFront = glm::normalize(Front);
 }
 
-int main()
+void LoadDrawEntities()
 {
-	if (glfwInit() == GL_FALSE)
-	{
-		Util::Log::Error("glfwInit result is GL_FALSE");
-		return -1;
-	}
-
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-
-	GenerateTerrain();
-
-	GLFWwindow* Window = glfwCreateWindow(1600, 800, "BMEngine", nullptr, nullptr);
-	if (Window == nullptr)
-	{
-		Util::Log::GlfwLogError();
-		glfwTerminate();
-		return -1;
-	}
-
-	glfwSetInputMode(Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
 	const char* TestTexture = "./Resources/Textures/giraffe.jpg";
 	const char* Modelpath = "./Resources/Models/uh60.obj";
 	const char* BaseDir = "./Resources/Models/";
@@ -266,13 +295,100 @@ int main()
 
 	if (!tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &Warn, &Err, Modelpath, BaseDir))
 	{
-		return -1;
+		assert(false);
 	}
 
 	// TODO: -_-
 	int TextureIndex = 1;
 	std::vector<int> MaterialToTexture(Materials.size());
 
+	AddTexture(TestTexture);
+
+	for (size_t i = 0; i < Materials.size(); i++)
+	{
+		MaterialToTexture[i] = 0;
+		const tinyobj::material_t& Material = Materials[i];
+		if (!Material.diffuse_texname.empty())
+		{
+			int Idx = Material.diffuse_texname.rfind("\\");
+			std::string FileName = "./Resources/Textures/" + Material.diffuse_texname.substr(Idx + 1);
+
+			MaterialToTexture[i] = TextureIndex;
+			AddTexture(FileName.c_str());
+			++TextureIndex;
+		}
+	}
+
+	std::vector<TestMesh> ModelMeshes;
+	ModelMeshes.reserve(Shapes.size());
+
+	std::unordered_map<Core::EntityVertex, uint32_t, std::hash<Core::EntityVertex>, VertexEqual> uniqueVertices{ };
+
+	for (const auto& Shape : Shapes)
+	{
+		TestMesh Tm;
+
+		for (const auto& index : Shape.mesh.indices)
+		{
+			Core::EntityVertex vertex{ };
+
+			vertex.Position =
+			{
+				Attrib.vertices[3 * index.vertex_index + 0],
+				Attrib.vertices[3 * index.vertex_index + 1],
+				Attrib.vertices[3 * index.vertex_index + 2]
+			};
+
+			vertex.TextureCoords =
+			{
+				Attrib.texcoords[2 * index.texcoord_index + 0],
+				Attrib.texcoords[2 * index.texcoord_index + 1]
+			};
+
+			vertex.Color = { 1.0f, 1.0f, 1.0f };
+
+			if (uniqueVertices.count(vertex) == 0)
+			{
+				uniqueVertices[vertex] = static_cast<uint32_t>(Tm.vertices.size());
+				Tm.vertices.push_back(vertex);
+			}
+
+			Tm.indices.push_back(uniqueVertices[vertex]);
+		}
+
+		Tm.TextureId = MaterialToTexture[Shape.mesh.material_ids[0]];
+
+		ModelMeshes.push_back(Tm);
+	}
+
+	ModelMeshes.emplace_back(CreateCubeMesh());
+
+	DrawEntities.resize(ModelMeshes.size());
+	
+	for (int i = 0; i < ModelMeshes.size(); ++i)
+	{
+		Core::Mesh m;
+		m.MeshVertices = ModelMeshes[i].vertices.data();
+		m.MeshVerticesCount = ModelMeshes[i].vertices.size();
+
+
+		m.MeshIndices = ModelMeshes[i].indices.data();
+		m.MeshIndicesCount = ModelMeshes[i].indices.size();
+
+		RenderingSystem.CreateDrawEntity(m, DrawEntities[i]);
+		DrawEntities[i].TextureId = ModelMeshes[i].TextureId;
+	}
+
+	glm::vec3 CubePos(1.2f, 1.0f, 2.0f);
+	glm::mat4 model = glm::mat4(1.0f);
+	model = glm::translate(model, CubePos);
+	model = glm::scale(model, glm::vec3(0.2f));
+
+	DrawEntities[ModelMeshes.size() - 1].Model = model;
+}
+
+void LoadShaders()
+{
 	std::vector<const char*> ShaderPaths;
 	ShaderPaths.reserve(Core::ShaderNames::ShadersCount);
 	std::vector<Core::ShaderName> NameToPath;
@@ -296,9 +412,6 @@ int main()
 	ShaderPaths.push_back("./Resources/Shaders/second_frag.spv");
 	NameToPath.push_back(Core::ShaderNames::DeferredFragment);
 
-	std::vector<std::vector<char>> ShaderCodes(Core::ShaderNames::ShadersCount);
-	Core::ShaderCodeDescription ShaderCodeDescriptions[Core::ShaderNames::ShadersCount];
-
 	for (uint32_t i = 0; i < Core::ShaderNames::ShadersCount; ++i)
 	{
 		Util::OpenAndReadFileFull(ShaderPaths[i], ShaderCodes[i], "rb");
@@ -306,99 +419,38 @@ int main()
 		ShaderCodeDescriptions[i].CodeSize = ShaderCodes[i].size();
 		ShaderCodeDescriptions[i].Name = NameToPath[i];
 	}
+}
 
-	Core::RenderConfig Config;
-	Config.RenderShaders = ShaderCodeDescriptions;
-	Config.ShadersCount = Core::ShaderNames::ShadersCount;
+int main()
+{
+	const uint32_t FrameAllocSize = 1024 * 1024;
 
-	Core::VulkanRenderingSystem RenderingSystem;
-	RenderingSystem.Init(Window, Config);
+	Memory::MemoryManagementSystem& MemorySystem = Memory::MemoryManagementSystem::Get();
+	MemorySystem.Init(FrameAllocSize);
 
-	Core::DrawScene Scene;
-
-	Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-		static_cast<float>(1600) / static_cast<float>(800), 0.1f, 100.0f);
-	Scene.ViewProjection.Projection[1][1] *= -1;
-	Scene.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
-	
-	AddTexture(TestTexture);
-
-	for (size_t i = 0; i < Materials.size(); i++)
+	if (glfwInit() == GL_FALSE)
 	{
-		MaterialToTexture[i] = 0;
-		const tinyobj::material_t& Material = Materials[i];
-		if (!Material.diffuse_texname.empty())
-		{
-			int Idx = Material.diffuse_texname.rfind("\\");
-			std::string FileName = "./Resources/Textures/" + Material.diffuse_texname.substr(Idx + 1);
-
-			MaterialToTexture[i] = TextureIndex;
-			AddTexture(FileName.c_str());
-			++TextureIndex;
-		}
+		Util::Log::Error("glfwInit result is GL_FALSE");
+		return -1;
 	}
 
-	std::vector<TestMesh> ModelMeshes;
-	ModelMeshes.reserve(Shapes.size());
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-	std::unordered_map<Core::EntityVertex, uint32_t, std::hash<Core::EntityVertex>, VertexEqual> uniqueVertices{};
-
-	for (const auto& Shape : Shapes)
+	GLFWwindow* Window = glfwCreateWindow(1600, 800, "BMEngine", nullptr, nullptr);
+	if (Window == nullptr)
 	{
-		TestMesh Tm;
-
-		for (const auto& index : Shape.mesh.indices)
-		{
-			Core::EntityVertex vertex{};
-
-			vertex.Position =
-			{
-				Attrib.vertices[3 * index.vertex_index + 0],
-				Attrib.vertices[3 * index.vertex_index + 1],
-				Attrib.vertices[3 * index.vertex_index + 2]
-			};
-
-			vertex.TextureCoords =
-			{
-				Attrib.texcoords[2 * index.texcoord_index + 0],
-				Attrib.texcoords[2 * index.texcoord_index + 1]
-			};
-
-			vertex.Color = { 1.0f, 1.0f, 1.0f };
-
-			if (uniqueVertices.count(vertex) == 0)
-			{
-				uniqueVertices[vertex] = static_cast<uint32_t>(Tm.vertices.size());
-				Tm.vertices.push_back(vertex);
-			}
-			
-			Tm.indices.push_back(uniqueVertices[vertex]);
-		}
-
-		Tm.TextureId = MaterialToTexture[Shape.mesh.material_ids[0]];
-
-		ModelMeshes.push_back(Tm);
+		Util::Log::GlfwLogError();
+		glfwTerminate();
+		return -1;
 	}
 
-	std::vector<Core::DrawEntity> DrawEntities(ModelMeshes.size());
+	glfwSetInputMode(Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-	for (int i = 0; i < ModelMeshes.size(); ++i)
-	{
-		Core::Mesh m;
-		m.MeshVertices = ModelMeshes[i].vertices.data();
-		m.MeshVerticesCount = ModelMeshes[i].vertices.size();
-
-
-		m.MeshIndices = ModelMeshes[i].indices.data();
-		m.MeshIndicesCount = ModelMeshes[i].indices.size();
-
-		RenderingSystem.CreateDrawEntity(m, DrawEntities[i]);
-		DrawEntities[i].TextureId = ModelMeshes[i].TextureId;
-	}
+	GenerateTerrain();
+	LoadShaders();
 
 	std::vector<uint32_t> indices;
-
 	for (int row = 0; row < NumRows - 1; ++row)
 	{
 		for (int col = 0; col < NumCols - 1; ++col)
@@ -420,8 +472,23 @@ int main()
 		}
 	}
 
-	Core::DrawTerrainEntity TestDrawTerrainEntity;
 
+	Core::RenderConfig Config;
+	Config.RenderShaders = ShaderCodeDescriptions;
+	Config.ShadersCount = Core::ShaderNames::ShadersCount;
+
+	RenderingSystem.Init(Window, Config);
+	LoadDrawEntities();
+
+	Core::DrawScene Scene;
+
+	Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
+		static_cast<float>(1600) / static_cast<float>(800), 0.1f, 100.0f);
+	Scene.ViewProjection.Projection[1][1] *= -1;
+	Scene.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+	
+	Core::DrawTerrainEntity TestDrawTerrainEntity;
 	RenderingSystem.CreateTerrainDrawEntity(&TerrainVerticesData[0][0], NumRows * NumCols, TestDrawTerrainEntity);
 
 	RenderingSystem.LoadTextures(TexturesInfo.data(), TexturesInfo.size());
@@ -433,13 +500,13 @@ int main()
 	Scene.DrawEntities = DrawEntities.data();
 	Scene.DrawEntitiesCount = DrawEntities.size();
 
-	
 
-	float Angle = 0.0f;
 	double DeltaTime = 0.0f;
 	double LastTime = 0.0f;
 
 	Camera MainCamera;
+
+	MemorySystem.FrameDealloc();
 
 	while (!glfwWindowShouldClose(Window) && !Close)
 	{
@@ -453,6 +520,8 @@ int main()
 		Scene.ViewProjection.View = glm::lookAt(MainCamera.CameraPosition, MainCamera.CameraPosition + MainCamera.CameraFront, MainCamera.CameraUp);
 
 		RenderingSystem.Draw(Scene);
+
+		MemorySystem.FrameDealloc();
 	}
 
 	for (int i = 0; i < DrawEntities.size(); ++i)
@@ -469,9 +538,11 @@ int main()
 
 	glfwTerminate();
 
-	if (Util::Memory::AllocateCounter != 0)
+	MemorySystem.DeInit();
+
+	if (Memory::MemoryManagementSystem::AllocateCounter != 0)
 	{
-		Util::Log::Error("AllocateCounter in not equal 0, counter is {}", Util::Memory::AllocateCounter);
+		Util::Log::Error("AllocateCounter in not equal 0, counter is {}", Memory::MemoryManagementSystem::AllocateCounter);
 		assert(false);
 	}
 

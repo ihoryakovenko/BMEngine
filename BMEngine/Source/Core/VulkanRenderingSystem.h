@@ -2,6 +2,7 @@
 
 #include "VulkanCoreTypes.h"
 #include "MainRenderPass.h"
+#include "Memory/MemoryManagmentSystem.h"
 
 namespace Core
 {
@@ -27,11 +28,11 @@ namespace Core
 	private:
 		static void SetConfig(const RenderConfig& InConfig) { Config = InConfig; };
 
-		void GetAvailableExtensionProperties(std::vector<VkExtensionProperties>& Data);
-		void GetAvailableInstanceLayerProperties(std::vector<VkLayerProperties>& Data);
-		void GetRequiredInstanceExtensions(const char** ValidationExtensions,
-			uint32_t ValidationExtensionsCount, std::vector<const char*>& Data);
-		void GetSurfaceFormats(VkSurfaceKHR Surface, std::vector<VkSurfaceFormatKHR>& SurfaceFormats);
+		Memory::FramePointer<VkExtensionProperties> GetAvailableExtensionProperties(uint32_t& Count);
+		Memory::FramePointer<VkLayerProperties> GetAvailableInstanceLayerProperties(uint32_t& Count);
+		Memory::FramePointer<const char*> GetRequiredInstanceExtensions(const char** ValidationExtensions,
+			uint32_t ValidationExtensionsCount, uint32_t& Count);
+		Memory::FramePointer<VkSurfaceFormatKHR> GetSurfaceFormats(VkSurfaceKHR Surface, uint32_t& Count);
 		
 		VkExtent2D GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities, GLFWwindow* Window);
 

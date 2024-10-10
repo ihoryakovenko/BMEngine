@@ -79,31 +79,6 @@ namespace Util
 		VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
 		void* UserData);
 
-	struct Memory
-	{
-		static inline int AllocateCounter = 0;
-
-		template <typename T>
-		static T* Allocate(size_t Count = 1)
-		{
-#ifndef NDEBUG
-			++AllocateCounter;
-#endif
-			return static_cast<T*>(std::malloc(Count * sizeof(T)));
-		}
-
-		static void Deallocate(void* Ptr)
-		{
-#ifndef NDEBUG
-			if (Ptr != nullptr)
-			{
-				--AllocateCounter;
-			}
-#endif
-			std::free(Ptr);
-		}
-	};
-
 #ifdef NDEBUG
 	static bool EnableValidationLayers = false;
 #else
