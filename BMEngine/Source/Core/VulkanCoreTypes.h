@@ -10,6 +10,32 @@
 
 namespace Core
 {
+	using ShaderName = const char*;
+	struct ShaderNames
+	{
+		static inline ShaderName TerrainVertex = "TerrainVertex";
+		static inline ShaderName TerrainFragment = "TerrainFragment";
+		static inline ShaderName EntityVertex = "EntityVertex";
+		static inline ShaderName EntityFragment = "EntityFragment";
+		static inline ShaderName DeferredVertex = "DeferredVertex";
+		static inline ShaderName DeferredFragment = "DeferredFragment";
+
+		static inline const uint32_t ShadersCount = 6;
+	};
+
+	struct ShaderCodeDescription
+	{
+		uint32_t* Code = nullptr;
+		uint32_t CodeSize = 0;
+		ShaderName Name = nullptr;
+	};
+
+	struct RenderConfig
+	{
+		ShaderCodeDescription* RenderShaders = nullptr;
+		uint32_t ShadersCount = 0;
+	};
+
 	typedef glm::mat4 Model;
 
 	struct UboViewProjection
@@ -24,7 +50,7 @@ namespace Core
 		int PresentationFamily = -1;
 	};
 
-	struct Vertex
+	struct EntityVertex
 	{
 		glm::vec3 Position;
 		glm::vec3 Color;
@@ -81,7 +107,7 @@ namespace Core
 	struct Mesh
 	{
 		uint32_t MeshVerticesCount = 0;
-		Vertex* MeshVertices = nullptr;
+		EntityVertex* MeshVertices = nullptr;
 
 		uint32_t MeshIndicesCount = 0;
 		uint32_t* MeshIndices = nullptr;

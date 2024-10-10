@@ -33,13 +33,7 @@
 const uint32_t NumRows = 600;
 const uint32_t NumCols = 600;
 
-Core::TerrainVertex TerrainVerticesData[NumRows][NumCols] = {
-	{ 0.0, 0.0, 0.0, 0.0, 0.0 },
-	{ 0.0, 1.0, 1.0, 1.0, 0.0 },
-	{ 0.0, 1.0, 2.0, 1.0, 0.0 },
-	{ 0.0, 1.0, 1.0, 1.0, 0.0 },
-	{ 0.0, 0.0, 0.0, 0.0, 0.0 },
-};
+Core::TerrainVertex TerrainVerticesData[NumRows][NumCols];
 
 void GenerateTerrain()
 {
@@ -103,14 +97,14 @@ uint32_t TerrainVerticesCount = NumRows * NumCols;
 
 struct TestMesh
 {
-	std::vector<Core::Vertex> vertices;
+	std::vector<Core::EntityVertex> vertices;
 	std::vector<uint32_t> indices;
 	int TextureId;
 };
 
-template<> struct std::hash<Core::Vertex>
+template<> struct std::hash<Core::EntityVertex>
 {
-	size_t operator()(Core::Vertex const& vertex) const
+	size_t operator()(Core::EntityVertex const& vertex) const
 	{
 		return ((std::hash<glm::vec3>()(vertex.Position) ^
 			(std::hash<glm::vec3>()(vertex.Color) << 1)) >> 1) ^
@@ -120,7 +114,7 @@ template<> struct std::hash<Core::Vertex>
 
 struct VertexEqual
 {
-	bool operator()(const Core::Vertex& lhs, const Core::Vertex& rhs) const
+	bool operator()(const Core::EntityVertex& lhs, const Core::EntityVertex& rhs) const
 	{
 		return lhs.Position == rhs.Position && lhs.Color == rhs.Color && lhs.TextureCoords == rhs.TextureCoords;
 	}
@@ -279,8 +273,46 @@ int main()
 	int TextureIndex = 1;
 	std::vector<int> MaterialToTexture(Materials.size());
 
+	std::vector<const char*> ShaderPaths;
+	ShaderPaths.reserve(Core::ShaderNames::ShadersCount);
+	std::vector<Core::ShaderName> NameToPath;
+	NameToPath.reserve(Core::ShaderNames::ShadersCount);
+
+	ShaderPaths.push_back("./Resources/Shaders/TerrainGenerator_vert.spv");
+	NameToPath.push_back(Core::ShaderNames::TerrainVertex);
+
+	ShaderPaths.push_back("./Resources/Shaders/TerrainGenerator_frag.spv");
+	NameToPath.push_back(Core::ShaderNames::TerrainFragment);
+
+	ShaderPaths.push_back("./Resources/Shaders/vert.spv");
+	NameToPath.push_back(Core::ShaderNames::EntityVertex);
+
+	ShaderPaths.push_back("./Resources/Shaders/frag.spv");
+	NameToPath.push_back(Core::ShaderNames::EntityFragment);
+
+	ShaderPaths.push_back("./Resources/Shaders/second_vert.spv");
+	NameToPath.push_back(Core::ShaderNames::DeferredVertex);
+
+	ShaderPaths.push_back("./Resources/Shaders/second_frag.spv");
+	NameToPath.push_back(Core::ShaderNames::DeferredFragment);
+
+	std::vector<std::vector<char>> ShaderCodes(Core::ShaderNames::ShadersCount);
+	Core::ShaderCodeDescription ShaderCodeDescriptions[Core::ShaderNames::ShadersCount];
+
+	for (uint32_t i = 0; i < Core::ShaderNames::ShadersCount; ++i)
+	{
+		Util::OpenAndReadFileFull(ShaderPaths[i], ShaderCodes[i], "rb");
+		ShaderCodeDescriptions[i].Code = reinterpret_cast<uint32_t*>(ShaderCodes[i].data());
+		ShaderCodeDescriptions[i].CodeSize = ShaderCodes[i].size();
+		ShaderCodeDescriptions[i].Name = NameToPath[i];
+	}
+
+	Core::RenderConfig Config;
+	Config.RenderShaders = ShaderCodeDescriptions;
+	Config.ShadersCount = Core::ShaderNames::ShadersCount;
+
 	Core::VulkanRenderingSystem RenderingSystem;
-	RenderingSystem.Init(Window);
+	RenderingSystem.Init(Window, Config);
 
 	Core::DrawScene Scene;
 
@@ -310,7 +342,7 @@ int main()
 	std::vector<TestMesh> ModelMeshes;
 	ModelMeshes.reserve(Shapes.size());
 
-	std::unordered_map<Core::Vertex, uint32_t, std::hash<Core::Vertex>, VertexEqual> uniqueVertices{};
+	std::unordered_map<Core::EntityVertex, uint32_t, std::hash<Core::EntityVertex>, VertexEqual> uniqueVertices{};
 
 	for (const auto& Shape : Shapes)
 	{
@@ -318,7 +350,7 @@ int main()
 
 		for (const auto& index : Shape.mesh.indices)
 		{
-			Core::Vertex vertex{};
+			Core::EntityVertex vertex{};
 
 			vertex.Position =
 			{

@@ -7,6 +7,14 @@
 
 namespace Core
 {
+	struct ShaderInput
+	{
+		static VkShaderModule FindShaderModuleByName(ShaderName Name, ShaderInput* ShaderInputs, uint32_t ShaderInputsCount);
+
+		ShaderName ShaderName = nullptr;
+		VkShaderModule Module = nullptr;
+	};
+
 	struct TerrainSubpass
 	{
 		void ClearResources(VkDevice LogicalDevice);
@@ -26,7 +34,6 @@ namespace Core
 		VkPipeline Pipeline = nullptr;
 
 		VkPushConstantRange PushConstantRange;
-		VkDescriptorSetLayout SamplerSetLayout = nullptr;
 		VkDescriptorSetLayout EntitySetLayout = nullptr;
 		VkDescriptorSet* EntitySets = nullptr;
 	};
@@ -57,8 +64,8 @@ namespace Core
 		void CreateTerrainSetLayout(VkDevice LogicalDevice);
 		void CreateEntitySetLayout(VkDevice LogicalDevice);
 		void CreateDeferredSetLayout(VkDevice LogicalDevice);
-		void CreatePipelineLayouts(VkDevice LogicalDevice);
-		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent);
+		void CreatePipelineLayouts(VkDevice LogicalDevice); 
+		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent, ShaderInput* ShaderInputs, uint32_t ShaderInputsCount);
 		void CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, uint32_t ImagesCount, VkExtent2D SwapExtent,
 			VkFormat DepthFormat, VkFormat ColorFormat);
 		void CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
@@ -76,5 +83,7 @@ namespace Core
 		ImageBuffer* ColorBuffers = nullptr;
 		ImageBuffer* DepthBuffers = nullptr;
 		GPUBuffer* VpUniformBuffers = nullptr;
+
+		VkDescriptorSetLayout SamplerSetLayout = nullptr;
 	};
 }

@@ -8,8 +8,12 @@
 
 namespace Core
 {
-	bool VulkanRenderingSystem::Init(GLFWwindow* Window)
+	bool VulkanRenderingSystem::Init(GLFWwindow* Window, const RenderConfig& InConfig)
 	{
+		SetConfig(InConfig);
+
+		assert(Config.ShadersCount == ShaderNames::ShadersCount);
+
 		const char* ValidationLayers[] = {
 			"VK_LAYER_KHRONOS_validation",
 			"VK_LAYER_LUNARG_monitor"
@@ -96,13 +100,9 @@ namespace Core
 
 		VkExtent2D Extent1 = GetBestSwapExtent(SurfaceCapabilities, Window);
 
-
-
 		CreateSynchronisation();
 		SetupQueues();
 
-
-		
 		SwapchainInstance SwapInstance1 = SwapchainInstance::CreateSwapchainInstance(Device.PhysicalDevice, Device.Indices,
 			LogicalDevice, Surface, SurfaceFormat, Extent1);
 
@@ -113,6 +113,13 @@ namespace Core
 
 		StaticPool = CreateDescriptorPool(LogicalDevice, TotalPassPoolSizes.data(), TotalPassPoolSizes.size(), TotalDescriptorCount);
 
+		ShaderInput ShaderInputs[ShaderNames::ShadersCount];
+		for (uint32_t i = 0; i < Config.ShadersCount; ++i)
+		{
+			ShaderInputs[i].ShaderName = Config.RenderShaders[i].Name;
+			CreateShader(LogicalDevice, Config.RenderShaders[i].Code, Config.RenderShaders[i].CodeSize, ShaderInputs[i].Module);
+		}
+
 		MainPass.CreateVulkanPass(LogicalDevice, ColorFormat, DepthFormat, SurfaceFormat);
 		MainPass.SetupPushConstants();
 		MainPass.CreateSamplerSetLayout(LogicalDevice);
@@ -121,10 +128,15 @@ namespace Core
 		MainPass.CreateEntitySetLayout(LogicalDevice);
 		MainPass.CreateDeferredSetLayout(LogicalDevice);
 		MainPass.CreatePipelineLayouts(LogicalDevice);
-		MainPass.CreatePipelines(LogicalDevice, Extent1);
+		MainPass.CreatePipelines(LogicalDevice, Extent1, ShaderInputs, ShaderNames::ShadersCount);
 		MainPass.CreateAttachments(Device.PhysicalDevice, LogicalDevice, SwapInstance1.ImagesCount, Extent1, DepthFormat, ColorFormat);
 		MainPass.CreateUniformBuffers(Device.PhysicalDevice, LogicalDevice, SwapInstance1.ImagesCount);
 		MainPass.CreateSets(LogicalDevice, StaticPool, SwapInstance1.ImagesCount);
+
+		for (int i = 0; i < ShaderNames::ShadersCount; ++i)
+		{
+			vkDestroyShaderModule(LogicalDevice, ShaderInputs[i].Module, nullptr);
+		}
 
 		InitViewport(Window, Surface, &MainViewport, StaticPool, SwapInstance1, MainPass.ColorBuffers, MainPass.DepthBuffers);
 
@@ -343,7 +355,7 @@ namespace Core
 			Barriers[i].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 			Barriers[i].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-			layouts[i] = MainPass.EntityPass.SamplerSetLayout;
+			layouts[i] = MainPass.SamplerSetLayout;
 		}
 
 		GPUBuffer::DestroyGPUBuffer(LogicalDevice, StagingBuffer);
@@ -846,8 +858,9 @@ namespace Core
 			VkBuffer TerrainVertexBuffers[] = { Scene.DrawTerrainEntities[0].VertexBuffer.Buffer };
 			VkDeviceSize TerrainBuffersOffsets[] = { 0 };
 
-			const uint32_t TerrainDescriptorSetGroupCount = 1;
-			VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = { MainPass.TerrainPass.TerrainSets[ImageIndex] };
+			const uint32_t TerrainDescriptorSetGroupCount = 2;
+			VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = {
+				MainPass.TerrainPass.TerrainSets[ImageIndex], TextureUnit.SamplerDescriptorSets[0] };
 
 			vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.TerrainPass.PipelineLayout,
 				0, TerrainDescriptorSetGroupCount, TerrainDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);

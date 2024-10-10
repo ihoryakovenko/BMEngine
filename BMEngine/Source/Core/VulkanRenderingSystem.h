@@ -8,7 +8,7 @@ namespace Core
 	class VulkanRenderingSystem
 	{
 	public:
-		bool Init(GLFWwindow* Window);
+		bool Init(GLFWwindow* Window, const RenderConfig& InConfig);
 		void DeInit();
 
 		void LoadTextures(TextureInfo* Infos, uint32_t TexturesCount);
@@ -22,7 +22,11 @@ namespace Core
 
 		void Draw(const DrawScene& Scene);
 
+		static inline RenderConfig Config;
+
 	private:
+		static void SetConfig(const RenderConfig& InConfig) { Config = InConfig; };
+
 		void GetAvailableExtensionProperties(std::vector<VkExtensionProperties>& Data);
 		void GetAvailableInstanceLayerProperties(std::vector<VkLayerProperties>& Data);
 		void GetRequiredInstanceExtensions(const char** ValidationExtensions,

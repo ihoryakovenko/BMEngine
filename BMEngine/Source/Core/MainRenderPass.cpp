@@ -5,6 +5,10 @@
 
 namespace Core
 {
+	static const uint32_t TerrainSubpassIndex = 0;  // Terrain will be first
+	static const uint32_t EntitySubpassIndex = 1;   // Entity subpass comes next
+	static const uint32_t DeferredSubpassIndex = 2; // Fullscreen effects
+
 	void MainRenderPass::GetPoolSizes(uint32_t TotalImagesCount, std::vector<VkDescriptorPoolSize>& TotalPassPoolSizes,
 		uint32_t& TotalDescriptorCount)
 	{
@@ -37,6 +41,7 @@ namespace Core
 		DeferredPass.ClearResources(LogicalDevice);
 		EntityPass.ClearResources(LogicalDevice);
 
+		vkDestroyDescriptorSetLayout(LogicalDevice, SamplerSetLayout, nullptr);
 		vkDestroyCommandPool(LogicalDevice, GraphicsCommandPool, nullptr);
 		vkDestroyRenderPass(LogicalDevice, RenderPass, nullptr);
 
@@ -48,10 +53,6 @@ namespace Core
 	void MainRenderPass::CreateVulkanPass(VkDevice LogicalDevice, VkFormat ColorFormat, VkFormat DepthFormat, VkSurfaceFormatKHR SurfaceFormat)
 	{
 		// TODO: Check AccessMasks
-
-		const uint32_t TerrainSubpassIndex = 0;  // Terrain will be first
-		const uint32_t EntitySubpassIndex = 1;   // Entity subpass comes next
-		const uint32_t DeferredSubpassIndex = 2; // Fullscreen effects
 
 		const uint32_t SubpassesCount = 3;
 		VkSubpassDescription Subpasses[SubpassesCount];
@@ -234,7 +235,7 @@ namespace Core
 		TextureLayoutCreateInfo.pBindings = &SamplerLayoutBinding;
 
 		const VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &TextureLayoutCreateInfo,
-			nullptr, &EntityPass.SamplerSetLayout);
+			nullptr, &SamplerSetLayout);
 		if (Result != VK_SUCCESS)
 		{
 			// TODO LOG
@@ -351,10 +352,15 @@ namespace Core
 
 	void MainRenderPass::CreatePipelineLayouts(VkDevice LogicalDevice)
 	{
+		const uint32_t TerrainPassDescriptorSetLayoutsCount = 2;
+		VkDescriptorSetLayout TerrainPassDescriptorSetLayouts[TerrainPassDescriptorSetLayoutsCount] = {
+			TerrainPass.TerrainSetLayout, SamplerSetLayout
+		};
+
 		VkPipelineLayoutCreateInfo TerrainLayoutCreateInfo = { };
 		TerrainLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		TerrainLayoutCreateInfo.setLayoutCount = 1;
-		TerrainLayoutCreateInfo.pSetLayouts = &TerrainPass.TerrainSetLayout;
+		TerrainLayoutCreateInfo.setLayoutCount = TerrainPassDescriptorSetLayoutsCount;
+		TerrainLayoutCreateInfo.pSetLayouts = TerrainPassDescriptorSetLayouts;
 		TerrainLayoutCreateInfo.pushConstantRangeCount = 0;
 		TerrainLayoutCreateInfo.pPushConstantRanges = nullptr;
 
@@ -367,7 +373,7 @@ namespace Core
 
 		const uint32_t EntityPassDescriptorSetLayoutsCount = 2;
 		VkDescriptorSetLayout EntityPassDescriptorSetLayouts[EntityPassDescriptorSetLayoutsCount] = {
-			EntityPass.EntitySetLayout, EntityPass.SamplerSetLayout
+			EntityPass.EntitySetLayout, SamplerSetLayout
 		};
 
 		VkPipelineLayoutCreateInfo EntityLayoutCreateInfo = { };
@@ -399,15 +405,9 @@ namespace Core
 		}
 	}
 
-	void MainRenderPass::CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent)
+	void MainRenderPass::CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent, ShaderInput* ShaderInputs, uint32_t ShaderInputsCount)
 	{
-		// TODO FIX!!!
-		// Todo: move to function to avoid code duplication?
-// Todo: use separate pipeline initialization structures or remove all values that are not used in next pipeline
-// TODO FIX!!!
-
-				// Viewport and scissor
-		VkViewport Viewport; //TODO: CHECK 4
+		VkViewport Viewport;
 		VkRect2D Scissor;
 
 		Viewport.x = 0.0f;
@@ -427,94 +427,60 @@ namespace Core
 		ViewportStateCreateInfo.scissorCount = 1;
 		ViewportStateCreateInfo.pScissors = &Scissor;
 
-		std::vector<char> TerrainVertexShaderCode;
-		std::vector<char> TerrainFragmentShaderCode;
-		std::vector<char> VertexShaderCode;
-		std::vector<char> FragmentShaderCode;
-		std::vector<char> SecondVertexShaderCode;
-		std::vector<char> SecondFragmentShaderCode;
-
-		Util::OpenAndReadFileFull("./Resources/Shaders/TerrainGenerator_vert.spv", TerrainVertexShaderCode, "rb");
-		Util::OpenAndReadFileFull("./Resources/Shaders/TerrainGenerator_frag.spv", TerrainFragmentShaderCode, "rb");
-		Util::OpenAndReadFileFull(Util::UtilHelper::GetVertexShaderPath().data(), VertexShaderCode, "rb");
-		Util::OpenAndReadFileFull(Util::UtilHelper::GetFragmentShaderPath().data(), FragmentShaderCode, "rb");
-		Util::OpenAndReadFileFull("./Resources/Shaders/second_vert.spv", SecondVertexShaderCode, "rb");
-		Util::OpenAndReadFileFull("./Resources/Shaders/second_frag.spv", SecondFragmentShaderCode, "rb");
-
-		VkShaderModule TerrainVertexShaderModule;
-		VkShaderModule TerrainFragmentShaderModule;
-		VkShaderModule VertexShaderModule;
-		VkShaderModule FragmentShaderModule;
-		VkShaderModule SecondVertexShaderModule;
-		VkShaderModule SecondFragmentShaderModule;
-
-		CreateShader(LogicalDevice, reinterpret_cast<const uint32_t*>(TerrainVertexShaderCode.data()),
-			TerrainVertexShaderCode.size(), TerrainVertexShaderModule);
-		CreateShader(LogicalDevice, reinterpret_cast<const uint32_t*>(TerrainFragmentShaderCode.data()),
-			TerrainFragmentShaderCode.size(), TerrainFragmentShaderModule);
-		CreateShader(LogicalDevice, reinterpret_cast<const uint32_t*>(VertexShaderCode.data()),
-			VertexShaderCode.size(), VertexShaderModule);
-		CreateShader(LogicalDevice, reinterpret_cast<const uint32_t*>(FragmentShaderCode.data()),
-			FragmentShaderCode.size(), FragmentShaderModule);
-		CreateShader(LogicalDevice, reinterpret_cast<const uint32_t*>(SecondVertexShaderCode.data()),
-			SecondVertexShaderCode.size(), SecondVertexShaderModule);
-		CreateShader(LogicalDevice, reinterpret_cast<const uint32_t*>(SecondFragmentShaderCode.data()),
-			SecondFragmentShaderCode.size(), SecondFragmentShaderModule);
-
 		VkPipelineShaderStageCreateInfo TerrainVertexShaderCreateInfo = { };
 		TerrainVertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		TerrainVertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-		TerrainVertexShaderCreateInfo.module = TerrainVertexShaderModule;
+		TerrainVertexShaderCreateInfo.module = ShaderInput::FindShaderModuleByName(ShaderNames::TerrainVertex, ShaderInputs, ShaderInputsCount);
 		TerrainVertexShaderCreateInfo.pName = "main";
-
+		
 		VkPipelineShaderStageCreateInfo TerrainFragmentShaderCreateInfo = { };
 		TerrainFragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		TerrainFragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		TerrainFragmentShaderCreateInfo.module = TerrainFragmentShaderModule;
+		TerrainFragmentShaderCreateInfo.module = ShaderInput::FindShaderModuleByName(ShaderNames::TerrainFragment, ShaderInputs, ShaderInputsCount);
 		TerrainFragmentShaderCreateInfo.pName = "main";
-
-		VkPipelineShaderStageCreateInfo VertexShaderCreateInfo = { };
-		VertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		VertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-		VertexShaderCreateInfo.module = VertexShaderModule;
-		VertexShaderCreateInfo.pName = "main";
-
-		VkPipelineShaderStageCreateInfo FragmentShaderCreateInfo = { };
-		FragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		FragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		FragmentShaderCreateInfo.module = FragmentShaderModule;
-		FragmentShaderCreateInfo.pName = "main";
-
-		VkPipelineShaderStageCreateInfo SecondVertexShaderCreateInfo = { };
-		SecondVertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		SecondVertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-		SecondVertexShaderCreateInfo.module = SecondVertexShaderModule;
-		SecondVertexShaderCreateInfo.pName = "main";
-
-		VkPipelineShaderStageCreateInfo SecondFragmentShaderCreateInfo = { };
-		SecondFragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		SecondFragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		SecondFragmentShaderCreateInfo.module = SecondFragmentShaderModule;
-		SecondFragmentShaderCreateInfo.pName = "main";
+		
+		VkPipelineShaderStageCreateInfo EntityVertexShaderCreateInfo = { };
+		EntityVertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		EntityVertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+		EntityVertexShaderCreateInfo.module = ShaderInput::FindShaderModuleByName(ShaderNames::EntityVertex, ShaderInputs, ShaderInputsCount);
+		EntityVertexShaderCreateInfo.pName = "main";
+		
+		VkPipelineShaderStageCreateInfo EntityFragmentShaderCreateInfo = { };
+		EntityFragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		EntityFragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+		EntityFragmentShaderCreateInfo.module = ShaderInput::FindShaderModuleByName(ShaderNames::EntityFragment, ShaderInputs, ShaderInputsCount);
+		EntityFragmentShaderCreateInfo.pName = "main";
+		
+		VkPipelineShaderStageCreateInfo DeferredVertexShaderCreateInfo = { };
+		DeferredVertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		DeferredVertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+		DeferredVertexShaderCreateInfo.module = ShaderInput::FindShaderModuleByName(ShaderNames::DeferredVertex, ShaderInputs, ShaderInputsCount);
+		DeferredVertexShaderCreateInfo.pName = "main";
+		
+		VkPipelineShaderStageCreateInfo DeferredFragmentShaderCreateInfo = { };
+		DeferredFragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		DeferredFragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+		DeferredFragmentShaderCreateInfo.module = ShaderInput::FindShaderModuleByName(ShaderNames::DeferredFragment, ShaderInputs, ShaderInputsCount);
+		DeferredFragmentShaderCreateInfo.pName = "main";
 
 		const uint32_t TerrainShaderStagesCount = 2;
 		VkPipelineShaderStageCreateInfo TerrainShaderStages[TerrainShaderStagesCount] = {
 			TerrainVertexShaderCreateInfo, TerrainFragmentShaderCreateInfo
 		};
 
-		const uint32_t ShaderStagesCount = 2;
-		VkPipelineShaderStageCreateInfo ShaderStages[ShaderStagesCount] = {
-			VertexShaderCreateInfo, FragmentShaderCreateInfo
+		const uint32_t EntityShaderStagesCount = 2;
+		VkPipelineShaderStageCreateInfo EntityShaderStages[EntityShaderStagesCount] = {
+			EntityVertexShaderCreateInfo, EntityFragmentShaderCreateInfo
 		};
 
-		const uint32_t SecondShaderStagesCount = 2;
-		VkPipelineShaderStageCreateInfo SecondShaderStages[SecondShaderStagesCount] = {
-			SecondVertexShaderCreateInfo, SecondFragmentShaderCreateInfo
+		const uint32_t DeferredShaderStagesCount = 2;
+		VkPipelineShaderStageCreateInfo DeferredShaderStages[DeferredShaderStagesCount] = {
+			DeferredVertexShaderCreateInfo, DeferredFragmentShaderCreateInfo
 		};
 
 		VkVertexInputBindingDescription TerrainVertexInputBindingDescription = { };
 		TerrainVertexInputBindingDescription.binding = 0;
-		TerrainVertexInputBindingDescription.stride = sizeof(float);
+		TerrainVertexInputBindingDescription.stride = sizeof(TerrainVertex);
 		TerrainVertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
 		const uint32_t TerrainVertexInputBindingDescriptionCount = 1;
@@ -523,37 +489,37 @@ namespace Core
 		TerrainAttributeDescriptions[0].binding = 0;
 		TerrainAttributeDescriptions[0].location = 0;
 		TerrainAttributeDescriptions[0].format = VK_FORMAT_R32_SFLOAT;
-		TerrainAttributeDescriptions[0].offset = 0;
+		TerrainAttributeDescriptions[0].offset = offsetof(Core::TerrainVertex, Altitude);
 
 		// How the data for a single vertex (including info such as position, color, texture coords, normals, etc) is as a whole
-		VkVertexInputBindingDescription VertexInputBindingDescription = { };
-		VertexInputBindingDescription.binding = 0;									// Can bind multiple streams of data, this defines which one
-		VertexInputBindingDescription.stride = sizeof(Core::Vertex);						// Size of a single vertex object
-		VertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;		// How to move between data after each vertex.
+		VkVertexInputBindingDescription EntityInputBindingDescription = { };
+		EntityInputBindingDescription.binding = 0;									// Can bind multiple streams of data, this defines which one
+		EntityInputBindingDescription.stride = sizeof(Core::EntityVertex);						// Size of a single vertex object
+		EntityInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;		// How to move between data after each vertex.
 		// VK_VERTEX_INPUT_RATE_INDEX		: Move on to the next vertex
 		// VK_VERTEX_INPUT_RATE_INSTANCE	: Move to a vertex for the next instance
 
 		// How the data for an attribute is defined within a vertex
-		const uint32_t VertexInputBindingDescriptionCount = 3;
-		VkVertexInputAttributeDescription AttributeDescriptions[VertexInputBindingDescriptionCount];
+		const uint32_t EntityVertexInputBindingDescriptionCount = 3;
+		VkVertexInputAttributeDescription EntityAttributeDescriptions[EntityVertexInputBindingDescriptionCount];
 
 		// Position Attribute
-		AttributeDescriptions[0].binding = 0;							// Which binding the data is at (should be same as above)
-		AttributeDescriptions[0].location = 0;							// Location in shader where data will be read from
-		AttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;	// Format the data will take (also helps define size of data)
-		AttributeDescriptions[0].offset = offsetof(Core::Vertex, Position);		// Where this attribute is defined in the data for a single vertex
+		EntityAttributeDescriptions[0].binding = 0;							// Which binding the data is at (should be same as above)
+		EntityAttributeDescriptions[0].location = 0;							// Location in shader where data will be read from
+		EntityAttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;	// Format the data will take (also helps define size of data)
+		EntityAttributeDescriptions[0].offset = offsetof(Core::EntityVertex, Position);		// Where this attribute is defined in the data for a single vertex
 
 		// Color Attribute
-		AttributeDescriptions[1].binding = 0;
-		AttributeDescriptions[1].location = 1;
-		AttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-		AttributeDescriptions[1].offset = offsetof(Core::Vertex, Color);
+		EntityAttributeDescriptions[1].binding = 0;
+		EntityAttributeDescriptions[1].location = 1;
+		EntityAttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+		EntityAttributeDescriptions[1].offset = offsetof(Core::EntityVertex, Color);
 
 		// Texture Attribute
-		AttributeDescriptions[2].binding = 0;
-		AttributeDescriptions[2].location = 2;
-		AttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-		AttributeDescriptions[2].offset = offsetof(Core::Vertex, TextureCoords);
+		EntityAttributeDescriptions[2].binding = 0;
+		EntityAttributeDescriptions[2].location = 2;
+		EntityAttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+		EntityAttributeDescriptions[2].offset = offsetof(Core::EntityVertex, TextureCoords);
 
 		VkPipelineVertexInputStateCreateInfo TerrainVertexInputCreateInfo = { };
 		TerrainVertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -563,20 +529,20 @@ namespace Core
 		TerrainVertexInputCreateInfo.pVertexAttributeDescriptions = TerrainAttributeDescriptions;
 
 		// Vertex input
-		VkPipelineVertexInputStateCreateInfo VertexInputCreateInfo = { };
-		VertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		VertexInputCreateInfo.vertexBindingDescriptionCount = 1;
-		VertexInputCreateInfo.pVertexBindingDescriptions = &VertexInputBindingDescription;
-		VertexInputCreateInfo.vertexAttributeDescriptionCount = VertexInputBindingDescriptionCount;
-		VertexInputCreateInfo.pVertexAttributeDescriptions = AttributeDescriptions;
+		VkPipelineVertexInputStateCreateInfo EntityVertexInputCreateInfo = { };
+		EntityVertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		EntityVertexInputCreateInfo.vertexBindingDescriptionCount = 1;
+		EntityVertexInputCreateInfo.pVertexBindingDescriptions = &EntityInputBindingDescription;
+		EntityVertexInputCreateInfo.vertexAttributeDescriptionCount = EntityVertexInputBindingDescriptionCount;
+		EntityVertexInputCreateInfo.pVertexAttributeDescriptions = EntityAttributeDescriptions;
 
-		VkPipelineVertexInputStateCreateInfo SecondVertexInputCreateInfo = { };
+		VkPipelineVertexInputStateCreateInfo DeferredVertexInputCreateInfo = { };
 		// No vertex data for second pass
-		SecondVertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		SecondVertexInputCreateInfo.vertexBindingDescriptionCount = 0;
-		SecondVertexInputCreateInfo.pVertexBindingDescriptions = nullptr;
-		SecondVertexInputCreateInfo.vertexAttributeDescriptionCount = 0;
-		SecondVertexInputCreateInfo.pVertexAttributeDescriptions = nullptr;
+		DeferredVertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		DeferredVertexInputCreateInfo.vertexBindingDescriptionCount = 0;
+		DeferredVertexInputCreateInfo.pVertexBindingDescriptions = nullptr;
+		DeferredVertexInputCreateInfo.vertexAttributeDescriptionCount = 0;
+		DeferredVertexInputCreateInfo.pVertexAttributeDescriptions = nullptr;
 
 		// Inputassembly
 		VkPipelineInputAssemblyStateCreateInfo InputAssemblyStateCreateInfo = { };
@@ -611,7 +577,6 @@ namespace Core
 		MultisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;	// Number of samples to use per fragment
 
 		// Blending
-
 		VkPipelineColorBlendAttachmentState ColorBlendAttachmentState = { };
 		ColorBlendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT	// Colors to apply blending to
 			| VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -653,39 +618,38 @@ namespace Core
 		const uint32_t GraphicsPipelineCreateInfosCount = 3;
 		VkGraphicsPipelineCreateInfo GraphicsPipelineCreateInfos[GraphicsPipelineCreateInfosCount];
 
-		GraphicsPipelineCreateInfos[0] = { };
-		GraphicsPipelineCreateInfos[0].sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-		GraphicsPipelineCreateInfos[0].stageCount = ShaderStagesCount;					// Number of shader stages
-		GraphicsPipelineCreateInfos[0].pStages = ShaderStages;							// List of shader stages
-		GraphicsPipelineCreateInfos[0].pVertexInputState = &VertexInputCreateInfo;		// All the fixed function pipeline states
-		GraphicsPipelineCreateInfos[0].pInputAssemblyState = &InputAssemblyStateCreateInfo;
-		GraphicsPipelineCreateInfos[0].pViewportState = &ViewportStateCreateInfo;
-		GraphicsPipelineCreateInfos[0].pDynamicState = nullptr;
-		GraphicsPipelineCreateInfos[0].pRasterizationState = &RasterizationStateCreateInfo;
-		GraphicsPipelineCreateInfos[0].pMultisampleState = &MultisampleStateCreateInfo;
-		GraphicsPipelineCreateInfos[0].pColorBlendState = &ColorBlendingCreateInfo;
-		GraphicsPipelineCreateInfos[0].pDepthStencilState = &DepthStencilCreateInfo;
-		GraphicsPipelineCreateInfos[0].layout = EntityPass.PipelineLayout;							// Pipeline Layout pipeline should use
-		GraphicsPipelineCreateInfos[0].renderPass = RenderPass;							// Render pass description the pipeline is compatible with
-		GraphicsPipelineCreateInfos[0].subpass = 1;										// Subpass of render pass to use with pipeline
+		GraphicsPipelineCreateInfos[EntitySubpassIndex] = { };
+		GraphicsPipelineCreateInfos[EntitySubpassIndex].sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		GraphicsPipelineCreateInfos[EntitySubpassIndex].stageCount = EntityShaderStagesCount;					// Number of shader stages
+		GraphicsPipelineCreateInfos[EntitySubpassIndex].pStages = EntityShaderStages;							// List of shader stages
+		GraphicsPipelineCreateInfos[EntitySubpassIndex].pVertexInputState = &EntityVertexInputCreateInfo;		// All the fixed function pipeline states
+		GraphicsPipelineCreateInfos[EntitySubpassIndex].pInputAssemblyState = &InputAssemblyStateCreateInfo;
+		GraphicsPipelineCreateInfos[EntitySubpassIndex].pViewportState = &ViewportStateCreateInfo;
+		GraphicsPipelineCreateInfos[EntitySubpassIndex].pDynamicState = nullptr;
+		GraphicsPipelineCreateInfos[EntitySubpassIndex].pRasterizationState = &RasterizationStateCreateInfo;
+		GraphicsPipelineCreateInfos[EntitySubpassIndex].pMultisampleState = &MultisampleStateCreateInfo;
+		GraphicsPipelineCreateInfos[EntitySubpassIndex].pColorBlendState = &ColorBlendingCreateInfo;
+		GraphicsPipelineCreateInfos[EntitySubpassIndex].pDepthStencilState = &DepthStencilCreateInfo;
+		GraphicsPipelineCreateInfos[EntitySubpassIndex].layout = EntityPass.PipelineLayout;							// Pipeline Layout pipeline should use
+		GraphicsPipelineCreateInfos[EntitySubpassIndex].renderPass = RenderPass;							// Render pass description the pipeline is compatible with
+		GraphicsPipelineCreateInfos[EntitySubpassIndex].subpass = EntitySubpassIndex;										// Subpass of render pass to use with pipeline
 
 		// Pipeline Derivatives : Can create multiple pipelines that derive from one another for optimisation
-		GraphicsPipelineCreateInfos[0].basePipelineHandle = VK_NULL_HANDLE;	// Existing pipeline to derive from...
-		GraphicsPipelineCreateInfos[0].basePipelineIndex = -1;				// or index of pipeline being created to derive from (in case creating multiple at once)
+		GraphicsPipelineCreateInfos[EntitySubpassIndex].basePipelineHandle = VK_NULL_HANDLE;	// Existing pipeline to derive from...
+		GraphicsPipelineCreateInfos[EntitySubpassIndex].basePipelineIndex = -1;				// or index of pipeline being created to derive from (in case creating multiple at once)
 
-		GraphicsPipelineCreateInfos[1] = GraphicsPipelineCreateInfos[0];
-		GraphicsPipelineCreateInfos[1].pDepthStencilState = &SecondDepthStencilCreateInfo;
-		GraphicsPipelineCreateInfos[1].pVertexInputState = &SecondVertexInputCreateInfo;
-		GraphicsPipelineCreateInfos[1].pStages = SecondShaderStages;	// Update second shader stage list
-		GraphicsPipelineCreateInfos[1].layout = DeferredPass.PipelineLayout;	// Change pipeline layout for input attachment descriptor sets
-		GraphicsPipelineCreateInfos[1].subpass = 2;						// Use second subpass
+		GraphicsPipelineCreateInfos[DeferredSubpassIndex] = GraphicsPipelineCreateInfos[EntitySubpassIndex];
+		GraphicsPipelineCreateInfos[DeferredSubpassIndex].pDepthStencilState = &SecondDepthStencilCreateInfo;
+		GraphicsPipelineCreateInfos[DeferredSubpassIndex].pVertexInputState = &DeferredVertexInputCreateInfo;
+		GraphicsPipelineCreateInfos[DeferredSubpassIndex].pStages = DeferredShaderStages;	// Update second shader stage list
+		GraphicsPipelineCreateInfos[DeferredSubpassIndex].layout = DeferredPass.PipelineLayout;	// Change pipeline layout for input attachment descriptor sets
+		GraphicsPipelineCreateInfos[DeferredSubpassIndex].subpass = DeferredSubpassIndex;						// Use second subpass
 
-
-		GraphicsPipelineCreateInfos[2] = GraphicsPipelineCreateInfos[0];
-		GraphicsPipelineCreateInfos[2].pVertexInputState = &TerrainVertexInputCreateInfo;
-		GraphicsPipelineCreateInfos[2].pStages = TerrainShaderStages;
-		GraphicsPipelineCreateInfos[2].layout = TerrainPass.PipelineLayout;
-		GraphicsPipelineCreateInfos[2].subpass = 0;
+		GraphicsPipelineCreateInfos[TerrainSubpassIndex] = GraphicsPipelineCreateInfos[EntitySubpassIndex];
+		GraphicsPipelineCreateInfos[TerrainSubpassIndex].pVertexInputState = &TerrainVertexInputCreateInfo;
+		GraphicsPipelineCreateInfos[TerrainSubpassIndex].pStages = TerrainShaderStages;
+		GraphicsPipelineCreateInfos[TerrainSubpassIndex].layout = TerrainPass.PipelineLayout;
+		GraphicsPipelineCreateInfos[TerrainSubpassIndex].subpass = TerrainSubpassIndex;
 
 		VkPipeline Pipelines[3];
 
@@ -698,16 +662,9 @@ namespace Core
 			assert(false);
 		}
 
-		TerrainPass.Pipeline = Pipelines[2];
-		EntityPass.Pipeline = Pipelines[0];
-		DeferredPass.Pipeline = Pipelines[1];
-
-		vkDestroyShaderModule(LogicalDevice, TerrainFragmentShaderModule, nullptr);
-		vkDestroyShaderModule(LogicalDevice, TerrainVertexShaderModule, nullptr);
-		vkDestroyShaderModule(LogicalDevice, FragmentShaderModule, nullptr);
-		vkDestroyShaderModule(LogicalDevice, VertexShaderModule, nullptr);
-		vkDestroyShaderModule(LogicalDevice, SecondFragmentShaderModule, nullptr);
-		vkDestroyShaderModule(LogicalDevice, SecondVertexShaderModule, nullptr);
+		TerrainPass.Pipeline = Pipelines[TerrainSubpassIndex];
+		EntityPass.Pipeline = Pipelines[EntitySubpassIndex];
+		DeferredPass.Pipeline = Pipelines[DeferredSubpassIndex];
 	}
 
 	void MainRenderPass::CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, uint32_t ImagesCount, VkExtent2D SwapExtent,
@@ -850,7 +807,6 @@ namespace Core
 		vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
 		vkDestroyPipeline(LogicalDevice, Pipeline, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, EntitySetLayout, nullptr);
-		vkDestroyDescriptorSetLayout(LogicalDevice, SamplerSetLayout, nullptr);
 
 		Util::Memory::Deallocate(EntitySets);
 	}
@@ -871,5 +827,18 @@ namespace Core
 		vkDestroyDescriptorSetLayout(LogicalDevice, TerrainSetLayout, nullptr);
 
 		Util::Memory::Deallocate(TerrainSets);
+	}
+
+	VkShaderModule ShaderInput::FindShaderModuleByName(Core::ShaderName Name, ShaderInput* ShaderInputs, uint32_t ShaderInputsCount)
+	{
+		for (uint32_t i = 0; i < ShaderInputsCount; ++i)
+		{
+			if (ShaderInputs[i].ShaderName == Name)
+			{
+				return ShaderInputs[i].Module;
+			}
+		}
+
+		assert(false);
 	}
 }
