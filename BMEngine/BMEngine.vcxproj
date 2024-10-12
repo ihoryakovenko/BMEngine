@@ -34,6 +34,7 @@
     <ClInclude Include="Source\Core\VulkanHelper.h" />
     <ClInclude Include="Source\Core\VulkanMemoryManagementSystem.h" />
     <ClInclude Include="Source\Core\VulkanRenderingSystem.h" />
+    <ClInclude Include="Source\Util\EngineTypes.h" />
     <ClInclude Include="Source\Util\stb_image.h" />
     <ClInclude Include="Source\Util\Util.h" />
   </ItemGroup>

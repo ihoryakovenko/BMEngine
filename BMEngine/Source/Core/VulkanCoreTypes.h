@@ -8,6 +8,7 @@
 
 #include <vector>
 
+#include "Util/EngineTypes.h"
 #include <Memory/MemoryManagmentSystem.h>
 
 namespace Core
@@ -22,23 +23,25 @@ namespace Core
 		static inline ShaderName DeferredVertex = "DeferredVertex";
 		static inline ShaderName DeferredFragment = "DeferredFragment";
 
-		static inline const uint32_t ShadersCount = 6;
+		static inline const u32 ShadersCount = 6;
 	};
 
 	struct ShaderCodeDescription
 	{
-		uint32_t* Code = nullptr;
-		uint32_t CodeSize = 0;
+		u32* Code = nullptr;
+		u32 CodeSize = 0;
 		ShaderName Name = nullptr;
 	};
 
 	struct RenderConfig
 	{
 		ShaderCodeDescription* RenderShaders = nullptr;
-		uint32_t ShadersCount = 0;
+		u32 ShadersCount = 0;
+
+		u32 MaxTextures = 0;
 	};
 
-	typedef glm::mat4 Model;
+	using Model = glm::mat4;
 
 	struct UboViewProjection
 	{
@@ -68,8 +71,7 @@ namespace Core
 	{
 		static void DestroyGPUBuffer(VkDevice LogicalDevice, GPUBuffer& buffer);
 		static GPUBuffer CreateIndexBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
-			VkCommandPool TransferCommandPool, VkQueue TransferQueue, uint32_t* Indices, uint32_t IndicesCount);
-		static GPUBuffer CreateUniformBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, VkDeviceSize bufferSize);
+			VkCommandPool TransferCommandPool, VkQueue TransferQueue, u32* Indices, u32 IndicesCount);
 		static GPUBuffer CreateIndirectBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
 			VkCommandPool TransferCommandPool, VkQueue TransferQueue, const std::vector<VkDrawIndexedIndirectCommand>& DrawCommands);
 		static GPUBuffer CreateGPUBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, VkDeviceSize bufferSize, VkBufferUsageFlags bufferUsage, VkMemoryPropertyFlags bufferProperties);
@@ -79,7 +81,7 @@ namespace Core
 
 		template <typename T>
 		static GPUBuffer CreateVertexBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
-			VkCommandPool TransferCommandPool, VkQueue TransferQueue, T* Vertices, uint32_t VerticesCount)
+			VkCommandPool TransferCommandPool, VkQueue TransferQueue, T* Vertices, u32 VerticesCount)
 		{
 			const VkDeviceSize BufferSize = sizeof(T) * VerticesCount;
 
@@ -108,11 +110,11 @@ namespace Core
 
 	struct Mesh
 	{
-		uint32_t MeshVerticesCount = 0;
+		u32 MeshVerticesCount = 0;
 		EntityVertex* MeshVertices = nullptr;
 
-		uint32_t MeshIndicesCount = 0;
-		uint32_t* MeshIndices = nullptr;
+		u32 MeshIndicesCount = 0;
+		u32* MeshIndices = nullptr;
 
 		Model Model = glm::mat4(1.0f);
 	};
@@ -126,20 +128,20 @@ namespace Core
 
 	struct DrawEntity
 	{
-		uint32_t VerticesCount = 0;
+		u32 VerticesCount = 0;
 		GPUBuffer VertexBuffer;
 
-		uint32_t IndicesCount = 0;
+		u32 IndicesCount = 0;
 		GPUBuffer IndexBuffer;
 
 		Model Model;
 
-		uint32_t TextureId = 0;
+		u32 TextureId = 0;
 	};
 
 	struct DrawTerrainEntity
 	{
-		uint32_t VerticesCount = 0;
+		u32 VerticesCount = 0;
 		GPUBuffer VertexBuffer;
 	};
 
@@ -156,16 +158,16 @@ namespace Core
 		UboViewProjection ViewProjection;
 
 		DrawEntity* DrawEntities;
-		uint32_t DrawEntitiesCount;
+		u32 DrawEntitiesCount;
 
 		DrawTerrainEntity* DrawTerrainEntities;
-		uint32_t DrawTerrainEntitiesCount;
+		u32 DrawTerrainEntitiesCount;
 	};
 	
 	struct MainInstance
 	{
-		static MainInstance CreateMainInstance(const char** RequiredExtensions, uint32_t RequiredExtensionsCount,
-			bool IsValidationLayersEnabled, const char* ValidationLayers[], uint32_t ValidationLayersSize);
+		static MainInstance CreateMainInstance(const char** RequiredExtensions, u32 RequiredExtensionsCount,
+			bool IsValidationLayersEnabled, const char* ValidationLayers[], u32 ValidationLayersSize);
 		static void DestroyMainInstance(MainInstance& Instance);
 
 		VkInstance VulkanInstance = nullptr;
@@ -184,12 +186,12 @@ namespace Core
 			VkSurfaceKHR Surface, VkSurfaceFormatKHR SurfaceFormat, VkExtent2D SwapExtent, VkPresentModeKHR PresentationMode,
 			PhysicalDeviceIndices DeviceIndices);
 		static VkPresentModeKHR GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
-		static Memory::FramePointer<VkPresentModeKHR> GetAvailablePresentModes(VkPhysicalDevice PhysicalDevice,
-			VkSurfaceKHR Surface, uint32_t& Count);
-		static Memory::FramePointer<VkImage> GetSwapchainImages(VkDevice LogicalDevice, VkSwapchainKHR VulkanSwapchain, uint32_t& Count);
+		static Memory::FrameArray<VkPresentModeKHR> GetAvailablePresentModes(VkPhysicalDevice PhysicalDevice,
+			VkSurfaceKHR Surface);
+		static Memory::FrameArray<VkImage> GetSwapchainImages(VkDevice LogicalDevice, VkSwapchainKHR VulkanSwapchain);
 
 		VkSwapchainKHR VulkanSwapchain = nullptr;
-		uint32_t ImagesCount = 0;
+		u32 ImagesCount = 0;
 		VkImageView* ImageViews = nullptr;
 		VkExtent2D SwapExtent = { };
 	};
@@ -197,18 +199,18 @@ namespace Core
 	struct DeviceInstance
 	{
 		void Init(VkInstance VulkanInstance, VkSurfaceKHR Surface, const char** DeviceExtensions,
-			uint32_t DeviceExtensionsSize);
+			u32 DeviceExtensionsSize);
 
-		static Memory::FramePointer<VkPhysicalDevice> GetPhysicalDeviceList(VkInstance VulkanInstance, uint32_t& Count);
-		static Memory::FramePointer<VkExtensionProperties> GetDeviceExtensionProperties(VkPhysicalDevice PhysicalDevice, uint32_t& Count);
-		static Memory::FramePointer<VkQueueFamilyProperties> GetQueueFamilyProperties(VkPhysicalDevice PhysicalDevice, uint32_t& Count);
-		static PhysicalDeviceIndices GetPhysicalDeviceIndices(VkQueueFamilyProperties* Properties, uint32_t PropertiesCount,
+		static Memory::FrameArray<VkPhysicalDevice> GetPhysicalDeviceList(VkInstance VulkanInstance);
+		static Memory::FrameArray<VkExtensionProperties> GetDeviceExtensionProperties(VkPhysicalDevice PhysicalDevice);
+		static Memory::FrameArray<VkQueueFamilyProperties> GetQueueFamilyProperties(VkPhysicalDevice PhysicalDevice);
+		static PhysicalDeviceIndices GetPhysicalDeviceIndices(VkQueueFamilyProperties* Properties, u32 PropertiesCount,
 			VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
-		static bool CheckDeviceSuitability(const char* DeviceExtensions[], uint32_t DeviceExtensionsSize,
-			VkExtensionProperties* ExtensionProperties, uint32_t ExtensionPropertiesCount, PhysicalDeviceIndices Indices,
+		static bool CheckDeviceSuitability(const char* DeviceExtensions[], u32 DeviceExtensionsSize,
+			VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount, PhysicalDeviceIndices Indices,
 			VkPhysicalDeviceFeatures AvailableFeatures);
-		static bool CheckDeviceExtensionsSupport(VkExtensionProperties* ExtensionProperties, uint32_t ExtensionPropertiesCount,
-			const char** ExtensionsToCheck, uint32_t ExtensionsToCheckSize);
+		static bool CheckDeviceExtensionsSupport(VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount,
+			const char** ExtensionsToCheck, u32 ExtensionsToCheckSize);
 
 		VkPhysicalDevice PhysicalDevice = nullptr;
 		PhysicalDeviceIndices Indices;

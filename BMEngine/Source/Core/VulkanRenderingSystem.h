@@ -2,6 +2,9 @@
 
 #include "VulkanCoreTypes.h"
 #include "MainRenderPass.h"
+#include "VulkanMemoryManagementSystem.h"
+#include "Util/EngineTypes.h"
+
 #include "Memory/MemoryManagmentSystem.h"
 
 namespace Core
@@ -12,13 +15,13 @@ namespace Core
 		bool Init(GLFWwindow* Window, const RenderConfig& InConfig);
 		void DeInit();
 
-		void LoadTextures(TextureInfo* Infos, uint32_t TexturesCount);
+		void LoadTextures(TextureInfo* Infos, u32 TexturesCount);
 
 		void CreateDrawEntity(Mesh Mesh, DrawEntity& OutEntity);
 		void DestroyDrawEntity(DrawEntity& Entity);
 
-		void CreateTerrainIndices(uint32_t* Indices, uint32_t IndicesCount);
-		void CreateTerrainDrawEntity(TerrainVertex* TerrainVertices, uint32_t TerrainVerticesCount, DrawTerrainEntity& OutTerrain);
+		void CreateTerrainIndices(u32* Indices, u32 IndicesCount);
+		void CreateTerrainDrawEntity(TerrainVertex* TerrainVertices, u32 TerrainVerticesCount, DrawTerrainEntity& OutTerrain);
 		void DestroyTerrainDrawEntity(DrawTerrainEntity& Entity);
 
 		void Draw(const DrawScene& Scene);
@@ -28,24 +31,23 @@ namespace Core
 	private:
 		static void SetConfig(const RenderConfig& InConfig) { Config = InConfig; };
 
-		Memory::FramePointer<VkExtensionProperties> GetAvailableExtensionProperties(uint32_t& Count);
-		Memory::FramePointer<VkLayerProperties> GetAvailableInstanceLayerProperties(uint32_t& Count);
-		Memory::FramePointer<const char*> GetRequiredInstanceExtensions(const char** ValidationExtensions,
-			uint32_t ValidationExtensionsCount, uint32_t& Count);
-		Memory::FramePointer<VkSurfaceFormatKHR> GetSurfaceFormats(VkSurfaceKHR Surface, uint32_t& Count);
+		Memory::FrameArray<VkExtensionProperties> GetAvailableExtensionProperties();
+		Memory::FrameArray<VkLayerProperties> GetAvailableInstanceLayerProperties();
+		Memory::FrameArray<const char*> GetRequiredInstanceExtensions(const char** ValidationExtensions, u32 ValidationExtensionsCount);
+		Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkSurfaceKHR Surface);
 		
 		VkExtent2D GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities, GLFWwindow* Window);
 
-		bool CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, uint32_t AvailableExtensionsCount,
-			const char** RequiredExtensions, uint32_t RequiredExtensionsCount);
-		bool CheckValidationLayersSupport(VkLayerProperties* Properties, uint32_t PropertiesSize,
-			const char** ValidationLeyersToCheck, uint32_t ValidationLeyersToCheckSize);
+		bool CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, u32 AvailableExtensionsCount,
+			const char** RequiredExtensions, u32 RequiredExtensionsCount);
+		bool CheckValidationLayersSupport(VkLayerProperties* Properties, u32 PropertiesSize,
+			const char** ValidationLeyersToCheck, u32 ValidationLeyersToCheckSize);
 		VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface);
 		
-		void CopyBufferToImage(VkBuffer SourceBuffer, VkDeviceSize bufferOffset, VkImage Image, uint32_t Width, uint32_t Height);
+		void CopyBufferToImage(VkBuffer SourceBuffer, VkDeviceSize bufferOffset, VkImage Image, u32 Width, u32 Height);
 
 		VkDevice CreateLogicalDevice(PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
-			uint32_t DeviceExtensionsSize);
+			u32 DeviceExtensionsSize);
 		VkSampler CreateTextureSampler();
 
 		bool SetupQueues();
@@ -55,7 +57,7 @@ namespace Core
 		void DestroySynchronisation();
 
 		void InitViewport(GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstance* OutViewport,
-			VkDescriptorPool DescriptorPool, SwapchainInstance SwapInstance, ImageBuffer* ColorBuffers, ImageBuffer* DepthBuffers);
+			SwapchainInstance SwapInstance, ImageBuffer* ColorBuffers, ImageBuffer* DepthBuffers);
 		void DeinitViewport(ViewportInstance* Viewport);
 
 	private:
@@ -73,8 +75,6 @@ namespace Core
 		VkFormat ColorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Todo: check if VK_FORMAT_R8G8B8A8_UNORM supported
 		VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
 
-		VkDescriptorPool StaticPool = nullptr;
-
 		VkSemaphore* ImageAvailable = nullptr;
 		VkSemaphore* RenderFinished = nullptr;
 		VkFence* DrawFences = nullptr;
@@ -86,16 +86,14 @@ namespace Core
 		struct
 		{
 			VkSampler TextureSampler = nullptr;
-			VkDescriptorPool SamplerDescriptorPool = nullptr;
 			VkDescriptorSet* SamplerDescriptorSets = nullptr;
 
-			VkDeviceMemory TextureImagesMemory = nullptr;
 			VkImage* Images = nullptr;
 			VkImageView* ImageViews = nullptr;
-			uint32_t ImagesCount = 0;
+			u32 ImagesCount = 0;
 		} TextureUnit;
 
-		uint32_t TerrainIndicesCount = 0;
+		u32 TerrainIndicesCount = 0;
 		GPUBuffer TerrainIndexBuffer;
 	};
 }

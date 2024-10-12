@@ -6,9 +6,9 @@
 namespace Core
 {
 	GPUBuffer GPUBuffer::CreateIndexBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
-		VkCommandPool TransferCommandPool, VkQueue TransferQueue, uint32_t* Indices, uint32_t IndicesCount)
+		VkCommandPool TransferCommandPool, VkQueue TransferQueue, u32* Indices, u32 IndicesCount)
 	{
-		const VkDeviceSize BufferSize = sizeof(uint32_t) * IndicesCount;
+		const VkDeviceSize BufferSize = sizeof(u32) * IndicesCount;
 
 		GPUBuffer StagingBuffer = CreateGPUBuffer(PhysicalDevice, LogicalDevice, BufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -29,13 +29,6 @@ namespace Core
 		return indexBuffer;
 	}
 
-	GPUBuffer GPUBuffer::CreateUniformBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, VkDeviceSize BufferSize)
-	{
-		GPUBuffer uniformBuffer = CreateGPUBuffer(PhysicalDevice, LogicalDevice, BufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-		return uniformBuffer;
-	}
-
 	GPUBuffer GPUBuffer::CreateIndirectBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
 		VkCommandPool TransferCommandPool, VkQueue TransferQueue, const std::vector<VkDrawIndexedIndirectCommand>& DrawCommands)
 	{
@@ -50,7 +43,7 @@ namespace Core
 		vkUnmapMemory(LogicalDevice, StagingBuffer.Memory);
 
 		GPUBuffer indirectBuffer = CreateGPUBuffer(PhysicalDevice, LogicalDevice, BufferSize, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT); // TODO: VK_MEMORY_PROPERTY_HOST_COHERENT_BIT - mistake?
 
 		// Copy from staging buffer to GPU access buffer
 		GPUBuffer::CopyGPUBuffer(LogicalDevice, TransferCommandPool, TransferQueue, StagingBuffer, indirectBuffer);
@@ -145,8 +138,8 @@ namespace Core
 		vkFreeMemory(LogicalDevice, buffer.Memory, nullptr);
 	}
 
-	MainInstance MainInstance::CreateMainInstance(const char** RequiredExtensions, uint32_t RequiredExtensionsCount,
-		bool IsValidationLayersEnabled, const char* ValidationLayers[], uint32_t ValidationLayersSize)
+	MainInstance MainInstance::CreateMainInstance(const char** RequiredExtensions, u32 RequiredExtensionsCount,
+		bool IsValidationLayersEnabled, const char* ValidationLayers[], u32 ValidationLayersSize)
 	{
 		VkApplicationInfo ApplicationInfo = { };
 		ApplicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -216,30 +209,24 @@ namespace Core
 	}
 
 	void DeviceInstance::Init(VkInstance VulkanInstance, VkSurfaceKHR Surface, const char** DeviceExtensions,
-		uint32_t DeviceExtensionsSize)
+		u32 DeviceExtensionsSize)
 	{
-		uint32_t DeviceCount;
-		Memory::FramePointer<VkPhysicalDevice> DeviceList = GetPhysicalDeviceList(VulkanInstance, DeviceCount);
+		Memory::FrameArray<VkPhysicalDevice> DeviceList = GetPhysicalDeviceList(VulkanInstance);
 		
 		bool IsDeviceFound = false;
-		for (uint32_t i = 0; i < DeviceCount; ++i)
+		for (u32 i = 0; i < DeviceList.Count; ++i)
 		{
 			PhysicalDevice = DeviceList[i];
 
-			uint32_t DeviceExtensionsDataCount;
-			Memory::FramePointer<VkExtensionProperties> DeviceExtensionsData =
-				GetDeviceExtensionProperties(PhysicalDevice, DeviceExtensionsDataCount);
-			
-			uint32_t FamilyPropertiesDataCount;
-			Memory::FramePointer<VkQueueFamilyProperties> FamilyPropertiesData =
-			GetQueueFamilyProperties(PhysicalDevice, FamilyPropertiesDataCount);
+			Memory::FrameArray<VkExtensionProperties> DeviceExtensionsData = GetDeviceExtensionProperties(PhysicalDevice);
+			Memory::FrameArray<VkQueueFamilyProperties> FamilyPropertiesData = GetQueueFamilyProperties(PhysicalDevice);
 
-			Indices = GetPhysicalDeviceIndices(FamilyPropertiesData.Data, FamilyPropertiesDataCount, PhysicalDevice, Surface);
+			Indices = GetPhysicalDeviceIndices(FamilyPropertiesData.Pointer.Data, FamilyPropertiesData.Count, PhysicalDevice, Surface);
 			vkGetPhysicalDeviceProperties(PhysicalDevice, &Properties);
 			vkGetPhysicalDeviceFeatures(PhysicalDevice, &AvailableFeatures);
 
 			IsDeviceFound = CheckDeviceSuitability(DeviceExtensions, DeviceExtensionsSize,
-				DeviceExtensionsData.Data, DeviceExtensionsDataCount, Indices, AvailableFeatures);
+				DeviceExtensionsData.Pointer.Data, DeviceExtensionsData.Count, Indices, AvailableFeatures);
 
 			if (IsDeviceFound)
 			{
@@ -251,18 +238,20 @@ namespace Core
 		assert(IsDeviceFound);
 	}
 
-	Memory::FramePointer<VkPhysicalDevice> DeviceInstance::GetPhysicalDeviceList(VkInstance VulkanInstance, uint32_t& Count)
+	Memory::FrameArray<VkPhysicalDevice> DeviceInstance::GetPhysicalDeviceList(VkInstance VulkanInstance)
 	{
+		u32 Count;
 		vkEnumeratePhysicalDevices(VulkanInstance, &Count, nullptr);
 
-		auto Pointer = Memory::FramePointer<VkPhysicalDevice>::Create(Count);
-		vkEnumeratePhysicalDevices(VulkanInstance, &Count, Pointer.Data);
+		auto Data = Memory::FrameArray<VkPhysicalDevice>::Create(Count);
+		vkEnumeratePhysicalDevices(VulkanInstance, &Count, Data.Pointer.Data);
 
-		return Pointer;
+		return Data;
 	}
 
-	Memory::FramePointer<VkExtensionProperties> DeviceInstance::GetDeviceExtensionProperties(VkPhysicalDevice PhysicalDevice, uint32_t& Count)
+	Memory::FrameArray<VkExtensionProperties> DeviceInstance::GetDeviceExtensionProperties(VkPhysicalDevice PhysicalDevice)
 	{
+		u32 Count;
 		const VkResult Result = vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &Count, nullptr);
 		if (Result != VK_SUCCESS)
 		{
@@ -270,31 +259,32 @@ namespace Core
 			assert(false);
 		}
 
-		auto Pointer = Memory::FramePointer<VkExtensionProperties>::Create(Count);
-		vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &Count, Pointer.Data);
+		auto Data = Memory::FrameArray<VkExtensionProperties>::Create(Count);
+		vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &Count, Data.Pointer.Data);
 
-		return Pointer;
+		return Data;
 	}
 
-	Memory::FramePointer<VkQueueFamilyProperties> DeviceInstance::GetQueueFamilyProperties(VkPhysicalDevice PhysicalDevice, uint32_t& Count)
+	Memory::FrameArray<VkQueueFamilyProperties> DeviceInstance::GetQueueFamilyProperties(VkPhysicalDevice PhysicalDevice)
 	{
+		u32 Count;
 		vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &Count, nullptr);
 
-		auto Pointer = Memory::FramePointer<VkQueueFamilyProperties>::Create(Count);
-		vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &Count, Pointer.Data);
+		auto Data = Memory::FrameArray<VkQueueFamilyProperties>::Create(Count);
+		vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &Count, Data.Pointer.Data);
 
-		return Pointer;
+		return Data;
 	}
 
 	// TODO check function
 	// In current realization if GraphicsFamily is valid but if PresentationFamily is not valid
 	// GraphicsFamily could be overridden on next iteration even when it is valid
-	PhysicalDeviceIndices DeviceInstance::GetPhysicalDeviceIndices(VkQueueFamilyProperties* Properties, uint32_t PropertiesCount,
+	PhysicalDeviceIndices DeviceInstance::GetPhysicalDeviceIndices(VkQueueFamilyProperties* Properties, u32 PropertiesCount,
 		VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
 	{
 		PhysicalDeviceIndices Indices;
 
-		for (uint32_t i = 0; i < PropertiesCount; ++i)
+		for (u32 i = 0; i < PropertiesCount; ++i)
 		{
 			// check if Queue is graphics type
 			if (Properties[i].queueCount > 0 && Properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
@@ -323,8 +313,8 @@ namespace Core
 		return Indices;
 	}
 
-	bool DeviceInstance::CheckDeviceSuitability(const char* DeviceExtensions[], uint32_t DeviceExtensionsSize,
-		VkExtensionProperties* ExtensionProperties, uint32_t ExtensionPropertiesCount, PhysicalDeviceIndices Indices,
+	bool DeviceInstance::CheckDeviceSuitability(const char* DeviceExtensions[], u32 DeviceExtensionsSize,
+		VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount, PhysicalDeviceIndices Indices,
 		VkPhysicalDeviceFeatures AvailableFeatures)
 	{
 		if (!CheckDeviceExtensionsSupport(ExtensionProperties, ExtensionPropertiesCount, DeviceExtensions, DeviceExtensionsSize))
@@ -354,13 +344,13 @@ namespace Core
 		return true;
 	}
 
-	bool DeviceInstance::CheckDeviceExtensionsSupport(VkExtensionProperties* ExtensionProperties, uint32_t ExtensionPropertiesCount,
-		const char** ExtensionsToCheck, uint32_t ExtensionsToCheckSize)
+	bool DeviceInstance::CheckDeviceExtensionsSupport(VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount,
+		const char** ExtensionsToCheck, u32 ExtensionsToCheckSize)
 	{
-		for (uint32_t i = 0; i < ExtensionsToCheckSize; ++i)
+		for (u32 i = 0; i < ExtensionsToCheckSize; ++i)
 		{
 			bool IsDeviceExtensionSupported = false;
-			for (uint32_t j = 0; j < ExtensionPropertiesCount; ++j)
+			for (u32 j = 0; j < ExtensionPropertiesCount; ++j)
 			{
 				if (std::strcmp(ExtensionsToCheck[i], ExtensionProperties[j].extensionName) == 0)
 				{
@@ -400,13 +390,12 @@ namespace Core
 		Instance.VulkanSwapchain = CreateSwapchain(LogicalDevice, SurfaceCapabilities, Surface, SurfaceFormat, Instance.SwapExtent,
 			PresentationMode, Indices);
 
-		uint32_t ImagesCount;
-		Memory::FramePointer<VkImage> Images = GetSwapchainImages(LogicalDevice, Instance.VulkanSwapchain, ImagesCount);
+		Memory::FrameArray<VkImage> Images = GetSwapchainImages(LogicalDevice, Instance.VulkanSwapchain);
 
-		Instance.ImagesCount = ImagesCount;
+		Instance.ImagesCount = Images.Count;
 		Instance.ImageViews = Memory::MemoryManagementSystem::Allocate<VkImageView>(Instance.ImagesCount);
 
-		for (uint32_t i = 0; i < Instance.ImagesCount; ++i)
+		for (u32 i = 0; i < Instance.ImagesCount; ++i)
 		{
 			VkImageView ImageView = CreateImageView(LogicalDevice, Images[i], SurfaceFormat.format, VK_IMAGE_ASPECT_COLOR_BIT);
 			if (ImageView == nullptr)
@@ -422,7 +411,7 @@ namespace Core
 
 	void SwapchainInstance::DestroySwapchainInstance(VkDevice LogicalDevice, SwapchainInstance& Instance)
 	{
-		for (uint32_t i = 0; i < Instance.ImagesCount; ++i)
+		for (u32 i = 0; i < Instance.ImagesCount; ++i)
 		{
 			vkDestroyImageView(LogicalDevice, Instance.ImageViews[i], nullptr);
 		}
@@ -437,7 +426,7 @@ namespace Core
 	{
 		// How many images are in the swap chain
 		// Get 1 more then the minimum to allow triple buffering
-		uint32_t ImageCount = SurfaceCapabilities.minImageCount + 1;
+		u32 ImageCount = SurfaceCapabilities.minImageCount + 1;
 
 		// If maxImageCount > 0, then limitless
 		if (SurfaceCapabilities.maxImageCount > 0
@@ -460,9 +449,9 @@ namespace Core
 		SwapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // How to handle windows blending
 		SwapchainCreateInfo.clipped = VK_TRUE;
 
-		uint32_t Indices[] = {
-			static_cast<uint32_t>(DeviceIndices.GraphicsFamily),
-			static_cast<uint32_t>(DeviceIndices.PresentationFamily)
+		u32 Indices[] = {
+			static_cast<u32>(DeviceIndices.GraphicsFamily),
+			static_cast<u32>(DeviceIndices.PresentationFamily)
 		};
 
 		if (DeviceIndices.GraphicsFamily != DeviceIndices.PresentationFamily)
@@ -495,11 +484,10 @@ namespace Core
 
 	VkPresentModeKHR SwapchainInstance::GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
 	{
-		uint32_t PresentModesCount;
-		Memory::FramePointer<VkPresentModeKHR> PresentModes = GetAvailablePresentModes(PhysicalDevice, Surface, PresentModesCount);
+		Memory::FrameArray<VkPresentModeKHR> PresentModes = GetAvailablePresentModes(PhysicalDevice, Surface);
 
 		VkPresentModeKHR Mode = VK_PRESENT_MODE_FIFO_KHR;
-		for (uint32_t i = 0; i < PresentModesCount; ++i)
+		for (u32 i = 0; i < PresentModes.Count; ++i)
 		{
 			if (PresentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR)
 			{
@@ -516,9 +504,10 @@ namespace Core
 		return Mode;
 	}
 
-	Memory::FramePointer<VkPresentModeKHR> SwapchainInstance::GetAvailablePresentModes(VkPhysicalDevice PhysicalDevice,
-		VkSurfaceKHR Surface, uint32_t& Count)
+	Memory::FrameArray<VkPresentModeKHR> SwapchainInstance::GetAvailablePresentModes(VkPhysicalDevice PhysicalDevice,
+		VkSurfaceKHR Surface)
 	{
+		u32 Count;
 		const VkResult Result = vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Count, nullptr);
 		if (Result != VK_SUCCESS)
 		{
@@ -526,20 +515,21 @@ namespace Core
 			assert(false);
 		}
 
-		auto Pointer = Memory::FramePointer<VkPresentModeKHR>::Create(Count);
-		vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Count, Pointer.Data);
+		auto Data = Memory::FrameArray<VkPresentModeKHR>::Create(Count);
+		vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Count, Data.Pointer.Data);
 
-		return Pointer;
+		return Data;
 	}
 
-	Memory::FramePointer<VkImage> SwapchainInstance::GetSwapchainImages(VkDevice LogicalDevice,
-		VkSwapchainKHR VulkanSwapchain, uint32_t& Count)
+	Memory::FrameArray<VkImage> SwapchainInstance::GetSwapchainImages(VkDevice LogicalDevice,
+		VkSwapchainKHR VulkanSwapchain)
 	{
+		u32 Count;
 		vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &Count, nullptr);
 
-		auto Pointer = Memory::FramePointer<VkImage>::Create(Count);
-		vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &Count, Pointer.Data);
+		auto Data = Memory::FrameArray<VkImage>::Create(Count);
+		vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &Count, Data.Pointer.Data);
 
-		return Pointer;
+		return Data;
 	}
 }

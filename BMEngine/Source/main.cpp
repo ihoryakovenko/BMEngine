@@ -20,12 +20,13 @@
 #include "Core/VulkanCoreTypes.h"
 #include <random>
 #include "Memory/MemoryManagmentSystem.h"
+#include "Util/EngineTypes.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 
-const uint32_t NumRows = 600;
-const uint32_t NumCols = 600;
+const u32 NumRows = 600;
+const u32 NumCols = 600;
 
 Core::TerrainVertex TerrainVerticesData[NumRows][NumCols];
 
@@ -93,12 +94,12 @@ void GenerateTerrain()
 }
 
 Core::TerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
-uint32_t TerrainVerticesCount = NumRows * NumCols;
+u32 TerrainVerticesCount = NumRows * NumCols;
 
 struct TestMesh
 {
 	std::vector<Core::EntityVertex> vertices;
-	std::vector<uint32_t> indices;
+	std::vector<u32> indices;
 	int TextureId;
 };
 
@@ -322,7 +323,7 @@ void LoadDrawEntities()
 	std::vector<TestMesh> ModelMeshes;
 	ModelMeshes.reserve(Shapes.size());
 
-	std::unordered_map<Core::EntityVertex, uint32_t, std::hash<Core::EntityVertex>, VertexEqual> uniqueVertices{ };
+	std::unordered_map<Core::EntityVertex, u32, std::hash<Core::EntityVertex>, VertexEqual> uniqueVertices{ };
 
 	for (const auto& Shape : Shapes)
 	{
@@ -349,7 +350,7 @@ void LoadDrawEntities()
 
 			if (uniqueVertices.count(vertex) == 0)
 			{
-				uniqueVertices[vertex] = static_cast<uint32_t>(Tm.vertices.size());
+				uniqueVertices[vertex] = static_cast<u32>(Tm.vertices.size());
 				Tm.vertices.push_back(vertex);
 			}
 
@@ -412,10 +413,10 @@ void LoadShaders()
 	ShaderPaths.push_back("./Resources/Shaders/second_frag.spv");
 	NameToPath.push_back(Core::ShaderNames::DeferredFragment);
 
-	for (uint32_t i = 0; i < Core::ShaderNames::ShadersCount; ++i)
+	for (u32 i = 0; i < Core::ShaderNames::ShadersCount; ++i)
 	{
 		Util::OpenAndReadFileFull(ShaderPaths[i], ShaderCodes[i], "rb");
-		ShaderCodeDescriptions[i].Code = reinterpret_cast<uint32_t*>(ShaderCodes[i].data());
+		ShaderCodeDescriptions[i].Code = reinterpret_cast<u32*>(ShaderCodes[i].data());
 		ShaderCodeDescriptions[i].CodeSize = ShaderCodes[i].size();
 		ShaderCodeDescriptions[i].Name = NameToPath[i];
 	}
@@ -423,10 +424,10 @@ void LoadShaders()
 
 int main()
 {
-	const uint32_t FrameAllocSize = 1024 * 1024;
+	const u32 FrameAllocSize = 1024 * 1024;
 
-	Memory::MemoryManagementSystem& MemorySystem = Memory::MemoryManagementSystem::Get();
-	MemorySystem.Init(FrameAllocSize);
+	auto MemorySystem = Memory::MemoryManagementSystem::Get();
+	MemorySystem->Init(FrameAllocSize);
 
 	if (glfwInit() == GL_FALSE)
 	{
@@ -450,15 +451,15 @@ int main()
 	GenerateTerrain();
 	LoadShaders();
 
-	std::vector<uint32_t> indices;
+	std::vector<u32> indices;
 	for (int row = 0; row < NumRows - 1; ++row)
 	{
 		for (int col = 0; col < NumCols - 1; ++col)
 		{
-			uint32_t topLeft = row * NumCols + col;
-			uint32_t topRight = topLeft + 1;
-			uint32_t bottomLeft = (row + 1) * NumCols + col;
-			uint32_t bottomRight = bottomLeft + 1;
+			u32 topLeft = row * NumCols + col;
+			u32 topRight = topLeft + 1;
+			u32 bottomLeft = (row + 1) * NumCols + col;
+			u32 bottomRight = bottomLeft + 1;
 
 			// First triangle (Top-left, Bottom-left, Bottom-right)
 			indices.push_back(topLeft);
@@ -476,6 +477,7 @@ int main()
 	Core::RenderConfig Config;
 	Config.RenderShaders = ShaderCodeDescriptions;
 	Config.ShadersCount = Core::ShaderNames::ShadersCount;
+	Config.MaxTextures = 33;
 
 	RenderingSystem.Init(Window, Config);
 	LoadDrawEntities();
@@ -506,7 +508,7 @@ int main()
 
 	Camera MainCamera;
 
-	MemorySystem.FrameDealloc();
+	MemorySystem->FrameDealloc();
 
 	while (!glfwWindowShouldClose(Window) && !Close)
 	{
@@ -521,7 +523,7 @@ int main()
 
 		RenderingSystem.Draw(Scene);
 
-		MemorySystem.FrameDealloc();
+		MemorySystem->FrameDealloc();
 	}
 
 	for (int i = 0; i < DrawEntities.size(); ++i)
@@ -538,7 +540,7 @@ int main()
 
 	glfwTerminate();
 
-	MemorySystem.DeInit();
+	MemorySystem->DeInit();
 
 	if (Memory::MemoryManagementSystem::AllocateCounter != 0)
 	{

@@ -1,7 +1,6 @@
 #include "VulkanRenderingSystem.h"
 
 #include <algorithm>
-#include <vector>
 
 #include "VulkanHelper.h"
 #include "Util/Util.h"
@@ -18,44 +17,39 @@ namespace Core
 			"VK_LAYER_KHRONOS_validation",
 			"VK_LAYER_LUNARG_monitor"
 		};
-		const uint32_t ValidationLayersSize = sizeof(ValidationLayers) / sizeof(ValidationLayers[0]);
+		const u32 ValidationLayersSize = sizeof(ValidationLayers) / sizeof(ValidationLayers[0]);
 
 		const char* ValidationExtensions[] = {
 			VK_EXT_DEBUG_UTILS_EXTENSION_NAME
 		};
-		const uint32_t ValidationExtensionsSize = Util::EnableValidationLayers ? sizeof(ValidationExtensions) / sizeof(ValidationExtensions[0]) : 0;
+		const u32 ValidationExtensionsSize = Util::EnableValidationLayers ? sizeof(ValidationExtensions) / sizeof(ValidationExtensions[0]) : 0;
 
 		const char* DeviceExtensions[] = {
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME
 		};
-		const uint32_t DeviceExtensionsSize = sizeof(DeviceExtensions) / sizeof(DeviceExtensions[0]);
+		const u32 DeviceExtensionsSize = sizeof(DeviceExtensions) / sizeof(DeviceExtensions[0]);
 
-		uint32_t AvailableExtensionsCount;
-		Memory::FramePointer<VkExtensionProperties> AvailableExtensions = GetAvailableExtensionProperties(AvailableExtensionsCount);
+		Memory::FrameArray<VkExtensionProperties> AvailableExtensions = GetAvailableExtensionProperties();
+		Memory::FrameArray<const char*> RequiredExtensions = GetRequiredInstanceExtensions(ValidationExtensions, ValidationExtensionsSize);
 
-		uint32_t RequiredExtensionsCount;
-		Memory::FramePointer<const char*> RequiredExtensions = GetRequiredInstanceExtensions(ValidationExtensions,
-			ValidationExtensionsSize, RequiredExtensionsCount);
-
-		if (!CheckRequiredInstanceExtensionsSupport(AvailableExtensions.Data, AvailableExtensionsCount,
-			RequiredExtensions.Data, RequiredExtensionsCount))
+		if (!CheckRequiredInstanceExtensionsSupport(AvailableExtensions.Pointer.Data, AvailableExtensions.Count,
+			RequiredExtensions.Pointer.Data, RequiredExtensions.Count))
 		{
 			return false;
 		}
 
 		if (Util::EnableValidationLayers)
 		{
-			uint32_t LayerPropertiesDataCount;
-			Memory::FramePointer<VkLayerProperties> LayerPropertiesData = GetAvailableInstanceLayerProperties(LayerPropertiesDataCount);
+			Memory::FrameArray<VkLayerProperties> LayerPropertiesData = GetAvailableInstanceLayerProperties();
 
-			if (!CheckValidationLayersSupport(LayerPropertiesData.Data, LayerPropertiesDataCount,
+			if (!CheckValidationLayersSupport(LayerPropertiesData.Pointer.Data, LayerPropertiesData.Count,
 				ValidationLayers, ValidationLayersSize))
 			{
 				return false;
 			}
 		}
 
-		Instance = MainInstance::CreateMainInstance(RequiredExtensions.Data, RequiredExtensionsCount,
+		Instance = MainInstance::CreateMainInstance(RequiredExtensions.Pointer.Data, RequiredExtensions.Count,
 			Util::EnableValidationLayers, ValidationLayers, ValidationLayersSize);
 
 		VkSurfaceKHR Surface = nullptr;
@@ -69,9 +63,16 @@ namespace Core
 
 		LogicalDevice = CreateLogicalDevice(Device.Indices, DeviceExtensions, DeviceExtensionsSize);
 
-		VkSurfaceFormatKHR SurfaceFormat = GetBestSurfaceFormat(Surface); // TODO: Check for surface 2
+		MemorySourceDevice MemoryDevice;
+		MemoryDevice.PhysicalDevice = Device.PhysicalDevice;
+		MemoryDevice.LogicalDevice = LogicalDevice;
 
-		const uint32_t FormatPrioritySize = 3;
+		auto VulkanMemoryManagement = VulkanMemoryManagementSystem::Get();
+		VulkanMemoryManagement->Init(MemoryDevice);
+
+		VkSurfaceFormatKHR SurfaceFormat = GetBestSurfaceFormat(Surface);
+
+		const u32 FormatPrioritySize = 3;
 		VkFormat FormatPriority[FormatPrioritySize] = { VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT };
 
 		bool IsSupportedFormatFound = false;
@@ -107,15 +108,25 @@ namespace Core
 		SwapchainInstance SwapInstance1 = SwapchainInstance::CreateSwapchainInstance(Device.PhysicalDevice, Device.Indices,
 			LogicalDevice, Surface, SurfaceFormat, Extent1);
 
+		auto TotalPassPoolSizes = Memory::FramePointer<VkDescriptorPoolSize>::Create(5);
+		u32 TotalDescriptorLayouts = 3;
+		// Layout 1
+		TotalPassPoolSizes[0] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
+		// Layout 2
+		TotalPassPoolSizes[1] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
+		// Layout 3
+		TotalPassPoolSizes[2] = { .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = SwapInstance1.ImagesCount };
+		TotalPassPoolSizes[3] = { .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = SwapInstance1.ImagesCount };
+		// Textures
+		TotalPassPoolSizes[4] = { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = Config.MaxTextures };
 
-		std::vector<VkDescriptorPoolSize> TotalPassPoolSizes;
-		uint32_t TotalDescriptorCount;
-		MainRenderPass::GetPoolSizes(SwapInstance1.ImagesCount, TotalPassPoolSizes, TotalDescriptorCount);
-
-		StaticPool = CreateDescriptorPool(LogicalDevice, TotalPassPoolSizes.data(), TotalPassPoolSizes.size(), TotalDescriptorCount);
+		u32 TotalDescriptorCount = TotalDescriptorLayouts * SwapInstance1.ImagesCount;
+		TotalDescriptorCount += Config.MaxTextures;
+		
+		VulkanMemoryManagement->AllocateDescriptorPool(TotalPassPoolSizes.Data, 5, TotalDescriptorCount);
 
 		ShaderInput ShaderInputs[ShaderNames::ShadersCount];
-		for (uint32_t i = 0; i < Config.ShadersCount; ++i)
+		for (u32 i = 0; i < Config.ShadersCount; ++i)
 		{
 			ShaderInputs[i].ShaderName = Config.RenderShaders[i].Name;
 			CreateShader(LogicalDevice, Config.RenderShaders[i].Code, Config.RenderShaders[i].CodeSize, ShaderInputs[i].Module);
@@ -132,14 +143,16 @@ namespace Core
 		MainPass.CreatePipelines(LogicalDevice, Extent1, ShaderInputs, ShaderNames::ShadersCount);
 		MainPass.CreateAttachments(Device.PhysicalDevice, LogicalDevice, SwapInstance1.ImagesCount, Extent1, DepthFormat, ColorFormat);
 		MainPass.CreateUniformBuffers(Device.PhysicalDevice, LogicalDevice, SwapInstance1.ImagesCount);
-		MainPass.CreateSets(LogicalDevice, StaticPool, SwapInstance1.ImagesCount);
+		MainPass.CreateSets(LogicalDevice, SwapInstance1.ImagesCount);
 
 		for (int i = 0; i < ShaderNames::ShadersCount; ++i)
 		{
 			vkDestroyShaderModule(LogicalDevice, ShaderInputs[i].Module, nullptr);
 		}
 
-		InitViewport(Window, Surface, &MainViewport, StaticPool, SwapInstance1, MainPass.ColorBuffers, MainPass.DepthBuffers);
+		InitViewport(Window, Surface, &MainViewport, SwapInstance1, MainPass.ColorBuffers, MainPass.DepthBuffers);
+
+		TextureUnit.TextureSampler = CreateTextureSampler();
 
 		return true;
 	}
@@ -152,18 +165,15 @@ namespace Core
 
 		vkDestroySampler(LogicalDevice, TextureUnit.TextureSampler, nullptr);
 
-		for (uint32_t i = 0; i < TextureUnit.ImagesCount; ++i)
+		for (u32 i = 0; i < TextureUnit.ImagesCount; ++i)
 		{
 			vkDestroyImageView(LogicalDevice, TextureUnit.ImageViews[i], nullptr);
-			vkDestroyImage(LogicalDevice, TextureUnit.Images[i], nullptr);
+			VulkanMemoryManagementSystem::Get()->DestroyImage(TextureUnit.Images[i]);
 		}
 
 		GPUBuffer::DestroyGPUBuffer(LogicalDevice, TerrainIndexBuffer);
 
-		vkFreeMemory(LogicalDevice, TextureUnit.TextureImagesMemory, nullptr);
-
-		vkDestroyDescriptorPool(LogicalDevice, TextureUnit.SamplerDescriptorPool, nullptr);
-		vkDestroyDescriptorPool(LogicalDevice, StaticPool, nullptr);
+		VulkanMemoryManagementSystem::Get()->Deinit();
 
 		MainPass.ClearResources(LogicalDevice, MainViewport.ViewportSwapchain.ImagesCount);
 
@@ -178,34 +188,27 @@ namespace Core
 		Memory::MemoryManagementSystem::Deallocate(TextureUnit.ImageViews);
 	}
 
-	void VulkanRenderingSystem::LoadTextures(TextureInfo* Infos, uint32_t TexturesCount)
+	void VulkanRenderingSystem::LoadTextures(TextureInfo* Infos, u32 TexturesCount)
 	{
 		assert(TexturesCount > 0);
 		assert(TextureUnit.ImagesCount == 0);
 
-		VkDescriptorPoolSize SamplerPoolSize = { };
-		// Todo: support VK_DESCRIPTOR_TYPE_SAMPLER and VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE separately
-		SamplerPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		SamplerPoolSize.descriptorCount = TexturesCount;
-
-		TextureUnit.SamplerDescriptorPool = CreateDescriptorPool(LogicalDevice, &SamplerPoolSize, 1, TexturesCount);
-		TextureUnit.TextureSampler = CreateTextureSampler();
 		TextureUnit.ImagesCount = TexturesCount;
 		TextureUnit.Images = Memory::MemoryManagementSystem::Allocate<VkImage>(TextureUnit.ImagesCount);
 		TextureUnit.ImageViews = Memory::MemoryManagementSystem::Allocate<VkImageView>(TextureUnit.ImagesCount);
 		TextureUnit.SamplerDescriptorSets = Memory::MemoryManagementSystem::Allocate<VkDescriptorSet>(TextureUnit.ImagesCount);
 
-		Memory::MemoryManagementSystem& System = Memory::MemoryManagementSystem::Get();
-		VkImageMemoryBarrier* Barriers = System.FrameAlloc<VkImageMemoryBarrier>(TextureUnit.ImagesCount);
-		VkWriteDescriptorSet* WriteData = System.FrameAlloc<VkWriteDescriptorSet>(TextureUnit.ImagesCount);
-		VkDescriptorImageInfo* ImageInfos = System.FrameAlloc<VkDescriptorImageInfo>(TextureUnit.ImagesCount);
-		VkDescriptorSetLayout* layouts = System.FrameAlloc<VkDescriptorSetLayout>(TextureUnit.ImagesCount);
-		VkMemoryRequirements* TextureMemoryRequirements = System.FrameAlloc<VkMemoryRequirements>(TextureUnit.ImagesCount);
+		auto System = Memory::MemoryManagementSystem::Get();
+		auto Barriers = System->FrameAlloc<VkImageMemoryBarrier>(TextureUnit.ImagesCount);
+		auto WriteData = System->FrameAlloc<VkWriteDescriptorSet>(TextureUnit.ImagesCount);
+		auto ImageInfos = System->FrameAlloc<VkDescriptorImageInfo>(TextureUnit.ImagesCount);
+		auto layouts = System->FrameAlloc<VkDescriptorSetLayout>(TextureUnit.ImagesCount);
+		auto TextureMemoryRequirements = System->FrameAlloc<VkMemoryRequirements>(TextureUnit.ImagesCount);
 
 		VkDeviceSize TotalAllocationSize = 0;
-		uint32_t MemoryTypeIndex = 0;
+		u32 MemoryTypeIndex = 0;
 
-		for (uint32_t i = 0; i < TextureUnit.ImagesCount; ++i)
+		for (u32 i = 0; i < TextureUnit.ImagesCount; ++i)
 		{
 			// TODO: check on different texture sizes, what if texture less then MemoryRequirements.alignment?
 			// Is it possible to store 2 small textures in one MemoryRequirements.alignment segment?
@@ -225,11 +228,7 @@ namespace Core
 			ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT; // Number of samples for multi-sampling
 			ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // Whether image can be shared between queues
 
-			VkResult Result = vkCreateImage(LogicalDevice, &ImageCreateInfo, nullptr, &(TextureUnit.Images[i]));
-			if (Result != VK_SUCCESS)
-			{
-				assert(false);
-			}
+			VulkanMemoryManagementSystem::Get()->CreateImage(&ImageCreateInfo, &(TextureUnit.Images[i]));
 
 			vkGetImageMemoryRequirements(LogicalDevice, TextureUnit.Images[i], &TextureMemoryRequirements[i]);
 
@@ -253,7 +252,7 @@ namespace Core
 		stbi_uc* TexturesData = Memory::MemoryManagementSystem::Allocate<stbi_uc>(TotalAllocationSize);
 		stbi_uc* CopyPointer = TexturesData;
 
-		for (uint32_t i = 0; i < TexturesCount; ++i)
+		for (u32 i = 0; i < TexturesCount; ++i)
 		{
 			int TextureSize = Infos[i].Width * Infos[i].Height * Infos[i].Format;
 			std::memcpy(CopyPointer, Infos[i].Data, TextureSize);
@@ -273,21 +272,13 @@ namespace Core
 		memcpy(Data, TexturesData, static_cast<size_t>(TotalAllocationSize));
 		vkUnmapMemory(LogicalDevice, StagingBuffer.Memory);
 
-		VkMemoryAllocateInfo MemoryAllocInfo = { };
-		MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		MemoryAllocInfo.allocationSize = TotalAllocationSize;
-		MemoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;
-
-		VkResult Result = vkAllocateMemory(LogicalDevice, &MemoryAllocInfo, nullptr, &TextureUnit.TextureImagesMemory);
-		if (Result != VK_SUCCESS)
-		{
-			assert(false);
-		}
+		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
+		VulkanMemorySystem->AllocateImageMemory(TotalAllocationSize, MemoryTypeIndex);
 
 		VkDeviceSize Offset = 0;
-		for (uint32_t i = 0; i < TextureUnit.ImagesCount; ++i)
+		for (u32 i = 0; i < TextureUnit.ImagesCount; ++i)
 		{
-			vkBindImageMemory(LogicalDevice, TextureUnit.Images[i], TextureUnit.TextureImagesMemory, Offset);
+			VulkanMemorySystem->BindImageToMemory(TextureUnit.Images[i], Offset);
 			Offset += TextureMemoryRequirements[i].size;
 
 			Barriers[i] = { };
@@ -348,7 +339,7 @@ namespace Core
 
 		// Copy image data
 		VkDeviceSize CopyOffset = 0;
-		for (uint32_t i = 0; i < TextureUnit.ImagesCount; ++i)
+		for (u32 i = 0; i < TextureUnit.ImagesCount; ++i)
 		{
 			CopyBufferToImage(StagingBuffer.Buffer, CopyOffset, TextureUnit.Images[i], Infos[i].Width, Infos[i].Height);
 			CopyOffset += TextureMemoryRequirements[i].size;
@@ -377,10 +368,10 @@ namespace Core
 
 		vkFreeCommandBuffers(LogicalDevice, MainPass.GraphicsCommandPool, 1, &CommandBuffer);
 
-		CreateDescriptorSets(LogicalDevice, TextureUnit.SamplerDescriptorPool, layouts,
+		VulkanMemoryManagementSystem::Get()->AllocateSets(layouts,
 			TextureUnit.ImagesCount, TextureUnit.SamplerDescriptorSets);
 
-		for (uint32_t i = 0; i < TextureUnit.ImagesCount; ++i)
+		for (u32 i = 0; i < TextureUnit.ImagesCount; ++i)
 		{
 			TextureUnit.ImageViews[i] = CreateImageView(LogicalDevice, TextureUnit.Images[i],
 				VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -405,13 +396,13 @@ namespace Core
 		Memory::MemoryManagementSystem::Deallocate(TexturesData);
 	}
 
-	bool VulkanRenderingSystem::CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, uint32_t AvailableExtensionsCount,
-		const char** RequiredExtensions, uint32_t RequiredExtensionsCount)
+	bool VulkanRenderingSystem::CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, u32 AvailableExtensionsCount,
+		const char** RequiredExtensions, u32 RequiredExtensionsCount)
 	{
-		for (uint32_t i = 0; i < RequiredExtensionsCount; ++i)
+		for (u32 i = 0; i < RequiredExtensionsCount; ++i)
 		{
 			bool IsExtensionSupported = false;
-			for (uint32_t j = 0; j < AvailableExtensionsCount; ++j)
+			for (u32 j = 0; j < AvailableExtensionsCount; ++j)
 			{
 				if (std::strcmp(RequiredExtensions[i], AvailableExtensions[j].extensionName) == 0)
 				{
@@ -430,13 +421,13 @@ namespace Core
 		return true;
 	}
 
-	bool VulkanRenderingSystem::CheckValidationLayersSupport(VkLayerProperties* Properties, uint32_t PropertiesSize,
-		const char** ValidationLeyersToCheck, uint32_t ValidationLeyersToCheckSize)
+	bool VulkanRenderingSystem::CheckValidationLayersSupport(VkLayerProperties* Properties, u32 PropertiesSize,
+		const char** ValidationLeyersToCheck, u32 ValidationLeyersToCheckSize)
 	{
-		for (uint32_t i = 0; i < ValidationLeyersToCheckSize; ++i)
+		for (u32 i = 0; i < ValidationLeyersToCheckSize; ++i)
 		{
 			bool IsLayerAvalible = false;
-			for (uint32_t j = 0; j < PropertiesSize; ++j)
+			for (u32 j = 0; j < PropertiesSize; ++j)
 			{
 				if (std::strcmp(ValidationLeyersToCheck[i], Properties[j].layerName) == 0)
 				{
@@ -458,7 +449,7 @@ namespace Core
 	VkExtent2D VulkanRenderingSystem::GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities,
 		GLFWwindow* Window)
 	{
-		if (SurfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
+		if (SurfaceCapabilities.currentExtent.width != std::numeric_limits<u32>::max())
 		{
 			return SurfaceCapabilities.currentExtent;
 		}
@@ -468,15 +459,16 @@ namespace Core
 			int Height;
 			glfwGetFramebufferSize(Window, &Width, &Height);
 
-			Width = std::clamp(static_cast<uint32_t>(Width), SurfaceCapabilities.minImageExtent.width, SurfaceCapabilities.maxImageExtent.width);
-			Height = std::clamp(static_cast<uint32_t>(Height), SurfaceCapabilities.minImageExtent.height, SurfaceCapabilities.maxImageExtent.height);
+			Width = std::clamp(static_cast<u32>(Width), SurfaceCapabilities.minImageExtent.width, SurfaceCapabilities.maxImageExtent.width);
+			Height = std::clamp(static_cast<u32>(Height), SurfaceCapabilities.minImageExtent.height, SurfaceCapabilities.maxImageExtent.height);
 
-			return { static_cast<uint32_t>(Width), static_cast<uint32_t>(Height) };
+			return { static_cast<u32>(Width), static_cast<u32>(Height) };
 		}
 	}
 
-	Memory::FramePointer<VkExtensionProperties> VulkanRenderingSystem::GetAvailableExtensionProperties(uint32_t& Count)
+	Memory::FrameArray<VkExtensionProperties> VulkanRenderingSystem::GetAvailableExtensionProperties()
 	{
+		u32 Count;
 		const VkResult Result = vkEnumerateInstanceExtensionProperties(nullptr, &Count, nullptr);
 		if (Result != VK_SUCCESS)
 		{
@@ -484,14 +476,15 @@ namespace Core
 			assert(false);
 		}
 
-		auto Pointer = Memory::FramePointer<VkExtensionProperties>::Create(Count);
-		vkEnumerateInstanceExtensionProperties(nullptr, &Count, Pointer.Data);
+		auto Data = Memory::FrameArray<VkExtensionProperties>::Create(Count);
+		vkEnumerateInstanceExtensionProperties(nullptr, &Count, Data.Pointer.Data);
 
-		return Pointer;
+		return Data;
 	}
 
-	Memory::FramePointer<VkLayerProperties> VulkanRenderingSystem::GetAvailableInstanceLayerProperties(uint32_t& Count)
+	Memory::FrameArray<VkLayerProperties> VulkanRenderingSystem::GetAvailableInstanceLayerProperties()
 	{
+		u32 Count;
 		const VkResult Result = vkEnumerateInstanceLayerProperties(&Count, nullptr);
 		if (Result != VK_SUCCESS)
 		{
@@ -499,16 +492,16 @@ namespace Core
 			assert(false);
 		}
 
-		auto Pointer = Memory::FramePointer<VkLayerProperties>::Create(Count);
-		vkEnumerateInstanceLayerProperties(&Count, Pointer.Data);
+		auto Data = Memory::FrameArray<VkLayerProperties>::Create(Count);
+		vkEnumerateInstanceLayerProperties(&Count, Data.Pointer.Data);
 
-		return Pointer;
+		return Data;
 	}
 
-	Memory::FramePointer<const char*> VulkanRenderingSystem::GetRequiredInstanceExtensions(const char** ValidationExtensions,
-		uint32_t ValidationExtensionsCount, uint32_t& Count)
+	Memory::FrameArray<const char*> VulkanRenderingSystem::GetRequiredInstanceExtensions(const char** ValidationExtensions,
+		u32 ValidationExtensionsCount)
 	{
-		uint32_t RequiredExtensionsCount = 0;
+		u32 RequiredExtensionsCount = 0;
 		const char** RequiredInstanceExtensions = glfwGetRequiredInstanceExtensions(&RequiredExtensionsCount);
 		if (RequiredExtensionsCount == 0)
 		{
@@ -516,26 +509,26 @@ namespace Core
 			assert(false);
 		}
 
-		Count = RequiredExtensionsCount + ValidationExtensionsCount;
-		auto Pointer = Memory::FramePointer<const char*>::Create(Count);
+		auto Data = Memory::FrameArray<const char*>::Create(RequiredExtensionsCount + ValidationExtensionsCount);
 
-		for (uint32_t i = 0; i < RequiredExtensionsCount; ++i)
+		for (u32 i = 0; i < RequiredExtensionsCount; ++i)
 		{
-			Pointer[i] = RequiredInstanceExtensions[i];
-			Util::Log().Info("Requested {} extension", Pointer[i]);
+			Data[i] = RequiredInstanceExtensions[i];
+			Util::Log().Info("Requested {} extension", Data[i]);
 		}
 
-		for (uint32_t i = 0; i < ValidationExtensionsCount; ++i)
+		for (u32 i = 0; i < ValidationExtensionsCount; ++i)
 		{
-			Pointer[i + RequiredExtensionsCount] = ValidationExtensions[i];
-			Util::Log().Info("Requested {} extension", Pointer[i]);
+			Data[i + RequiredExtensionsCount] = ValidationExtensions[i];
+			Util::Log().Info("Requested {} extension", Data[i]);
 		}
 
-		return Pointer;
+		return Data;
 	}
 
-	Memory::FramePointer<VkSurfaceFormatKHR> VulkanRenderingSystem::GetSurfaceFormats(VkSurfaceKHR Surface, uint32_t& Count)
+	Memory::FrameArray<VkSurfaceFormatKHR> VulkanRenderingSystem::GetSurfaceFormats(VkSurfaceKHR Surface)
 	{
+		u32 Count;
 		const VkResult Result = vkGetPhysicalDeviceSurfaceFormatsKHR(Device.PhysicalDevice, Surface, &Count, nullptr);
 		if (Result != VK_SUCCESS)
 		{
@@ -543,13 +536,13 @@ namespace Core
 			assert(false);
 		}
 
-		auto Pointer = Memory::FramePointer<VkSurfaceFormatKHR>::Create(Count);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(Device.PhysicalDevice, Surface, &Count, Pointer.Data);
+		auto Data = Memory::FrameArray<VkSurfaceFormatKHR>::Create(Count);
+		vkGetPhysicalDeviceSurfaceFormatsKHR(Device.PhysicalDevice, Surface, &Count, Data.Pointer.Data);
 
-		return Pointer;
+		return Data;
 	}
 
-	void VulkanRenderingSystem::CopyBufferToImage(VkBuffer SourceBuffer, VkDeviceSize bufferOffset, VkImage Image, uint32_t Width, uint32_t Height)
+	void VulkanRenderingSystem::CopyBufferToImage(VkBuffer SourceBuffer, VkDeviceSize bufferOffset, VkImage Image, u32 Width, u32 Height)
 	{
 		// Todo: Use 1 CommandBuffer for all copy operations?
 		VkCommandBuffer TransferCommandBuffer;
@@ -596,24 +589,24 @@ namespace Core
 	}
 
 	VkDevice VulkanRenderingSystem::CreateLogicalDevice(PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
-		uint32_t DeviceExtensionsSize)
+		u32 DeviceExtensionsSize)
 	{
 		const float Priority = 1.0f;
 
 		// One family can support graphics and presentation
 		// In that case create multiple VkDeviceQueueCreateInfo
 		VkDeviceQueueCreateInfo QueueCreateInfos[2] = { };
-		uint32_t FamilyIndicesSize = 1;
+		u32 FamilyIndicesSize = 1;
 
 		QueueCreateInfos[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		QueueCreateInfos[0].queueFamilyIndex = static_cast<uint32_t>(Indices.GraphicsFamily);
+		QueueCreateInfos[0].queueFamilyIndex = static_cast<u32>(Indices.GraphicsFamily);
 		QueueCreateInfos[0].queueCount = 1;
 		QueueCreateInfos[0].pQueuePriorities = &Priority;
 
 		if (Indices.GraphicsFamily != Indices.PresentationFamily)
 		{
 			QueueCreateInfos[1].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-			QueueCreateInfos[1].queueFamilyIndex = static_cast<uint32_t>(Indices.PresentationFamily);
+			QueueCreateInfos[1].queueFamilyIndex = static_cast<u32>(Indices.PresentationFamily);
 			QueueCreateInfos[1].queueCount = 1;
 			QueueCreateInfos[1].pQueuePriorities = &Priority;
 
@@ -647,19 +640,18 @@ namespace Core
 
 	VkSurfaceFormatKHR VulkanRenderingSystem::GetBestSurfaceFormat(VkSurfaceKHR Surface)
 	{
-		uint32_t FormatsDataCount;
-		Memory::FramePointer<VkSurfaceFormatKHR> FormatsData = GetSurfaceFormats(Surface, FormatsDataCount);
+		Memory::FrameArray<VkSurfaceFormatKHR> FormatsData = GetSurfaceFormats(Surface);
 
 		VkSurfaceFormatKHR Format = { VK_FORMAT_UNDEFINED, static_cast<VkColorSpaceKHR>(0) };
 
 		// All formats available
-		if (FormatsDataCount == 1 && FormatsData[0].format == VK_FORMAT_UNDEFINED)
+		if (FormatsData.Count == 1 && FormatsData[0].format == VK_FORMAT_UNDEFINED)
 		{
 			Format = { VK_FORMAT_R8G8B8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
 		}
 		else
 		{
-			for (uint32_t i = 0; i < FormatsDataCount; ++i)
+			for (u32 i = 0; i < FormatsData.Count; ++i)
 			{
 				VkSurfaceFormatKHR AvailableFormat = FormatsData[i];
 				if ((AvailableFormat.format == VK_FORMAT_R8G8B8_UNORM || AvailableFormat.format == VK_FORMAT_B8G8R8A8_UNORM)
@@ -709,8 +701,8 @@ namespace Core
 
 	bool VulkanRenderingSystem::SetupQueues()
 	{
-		vkGetDeviceQueue(LogicalDevice, static_cast<uint32_t>(Device.Indices.GraphicsFamily), 0, &GraphicsQueue);
-		vkGetDeviceQueue(LogicalDevice, static_cast<uint32_t>(Device.Indices.PresentationFamily), 0, &PresentationQueue);
+		vkGetDeviceQueue(LogicalDevice, static_cast<u32>(Device.Indices.GraphicsFamily), 0, &GraphicsQueue);
+		vkGetDeviceQueue(LogicalDevice, static_cast<u32>(Device.Indices.PresentationFamily), 0, &PresentationQueue);
 
 		if (GraphicsQueue == nullptr && PresentationQueue == nullptr)
 		{
@@ -752,7 +744,7 @@ namespace Core
 		GPUBuffer::DestroyGPUBuffer(LogicalDevice, Entity.IndexBuffer);
 	}
 
-	void VulkanRenderingSystem::CreateTerrainIndices(uint32_t* Indices, uint32_t IndicesCount)
+	void VulkanRenderingSystem::CreateTerrainIndices(u32* Indices, u32 IndicesCount)
 	{
 		assert(TerrainIndicesCount == 0);
 		TerrainIndicesCount = IndicesCount;
@@ -760,7 +752,7 @@ namespace Core
 			MainPass.GraphicsCommandPool, GraphicsQueue, Indices, TerrainIndicesCount);
 	}
 
-	void VulkanRenderingSystem::CreateTerrainDrawEntity(TerrainVertex* TerrainVertices, uint32_t TerrainVerticesCount, DrawTerrainEntity& OutTerrain)
+	void VulkanRenderingSystem::CreateTerrainDrawEntity(TerrainVertex* TerrainVertices, u32 TerrainVerticesCount, DrawTerrainEntity& OutTerrain)
 	{
 		OutTerrain.VerticesCount = TerrainVerticesCount;
 		OutTerrain.VertexBuffer = GPUBuffer::CreateVertexBuffer(Device.PhysicalDevice, LogicalDevice,
@@ -817,7 +809,7 @@ namespace Core
 		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
 		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-		const uint32_t ClearValuesSize = 3;
+		const u32 ClearValuesSize = 3;
 		VkClearValue ClearValues[ClearValuesSize];
 		// Todo: do not forget about position in array AttachmentDescriptions
 		ClearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -839,7 +831,7 @@ namespace Core
 		vkResetFences(LogicalDevice, 1, &DrawFences[CurrentFrame]);
 
 		// Get index of next image to be drawn to, and signal semaphore when ready to be drawn to
-		uint32_t ImageIndex;
+		u32 ImageIndex;
 		vkAcquireNextImageKHR(LogicalDevice, MainViewport.ViewportSwapchain.VulkanSwapchain, std::numeric_limits<uint64_t>::max(),
 			ImageAvailable[CurrentFrame], VK_NULL_HANDLE, &ImageIndex);
 
@@ -863,7 +855,7 @@ namespace Core
 			VkBuffer TerrainVertexBuffers[] = { Scene.DrawTerrainEntities[0].VertexBuffer.Buffer };
 			VkDeviceSize TerrainBuffersOffsets[] = { 0 };
 
-			const uint32_t TerrainDescriptorSetGroupCount = 2;
+			const u32 TerrainDescriptorSetGroupCount = 2;
 			VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = {
 				MainPass.TerrainPass.TerrainSets[ImageIndex], TextureUnit.SamplerDescriptorSets[0] };
 
@@ -879,13 +871,13 @@ namespace Core
 		vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.EntityPass.Pipeline);
 
 		// TODO: Support rework to not create identical index buffers
-		for (uint32_t j = 0; j < Scene.DrawEntitiesCount; ++j)
+		for (u32 j = 0; j < Scene.DrawEntitiesCount; ++j)
 		{
 			VkBuffer VertexBuffers[] = { Scene.DrawEntities[j].VertexBuffer.Buffer };
 			VkDeviceSize Offsets[] = { 0 };
 
 			// Todo: do not record textureId on each frame?
-			const uint32_t DescriptorSetGroupCount = 2;
+			const u32 DescriptorSetGroupCount = 2;
 			VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] = { MainPass.EntityPass.EntitySets[ImageIndex],
 				TextureUnit.SamplerDescriptorSets[Scene.DrawEntities[j].TextureId] };
 
@@ -917,11 +909,8 @@ namespace Core
 		// Function end RecordCommands
 
 		//UpdateUniformBuffer
-		void* Data;
-		vkMapMemory(LogicalDevice, MainPass.VpUniformBuffers[ImageIndex].Memory, 0, sizeof(UboViewProjection),
-			0, &Data);
-		std::memcpy(Data, &Scene.ViewProjection, sizeof(UboViewProjection));
-		vkUnmapMemory(LogicalDevice, MainPass.VpUniformBuffers[ImageIndex].Memory);
+		VulkanMemoryManagementSystem::Get()->CopyDataToMemory(BufferType::Uniform, sizeof(UboViewProjection) * ImageIndex,
+			sizeof(UboViewProjection), &Scene.ViewProjection);
 
 		// Submit command buffer to queue
 		VkSubmitInfo submitInfo = { };
@@ -959,7 +948,7 @@ namespace Core
 
 	void VulkanRenderingSystem::DeinitViewport(ViewportInstance* Viewport)
 	{
-		for (uint32_t i = 0; i < Viewport->ViewportSwapchain.ImagesCount; ++i)
+		for (u32 i = 0; i < Viewport->ViewportSwapchain.ImagesCount; ++i)
 		{
 			vkDestroyFramebuffer(LogicalDevice, Viewport->SwapchainFramebuffers[i], nullptr);
 		}
@@ -972,7 +961,7 @@ namespace Core
 	}
 
 	void VulkanRenderingSystem::InitViewport(GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstance* OutViewport,
-		VkDescriptorPool DescriptorPool, SwapchainInstance SwapInstance, ImageBuffer* ColorBuffers, ImageBuffer* DepthBuffers)
+		SwapchainInstance SwapInstance, ImageBuffer* ColorBuffers, ImageBuffer* DepthBuffers)
 	{
 		OutViewport->Window = Window;
 		OutViewport->Surface = Surface;
@@ -982,9 +971,9 @@ namespace Core
 
 		// Function CreateFrameBuffers
 		// Create a framebuffer for each swap chain image
-		for (uint32_t i = 0; i < OutViewport->ViewportSwapchain.ImagesCount; i++)
+		for (u32 i = 0; i < OutViewport->ViewportSwapchain.ImagesCount; i++)
 		{
-			const uint32_t AttachmentsCount = 3;
+			const u32 AttachmentsCount = 3;
 			VkImageView Attachments[AttachmentsCount] = {
 				OutViewport->ViewportSwapchain.ImageViews[i],
 				// Todo: do not forget about position in array AttachmentDescriptions
@@ -1016,7 +1005,7 @@ namespace Core
 		CommandBufferAllocateInfo.commandPool = MainPass.GraphicsCommandPool;
 		CommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;	// VK_COMMAND_BUFFER_LEVEL_PRIMARY	: Buffer you submit directly to queue. Cant be called by other buffers.
 		// VK_COMMAND_BUFFER_LEVEL_SECONARY	: Buffer can't be called directly. Can be called from other buffers via "vkCmdExecuteCommands" when recording commands in primary buffer
-		CommandBufferAllocateInfo.commandBufferCount = static_cast<uint32_t>(OutViewport->ViewportSwapchain.ImagesCount);
+		CommandBufferAllocateInfo.commandBufferCount = static_cast<u32>(OutViewport->ViewportSwapchain.ImagesCount);
 
 		// Allocate command buffers and place handles in array of buffers
 		OutViewport->CommandBuffers = Memory::MemoryManagementSystem::Allocate<VkCommandBuffer>(OutViewport->ViewportSwapchain.ImagesCount);
