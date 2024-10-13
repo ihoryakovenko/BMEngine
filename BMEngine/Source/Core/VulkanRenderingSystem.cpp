@@ -97,6 +97,7 @@ namespace Core
 
 		CreateSynchronisation();
 		SetupQueues();
+		CreateCommandPool(LogicalDevice, Device.Indices.GraphicsFamily);
 
 		SwapchainInstance SwapInstance1 = SwapchainInstance::CreateSwapchainInstance(Device.PhysicalDevice, Device.Indices,
 			LogicalDevice, Surface, SurfaceFormat, Extent1);
@@ -120,6 +121,8 @@ namespace Core
 		MemorySourceDevice MemoryDevice;
 		MemoryDevice.PhysicalDevice = Device.PhysicalDevice;
 		MemoryDevice.LogicalDevice = LogicalDevice;
+		MemoryDevice.TransferCommandPool = GraphicsCommandPool;
+		MemoryDevice.TransferQueue = GraphicsQueue;
 
 		auto VulkanMemoryManagement = VulkanMemoryManagementSystem::Get();
 
@@ -136,7 +139,6 @@ namespace Core
 		MainPass.CreateVulkanPass(LogicalDevice, ColorFormat, DepthFormat, SurfaceFormat);
 		MainPass.SetupPushConstants();
 		MainPass.CreateSamplerSetLayout(LogicalDevice);
-		MainPass.CreateCommandPool(LogicalDevice, Device.Indices.GraphicsFamily);
 		MainPass.CreateTerrainSetLayout(LogicalDevice);
 		MainPass.CreateEntitySetLayout(LogicalDevice);
 		MainPass.CreateDeferredSetLayout(LogicalDevice);
@@ -172,10 +174,12 @@ namespace Core
 			VulkanMemoryManagementSystem::Get()->DestroyImage(TextureUnit.Images[i]);
 		}
 
+		vkDestroyBuffer(LogicalDevice, VertexBuffer, nullptr);
 		GPUBuffer::DestroyGPUBuffer(LogicalDevice, TerrainIndexBuffer);
 
 		VulkanMemoryManagementSystem::Get()->Deinit();
 
+		vkDestroyCommandPool(LogicalDevice, GraphicsCommandPool, nullptr);
 		MainPass.ClearResources(LogicalDevice, MainViewport.ViewportSwapchain.ImagesCount);
 
 		DeinitViewport(&MainViewport);
@@ -187,6 +191,7 @@ namespace Core
 		Memory::MemoryManagementSystem::Deallocate(TextureUnit.SamplerDescriptorSets);
 		Memory::MemoryManagementSystem::Deallocate(TextureUnit.Images);
 		Memory::MemoryManagementSystem::Deallocate(TextureUnit.ImageViews);
+		Memory::MemoryManagementSystem::Deallocate(VertexOffsets);
 	}
 
 	void VulkanRenderingSystem::LoadTextures(TextureInfo* Infos, u32 TexturesCount)
@@ -305,7 +310,7 @@ namespace Core
 		VkCommandBufferAllocateInfo AllocInfo = { };
 		AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		AllocInfo.commandPool = MainPass.GraphicsCommandPool;
+		AllocInfo.commandPool = GraphicsCommandPool;
 		AllocInfo.commandBufferCount = 1;
 
 		vkAllocateCommandBuffers(LogicalDevice, &AllocInfo, &CommandBuffer);
@@ -367,7 +372,7 @@ namespace Core
 		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
 		vkQueueWaitIdle(GraphicsQueue);
 
-		vkFreeCommandBuffers(LogicalDevice, MainPass.GraphicsCommandPool, 1, &CommandBuffer);
+		vkFreeCommandBuffers(LogicalDevice, GraphicsCommandPool, 1, &CommandBuffer);
 
 		VulkanMemoryManagementSystem::Get()->AllocateSets(layouts,
 			TextureUnit.ImagesCount, TextureUnit.SamplerDescriptorSets);
@@ -551,7 +556,7 @@ namespace Core
 		VkCommandBufferAllocateInfo AllocInfo = { };
 		AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		AllocInfo.commandPool = MainPass.GraphicsCommandPool;
+		AllocInfo.commandPool = GraphicsCommandPool;
 		AllocInfo.commandBufferCount = 1;
 
 		vkAllocateCommandBuffers(LogicalDevice, &AllocInfo, &TransferCommandBuffer);
@@ -586,7 +591,7 @@ namespace Core
 		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
 		vkQueueWaitIdle(GraphicsQueue);
 
-		vkFreeCommandBuffers(LogicalDevice, MainPass.GraphicsCommandPool, 1, &TransferCommandBuffer);
+		vkFreeCommandBuffers(LogicalDevice, GraphicsCommandPool, 1, &TransferCommandBuffer);
 	}
 
 	VkDevice VulkanRenderingSystem::CreateLogicalDevice(PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
@@ -726,22 +731,68 @@ namespace Core
 		}
 	}
 
-	void VulkanRenderingSystem::CreateDrawEntity(Mesh Mesh, DrawEntity& OutEntity)
+	void VulkanRenderingSystem::CreateDrawEntities(Mesh* Meshes, u32 MeshesCount, DrawEntity* OutEntities)
 	{
-		OutEntity.VertexBuffer = GPUBuffer::CreateVertexBuffer(Device.PhysicalDevice, LogicalDevice, MainPass.GraphicsCommandPool, GraphicsQueue, Mesh.MeshVertices, Mesh.MeshVerticesCount);
-		OutEntity.VerticesCount = Mesh.MeshVerticesCount;
+		VertexOffsets = Memory::MemoryManagementSystem::Allocate<VkDeviceSize>(MeshesCount);
 
-		OutEntity.IndexBuffer = GPUBuffer::CreateIndexBuffer(Device.PhysicalDevice, LogicalDevice, MainPass.GraphicsCommandPool, GraphicsQueue, Mesh.MeshIndices, Mesh.MeshIndicesCount);
-		OutEntity.IndicesCount = Mesh.MeshIndicesCount;
+		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
+		VkDeviceSize TotalSize = 0;
 
-		OutEntity.Model = Mesh.Model;
+		for (u32 i = 0; i < MeshesCount; ++i)
+		{
+			const VkDeviceSize MeshVerticesSize = sizeof(EntityVertex) * Meshes[i].MeshVerticesCount;
+
+			u32 BufferPadding = 0;
+			if (MeshVerticesSize % VulkanMemorySystem->BuffersAlignment[BufferType::Vertex] != 0)
+			{
+				BufferPadding = VulkanMemorySystem->BuffersAlignment[BufferType::Vertex] -
+					(MeshVerticesSize % VulkanMemorySystem->BuffersAlignment[BufferType::Vertex]);
+			}
+
+			const VkDeviceSize AlignedSize = MeshVerticesSize + BufferPadding;
+
+			VertexOffsets[i] = TotalSize;
+			TotalSize += AlignedSize;
+		}
+
+		EntityVertex* AllVertices = Memory::MemoryManagementSystem::Allocate<EntityVertex>(TotalSize);
+		char* CopyPointer = reinterpret_cast<char *>(AllVertices);
+
+		for (u32 i = 0; i < MeshesCount; ++i)
+		{
+			const VkDeviceSize MeshVerticesSize = sizeof(EntityVertex) * Meshes[i].MeshVerticesCount;
+			std::memcpy(CopyPointer, Meshes[i].MeshVertices, MeshVerticesSize);
+
+			u32 BufferPadding = 0;
+			if (MeshVerticesSize % VulkanMemorySystem->BuffersAlignment[BufferType::Vertex] != 0)
+			{
+				BufferPadding = VulkanMemorySystem->BuffersAlignment[BufferType::Vertex] -
+					(MeshVerticesSize % VulkanMemorySystem->BuffersAlignment[BufferType::Vertex]);
+			}
+
+			const VkDeviceSize AlignedSize = MeshVerticesSize + BufferPadding;
+			CopyPointer += AlignedSize;
+
+			////
+			OutEntities[i].IndexBuffer = GPUBuffer::CreateIndexBuffer(Device.PhysicalDevice, LogicalDevice,
+				GraphicsCommandPool, GraphicsQueue, Meshes[i].MeshIndices, Meshes[i].MeshIndicesCount);
+			OutEntities[i].IndicesCount = Meshes[i].MeshIndicesCount;
+
+			OutEntities[i].Model = Meshes[i].Model;
+		}
+		
+		VulkanMemorySystem->AllocateBufferMemory(BufferType::Vertex, TotalSize);
+
+		VertexBuffer = VulkanMemorySystem->CreateBuffer(BufferType::Vertex, TotalSize);
+		VulkanMemorySystem->CopyDataToBuffer(VertexBuffer, 0, TotalSize, AllVertices);
+
+		Memory::MemoryManagementSystem::Deallocate(AllVertices);
 	}
 
 	void VulkanRenderingSystem::DestroyDrawEntity(DrawEntity& Entity)
 	{
 		// TODO: Mark object to for delete and delete it after draw
 		vkWaitForFences(LogicalDevice, MaxFrameDraws, DrawFences, VK_TRUE, std::numeric_limits<uint64_t>::max());
-		GPUBuffer::DestroyGPUBuffer(LogicalDevice, Entity.VertexBuffer);
 		GPUBuffer::DestroyGPUBuffer(LogicalDevice, Entity.IndexBuffer);
 	}
 
@@ -750,14 +801,14 @@ namespace Core
 		assert(TerrainIndicesCount == 0);
 		TerrainIndicesCount = IndicesCount;
 		TerrainIndexBuffer = GPUBuffer::CreateIndexBuffer(Device.PhysicalDevice, LogicalDevice,
-			MainPass.GraphicsCommandPool, GraphicsQueue, Indices, TerrainIndicesCount);
+			GraphicsCommandPool, GraphicsQueue, Indices, TerrainIndicesCount);
 	}
 
 	void VulkanRenderingSystem::CreateTerrainDrawEntity(TerrainVertex* TerrainVertices, u32 TerrainVerticesCount, DrawTerrainEntity& OutTerrain)
 	{
 		OutTerrain.VerticesCount = TerrainVerticesCount;
 		OutTerrain.VertexBuffer = GPUBuffer::CreateVertexBuffer(Device.PhysicalDevice, LogicalDevice,
-			MainPass.GraphicsCommandPool, GraphicsQueue, TerrainVertices, TerrainVerticesCount);
+			GraphicsCommandPool, GraphicsQueue, TerrainVertices, TerrainVerticesCount);
 	}
 
 	void VulkanRenderingSystem::DestroyTerrainDrawEntity(DrawTerrainEntity& Entity)
@@ -874,8 +925,8 @@ namespace Core
 		// TODO: Support rework to not create identical index buffers
 		for (u32 j = 0; j < Scene.DrawEntitiesCount; ++j)
 		{
-			VkBuffer VertexBuffers[] = { Scene.DrawEntities[j].VertexBuffer.Buffer };
-			VkDeviceSize Offsets[] = { 0 };
+			VkBuffer VertexBuffers[] = { VertexBuffer };
+			VkDeviceSize Offsets[] = { VertexOffsets[j] };
 
 			// Todo: do not record textureId on each frame?
 			const u32 DescriptorSetGroupCount = 2;
@@ -1003,7 +1054,7 @@ namespace Core
 		// Function CreateCommandBuffers
 		VkCommandBufferAllocateInfo CommandBufferAllocateInfo = { };
 		CommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		CommandBufferAllocateInfo.commandPool = MainPass.GraphicsCommandPool;
+		CommandBufferAllocateInfo.commandPool = GraphicsCommandPool;
 		CommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;	// VK_COMMAND_BUFFER_LEVEL_PRIMARY	: Buffer you submit directly to queue. Cant be called by other buffers.
 		// VK_COMMAND_BUFFER_LEVEL_SECONARY	: Buffer can't be called directly. Can be called from other buffers via "vkCmdExecuteCommands" when recording commands in primary buffer
 		CommandBufferAllocateInfo.commandBufferCount = static_cast<u32>(OutViewport->ViewportSwapchain.ImagesCount);
@@ -1017,5 +1068,20 @@ namespace Core
 			assert(false);
 		}
 		// Function end CreateCommandBuffers
+	}
+
+	void VulkanRenderingSystem::CreateCommandPool(VkDevice LogicalDevice, u32 FamilyIndex)
+	{
+		VkCommandPoolCreateInfo PoolInfo = { };
+		PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		PoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+		PoolInfo.queueFamilyIndex = FamilyIndex;	// Queue Family type that buffers from this command pool will use
+
+		VkResult Result = vkCreateCommandPool(LogicalDevice, &PoolInfo, nullptr, &GraphicsCommandPool);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkCreateCommandPool result is {}", static_cast<int>(Result));
+			assert(false);
+		}
 	}
 }

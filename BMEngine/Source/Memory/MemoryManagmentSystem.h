@@ -77,9 +77,9 @@ namespace Memory
 		}
 
 	private:
-		u32 ByteCount = 0;
-		char* NextMemory = nullptr;
-		char* MemoryPool = nullptr;
+		static inline u32 ByteCount = 0;
+		static inline char* NextMemory = nullptr;
+		static inline char* MemoryPool = nullptr;
 	};
 
 	template <typename T>

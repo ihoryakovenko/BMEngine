@@ -32,7 +32,6 @@ namespace Core
 		EntityPass.ClearResources(LogicalDevice);
 
 		vkDestroyDescriptorSetLayout(LogicalDevice, SamplerSetLayout, nullptr);
-		vkDestroyCommandPool(LogicalDevice, GraphicsCommandPool, nullptr);
 		vkDestroyRenderPass(LogicalDevice, RenderPass, nullptr);
 
 		Memory::MemoryManagementSystem::Deallocate(DepthBuffers);
@@ -229,21 +228,6 @@ namespace Core
 		if (Result != VK_SUCCESS)
 		{
 			// TODO LOG
-			assert(false);
-		}
-	}
-
-	void MainRenderPass::CreateCommandPool(VkDevice LogicalDevice, u32 FamilyIndex)
-	{
-		VkCommandPoolCreateInfo PoolInfo = { };
-		PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-		PoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		PoolInfo.queueFamilyIndex = FamilyIndex;	// Queue Family type that buffers from this command pool will use
-
-		VkResult Result = vkCreateCommandPool(LogicalDevice, &PoolInfo, nullptr, &GraphicsCommandPool);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkCreateCommandPool result is {}", static_cast<int>(Result));
 			assert(false);
 		}
 	}
@@ -693,7 +677,7 @@ namespace Core
 				(VpBufferSize % VulkanMemorySystem->BuffersAlignment[BufferType::Uniform]);
 		}
 
-		const u32 AlignedSize = VpBufferSize + UniformBufferPadding;
+		const VkDeviceSize AlignedSize = VpBufferSize + UniformBufferPadding;
 		VulkanMemorySystem->AllocateBufferMemory(BufferType::Uniform, AlignedSize * ImagesCount);
 
 		VpUniformBuffers = Memory::MemoryManagementSystem::Allocate<VkBuffer>(ImagesCount);

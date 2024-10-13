@@ -17,7 +17,7 @@ namespace Core
 
 		void LoadTextures(TextureInfo* Infos, u32 TexturesCount);
 
-		void CreateDrawEntity(Mesh Mesh, DrawEntity& OutEntity);
+		void CreateDrawEntities(Mesh* Meshes, u32 MeshesCount, DrawEntity* OutEntities);
 		void DestroyDrawEntity(DrawEntity& Entity);
 
 		void CreateTerrainIndices(u32* Indices, u32 IndicesCount);
@@ -60,6 +60,8 @@ namespace Core
 			SwapchainInstance SwapInstance, ImageBuffer* ColorBuffers, ImageBuffer* DepthBuffers);
 		void DeinitViewport(ViewportInstance* Viewport);
 
+		void CreateCommandPool(VkDevice LogicalDevice, u32 FamilyIndex);
+
 	private:
 		MainInstance Instance;
 		VkDevice LogicalDevice = nullptr;
@@ -78,6 +80,11 @@ namespace Core
 		VkSemaphore* ImageAvailable = nullptr;
 		VkSemaphore* RenderFinished = nullptr;
 		VkFence* DrawFences = nullptr;
+
+		VkCommandPool GraphicsCommandPool = nullptr;
+
+		VkBuffer VertexBuffer = nullptr;
+		VkDeviceSize* VertexOffsets = nullptr;
 
 		const int MaxFrameDraws = 2;
 		int CurrentFrame = 0;

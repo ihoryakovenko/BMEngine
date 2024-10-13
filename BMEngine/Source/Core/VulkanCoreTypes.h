@@ -128,9 +128,6 @@ namespace Core
 
 	struct DrawEntity
 	{
-		u32 VerticesCount = 0;
-		GPUBuffer VertexBuffer;
-
 		u32 IndicesCount = 0;
 		GPUBuffer IndexBuffer;
 

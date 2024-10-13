@@ -366,19 +366,21 @@ void LoadDrawEntities()
 
 	DrawEntities.resize(ModelMeshes.size());
 	
+	std::vector<Core::Mesh> m(ModelMeshes.size());
+
 	for (int i = 0; i < ModelMeshes.size(); ++i)
 	{
-		Core::Mesh m;
-		m.MeshVertices = ModelMeshes[i].vertices.data();
-		m.MeshVerticesCount = ModelMeshes[i].vertices.size();
+		m[i].MeshVertices = ModelMeshes[i].vertices.data();
+		m[i].MeshVerticesCount = ModelMeshes[i].vertices.size();
 
 
-		m.MeshIndices = ModelMeshes[i].indices.data();
-		m.MeshIndicesCount = ModelMeshes[i].indices.size();
+		m[i].MeshIndices = ModelMeshes[i].indices.data();
+		m[i].MeshIndicesCount = ModelMeshes[i].indices.size();
 
-		RenderingSystem.CreateDrawEntity(m, DrawEntities[i]);
 		DrawEntities[i].TextureId = ModelMeshes[i].TextureId;
 	}
+
+	RenderingSystem.CreateDrawEntities(m.data(), m.size(), DrawEntities.data());
 
 	glm::vec3 CubePos(1.2f, 1.0f, 2.0f);
 	glm::mat4 model = glm::mat4(1.0f);

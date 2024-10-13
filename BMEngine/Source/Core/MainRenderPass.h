@@ -58,7 +58,6 @@ namespace Core
 			VkSurfaceFormatKHR SurfaceFormat);
 		void SetupPushConstants();
 		void CreateSamplerSetLayout(VkDevice LogicalDevice);
-		void CreateCommandPool(VkDevice LogicalDevice, u32 FamilyIndex);
 		void CreateTerrainSetLayout(VkDevice LogicalDevice);
 		void CreateEntitySetLayout(VkDevice LogicalDevice);
 		void CreateDeferredSetLayout(VkDevice LogicalDevice);
@@ -75,8 +74,6 @@ namespace Core
 		TerrainSubpass TerrainPass;
 		EntitySubpass EntityPass;
 		DeferredSubpass DeferredPass;
-
-		VkCommandPool GraphicsCommandPool = nullptr;
 
 		ImageBuffer* ColorBuffers = nullptr;
 		ImageBuffer* DepthBuffers = nullptr;

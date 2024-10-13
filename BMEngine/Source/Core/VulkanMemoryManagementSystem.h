@@ -22,10 +22,20 @@ namespace Core
 		};
 	};
 
+	namespace ImageType
+	{
+		enum ImageType
+		{
+
+		};
+	};
+
 	struct MemorySourceDevice
 	{
 		VkPhysicalDevice PhysicalDevice = nullptr;
 		VkDevice LogicalDevice = nullptr;
+		VkCommandPool TransferCommandPool = nullptr;
+		VkQueue TransferQueue = nullptr;
 	};
 
 	class VulkanMemoryManagementSystem
@@ -50,37 +60,38 @@ namespace Core
 		VkBuffer CreateBuffer(BufferType::BufferType Type, VkDeviceSize BufferSize);
 		void DestroyBuffer(VkBuffer Buffer);
 
-		template <typename T>
-		void CopyDataToMemory(BufferType::BufferType Type, VkDeviceSize Offset, VkDeviceSize Size, T* Data)
-		{
-			void* MappedMemory;
-			vkMapMemory(MemorySource.LogicalDevice, BuffersMemory[Type], Offset, Size, 0, &MappedMemory);
-			std::memcpy(MappedMemory, Data, Size);
-			vkUnmapMemory(MemorySource.LogicalDevice, BuffersMemory[Type]);
-		}
-
-	public:
-		u32 BuffersAlignment[BufferType::Count];
-		u32 BuffersMemoryTypeIndex[BufferType::Count];
+		void CopyDataToMemory(BufferType::BufferType Type, VkDeviceSize Offset, VkDeviceSize Size, const void* Data);
+		void CopyDataToBuffer(VkBuffer SrcBuffer, VkDeviceSize Offset, VkDeviceSize Size, const void* Data);
 
 	private:
-		MemorySourceDevice MemorySource;
+		VkBuffer CreateBufferInternal(VkDeviceSize BufferSize, VkBufferUsageFlags BufferUsage);
+		void CreateStagingBuffer(VkDeviceSize Size);
 
-		VkDescriptorPool Pool = nullptr;
+	public:
+		static inline u32 BuffersAlignment[BufferType::Count];
+		static inline u32 BuffersMemoryTypeIndex[BufferType::Count];
 
-		VkDeviceMemory ImageMemory = nullptr;
+	private:
+		static inline MemorySourceDevice MemorySource;
 
-		VkDeviceMemory BuffersMemory[BufferType::Count];
-		u32 BuffersOffset[BufferType::Count];
+		static inline VkBuffer StagingBuffer = nullptr;
+		static inline VkDeviceMemory StagingBufferMemory = nullptr;
 
-		VkBufferUsageFlags BuffersUsage[BufferType::Count] =
+		static inline VkDescriptorPool Pool = nullptr;
+
+		static inline VkDeviceMemory ImageMemory = nullptr;
+
+		static inline VkDeviceMemory BuffersMemory[BufferType::Count];
+		static inline u32 BuffersOffset[BufferType::Count];
+
+		static inline VkBufferUsageFlags BuffersUsage[BufferType::Count] =
 		{
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT
 		};
 
-		VkMemoryPropertyFlags BuffersProperties[BufferType::Count] =
+		static inline VkMemoryPropertyFlags BuffersProperties[BufferType::Count] =
 		{
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
