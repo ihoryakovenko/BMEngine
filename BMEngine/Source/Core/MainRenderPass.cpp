@@ -683,17 +683,24 @@ namespace Core
 	void MainRenderPass::CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
 		u32 ImagesCount)
 	{
-		auto VpBufferSize = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDeviceSize>(ImagesCount);
+		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
+		const VkDeviceSize VpBufferSize = sizeof(UboViewProjection);
 
-		for (u32 i = 0; i < ImagesCount; ++i)
+		u32 UniformBufferPadding = 0;
+		if (VpBufferSize % VulkanMemorySystem->BuffersAlignment[BufferType::Uniform] != 0)
 		{
-			VpBufferSize[i] = sizeof(UboViewProjection);
+			UniformBufferPadding = VulkanMemorySystem->BuffersAlignment[BufferType::Uniform] -
+				(VpBufferSize % VulkanMemorySystem->BuffersAlignment[BufferType::Uniform]);
 		}
 
-		VpUniformBuffers = Memory::MemoryManagementSystem::Allocate<VkBuffer>(ImagesCount);
+		const u32 AlignedSize = VpBufferSize + UniformBufferPadding;
+		VulkanMemorySystem->AllocateBufferMemory(BufferType::Uniform, AlignedSize * ImagesCount);
 
-		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
-		VulkanMemorySystem->CreateUniformBuffers(VpBufferSize, VpUniformBuffers, ImagesCount);
+		VpUniformBuffers = Memory::MemoryManagementSystem::Allocate<VkBuffer>(ImagesCount);
+		for (u32 i = 0; i < ImagesCount; i++)
+		{
+			VpUniformBuffers[i] = VulkanMemorySystem->CreateBuffer(BufferType::Uniform, VpBufferSize);
+		}
 	}
 
 	void MainRenderPass::CreateSets(VkDevice LogicalDevice, u32 ImagesCount)

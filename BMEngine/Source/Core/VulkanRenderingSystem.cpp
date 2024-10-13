@@ -63,13 +63,6 @@ namespace Core
 
 		LogicalDevice = CreateLogicalDevice(Device.Indices, DeviceExtensions, DeviceExtensionsSize);
 
-		MemorySourceDevice MemoryDevice;
-		MemoryDevice.PhysicalDevice = Device.PhysicalDevice;
-		MemoryDevice.LogicalDevice = LogicalDevice;
-
-		auto VulkanMemoryManagement = VulkanMemoryManagementSystem::Get();
-		VulkanMemoryManagement->Init(MemoryDevice);
-
 		VkSurfaceFormatKHR SurfaceFormat = GetBestSurfaceFormat(Surface);
 
 		const u32 FormatPrioritySize = 3;
@@ -108,7 +101,8 @@ namespace Core
 		SwapchainInstance SwapInstance1 = SwapchainInstance::CreateSwapchainInstance(Device.PhysicalDevice, Device.Indices,
 			LogicalDevice, Surface, SurfaceFormat, Extent1);
 
-		auto TotalPassPoolSizes = Memory::FramePointer<VkDescriptorPoolSize>::Create(5);
+		const u32 PoolSizeCount = 5;
+		auto TotalPassPoolSizes = Memory::FramePointer<VkDescriptorPoolSize>::Create(PoolSizeCount);
 		u32 TotalDescriptorLayouts = 3;
 		// Layout 1
 		TotalPassPoolSizes[0] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
@@ -122,8 +116,15 @@ namespace Core
 
 		u32 TotalDescriptorCount = TotalDescriptorLayouts * SwapInstance1.ImagesCount;
 		TotalDescriptorCount += Config.MaxTextures;
-		
-		VulkanMemoryManagement->AllocateDescriptorPool(TotalPassPoolSizes.Data, 5, TotalDescriptorCount);
+
+		MemorySourceDevice MemoryDevice;
+		MemoryDevice.PhysicalDevice = Device.PhysicalDevice;
+		MemoryDevice.LogicalDevice = LogicalDevice;
+
+		auto VulkanMemoryManagement = VulkanMemoryManagementSystem::Get();
+
+		VulkanMemoryManagement->Init(MemoryDevice);
+		VulkanMemoryManagement->AllocateDescriptorPool(TotalPassPoolSizes.Data, PoolSizeCount, TotalDescriptorCount);
 
 		ShaderInput ShaderInputs[ShaderNames::ShadersCount];
 		for (u32 i = 0; i < Config.ShadersCount; ++i)
@@ -823,7 +824,7 @@ namespace Core
 		RenderPassBeginInfo.pClearValues = ClearValues;
 		RenderPassBeginInfo.clearValueCount = ClearValuesSize;
 
-		VkPipelineStageFlags waitStages[] = {
+		VkPipelineStageFlags WaitStages[] = {
 			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
 		};
 
@@ -913,16 +914,16 @@ namespace Core
 			sizeof(UboViewProjection), &Scene.ViewProjection);
 
 		// Submit command buffer to queue
-		VkSubmitInfo submitInfo = { };
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		submitInfo.waitSemaphoreCount = 1;										// Number of semaphores to wait on
-		submitInfo.pWaitDstStageMask = waitStages;						// Stages to check semaphores at
-		submitInfo.commandBufferCount = 1;								// Number of command buffers to submit
-		submitInfo.signalSemaphoreCount = 1;							// Number of semaphores to signal
-		submitInfo.pWaitSemaphores = &ImageAvailable[CurrentFrame];				// List of semaphores to wait on
-		submitInfo.pCommandBuffers = &MainViewport.CommandBuffers[ImageIndex];		// Command buffer to submit
-		submitInfo.pSignalSemaphores = &RenderFinished[CurrentFrame];	// Semaphores to signal when command buffer finishes
-		Result = vkQueueSubmit(GraphicsQueue, 1, &submitInfo, DrawFences[CurrentFrame]);
+		VkSubmitInfo SubmitInfo = { };
+		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		SubmitInfo.waitSemaphoreCount = 1;										// Number of semaphores to wait on
+		SubmitInfo.pWaitDstStageMask = WaitStages;						// Stages to check semaphores at
+		SubmitInfo.commandBufferCount = 1;								// Number of command buffers to submit
+		SubmitInfo.signalSemaphoreCount = 1;							// Number of semaphores to signal
+		SubmitInfo.pWaitSemaphores = &ImageAvailable[CurrentFrame];				// List of semaphores to wait on
+		SubmitInfo.pCommandBuffers = &MainViewport.CommandBuffers[ImageIndex];		// Command buffer to submit
+		SubmitInfo.pSignalSemaphores = &RenderFinished[CurrentFrame];	// Semaphores to signal when command buffer finishes
+		Result = vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, DrawFences[CurrentFrame]);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkQueueSubmit result is {}", static_cast<int>(Result));

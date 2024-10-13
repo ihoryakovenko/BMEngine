@@ -36,19 +36,19 @@ namespace Core
 		void Init(MemorySourceDevice Device);
 		void Deinit();
 
-		void AllocateDescriptorPool(VkDescriptorPoolSize* PoolSizes, uint32_t PoolSizeCount, uint32_t MaxDescriptorCount);
-		void AllocateSets(VkDescriptorSetLayout* Layouts, uint32_t DescriptorSetCount, VkDescriptorSet* OutSets);
+		void AllocateDescriptorPool(VkDescriptorPoolSize* PoolSizes, u32 PoolSizeCount, u32 MaxDescriptorCount);
+		void AllocateSets(VkDescriptorSetLayout* Layouts, u32 DescriptorSetCount, VkDescriptorSet* OutSets);
 
-		void AllocateMemory(VkDeviceSize AllocationSize, uint32_t MemoryTypeIndex, VkDeviceMemory* Memory);
+		void AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex, VkDeviceMemory* Memory);
 
-		void AllocateImageMemory(VkDeviceSize AllocationSize, uint32_t MemoryTypeIndex);
+		void AllocateImageMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex);
 		void CreateImage(VkImageCreateInfo* pCreateInfo, VkImage* Image);
 		void DestroyImage(VkImage Image);
 		void BindImageToMemory(VkImage Image, VkDeviceSize Offset);
 
-		VkBuffer CreateBuffer(VkDeviceSize BufferSize, VkBufferUsageFlags BufferUsage, VkMemoryPropertyFlags BufferProperties);
+		void AllocateBufferMemory(BufferType::BufferType Type, VkDeviceSize Size);
+		VkBuffer CreateBuffer(BufferType::BufferType Type, VkDeviceSize BufferSize);
 		void DestroyBuffer(VkBuffer Buffer);
-		void BindBufferToMemory(VkBuffer Buffer, BufferType::BufferType Type, VkDeviceSize Offset);
 
 		template <typename T>
 		void CopyDataToMemory(BufferType::BufferType Type, VkDeviceSize Offset, VkDeviceSize Size, T* Data)
@@ -59,16 +59,32 @@ namespace Core
 			vkUnmapMemory(MemorySource.LogicalDevice, BuffersMemory[Type]);
 		}
 
-		void CreateUniformBuffers(VkDeviceSize* BufferSizes, VkBuffer* OutBuffers, u32 BuffersCount);
-
-	private:
-		void AllocateBufferMemory(BufferType::BufferType Type, VkDeviceSize AllocationSize, uint32_t MemoryTypeIndex);
+	public:
+		u32 BuffersAlignment[BufferType::Count];
+		u32 BuffersMemoryTypeIndex[BufferType::Count];
 
 	private:
 		MemorySourceDevice MemorySource;
 
 		VkDescriptorPool Pool = nullptr;
-		VkDeviceMemory BuffersMemory[BufferType::Count];
+
 		VkDeviceMemory ImageMemory = nullptr;
+
+		VkDeviceMemory BuffersMemory[BufferType::Count];
+		u32 BuffersOffset[BufferType::Count];
+
+		VkBufferUsageFlags BuffersUsage[BufferType::Count] =
+		{
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT
+		};
+
+		VkMemoryPropertyFlags BuffersProperties[BufferType::Count] =
+		{
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+		};
 	};
 }

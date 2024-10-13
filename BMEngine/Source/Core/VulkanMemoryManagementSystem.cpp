@@ -17,9 +17,33 @@ namespace Core
 	{
 		MemorySource = Device;
 
-		for (uint32_t i = 0; i < BufferType::Count; ++i)
+		for (u32 i = 0; i < BufferType::Count; ++i)
 		{
 			BuffersMemory[i] = nullptr;
+			BuffersOffset[i] = 0;
+
+			// Shit
+			VkBufferCreateInfo BufferInfo = { };
+			BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+			BufferInfo.size = 1;
+			BufferInfo.usage = BuffersUsage[i];
+			BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+			VkBuffer InitialBuffer;
+			VkResult Result = vkCreateBuffer(MemorySource.LogicalDevice, &BufferInfo, nullptr, &InitialBuffer);
+			if (Result != VK_SUCCESS)
+			{
+				Util::Log().Error("Cannot create initial buffer, result is {}", static_cast<int>(Result));
+				assert(false);
+			}
+
+			VkMemoryRequirements MemRequirements;
+			vkGetBufferMemoryRequirements(MemorySource.LogicalDevice, InitialBuffer, &MemRequirements);
+
+			BuffersAlignment[i] = MemRequirements.alignment;
+			BuffersMemoryTypeIndex[i] = GetMemoryTypeIndex(MemorySource.PhysicalDevice, MemRequirements.memoryTypeBits, BuffersProperties[i]);
+		
+			vkDestroyBuffer(MemorySource.LogicalDevice, InitialBuffer, nullptr);
 		}
 	}
 
@@ -28,7 +52,7 @@ namespace Core
 		vkDestroyDescriptorPool(MemorySource.LogicalDevice, Pool, nullptr);
 		vkFreeMemory(MemorySource.LogicalDevice, ImageMemory, nullptr);
 		
-		for (uint32_t i = 0; i < BufferType::Count; ++i)
+		for (u32 i = 0; i < BufferType::Count; ++i)
 		{
 			if (BuffersMemory[i] != nullptr)
 			{
@@ -37,12 +61,12 @@ namespace Core
 		}
 	}
 
-	void VulkanMemoryManagementSystem::AllocateDescriptorPool(VkDescriptorPoolSize* PoolSizes, uint32_t PoolSizeCount, uint32_t MaxDescriptorCount)
+	void VulkanMemoryManagementSystem::AllocateDescriptorPool(VkDescriptorPoolSize* PoolSizes, u32 PoolSizeCount, u32 MaxDescriptorCount)
 	{
 		assert(Pool == nullptr);
 		Util::Log().Info("Creating descriptor pool. Size count: {}", PoolSizeCount);
 
-		for (uint32_t i = 0; i < PoolSizeCount; ++i)
+		for (u32 i = 0; i < PoolSizeCount; ++i)
 		{
 			Util::Log().Info("Type: {}, Count: {}", static_cast<int>(PoolSizes[i].type), PoolSizes[i].descriptorCount);
 		}
@@ -63,7 +87,7 @@ namespace Core
 		}
 	}
 
-	void VulkanMemoryManagementSystem::AllocateSets(VkDescriptorSetLayout* Layouts, uint32_t DescriptorSetCount, VkDescriptorSet* OutSets)
+	void VulkanMemoryManagementSystem::AllocateSets(VkDescriptorSetLayout* Layouts, u32 DescriptorSetCount, VkDescriptorSet* OutSets)
 	{
 		Util::Log().Info("Allocating descriptor sets. Size count: {}", DescriptorSetCount);
 
@@ -82,7 +106,7 @@ namespace Core
 	}
 
 	void VulkanMemoryManagementSystem::AllocateImageMemory(VkDeviceSize AllocationSize,
-		uint32_t MemoryTypeIndex)
+		u32 MemoryTypeIndex)
 	{
 		assert(ImageMemory == nullptr);
 		AllocateMemory(AllocationSize, MemoryTypeIndex, &ImageMemory);
@@ -108,30 +132,41 @@ namespace Core
 		vkBindImageMemory(MemorySource.LogicalDevice, Image, ImageMemory, Offset);
 	}
 
-	void VulkanMemoryManagementSystem::AllocateBufferMemory(BufferType::BufferType Type, VkDeviceSize AllocationSize,
-		uint32_t MemoryTypeIndex)
+	void VulkanMemoryManagementSystem::AllocateBufferMemory(BufferType::BufferType Type, VkDeviceSize Size)
 	{
-		assert(Type < BufferType::Count);
-		assert(BuffersMemory[Type] == nullptr);
-		AllocateMemory(AllocationSize, MemoryTypeIndex, &BuffersMemory[Type]);
+		assert(Size % BuffersAlignment[Type] == 0);
+		AllocateMemory(Size, BuffersMemoryTypeIndex[Type], &BuffersMemory[Type]);
 	}
 
-	VkBuffer VulkanMemoryManagementSystem::CreateBuffer(VkDeviceSize BufferSize, VkBufferUsageFlags BufferUsage,
-		VkMemoryPropertyFlags BufferProperties)
+	VkBuffer VulkanMemoryManagementSystem::CreateBuffer(BufferType::BufferType Type, VkDeviceSize BufferSize)
 	{
-		VkBufferCreateInfo bufferInfo = { };
-		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		bufferInfo.size = BufferSize;
-		bufferInfo.usage = BufferUsage;
-		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		Util::Log().Info("Creating buffer, Type: {}. Requested size: {}", static_cast<int>(Type), BufferSize);
+
+		VkBufferCreateInfo BufferInfo = { };
+		BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		BufferInfo.size = BufferSize;
+		BufferInfo.usage = BuffersUsage[Type];
+		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 		VkBuffer Buffer;
-		VkResult Result = vkCreateBuffer(MemorySource.LogicalDevice, &bufferInfo, nullptr, &Buffer);
+		VkResult Result = vkCreateBuffer(MemorySource.LogicalDevice, &BufferInfo, nullptr, &Buffer);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkCreateBuffer result is {}", static_cast<int>(Result));
 			assert(false);
 		}
+
+		VkMemoryRequirements MemRequirements;
+		vkGetBufferMemoryRequirements(MemorySource.LogicalDevice, Buffer, &MemRequirements);
+
+		if (BufferSize != MemRequirements.size)
+		{
+			Util::Log().Warning("Buffer memory requirement size is {}, allocating {} more then buffer size",
+				MemRequirements.size, MemRequirements.size - BufferSize);
+		}
+
+		vkBindBufferMemory(MemorySource.LogicalDevice, Buffer, BuffersMemory[Type], BuffersOffset[Type]);
+		BuffersOffset[Type] += MemRequirements.size;
 
 		return Buffer;
 	}
@@ -141,40 +176,7 @@ namespace Core
 		vkDestroyBuffer(MemorySource.LogicalDevice, Buffer, nullptr);
 	}
 
-	void VulkanMemoryManagementSystem::BindBufferToMemory(VkBuffer Buffer, BufferType::BufferType Type, VkDeviceSize Offset)
-	{
-		vkBindBufferMemory(MemorySource.LogicalDevice, Buffer, BuffersMemory[Type], Offset);
-	}
-
-	void VulkanMemoryManagementSystem::CreateUniformBuffers(VkDeviceSize* BufferSizes, VkBuffer* OutBuffers,
-		u32 BuffersCount)
-	{
-		const VkMemoryPropertyFlags BufferProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-
-		VkDeviceSize TotalSize = 0;
-		for (u32 i = 0; i < BuffersCount; ++i)
-		{
-			OutBuffers[i] = CreateBuffer(BufferSizes[i], VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, BufferProperties);
-			TotalSize += BufferSizes[i];
-		}
-
-		VkMemoryRequirements MemRequirements;
-		vkGetBufferMemoryRequirements(MemorySource.LogicalDevice, OutBuffers[0], &MemRequirements);
-
-		const u32 Index = GetMemoryTypeIndex(MemorySource.PhysicalDevice, MemRequirements.memoryTypeBits, BufferProperties);
-
-		assert(BuffersMemory[BufferType::Uniform] == nullptr);
-		AllocateMemory(TotalSize, Index, &(BuffersMemory[BufferType::Uniform]));
-
-		VkDeviceSize Offset = 0;
-		for (u32 i = 0; i < BuffersCount; ++i)
-		{
-			vkBindBufferMemory(MemorySource.LogicalDevice, OutBuffers[i], BuffersMemory[BufferType::Uniform], Offset);
-			Offset += BufferSizes[i];
-		}
-	}
-
-	void VulkanMemoryManagementSystem::AllocateMemory(VkDeviceSize AllocationSize, uint32_t MemoryTypeIndex,
+	void VulkanMemoryManagementSystem::AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex,
 		VkDeviceMemory* Memory)
 	{
 		assert(*Memory == nullptr);
