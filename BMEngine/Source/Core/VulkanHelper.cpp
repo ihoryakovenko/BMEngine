@@ -5,7 +5,7 @@
 
 namespace Core
 {
-	bool CreateShader(VkDevice LogicalDevice, const uint32_t* Code, uint32_t CodeSize,
+	bool CreateShader(VkDevice LogicalDevice, const u32* Code, u32 CodeSize,
 		VkShaderModule &VertexShaderModule)
 	{
 		VkShaderModuleCreateInfo ShaderModuleCreateInfo = { };
@@ -54,40 +54,12 @@ namespace Core
 		return ImageView;
 	}
 
-	VkDescriptorPool CreateDescriptorPool(VkDevice LogicalDevice, VkDescriptorPoolSize* PoolSizes, uint32_t PoolSizeCount, uint32_t MaxDescriptorCount)
-	{
-		Util::Log().Info("Creating descriptor pool. Size count: {}", PoolSizeCount);
-
-		for (uint32_t i = 0; i < PoolSizeCount; ++i)
-		{
-			Util::Log().Info("Type: {}, Count: {}", static_cast<int>(PoolSizes[i].type), PoolSizes[i].descriptorCount);
-		}
-
-		Util::Log().Info("Maximum descriptor count: {}", MaxDescriptorCount);
-
-		VkDescriptorPoolCreateInfo PoolCreateInfo = { };
-		PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		PoolCreateInfo.maxSets = MaxDescriptorCount; // Maximum number of Descriptor Sets that can be created from pool
-		PoolCreateInfo.poolSizeCount = PoolSizeCount; // Amount of Pool Sizes being passed
-		PoolCreateInfo.pPoolSizes = PoolSizes; // Pool Sizes to create pool with
-
-		VkDescriptorPool Pool;
-		VkResult Result = vkCreateDescriptorPool(LogicalDevice, &PoolCreateInfo, nullptr, &Pool);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkCreateDescriptorPool result is {}", static_cast<int>(Result));
-			assert(false);
-		}
-
-		return Pool;
-	}
-
-	uint32_t GetMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, uint32_t AllowedTypes, VkMemoryPropertyFlags Properties)
+	u32 GetMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, u32 AllowedTypes, VkMemoryPropertyFlags Properties)
 	{
 		VkPhysicalDeviceMemoryProperties MemoryProperties;
 		vkGetPhysicalDeviceMemoryProperties(PhysicalDevice, &MemoryProperties);
 
-		for (uint32_t MemoryTypeIndex = 0; MemoryTypeIndex < MemoryProperties.memoryTypeCount; MemoryTypeIndex++)
+		for (u32 MemoryTypeIndex = 0; MemoryTypeIndex < MemoryProperties.memoryTypeCount; MemoryTypeIndex++)
 		{
 			if ((AllowedTypes & (1 << MemoryTypeIndex))														// Index of memory type must match corresponding bit in allowedTypes
 				&& (MemoryProperties.memoryTypes[MemoryTypeIndex].propertyFlags & Properties) == Properties)	// Desired property bit flags are part of memory type's property flags
@@ -97,11 +69,11 @@ namespace Core
 			}
 		}
 
-		// Todo Error?
+		assert(false);
 		return 0;
 	}
 
-	VkImage CreateImage(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, uint32_t Width, uint32_t Height,
+	VkImage CreateImage(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 Width, u32 Height,
 		VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags,
 		VkDeviceMemory* OutImageMemory)
 	{
@@ -151,24 +123,5 @@ namespace Core
 		vkBindImageMemory(LogicalDevice, Image, *OutImageMemory, 0);
 
 		return Image;
-	}
-
-	void CreateDescriptorSets(VkDevice LogicalDevice, VkDescriptorPool DescriptorPool, VkDescriptorSetLayout* Layouts,
-		uint32_t DescriptorSetCount, VkDescriptorSet* OutSets)
-	{
-		Util::Log().Info("Creating descriptor sets. Size count: {}", DescriptorSetCount);
-
-		VkDescriptorSetAllocateInfo SetAllocInfo = { };
-		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		SetAllocInfo.descriptorPool = DescriptorPool; // Pool to allocate Descriptor Set from
-		SetAllocInfo.descriptorSetCount = DescriptorSetCount; // Number of sets to allocate
-		SetAllocInfo.pSetLayouts = Layouts; // Layouts to use to allocate sets (1:1 relationship)
-
-		VkResult Result = vkAllocateDescriptorSets(LogicalDevice, &SetAllocInfo, OutSets);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkAllocateCommandBuffers result is {}", static_cast<int>(Result));
-			assert(false);
-		}
 	}
 }

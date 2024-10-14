@@ -4,12 +4,13 @@
 #include <GLFW/glfw3.h>
 
 #include "VulkanCoreTypes.h"
+#include "Util/EngineTypes.h"
 
 namespace Core
 {
 	struct ShaderInput
 	{
-		static VkShaderModule FindShaderModuleByName(ShaderName Name, ShaderInput* ShaderInputs, uint32_t ShaderInputsCount);
+		static VkShaderModule FindShaderModuleByName(ShaderName Name, ShaderInput* ShaderInputs, u32 ShaderInputsCount);
 
 		ShaderName ShaderName = nullptr;
 		VkShaderModule Module = nullptr;
@@ -23,7 +24,7 @@ namespace Core
 		VkPipeline Pipeline = nullptr;
 
 		VkDescriptorSetLayout TerrainSetLayout = nullptr;
-		VkDescriptorSet* TerrainSets = nullptr;
+		VkDescriptorSet TerrainSets[MAX_IMAGE_COUNT];
 	};
 
 	struct EntitySubpass
@@ -35,7 +36,7 @@ namespace Core
 
 		VkPushConstantRange PushConstantRange;
 		VkDescriptorSetLayout EntitySetLayout = nullptr;
-		VkDescriptorSet* EntitySets = nullptr;
+		VkDescriptorSet EntitySets[MAX_IMAGE_COUNT];
 	};
 
 	struct DeferredSubpass
@@ -46,31 +47,27 @@ namespace Core
 		VkPipeline Pipeline = nullptr;
 
 		VkDescriptorSetLayout DeferredLayout = nullptr;
-		VkDescriptorSet* DeferredSets = nullptr;
+		VkDescriptorSet DeferredSets[MAX_IMAGE_COUNT];
 	};
 
 	struct MainRenderPass
 	{
-		static void GetPoolSizes(uint32_t TotalImagesCount, std::vector<VkDescriptorPoolSize>& TotalPassPoolSizes,
-			uint32_t& TotalDescriptorCount);
-
-		void ClearResources(VkDevice LogicalDevice, uint32_t ImagesCount);
+		void ClearResources(VkDevice LogicalDevice, u32 ImagesCount);
 
 		void CreateVulkanPass(VkDevice LogicalDevice, VkFormat ColorFormat, VkFormat DepthFormat,
 			VkSurfaceFormatKHR SurfaceFormat);
 		void SetupPushConstants();
 		void CreateSamplerSetLayout(VkDevice LogicalDevice);
-		void CreateCommandPool(VkDevice LogicalDevice, uint32_t FamilyIndex);
 		void CreateTerrainSetLayout(VkDevice LogicalDevice);
 		void CreateEntitySetLayout(VkDevice LogicalDevice);
 		void CreateDeferredSetLayout(VkDevice LogicalDevice);
 		void CreatePipelineLayouts(VkDevice LogicalDevice); 
-		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent, ShaderInput* ShaderInputs, uint32_t ShaderInputsCount);
-		void CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, uint32_t ImagesCount, VkExtent2D SwapExtent,
+		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent, ShaderInput* ShaderInputs, u32 ShaderInputsCount);
+		void CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 ImagesCount, VkExtent2D SwapExtent,
 			VkFormat DepthFormat, VkFormat ColorFormat);
 		void CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
-			uint32_t ImagesCount);
-		void CreateSets(VkDevice LogicalDevice, VkDescriptorPool DescriptorPool, uint32_t ImagesCount);
+			u32 ImagesCount);
+		void CreateSets(VkDevice LogicalDevice, u32 ImagesCount);
 
 		VkRenderPass RenderPass = nullptr;
 
@@ -78,11 +75,9 @@ namespace Core
 		EntitySubpass EntityPass;
 		DeferredSubpass DeferredPass;
 
-		VkCommandPool GraphicsCommandPool = nullptr;
-
-		ImageBuffer* ColorBuffers = nullptr;
-		ImageBuffer* DepthBuffers = nullptr;
-		GPUBuffer* VpUniformBuffers = nullptr;
+		ImageBuffer ColorBuffers[MAX_IMAGE_COUNT];
+		ImageBuffer DepthBuffers[MAX_IMAGE_COUNT];
+		VkBuffer VpUniformBuffers[MAX_IMAGE_COUNT];
 
 		VkDescriptorSetLayout SamplerSetLayout = nullptr;
 	};

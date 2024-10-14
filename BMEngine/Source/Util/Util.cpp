@@ -1,5 +1,7 @@
 #include "Util.h"
 
+#include "EngineTypes.h"
+
 namespace Util
 {
 	bool ReadFileFull(FILE* File, std::vector<char>& OutFileData)
@@ -10,10 +12,10 @@ namespace Util
 		{
 			rewind(File); // Put file pointer to 0 index
 
-			OutFileData.resize(static_cast<size_t>(FileSize));
+			OutFileData.resize(static_cast<u64>(FileSize));
 			// Need to check fread result if we know the size?
-			const size_t ReadResult = fread(OutFileData.data(), 1, static_cast<size_t>(FileSize), File);
-			if (ReadResult == static_cast<size_t>(FileSize))
+			const u64 ReadResult = fread(OutFileData.data(), 1, static_cast<u64>(FileSize), File);
+			if (ReadResult == static_cast<u64>(FileSize))
 			{
 				return true;
 			}

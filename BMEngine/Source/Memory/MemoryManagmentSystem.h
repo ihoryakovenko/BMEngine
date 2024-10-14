@@ -3,22 +3,23 @@
 #include <cstdint>
 
 #include "Util/Util.h"
+#include "Util/EngineTypes.h"
 
 namespace Memory
 {
 	class MemoryManagementSystem
 	{
 	public:
-		static MemoryManagementSystem& Get()
+		static MemoryManagementSystem* Get()
 		{
 			static MemoryManagementSystem Instance;
-			return Instance;
+			return &Instance;
 		}
 
 		static inline int AllocateCounter = 0;
 
 		template <typename T>
-		static T* Allocate(size_t Count = 1)
+		static T* Allocate(u64 Count = 1)
 		{
 #ifndef NDEBUG
 			++AllocateCounter;
@@ -27,7 +28,7 @@ namespace Memory
 		}
 
 		template <typename T>
-		static T* CAllocate(size_t Count = 1)
+		static T* CAllocate(u64 Count = 1)
 		{
 #ifndef NDEBUG
 			++AllocateCounter;
@@ -47,10 +48,10 @@ namespace Memory
 			std::free(Ptr);
 		}
 
-		void Init(uint32_t InByteCount)
+		void Init(u32 InByteCount)
 		{
 			ByteCount = InByteCount;
-			MemoryPool = CAllocate<int8_t>(ByteCount);
+			MemoryPool = CAllocate<char>(ByteCount);
 			NextMemory = MemoryPool;
 		}
 
@@ -60,7 +61,7 @@ namespace Memory
 		}
 
 		template<typename T>
-		inline T* FrameAlloc(uint32_t Count = 1)
+		inline T* FrameAlloc(u32 Count = 1)
 		{
 			assert(MemoryPool != nullptr);
 			assert(NextMemory + sizeof(T) * Count <= MemoryPool + ByteCount);
@@ -76,18 +77,18 @@ namespace Memory
 		}
 
 	private:
-		uint32_t ByteCount = 0;
-		int8_t* NextMemory = nullptr;
-		int8_t* MemoryPool = nullptr;
+		static inline u32 ByteCount = 0;
+		static inline char* NextMemory = nullptr;
+		static inline char* MemoryPool = nullptr;
 	};
 
 	template <typename T>
 	struct FramePointer
 	{
-		static FramePointer<T> Create(uint32_t InCount = 1)
+		static FramePointer<T> Create(u32 InCount = 1)
 		{
 			FramePointer Pointer;
-			Pointer.Data = MemoryManagementSystem::Get().FrameAlloc<T>(InCount);
+			Pointer.Data = MemoryManagementSystem::Get()->FrameAlloc<T>(InCount);
 			return Pointer;
 		}
 
@@ -101,11 +102,31 @@ namespace Memory
 			return *Data;
 		}
 
-		T& operator[](size_t index)
+		T& operator[](u64 index)
 		{
 			return Data[index];
 		}
 
 		T* Data = nullptr;
+	};
+
+	template <typename T>
+	struct FrameArray
+	{
+		static FrameArray<T> Create(u32 InCount = 1)
+		{
+			FrameArray Array;
+			Array.Count = InCount;
+			Array.Pointer.Data = MemoryManagementSystem::Get()->FrameAlloc<T>(InCount);
+			return Array;
+		}
+
+		T& operator[](u64 index)
+		{
+			return Pointer[index];
+		}
+
+		u32 Count = 0;
+		FramePointer<T> Pointer;
 	};
 }

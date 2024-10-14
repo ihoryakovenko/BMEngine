@@ -2,30 +2,19 @@
 
 #include "Util/Util.h"
 #include "VulkanHelper.h"
+#include "VulkanMemoryManagementSystem.h"
+
 #include "Memory/MemoryManagmentSystem.h"
 
 namespace Core
 {
-	static const uint32_t TerrainSubpassIndex = 0;  // Terrain will be first
-	static const uint32_t EntitySubpassIndex = 1;   // Entity subpass comes next
-	static const uint32_t DeferredSubpassIndex = 2; // Fullscreen effects
+	static const u32 TerrainSubpassIndex = 0;  // Terrain will be first
+	static const u32 EntitySubpassIndex = 1;   // Entity subpass comes next
+	static const u32 DeferredSubpassIndex = 2; // Fullscreen effects
 
-	void MainRenderPass::GetPoolSizes(uint32_t TotalImagesCount, std::vector<VkDescriptorPoolSize>& TotalPassPoolSizes,
-		uint32_t& TotalDescriptorCount)
+	void MainRenderPass::ClearResources(VkDevice LogicalDevice, u32 ImagesCount)
 	{
-		TotalPassPoolSizes.reserve(4);
-		TotalPassPoolSizes.push_back({ .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = TotalImagesCount });
-		TotalPassPoolSizes.push_back({ .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = TotalImagesCount });
-		TotalPassPoolSizes.push_back({ .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = TotalImagesCount });
-		TotalPassPoolSizes.push_back({ .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = TotalImagesCount });
-
-		uint32_t TotalDescriptorLayouts = 3;
-		TotalDescriptorCount = TotalDescriptorLayouts * TotalImagesCount;
-	}
-
-	void MainRenderPass::ClearResources(VkDevice LogicalDevice, uint32_t ImagesCount)
-	{
-		for (uint32_t i = 0; i < ImagesCount; ++i)
+		for (u32 i = 0; i < ImagesCount; ++i)
 		{
 			vkDestroyImageView(LogicalDevice, DepthBuffers[i].ImageView, nullptr);
 			vkDestroyImage(LogicalDevice, DepthBuffers[i].Image, nullptr);
@@ -35,7 +24,7 @@ namespace Core
 			vkDestroyImage(LogicalDevice, ColorBuffers[i].Image, nullptr);
 			vkFreeMemory(LogicalDevice, ColorBuffers[i].Memory, nullptr);
 
-			GPUBuffer::GPUBuffer::DestroyGPUBuffer(LogicalDevice, VpUniformBuffers[i]);
+			VulkanMemoryManagementSystem::Get()->DestroyBuffer(VpUniformBuffers[i]);
 		}
 
 		TerrainPass.ClearResources(LogicalDevice);
@@ -43,26 +32,21 @@ namespace Core
 		EntityPass.ClearResources(LogicalDevice);
 
 		vkDestroyDescriptorSetLayout(LogicalDevice, SamplerSetLayout, nullptr);
-		vkDestroyCommandPool(LogicalDevice, GraphicsCommandPool, nullptr);
 		vkDestroyRenderPass(LogicalDevice, RenderPass, nullptr);
-
-		Memory::MemoryManagementSystem::Deallocate(DepthBuffers);
-		Memory::MemoryManagementSystem::Deallocate(ColorBuffers);
-		Memory::MemoryManagementSystem::Deallocate(VpUniformBuffers);
 	}
 
 	void MainRenderPass::CreateVulkanPass(VkDevice LogicalDevice, VkFormat ColorFormat, VkFormat DepthFormat, VkSurfaceFormatKHR SurfaceFormat)
 	{
 		// TODO: Check AccessMasks
 
-		const uint32_t SubpassesCount = 3;
+		const u32 SubpassesCount = 3;
 		VkSubpassDescription Subpasses[SubpassesCount];
 
-		const uint32_t SwapchainColorAttachmentIndex = 0;
-		const uint32_t SubpassColorAttachmentIndex = 1;
-		const uint32_t SubpassDepthAttachmentIndex = 2;
+		const u32 SwapchainColorAttachmentIndex = 0;
+		const u32 SubpassColorAttachmentIndex = 1;
+		const u32 SubpassDepthAttachmentIndex = 2;
 
-		const uint32_t AttachmentDescriptionsCount = 3;
+		const u32 AttachmentDescriptionsCount = 3;
 		VkAttachmentDescription AttachmentDescriptions[AttachmentDescriptionsCount];
 
 		AttachmentDescriptions[SwapchainColorAttachmentIndex] = { };
@@ -131,7 +115,7 @@ namespace Core
 		SwapchainColorAttachmentReference.attachment = SwapchainColorAttachmentIndex; // Swapchain color attachment
 		SwapchainColorAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-		const uint32_t InputReferencesCount = 2;
+		const u32 InputReferencesCount = 2;
 		VkAttachmentReference InputReferences[InputReferencesCount];
 		InputReferences[0].attachment = 1;
 		InputReferences[0].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -146,8 +130,8 @@ namespace Core
 		Subpasses[DeferredSubpassIndex].pInputAttachments = InputReferences;
 
 		// Subpass dependencies
-		const uint32_t ExitDependenciesIndex = DeferredSubpassIndex + 1;
-		const uint32_t SubpassDependenciesCount = SubpassesCount + 1;
+		const u32 ExitDependenciesIndex = DeferredSubpassIndex + 1;
+		const u32 SubpassDependenciesCount = SubpassesCount + 1;
 		VkSubpassDependency SubpassDependencies[SubpassDependenciesCount];
 
 		// Transition from external to Terrain subpass
@@ -244,21 +228,6 @@ namespace Core
 		}
 	}
 
-	void MainRenderPass::CreateCommandPool(VkDevice LogicalDevice, uint32_t FamilyIndex)
-	{
-		VkCommandPoolCreateInfo PoolInfo = { };
-		PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-		PoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		PoolInfo.queueFamilyIndex = FamilyIndex;	// Queue Family type that buffers from this command pool will use
-
-		VkResult Result = vkCreateCommandPool(LogicalDevice, &PoolInfo, nullptr, &GraphicsCommandPool);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkCreateCommandPool result is {}", static_cast<int>(Result));
-			assert(false);
-		}
-	}
-
 	void MainRenderPass::CreateTerrainSetLayout(VkDevice LogicalDevice)
 	{
 		VkDescriptorSetLayoutBinding VpLayoutBinding = { };
@@ -268,7 +237,7 @@ namespace Core
 		VpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;				// Shader stage to bind to
 		VpLayoutBinding.pImmutableSamplers = nullptr;							// For Texture: Can make sampler data unchangeable (immutable) by specifying in layout
 
-		const uint32_t BindingCount = 1;
+		const u32 BindingCount = 1;
 		VkDescriptorSetLayoutBinding Bindings[BindingCount] = { VpLayoutBinding };
 
 		// Create Descriptor Set Layout with given bindings
@@ -295,7 +264,7 @@ namespace Core
 		VpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;				// Shader stage to bind to
 		VpLayoutBinding.pImmutableSamplers = nullptr;							// For Texture: Can make sampler data unchangeable (immutable) by specifying in layout
 
-		const uint32_t BindingCount = 1;
+		const u32 BindingCount = 1;
 		VkDescriptorSetLayoutBinding Bindings[BindingCount] = { VpLayoutBinding };
 
 		// Create Descriptor Set Layout with given bindings
@@ -331,7 +300,7 @@ namespace Core
 		DepthInputLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
 		// Array of input attachment bindings
-		const uint32_t InputBindingsCount = 2;
+		const u32 InputBindingsCount = 2;
 		// Todo: do not copy InputBindings
 		VkDescriptorSetLayoutBinding InputBindings[InputBindingsCount] = { ColourInputLayoutBinding, DepthInputLayoutBinding };
 
@@ -353,7 +322,7 @@ namespace Core
 
 	void MainRenderPass::CreatePipelineLayouts(VkDevice LogicalDevice)
 	{
-		const uint32_t TerrainPassDescriptorSetLayoutsCount = 2;
+		const u32 TerrainPassDescriptorSetLayoutsCount = 2;
 		VkDescriptorSetLayout TerrainPassDescriptorSetLayouts[TerrainPassDescriptorSetLayoutsCount] = {
 			TerrainPass.TerrainSetLayout, SamplerSetLayout
 		};
@@ -372,7 +341,7 @@ namespace Core
 			assert(false);
 		}
 
-		const uint32_t EntityPassDescriptorSetLayoutsCount = 2;
+		const u32 EntityPassDescriptorSetLayoutsCount = 2;
 		VkDescriptorSetLayout EntityPassDescriptorSetLayouts[EntityPassDescriptorSetLayoutsCount] = {
 			EntityPass.EntitySetLayout, SamplerSetLayout
 		};
@@ -406,7 +375,7 @@ namespace Core
 		}
 	}
 
-	void MainRenderPass::CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent, ShaderInput* ShaderInputs, uint32_t ShaderInputsCount)
+	void MainRenderPass::CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent, ShaderInput* ShaderInputs, u32 ShaderInputsCount)
 	{
 		VkViewport Viewport;
 		VkRect2D Scissor;
@@ -464,17 +433,17 @@ namespace Core
 		DeferredFragmentShaderCreateInfo.module = ShaderInput::FindShaderModuleByName(ShaderNames::DeferredFragment, ShaderInputs, ShaderInputsCount);
 		DeferredFragmentShaderCreateInfo.pName = "main";
 
-		const uint32_t TerrainShaderStagesCount = 2;
+		const u32 TerrainShaderStagesCount = 2;
 		VkPipelineShaderStageCreateInfo TerrainShaderStages[TerrainShaderStagesCount] = {
 			TerrainVertexShaderCreateInfo, TerrainFragmentShaderCreateInfo
 		};
 
-		const uint32_t EntityShaderStagesCount = 2;
+		const u32 EntityShaderStagesCount = 2;
 		VkPipelineShaderStageCreateInfo EntityShaderStages[EntityShaderStagesCount] = {
 			EntityVertexShaderCreateInfo, EntityFragmentShaderCreateInfo
 		};
 
-		const uint32_t DeferredShaderStagesCount = 2;
+		const u32 DeferredShaderStagesCount = 2;
 		VkPipelineShaderStageCreateInfo DeferredShaderStages[DeferredShaderStagesCount] = {
 			DeferredVertexShaderCreateInfo, DeferredFragmentShaderCreateInfo
 		};
@@ -484,7 +453,7 @@ namespace Core
 		TerrainVertexInputBindingDescription.stride = sizeof(TerrainVertex);
 		TerrainVertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-		const uint32_t TerrainVertexInputBindingDescriptionCount = 1;
+		const u32 TerrainVertexInputBindingDescriptionCount = 1;
 		VkVertexInputAttributeDescription TerrainAttributeDescriptions[TerrainVertexInputBindingDescriptionCount];
 
 		TerrainAttributeDescriptions[0].binding = 0;
@@ -501,7 +470,7 @@ namespace Core
 		// VK_VERTEX_INPUT_RATE_INSTANCE	: Move to a vertex for the next instance
 
 		// How the data for an attribute is defined within a vertex
-		const uint32_t EntityVertexInputBindingDescriptionCount = 3;
+		const u32 EntityVertexInputBindingDescriptionCount = 3;
 		VkVertexInputAttributeDescription EntityAttributeDescriptions[EntityVertexInputBindingDescriptionCount];
 
 		// Position Attribute
@@ -557,7 +526,7 @@ namespace Core
 
 		//VkPipelineDynamicStateCreateInfo DynamicStateCreateInfo = {};
 		//DynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-		//DynamicStateCreateInfo.dynamicStateCount = static_cast<uint32_t>(2);
+		//DynamicStateCreateInfo.dynamicStateCount = static_cast<u32>(2);
 		//DynamicStateCreateInfo.pDynamicStates = DynamicStates;
 
 		// Rasterizer
@@ -616,7 +585,7 @@ namespace Core
 		SecondDepthStencilCreateInfo.depthWriteEnable = VK_FALSE;
 
 		// Graphics pipeline creation
-		const uint32_t GraphicsPipelineCreateInfosCount = 3;
+		const u32 GraphicsPipelineCreateInfosCount = 3;
 		VkGraphicsPipelineCreateInfo GraphicsPipelineCreateInfos[GraphicsPipelineCreateInfosCount];
 
 		GraphicsPipelineCreateInfos[EntitySubpassIndex] = { };
@@ -668,13 +637,10 @@ namespace Core
 		DeferredPass.Pipeline = Pipelines[DeferredSubpassIndex];
 	}
 
-	void MainRenderPass::CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, uint32_t ImagesCount, VkExtent2D SwapExtent,
+	void MainRenderPass::CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 ImagesCount, VkExtent2D SwapExtent,
 		VkFormat DepthFormat, VkFormat ColorFormat)
 	{
-		DepthBuffers = Memory::MemoryManagementSystem::Allocate<ImageBuffer>(ImagesCount);
-		ColorBuffers = Memory::MemoryManagementSystem::Allocate<ImageBuffer>(ImagesCount);
-
-		for (uint32_t i = 0; i < ImagesCount; ++i)
+		for (u32 i = 0; i < ImagesCount; ++i)
 		{
 			DepthBuffers[i].Image = CreateImage(PhysicalDevice, LogicalDevice, SwapExtent.width, SwapExtent.height,
 				DepthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -692,40 +658,41 @@ namespace Core
 	}
 
 	void MainRenderPass::CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
-		uint32_t ImagesCount)
+		u32 ImagesCount)
 	{
+		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
 		const VkDeviceSize VpBufferSize = sizeof(UboViewProjection);
 
-		VpUniformBuffers = Memory::MemoryManagementSystem::Allocate<GPUBuffer>(ImagesCount);
-		for (uint32_t i = 0; i < ImagesCount; i++)
+		const VkDeviceSize AlignedSize = VulkanMemorySystem->CalculateAlignedSize(BufferType::Uniform, VpBufferSize);
+		VulkanMemorySystem->AllocateBufferMemory(BufferType::Uniform, AlignedSize * ImagesCount);
+
+		for (u32 i = 0; i < ImagesCount; i++)
 		{
-			VpUniformBuffers[i] = GPUBuffer::CreateUniformBuffer(PhysicalDevice, LogicalDevice, VpBufferSize);
+			VpUniformBuffers[i] = VulkanMemorySystem->CreateBuffer(BufferType::Uniform, VpBufferSize);
 		}
 	}
 
-	void MainRenderPass::CreateSets(VkDevice LogicalDevice, VkDescriptorPool DescriptorPool, uint32_t ImagesCount)
+	void MainRenderPass::CreateSets(VkDevice LogicalDevice, u32 ImagesCount)
 	{
-		TerrainPass.TerrainSets = Memory::MemoryManagementSystem::Allocate<VkDescriptorSet>(ImagesCount);
-		EntityPass.EntitySets = Memory::MemoryManagementSystem::Allocate<VkDescriptorSet>(ImagesCount);
-		DeferredPass.DeferredSets = Memory::MemoryManagementSystem::Allocate<VkDescriptorSet>(ImagesCount);
-
-		VkDescriptorSetLayout* SetLayouts = Memory::MemoryManagementSystem::Get().FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
-		for (uint32_t i = 0; i < ImagesCount; i++)
+		VkDescriptorSetLayout* SetLayouts = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
+		for (u32 i = 0; i < ImagesCount; i++)
 		{
 			SetLayouts[i] = EntityPass.EntitySetLayout;
 		}
 
-		CreateDescriptorSets(LogicalDevice, DescriptorPool, SetLayouts, ImagesCount, EntityPass.EntitySets);
+		auto VulkanMemoryManagement = VulkanMemoryManagementSystem::Get();
+
+		VulkanMemoryManagement->AllocateSets(SetLayouts, ImagesCount, EntityPass.EntitySets);
 
 		//TODO FIX
-		CreateDescriptorSets(LogicalDevice, DescriptorPool, SetLayouts, ImagesCount, TerrainPass.TerrainSets);
+		VulkanMemoryManagement->AllocateSets(SetLayouts, ImagesCount, TerrainPass.TerrainSets);
 
 		VkDescriptorBufferInfo VpBufferInfo = { };
 		// Update all of descriptor set buffer bindings
-		for (uint32_t i = 0; i < ImagesCount; i++)
+		for (u32 i = 0; i < ImagesCount; i++)
 		{
 			// Todo: validate
-			VpBufferInfo.buffer = VpUniformBuffers[i].Buffer;
+			VpBufferInfo.buffer = VpUniformBuffers[i];
 			VpBufferInfo.offset = 0;
 			VpBufferInfo.range = sizeof(UboViewProjection);
 
@@ -738,7 +705,7 @@ namespace Core
 			VpSetWrite.descriptorCount = 1;
 			VpSetWrite.pBufferInfo = &VpBufferInfo;
 
-			const uint32_t WriteSetsCount = 1;
+			const u32 WriteSetsCount = 1;
 			// Todo: do not copy
 			VkWriteDescriptorSet WriteSets[WriteSetsCount] = { VpSetWrite };
 
@@ -751,15 +718,15 @@ namespace Core
 			vkUpdateDescriptorSets(LogicalDevice, WriteSetsCount, WriteSets2, 0, nullptr);
 		}
 
-		for (uint32_t i = 0; i < ImagesCount; i++)
+		for (u32 i = 0; i < ImagesCount; i++)
 		{
 			SetLayouts[i] = DeferredPass.DeferredLayout;
 		}
 
-		CreateDescriptorSets(LogicalDevice, DescriptorPool, SetLayouts, ImagesCount, DeferredPass.DeferredSets);
+		VulkanMemoryManagement->AllocateSets(SetLayouts, ImagesCount, DeferredPass.DeferredSets);
 
 		// Todo: move this and previus loop to function?
-		for (size_t i = 0; i < ImagesCount; i++)
+		for (u32 i = 0; i < ImagesCount; i++)
 		{
 			// Todo: move from loop?
 			VkDescriptorImageInfo ColourAttachmentDescriptor = { };
@@ -792,7 +759,7 @@ namespace Core
 
 
 			// Todo: do not copy
-			const uint32_t CetWritesCount = 2;
+			const u32 CetWritesCount = 2;
 			VkWriteDescriptorSet SetWrites[CetWritesCount] = { ColourWrite, DepthWrite };
 
 			// Update descriptor sets
@@ -806,8 +773,6 @@ namespace Core
 		vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
 		vkDestroyPipeline(LogicalDevice, Pipeline, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, EntitySetLayout, nullptr);
-
-		Memory::MemoryManagementSystem::Deallocate(EntitySets);
 	}
 
 	void DeferredSubpass::ClearResources(VkDevice LogicalDevice)
@@ -815,8 +780,6 @@ namespace Core
 		vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
 		vkDestroyPipeline(LogicalDevice, Pipeline, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, DeferredLayout, nullptr);
-
-		Memory::MemoryManagementSystem::Deallocate(DeferredSets);
 	}
 
 	void TerrainSubpass::ClearResources(VkDevice LogicalDevice)
@@ -824,13 +787,11 @@ namespace Core
 		vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
 		vkDestroyPipeline(LogicalDevice, Pipeline, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, TerrainSetLayout, nullptr);
-
-		Memory::MemoryManagementSystem::Deallocate(TerrainSets);
 	}
 
-	VkShaderModule ShaderInput::FindShaderModuleByName(Core::ShaderName Name, ShaderInput* ShaderInputs, uint32_t ShaderInputsCount)
+	VkShaderModule ShaderInput::FindShaderModuleByName(Core::ShaderName Name, ShaderInput* ShaderInputs, u32 ShaderInputsCount)
 	{
-		for (uint32_t i = 0; i < ShaderInputsCount; ++i)
+		for (u32 i = 0; i < ShaderInputsCount; ++i)
 		{
 			if (ShaderInputs[i].ShaderName == Name)
 			{
