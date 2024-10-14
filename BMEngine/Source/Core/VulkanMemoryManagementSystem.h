@@ -46,6 +46,8 @@ namespace Core
 		void Init(MemorySourceDevice Device);
 		void Deinit();
 
+		VkDeviceSize CalculateAlignedSize(BufferType::BufferType Type, VkDeviceSize BufferSize);
+
 		void AllocateDescriptorPool(VkDescriptorPoolSize* PoolSizes, u32 PoolSizeCount, u32 MaxDescriptorCount);
 		void AllocateSets(VkDescriptorSetLayout* Layouts, u32 DescriptorSetCount, VkDescriptorSet* OutSets);
 
@@ -61,7 +63,7 @@ namespace Core
 		void DestroyBuffer(VkBuffer Buffer);
 
 		void CopyDataToMemory(BufferType::BufferType Type, VkDeviceSize Offset, VkDeviceSize Size, const void* Data);
-		void CopyDataToBuffer(VkBuffer SrcBuffer, VkDeviceSize Offset, VkDeviceSize Size, const void* Data);
+		void CopyDataToBuffer(BufferType::BufferType Type, VkDeviceSize Size, const void* Data);
 
 	private:
 		VkBuffer CreateBufferInternal(VkDeviceSize BufferSize, VkBufferUsageFlags BufferUsage);
@@ -70,6 +72,8 @@ namespace Core
 	public:
 		static inline u32 BuffersAlignment[BufferType::Count];
 		static inline u32 BuffersMemoryTypeIndex[BufferType::Count];
+		static inline VkBuffer Buffers[BufferType::Count];
+		static inline u32 BuffersOffset[BufferType::Count];
 
 	private:
 		static inline MemorySourceDevice MemorySource;
@@ -82,7 +86,7 @@ namespace Core
 		static inline VkDeviceMemory ImageMemory = nullptr;
 
 		static inline VkDeviceMemory BuffersMemory[BufferType::Count];
-		static inline u32 BuffersOffset[BufferType::Count];
+		static inline u32 MemoryOffsets[BufferType::Count];
 
 		static inline VkBufferUsageFlags BuffersUsage[BufferType::Count] =
 		{

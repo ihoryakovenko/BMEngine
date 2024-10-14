@@ -19,7 +19,7 @@ namespace Memory
 		static inline int AllocateCounter = 0;
 
 		template <typename T>
-		static T* Allocate(size_t Count = 1)
+		static T* Allocate(u64 Count = 1)
 		{
 #ifndef NDEBUG
 			++AllocateCounter;
@@ -28,7 +28,7 @@ namespace Memory
 		}
 
 		template <typename T>
-		static T* CAllocate(size_t Count = 1)
+		static T* CAllocate(u64 Count = 1)
 		{
 #ifndef NDEBUG
 			++AllocateCounter;
@@ -102,7 +102,7 @@ namespace Memory
 			return *Data;
 		}
 
-		T& operator[](size_t index)
+		T& operator[](u64 index)
 		{
 			return Data[index];
 		}
@@ -121,7 +121,7 @@ namespace Memory
 			return Array;
 		}
 
-		T& operator[](size_t index)
+		T& operator[](u64 index)
 		{
 			return Pointer[index];
 		}

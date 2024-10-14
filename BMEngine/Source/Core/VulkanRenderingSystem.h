@@ -18,11 +18,9 @@ namespace Core
 		void LoadTextures(TextureInfo* Infos, u32 TexturesCount);
 
 		void CreateDrawEntities(Mesh* Meshes, u32 MeshesCount, DrawEntity* OutEntities);
-		void DestroyDrawEntity(DrawEntity& Entity);
 
 		void CreateTerrainIndices(u32* Indices, u32 IndicesCount);
 		void CreateTerrainDrawEntity(TerrainVertex* TerrainVertices, u32 TerrainVerticesCount, DrawTerrainEntity& OutTerrain);
-		void DestroyTerrainDrawEntity(DrawTerrainEntity& Entity);
 
 		void Draw(const DrawScene& Scene);
 
@@ -77,30 +75,29 @@ namespace Core
 		VkFormat ColorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Todo: check if VK_FORMAT_R8G8B8A8_UNORM supported
 		VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
 
-		VkSemaphore* ImageAvailable = nullptr;
-		VkSemaphore* RenderFinished = nullptr;
-		VkFence* DrawFences = nullptr;
+		static const u32 MAX_DRAW_FRAMES = 2;
+		int CurrentFrame = 0;
+
+		VkSemaphore ImageAvailable[MAX_DRAW_FRAMES];
+		VkSemaphore RenderFinished[MAX_DRAW_FRAMES];
+		VkFence DrawFences[MAX_DRAW_FRAMES];
 
 		VkCommandPool GraphicsCommandPool = nullptr;
 
-		VkBuffer VertexBuffer = nullptr;
-		VkDeviceSize* VertexOffsets = nullptr;
-
-		const int MaxFrameDraws = 2;
-		int CurrentFrame = 0;
+		static const u32 MAX_IMAGES = 1024;
 
 		// Todo: put all textures in atlases or texture layers?
 		struct
 		{
 			VkSampler TextureSampler = nullptr;
-			VkDescriptorSet* SamplerDescriptorSets = nullptr;
+			static inline VkDescriptorSet SamplerDescriptorSets[MAX_IMAGES];
 
-			VkImage* Images = nullptr;
-			VkImageView* ImageViews = nullptr;
+			static inline VkImage Images[MAX_IMAGES];
+			static inline VkImageView ImageViews[MAX_IMAGES];
 			u32 ImagesCount = 0;
 		} TextureUnit;
 
 		u32 TerrainIndicesCount = 0;
-		GPUBuffer TerrainIndexBuffer;
+		VkDeviceSize TerrainIndexOffset = 0;
 	};
 }

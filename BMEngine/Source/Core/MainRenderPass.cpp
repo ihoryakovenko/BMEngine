@@ -33,10 +33,6 @@ namespace Core
 
 		vkDestroyDescriptorSetLayout(LogicalDevice, SamplerSetLayout, nullptr);
 		vkDestroyRenderPass(LogicalDevice, RenderPass, nullptr);
-
-		Memory::MemoryManagementSystem::Deallocate(DepthBuffers);
-		Memory::MemoryManagementSystem::Deallocate(ColorBuffers);
-		Memory::MemoryManagementSystem::Deallocate(VpUniformBuffers);
 	}
 
 	void MainRenderPass::CreateVulkanPass(VkDevice LogicalDevice, VkFormat ColorFormat, VkFormat DepthFormat, VkSurfaceFormatKHR SurfaceFormat)
@@ -644,9 +640,6 @@ namespace Core
 	void MainRenderPass::CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 ImagesCount, VkExtent2D SwapExtent,
 		VkFormat DepthFormat, VkFormat ColorFormat)
 	{
-		DepthBuffers = Memory::MemoryManagementSystem::Allocate<ImageBuffer>(ImagesCount);
-		ColorBuffers = Memory::MemoryManagementSystem::Allocate<ImageBuffer>(ImagesCount);
-
 		for (u32 i = 0; i < ImagesCount; ++i)
 		{
 			DepthBuffers[i].Image = CreateImage(PhysicalDevice, LogicalDevice, SwapExtent.width, SwapExtent.height,
@@ -670,17 +663,9 @@ namespace Core
 		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
 		const VkDeviceSize VpBufferSize = sizeof(UboViewProjection);
 
-		u32 UniformBufferPadding = 0;
-		if (VpBufferSize % VulkanMemorySystem->BuffersAlignment[BufferType::Uniform] != 0)
-		{
-			UniformBufferPadding = VulkanMemorySystem->BuffersAlignment[BufferType::Uniform] -
-				(VpBufferSize % VulkanMemorySystem->BuffersAlignment[BufferType::Uniform]);
-		}
-
-		const VkDeviceSize AlignedSize = VpBufferSize + UniformBufferPadding;
+		const VkDeviceSize AlignedSize = VulkanMemorySystem->CalculateAlignedSize(BufferType::Uniform, VpBufferSize);
 		VulkanMemorySystem->AllocateBufferMemory(BufferType::Uniform, AlignedSize * ImagesCount);
 
-		VpUniformBuffers = Memory::MemoryManagementSystem::Allocate<VkBuffer>(ImagesCount);
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
 			VpUniformBuffers[i] = VulkanMemorySystem->CreateBuffer(BufferType::Uniform, VpBufferSize);
@@ -689,10 +674,6 @@ namespace Core
 
 	void MainRenderPass::CreateSets(VkDevice LogicalDevice, u32 ImagesCount)
 	{
-		TerrainPass.TerrainSets = Memory::MemoryManagementSystem::Allocate<VkDescriptorSet>(ImagesCount);
-		EntityPass.EntitySets = Memory::MemoryManagementSystem::Allocate<VkDescriptorSet>(ImagesCount);
-		DeferredPass.DeferredSets = Memory::MemoryManagementSystem::Allocate<VkDescriptorSet>(ImagesCount);
-
 		VkDescriptorSetLayout* SetLayouts = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
@@ -792,8 +773,6 @@ namespace Core
 		vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
 		vkDestroyPipeline(LogicalDevice, Pipeline, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, EntitySetLayout, nullptr);
-
-		Memory::MemoryManagementSystem::Deallocate(EntitySets);
 	}
 
 	void DeferredSubpass::ClearResources(VkDevice LogicalDevice)
@@ -801,8 +780,6 @@ namespace Core
 		vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
 		vkDestroyPipeline(LogicalDevice, Pipeline, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, DeferredLayout, nullptr);
-
-		Memory::MemoryManagementSystem::Deallocate(DeferredSets);
 	}
 
 	void TerrainSubpass::ClearResources(VkDevice LogicalDevice)
@@ -810,8 +787,6 @@ namespace Core
 		vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
 		vkDestroyPipeline(LogicalDevice, Pipeline, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, TerrainSetLayout, nullptr);
-
-		Memory::MemoryManagementSystem::Deallocate(TerrainSets);
 	}
 
 	VkShaderModule ShaderInput::FindShaderModuleByName(Core::ShaderName Name, ShaderInput* ShaderInputs, u32 ShaderInputsCount)

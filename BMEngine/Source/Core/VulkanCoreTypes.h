@@ -13,6 +13,8 @@
 
 namespace Core
 {
+	static const u32 MAX_IMAGE_COUNT = 3;
+
 	using ShaderName = const char*;
 	struct ShaderNames
 	{
@@ -90,7 +92,7 @@ namespace Core
 
 			void* Data;
 			vkMapMemory(LogicalDevice, StagingBuffer.Memory, 0, BufferSize, 0, &Data);
-			memcpy(Data, Vertices, (size_t)BufferSize);
+			memcpy(Data, Vertices, (u64)BufferSize);
 			vkUnmapMemory(LogicalDevice, StagingBuffer.Memory);
 
 			GPUBuffer vertexBuffer = CreateGPUBuffer(PhysicalDevice, LogicalDevice, BufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -119,6 +121,21 @@ namespace Core
 		Model Model = glm::mat4(1.0f);
 	};
 
+	struct TerrainMesh
+	{
+		u32 VerticesCount = 0;
+		TerrainVertex* Vertices = nullptr;
+	};
+
+	struct LoadScene
+	{
+		Mesh* Meshes = nullptr;
+		u32 MeshesCount = 0;
+
+		TerrainMesh* TerrainMeshes = nullptr;
+		u32 TerrainMeshesCount = 0;
+	};
+
 	struct ImageBuffer
 	{
 		VkImage Image = nullptr;
@@ -128,26 +145,16 @@ namespace Core
 
 	struct DrawEntity
 	{
+		VkDeviceSize VertexOffset = 0;
+		VkDeviceSize IndexOffset = 0;
 		u32 IndicesCount = 0;
-		GPUBuffer IndexBuffer;
-
 		Model Model;
-
 		u32 TextureId = 0;
 	};
 
 	struct DrawTerrainEntity
 	{
-		u32 VerticesCount = 0;
-		GPUBuffer VertexBuffer;
-	};
-
-	struct TextureInfo
-	{
-		int Width = 0;
-		int Height = 0;
-		int Format = 0;
-		stbi_uc* Data = nullptr;
+		VkDeviceSize VertexOffset = 0;
 	};
 
 	struct DrawScene
@@ -159,6 +166,14 @@ namespace Core
 
 		DrawTerrainEntity* DrawTerrainEntities;
 		u32 DrawTerrainEntitiesCount;
+	};
+
+	struct TextureInfo
+	{
+		int Width = 0;
+		int Height = 0;
+		int Format = 0;
+		stbi_uc* Data = nullptr;
 	};
 	
 	struct MainInstance
@@ -189,7 +204,7 @@ namespace Core
 
 		VkSwapchainKHR VulkanSwapchain = nullptr;
 		u32 ImagesCount = 0;
-		VkImageView* ImageViews = nullptr;
+		VkImageView ImageViews[MAX_IMAGE_COUNT];
 		VkExtent2D SwapExtent = { };
 	};
 
@@ -222,7 +237,7 @@ namespace Core
 
 		SwapchainInstance ViewportSwapchain;
 
-		VkFramebuffer* SwapchainFramebuffers = nullptr;
-		VkCommandBuffer* CommandBuffers = nullptr;
+		VkFramebuffer SwapchainFramebuffers[MAX_IMAGE_COUNT];
+		VkCommandBuffer CommandBuffers[MAX_IMAGE_COUNT];
 	};
 }

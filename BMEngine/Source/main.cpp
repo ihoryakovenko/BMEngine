@@ -527,13 +527,6 @@ int main()
 
 		MemorySystem->FrameDealloc();
 	}
-
-	for (int i = 0; i < DrawEntities.size(); ++i)
-	{
-		RenderingSystem.DestroyDrawEntity(DrawEntities[i]);
-	}
-
-	RenderingSystem.DestroyTerrainDrawEntity(TestDrawTerrainEntity);
 	
 	RenderingSystem.DeInit();
 

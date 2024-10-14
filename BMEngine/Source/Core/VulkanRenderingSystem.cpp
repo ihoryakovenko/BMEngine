@@ -136,6 +136,12 @@ namespace Core
 			CreateShader(LogicalDevice, Config.RenderShaders[i].Code, Config.RenderShaders[i].CodeSize, ShaderInputs[i].Module);
 		}
 
+		const u32 Mb64 = 1024 * 1024 * 64;
+		VulkanMemoryManagement->AllocateBufferMemory(BufferType::Vertex, Mb64);
+		VulkanMemoryManagement->AllocateBufferMemory(BufferType::Index, Mb64);
+		VulkanMemoryManagement->Buffers[BufferType::Vertex] = VulkanMemoryManagement->CreateBuffer(BufferType::Vertex, Mb64);
+		VulkanMemoryManagement->Buffers[BufferType::Index] = VulkanMemoryManagement->CreateBuffer(BufferType::Index, Mb64);
+
 		MainPass.CreateVulkanPass(LogicalDevice, ColorFormat, DepthFormat, SurfaceFormat);
 		MainPass.SetupPushConstants();
 		MainPass.CreateSamplerSetLayout(LogicalDevice);
@@ -174,9 +180,6 @@ namespace Core
 			VulkanMemoryManagementSystem::Get()->DestroyImage(TextureUnit.Images[i]);
 		}
 
-		vkDestroyBuffer(LogicalDevice, VertexBuffer, nullptr);
-		GPUBuffer::DestroyGPUBuffer(LogicalDevice, TerrainIndexBuffer);
-
 		VulkanMemoryManagementSystem::Get()->Deinit();
 
 		vkDestroyCommandPool(LogicalDevice, GraphicsCommandPool, nullptr);
@@ -187,22 +190,15 @@ namespace Core
 		vkDestroyDevice(LogicalDevice, nullptr);
 
 		MainInstance::DestroyMainInstance(Instance);
-
-		Memory::MemoryManagementSystem::Deallocate(TextureUnit.SamplerDescriptorSets);
-		Memory::MemoryManagementSystem::Deallocate(TextureUnit.Images);
-		Memory::MemoryManagementSystem::Deallocate(TextureUnit.ImageViews);
-		Memory::MemoryManagementSystem::Deallocate(VertexOffsets);
 	}
 
 	void VulkanRenderingSystem::LoadTextures(TextureInfo* Infos, u32 TexturesCount)
 	{
 		assert(TexturesCount > 0);
 		assert(TextureUnit.ImagesCount == 0);
+		assert(TexturesCount < MAX_IMAGES);
 
 		TextureUnit.ImagesCount = TexturesCount;
-		TextureUnit.Images = Memory::MemoryManagementSystem::Allocate<VkImage>(TextureUnit.ImagesCount);
-		TextureUnit.ImageViews = Memory::MemoryManagementSystem::Allocate<VkImageView>(TextureUnit.ImagesCount);
-		TextureUnit.SamplerDescriptorSets = Memory::MemoryManagementSystem::Allocate<VkDescriptorSet>(TextureUnit.ImagesCount);
 
 		auto System = Memory::MemoryManagementSystem::Get();
 		auto Barriers = System->FrameAlloc<VkImageMemoryBarrier>(TextureUnit.ImagesCount);
@@ -263,11 +259,6 @@ namespace Core
 			int TextureSize = Infos[i].Width * Infos[i].Height * Infos[i].Format;
 			std::memcpy(CopyPointer, Infos[i].Data, TextureSize);
 			CopyPointer += TextureMemoryRequirements[i].size; // size is aligned
-
-			// TODO: Check
-			//VkDeviceSize Alignment = TextureMemoryRequirements[i].alignment;
-			//CopyPointer += TextureSize;
-			//CopyPointer = reinterpret_cast<stbi_uc*>((reinterpret_cast<uintptr_t>(CopyPointer) + Alignment - 1) & ~(Alignment - 1));
 		}
 
 		GPUBuffer StagingBuffer = GPUBuffer::CreateGPUBuffer(Device.PhysicalDevice, LogicalDevice, TotalAllocationSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -275,7 +266,7 @@ namespace Core
 
 		void* Data;
 		vkMapMemory(LogicalDevice, StagingBuffer.Memory, 0, TotalAllocationSize, 0, &Data);
-		memcpy(Data, TexturesData, static_cast<size_t>(TotalAllocationSize));
+		memcpy(Data, TexturesData, static_cast<u64>(TotalAllocationSize));
 		vkUnmapMemory(LogicalDevice, StagingBuffer.Memory);
 
 		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
@@ -733,95 +724,78 @@ namespace Core
 
 	void VulkanRenderingSystem::CreateDrawEntities(Mesh* Meshes, u32 MeshesCount, DrawEntity* OutEntities)
 	{
-		VertexOffsets = Memory::MemoryManagementSystem::Allocate<VkDeviceSize>(MeshesCount);
-
 		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
-		VkDeviceSize TotalSize = 0;
+		VkDeviceSize TotalVertexSize = 0;
+		VkDeviceSize TotalIndexSize = 0;
 
 		for (u32 i = 0; i < MeshesCount; ++i)
 		{
 			const VkDeviceSize MeshVerticesSize = sizeof(EntityVertex) * Meshes[i].MeshVerticesCount;
+			const VkDeviceSize MeshIndicesSize = sizeof(u32) * Meshes[i].MeshIndicesCount;
 
-			u32 BufferPadding = 0;
-			if (MeshVerticesSize % VulkanMemorySystem->BuffersAlignment[BufferType::Vertex] != 0)
-			{
-				BufferPadding = VulkanMemorySystem->BuffersAlignment[BufferType::Vertex] -
-					(MeshVerticesSize % VulkanMemorySystem->BuffersAlignment[BufferType::Vertex]);
-			}
+			OutEntities[i].VertexOffset = TotalVertexSize + VulkanMemorySystem->BuffersOffset[BufferType::Vertex];
+			OutEntities[i].IndexOffset = TotalIndexSize + VulkanMemorySystem->BuffersOffset[BufferType::Index];
 
-			const VkDeviceSize AlignedSize = MeshVerticesSize + BufferPadding;
-
-			VertexOffsets[i] = TotalSize;
-			TotalSize += AlignedSize;
+			TotalVertexSize += VulkanMemorySystem->CalculateAlignedSize(BufferType::Vertex, MeshVerticesSize);
+			TotalIndexSize += VulkanMemorySystem->CalculateAlignedSize(BufferType::Index, MeshIndicesSize);
 		}
 
-		EntityVertex* AllVertices = Memory::MemoryManagementSystem::Allocate<EntityVertex>(TotalSize);
-		char* CopyPointer = reinterpret_cast<char *>(AllVertices);
+		EntityVertex* AllVertices = Memory::MemoryManagementSystem::Allocate<EntityVertex>(TotalVertexSize);
+		u32* AllIndices = Memory::MemoryManagementSystem::Allocate<u32>(TotalIndexSize);
+
+		char* VertexCopyPointer = reinterpret_cast<char*>(AllVertices);
+		char* IndexCopyPointer = reinterpret_cast<char*>(AllIndices);
 
 		for (u32 i = 0; i < MeshesCount; ++i)
 		{
 			const VkDeviceSize MeshVerticesSize = sizeof(EntityVertex) * Meshes[i].MeshVerticesCount;
-			std::memcpy(CopyPointer, Meshes[i].MeshVertices, MeshVerticesSize);
+			const VkDeviceSize MeshIndicesSize = sizeof(u32) * Meshes[i].MeshIndicesCount;
 
-			u32 BufferPadding = 0;
-			if (MeshVerticesSize % VulkanMemorySystem->BuffersAlignment[BufferType::Vertex] != 0)
-			{
-				BufferPadding = VulkanMemorySystem->BuffersAlignment[BufferType::Vertex] -
-					(MeshVerticesSize % VulkanMemorySystem->BuffersAlignment[BufferType::Vertex]);
-			}
+			std::memcpy(VertexCopyPointer, Meshes[i].MeshVertices, MeshVerticesSize);
+			std::memcpy(IndexCopyPointer, Meshes[i].MeshIndices, MeshIndicesSize);
 
-			const VkDeviceSize AlignedSize = MeshVerticesSize + BufferPadding;
-			CopyPointer += AlignedSize;
-
-			////
-			OutEntities[i].IndexBuffer = GPUBuffer::CreateIndexBuffer(Device.PhysicalDevice, LogicalDevice,
-				GraphicsCommandPool, GraphicsQueue, Meshes[i].MeshIndices, Meshes[i].MeshIndicesCount);
-			OutEntities[i].IndicesCount = Meshes[i].MeshIndicesCount;
+			VertexCopyPointer += VulkanMemorySystem->CalculateAlignedSize(BufferType::Vertex, MeshVerticesSize);
+			IndexCopyPointer += VulkanMemorySystem->CalculateAlignedSize(BufferType::Index, MeshIndicesSize);
 
 			OutEntities[i].Model = Meshes[i].Model;
+			OutEntities[i].IndicesCount = Meshes[i].MeshIndicesCount;
 		}
-		
-		VulkanMemorySystem->AllocateBufferMemory(BufferType::Vertex, TotalSize);
 
-		VertexBuffer = VulkanMemorySystem->CreateBuffer(BufferType::Vertex, TotalSize);
-		VulkanMemorySystem->CopyDataToBuffer(VertexBuffer, 0, TotalSize, AllVertices);
+		VulkanMemorySystem->CopyDataToBuffer(BufferType::Vertex, TotalVertexSize, AllVertices);
+		VulkanMemorySystem->CopyDataToBuffer(BufferType::Index, TotalIndexSize, AllIndices);
 
 		Memory::MemoryManagementSystem::Deallocate(AllVertices);
-	}
-
-	void VulkanRenderingSystem::DestroyDrawEntity(DrawEntity& Entity)
-	{
-		// TODO: Mark object to for delete and delete it after draw
-		vkWaitForFences(LogicalDevice, MaxFrameDraws, DrawFences, VK_TRUE, std::numeric_limits<uint64_t>::max());
-		GPUBuffer::DestroyGPUBuffer(LogicalDevice, Entity.IndexBuffer);
+		Memory::MemoryManagementSystem::Deallocate(AllIndices);
 	}
 
 	void VulkanRenderingSystem::CreateTerrainIndices(u32* Indices, u32 IndicesCount)
 	{
 		assert(TerrainIndicesCount == 0);
+
+		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
+
+		TerrainIndexOffset = VulkanMemorySystem->BuffersOffset[BufferType::Index];
 		TerrainIndicesCount = IndicesCount;
-		TerrainIndexBuffer = GPUBuffer::CreateIndexBuffer(Device.PhysicalDevice, LogicalDevice,
-			GraphicsCommandPool, GraphicsQueue, Indices, TerrainIndicesCount);
+
+		VkDeviceSize MeshIndexSize = sizeof(u32) * TerrainIndicesCount;
+		MeshIndexSize = VulkanMemorySystem->CalculateAlignedSize(BufferType::Vertex, MeshIndexSize);
+
+		VulkanMemorySystem->CopyDataToBuffer(BufferType::Index, MeshIndexSize, Indices);
 	}
 
 	void VulkanRenderingSystem::CreateTerrainDrawEntity(TerrainVertex* TerrainVertices, u32 TerrainVerticesCount, DrawTerrainEntity& OutTerrain)
 	{
-		OutTerrain.VerticesCount = TerrainVerticesCount;
-		OutTerrain.VertexBuffer = GPUBuffer::CreateVertexBuffer(Device.PhysicalDevice, LogicalDevice,
-			GraphicsCommandPool, GraphicsQueue, TerrainVertices, TerrainVerticesCount);
-	}
+		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
+		OutTerrain.VertexOffset = VulkanMemorySystem->BuffersOffset[BufferType::Vertex];
 
-	void VulkanRenderingSystem::DestroyTerrainDrawEntity(DrawTerrainEntity& Entity)
-	{
-		GPUBuffer::DestroyGPUBuffer(LogicalDevice, Entity.VertexBuffer);
+		VkDeviceSize MeshVerticesSize = sizeof(TerrainVertex) * TerrainVerticesCount;
+		MeshVerticesSize = VulkanMemorySystem->CalculateAlignedSize(BufferType::Vertex, MeshVerticesSize);
+
+		VulkanMemorySystem->CopyDataToBuffer(BufferType::Vertex, MeshVerticesSize, TerrainVertices);
 	}
 
 	void VulkanRenderingSystem::CreateSynchronisation()
 	{
-		ImageAvailable = Memory::MemoryManagementSystem::Allocate<VkSemaphore>(MaxFrameDraws);
-		RenderFinished = Memory::MemoryManagementSystem::Allocate<VkSemaphore>(MaxFrameDraws);
-		DrawFences = Memory::MemoryManagementSystem::Allocate<VkFence>(MaxFrameDraws);
-
 		VkSemaphoreCreateInfo SemaphoreCreateInfo = { };
 		SemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -830,7 +804,7 @@ namespace Core
 		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 		FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-		for (size_t i = 0; i < MaxFrameDraws; i++)
+		for (u64 i = 0; i < MAX_DRAW_FRAMES; i++)
 		{
 			if (vkCreateSemaphore(LogicalDevice, &SemaphoreCreateInfo, nullptr, &ImageAvailable[i]) != VK_SUCCESS ||
 				vkCreateSemaphore(LogicalDevice, &SemaphoreCreateInfo, nullptr, &RenderFinished[i]) != VK_SUCCESS ||
@@ -844,16 +818,12 @@ namespace Core
 
 	void VulkanRenderingSystem::DestroySynchronisation()
 	{
-		for (size_t i = 0; i < MaxFrameDraws; i++)
+		for (u64 i = 0; i < MAX_DRAW_FRAMES; i++)
 		{
 			vkDestroySemaphore(LogicalDevice, RenderFinished[i], nullptr);
 			vkDestroySemaphore(LogicalDevice, ImageAvailable[i], nullptr);
 			vkDestroyFence(LogicalDevice, DrawFences[i], nullptr);
 		}
-
-		Memory::MemoryManagementSystem::Deallocate(RenderFinished);
-		Memory::MemoryManagementSystem::Deallocate(ImageAvailable);
-		Memory::MemoryManagementSystem::Deallocate(DrawFences);
 	}
 
 	void VulkanRenderingSystem::Draw(const DrawScene& Scene)
@@ -879,12 +849,12 @@ namespace Core
 			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
 		};
 
-		vkWaitForFences(LogicalDevice, 1, &DrawFences[CurrentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
+		vkWaitForFences(LogicalDevice, 1, &DrawFences[CurrentFrame], VK_TRUE, std::numeric_limits<u64>::max());
 		vkResetFences(LogicalDevice, 1, &DrawFences[CurrentFrame]);
 
 		// Get index of next image to be drawn to, and signal semaphore when ready to be drawn to
 		u32 ImageIndex;
-		vkAcquireNextImageKHR(LogicalDevice, MainViewport.ViewportSwapchain.VulkanSwapchain, std::numeric_limits<uint64_t>::max(),
+		vkAcquireNextImageKHR(LogicalDevice, MainViewport.ViewportSwapchain.VulkanSwapchain, std::numeric_limits<u64>::max(),
 			ImageAvailable[CurrentFrame], VK_NULL_HANDLE, &ImageIndex);
 
 		// Start point of render pass in pixels
@@ -900,12 +870,14 @@ namespace Core
 
 		vkCmdBeginRenderPass(MainViewport.CommandBuffers[ImageIndex], &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+		auto VulkanMemoryManagement = VulkanMemoryManagementSystem::Get();
+
 		{
 			vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.TerrainPass.Pipeline);
 
 			//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			VkBuffer TerrainVertexBuffers[] = { Scene.DrawTerrainEntities[0].VertexBuffer.Buffer };
-			VkDeviceSize TerrainBuffersOffsets[] = { 0 };
+			VkBuffer TerrainVertexBuffers[] = { VulkanMemoryManagement->Buffers[BufferType::Vertex] };
+			VkDeviceSize TerrainBuffersOffsets[] = { Scene.DrawTerrainEntities[0].VertexOffset };
 
 			const u32 TerrainDescriptorSetGroupCount = 2;
 			VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = {
@@ -915,41 +887,49 @@ namespace Core
 				0, TerrainDescriptorSetGroupCount, TerrainDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
 
 			vkCmdBindVertexBuffers(MainViewport.CommandBuffers[ImageIndex], 0, 1, TerrainVertexBuffers, TerrainBuffersOffsets);
-			vkCmdBindIndexBuffer(MainViewport.CommandBuffers[ImageIndex], TerrainIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdBindIndexBuffer(MainViewport.CommandBuffers[ImageIndex],
+				VulkanMemoryManagement->Buffers[BufferType::Index], TerrainIndexOffset, VK_INDEX_TYPE_UINT32);
 			vkCmdDrawIndexed(MainViewport.CommandBuffers[ImageIndex], TerrainIndicesCount, 1, 0, 0, 0);
 		}
 
 		vkCmdNextSubpass(MainViewport.CommandBuffers[ImageIndex], VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.EntityPass.Pipeline);
 
-		// TODO: Support rework to not create identical index buffers
-		for (u32 j = 0; j < Scene.DrawEntitiesCount; ++j)
 		{
-			VkBuffer VertexBuffers[] = { VertexBuffer };
-			VkDeviceSize Offsets[] = { VertexOffsets[j] };
+			vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.EntityPass.Pipeline);
 
-			// Todo: do not record textureId on each frame?
-			const u32 DescriptorSetGroupCount = 2;
-			VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] = { MainPass.EntityPass.EntitySets[ImageIndex],
-				TextureUnit.SamplerDescriptorSets[Scene.DrawEntities[j].TextureId] };
+			// TODO: Support rework to not create identical index buffers
+			for (u32 j = 0; j < Scene.DrawEntitiesCount; ++j)
+			{
+				VkBuffer VertexBuffers[] = { VulkanMemoryManagement->Buffers[BufferType::Vertex] };
+				VkDeviceSize Offsets[] = { Scene.DrawEntities[j].VertexOffset };
 
-			vkCmdPushConstants(MainViewport.CommandBuffers[ImageIndex], MainPass.EntityPass.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-				0, sizeof(Model), &Scene.DrawEntities[j].Model);
-			vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.EntityPass.PipelineLayout,
-				0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+				// Todo: do not record textureId on each frame?
+				const u32 DescriptorSetGroupCount = 2;
+				VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] = { MainPass.EntityPass.EntitySets[ImageIndex],
+					TextureUnit.SamplerDescriptorSets[Scene.DrawEntities[j].TextureId] };
 
-			vkCmdBindVertexBuffers(MainViewport.CommandBuffers[ImageIndex], 0, 1, VertexBuffers, Offsets);
-			vkCmdBindIndexBuffer(MainViewport.CommandBuffers[ImageIndex], Scene.DrawEntities[j].IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(MainViewport.CommandBuffers[ImageIndex], Scene.DrawEntities[j].IndicesCount, 1, 0, 0, 0);
+				vkCmdPushConstants(MainViewport.CommandBuffers[ImageIndex], MainPass.EntityPass.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
+					0, sizeof(Model), &Scene.DrawEntities[j].Model);
+				vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.EntityPass.PipelineLayout,
+					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+
+				vkCmdBindVertexBuffers(MainViewport.CommandBuffers[ImageIndex], 0, 1, VertexBuffers, Offsets);
+				vkCmdBindIndexBuffer(MainViewport.CommandBuffers[ImageIndex], VulkanMemoryManagement->Buffers[BufferType::Index],
+					Scene.DrawEntities[j].IndexOffset, VK_INDEX_TYPE_UINT32);
+				vkCmdDrawIndexed(MainViewport.CommandBuffers[ImageIndex], Scene.DrawEntities[j].IndicesCount, 1, 0, 0, 0);
+			}
 		}
 
 		vkCmdNextSubpass(MainViewport.CommandBuffers[ImageIndex], VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.DeferredPass.Pipeline);
-		
-		vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.DeferredPass.PipelineLayout,
-			0, 1, &MainPass.DeferredPass.DeferredSets[ImageIndex], 0, nullptr);
 
-		vkCmdDraw(MainViewport.CommandBuffers[ImageIndex], 3, 1, 0, 0); // 3 hardcoded Indices for second "post processing" subpass
+		{
+			vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.DeferredPass.Pipeline);
+
+			vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.DeferredPass.PipelineLayout,
+				0, 1, &MainPass.DeferredPass.DeferredSets[ImageIndex], 0, nullptr);
+
+			vkCmdDraw(MainViewport.CommandBuffers[ImageIndex], 3, 1, 0, 0); // 3 hardcoded Indices for second "post processing" subpass
+		}
 
 		vkCmdEndRenderPass(MainViewport.CommandBuffers[ImageIndex]);
 
@@ -995,7 +975,7 @@ namespace Core
 			assert(false);
 		}
 
-		CurrentFrame = (CurrentFrame + 1) % MaxFrameDraws;
+		CurrentFrame = (CurrentFrame + 1) % MAX_DRAW_FRAMES;
 	}
 
 	void VulkanRenderingSystem::DeinitViewport(ViewportInstance* Viewport)
@@ -1007,9 +987,6 @@ namespace Core
 
 		SwapchainInstance::DestroySwapchainInstance(LogicalDevice, Viewport->ViewportSwapchain);
 		vkDestroySurfaceKHR(Instance.VulkanInstance, Viewport->Surface, nullptr);
-
-		Memory::MemoryManagementSystem::Deallocate(Viewport->SwapchainFramebuffers);
-		Memory::MemoryManagementSystem::Deallocate(Viewport->CommandBuffers);
 	}
 
 	void VulkanRenderingSystem::InitViewport(GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstance* OutViewport,
@@ -1018,8 +995,6 @@ namespace Core
 		OutViewport->Window = Window;
 		OutViewport->Surface = Surface;
 		OutViewport->ViewportSwapchain = SwapInstance;
-
-		OutViewport->SwapchainFramebuffers = Memory::MemoryManagementSystem::Allocate<VkFramebuffer>(OutViewport->ViewportSwapchain.ImagesCount);
 
 		// Function CreateFrameBuffers
 		// Create a framebuffer for each swap chain image
@@ -1060,7 +1035,6 @@ namespace Core
 		CommandBufferAllocateInfo.commandBufferCount = static_cast<u32>(OutViewport->ViewportSwapchain.ImagesCount);
 
 		// Allocate command buffers and place handles in array of buffers
-		OutViewport->CommandBuffers = Memory::MemoryManagementSystem::Allocate<VkCommandBuffer>(OutViewport->ViewportSwapchain.ImagesCount);
 		VkResult Result = vkAllocateCommandBuffers(LogicalDevice, &CommandBufferAllocateInfo, OutViewport->CommandBuffers);
 		if (Result != VK_SUCCESS)
 		{

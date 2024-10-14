@@ -15,7 +15,7 @@ namespace Core
 
 		void* Data;
 		vkMapMemory(LogicalDevice, StagingBuffer.Memory, 0, BufferSize, 0, &Data);
-		memcpy(Data, Indices, (size_t)BufferSize);
+		memcpy(Data, Indices, (u64)BufferSize);
 		vkUnmapMemory(LogicalDevice, StagingBuffer.Memory);
 
 		// Create buffer for INDEX data on GPU access only area
@@ -39,7 +39,7 @@ namespace Core
 
 		void* Data;
 		vkMapMemory(LogicalDevice, StagingBuffer.Memory, 0, BufferSize, 0, &Data);
-		memcpy(Data, DrawCommands.data(), (size_t)BufferSize);
+		memcpy(Data, DrawCommands.data(), (u64)BufferSize);
 		vkUnmapMemory(LogicalDevice, StagingBuffer.Memory);
 
 		GPUBuffer indirectBuffer = CreateGPUBuffer(PhysicalDevice, LogicalDevice, BufferSize, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
@@ -393,7 +393,6 @@ namespace Core
 		Memory::FrameArray<VkImage> Images = GetSwapchainImages(LogicalDevice, Instance.VulkanSwapchain);
 
 		Instance.ImagesCount = Images.Count;
-		Instance.ImageViews = Memory::MemoryManagementSystem::Allocate<VkImageView>(Instance.ImagesCount);
 
 		for (u32 i = 0; i < Instance.ImagesCount; ++i)
 		{
@@ -417,7 +416,6 @@ namespace Core
 		}
 
 		vkDestroySwapchainKHR(LogicalDevice, Instance.VulkanSwapchain, nullptr);
-		Memory::MemoryManagementSystem::Deallocate(Instance.ImageViews);
 	}
 
 	VkSwapchainKHR SwapchainInstance::CreateSwapchain(VkDevice LogicalDevice, const VkSurfaceCapabilitiesKHR& SurfaceCapabilities,

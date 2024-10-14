@@ -22,7 +22,8 @@ namespace Core
 		for (u32 i = 0; i < BufferType::Count; ++i)
 		{
 			BuffersMemory[i] = nullptr;
-			BuffersOffset[i] = 0;
+			MemoryOffsets[i] = 0;
+			Buffers[i] = nullptr;
 
 			// Shit
 			// https://stackoverflow.com/questions/55445653/deriving-the-vkmemoryrequirements
@@ -57,10 +58,27 @@ namespace Core
 			{
 				vkFreeMemory(MemorySource.LogicalDevice, BuffersMemory[i], nullptr);
 			}
+
+			if (Buffers[i] != nullptr)
+			{
+				vkDestroyBuffer(MemorySource.LogicalDevice, Buffers[i], nullptr);
+			}
 		}
 
 		DestroyBuffer(StagingBuffer);
 		vkFreeMemory(MemorySource.LogicalDevice, StagingBufferMemory, nullptr);
+	}
+
+	VkDeviceSize VulkanMemoryManagementSystem::CalculateAlignedSize(BufferType::BufferType Type, VkDeviceSize BufferSize)
+	{
+		u32 Padding = 0;
+		if (BufferSize % BuffersAlignment[BufferType::Vertex] != 0)
+		{
+			Padding = BuffersAlignment[BufferType::Vertex] -
+				(BufferSize % BuffersAlignment[BufferType::Vertex]);
+		}
+
+		return BufferSize + Padding;
 	}
 
 	void VulkanMemoryManagementSystem::AllocateDescriptorPool(VkDescriptorPoolSize* PoolSizes, u32 PoolSizeCount, u32 MaxDescriptorCount)
@@ -161,8 +179,8 @@ namespace Core
 				MemRequirements.size, MemRequirements.size - BufferSize);
 		}
 
-		vkBindBufferMemory(MemorySource.LogicalDevice, Buffer, BuffersMemory[Type], BuffersOffset[Type]);
-		BuffersOffset[Type] += MemRequirements.size;
+		vkBindBufferMemory(MemorySource.LogicalDevice, Buffer, BuffersMemory[Type], MemoryOffsets[Type]);
+		MemoryOffsets[Type] += MemRequirements.size;
 
 		return Buffer;
 	}
@@ -180,7 +198,7 @@ namespace Core
 		vkUnmapMemory(MemorySource.LogicalDevice, BuffersMemory[Type]);
 	}
 
-	void VulkanMemoryManagementSystem::CopyDataToBuffer(VkBuffer DstBuffer, VkDeviceSize Offset, VkDeviceSize Size,
+	void VulkanMemoryManagementSystem::CopyDataToBuffer(BufferType::BufferType Type, VkDeviceSize Size,
 		const void* Data)
 	{
 		assert(Size <= Mb64);
@@ -209,10 +227,10 @@ namespace Core
 
 		VkBufferCopy BufferCopyRegion = { };
 		BufferCopyRegion.srcOffset = 0;
-		BufferCopyRegion.dstOffset = Offset;
+		BufferCopyRegion.dstOffset = BuffersOffset[Type];
 		BufferCopyRegion.size = Size;
 
-		vkCmdCopyBuffer(TransferCommandBuffer, StagingBuffer, DstBuffer, 1, &BufferCopyRegion);
+		vkCmdCopyBuffer(TransferCommandBuffer, StagingBuffer, Buffers[Type], 1, &BufferCopyRegion);
 		vkEndCommandBuffer(TransferCommandBuffer);
 
 		VkSubmitInfo SubmitInfo = { };
@@ -224,6 +242,8 @@ namespace Core
 		vkQueueWaitIdle(MemorySource.TransferQueue);
 
 		vkFreeCommandBuffers(MemorySource.LogicalDevice, MemorySource.TransferCommandPool, 1, &TransferCommandBuffer);
+
+		BuffersOffset[Type] += Size;
 	}
 
 	VkBuffer VulkanMemoryManagementSystem::CreateBufferInternal(VkDeviceSize BufferSize, VkBufferUsageFlags BufferUsage)
