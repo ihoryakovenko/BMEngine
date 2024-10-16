@@ -15,7 +15,7 @@ namespace Core
 		bool Init(GLFWwindow* Window, const RenderConfig& InConfig);
 		void DeInit();
 
-		void LoadTextures(TextureInfo* Infos, u32 TexturesCount);
+		void LoadTextures(TextureArrayInfo* ArrayInfos, u32 TexturesCount, u32* ResourceIndices);
 
 		void CreateDrawEntities(Mesh* Meshes, u32 MeshesCount, DrawEntity* OutEntities);
 
@@ -41,8 +41,6 @@ namespace Core
 		bool CheckValidationLayersSupport(VkLayerProperties* Properties, u32 PropertiesSize,
 			const char** ValidationLeyersToCheck, u32 ValidationLeyersToCheckSize);
 		VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface);
-		
-		void CopyBufferToImage(VkBuffer SourceBuffer, VkDeviceSize bufferOffset, VkImage Image, u32 Width, u32 Height);
 
 		VkDevice CreateLogicalDevice(PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
 			u32 DeviceExtensionsSize);
@@ -84,8 +82,6 @@ namespace Core
 
 		VkCommandPool GraphicsCommandPool = nullptr;
 
-		static const u32 MAX_IMAGES = 1024;
-
 		// Todo: put all textures in atlases or texture layers?
 		struct
 		{
@@ -93,8 +89,10 @@ namespace Core
 			static inline VkDescriptorSet SamplerDescriptorSets[MAX_IMAGES];
 
 			static inline VkImage Images[MAX_IMAGES];
+			u32 ImageArraysCount = 0;
 			static inline VkImageView ImageViews[MAX_IMAGES];
-			u32 ImagesCount = 0;
+			u32 ImagesViewsCount = 0;
+			
 		} TextureUnit;
 
 		u32 TerrainIndicesCount = 0;

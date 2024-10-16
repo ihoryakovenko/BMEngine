@@ -5,6 +5,8 @@
 
 #include <cstring>
 
+#include "VulkanCoreTypes.h"
+
 #include "Util/EngineTypes.h"
 
 namespace Core
@@ -26,7 +28,10 @@ namespace Core
 	{
 		enum ImageType
 		{
+			Texture_2D,
 
+			Count,
+			None = -1
 		};
 	};
 
@@ -51,8 +56,6 @@ namespace Core
 		void AllocateDescriptorPool(VkDescriptorPoolSize* PoolSizes, u32 PoolSizeCount, u32 MaxDescriptorCount);
 		void AllocateSets(VkDescriptorSetLayout* Layouts, u32 DescriptorSetCount, VkDescriptorSet* OutSets);
 
-		void AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex, VkDeviceMemory* Memory);
-
 		void AllocateImageMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex);
 		void CreateImage(VkImageCreateInfo* pCreateInfo, VkImage* Image);
 		void DestroyImage(VkImage Image);
@@ -64,16 +67,22 @@ namespace Core
 
 		void CopyDataToMemory(BufferType::BufferType Type, VkDeviceSize Offset, VkDeviceSize Size, const void* Data);
 		void CopyDataToBuffer(BufferType::BufferType Type, VkDeviceSize Size, const void* Data);
+		void CopyDataToImage(VkImage Image, u32 Width, u32 Height, VkDeviceSize Size, u32 LayersCount, const void* Data);
 
 	private:
 		VkBuffer CreateBufferInternal(VkDeviceSize BufferSize, VkBufferUsageFlags BufferUsage);
 		void CreateStagingBuffer(VkDeviceSize Size);
+		void AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex, VkDeviceMemory* Memory);
 
 	public:
 		static inline u32 BuffersAlignment[BufferType::Count];
 		static inline u32 BuffersMemoryTypeIndex[BufferType::Count];
 		static inline VkBuffer Buffers[BufferType::Count];
 		static inline u32 BuffersOffset[BufferType::Count];
+
+		static inline u32 ImagesMemoryAlignment[MAX_IMAGES];
+		static inline u32 ImagesMemoryTypeIndex[MAX_IMAGES];
+		static inline VkImage Images[MAX_IMAGES];
 
 	private:
 		static inline MemorySourceDevice MemorySource;
@@ -83,7 +92,8 @@ namespace Core
 
 		static inline VkDescriptorPool Pool = nullptr;
 
-		static inline VkDeviceMemory ImageMemory = nullptr;
+		static inline VkDeviceMemory ImagesMemory[MAX_IMAGES];
+		static inline u32 ImagesMemoryCount = 0;
 
 		static inline VkDeviceMemory BuffersMemory[BufferType::Count];
 		static inline u32 MemoryOffsets[BufferType::Count];

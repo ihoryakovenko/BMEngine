@@ -24,7 +24,7 @@ namespace Core
 		VkPipeline Pipeline = nullptr;
 
 		VkDescriptorSetLayout TerrainSetLayout = nullptr;
-		VkDescriptorSet TerrainSets[MAX_IMAGE_COUNT];
+		VkDescriptorSet TerrainSets[MAX_SWAPCHAIN_IMAGES_COUNT];
 	};
 
 	struct EntitySubpass
@@ -36,7 +36,7 @@ namespace Core
 
 		VkPushConstantRange PushConstantRange;
 		VkDescriptorSetLayout EntitySetLayout = nullptr;
-		VkDescriptorSet EntitySets[MAX_IMAGE_COUNT];
+		VkDescriptorSet EntitySets[MAX_SWAPCHAIN_IMAGES_COUNT];
 	};
 
 	struct DeferredSubpass
@@ -47,7 +47,7 @@ namespace Core
 		VkPipeline Pipeline = nullptr;
 
 		VkDescriptorSetLayout DeferredLayout = nullptr;
-		VkDescriptorSet DeferredSets[MAX_IMAGE_COUNT];
+		VkDescriptorSet DeferredSets[MAX_SWAPCHAIN_IMAGES_COUNT];
 	};
 
 	struct MainRenderPass
@@ -75,9 +75,9 @@ namespace Core
 		EntitySubpass EntityPass;
 		DeferredSubpass DeferredPass;
 
-		ImageBuffer ColorBuffers[MAX_IMAGE_COUNT];
-		ImageBuffer DepthBuffers[MAX_IMAGE_COUNT];
-		VkBuffer VpUniformBuffers[MAX_IMAGE_COUNT];
+		ImageBuffer ColorBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		ImageBuffer DepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkBuffer VpUniformBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		VkDescriptorSetLayout SamplerSetLayout = nullptr;
 	};

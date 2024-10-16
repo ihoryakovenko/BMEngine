@@ -13,7 +13,9 @@
 
 namespace Core
 {
-	static const u32 MAX_IMAGE_COUNT = 3;
+	static const u32 MAX_SWAPCHAIN_IMAGES_COUNT = 3;
+	static const u32 MAX_IMAGES = 1024;
+	static const u32 Mb64 = 1024 * 1024 * 64;
 
 	using ShaderName = const char*;
 	struct ShaderNames
@@ -67,47 +69,6 @@ namespace Core
 	struct TerrainVertex
 	{
 		float Altitude;
-	};
-
-	struct GPUBuffer
-	{
-		static void DestroyGPUBuffer(VkDevice LogicalDevice, GPUBuffer& buffer);
-		static GPUBuffer CreateIndexBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
-			VkCommandPool TransferCommandPool, VkQueue TransferQueue, u32* Indices, u32 IndicesCount);
-		static GPUBuffer CreateIndirectBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
-			VkCommandPool TransferCommandPool, VkQueue TransferQueue, const std::vector<VkDrawIndexedIndirectCommand>& DrawCommands);
-		static GPUBuffer CreateGPUBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, VkDeviceSize bufferSize, VkBufferUsageFlags bufferUsage, VkMemoryPropertyFlags bufferProperties);
-
-		static void CopyGPUBuffer(VkDevice LogicalDevice, VkCommandPool TransferCommandPool, VkQueue TransferQueue,
-			const GPUBuffer& srcBuffer, GPUBuffer& dstBuffer);
-
-		template <typename T>
-		static GPUBuffer CreateVertexBuffer(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
-			VkCommandPool TransferCommandPool, VkQueue TransferQueue, T* Vertices, u32 VerticesCount)
-		{
-			const VkDeviceSize BufferSize = sizeof(T) * VerticesCount;
-
-			GPUBuffer StagingBuffer = CreateGPUBuffer(PhysicalDevice, LogicalDevice, BufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-			void* Data;
-			vkMapMemory(LogicalDevice, StagingBuffer.Memory, 0, BufferSize, 0, &Data);
-			memcpy(Data, Vertices, (u64)BufferSize);
-			vkUnmapMemory(LogicalDevice, StagingBuffer.Memory);
-
-			GPUBuffer vertexBuffer = CreateGPUBuffer(PhysicalDevice, LogicalDevice, BufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-			// Copy staging buffer to vertex buffer on GPU;
-			GPUBuffer::CopyGPUBuffer(LogicalDevice, TransferCommandPool, TransferQueue, StagingBuffer, vertexBuffer);
-			GPUBuffer::DestroyGPUBuffer(LogicalDevice, StagingBuffer);
-
-			return vertexBuffer;
-		}
-
-		VkBuffer Buffer = 0;
-		VkDeviceMemory Memory = 0;
-		VkDeviceSize Size = 0;
 	};
 
 	struct Mesh
@@ -168,11 +129,12 @@ namespace Core
 		u32 DrawTerrainEntitiesCount;
 	};
 
-	struct TextureInfo
+	struct TextureArrayInfo
 	{
-		int Width = 0;
-		int Height = 0;
-		int Format = 0;
+		u32 Width = 0;
+		u32 Height = 0;
+		u32 Format = 0;
+		u32 LayersCount = 0;
 		stbi_uc* Data = nullptr;
 	};
 	
@@ -204,7 +166,7 @@ namespace Core
 
 		VkSwapchainKHR VulkanSwapchain = nullptr;
 		u32 ImagesCount = 0;
-		VkImageView ImageViews[MAX_IMAGE_COUNT];
+		VkImageView ImageViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkExtent2D SwapExtent = { };
 	};
 
@@ -237,7 +199,7 @@ namespace Core
 
 		SwapchainInstance ViewportSwapchain;
 
-		VkFramebuffer SwapchainFramebuffers[MAX_IMAGE_COUNT];
-		VkCommandBuffer CommandBuffers[MAX_IMAGE_COUNT];
+		VkFramebuffer SwapchainFramebuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkCommandBuffer CommandBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 	};
 }

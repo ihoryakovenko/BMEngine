@@ -7,8 +7,6 @@
 
 namespace Core
 {
-	static const u32 Mb64 = 1024 * 1024 * 64;
-
 	VulkanMemoryManagementSystem* VulkanMemoryManagementSystem::Get()
 	{
 		static VulkanMemoryManagementSystem Instance;
@@ -50,7 +48,11 @@ namespace Core
 	void VulkanMemoryManagementSystem::Deinit()
 	{
 		vkDestroyDescriptorPool(MemorySource.LogicalDevice, Pool, nullptr);
-		vkFreeMemory(MemorySource.LogicalDevice, ImageMemory, nullptr);
+
+		for (u32 i = 0; i < ImagesMemoryCount; ++i)
+		{
+			vkFreeMemory(MemorySource.LogicalDevice, ImagesMemory[i], nullptr);
+		}
 		
 		for (u32 i = 0; i < BufferType::Count; ++i)
 		{
@@ -128,8 +130,8 @@ namespace Core
 	void VulkanMemoryManagementSystem::AllocateImageMemory(VkDeviceSize AllocationSize,
 		u32 MemoryTypeIndex)
 	{
-		assert(ImageMemory == nullptr);
-		AllocateMemory(AllocationSize, MemoryTypeIndex, &ImageMemory);
+		AllocateMemory(AllocationSize, MemoryTypeIndex, &ImagesMemory[ImagesMemoryCount]);
+		++ImagesMemoryCount;
 	}
 
 	void VulkanMemoryManagementSystem::CreateImage(VkImageCreateInfo* pCreateInfo, VkImage* Image)
@@ -149,7 +151,7 @@ namespace Core
 
 	void VulkanMemoryManagementSystem::BindImageToMemory(VkImage Image, VkDeviceSize Offset)
 	{
-		vkBindImageMemory(MemorySource.LogicalDevice, Image, ImageMemory, Offset);
+		vkBindImageMemory(MemorySource.LogicalDevice, Image, ImagesMemory[ImagesMemoryCount - 1], Offset);
 	}
 
 	void VulkanMemoryManagementSystem::AllocateBufferMemory(BufferType::BufferType Type, VkDeviceSize Size)
@@ -244,6 +246,59 @@ namespace Core
 		vkFreeCommandBuffers(MemorySource.LogicalDevice, MemorySource.TransferCommandPool, 1, &TransferCommandBuffer);
 
 		BuffersOffset[Type] += Size;
+	}
+
+	void VulkanMemoryManagementSystem::CopyDataToImage(VkImage Image, u32 Width, u32 Height, VkDeviceSize Size,
+		u32 LayersCount, const void* Data)
+	{
+		assert(Size <= Mb64);
+
+		void* MappedMemory;
+		vkMapMemory(MemorySource.LogicalDevice, StagingBufferMemory, 0, Size, 0, &MappedMemory);
+		std::memcpy(MappedMemory, Data, Size);
+		vkUnmapMemory(MemorySource.LogicalDevice, StagingBufferMemory);
+
+		VkCommandBuffer TransferCommandBuffer;
+
+		VkCommandBufferAllocateInfo AllocInfo = { };
+		AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		AllocInfo.commandPool = MemorySource.TransferCommandPool;
+		AllocInfo.commandBufferCount = 1;
+
+		vkAllocateCommandBuffers(MemorySource.LogicalDevice, &AllocInfo, &TransferCommandBuffer);
+
+		VkCommandBufferBeginInfo BeginInfo = { };
+		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+		vkBeginCommandBuffer(TransferCommandBuffer, &BeginInfo);
+
+		VkBufferImageCopy ImageRegion = { };
+		ImageRegion.bufferOffset = 0;
+		ImageRegion.bufferRowLength = 0;
+		ImageRegion.bufferImageHeight = 0;
+		ImageRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		ImageRegion.imageSubresource.mipLevel = 0;
+		ImageRegion.imageSubresource.baseArrayLayer = 0; // Starting array layer (if array)
+		ImageRegion.imageSubresource.layerCount = LayersCount;
+		ImageRegion.imageOffset = { 0, 0, 0 };
+		ImageRegion.imageExtent = { Width, Height, 1 };
+
+		// Todo copy multiple regions at once?
+		vkCmdCopyBufferToImage(TransferCommandBuffer, StagingBuffer, Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ImageRegion);
+
+		vkEndCommandBuffer(TransferCommandBuffer);
+
+		VkSubmitInfo SubmitInfo = { };
+		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		SubmitInfo.commandBufferCount = 1;
+		SubmitInfo.pCommandBuffers = &TransferCommandBuffer;
+
+		vkQueueSubmit(MemorySource.TransferQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
+		vkQueueWaitIdle(MemorySource.TransferQueue);
+
+		vkFreeCommandBuffers(MemorySource.LogicalDevice, MemorySource.TransferCommandPool, 1, &TransferCommandBuffer);
 	}
 
 	VkBuffer VulkanMemoryManagementSystem::CreateBufferInternal(VkDeviceSize BufferSize, VkBufferUsageFlags BufferUsage)

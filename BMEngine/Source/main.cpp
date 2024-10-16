@@ -178,7 +178,7 @@ struct Camera
 	glm::vec3 CameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 };
 
-std::vector<Core::TextureInfo> TexturesInfo;
+std::vector<Core::TextureArrayInfo> TexturesInfo;
 
 void AddTexture(const char* TexturePath)
 {
@@ -194,7 +194,14 @@ void AddTexture(const char* TexturePath)
 		assert(false);
 	}
 
-	TexturesInfo.push_back({ .Width =  Width, .Height = Height, .Format = STBI_rgb_alpha, .Data = ImageData });
+	Core::TextureArrayInfo Info;
+	Info.Width = Width;
+	Info.Height = Height;
+	Info.Format = STBI_rgb_alpha;
+	Info.LayersCount = 1;
+	Info.Data = ImageData;
+
+	TexturesInfo.push_back(Info);
 }
 
 void WindowCloseCallback(GLFWwindow* Window)
@@ -285,7 +292,7 @@ void MoveCamera(GLFWwindow* Window, float DeltaTime, Camera& MainCamera)
 
 void LoadDrawEntities()
 {
-	const char* TestTexture = "./Resources/Textures/giraffe.jpg";
+	const char* TestTexture = "./Resources/Textures/1giraffe.jpg";
 	const char* Modelpath = "./Resources/Models/uh60.obj";
 	const char* BaseDir = "./Resources/Models/";
 
@@ -495,7 +502,8 @@ int main()
 	Core::DrawTerrainEntity TestDrawTerrainEntity;
 	RenderingSystem.CreateTerrainDrawEntity(&TerrainVerticesData[0][0], NumRows * NumCols, TestDrawTerrainEntity);
 
-	RenderingSystem.LoadTextures(TexturesInfo.data(), TexturesInfo.size());
+	std::vector<u32> Test(33);
+	RenderingSystem.LoadTextures(TexturesInfo.data(), TexturesInfo.size(), Test.data());
 	RenderingSystem.CreateTerrainIndices(indices.data(), indices.size());
 
 	Scene.DrawTerrainEntities = &TestDrawTerrainEntity;
