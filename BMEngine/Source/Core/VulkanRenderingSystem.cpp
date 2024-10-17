@@ -102,18 +102,19 @@ namespace Core
 		SwapchainInstance SwapInstance1 = SwapchainInstance::CreateSwapchainInstance(Device.PhysicalDevice, Device.Indices,
 			LogicalDevice, Surface, SurfaceFormat, Extent1);
 
-		const u32 PoolSizeCount = 5;
+		const u32 PoolSizeCount = 6;
 		auto TotalPassPoolSizes = Memory::FramePointer<VkDescriptorPoolSize>::Create(PoolSizeCount);
-		u32 TotalDescriptorLayouts = 3;
+		u32 TotalDescriptorLayouts = 4;
 		// Layout 1
 		TotalPassPoolSizes[0] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
 		// Layout 2
 		TotalPassPoolSizes[1] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
+		TotalPassPoolSizes[2] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
 		// Layout 3
-		TotalPassPoolSizes[2] = { .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = SwapInstance1.ImagesCount };
 		TotalPassPoolSizes[3] = { .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = SwapInstance1.ImagesCount };
+		TotalPassPoolSizes[4] = { .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = SwapInstance1.ImagesCount };
 		// Textures
-		TotalPassPoolSizes[4] = { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = Config.MaxTextures };
+		TotalPassPoolSizes[5] = { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = Config.MaxTextures };
 
 		u32 TotalDescriptorCount = TotalDescriptorLayouts * SwapInstance1.ImagesCount;
 		TotalDescriptorCount += Config.MaxTextures;
@@ -826,9 +827,9 @@ namespace Core
 				VkDeviceSize Offsets[] = { Scene.DrawEntities[j].VertexOffset };
 
 				// Todo: do not record textureId on each frame?
-				const u32 DescriptorSetGroupCount = 2;
+				const u32 DescriptorSetGroupCount = 3;
 				VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] = { MainPass.EntityPass.EntitySets[ImageIndex],
-					TextureUnit.SamplerDescriptorSets[Scene.DrawEntities[j].TextureId] };
+					TextureUnit.SamplerDescriptorSets[Scene.DrawEntities[j].TextureId], MainPass.SceneLightSets[ImageIndex] };
 
 				vkCmdPushConstants(MainViewport.CommandBuffers[ImageIndex], MainPass.EntityPass.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
 					0, sizeof(Model), &Scene.DrawEntities[j].Model);
@@ -860,11 +861,16 @@ namespace Core
 		{
 			Util::Log().Error("vkBeginCommandBuffer result is {}", static_cast<int>(Result));
 		}
-		// Function end RecordCommands
 
 		//UpdateUniformBuffer
 		VulkanMemoryManagementSystem::Get()->CopyDataToMemory(BufferType::Uniform, sizeof(UboViewProjection) * ImageIndex,
 			sizeof(UboViewProjection), &Scene.ViewProjection);
+
+		glm::vec3 TestData = glm::vec3(0.0, 0.0, 1.0);
+
+		VulkanMemoryManagementSystem::Get()->CopyDataToMemory(BufferType::Uniform, sizeof(UboViewProjection) * 3 +
+			64 * ImageIndex,
+			sizeof(glm::vec3), &TestData);
 
 		// Submit command buffer to queue
 		VkSubmitInfo SubmitInfo = { };

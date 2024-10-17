@@ -79,6 +79,10 @@ namespace Core
 		ImageBuffer DepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkBuffer VpUniformBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 
+		VkBuffer SceneLightBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkDescriptorSetLayout SceneLightLayout = nullptr;
+		VkDescriptorSet SceneLightSets[MAX_SWAPCHAIN_IMAGES_COUNT];
+
 		VkDescriptorSetLayout SamplerSetLayout = nullptr;
 	};
 }

@@ -24,13 +24,16 @@ namespace Core
 			vkDestroyImage(LogicalDevice, ColorBuffers[i].Image, nullptr);
 			vkFreeMemory(LogicalDevice, ColorBuffers[i].Memory, nullptr);
 
+
 			VulkanMemoryManagementSystem::Get()->DestroyBuffer(VpUniformBuffers[i]);
+			VulkanMemoryManagementSystem::Get()->DestroyBuffer(SceneLightBuffers[i]);
 		}
 
 		TerrainPass.ClearResources(LogicalDevice);
 		DeferredPass.ClearResources(LogicalDevice);
 		EntityPass.ClearResources(LogicalDevice);
 
+		vkDestroyDescriptorSetLayout(LogicalDevice, SceneLightLayout, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, SamplerSetLayout, nullptr);
 		vkDestroyRenderPass(LogicalDevice, RenderPass, nullptr);
 	}
@@ -280,6 +283,23 @@ namespace Core
 			//TODO LOG
 			assert(false);
 		}
+
+		VkDescriptorSetLayoutBinding SceneLightLayoutBinding = { };
+		SceneLightLayoutBinding.binding = 0;
+		SceneLightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		SceneLightLayoutBinding.descriptorCount = 1;
+		SceneLightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		SceneLightLayoutBinding.pImmutableSamplers = nullptr;
+
+		Bindings[0] = SceneLightLayoutBinding;
+
+		Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo,
+			nullptr, &SceneLightLayout);
+		if (Result != VK_SUCCESS)
+		{
+			//TODO LOG
+			assert(false);
+		}
 	}
 
 	void MainRenderPass::CreateDeferredSetLayout(VkDevice LogicalDevice)
@@ -341,9 +361,9 @@ namespace Core
 			assert(false);
 		}
 
-		const u32 EntityPassDescriptorSetLayoutsCount = 2;
+		const u32 EntityPassDescriptorSetLayoutsCount = 3;
 		VkDescriptorSetLayout EntityPassDescriptorSetLayouts[EntityPassDescriptorSetLayoutsCount] = {
-			EntityPass.EntitySetLayout, SamplerSetLayout
+			EntityPass.EntitySetLayout, SamplerSetLayout, SceneLightLayout
 		};
 
 		VkPipelineLayoutCreateInfo EntityLayoutCreateInfo = { };
@@ -662,39 +682,52 @@ namespace Core
 	{
 		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
 		const VkDeviceSize VpBufferSize = sizeof(UboViewProjection);
+		const VkDeviceSize LightBufferSize = sizeof(glm::vec3);
 
-		const VkDeviceSize AlignedSize = VulkanMemorySystem->CalculateAlignedSize(BufferType::Uniform, VpBufferSize);
-		VulkanMemorySystem->AllocateBufferMemory(BufferType::Uniform, AlignedSize * ImagesCount);
+		const VkDeviceSize AlignedVpSize = VulkanMemorySystem->CalculateAlignedSize(BufferType::Uniform, VpBufferSize);
+		const VkDeviceSize AlignedLightSize = VulkanMemorySystem->CalculateAlignedSize(BufferType::Uniform, LightBufferSize);
+		VulkanMemorySystem->AllocateBufferMemory(BufferType::Uniform, (AlignedVpSize + AlignedLightSize) * ImagesCount);
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
 			VpUniformBuffers[i] = VulkanMemorySystem->CreateBuffer(BufferType::Uniform, VpBufferSize);
 		}
+
+		for (u32 i = 0; i < ImagesCount; i++)
+		{
+			SceneLightBuffers[i] = VulkanMemorySystem->CreateBuffer(BufferType::Uniform, LightBufferSize);
+		}
 	}
 
 	void MainRenderPass::CreateSets(VkDevice LogicalDevice, u32 ImagesCount)
 	{
+		auto VulkanMemoryManagement = VulkanMemoryManagementSystem::Get();
 		VkDescriptorSetLayout* SetLayouts = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
+		VkDescriptorSetLayout* TerrainLayouts = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
+		VkDescriptorSetLayout* LightLayouts = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
+
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
 			SetLayouts[i] = EntityPass.EntitySetLayout;
+			TerrainLayouts[i] = TerrainPass.TerrainSetLayout;
+			LightLayouts[i] = SceneLightLayout;
 		}
 
-		auto VulkanMemoryManagement = VulkanMemoryManagementSystem::Get();
-
 		VulkanMemoryManagement->AllocateSets(SetLayouts, ImagesCount, EntityPass.EntitySets);
+		VulkanMemoryManagement->AllocateSets(TerrainLayouts, ImagesCount, TerrainPass.TerrainSets);
+		VulkanMemoryManagement->AllocateSets(LightLayouts, ImagesCount, SceneLightSets);
 
-		//TODO FIX
-		VulkanMemoryManagement->AllocateSets(SetLayouts, ImagesCount, TerrainPass.TerrainSets);
-
-		VkDescriptorBufferInfo VpBufferInfo = { };
-		// Update all of descriptor set buffer bindings
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
-			// Todo: validate
+			VkDescriptorBufferInfo VpBufferInfo = { };
 			VpBufferInfo.buffer = VpUniformBuffers[i];
 			VpBufferInfo.offset = 0;
 			VpBufferInfo.range = sizeof(UboViewProjection);
+
+			VkDescriptorBufferInfo LightBufferInfo = { };
+			LightBufferInfo.buffer = SceneLightBuffers[i];
+			LightBufferInfo.offset = 0;
+			LightBufferInfo.range = sizeof(glm::vec3);
 
 			VkWriteDescriptorSet VpSetWrite = { };
 			VpSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -705,17 +738,21 @@ namespace Core
 			VpSetWrite.descriptorCount = 1;
 			VpSetWrite.pBufferInfo = &VpBufferInfo;
 
-			const u32 WriteSetsCount = 1;
-			// Todo: do not copy
-			VkWriteDescriptorSet WriteSets[WriteSetsCount] = { VpSetWrite };
+			VkWriteDescriptorSet LightSetWrite = { };
+			LightSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			LightSetWrite.dstSet = SceneLightSets[i];
+			LightSetWrite.dstBinding = 0;
+			LightSetWrite.dstArrayElement = 0;
+			LightSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			LightSetWrite.descriptorCount = 1;
+			LightSetWrite.pBufferInfo = &LightBufferInfo;
 
-			// Todo: use one vkUpdateDescriptorSets call to update all descriptors
+			VkWriteDescriptorSet VpTerrainWrite = VpSetWrite;
+			VpTerrainWrite.dstSet = TerrainPass.TerrainSets[i];
+
+			const u32 WriteSetsCount = 3;
+			VkWriteDescriptorSet WriteSets[WriteSetsCount] = { VpSetWrite, LightSetWrite, VpTerrainWrite };
 			vkUpdateDescriptorSets(LogicalDevice, WriteSetsCount, WriteSets, 0, nullptr);
-
-			//TODO FIX
-			VpSetWrite.dstSet = TerrainPass.TerrainSets[i];
-			VkWriteDescriptorSet WriteSets2[WriteSetsCount] = { VpSetWrite };
-			vkUpdateDescriptorSets(LogicalDevice, WriteSetsCount, WriteSets2, 0, nullptr);
 		}
 
 		for (u32 i = 0; i < ImagesCount; i++)
@@ -757,12 +794,8 @@ namespace Core
 			DepthWrite.descriptorCount = 1;
 			DepthWrite.pImageInfo = &DepthAttachmentDescriptor;
 
-
-			// Todo: do not copy
 			const u32 CetWritesCount = 2;
 			VkWriteDescriptorSet SetWrites[CetWritesCount] = { ColourWrite, DepthWrite };
-
-			// Update descriptor sets
 			vkUpdateDescriptorSets(LogicalDevice, CetWritesCount, SetWrites, 0, nullptr);
 		}
 	}
