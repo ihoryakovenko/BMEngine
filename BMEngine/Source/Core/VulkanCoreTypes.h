@@ -64,6 +64,7 @@ namespace Core
 		glm::vec3 Position;
 		glm::vec3 Color;
 		glm::vec2 TextureCoords;
+		glm::vec3 Normal;
 	};
 
 	struct TerrainVertex

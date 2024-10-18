@@ -117,18 +117,25 @@ TestMesh CreateCubeMesh()
 	glm::vec3 magenta = { 1.0f, 0.0f, 1.0f };
 	glm::vec3 black = { 0.0f, 0.0f, 0.0f };
 
+	glm::vec3 frontNormal = { 0.0f, 0.0f, 1.0f };
+	glm::vec3 backNormal = { 0.0f, 0.0f, -1.0f };
+	glm::vec3 leftNormal = { -1.0f, 0.0f, 0.0f };
+	glm::vec3 rightNormal = { 1.0f, 0.0f, 0.0f };
+	glm::vec3 topNormal = { 0.0f, 1.0f, 0.0f };
+	glm::vec3 bottomNormal = { 0.0f, -1.0f, 0.0f };
+
 	cube.vertices = {
 		// Front face
-		{ { -1.0f, -1.0f, 1.0f }, red, { 0.0f, 0.0f } }, // 0: Bottom-left
-		{ { 1.0f, -1.0f, 1.0f }, green, { 1.0f, 0.0f } }, // 1: Bottom-right
-		{ { 1.0f, 1.0f, 1.0f }, blue, { 1.0f, 1.0f } }, // 2: Top-right
-		{ { -1.0f, 1.0f, 1.0f }, white, { 0.0f, 1.0f } }, // 3: Top-left
+		{ { -1.0f, -1.0f, 1.0f }, red, { 0.0f, 0.0f }, frontNormal },  // 0: Bottom-left
+		{ { 1.0f, -1.0f, 1.0f }, green, { 1.0f, 0.0f }, frontNormal }, // 1: Bottom-right
+		{ { 1.0f, 1.0f, 1.0f }, blue, { 1.0f, 1.0f }, frontNormal },   // 2: Top-right
+		{ { -1.0f, 1.0f, 1.0f }, white, { 0.0f, 1.0f }, frontNormal }, // 3: Top-left
 
 		// Back face
-		{ { -1.0f, -1.0f, -1.0f }, yellow, { 1.0f, 0.0f } }, // 4: Bottom-left
-		{ { 1.0f, -1.0f, -1.0f }, cyan, { 0.0f, 0.0f } }, // 5: Bottom-right
-		{ { 1.0f, 1.0f, -1.0f }, magenta, { 0.0f, 1.0f } }, // 6: Top-right
-		{ { -1.0f, 1.0f, -1.0f }, black, { 1.0f, 1.0f } }, // 7: Top-left
+		{ { -1.0f, -1.0f, -1.0f }, yellow, { 1.0f, 0.0f }, backNormal }, // 4: Bottom-left
+		{ { 1.0f, -1.0f, -1.0f }, cyan, { 0.0f, 0.0f }, backNormal },   // 5: Bottom-right
+		{ { 1.0f, 1.0f, -1.0f }, magenta, { 0.0f, 1.0f }, backNormal }, // 6: Top-right
+		{ { -1.0f, 1.0f, -1.0f }, black, { 1.0f, 1.0f }, backNormal },  // 7: Top-left
 	};
 
 	// Define the indices for the cube (2 triangles per face, 6 faces total)
@@ -150,18 +157,49 @@ TestMesh CreateCubeMesh()
 	// Set the texture ID (if needed)
 	cube.TextureId = 0;
 
+	cube.vertices[1].Normal = rightNormal; // Right face normals
+	cube.vertices[2].Normal = rightNormal;
+	cube.vertices[5].Normal = rightNormal;
+	cube.vertices[6].Normal = rightNormal;
+
+	cube.vertices[0].Normal = leftNormal;  // Left face normals
+	cube.vertices[3].Normal = leftNormal;
+	cube.vertices[4].Normal = leftNormal;
+	cube.vertices[7].Normal = leftNormal;
+
+	cube.vertices[2].Normal = topNormal;   // Top face normals
+	cube.vertices[3].Normal = topNormal;
+	cube.vertices[6].Normal = topNormal;
+	cube.vertices[7].Normal = topNormal;
+
+	cube.vertices[0].Normal = bottomNormal; // Bottom face normals
+	cube.vertices[1].Normal = bottomNormal;
+	cube.vertices[4].Normal = bottomNormal;
+	cube.vertices[5].Normal = bottomNormal;
+
 	return cube;
 }
 
-template<> struct std::hash<Core::EntityVertex>
+namespace std
 {
-	size_t operator()(Core::EntityVertex const& vertex) const
+	template<> struct hash<Core::EntityVertex>
 	{
-		return ((std::hash<glm::vec3>()(vertex.Position) ^
-			(std::hash<glm::vec3>()(vertex.Color) << 1)) >> 1) ^
-			(std::hash<glm::vec2>()(vertex.TextureCoords) << 1);
-	}
-};
+		size_t operator()(Core::EntityVertex const& vertex) const
+		{
+			size_t hashPosition = std::hash<glm::vec3>()(vertex.Position);
+			size_t hashColor = std::hash<glm::vec3>()(vertex.Color);
+			size_t hashTextureCoords = std::hash<glm::vec2>()(vertex.TextureCoords);
+			size_t hashNormal = std::hash<glm::vec3>()(vertex.Normal);
+
+			size_t combinedHash = hashPosition;
+			combinedHash ^= (hashColor << 1);
+			combinedHash ^= (hashTextureCoords << 1);
+			combinedHash ^= (hashNormal << 1);
+
+			return combinedHash;
+		}
+	};
+}
 
 struct VertexEqual
 {
@@ -336,6 +374,39 @@ void LoadDrawEntities()
 	{
 		TestMesh Tm;
 
+		std::vector<glm::vec3> vertexNormals(Attrib.vertices.size() / 3, glm::vec3(0.0f));
+
+		for (size_t i = 0; i < Shape.mesh.indices.size(); i += 3)
+		{
+			auto index0 = Shape.mesh.indices[i + 0];
+			auto index1 = Shape.mesh.indices[i + 1];
+			auto index2 = Shape.mesh.indices[i + 2];
+
+			glm::vec3 v0 = {
+				Attrib.vertices[3 * index0.vertex_index + 0],
+				Attrib.vertices[3 * index0.vertex_index + 1],
+				Attrib.vertices[3 * index0.vertex_index + 2]
+			};
+			glm::vec3 v1 = {
+				Attrib.vertices[3 * index1.vertex_index + 0],
+				Attrib.vertices[3 * index1.vertex_index + 1],
+				Attrib.vertices[3 * index1.vertex_index + 2]
+			};
+			glm::vec3 v2 = {
+				Attrib.vertices[3 * index2.vertex_index + 0],
+				Attrib.vertices[3 * index2.vertex_index + 1],
+				Attrib.vertices[3 * index2.vertex_index + 2]
+			};
+
+			glm::vec3 edge1 = v1 - v0;
+			glm::vec3 edge2 = v2 - v0;
+			glm::vec3 faceNormal = glm::normalize(glm::cross(edge1, edge2));
+
+			vertexNormals[index0.vertex_index] += faceNormal;
+			vertexNormals[index1.vertex_index] += faceNormal;
+			vertexNormals[index2.vertex_index] += faceNormal;
+		}
+
 		for (const auto& index : Shape.mesh.indices)
 		{
 			Core::EntityVertex vertex{ };
@@ -354,6 +425,8 @@ void LoadDrawEntities()
 			};
 
 			vertex.Color = { 1.0f, 1.0f, 1.0f };
+
+			vertex.Normal = glm::normalize(vertexNormals[index.vertex_index]);
 
 			if (uniqueVertices.count(vertex) == 0)
 			{

@@ -26,14 +26,16 @@ namespace Core
 
 
 			VulkanMemoryManagementSystem::Get()->DestroyBuffer(VpUniformBuffers[i]);
-			VulkanMemoryManagementSystem::Get()->DestroyBuffer(SceneLightBuffers[i]);
+			VulkanMemoryManagementSystem::Get()->DestroyBuffer(AmbientLightingBuffers[i]);
+			VulkanMemoryManagementSystem::Get()->DestroyBuffer(PointLightingBuffers[i]);
 		}
 
 		TerrainPass.ClearResources(LogicalDevice);
 		DeferredPass.ClearResources(LogicalDevice);
 		EntityPass.ClearResources(LogicalDevice);
 
-		vkDestroyDescriptorSetLayout(LogicalDevice, SceneLightLayout, nullptr);
+		vkDestroyDescriptorSetLayout(LogicalDevice, AmbientLightingLayout, nullptr);
+		vkDestroyDescriptorSetLayout(LogicalDevice, PointLightingLayout, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, SamplerSetLayout, nullptr);
 		vkDestroyRenderPass(LogicalDevice, RenderPass, nullptr);
 	}
@@ -284,17 +286,34 @@ namespace Core
 			assert(false);
 		}
 
-		VkDescriptorSetLayoutBinding SceneLightLayoutBinding = { };
-		SceneLightLayoutBinding.binding = 0;
-		SceneLightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		SceneLightLayoutBinding.descriptorCount = 1;
-		SceneLightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		SceneLightLayoutBinding.pImmutableSamplers = nullptr;
+		VkDescriptorSetLayoutBinding AmbientLightLayoutBinding = { };
+		AmbientLightLayoutBinding.binding = 0;
+		AmbientLightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		AmbientLightLayoutBinding.descriptorCount = 1;
+		AmbientLightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		AmbientLightLayoutBinding.pImmutableSamplers = nullptr;
 
-		Bindings[0] = SceneLightLayoutBinding;
+		Bindings[0] = AmbientLightLayoutBinding;
 
 		Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo,
-			nullptr, &SceneLightLayout);
+			nullptr, &AmbientLightingLayout);
+		if (Result != VK_SUCCESS)
+		{
+			//TODO LOG
+			assert(false);
+		}
+
+		VkDescriptorSetLayoutBinding PointLightLayoutBinding = { };
+		PointLightLayoutBinding.binding = 0;
+		PointLightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		PointLightLayoutBinding.descriptorCount = 1;
+		PointLightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		PointLightLayoutBinding.pImmutableSamplers = nullptr;
+
+		Bindings[0] = PointLightLayoutBinding;
+
+		Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo,
+			nullptr, &PointLightingLayout);
 		if (Result != VK_SUCCESS)
 		{
 			//TODO LOG
@@ -361,9 +380,9 @@ namespace Core
 			assert(false);
 		}
 
-		const u32 EntityPassDescriptorSetLayoutsCount = 3;
+		const u32 EntityPassDescriptorSetLayoutsCount = 4;
 		VkDescriptorSetLayout EntityPassDescriptorSetLayouts[EntityPassDescriptorSetLayoutsCount] = {
-			EntityPass.EntitySetLayout, SamplerSetLayout, SceneLightLayout
+			EntityPass.EntitySetLayout, SamplerSetLayout, AmbientLightingLayout, PointLightingLayout
 		};
 
 		VkPipelineLayoutCreateInfo EntityLayoutCreateInfo = { };
@@ -490,7 +509,7 @@ namespace Core
 		// VK_VERTEX_INPUT_RATE_INSTANCE	: Move to a vertex for the next instance
 
 		// How the data for an attribute is defined within a vertex
-		const u32 EntityVertexInputBindingDescriptionCount = 3;
+		const u32 EntityVertexInputBindingDescriptionCount = 4;
 		VkVertexInputAttributeDescription EntityAttributeDescriptions[EntityVertexInputBindingDescriptionCount];
 
 		// Position Attribute
@@ -510,6 +529,12 @@ namespace Core
 		EntityAttributeDescriptions[2].location = 2;
 		EntityAttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
 		EntityAttributeDescriptions[2].offset = offsetof(Core::EntityVertex, TextureCoords);
+
+		// Normal Attribute
+		EntityAttributeDescriptions[3].binding = 0;
+		EntityAttributeDescriptions[3].location = 3;
+		EntityAttributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
+		EntityAttributeDescriptions[3].offset = offsetof(Core::EntityVertex, Normal);
 
 		VkPipelineVertexInputStateCreateInfo TerrainVertexInputCreateInfo = { };
 		TerrainVertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -682,11 +707,14 @@ namespace Core
 	{
 		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
 		const VkDeviceSize VpBufferSize = sizeof(UboViewProjection);
-		const VkDeviceSize LightBufferSize = sizeof(glm::vec3);
+		const VkDeviceSize AmbientLightBufferSize = sizeof(glm::vec3);
+		const VkDeviceSize PointLightBufferSize = sizeof(glm::vec3);
 
 		const VkDeviceSize AlignedVpSize = VulkanMemorySystem->CalculateAlignedSize(BufferType::Uniform, VpBufferSize);
-		const VkDeviceSize AlignedLightSize = VulkanMemorySystem->CalculateAlignedSize(BufferType::Uniform, LightBufferSize);
-		VulkanMemorySystem->AllocateBufferMemory(BufferType::Uniform, (AlignedVpSize + AlignedLightSize) * ImagesCount);
+		const VkDeviceSize AlignedAmbientLightSize = VulkanMemorySystem->CalculateAlignedSize(BufferType::Uniform, AmbientLightBufferSize);
+		const VkDeviceSize AlignedPointLightSize = VulkanMemorySystem->CalculateAlignedSize(BufferType::Uniform, PointLightBufferSize);
+		VulkanMemorySystem->AllocateBufferMemory(BufferType::Uniform,
+			(AlignedVpSize + AlignedAmbientLightSize + AlignedPointLightSize) * ImagesCount);
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
@@ -695,7 +723,12 @@ namespace Core
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
-			SceneLightBuffers[i] = VulkanMemorySystem->CreateBuffer(BufferType::Uniform, LightBufferSize);
+			AmbientLightingBuffers[i] = VulkanMemorySystem->CreateBuffer(BufferType::Uniform, AmbientLightBufferSize);
+		}
+
+		for (u32 i = 0; i < ImagesCount; i++)
+		{
+			PointLightingBuffers[i] = VulkanMemorySystem->CreateBuffer(BufferType::Uniform, AlignedPointLightSize);
 		}
 	}
 
@@ -704,18 +737,21 @@ namespace Core
 		auto VulkanMemoryManagement = VulkanMemoryManagementSystem::Get();
 		VkDescriptorSetLayout* SetLayouts = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
 		VkDescriptorSetLayout* TerrainLayouts = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
-		VkDescriptorSetLayout* LightLayouts = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
+		VkDescriptorSetLayout* AmbientLightLayouts = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
+		VkDescriptorSetLayout* PointLightLayouts = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
 			SetLayouts[i] = EntityPass.EntitySetLayout;
 			TerrainLayouts[i] = TerrainPass.TerrainSetLayout;
-			LightLayouts[i] = SceneLightLayout;
+			AmbientLightLayouts[i] = AmbientLightingLayout;
+			PointLightLayouts[i] = PointLightingLayout;
 		}
 
 		VulkanMemoryManagement->AllocateSets(SetLayouts, ImagesCount, EntityPass.EntitySets);
 		VulkanMemoryManagement->AllocateSets(TerrainLayouts, ImagesCount, TerrainPass.TerrainSets);
-		VulkanMemoryManagement->AllocateSets(LightLayouts, ImagesCount, SceneLightSets);
+		VulkanMemoryManagement->AllocateSets(AmbientLightLayouts, ImagesCount, AmbientLightingSets);
+		VulkanMemoryManagement->AllocateSets(AmbientLightLayouts, ImagesCount, PointLightingSets);
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
@@ -724,10 +760,15 @@ namespace Core
 			VpBufferInfo.offset = 0;
 			VpBufferInfo.range = sizeof(UboViewProjection);
 
-			VkDescriptorBufferInfo LightBufferInfo = { };
-			LightBufferInfo.buffer = SceneLightBuffers[i];
-			LightBufferInfo.offset = 0;
-			LightBufferInfo.range = sizeof(glm::vec3);
+			VkDescriptorBufferInfo AmbientLightBufferInfo = { };
+			AmbientLightBufferInfo.buffer = AmbientLightingBuffers[i];
+			AmbientLightBufferInfo.offset = 0;
+			AmbientLightBufferInfo.range = sizeof(glm::vec3);
+
+			VkDescriptorBufferInfo PointLightBufferInfo = { };
+			PointLightBufferInfo.buffer = PointLightingBuffers[i];
+			PointLightBufferInfo.offset = 0;
+			PointLightBufferInfo.range = sizeof(glm::vec3);
 
 			VkWriteDescriptorSet VpSetWrite = { };
 			VpSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -738,20 +779,29 @@ namespace Core
 			VpSetWrite.descriptorCount = 1;
 			VpSetWrite.pBufferInfo = &VpBufferInfo;
 
-			VkWriteDescriptorSet LightSetWrite = { };
-			LightSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			LightSetWrite.dstSet = SceneLightSets[i];
-			LightSetWrite.dstBinding = 0;
-			LightSetWrite.dstArrayElement = 0;
-			LightSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			LightSetWrite.descriptorCount = 1;
-			LightSetWrite.pBufferInfo = &LightBufferInfo;
+			VkWriteDescriptorSet AmbientLightSetWrite = { };
+			AmbientLightSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			AmbientLightSetWrite.dstSet = AmbientLightingSets[i];
+			AmbientLightSetWrite.dstBinding = 0;
+			AmbientLightSetWrite.dstArrayElement = 0;
+			AmbientLightSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			AmbientLightSetWrite.descriptorCount = 1;
+			AmbientLightSetWrite.pBufferInfo = &AmbientLightBufferInfo;
+
+			VkWriteDescriptorSet PointLightSetWrite = { };
+			PointLightSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			PointLightSetWrite.dstSet = PointLightingSets[i];
+			PointLightSetWrite.dstBinding = 0;
+			PointLightSetWrite.dstArrayElement = 0;
+			PointLightSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			PointLightSetWrite.descriptorCount = 1;
+			PointLightSetWrite.pBufferInfo = &PointLightBufferInfo;
 
 			VkWriteDescriptorSet VpTerrainWrite = VpSetWrite;
 			VpTerrainWrite.dstSet = TerrainPass.TerrainSets[i];
 
-			const u32 WriteSetsCount = 3;
-			VkWriteDescriptorSet WriteSets[WriteSetsCount] = { VpSetWrite, LightSetWrite, VpTerrainWrite };
+			const u32 WriteSetsCount = 4;
+			VkWriteDescriptorSet WriteSets[WriteSetsCount] = { VpSetWrite, AmbientLightSetWrite, VpTerrainWrite, PointLightSetWrite };
 			vkUpdateDescriptorSets(LogicalDevice, WriteSetsCount, WriteSets, 0, nullptr);
 		}
 
