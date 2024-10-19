@@ -53,7 +53,7 @@ namespace Core
 		void DestroySynchronisation();
 
 		void InitViewport(GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstance* OutViewport,
-			SwapchainInstance SwapInstance, ImageBuffer* ColorBuffers, ImageBuffer* DepthBuffers);
+			SwapchainInstance SwapInstance, VkImageView* ColorBuffers, VkImageView* DepthBuffers);
 		void DeinitViewport(ViewportInstance* Viewport);
 
 		void CreateCommandPool(VkDevice LogicalDevice, u32 FamilyIndex);
@@ -82,13 +82,20 @@ namespace Core
 
 		VkCommandPool GraphicsCommandPool = nullptr;
 
+		GPUBuffer VertexBuffer;
+		u32 VertexBufferOffset = 0;
+		GPUBuffer IndexBuffer;
+		u32 IndexBufferOffset = 0;
+
+		VkDescriptorPool MainPool = nullptr;
+
 		// Todo: put all textures in atlases or texture layers?
 		struct
 		{
 			VkSampler TextureSampler = nullptr;
 			static inline VkDescriptorSet SamplerDescriptorSets[MAX_IMAGES];
 
-			static inline VkImage Images[MAX_IMAGES];
+			static inline ImageBuffer Images[MAX_IMAGES];
 			u32 ImageArraysCount = 0;
 			static inline VkImageView ImageViews[MAX_IMAGES];
 			u32 ImagesViewsCount = 0;

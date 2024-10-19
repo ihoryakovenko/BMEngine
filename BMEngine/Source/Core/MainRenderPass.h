@@ -67,7 +67,7 @@ namespace Core
 			VkFormat DepthFormat, VkFormat ColorFormat);
 		void CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
 			u32 ImagesCount);
-		void CreateSets(VkDevice LogicalDevice, u32 ImagesCount);
+		void CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount);
 
 		VkRenderPass RenderPass = nullptr;
 
@@ -76,16 +76,19 @@ namespace Core
 		DeferredSubpass DeferredPass;
 
 		ImageBuffer ColorBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkImageView ColorBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
+
 		ImageBuffer DepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
-		VkBuffer VpUniformBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkImageView DepthBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		VkBuffer AmbientLightingBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
-		VkDescriptorSetLayout AmbientLightingLayout = nullptr;
-		VkDescriptorSet AmbientLightingSets[MAX_SWAPCHAIN_IMAGES_COUNT];
+		GPUBuffer VpUniformBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		VkBuffer PointLightingBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
-		VkDescriptorSetLayout PointLightingLayout = nullptr;
-		VkDescriptorSet PointLightingSets[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkDescriptorSetLayout LightingSetLayout = nullptr;
+		VkDescriptorSet LightingSets[MAX_SWAPCHAIN_IMAGES_COUNT];
+
+		GPUBuffer AmbientLightingBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+
+		GPUBuffer PointLightingBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		VkDescriptorSetLayout SamplerSetLayout = nullptr;
 	};

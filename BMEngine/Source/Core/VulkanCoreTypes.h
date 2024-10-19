@@ -16,6 +16,8 @@ namespace Core
 	static const u32 MAX_SWAPCHAIN_IMAGES_COUNT = 3;
 	static const u32 MAX_IMAGES = 1024;
 	static const u32 Mb64 = 1024 * 1024 * 64;
+	static const u32 BufferAlignment = 64;
+	static const u32 ImageAlignment = 4096;
 
 	using ShaderName = const char*;
 	struct ShaderNames
@@ -102,7 +104,12 @@ namespace Core
 	{
 		VkImage Image = nullptr;
 		VkDeviceMemory Memory = nullptr;
-		VkImageView ImageView = nullptr;
+	};
+
+	struct GPUBuffer
+	{
+		VkBuffer Buffer = nullptr;
+		VkDeviceMemory Memory = nullptr;
 	};
 
 	struct DrawEntity
@@ -117,6 +124,23 @@ namespace Core
 	struct DrawTerrainEntity
 	{
 		VkDeviceSize VertexOffset = 0;
+	};
+
+	struct DrawAmbientLightEntity
+	{
+		alignas(16) glm::vec3 LightColor;
+	};
+
+	struct DrawPointLightEntity
+	{
+		alignas(16) glm::vec3 LightPosition;
+		alignas(16) glm::vec3 LightColor;
+	};
+
+	struct LightBuffer
+	{
+		DrawAmbientLightEntity AmbientLight;
+		DrawPointLightEntity PointLight;
 	};
 
 	struct DrawScene

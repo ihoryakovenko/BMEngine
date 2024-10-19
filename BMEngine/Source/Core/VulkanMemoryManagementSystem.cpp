@@ -16,76 +16,39 @@ namespace Core
 	void VulkanMemoryManagementSystem::Init(MemorySourceDevice Device)
 	{
 		MemorySource = Device;
-
-		for (u32 i = 0; i < BufferType::Count; ++i)
-		{
-			BuffersMemory[i] = nullptr;
-			MemoryOffsets[i] = 0;
-			Buffers[i] = nullptr;
-
-			// Shit
-			// https://stackoverflow.com/questions/55445653/deriving-the-vkmemoryrequirements
-			VkBufferCreateInfo BufferInfo = { };
-			BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-			BufferInfo.size = 1;
-			BufferInfo.usage = BuffersUsage[i];
-			BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-			VkBuffer InitialBuffer = CreateBufferInternal(1, BuffersUsage[i]);
-
-			VkMemoryRequirements MemRequirements;
-			vkGetBufferMemoryRequirements(MemorySource.LogicalDevice, InitialBuffer, &MemRequirements);
-
-			BuffersAlignment[i] = MemRequirements.alignment;
-			BuffersMemoryTypeIndex[i] = GetMemoryTypeIndex(MemorySource.PhysicalDevice, MemRequirements.memoryTypeBits, BuffersProperties[i]);
-		
-			DestroyBuffer(InitialBuffer);
-		}
-
-		CreateStagingBuffer(Mb64);
+		StagingBuffer = CreateBuffer(Mb64, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	}
 
 	void VulkanMemoryManagementSystem::Deinit()
 	{
-		vkDestroyDescriptorPool(MemorySource.LogicalDevice, Pool, nullptr);
-
-		for (u32 i = 0; i < ImagesMemoryCount; ++i)
-		{
-			vkFreeMemory(MemorySource.LogicalDevice, ImagesMemory[i], nullptr);
-		}
-		
-		for (u32 i = 0; i < BufferType::Count; ++i)
-		{
-			if (BuffersMemory[i] != nullptr)
-			{
-				vkFreeMemory(MemorySource.LogicalDevice, BuffersMemory[i], nullptr);
-			}
-
-			if (Buffers[i] != nullptr)
-			{
-				vkDestroyBuffer(MemorySource.LogicalDevice, Buffers[i], nullptr);
-			}
-		}
-
 		DestroyBuffer(StagingBuffer);
-		vkFreeMemory(MemorySource.LogicalDevice, StagingBufferMemory, nullptr);
 	}
 
-	VkDeviceSize VulkanMemoryManagementSystem::CalculateAlignedSize(BufferType::BufferType Type, VkDeviceSize BufferSize)
+	VkDeviceSize VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VkDeviceSize BufferSize)
 	{
 		u32 Padding = 0;
-		if (BufferSize % BuffersAlignment[BufferType::Vertex] != 0)
+		if (BufferSize % BufferAlignment != 0)
 		{
-			Padding = BuffersAlignment[BufferType::Vertex] -
-				(BufferSize % BuffersAlignment[BufferType::Vertex]);
+			Padding = BufferAlignment - (BufferSize % BufferAlignment);
 		}
 
 		return BufferSize + Padding;
 	}
 
-	void VulkanMemoryManagementSystem::AllocateDescriptorPool(VkDescriptorPoolSize* PoolSizes, u32 PoolSizeCount, u32 MaxDescriptorCount)
+	VkDeviceSize VulkanMemoryManagementSystem::CalculateImageAlignedSize(VkDeviceSize BufferSize)
 	{
-		assert(Pool == nullptr);
+		u32 Padding = 0;
+		if (BufferSize % ImageAlignment != 0)
+		{
+			Padding = ImageAlignment - (BufferSize % ImageAlignment);
+		}
+
+		return BufferSize + Padding;
+	}
+
+	VkDescriptorPool VulkanMemoryManagementSystem::AllocateDescriptorPool(VkDescriptorPoolSize* PoolSizes, u32 PoolSizeCount, u32 MaxDescriptorCount)
+	{
 		Util::Log().Info("Creating descriptor pool. Size count: {}", PoolSizeCount);
 
 		for (u32 i = 0; i < PoolSizeCount; ++i)
@@ -101,15 +64,19 @@ namespace Core
 		PoolCreateInfo.poolSizeCount = PoolSizeCount; // Amount of Pool Sizes being passed
 		PoolCreateInfo.pPoolSizes = PoolSizes; // Pool Sizes to create pool with
 
+		VkDescriptorPool Pool;
 		VkResult Result = vkCreateDescriptorPool(MemorySource.LogicalDevice, &PoolCreateInfo, nullptr, &Pool);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkCreateDescriptorPool result is {}", static_cast<int>(Result));
 			assert(false);
 		}
+
+		return Pool;
 	}
 
-	void VulkanMemoryManagementSystem::AllocateSets(VkDescriptorSetLayout* Layouts, u32 DescriptorSetCount, VkDescriptorSet* OutSets)
+	void VulkanMemoryManagementSystem::AllocateSets(VkDescriptorPool Pool, VkDescriptorSetLayout* Layouts,
+		u32 DescriptorSetCount, VkDescriptorSet* OutSets)
 	{
 		Util::Log().Info("Allocating descriptor sets. Size count: {}", DescriptorSetCount);
 
@@ -127,88 +94,94 @@ namespace Core
 		}
 	}
 
-	void VulkanMemoryManagementSystem::AllocateImageMemory(VkDeviceSize AllocationSize,
-		u32 MemoryTypeIndex)
+	ImageBuffer VulkanMemoryManagementSystem::CreateImageBuffer(VkImageCreateInfo* pCreateInfo)
 	{
-		AllocateMemory(AllocationSize, MemoryTypeIndex, &ImagesMemory[ImagesMemoryCount]);
-		++ImagesMemoryCount;
-	}
-
-	void VulkanMemoryManagementSystem::CreateImage(VkImageCreateInfo* pCreateInfo, VkImage* Image)
-	{
-		VkResult Result = vkCreateImage(MemorySource.LogicalDevice, pCreateInfo, nullptr, Image);
+		ImageBuffer Buffer;
+		VkResult Result = vkCreateImage(MemorySource.LogicalDevice, pCreateInfo, nullptr, &Buffer.Image);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("CreateImage result is {}", static_cast<int>(Result));
 			assert(false);
 		}
-	}
 
-	void VulkanMemoryManagementSystem::DestroyImage(VkImage Image)
-	{
-		vkDestroyImage(MemorySource.LogicalDevice, Image, nullptr);
-	}
+		VkMemoryRequirements MemoryRequirements;
+		vkGetImageMemoryRequirements(MemorySource.LogicalDevice, Buffer.Image, &MemoryRequirements);
 
-	void VulkanMemoryManagementSystem::BindImageToMemory(VkImage Image, VkDeviceSize Offset)
-	{
-		vkBindImageMemory(MemorySource.LogicalDevice, Image, ImagesMemory[ImagesMemoryCount - 1], Offset);
-	}
+		const u32 MemoryTypeIndex = GetMemoryTypeIndex(MemorySource.PhysicalDevice, MemoryRequirements.memoryTypeBits,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-	void VulkanMemoryManagementSystem::AllocateBufferMemory(BufferType::BufferType Type, VkDeviceSize Size)
-	{
-		assert(Size % BuffersAlignment[Type] == 0);
-		AllocateMemory(Size, BuffersMemoryTypeIndex[Type], &BuffersMemory[Type]);
-	}
-
-	VkBuffer VulkanMemoryManagementSystem::CreateBuffer(BufferType::BufferType Type, VkDeviceSize BufferSize)
-	{
-		Util::Log().Info("Creating buffer, Type: {}. Requested size: {}", static_cast<int>(Type), BufferSize);
-
-		VkBufferCreateInfo BufferInfo = { };
-		BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		BufferInfo.size = BufferSize;
-		BufferInfo.usage = BuffersUsage[Type];
-		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-		VkBuffer Buffer = CreateBufferInternal(BufferSize, BuffersUsage[Type]);
-
-		VkMemoryRequirements MemRequirements;
-		vkGetBufferMemoryRequirements(MemorySource.LogicalDevice, Buffer, &MemRequirements);
-
-		if (BufferSize != MemRequirements.size)
-		{
-			Util::Log().Warning("Buffer memory requirement size is {}, allocating {} more then buffer size",
-				MemRequirements.size, MemRequirements.size - BufferSize);
-		}
-
-		vkBindBufferMemory(MemorySource.LogicalDevice, Buffer, BuffersMemory[Type], MemoryOffsets[Type]);
-		MemoryOffsets[Type] += MemRequirements.size;
+		Buffer.Memory = AllocateMemory(MemoryRequirements.size, MemoryTypeIndex);
+		vkBindImageMemory(MemorySource.LogicalDevice, Buffer.Image, Buffer.Memory, 0);
 
 		return Buffer;
 	}
 
-	void VulkanMemoryManagementSystem::DestroyBuffer(VkBuffer Buffer)
+	void VulkanMemoryManagementSystem::DestroyImageBuffer(ImageBuffer Image)
 	{
-		vkDestroyBuffer(MemorySource.LogicalDevice, Buffer, nullptr);
+		vkDestroyImage(MemorySource.LogicalDevice, Image.Image, nullptr);
+		vkFreeMemory(MemorySource.LogicalDevice, Image.Memory, nullptr);
 	}
 
-	void VulkanMemoryManagementSystem::CopyDataToMemory(BufferType::BufferType Type, VkDeviceSize Offset, VkDeviceSize Size, const void* Data)
+	GPUBuffer VulkanMemoryManagementSystem::CreateBuffer(VkDeviceSize BufferSize, VkBufferUsageFlags Usage,
+		VkMemoryPropertyFlags Properties)
+	{
+		Util::Log().Info("Creating buffer. Requested size: {}", BufferSize);
+
+		VkBufferCreateInfo BufferInfo = { };
+		BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		BufferInfo.size = BufferSize;
+		BufferInfo.usage = Usage;
+		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		GPUBuffer Buffer;
+		VkResult Result = vkCreateBuffer(MemorySource.LogicalDevice, &BufferInfo, nullptr, &Buffer.Buffer);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkCreateBuffer result is {}", static_cast<int>(Result));
+			assert(false);
+		}
+
+		VkMemoryRequirements MemoryRequirements;
+		vkGetBufferMemoryRequirements(MemorySource.LogicalDevice, Buffer.Buffer, &MemoryRequirements);
+
+		const u32 MemoryTypeIndex = GetMemoryTypeIndex(MemorySource.PhysicalDevice, MemoryRequirements.memoryTypeBits,
+			Properties);
+
+		if (BufferSize != MemoryRequirements.size)
+		{
+			Util::Log().Warning("Buffer memory requirement size is {}, allocating {} more then buffer size",
+				MemoryRequirements.size, MemoryRequirements.size - BufferSize);
+		}
+
+		Buffer.Memory = AllocateMemory(MemoryRequirements.size, MemoryTypeIndex);
+		vkBindBufferMemory(MemorySource.LogicalDevice, Buffer.Buffer, Buffer.Memory, 0);
+
+		return Buffer;
+	}
+
+	void VulkanMemoryManagementSystem::DestroyBuffer(GPUBuffer Buffer)
+	{
+		vkDestroyBuffer(MemorySource.LogicalDevice, Buffer.Buffer, nullptr);
+		vkFreeMemory(MemorySource.LogicalDevice, Buffer.Memory, nullptr);
+	}
+
+	void VulkanMemoryManagementSystem::CopyDataToMemory(VkDeviceMemory Memory,
+		VkDeviceSize Offset, VkDeviceSize Size, const void* Data)
 	{
 		void* MappedMemory;
-		vkMapMemory(MemorySource.LogicalDevice, BuffersMemory[Type], Offset, Size, 0, &MappedMemory);
+		vkMapMemory(MemorySource.LogicalDevice, Memory, Offset, Size, 0, &MappedMemory);
 		std::memcpy(MappedMemory, Data, Size);
-		vkUnmapMemory(MemorySource.LogicalDevice, BuffersMemory[Type]);
+		vkUnmapMemory(MemorySource.LogicalDevice, Memory);
 	}
 
-	void VulkanMemoryManagementSystem::CopyDataToBuffer(BufferType::BufferType Type, VkDeviceSize Size,
-		const void* Data)
+	void VulkanMemoryManagementSystem::CopyDataToBuffer(VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Size, const void* Data)
 	{
 		assert(Size <= Mb64);
 
 		void* MappedMemory;
-		vkMapMemory(MemorySource.LogicalDevice, StagingBufferMemory, 0, Size, 0, &MappedMemory);
+		vkMapMemory(MemorySource.LogicalDevice, StagingBuffer.Memory, 0, Size, 0, &MappedMemory);
 		std::memcpy(MappedMemory, Data, Size);
-		vkUnmapMemory(MemorySource.LogicalDevice, StagingBufferMemory);
+		vkUnmapMemory(MemorySource.LogicalDevice, StagingBuffer.Memory);
 
 		VkCommandBuffer TransferCommandBuffer;
 
@@ -229,10 +202,10 @@ namespace Core
 
 		VkBufferCopy BufferCopyRegion = { };
 		BufferCopyRegion.srcOffset = 0;
-		BufferCopyRegion.dstOffset = BuffersOffset[Type];
+		BufferCopyRegion.dstOffset = Offset;
 		BufferCopyRegion.size = Size;
 
-		vkCmdCopyBuffer(TransferCommandBuffer, StagingBuffer, Buffers[Type], 1, &BufferCopyRegion);
+		vkCmdCopyBuffer(TransferCommandBuffer, StagingBuffer.Buffer, Buffer, 1, &BufferCopyRegion);
 		vkEndCommandBuffer(TransferCommandBuffer);
 
 		VkSubmitInfo SubmitInfo = { };
@@ -244,8 +217,6 @@ namespace Core
 		vkQueueWaitIdle(MemorySource.TransferQueue);
 
 		vkFreeCommandBuffers(MemorySource.LogicalDevice, MemorySource.TransferCommandPool, 1, &TransferCommandBuffer);
-
-		BuffersOffset[Type] += Size;
 	}
 
 	void VulkanMemoryManagementSystem::CopyDataToImage(VkImage Image, u32 Width, u32 Height, VkDeviceSize Size,
@@ -254,9 +225,9 @@ namespace Core
 		assert(Size <= Mb64);
 
 		void* MappedMemory;
-		vkMapMemory(MemorySource.LogicalDevice, StagingBufferMemory, 0, Size, 0, &MappedMemory);
+		vkMapMemory(MemorySource.LogicalDevice, StagingBuffer.Memory, 0, Size, 0, &MappedMemory);
 		std::memcpy(MappedMemory, Data, Size);
-		vkUnmapMemory(MemorySource.LogicalDevice, StagingBufferMemory);
+		vkUnmapMemory(MemorySource.LogicalDevice, StagingBuffer.Memory);
 
 		VkCommandBuffer TransferCommandBuffer;
 
@@ -286,7 +257,7 @@ namespace Core
 		ImageRegion.imageExtent = { Width, Height, 1 };
 
 		// Todo copy multiple regions at once?
-		vkCmdCopyBufferToImage(TransferCommandBuffer, StagingBuffer, Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ImageRegion);
+		vkCmdCopyBufferToImage(TransferCommandBuffer, StagingBuffer.Buffer, Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ImageRegion);
 
 		vkEndCommandBuffer(TransferCommandBuffer);
 
@@ -301,43 +272,8 @@ namespace Core
 		vkFreeCommandBuffers(MemorySource.LogicalDevice, MemorySource.TransferCommandPool, 1, &TransferCommandBuffer);
 	}
 
-	VkBuffer VulkanMemoryManagementSystem::CreateBufferInternal(VkDeviceSize BufferSize, VkBufferUsageFlags BufferUsage)
+	VkDeviceMemory VulkanMemoryManagementSystem::AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex)
 	{
-		VkBufferCreateInfo BufferInfo = { };
-		BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		BufferInfo.size = BufferSize;
-		BufferInfo.usage = BufferUsage;
-		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-		VkBuffer Buffer;
-		VkResult Result = vkCreateBuffer(MemorySource.LogicalDevice, &BufferInfo, nullptr, &Buffer);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkCreateBuffer result is {}", static_cast<int>(Result));
-			assert(false);
-		}
-
-		return Buffer;
-	}
-
-	void VulkanMemoryManagementSystem::CreateStagingBuffer(VkDeviceSize Size)
-	{
-		const VkMemoryPropertyFlags Properties =  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-		StagingBuffer = CreateBufferInternal(Size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-
-		VkMemoryRequirements MemRequirements;
-		vkGetBufferMemoryRequirements(MemorySource.LogicalDevice, StagingBuffer, &MemRequirements);
-
-		const u32 Index = GetMemoryTypeIndex(MemorySource.PhysicalDevice, MemRequirements.memoryTypeBits, Properties);
-		AllocateMemory(Size, Index, &StagingBufferMemory);
-
-		vkBindBufferMemory(MemorySource.LogicalDevice, StagingBuffer, StagingBufferMemory, 0);
-	}
-
-	void VulkanMemoryManagementSystem::AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex,
-		VkDeviceMemory* Memory)
-	{
-		assert(*Memory == nullptr);
 		Util::Log().Info("Allocating Device memory. Buffer type: Image, Size count: {}, Index: {}",
 			AllocationSize, MemoryTypeIndex);
 
@@ -346,11 +282,14 @@ namespace Core
 		MemoryAllocInfo.allocationSize = AllocationSize;
 		MemoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;
 
-		VkResult Result = vkAllocateMemory(MemorySource.LogicalDevice, &MemoryAllocInfo, nullptr, Memory);
+		VkDeviceMemory Memory;
+		VkResult Result = vkAllocateMemory(MemorySource.LogicalDevice, &MemoryAllocInfo, nullptr, &Memory);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkAllocateMemory result is {}", static_cast<int>(Result));
 			assert(false);
 		}
+
+		return Memory;
 	}
 }

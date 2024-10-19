@@ -16,14 +16,11 @@ namespace Core
 	{
 		for (u32 i = 0; i < ImagesCount; ++i)
 		{
-			vkDestroyImageView(LogicalDevice, DepthBuffers[i].ImageView, nullptr);
-			vkDestroyImage(LogicalDevice, DepthBuffers[i].Image, nullptr);
-			vkFreeMemory(LogicalDevice, DepthBuffers[i].Memory, nullptr);
+			vkDestroyImageView(LogicalDevice, DepthBufferViews[i], nullptr);
+			VulkanMemoryManagementSystem::Get()->DestroyImageBuffer(DepthBuffers[i]);
 
-			vkDestroyImageView(LogicalDevice, ColorBuffers[i].ImageView, nullptr);
-			vkDestroyImage(LogicalDevice, ColorBuffers[i].Image, nullptr);
-			vkFreeMemory(LogicalDevice, ColorBuffers[i].Memory, nullptr);
-
+			vkDestroyImageView(LogicalDevice, ColorBufferViews[i], nullptr);
+			VulkanMemoryManagementSystem::Get()->DestroyImageBuffer(ColorBuffers[i]);
 
 			VulkanMemoryManagementSystem::Get()->DestroyBuffer(VpUniformBuffers[i]);
 			VulkanMemoryManagementSystem::Get()->DestroyBuffer(AmbientLightingBuffers[i]);
@@ -34,8 +31,7 @@ namespace Core
 		DeferredPass.ClearResources(LogicalDevice);
 		EntityPass.ClearResources(LogicalDevice);
 
-		vkDestroyDescriptorSetLayout(LogicalDevice, AmbientLightingLayout, nullptr);
-		vkDestroyDescriptorSetLayout(LogicalDevice, PointLightingLayout, nullptr);
+		vkDestroyDescriptorSetLayout(LogicalDevice, LightingSetLayout, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, SamplerSetLayout, nullptr);
 		vkDestroyRenderPass(LogicalDevice, RenderPass, nullptr);
 	}
@@ -286,34 +282,23 @@ namespace Core
 			assert(false);
 		}
 
-		VkDescriptorSetLayoutBinding AmbientLightLayoutBinding = { };
-		AmbientLightLayoutBinding.binding = 0;
-		AmbientLightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		AmbientLightLayoutBinding.descriptorCount = 1;
-		AmbientLightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		AmbientLightLayoutBinding.pImmutableSamplers = nullptr;
+		const u32 LightBindingsCount = 2;
+		VkDescriptorSetLayoutBinding LightBindings[LightBindingsCount];
+		LightBindings[0] = { };
+		LightBindings[0].binding = 0;
+		LightBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		LightBindings[0].descriptorCount = 1;
+		LightBindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		LightBindings[0].pImmutableSamplers = nullptr;
 
-		Bindings[0] = AmbientLightLayoutBinding;
+		LightBindings[1] = LightBindings[0];
+		LightBindings[1].binding = 1;
 
-		Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo,
-			nullptr, &AmbientLightingLayout);
-		if (Result != VK_SUCCESS)
-		{
-			//TODO LOG
-			assert(false);
-		}
-
-		VkDescriptorSetLayoutBinding PointLightLayoutBinding = { };
-		PointLightLayoutBinding.binding = 0;
-		PointLightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		PointLightLayoutBinding.descriptorCount = 1;
-		PointLightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		PointLightLayoutBinding.pImmutableSamplers = nullptr;
-
-		Bindings[0] = PointLightLayoutBinding;
+		LayoutCreateInfo.bindingCount = LightBindingsCount;
+		LayoutCreateInfo.pBindings = LightBindings;
 
 		Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo,
-			nullptr, &PointLightingLayout);
+			nullptr, &LightingSetLayout);
 		if (Result != VK_SUCCESS)
 		{
 			//TODO LOG
@@ -380,9 +365,9 @@ namespace Core
 			assert(false);
 		}
 
-		const u32 EntityPassDescriptorSetLayoutsCount = 4;
+		const u32 EntityPassDescriptorSetLayoutsCount = 3;
 		VkDescriptorSetLayout EntityPassDescriptorSetLayouts[EntityPassDescriptorSetLayoutsCount] = {
-			EntityPass.EntitySetLayout, SamplerSetLayout, AmbientLightingLayout, PointLightingLayout
+			EntityPass.EntitySetLayout, SamplerSetLayout, LightingSetLayout
 		};
 
 		VkPipelineLayoutCreateInfo EntityLayoutCreateInfo = { };
@@ -691,14 +676,14 @@ namespace Core
 				DepthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 				&DepthBuffers[i].Memory);
 
-			DepthBuffers[i].ImageView = CreateImageView(LogicalDevice, DepthBuffers[i].Image, DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+			DepthBufferViews[i] = CreateImageView(LogicalDevice, DepthBuffers[i].Image, DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
 			// VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT says that image can be used only as attachment. Used only for sub pass
 			ColorBuffers[i].Image = CreateImage(PhysicalDevice, LogicalDevice, SwapExtent.width, SwapExtent.height,
 				ColorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 				&ColorBuffers[i].Memory);
 
-			ColorBuffers[i].ImageView = CreateImageView(LogicalDevice, ColorBuffers[i].Image, ColorFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+			ColorBufferViews[i] = CreateImageView(LogicalDevice, ColorBuffers[i].Image, ColorFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 		}
 	}
 
@@ -707,68 +692,69 @@ namespace Core
 	{
 		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
 		const VkDeviceSize VpBufferSize = sizeof(UboViewProjection);
-		const VkDeviceSize AmbientLightBufferSize = sizeof(glm::vec3);
-		const VkDeviceSize PointLightBufferSize = sizeof(glm::vec3);
+		const VkDeviceSize AmbientLightBufferSize = sizeof(DrawAmbientLightEntity);
+		const VkDeviceSize PointLightBufferSize = sizeof(DrawPointLightEntity);
 
-		const VkDeviceSize AlignedVpSize = VulkanMemorySystem->CalculateAlignedSize(BufferType::Uniform, VpBufferSize);
-		const VkDeviceSize AlignedAmbientLightSize = VulkanMemorySystem->CalculateAlignedSize(BufferType::Uniform, AmbientLightBufferSize);
-		const VkDeviceSize AlignedPointLightSize = VulkanMemorySystem->CalculateAlignedSize(BufferType::Uniform, PointLightBufferSize);
-		VulkanMemorySystem->AllocateBufferMemory(BufferType::Uniform,
-			(AlignedVpSize + AlignedAmbientLightSize + AlignedPointLightSize) * ImagesCount);
+		const VkDeviceSize AlignedVpSize = VulkanMemorySystem->CalculateBufferAlignedSize(VpBufferSize);
+		const VkDeviceSize AlignedAmbientLightSize = VulkanMemorySystem->CalculateBufferAlignedSize(AmbientLightBufferSize);
+		const VkDeviceSize AlignedPointLightSize = VulkanMemorySystem->CalculateBufferAlignedSize(PointLightBufferSize);
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
-			VpUniformBuffers[i] = VulkanMemorySystem->CreateBuffer(BufferType::Uniform, VpBufferSize);
+			VpUniformBuffers[i] = VulkanMemorySystem->CreateBuffer(VpBufferSize,
+				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 		}
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
-			AmbientLightingBuffers[i] = VulkanMemorySystem->CreateBuffer(BufferType::Uniform, AmbientLightBufferSize);
+			AmbientLightingBuffers[i] = VulkanMemorySystem->CreateBuffer(AmbientLightBufferSize,
+				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 		}
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
-			PointLightingBuffers[i] = VulkanMemorySystem->CreateBuffer(BufferType::Uniform, AlignedPointLightSize);
+			PointLightingBuffers[i] = VulkanMemorySystem->CreateBuffer(AlignedPointLightSize,
+				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 		}
 	}
 
-	void MainRenderPass::CreateSets(VkDevice LogicalDevice, u32 ImagesCount)
+	void MainRenderPass::CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount)
 	{
 		auto VulkanMemoryManagement = VulkanMemoryManagementSystem::Get();
 		VkDescriptorSetLayout* SetLayouts = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
 		VkDescriptorSetLayout* TerrainLayouts = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
-		VkDescriptorSetLayout* AmbientLightLayouts = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
-		VkDescriptorSetLayout* PointLightLayouts = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
+		VkDescriptorSetLayout* LightingSetLayouts = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
 			SetLayouts[i] = EntityPass.EntitySetLayout;
 			TerrainLayouts[i] = TerrainPass.TerrainSetLayout;
-			AmbientLightLayouts[i] = AmbientLightingLayout;
-			PointLightLayouts[i] = PointLightingLayout;
+			LightingSetLayouts[i] = LightingSetLayout;
 		}
 
-		VulkanMemoryManagement->AllocateSets(SetLayouts, ImagesCount, EntityPass.EntitySets);
-		VulkanMemoryManagement->AllocateSets(TerrainLayouts, ImagesCount, TerrainPass.TerrainSets);
-		VulkanMemoryManagement->AllocateSets(AmbientLightLayouts, ImagesCount, AmbientLightingSets);
-		VulkanMemoryManagement->AllocateSets(AmbientLightLayouts, ImagesCount, PointLightingSets);
+		VulkanMemoryManagement->AllocateSets(Pool, SetLayouts, ImagesCount, EntityPass.EntitySets);
+		VulkanMemoryManagement->AllocateSets(Pool, TerrainLayouts, ImagesCount, TerrainPass.TerrainSets);
+		VulkanMemoryManagement->AllocateSets(Pool, LightingSetLayouts, ImagesCount, LightingSets);
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
 			VkDescriptorBufferInfo VpBufferInfo = { };
-			VpBufferInfo.buffer = VpUniformBuffers[i];
+			VpBufferInfo.buffer = VpUniformBuffers[i].Buffer;
 			VpBufferInfo.offset = 0;
 			VpBufferInfo.range = sizeof(UboViewProjection);
 
 			VkDescriptorBufferInfo AmbientLightBufferInfo = { };
-			AmbientLightBufferInfo.buffer = AmbientLightingBuffers[i];
+			AmbientLightBufferInfo.buffer = AmbientLightingBuffers[i].Buffer;
 			AmbientLightBufferInfo.offset = 0;
-			AmbientLightBufferInfo.range = sizeof(glm::vec3);
+			AmbientLightBufferInfo.range = sizeof(DrawAmbientLightEntity);
 
 			VkDescriptorBufferInfo PointLightBufferInfo = { };
-			PointLightBufferInfo.buffer = PointLightingBuffers[i];
+			PointLightBufferInfo.buffer = PointLightingBuffers[i].Buffer;
 			PointLightBufferInfo.offset = 0;
-			PointLightBufferInfo.range = sizeof(glm::vec3);
+			PointLightBufferInfo.range = sizeof(DrawPointLightEntity);
 
 			VkWriteDescriptorSet VpSetWrite = { };
 			VpSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -781,7 +767,7 @@ namespace Core
 
 			VkWriteDescriptorSet AmbientLightSetWrite = { };
 			AmbientLightSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			AmbientLightSetWrite.dstSet = AmbientLightingSets[i];
+			AmbientLightSetWrite.dstSet = LightingSets[i];
 			AmbientLightSetWrite.dstBinding = 0;
 			AmbientLightSetWrite.dstArrayElement = 0;
 			AmbientLightSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -790,8 +776,8 @@ namespace Core
 
 			VkWriteDescriptorSet PointLightSetWrite = { };
 			PointLightSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			PointLightSetWrite.dstSet = PointLightingSets[i];
-			PointLightSetWrite.dstBinding = 0;
+			PointLightSetWrite.dstSet = LightingSets[i];
+			PointLightSetWrite.dstBinding = 1;
 			PointLightSetWrite.dstArrayElement = 0;
 			PointLightSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			PointLightSetWrite.descriptorCount = 1;
@@ -810,7 +796,7 @@ namespace Core
 			SetLayouts[i] = DeferredPass.DeferredLayout;
 		}
 
-		VulkanMemoryManagement->AllocateSets(SetLayouts, ImagesCount, DeferredPass.DeferredSets);
+		VulkanMemoryManagement->AllocateSets(Pool, SetLayouts, ImagesCount, DeferredPass.DeferredSets);
 
 		// Todo: move this and previus loop to function?
 		for (u32 i = 0; i < ImagesCount; i++)
@@ -818,7 +804,7 @@ namespace Core
 			// Todo: move from loop?
 			VkDescriptorImageInfo ColourAttachmentDescriptor = { };
 			ColourAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			ColourAttachmentDescriptor.imageView = ColorBuffers[i].ImageView;
+			ColourAttachmentDescriptor.imageView = ColorBufferViews[i];
 			ColourAttachmentDescriptor.sampler = VK_NULL_HANDLE;
 
 			VkWriteDescriptorSet ColourWrite = { };
@@ -832,7 +818,7 @@ namespace Core
 
 			VkDescriptorImageInfo DepthAttachmentDescriptor = { };
 			DepthAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			DepthAttachmentDescriptor.imageView = DepthBuffers[i].ImageView;
+			DepthAttachmentDescriptor.imageView = DepthBufferViews[i];
 			DepthAttachmentDescriptor.sampler = VK_NULL_HANDLE;
 
 			VkWriteDescriptorSet DepthWrite = { };
