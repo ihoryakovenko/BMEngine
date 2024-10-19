@@ -875,13 +875,13 @@ namespace Core
 		VulkanMemoryManagementSystem::Get()->CopyDataToMemory(MainPass.VpUniformBuffers[ImageIndex].Memory, 0,
 			sizeof(UboViewProjection), &Scene.ViewProjection);
 
-		DrawAmbientLightEntity TestData = { glm::vec3(1.0f, 1.0f, 1.0f) * 0.1f };
+		DrawAmbientLightEntity TestData = { glm::vec3(1.0f, 1.0f, 1.0f)};
 
 		VulkanMemoryManagementSystem::Get()->CopyDataToMemory(MainPass.AmbientLightingBuffers[ImageIndex].Memory, 0,
 			sizeof(glm::vec3), &TestData);
 
 		DrawPointLightEntity TestData2;
-		TestData2.LightPosition = glm::vec3(1.0f, 10.0f, 1.0f);
+		TestData2.LightPosition = glm::vec3(0.0f, 0.0f, 10.0f);
 		TestData2.LightColor = glm::vec3(1.0f, 1.0f, 1.0f);
 
 		VulkanMemoryManagementSystem::Get()->CopyDataToMemory(MainPass.PointLightingBuffers[ImageIndex].Memory, 0,

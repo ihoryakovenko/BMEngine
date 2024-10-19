@@ -21,6 +21,8 @@
 #include <random>
 #include "Memory/MemoryManagmentSystem.h"
 #include "Util/EngineTypes.h"
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/string_cast.hpp>
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
@@ -107,35 +109,19 @@ TestMesh CreateCubeMesh()
 {
 	TestMesh cube;
 
-	// Define the 8 unique vertices for the cube with positions, colors, and texture coordinates
-	glm::vec3 red = { 1.0f, 0.0f, 0.0f };
-	glm::vec3 green = { 0.0f, 1.0f, 0.0f };
-	glm::vec3 blue = { 0.0f, 0.0f, 1.0f };
-	glm::vec3 white = { 1.0f, 1.0f, 1.0f };
-	glm::vec3 yellow = { 1.0f, 1.0f, 0.0f };
-	glm::vec3 cyan = { 0.0f, 1.0f, 1.0f };
-	glm::vec3 magenta = { 1.0f, 0.0f, 1.0f };
-	glm::vec3 black = { 0.0f, 0.0f, 0.0f };
-
-	glm::vec3 frontNormal = { 0.0f, 0.0f, 1.0f };
-	glm::vec3 backNormal = { 0.0f, 0.0f, -1.0f };
-	glm::vec3 leftNormal = { -1.0f, 0.0f, 0.0f };
-	glm::vec3 rightNormal = { 1.0f, 0.0f, 0.0f };
-	glm::vec3 topNormal = { 0.0f, 1.0f, 0.0f };
-	glm::vec3 bottomNormal = { 0.0f, -1.0f, 0.0f };
-
+	// Define vertices for the cube
 	cube.vertices = {
 		// Front face
-		{ { -1.0f, -1.0f, 1.0f }, red, { 0.0f, 0.0f }, frontNormal },  // 0: Bottom-left
-		{ { 1.0f, -1.0f, 1.0f }, green, { 1.0f, 0.0f }, frontNormal }, // 1: Bottom-right
-		{ { 1.0f, 1.0f, 1.0f }, blue, { 1.0f, 1.0f }, frontNormal },   // 2: Top-right
-		{ { -1.0f, 1.0f, 1.0f }, white, { 0.0f, 1.0f }, frontNormal }, // 3: Top-left
+		{ { -1.0f, -1.0f, 1.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } },  // 0: Bottom-left
+		{ { 1.0f, -1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } }, // 1: Bottom-right
+		{ { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f } },   // 2: Top-right
+		{ { -1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 0.0f } }, // 3: Top-left
 
 		// Back face
-		{ { -1.0f, -1.0f, -1.0f }, yellow, { 1.0f, 0.0f }, backNormal }, // 4: Bottom-left
-		{ { 1.0f, -1.0f, -1.0f }, cyan, { 0.0f, 0.0f }, backNormal },   // 5: Bottom-right
-		{ { 1.0f, 1.0f, -1.0f }, magenta, { 0.0f, 1.0f }, backNormal }, // 6: Top-right
-		{ { -1.0f, 1.0f, -1.0f }, black, { 1.0f, 1.0f }, backNormal },  // 7: Top-left
+		{ { -1.0f, -1.0f, -1.0f }, { 1.0f, 1.0f, 0.0f }, { 1.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } }, // 4: Bottom-left
+		{ { 1.0f, -1.0f, -1.0f }, { 0.0f, 1.0f, 1.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } },   // 5: Bottom-right
+		{ { 1.0f, 1.0f, -1.0f }, { 1.0f, 0.0f, 1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 0.0f } }, // 6: Top-right
+		{ { -1.0f, 1.0f, -1.0f }, { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f } },  // 7: Top-left
 	};
 
 	// Define the indices for the cube (2 triangles per face, 6 faces total)
@@ -157,25 +143,37 @@ TestMesh CreateCubeMesh()
 	// Set the texture ID (if needed)
 	cube.TextureId = 0;
 
-	cube.vertices[1].Normal = rightNormal; // Right face normals
-	cube.vertices[2].Normal = rightNormal;
-	cube.vertices[5].Normal = rightNormal;
-	cube.vertices[6].Normal = rightNormal;
+	// Calculate normals for each face based on vertex positions
+	for (size_t i = 0; i < cube.indices.size(); i += 3)
+	{
+		// Get indices for the triangle
+		u32 index0 = cube.indices[i];
+		u32 index1 = cube.indices[i + 1];
+		u32 index2 = cube.indices[i + 2];
 
-	cube.vertices[0].Normal = leftNormal;  // Left face normals
-	cube.vertices[3].Normal = leftNormal;
-	cube.vertices[4].Normal = leftNormal;
-	cube.vertices[7].Normal = leftNormal;
+		// Get the positions of the vertices
+		glm::vec3 v0 = cube.vertices[index0].Position;
+		glm::vec3 v1 = cube.vertices[index1].Position;
+		glm::vec3 v2 = cube.vertices[index2].Position;
 
-	cube.vertices[2].Normal = topNormal;   // Top face normals
-	cube.vertices[3].Normal = topNormal;
-	cube.vertices[6].Normal = topNormal;
-	cube.vertices[7].Normal = topNormal;
+		// Calculate two edges of the triangle
+		glm::vec3 edge1 = v1 - v0;
+		glm::vec3 edge2 = v2 - v0;
 
-	cube.vertices[0].Normal = bottomNormal; // Bottom face normals
-	cube.vertices[1].Normal = bottomNormal;
-	cube.vertices[4].Normal = bottomNormal;
-	cube.vertices[5].Normal = bottomNormal;
+		// Calculate the normal using the cross product
+		glm::vec3 normal = glm::normalize(glm::cross(edge1, edge2));
+
+		// Assign the normal to each vertex of the triangle
+		cube.vertices[index0].Normal += normal;
+		cube.vertices[index1].Normal += normal;
+		cube.vertices[index2].Normal += normal;
+	}
+
+	// Normalize the normals for each vertex
+	for (auto& vertex : cube.vertices)
+	{
+		vertex.Normal = glm::normalize(vertex.Normal);
+	}
 
 	return cube;
 }
@@ -443,6 +441,7 @@ void LoadDrawEntities()
 	}
 
 	ModelMeshes.emplace_back(CreateCubeMesh());
+	ModelMeshes.emplace_back(CreateCubeMesh());
 
 	DrawEntities.resize(ModelMeshes.size());
 	
@@ -462,10 +461,17 @@ void LoadDrawEntities()
 
 	RenderingSystem.CreateDrawEntities(m.data(), m.size(), DrawEntities.data());
 
-	glm::vec3 CubePos(1.2f, 1.0f, 2.0f);
+	glm::vec3 LightCubePos(0.0f, 0.0f, 10.0f);
+	glm::mat4 Lightmodel = glm::mat4(1.0f);
+	Lightmodel = glm::translate(Lightmodel, LightCubePos);
+	Lightmodel = glm::scale(Lightmodel, glm::vec3(0.2f));
+
+	DrawEntities[ModelMeshes.size() - 2].Model = Lightmodel;
+
+	glm::vec3 CubePos(0.0f, 0.0f, 15.0f);
 	glm::mat4 model = glm::mat4(1.0f);
 	model = glm::translate(model, CubePos);
-	model = glm::scale(model, glm::vec3(0.2f));
+	model = glm::scale(model, glm::vec3(1.0f));
 
 	DrawEntities[ModelMeshes.size() - 1].Model = model;
 }
@@ -589,6 +595,8 @@ int main()
 	double DeltaTime = 0.0f;
 	double LastTime = 0.0f;
 
+	float Angle = 0.0f;
+
 	Camera MainCamera;
 
 	MemorySystem->FrameDealloc();
@@ -600,6 +608,18 @@ int main()
 		const double CurrentTime = glfwGetTime();
 		DeltaTime = CurrentTime - LastTime;
 		LastTime = static_cast<float>(CurrentTime);
+
+		Angle += 0.5f * static_cast<float>(DeltaTime);
+		if (Angle > 360.0f)
+		{
+			Angle -= 360.0f;
+		}
+
+		for (int i = 0; i < Scene.DrawEntitiesCount; ++i)
+		{
+			glm::mat4 TestMat = glm::rotate(Scene.DrawEntities[i].Model, glm::radians(0.5f), glm::vec3(0.0f, 1.0f, 0.0f));
+			Scene.DrawEntities[i].Model = TestMat;
+		}
 
 		MoveCamera(Window, DeltaTime, MainCamera);
 		Scene.ViewProjection.View = glm::lookAt(MainCamera.CameraPosition, MainCamera.CameraPosition + MainCamera.CameraFront, MainCamera.CameraUp);

@@ -262,7 +262,7 @@ namespace Core
 		VpLayoutBinding.binding = 0;											// Binding point in shader (designated by binding number in shader)
 		VpLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;	// Type of descriptor (uniform, dynamic uniform, image sampler, etc)
 		VpLayoutBinding.descriptorCount = 1;									// Number of descriptors for binding
-		VpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;				// Shader stage to bind to
+		VpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;				// Shader stage to bind to
 		VpLayoutBinding.pImmutableSamplers = nullptr;							// For Texture: Can make sampler data unchangeable (immutable) by specifying in layout
 
 		const u32 BindingCount = 1;
