@@ -126,21 +126,20 @@ namespace Core
 		VkDeviceSize VertexOffset = 0;
 	};
 
-	struct DrawAmbientLightEntity
-	{
-		alignas(16) glm::vec3 LightColor;
-	};
-
 	struct DrawPointLightEntity
 	{
-		alignas(16) glm::vec3 LightPosition;
-		alignas(16) glm::vec3 LightColor;
+		alignas(16) glm::vec3 Position;
+		alignas(16) glm::vec3 Ambient;
+		alignas(16) glm::vec3 Diffuse;
+		alignas(16) glm::vec3 Specular;
 	};
 
-	struct LightBuffer
+	struct Material
 	{
-		DrawAmbientLightEntity AmbientLight;
-		DrawPointLightEntity PointLight;
+		alignas(16) glm::vec3 Ambient;
+		alignas(16) glm::vec3 Diffuse;
+		glm::vec3 Specular;
+		float Shininess;
 	};
 
 	struct DrawScene

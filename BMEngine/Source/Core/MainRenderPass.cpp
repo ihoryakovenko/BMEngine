@@ -23,14 +23,16 @@ namespace Core
 			VulkanMemoryManagementSystem::Get()->DestroyImageBuffer(ColorBuffers[i]);
 
 			VulkanMemoryManagementSystem::Get()->DestroyBuffer(VpUniformBuffers[i]);
-			VulkanMemoryManagementSystem::Get()->DestroyBuffer(AmbientLightingBuffers[i]);
-			VulkanMemoryManagementSystem::Get()->DestroyBuffer(PointLightingBuffers[i]);
+			VulkanMemoryManagementSystem::Get()->DestroyBuffer(LightBuffers[i]);
 		}
+
+		VulkanMemoryManagementSystem::Get()->DestroyBuffer(MaterialBuffer);
 
 		TerrainPass.ClearResources(LogicalDevice);
 		DeferredPass.ClearResources(LogicalDevice);
 		EntityPass.ClearResources(LogicalDevice);
 
+		vkDestroyDescriptorSetLayout(LogicalDevice, MaterialLayout, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, LightingSetLayout, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, SamplerSetLayout, nullptr);
 		vkDestroyRenderPass(LogicalDevice, RenderPass, nullptr);
@@ -224,7 +226,7 @@ namespace Core
 			nullptr, &SamplerSetLayout);
 		if (Result != VK_SUCCESS)
 		{
-			// TODO LOG
+			Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
 			assert(false);
 		}
 	}
@@ -251,7 +253,7 @@ namespace Core
 			nullptr, &TerrainPass.TerrainSetLayout);
 		if (Result != VK_SUCCESS)
 		{
-			//TODO LOG
+			Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
 			assert(false);
 		}
 	}
@@ -259,26 +261,25 @@ namespace Core
 	void MainRenderPass::CreateEntitySetLayout(VkDevice LogicalDevice)
 	{
 		VkDescriptorSetLayoutBinding VpLayoutBinding = { };
-		VpLayoutBinding.binding = 0;											// Binding point in shader (designated by binding number in shader)
-		VpLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;	// Type of descriptor (uniform, dynamic uniform, image sampler, etc)
-		VpLayoutBinding.descriptorCount = 1;									// Number of descriptors for binding
-		VpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;				// Shader stage to bind to
-		VpLayoutBinding.pImmutableSamplers = nullptr;							// For Texture: Can make sampler data unchangeable (immutable) by specifying in layout
+		VpLayoutBinding.binding = 0;
+		VpLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		VpLayoutBinding.descriptorCount = 1;
+		VpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		VpLayoutBinding.pImmutableSamplers = nullptr; // For Texture: Can make sampler data unchangeable (immutable) by specifying in layout
 
 		const u32 BindingCount = 1;
-		VkDescriptorSetLayoutBinding Bindings[BindingCount] = { VpLayoutBinding };
 
 		// Create Descriptor Set Layout with given bindings
 		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
 		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		LayoutCreateInfo.bindingCount = BindingCount;					// Number of binding infos
-		LayoutCreateInfo.pBindings = Bindings;		// Array of binding infos
+		LayoutCreateInfo.pBindings = &VpLayoutBinding;		// Array of binding infos
 
 		VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo,
 			nullptr, &EntityPass.EntitySetLayout);
 		if (Result != VK_SUCCESS)
 		{
-			//TODO LOG
+			Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
 			assert(false);
 		}
 
@@ -301,7 +302,25 @@ namespace Core
 			nullptr, &LightingSetLayout);
 		if (Result != VK_SUCCESS)
 		{
-			//TODO LOG
+			Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
+			assert(false);
+		}
+
+		VkDescriptorSetLayoutBinding materialLayoutBinding = { };
+		materialLayoutBinding.binding = 0;
+		materialLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		materialLayoutBinding.descriptorCount = 1;
+		materialLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		materialLayoutBinding.pImmutableSamplers = nullptr;
+
+		LayoutCreateInfo.bindingCount = 1;
+		LayoutCreateInfo.pBindings = &materialLayoutBinding;
+
+		Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo,
+			nullptr, &MaterialLayout);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
 			assert(false);
 		}
 	}
@@ -365,9 +384,9 @@ namespace Core
 			assert(false);
 		}
 
-		const u32 EntityPassDescriptorSetLayoutsCount = 3;
+		const u32 EntityPassDescriptorSetLayoutsCount = 4;
 		VkDescriptorSetLayout EntityPassDescriptorSetLayouts[EntityPassDescriptorSetLayoutsCount] = {
-			EntityPass.EntitySetLayout, SamplerSetLayout, LightingSetLayout
+			EntityPass.EntitySetLayout, SamplerSetLayout, LightingSetLayout, MaterialLayout
 		};
 
 		VkPipelineLayoutCreateInfo EntityLayoutCreateInfo = { };
@@ -692,12 +711,12 @@ namespace Core
 	{
 		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
 		const VkDeviceSize VpBufferSize = sizeof(UboViewProjection);
-		const VkDeviceSize AmbientLightBufferSize = sizeof(DrawAmbientLightEntity);
-		const VkDeviceSize PointLightBufferSize = sizeof(DrawPointLightEntity);
+		const VkDeviceSize LightBufferSize = sizeof(DrawPointLightEntity);
+		const VkDeviceSize MaterialBufferSize = sizeof(Material);
 
-		const VkDeviceSize AlignedVpSize = VulkanMemorySystem->CalculateBufferAlignedSize(VpBufferSize);
-		const VkDeviceSize AlignedAmbientLightSize = VulkanMemorySystem->CalculateBufferAlignedSize(AmbientLightBufferSize);
-		const VkDeviceSize AlignedPointLightSize = VulkanMemorySystem->CalculateBufferAlignedSize(PointLightBufferSize);
+		//const VkDeviceSize AlignedVpSize = VulkanMemorySystem->CalculateBufferAlignedSize(VpBufferSize);
+		//const VkDeviceSize AlignedAmbientLightSize = VulkanMemorySystem->CalculateBufferAlignedSize(AmbientLightBufferSize);
+		//const VkDeviceSize AlignedPointLightSize = VulkanMemorySystem->CalculateBufferAlignedSize(PointLightBufferSize);
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
@@ -708,17 +727,14 @@ namespace Core
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
-			AmbientLightingBuffers[i] = VulkanMemorySystem->CreateBuffer(AmbientLightBufferSize,
+			LightBuffers[i] = VulkanMemorySystem->CreateBuffer(LightBufferSize,
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 		}
 
-		for (u32 i = 0; i < ImagesCount; i++)
-		{
-			PointLightingBuffers[i] = VulkanMemorySystem->CreateBuffer(AlignedPointLightSize,
-				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-		}
+		MaterialBuffer = VulkanMemorySystem->CreateBuffer(MaterialBufferSize,
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	}
 
 	void MainRenderPass::CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount)
@@ -747,14 +763,9 @@ namespace Core
 			VpBufferInfo.range = sizeof(UboViewProjection);
 
 			VkDescriptorBufferInfo AmbientLightBufferInfo = { };
-			AmbientLightBufferInfo.buffer = AmbientLightingBuffers[i].Buffer;
+			AmbientLightBufferInfo.buffer = LightBuffers[i].Buffer;
 			AmbientLightBufferInfo.offset = 0;
-			AmbientLightBufferInfo.range = sizeof(DrawAmbientLightEntity);
-
-			VkDescriptorBufferInfo PointLightBufferInfo = { };
-			PointLightBufferInfo.buffer = PointLightingBuffers[i].Buffer;
-			PointLightBufferInfo.offset = 0;
-			PointLightBufferInfo.range = sizeof(DrawPointLightEntity);
+			AmbientLightBufferInfo.range = sizeof(DrawPointLightEntity);
 
 			VkWriteDescriptorSet VpSetWrite = { };
 			VpSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -765,29 +776,20 @@ namespace Core
 			VpSetWrite.descriptorCount = 1;
 			VpSetWrite.pBufferInfo = &VpBufferInfo;
 
-			VkWriteDescriptorSet AmbientLightSetWrite = { };
-			AmbientLightSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			AmbientLightSetWrite.dstSet = LightingSets[i];
-			AmbientLightSetWrite.dstBinding = 0;
-			AmbientLightSetWrite.dstArrayElement = 0;
-			AmbientLightSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			AmbientLightSetWrite.descriptorCount = 1;
-			AmbientLightSetWrite.pBufferInfo = &AmbientLightBufferInfo;
-
-			VkWriteDescriptorSet PointLightSetWrite = { };
-			PointLightSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			PointLightSetWrite.dstSet = LightingSets[i];
-			PointLightSetWrite.dstBinding = 1;
-			PointLightSetWrite.dstArrayElement = 0;
-			PointLightSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			PointLightSetWrite.descriptorCount = 1;
-			PointLightSetWrite.pBufferInfo = &PointLightBufferInfo;
+			VkWriteDescriptorSet LightSetWrite = { };
+			LightSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			LightSetWrite.dstSet = LightingSets[i];
+			LightSetWrite.dstBinding = 0;
+			LightSetWrite.dstArrayElement = 0;
+			LightSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			LightSetWrite.descriptorCount = 1;
+			LightSetWrite.pBufferInfo = &AmbientLightBufferInfo;
 
 			VkWriteDescriptorSet VpTerrainWrite = VpSetWrite;
 			VpTerrainWrite.dstSet = TerrainPass.TerrainSets[i];
 
-			const u32 WriteSetsCount = 4;
-			VkWriteDescriptorSet WriteSets[WriteSetsCount] = { VpSetWrite, AmbientLightSetWrite, VpTerrainWrite, PointLightSetWrite };
+			const u32 WriteSetsCount = 3;
+			VkWriteDescriptorSet WriteSets[WriteSetsCount] = { VpSetWrite, VpTerrainWrite, LightSetWrite };
 			vkUpdateDescriptorSets(LogicalDevice, WriteSetsCount, WriteSets, 0, nullptr);
 		}
 
@@ -834,6 +836,24 @@ namespace Core
 			VkWriteDescriptorSet SetWrites[CetWritesCount] = { ColourWrite, DepthWrite };
 			vkUpdateDescriptorSets(LogicalDevice, CetWritesCount, SetWrites, 0, nullptr);
 		}
+
+		VulkanMemoryManagement->AllocateSets(Pool, &MaterialLayout, 1, &MaterialSet);
+
+		VkDescriptorBufferInfo MaterialBufferInfo = { };
+		MaterialBufferInfo.buffer = MaterialBuffer.Buffer;
+		MaterialBufferInfo.offset = 0;
+		MaterialBufferInfo.range = sizeof(Material);
+
+		VkWriteDescriptorSet MaterialSetWrite = { };
+		MaterialSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		MaterialSetWrite.dstSet = MaterialSet;
+		MaterialSetWrite.dstBinding = 0;
+		MaterialSetWrite.dstArrayElement = 0;
+		MaterialSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		MaterialSetWrite.descriptorCount = 1;
+		MaterialSetWrite.pBufferInfo = &MaterialBufferInfo;
+
+		vkUpdateDescriptorSets(LogicalDevice, 1, &MaterialSetWrite, 0, nullptr);
 	}
 
 	void EntitySubpass::ClearResources(VkDevice LogicalDevice)

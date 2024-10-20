@@ -102,7 +102,7 @@ namespace Core
 		SwapchainInstance SwapInstance1 = SwapchainInstance::CreateSwapchainInstance(Device.PhysicalDevice, Device.Indices,
 			LogicalDevice, Surface, SurfaceFormat, Extent1);
 
-		const u32 PoolSizeCount = 8;
+		const u32 PoolSizeCount = 9;
 		auto TotalPassPoolSizes = Memory::FramePointer<VkDescriptorPoolSize>::Create(PoolSizeCount);
 		u32 TotalDescriptorLayouts = 20;
 		// Layout 1
@@ -120,6 +120,7 @@ namespace Core
 		TotalPassPoolSizes[6] = { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = Config.MaxTextures };
 
 		TotalPassPoolSizes[7] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
+		TotalPassPoolSizes[8] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
 
 		u32 TotalDescriptorCount = TotalDescriptorLayouts * SwapInstance1.ImagesCount;
 		TotalDescriptorCount += Config.MaxTextures;
@@ -832,12 +833,13 @@ namespace Core
 				VkDeviceSize Offsets[] = { Scene.DrawEntities[j].VertexOffset };
 
 				// Todo: do not record textureId on each frame?
-				const u32 DescriptorSetGroupCount = 3;
+				const u32 DescriptorSetGroupCount = 4;
 				VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] = 
 				{
 					MainPass.EntityPass.EntitySets[ImageIndex],
 					TextureUnit.SamplerDescriptorSets[Scene.DrawEntities[j].TextureId],
 					MainPass.LightingSets[ImageIndex],
+					MainPass.MaterialSet
 				};
 
 				vkCmdPushConstants(MainViewport.CommandBuffers[ImageIndex], MainPass.EntityPass.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
@@ -875,17 +877,23 @@ namespace Core
 		VulkanMemoryManagementSystem::Get()->CopyDataToMemory(MainPass.VpUniformBuffers[ImageIndex].Memory, 0,
 			sizeof(UboViewProjection), &Scene.ViewProjection);
 
-		DrawAmbientLightEntity TestData = { glm::vec3(1.0f, 1.0f, 1.0f)};
+		DrawPointLightEntity TestData = { glm::vec3(1.0f, 1.0f, 1.0f)};
+		TestData.Position = glm::vec3(0.0f, 0.0f, 10.0f);
+		TestData.Ambient = glm::vec3(0.2f, 0.2f, 0.2f);
+		TestData.Diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
+		TestData.Specular = glm::vec3(1.0f, 1.0f, 1.0f);
 
-		VulkanMemoryManagementSystem::Get()->CopyDataToMemory(MainPass.AmbientLightingBuffers[ImageIndex].Memory, 0,
-			sizeof(glm::vec3), &TestData);
+		VulkanMemoryManagementSystem::Get()->CopyDataToMemory(MainPass.LightBuffers[ImageIndex].Memory, 0,
+			sizeof(DrawPointLightEntity), &TestData);
 
-		DrawPointLightEntity TestData2;
-		TestData2.LightPosition = glm::vec3(0.0f, 0.0f, 10.0f);
-		TestData2.LightColor = glm::vec3(1.0f, 1.0f, 1.0f);
+		Material Mat;
+		Mat.Ambient = glm::vec3(0.24725f, 0.1995f, 0.0745f);
+		Mat.Diffuse = glm::vec3(0.75164f, 0.60648f, 0.22648f);
+		Mat.Specular = glm::vec3(0.628281f, 0.555802f, 0.366065f);
+		Mat.Shininess = 0.4f;
 
-		VulkanMemoryManagementSystem::Get()->CopyDataToMemory(MainPass.PointLightingBuffers[ImageIndex].Memory, 0,
-			sizeof(DrawPointLightEntity), &TestData2);
+		VulkanMemoryManagementSystem::Get()->CopyDataToMemory(MainPass.MaterialBuffer.Memory, 0,
+			sizeof(Material), &Mat);
 
 		// Submit command buffer to queue
 		VkSubmitInfo SubmitInfo = { };

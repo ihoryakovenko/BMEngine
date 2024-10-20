@@ -86,9 +86,11 @@ namespace Core
 		VkDescriptorSetLayout LightingSetLayout = nullptr;
 		VkDescriptorSet LightingSets[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		GPUBuffer AmbientLightingBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		GPUBuffer LightBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		GPUBuffer PointLightingBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		GPUBuffer MaterialBuffer;
+		VkDescriptorSetLayout MaterialLayout = nullptr;
+		VkDescriptorSet MaterialSet = nullptr;
 
 		VkDescriptorSetLayout SamplerSetLayout = nullptr;
 	};
