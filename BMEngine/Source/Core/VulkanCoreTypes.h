@@ -136,9 +136,6 @@ namespace Core
 
 	struct Material
 	{
-		alignas(16) glm::vec3 Ambient;
-		alignas(16) glm::vec3 Diffuse;
-		glm::vec3 Specular;
 		float Shininess;
 	};
 

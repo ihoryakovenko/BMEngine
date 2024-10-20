@@ -141,16 +141,14 @@ struct Camera
 	glm::vec3 CameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 };
 
-std::vector<Core::TextureArrayInfo> TexturesInfo;
-
-void AddTexture(const char* TexturePath)
+void AddTexture(const char* DiffuseTexturePath)
 {
 	int Width;
 	int Height;
 	int Channels;
 
 	// TODO: delete
-	stbi_uc* ImageData = stbi_load(TexturePath, &Width, &Height, &Channels, STBI_rgb_alpha);
+	stbi_uc* ImageData = stbi_load(DiffuseTexturePath, &Width, &Height, &Channels, STBI_rgb_alpha);
 
 	if (ImageData == nullptr)
 	{
@@ -164,7 +162,26 @@ void AddTexture(const char* TexturePath)
 	Info.LayersCount = 1;
 	Info.Data = ImageData;
 
-	TexturesInfo.push_back(Info);
+	static Core::TextureArrayInfo Info2 = []()
+	{
+		int Width;
+		int Height;
+		int Channels;
+
+		// TODO: delete
+		stbi_uc* Specular = stbi_load("./Resources/Textures/container2_specular.png", &Width, &Height, &Channels, STBI_rgb_alpha);
+
+		Core::TextureArrayInfo res;
+		res.Width = Width;
+		res.Height = Height;
+		res.Format = STBI_rgb_alpha;
+		res.LayersCount = 1;
+		res.Data = Specular;
+
+		return res;
+	}();
+
+	RenderingSystem.LoadTexture(Info, Info2);
 }
 
 void WindowCloseCallback(GLFWwindow* Window)
@@ -253,7 +270,7 @@ void MoveCamera(GLFWwindow* Window, float DeltaTime, Camera& MainCamera)
 	MainCamera.CameraFront = glm::normalize(Front);
 }
 
-TestMesh CreateCubeMesh()
+TestMesh CreateCubeMesh(int texture)
 {
 	TestMesh cube;
 
@@ -318,8 +335,7 @@ TestMesh CreateCubeMesh()
 			cube.indices.push_back(uniqueVertices[vertex]);
 		}
 
-		cube.TextureId = 1;
-
+		cube.TextureId = texture;
 	}
 
 	return cube;
@@ -327,6 +343,8 @@ TestMesh CreateCubeMesh()
 
 void LoadDrawEntities()
 {
+	const char* ContainerSpecularTexture = "./Resources/Textures/container2_specular.png";
+	const char* ContainerTexture = "./Resources/Textures/container2.png";
 	const char* WhiteTexture = "./Resources/Textures/White.png";
 	const char* TestTexture = "./Resources/Textures/1giraffe.jpg";
 	const char* Modelpath = "./Resources/Models/uh60.obj";
@@ -343,11 +361,13 @@ void LoadDrawEntities()
 	}
 
 	// TODO: -_-
-	int TextureIndex = 2;
+	int TextureIndex = 4;
 	std::vector<int> MaterialToTexture(Materials.size());
 
 	AddTexture(TestTexture);
 	AddTexture(WhiteTexture);
+	AddTexture(ContainerTexture);
+	AddTexture(ContainerSpecularTexture);
 
 	for (size_t i = 0; i < Materials.size(); i++)
 	{
@@ -422,8 +442,9 @@ void LoadDrawEntities()
 		ModelMeshes.push_back(Tm);
 	}
 
-	ModelMeshes.emplace_back(CreateCubeMesh());
-	ModelMeshes.emplace_back(CreateCubeMesh());
+	ModelMeshes.emplace_back(CreateCubeMesh(1));
+	ModelMeshes.emplace_back(CreateCubeMesh(1));
+	ModelMeshes.emplace_back(CreateCubeMesh(2));
 
 	DrawEntities.resize(ModelMeshes.size());
 	
@@ -442,20 +463,34 @@ void LoadDrawEntities()
 	}
 
 	RenderingSystem.CreateDrawEntities(m.data(), m.size(), DrawEntities.data());
+	{
+		glm::vec3 LightCubePos(0.0f, 0.0f, 10.0f);
+		glm::mat4 Lightmodel = glm::mat4(1.0f);
+		Lightmodel = glm::translate(Lightmodel, LightCubePos);
+		Lightmodel = glm::scale(Lightmodel, glm::vec3(0.2f));
 
-	glm::vec3 LightCubePos(0.0f, 0.0f, 10.0f);
-	glm::mat4 Lightmodel = glm::mat4(1.0f);
-	Lightmodel = glm::translate(Lightmodel, LightCubePos);
-	Lightmodel = glm::scale(Lightmodel, glm::vec3(0.2f));
+		DrawEntities[ModelMeshes.size() - 3].Model = Lightmodel;
+	}
 
-	DrawEntities[ModelMeshes.size() - 2].Model = Lightmodel;
+	{
+		glm::vec3 CubePos(0.0f, 0.0f, 15.0f);
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, CubePos);
+		model = glm::scale(model, glm::vec3(1.0f));
 
-	glm::vec3 CubePos(0.0f, 0.0f, 15.0f);
-	glm::mat4 model = glm::mat4(1.0f);
-	model = glm::translate(model, CubePos);
-	model = glm::scale(model, glm::vec3(1.0f));
+		DrawEntities[ModelMeshes.size() - 2].Model = model;
+	}
 
-	DrawEntities[ModelMeshes.size() - 1].Model = model;
+	{
+		glm::vec3 CubePos(5.0f, 0.0f, 10.0f);
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, CubePos);
+		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		model = glm::scale(model, glm::vec3(1.0f));
+
+		DrawEntities[ModelMeshes.size() - 1].Model = model;
+	}
+
 }
 
 void LoadShaders()
@@ -547,7 +582,7 @@ int main()
 	Core::RenderConfig Config;
 	Config.RenderShaders = ShaderCodeDescriptions;
 	Config.ShadersCount = Core::ShaderNames::ShadersCount;
-	Config.MaxTextures = 33;
+	Config.MaxTextures = 90;
 
 	RenderingSystem.Init(Window, Config);
 	LoadDrawEntities();
@@ -562,9 +597,6 @@ int main()
 	
 	Core::DrawTerrainEntity TestDrawTerrainEntity;
 	RenderingSystem.CreateTerrainDrawEntity(&TerrainVerticesData[0][0], NumRows * NumCols, TestDrawTerrainEntity);
-
-	std::vector<u32> Test(40);
-	RenderingSystem.LoadTextures(TexturesInfo.data(), TexturesInfo.size(), Test.data());
 	RenderingSystem.CreateTerrainIndices(indices.data(), indices.size());
 
 	Scene.DrawTerrainEntities = &TestDrawTerrainEntity;

@@ -15,7 +15,7 @@ namespace Core
 		bool Init(GLFWwindow* Window, const RenderConfig& InConfig);
 		void DeInit();
 
-		void LoadTextures(TextureArrayInfo* ArrayInfos, u32 TexturesCount, u32* ResourceIndices);
+		void LoadTexture(TextureArrayInfo DiffuseTexture, TextureArrayInfo SpecularTexture);
 
 		void CreateDrawEntities(Mesh* Meshes, u32 MeshesCount, DrawEntity* OutEntities);
 
@@ -89,16 +89,15 @@ namespace Core
 
 		VkDescriptorPool MainPool = nullptr;
 
-		// Todo: put all textures in atlases or texture layers?
 		struct
 		{
-			VkSampler TextureSampler = nullptr;
-			static inline VkDescriptorSet SamplerDescriptorSets[MAX_IMAGES];
-
-			static inline ImageBuffer Images[MAX_IMAGES];
+			VkSampler DiffuseTextureSampler = nullptr;
+			VkSampler SpecularTextureSampler = nullptr;
+			static inline ImageBuffer DiffuseTextureBuffers[MAX_IMAGES];
+			static inline ImageBuffer SpecularTextureBuffers[MAX_IMAGES];
 			u32 ImageArraysCount = 0;
-			static inline VkImageView ImageViews[MAX_IMAGES];
-			u32 ImagesViewsCount = 0;
+			static inline VkImageView DiffuseTextureImageViews[MAX_IMAGES];
+			static inline VkImageView SpecularTextureImageViews[MAX_IMAGES];
 			
 		} TextureUnit;
 

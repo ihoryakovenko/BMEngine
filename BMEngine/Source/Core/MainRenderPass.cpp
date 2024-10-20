@@ -34,7 +34,7 @@ namespace Core
 
 		vkDestroyDescriptorSetLayout(LogicalDevice, MaterialLayout, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, LightingSetLayout, nullptr);
-		vkDestroyDescriptorSetLayout(LogicalDevice, SamplerSetLayout, nullptr);
+
 		vkDestroyRenderPass(LogicalDevice, RenderPass, nullptr);
 	}
 
@@ -209,21 +209,45 @@ namespace Core
 
 	void MainRenderPass::CreateSamplerSetLayout(VkDevice LogicalDevice)
 	{
-		VkDescriptorSetLayoutBinding SamplerLayoutBinding = { };
-		SamplerLayoutBinding.binding = 0;
-		SamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		SamplerLayoutBinding.descriptorCount = 1;
-		SamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		SamplerLayoutBinding.pImmutableSamplers = nullptr;
+		const u32 EntitySamplerLayoutBindingCount = 2;
+		VkDescriptorSetLayoutBinding EntitySamplerLayoutBinding[EntitySamplerLayoutBindingCount];
+		EntitySamplerLayoutBinding[0].binding = 0;
+		EntitySamplerLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		EntitySamplerLayoutBinding[0].descriptorCount = 1;
+		EntitySamplerLayoutBinding[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		EntitySamplerLayoutBinding[0].pImmutableSamplers = nullptr;
 
-		// Create a Descriptor Set Layout with given bindings for texture
-		VkDescriptorSetLayoutCreateInfo TextureLayoutCreateInfo = { };
-		TextureLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		TextureLayoutCreateInfo.bindingCount = 1;
-		TextureLayoutCreateInfo.pBindings = &SamplerLayoutBinding;
+		EntitySamplerLayoutBinding[1] = EntitySamplerLayoutBinding[0];
+		EntitySamplerLayoutBinding[1].binding = 1;
 
-		const VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &TextureLayoutCreateInfo,
-			nullptr, &SamplerSetLayout);
+
+		VkDescriptorSetLayoutCreateInfo EntityTextureLayoutCreateInfo = { };
+		EntityTextureLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		EntityTextureLayoutCreateInfo.bindingCount = EntitySamplerLayoutBindingCount;
+		EntityTextureLayoutCreateInfo.pBindings = EntitySamplerLayoutBinding;
+
+		VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &EntityTextureLayoutCreateInfo,
+			nullptr, &EntityPass.EntitySamplerSetLayout);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
+			assert(false);
+		}
+
+		VkDescriptorSetLayoutBinding TerrainSamplerLayoutBinding = { };
+		TerrainSamplerLayoutBinding.binding = 0;
+		TerrainSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		TerrainSamplerLayoutBinding.descriptorCount = 1;
+		TerrainSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		TerrainSamplerLayoutBinding.pImmutableSamplers = nullptr;
+
+		VkDescriptorSetLayoutCreateInfo TerrainTextureLayoutCreateInfo = { };
+		TerrainTextureLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		TerrainTextureLayoutCreateInfo.bindingCount = 1;
+		TerrainTextureLayoutCreateInfo.pBindings = &TerrainSamplerLayoutBinding;
+
+		Result = vkCreateDescriptorSetLayout(LogicalDevice, &TerrainTextureLayoutCreateInfo,
+			nullptr, &TerrainPass.TerrainSamplerSetLayout);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
@@ -367,7 +391,7 @@ namespace Core
 	{
 		const u32 TerrainPassDescriptorSetLayoutsCount = 2;
 		VkDescriptorSetLayout TerrainPassDescriptorSetLayouts[TerrainPassDescriptorSetLayoutsCount] = {
-			TerrainPass.TerrainSetLayout, SamplerSetLayout
+			TerrainPass.TerrainSetLayout, TerrainPass.TerrainSamplerSetLayout
 		};
 
 		VkPipelineLayoutCreateInfo TerrainLayoutCreateInfo = { };
@@ -386,7 +410,7 @@ namespace Core
 
 		const u32 EntityPassDescriptorSetLayoutsCount = 4;
 		VkDescriptorSetLayout EntityPassDescriptorSetLayouts[EntityPassDescriptorSetLayoutsCount] = {
-			EntityPass.EntitySetLayout, SamplerSetLayout, LightingSetLayout, MaterialLayout
+			EntityPass.EntitySetLayout, EntityPass.EntitySamplerSetLayout, LightingSetLayout, MaterialLayout
 		};
 
 		VkPipelineLayoutCreateInfo EntityLayoutCreateInfo = { };
@@ -858,10 +882,10 @@ namespace Core
 
 	void EntitySubpass::ClearResources(VkDevice LogicalDevice)
 	{
-
 		vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
 		vkDestroyPipeline(LogicalDevice, Pipeline, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, EntitySetLayout, nullptr);
+		vkDestroyDescriptorSetLayout(LogicalDevice, EntitySamplerSetLayout, nullptr);
 	}
 
 	void DeferredSubpass::ClearResources(VkDevice LogicalDevice)
@@ -876,6 +900,7 @@ namespace Core
 		vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
 		vkDestroyPipeline(LogicalDevice, Pipeline, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, TerrainSetLayout, nullptr);
+		vkDestroyDescriptorSetLayout(LogicalDevice, TerrainSamplerSetLayout, nullptr);
 	}
 
 	VkShaderModule ShaderInput::FindShaderModuleByName(Core::ShaderName Name, ShaderInput* ShaderInputs, u32 ShaderInputsCount)

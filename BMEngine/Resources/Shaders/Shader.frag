@@ -11,7 +11,9 @@ layout(set = 0, binding = 0) uniform UboViewProjection
 	mat4 Projection;
 } ViewProjection;
 
-layout(set = 1, binding = 0) uniform sampler2D TextureSampler;
+layout(set = 1, binding = 0) uniform sampler2D DiffuseTexture;
+layout(set = 1, binding = 1) uniform sampler2D SpecularTexture;
+
 
 layout(set = 2, binding = 0) uniform PointLight
 {
@@ -24,9 +26,6 @@ pointLight;
 
 layout(set = 3, binding = 0) uniform Materials
 {
-	vec3 Ambient;
-	vec3 Diffuse;
-	vec3 Specular;
 	float Shininess;
 }
 materials;
@@ -37,25 +36,25 @@ void main()
 {
 	vec3 Norm = normalize(FragmentNormal);
 	vec3 ViewLightPosition = vec3(ViewProjection.View * vec4(pointLight.Position, 1.0));
+	vec3 DiffuseTexture = vec3(texture(DiffuseTexture, FragmentTexture));
+	vec3 SpecularTexture = vec3(texture(SpecularTexture, FragmentTexture));
 
 	// Ambient color
-	vec3 AmbientColor = materials.Ambient * pointLight.Ambient;
+	vec3 AmbientColor = pointLight.Ambient * DiffuseTexture;
 
 	// Diffuse color
 	vec3 LightDirection = normalize(ViewLightPosition - FragmentPosition);
-
 	float DiffuseImpact = max(dot(Norm, LightDirection), 0.0);
-	vec3 DiffuseColor = materials.Diffuse * DiffuseImpact * pointLight.Diffuse;
+
+	vec3 DiffuseColor = pointLight.Diffuse * DiffuseImpact * DiffuseTexture;
 
 	// Specular color
 	vec3 ViewDirection = normalize(-FragmentPosition);
 	vec3 ReflectDirection = reflect(-LightDirection, Norm);
 
 	float SpecularImpact = pow(max(dot(ViewDirection, ReflectDirection), 0.0), 32);
-	vec3 SpecularColor = materials.Specular * SpecularImpact * pointLight.Specular; 
+	vec3 SpecularColor = pointLight.Specular * SpecularImpact * SpecularTexture; 
 
 	vec3 ResultLightColor = AmbientColor + DiffuseColor + SpecularColor;
-
-	vec4 LightAmplifiedColor = vec4(FragmentColor, 1.0) * vec4(ResultLightColor, 1.0);
-	OutColour = texture(TextureSampler, FragmentTexture) * LightAmplifiedColor;
+	OutColour = vec4(ResultLightColor, 1.0);
 }

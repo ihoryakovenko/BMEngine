@@ -25,6 +25,9 @@ namespace Core
 
 		VkDescriptorSetLayout TerrainSetLayout = nullptr;
 		VkDescriptorSet TerrainSets[MAX_SWAPCHAIN_IMAGES_COUNT];
+
+		VkDescriptorSetLayout TerrainSamplerSetLayout = nullptr;
+		static inline VkDescriptorSet TerrainSamplerDescriptorSets[MAX_IMAGES];
 	};
 
 	struct EntitySubpass
@@ -37,6 +40,9 @@ namespace Core
 		VkPushConstantRange PushConstantRange;
 		VkDescriptorSetLayout EntitySetLayout = nullptr;
 		VkDescriptorSet EntitySets[MAX_SWAPCHAIN_IMAGES_COUNT];
+
+		VkDescriptorSetLayout EntitySamplerSetLayout = nullptr;
+		static inline VkDescriptorSet EntitySamplerDescriptorSets[MAX_IMAGES];
 	};
 
 	struct DeferredSubpass
@@ -91,7 +97,5 @@ namespace Core
 		GPUBuffer MaterialBuffer;
 		VkDescriptorSetLayout MaterialLayout = nullptr;
 		VkDescriptorSet MaterialSet = nullptr;
-
-		VkDescriptorSetLayout SamplerSetLayout = nullptr;
 	};
 }
