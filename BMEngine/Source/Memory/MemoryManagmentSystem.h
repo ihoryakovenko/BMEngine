@@ -7,7 +7,7 @@
 
 namespace Memory
 {
-	class MemoryManagementSystem
+	struct MemoryManagementSystem
 	{
 	public:
 		static MemoryManagementSystem* Get()
@@ -48,20 +48,20 @@ namespace Memory
 			std::free(Ptr);
 		}
 
-		void Init(u32 InByteCount)
+		static void Init(u32 InByteCount)
 		{
 			ByteCount = InByteCount;
 			MemoryPool = CAllocate<char>(ByteCount);
 			NextMemory = MemoryPool;
 		}
 
-		void DeInit()
+		static void DeInit()
 		{
 			Deallocate(MemoryPool);
 		}
 
 		template<typename T>
-		inline T* FrameAlloc(u32 Count = 1)
+		static T* FrameAlloc(u32 Count = 1)
 		{
 			assert(MemoryPool != nullptr);
 			assert(NextMemory + sizeof(T) * Count <= MemoryPool + ByteCount);
@@ -71,12 +71,11 @@ namespace Memory
 			return static_cast<T*>(ReturnPointer);
 		}
 
-		void FrameDealloc()
+		static void FrameDealloc()
 		{
 			NextMemory = MemoryPool;
 		}
 
-	private:
 		static inline u32 ByteCount = 0;
 		static inline char* NextMemory = nullptr;
 		static inline char* MemoryPool = nullptr;

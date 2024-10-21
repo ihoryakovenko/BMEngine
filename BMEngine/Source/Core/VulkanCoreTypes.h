@@ -82,6 +82,8 @@ namespace Core
 		u32 MeshIndicesCount = 0;
 		u32* MeshIndices = nullptr;
 
+		u32 MaterialIndex = -1;
+
 		Model Model = glm::mat4(1.0f);
 	};
 
@@ -117,8 +119,8 @@ namespace Core
 		VkDeviceSize VertexOffset = 0;
 		VkDeviceSize IndexOffset = 0;
 		u32 IndicesCount = 0;
+		u32 MaterialIndex = -1;
 		Model Model;
-		u32 TextureId = 0;
 	};
 
 	struct DrawTerrainEntity

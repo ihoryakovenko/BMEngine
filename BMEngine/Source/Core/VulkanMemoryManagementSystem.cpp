@@ -1,31 +1,31 @@
 #include "VulkanMemoryManagementSystem.h"
 
 #include <cassert>
+#include <cstring>
 
 #include "Util/Util.h"
 #include "VulkanHelper.h"
 
-namespace Core
+namespace Core::VulkanMemoryManagementSystem
 {
-	VulkanMemoryManagementSystem* VulkanMemoryManagementSystem::Get()
-	{
-		static VulkanMemoryManagementSystem Instance;
-		return &Instance;
-	}
+	static VkDeviceMemory AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex);
 
-	void VulkanMemoryManagementSystem::Init(MemorySourceDevice Device)
+	static MemorySourceDevice MemorySource;
+	static GPUBuffer StagingBuffer;
+
+	void Init(MemorySourceDevice Device)
 	{
 		MemorySource = Device;
 		StagingBuffer = CreateBuffer(Mb64, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	}
 
-	void VulkanMemoryManagementSystem::Deinit()
+	void Deinit()
 	{
 		DestroyBuffer(StagingBuffer);
 	}
 
-	VkDeviceSize VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VkDeviceSize BufferSize)
+	VkDeviceSize CalculateBufferAlignedSize(VkDeviceSize BufferSize)
 	{
 		u32 Padding = 0;
 		if (BufferSize % BufferAlignment != 0)
@@ -36,7 +36,7 @@ namespace Core
 		return BufferSize + Padding;
 	}
 
-	VkDeviceSize VulkanMemoryManagementSystem::CalculateImageAlignedSize(VkDeviceSize BufferSize)
+	VkDeviceSize CalculateImageAlignedSize(VkDeviceSize BufferSize)
 	{
 		u32 Padding = 0;
 		if (BufferSize % ImageAlignment != 0)
@@ -47,7 +47,7 @@ namespace Core
 		return BufferSize + Padding;
 	}
 
-	VkDescriptorPool VulkanMemoryManagementSystem::AllocateDescriptorPool(VkDescriptorPoolSize* PoolSizes, u32 PoolSizeCount, u32 MaxDescriptorCount)
+	VkDescriptorPool AllocateDescriptorPool(VkDescriptorPoolSize* PoolSizes, u32 PoolSizeCount, u32 MaxDescriptorCount)
 	{
 		Util::Log().Info("Creating descriptor pool. Size count: {}", PoolSizeCount);
 
@@ -75,7 +75,7 @@ namespace Core
 		return Pool;
 	}
 
-	void VulkanMemoryManagementSystem::AllocateSets(VkDescriptorPool Pool, VkDescriptorSetLayout* Layouts,
+	void AllocateSets(VkDescriptorPool Pool, VkDescriptorSetLayout* Layouts,
 		u32 DescriptorSetCount, VkDescriptorSet* OutSets)
 	{
 		Util::Log().Info("Allocating descriptor sets. Size count: {}", DescriptorSetCount);
@@ -94,7 +94,7 @@ namespace Core
 		}
 	}
 
-	ImageBuffer VulkanMemoryManagementSystem::CreateImageBuffer(VkImageCreateInfo* pCreateInfo)
+	ImageBuffer CreateImageBuffer(VkImageCreateInfo* pCreateInfo)
 	{
 		ImageBuffer Buffer;
 		VkResult Result = vkCreateImage(MemorySource.LogicalDevice, pCreateInfo, nullptr, &Buffer.Image);
@@ -116,13 +116,13 @@ namespace Core
 		return Buffer;
 	}
 
-	void VulkanMemoryManagementSystem::DestroyImageBuffer(ImageBuffer Image)
+	void DestroyImageBuffer(ImageBuffer Image)
 	{
 		vkDestroyImage(MemorySource.LogicalDevice, Image.Image, nullptr);
 		vkFreeMemory(MemorySource.LogicalDevice, Image.Memory, nullptr);
 	}
 
-	GPUBuffer VulkanMemoryManagementSystem::CreateBuffer(VkDeviceSize BufferSize, VkBufferUsageFlags Usage,
+	GPUBuffer CreateBuffer(VkDeviceSize BufferSize, VkBufferUsageFlags Usage,
 		VkMemoryPropertyFlags Properties)
 	{
 		Util::Log().Info("Creating buffer. Requested size: {}", BufferSize);
@@ -159,13 +159,13 @@ namespace Core
 		return Buffer;
 	}
 
-	void VulkanMemoryManagementSystem::DestroyBuffer(GPUBuffer Buffer)
+	void DestroyBuffer(GPUBuffer Buffer)
 	{
 		vkDestroyBuffer(MemorySource.LogicalDevice, Buffer.Buffer, nullptr);
 		vkFreeMemory(MemorySource.LogicalDevice, Buffer.Memory, nullptr);
 	}
 
-	void VulkanMemoryManagementSystem::CopyDataToMemory(VkDeviceMemory Memory,
+	void CopyDataToMemory(VkDeviceMemory Memory,
 		VkDeviceSize Offset, VkDeviceSize Size, const void* Data)
 	{
 		void* MappedMemory;
@@ -174,7 +174,7 @@ namespace Core
 		vkUnmapMemory(MemorySource.LogicalDevice, Memory);
 	}
 
-	void VulkanMemoryManagementSystem::CopyDataToBuffer(VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Size, const void* Data)
+	void CopyDataToBuffer(VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Size, const void* Data)
 	{
 		assert(Size <= Mb64);
 
@@ -219,7 +219,7 @@ namespace Core
 		vkFreeCommandBuffers(MemorySource.LogicalDevice, MemorySource.TransferCommandPool, 1, &TransferCommandBuffer);
 	}
 
-	void VulkanMemoryManagementSystem::CopyDataToImage(VkImage Image, u32 Width, u32 Height, VkDeviceSize Size,
+	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, VkDeviceSize Size,
 		u32 LayersCount, const void* Data)
 	{
 		assert(Size <= Mb64);
@@ -272,7 +272,7 @@ namespace Core
 		vkFreeCommandBuffers(MemorySource.LogicalDevice, MemorySource.TransferCommandPool, 1, &TransferCommandBuffer);
 	}
 
-	VkDeviceMemory VulkanMemoryManagementSystem::AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex)
+	VkDeviceMemory AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex)
 	{
 		Util::Log().Info("Allocating Device memory. Buffer type: Image, Size count: {}, Index: {}",
 			AllocationSize, MemoryTypeIndex);

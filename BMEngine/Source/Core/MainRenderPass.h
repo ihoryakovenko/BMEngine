@@ -97,5 +97,7 @@ namespace Core
 		GPUBuffer MaterialBuffer;
 		VkDescriptorSetLayout MaterialLayout = nullptr;
 		VkDescriptorSet MaterialSet = nullptr;
+
+		u32 TextureDescriptorCountTest = 0;
 	};
 }

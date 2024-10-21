@@ -17,16 +17,16 @@ namespace Core
 		for (u32 i = 0; i < ImagesCount; ++i)
 		{
 			vkDestroyImageView(LogicalDevice, DepthBufferViews[i], nullptr);
-			VulkanMemoryManagementSystem::Get()->DestroyImageBuffer(DepthBuffers[i]);
+			VulkanMemoryManagementSystem::DestroyImageBuffer(DepthBuffers[i]);
 
 			vkDestroyImageView(LogicalDevice, ColorBufferViews[i], nullptr);
-			VulkanMemoryManagementSystem::Get()->DestroyImageBuffer(ColorBuffers[i]);
+			VulkanMemoryManagementSystem::DestroyImageBuffer(ColorBuffers[i]);
 
-			VulkanMemoryManagementSystem::Get()->DestroyBuffer(VpUniformBuffers[i]);
-			VulkanMemoryManagementSystem::Get()->DestroyBuffer(LightBuffers[i]);
+			VulkanMemoryManagementSystem::DestroyBuffer(VpUniformBuffers[i]);
+			VulkanMemoryManagementSystem::DestroyBuffer(LightBuffers[i]);
 		}
 
-		VulkanMemoryManagementSystem::Get()->DestroyBuffer(MaterialBuffer);
+		VulkanMemoryManagementSystem::DestroyBuffer(MaterialBuffer);
 
 		TerrainPass.ClearResources(LogicalDevice);
 		DeferredPass.ClearResources(LogicalDevice);
@@ -449,8 +449,8 @@ namespace Core
 
 		Viewport.x = 0.0f;
 		Viewport.y = 0.0f;
-		Viewport.width = static_cast<float>(SwapExtent.width);
-		Viewport.height = static_cast<float>(SwapExtent.height);
+		Viewport.width = static_cast<f32>(SwapExtent.width);
+		Viewport.height = static_cast<f32>(SwapExtent.height);
 		Viewport.minDepth = 0.0f;
 		Viewport.maxDepth = 1.0f;
 
@@ -733,40 +733,38 @@ namespace Core
 	void MainRenderPass::CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
 		u32 ImagesCount)
 	{
-		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
 		const VkDeviceSize VpBufferSize = sizeof(UboViewProjection);
 		const VkDeviceSize LightBufferSize = sizeof(DrawPointLightEntity);
 		const VkDeviceSize MaterialBufferSize = sizeof(Material);
 
-		//const VkDeviceSize AlignedVpSize = VulkanMemorySystem->CalculateBufferAlignedSize(VpBufferSize);
-		//const VkDeviceSize AlignedAmbientLightSize = VulkanMemorySystem->CalculateBufferAlignedSize(AmbientLightBufferSize);
-		//const VkDeviceSize AlignedPointLightSize = VulkanMemorySystem->CalculateBufferAlignedSize(PointLightBufferSize);
+		//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
+		//const VkDeviceSize AlignedAmbientLightSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(AmbientLightBufferSize);
+		//const VkDeviceSize AlignedPointLightSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(PointLightBufferSize);
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
-			VpUniformBuffers[i] = VulkanMemorySystem->CreateBuffer(VpBufferSize,
+			VpUniformBuffers[i] = VulkanMemoryManagementSystem::CreateBuffer(VpBufferSize,
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 		}
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
-			LightBuffers[i] = VulkanMemorySystem->CreateBuffer(LightBufferSize,
+			LightBuffers[i] = VulkanMemoryManagementSystem::CreateBuffer(LightBufferSize,
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 		}
 
-		MaterialBuffer = VulkanMemorySystem->CreateBuffer(MaterialBufferSize,
+		MaterialBuffer = VulkanMemoryManagementSystem::CreateBuffer(MaterialBufferSize,
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	}
 
 	void MainRenderPass::CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount)
 	{
-		auto VulkanMemoryManagement = VulkanMemoryManagementSystem::Get();
-		VkDescriptorSetLayout* SetLayouts = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
-		VkDescriptorSetLayout* TerrainLayouts = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
-		VkDescriptorSetLayout* LightingSetLayouts = Memory::MemoryManagementSystem::Get()->FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
+		VkDescriptorSetLayout* SetLayouts = Memory::MemoryManagementSystem::FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
+		VkDescriptorSetLayout* TerrainLayouts = Memory::MemoryManagementSystem::FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
+		VkDescriptorSetLayout* LightingSetLayouts = Memory::MemoryManagementSystem::FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
@@ -775,9 +773,9 @@ namespace Core
 			LightingSetLayouts[i] = LightingSetLayout;
 		}
 
-		VulkanMemoryManagement->AllocateSets(Pool, SetLayouts, ImagesCount, EntityPass.EntitySets);
-		VulkanMemoryManagement->AllocateSets(Pool, TerrainLayouts, ImagesCount, TerrainPass.TerrainSets);
-		VulkanMemoryManagement->AllocateSets(Pool, LightingSetLayouts, ImagesCount, LightingSets);
+		VulkanMemoryManagementSystem::AllocateSets(Pool, SetLayouts, ImagesCount, EntityPass.EntitySets);
+		VulkanMemoryManagementSystem::AllocateSets(Pool, TerrainLayouts, ImagesCount, TerrainPass.TerrainSets);
+		VulkanMemoryManagementSystem::AllocateSets(Pool, LightingSetLayouts, ImagesCount, LightingSets);
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
@@ -822,7 +820,7 @@ namespace Core
 			SetLayouts[i] = DeferredPass.DeferredLayout;
 		}
 
-		VulkanMemoryManagement->AllocateSets(Pool, SetLayouts, ImagesCount, DeferredPass.DeferredSets);
+		VulkanMemoryManagementSystem::AllocateSets(Pool, SetLayouts, ImagesCount, DeferredPass.DeferredSets);
 
 		// Todo: move this and previus loop to function?
 		for (u32 i = 0; i < ImagesCount; i++)
@@ -861,7 +859,7 @@ namespace Core
 			vkUpdateDescriptorSets(LogicalDevice, CetWritesCount, SetWrites, 0, nullptr);
 		}
 
-		VulkanMemoryManagement->AllocateSets(Pool, &MaterialLayout, 1, &MaterialSet);
+		VulkanMemoryManagementSystem::AllocateSets(Pool, &MaterialLayout, 1, &MaterialSet);
 
 		VkDescriptorBufferInfo MaterialBufferInfo = { };
 		MaterialBufferInfo.buffer = MaterialBuffer.Buffer;

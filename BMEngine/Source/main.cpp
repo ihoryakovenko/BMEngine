@@ -30,25 +30,32 @@
 const u32 NumRows = 600;
 const u32 NumCols = 600;
 
+u32 TestTextureIndex;
+u32 WhiteTextureIndex;
+u32 ContainerTextureIndex;
+u32 ContainerSpecularTextureIndex;
+
+u32 TestMaterialIndex;
+u32 WhiteMaterialIndex;
+u32 ContainerMaterialIndex;
+
 Core::TerrainVertex TerrainVerticesData[NumRows][NumCols];
 
 std::vector<Core::DrawEntity> DrawEntities;
 Core::ShaderCodeDescription ShaderCodeDescriptions[Core::ShaderNames::ShadersCount];
 std::vector<std::vector<char>> ShaderCodes(Core::ShaderNames::ShadersCount);
 
-Core::VulkanRenderingSystem RenderingSystem;
-
 void GenerateTerrain()
 {
-	const float MaxAltitude = 10.0f;
-	const float MinAltitude = 0.0f;
-	const float SmoothMin = 7.0f;
-	const float SmoothMax = 3.0f;
-	const float SmoothFactor = 0.5f;
-	const float ScaleFactor = 0.2f;
+	const f32 MaxAltitude = 10.0f;
+	const f32 MinAltitude = 0.0f;
+	const f32 SmoothMin = 7.0f;
+	const f32 SmoothMax = 3.0f;
+	const f32 SmoothFactor = 0.5f;
+	const f32 ScaleFactor = 0.2f;
 
 	std::mt19937 Gen(1);
-	std::uniform_real_distribution<float> Dist(MinAltitude, MaxAltitude);
+	std::uniform_real_distribution<f32> Dist(MinAltitude, MaxAltitude);
 
 	bool UpFactor = false;
 	bool DownFactor = false;
@@ -57,18 +64,18 @@ void GenerateTerrain()
 	{
 		for (int j = 0; j < NumCols; ++j)
 		{
-			const float RandomAltitude = Dist(Gen);
-			const float Probability = (RandomAltitude - MinAltitude) / (MaxAltitude - MinAltitude);
+			const f32 RandomAltitude = Dist(Gen);
+			const f32 Probability = (RandomAltitude - MinAltitude) / (MaxAltitude - MinAltitude);
 
-			const float PreviousCornerAltitude = i > 0 && j > 0 ? TerrainVerticesData[i - 1][j - 1].Altitude : 5.0f;
-			const float PreviousIAltitude = i > 0 ? TerrainVerticesData[i - 1][j].Altitude : 5.0f;
-			const float PreviousJAltitude = j > 0 ? TerrainVerticesData[i][j - 1].Altitude : 5.0f;
+			const f32 PreviousCornerAltitude = i > 0 && j > 0 ? TerrainVerticesData[i - 1][j - 1].Altitude : 5.0f;
+			const f32 PreviousIAltitude = i > 0 ? TerrainVerticesData[i - 1][j].Altitude : 5.0f;
+			const f32 PreviousJAltitude = j > 0 ? TerrainVerticesData[i][j - 1].Altitude : 5.0f;
 
-			const float PreviousAverageAltitude = (PreviousCornerAltitude + PreviousIAltitude + PreviousJAltitude) / 3.0f;
+			const f32 PreviousAverageAltitude = (PreviousCornerAltitude + PreviousIAltitude + PreviousJAltitude) / 3.0f;
 
-			float NormalizedAltitude = (PreviousAverageAltitude - MinAltitude) / (MaxAltitude - MinAltitude);
+			f32 NormalizedAltitude = (PreviousAverageAltitude - MinAltitude) / (MaxAltitude - MinAltitude);
 
-			const float Smooth = (PreviousAverageAltitude <= SmoothMin || PreviousAverageAltitude >= SmoothMax) ? SmoothFactor : 1.0f;
+			const f32 Smooth = (PreviousAverageAltitude <= SmoothMin || PreviousAverageAltitude >= SmoothMax) ? SmoothFactor : 1.0f;
 
 			if (UpFactor)
 			{
@@ -102,7 +109,7 @@ struct TestMesh
 {
 	std::vector<Core::EntityVertex> vertices;
 	std::vector<u32> indices;
-	int TextureId;
+	int MaterialIndex;
 };
 
 namespace std
@@ -141,7 +148,7 @@ struct Camera
 	glm::vec3 CameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 };
 
-void AddTexture(const char* DiffuseTexturePath)
+u32 AddTexture(const char* DiffuseTexturePath)
 {
 	int Width;
 	int Height;
@@ -162,26 +169,7 @@ void AddTexture(const char* DiffuseTexturePath)
 	Info.LayersCount = 1;
 	Info.Data = ImageData;
 
-	static Core::TextureArrayInfo Info2 = []()
-	{
-		int Width;
-		int Height;
-		int Channels;
-
-		// TODO: delete
-		stbi_uc* Specular = stbi_load("./Resources/Textures/container2_specular.png", &Width, &Height, &Channels, STBI_rgb_alpha);
-
-		Core::TextureArrayInfo res;
-		res.Width = Width;
-		res.Height = Height;
-		res.Format = STBI_rgb_alpha;
-		res.LayersCount = 1;
-		res.Data = Specular;
-
-		return res;
-	}();
-
-	RenderingSystem.LoadTexture(Info, Info2);
+	return Core::VulkanRenderingSystemInterface::CreateTexture(Info);
 }
 
 void WindowCloseCallback(GLFWwindow* Window)
@@ -192,16 +180,16 @@ void WindowCloseCallback(GLFWwindow* Window)
 bool Close = false;
 
 static bool FirstMouse = true;
-static float LastX = 400, LastY = 300;
-float Yaw = -90.0f;
-float Pitch = 0.0f;
+static f32 LastX = 400, LastY = 300;
+f32 Yaw = -90.0f;
+f32 Pitch = 0.0f;
 
-void MoveCamera(GLFWwindow* Window, float DeltaTime, Camera& MainCamera)
+void MoveCamera(GLFWwindow* Window, f32 DeltaTime, Camera& MainCamera)
 {
-	const float RotationSpeed = 0.1f;
-	const float CameraSpeed = 10.0f;
+	const f32 RotationSpeed = 0.1f;
+	const f32 CameraSpeed = 10.0f;
 
-	float CameraDeltaSpeed = CameraSpeed * DeltaTime;
+	f32 CameraDeltaSpeed = CameraSpeed * DeltaTime;
 
 	// Handle camera movement with keys
 	if (glfwGetKey(Window, GLFW_KEY_W) == GLFW_PRESS)
@@ -239,7 +227,7 @@ void MoveCamera(GLFWwindow* Window, float DeltaTime, Camera& MainCamera)
 		Close = true;
 	}
 
-	double MouseX, MouseY;
+	f64 MouseX, MouseY;
 	glfwGetCursorPos(Window, &MouseX, &MouseY);
 
 	if (FirstMouse)
@@ -249,8 +237,8 @@ void MoveCamera(GLFWwindow* Window, float DeltaTime, Camera& MainCamera)
 		FirstMouse = false;
 	}
 
-	float OffsetX = MouseX - LastX;
-	float OffsetY = LastY - MouseY;
+	f32 OffsetX = MouseX - LastX;
+	f32 OffsetY = LastY - MouseY;
 	LastX = MouseX;
 	LastY = MouseY;
 
@@ -270,7 +258,7 @@ void MoveCamera(GLFWwindow* Window, float DeltaTime, Camera& MainCamera)
 	MainCamera.CameraFront = glm::normalize(Front);
 }
 
-TestMesh CreateCubeMesh(int texture)
+TestMesh CreateCubeMesh(int materialIndex)
 {
 	TestMesh cube;
 
@@ -335,7 +323,7 @@ TestMesh CreateCubeMesh(int texture)
 			cube.indices.push_back(uniqueVertices[vertex]);
 		}
 
-		cube.TextureId = texture;
+		cube.MaterialIndex = materialIndex;
 	}
 
 	return cube;
@@ -360,14 +348,16 @@ void LoadDrawEntities()
 		assert(false);
 	}
 
-	// TODO: -_-
-	int TextureIndex = 4;
 	std::vector<int> MaterialToTexture(Materials.size());
 
-	AddTexture(TestTexture);
-	AddTexture(WhiteTexture);
-	AddTexture(ContainerTexture);
-	AddTexture(ContainerSpecularTexture);
+	TestTextureIndex = AddTexture(TestTexture);
+	WhiteTextureIndex = AddTexture(WhiteTexture);
+	ContainerTextureIndex = AddTexture(ContainerTexture);
+	ContainerSpecularTextureIndex = AddTexture(ContainerSpecularTexture);
+
+	TestMaterialIndex = Core::VulkanRenderingSystemInterface::CreateMaterial(TestTextureIndex, ContainerSpecularTextureIndex);
+	WhiteMaterialIndex = Core::VulkanRenderingSystemInterface::CreateMaterial(WhiteTextureIndex, WhiteTextureIndex);
+	ContainerMaterialIndex = Core::VulkanRenderingSystemInterface::CreateMaterial(ContainerTextureIndex, ContainerSpecularTextureIndex);
 
 	for (size_t i = 0; i < Materials.size(); i++)
 	{
@@ -378,9 +368,7 @@ void LoadDrawEntities()
 			int Idx = Material.diffuse_texname.rfind("\\");
 			std::string FileName = "./Resources/Textures/" + Material.diffuse_texname.substr(Idx + 1);
 
-			MaterialToTexture[i] = TextureIndex;
-			AddTexture(FileName.c_str());
-			++TextureIndex;
+			MaterialToTexture[i] = Core::VulkanRenderingSystemInterface::CreateMaterial(AddTexture(FileName.c_str()), ContainerSpecularTextureIndex);
 		}
 	}
 
@@ -437,14 +425,14 @@ void LoadDrawEntities()
 			Tm.indices.push_back(uniqueVertices[vertex]);
 		}
 
-		Tm.TextureId = MaterialToTexture[Shape.mesh.material_ids[0]];
+		Tm.MaterialIndex = MaterialToTexture[Shape.mesh.material_ids[0]];
 
 		ModelMeshes.push_back(Tm);
 	}
 
-	ModelMeshes.emplace_back(CreateCubeMesh(1));
-	ModelMeshes.emplace_back(CreateCubeMesh(1));
-	ModelMeshes.emplace_back(CreateCubeMesh(2));
+	ModelMeshes.emplace_back(CreateCubeMesh(WhiteMaterialIndex));
+	ModelMeshes.emplace_back(CreateCubeMesh(WhiteMaterialIndex));
+	ModelMeshes.emplace_back(CreateCubeMesh(ContainerMaterialIndex));
 
 	DrawEntities.resize(ModelMeshes.size());
 	
@@ -455,14 +443,14 @@ void LoadDrawEntities()
 		m[i].MeshVertices = ModelMeshes[i].vertices.data();
 		m[i].MeshVerticesCount = ModelMeshes[i].vertices.size();
 
-
 		m[i].MeshIndices = ModelMeshes[i].indices.data();
 		m[i].MeshIndicesCount = ModelMeshes[i].indices.size();
 
-		DrawEntities[i].TextureId = ModelMeshes[i].TextureId;
+		m[i].MaterialIndex = ModelMeshes[i].MaterialIndex;
 	}
 
-	RenderingSystem.CreateDrawEntities(m.data(), m.size(), DrawEntities.data());
+	Core::VulkanRenderingSystemInterface::CreateDrawEntities(m.data(), m.size(), DrawEntities.data());
+
 	{
 		glm::vec3 LightCubePos(0.0f, 0.0f, 10.0f);
 		glm::mat4 Lightmodel = glm::mat4(1.0f);
@@ -531,8 +519,7 @@ int main()
 {
 	const u32 FrameAllocSize = 1024 * 1024;
 
-	auto MemorySystem = Memory::MemoryManagementSystem::Get();
-	MemorySystem->Init(FrameAllocSize);
+	Memory::MemoryManagementSystem::Init(FrameAllocSize);
 
 	if (glfwInit() == GL_FALSE)
 	{
@@ -584,20 +571,20 @@ int main()
 	Config.ShadersCount = Core::ShaderNames::ShadersCount;
 	Config.MaxTextures = 90;
 
-	RenderingSystem.Init(Window, Config);
+	Core::VulkanRenderingSystemInterface::Init(Window, Config);
 	LoadDrawEntities();
 
 	Core::DrawScene Scene;
 
 	Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-		static_cast<float>(1600) / static_cast<float>(800), 0.1f, 100.0f);
+		static_cast<f32>(1600) / static_cast<f32>(800), 0.1f, 100.0f);
 	Scene.ViewProjection.Projection[1][1] *= -1;
 	Scene.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	
 	Core::DrawTerrainEntity TestDrawTerrainEntity;
-	RenderingSystem.CreateTerrainDrawEntity(&TerrainVerticesData[0][0], NumRows * NumCols, TestDrawTerrainEntity);
-	RenderingSystem.CreateTerrainIndices(indices.data(), indices.size());
+	Core::VulkanRenderingSystemInterface::CreateTerrainDrawEntity(&TerrainVerticesData[0][0], NumRows * NumCols, TestDrawTerrainEntity);
+	Core::VulkanRenderingSystemInterface::CreateTerrainIndices(indices.data(), indices.size());
 
 	Scene.DrawTerrainEntities = &TestDrawTerrainEntity;
 	Scene.DrawTerrainEntitiesCount = 1;
@@ -606,24 +593,24 @@ int main()
 	Scene.DrawEntitiesCount = DrawEntities.size();
 
 
-	double DeltaTime = 0.0f;
-	double LastTime = 0.0f;
+	f64 DeltaTime = 0.0f;
+	f64 LastTime = 0.0f;
 
-	float Angle = 0.0f;
+	f32 Angle = 0.0f;
 
 	Camera MainCamera;
 
-	MemorySystem->FrameDealloc();
+	Memory::MemoryManagementSystem::FrameDealloc();
 
 	while (!glfwWindowShouldClose(Window) && !Close)
 	{
 		glfwPollEvents();
 
-		const double CurrentTime = glfwGetTime();
+		const f64 CurrentTime = glfwGetTime();
 		DeltaTime = CurrentTime - LastTime;
-		LastTime = static_cast<float>(CurrentTime);
+		LastTime = static_cast<f32>(CurrentTime);
 
-		Angle += 0.5f * static_cast<float>(DeltaTime);
+		Angle += 0.5f * static_cast<f32>(DeltaTime);
 		if (Angle > 360.0f)
 		{
 			Angle -= 360.0f;
@@ -638,19 +625,19 @@ int main()
 		MoveCamera(Window, DeltaTime, MainCamera);
 		Scene.ViewProjection.View = glm::lookAt(MainCamera.CameraPosition, MainCamera.CameraPosition + MainCamera.CameraFront, MainCamera.CameraUp);
 
-		RenderingSystem.Draw(Scene);
+		Core::VulkanRenderingSystemInterface::Draw(Scene);
 
-		MemorySystem->FrameDealloc();
+		Memory::MemoryManagementSystem::FrameDealloc();
 	}
 	
-	RenderingSystem.DeInit();
+	Core::VulkanRenderingSystemInterface::DeInit();
 
 
 	glfwDestroyWindow(Window);
 
 	glfwTerminate();
 
-	MemorySystem->DeInit();
+	Memory::MemoryManagementSystem::DeInit();
 
 	if (Memory::MemoryManagementSystem::AllocateCounter != 0)
 	{

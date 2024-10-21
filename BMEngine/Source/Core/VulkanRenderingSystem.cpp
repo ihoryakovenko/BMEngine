@@ -2,14 +2,90 @@
 
 #include <algorithm>
 
+#include "Memory/MemoryManagmentSystem.h"
+#include "VulkanMemoryManagementSystem.h"
+
+#include "MainRenderPass.h"
 #include "VulkanHelper.h"
 #include "Util/Util.h"
 
-namespace Core
+namespace Core::VulkanRenderingSystemInterface
 {
-	bool VulkanRenderingSystem::Init(GLFWwindow* Window, const RenderConfig& InConfig)
+	static u32 CreateTextureDescriptorSets(VkImageView DiffuseTexture, VkImageView SpecularTexture);
+
+	static Memory::FrameArray<VkExtensionProperties> GetAvailableExtensionProperties();
+	static Memory::FrameArray<VkLayerProperties> GetAvailableInstanceLayerProperties();
+	static Memory::FrameArray<const char*> GetRequiredInstanceExtensions(const char** ValidationExtensions, u32 ValidationExtensionsCount);
+	static Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkSurfaceKHR Surface);
+
+	static VkExtent2D GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities, GLFWwindow* Window);
+
+	static bool CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, u32 AvailableExtensionsCount,
+		const char** RequiredExtensions, u32 RequiredExtensionsCount);
+	static bool CheckValidationLayersSupport(VkLayerProperties* Properties, u32 PropertiesSize,
+		const char** ValidationLeyersToCheck, u32 ValidationLeyersToCheckSize);
+	static VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface);
+
+	static VkDevice CreateLogicalDevice(PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
+		u32 DeviceExtensionsSize);
+	static VkSampler CreateTextureSampler();
+
+	static bool SetupQueues();
+	static bool IsFormatSupported(VkFormat Format, VkImageTiling Tiling, VkFormatFeatureFlags FeatureFlags);
+
+	static void CreateSynchronisation();
+	static void DestroySynchronisation();
+
+	static void InitViewport(GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstance* OutViewport,
+		SwapchainInstance SwapInstance, VkImageView* ColorBuffers, VkImageView* DepthBuffers);
+	static void DeinitViewport(ViewportInstance* Viewport);
+
+	static void CreateCommandPool(VkDevice LogicalDevice, u32 FamilyIndex);
+
+	static RenderConfig Config;
+
+	static MainInstance Instance;
+	static VkDevice LogicalDevice = nullptr;
+	static DeviceInstance Device;
+	static MainRenderPass MainPass;
+
+	static ViewportInstance MainViewport;
+
+	static VkQueue GraphicsQueue = nullptr;
+	static VkQueue PresentationQueue = nullptr;
+
+	// Todo: pass as AddViewport params? 
+	static VkFormat ColorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Todo: check if VK_FORMAT_R8G8B8A8_UNORM supported
+	static VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
+
+	static const u32 MAX_DRAW_FRAMES = 2;
+	static int CurrentFrame = 0;
+
+	static VkSemaphore ImageAvailable[MAX_DRAW_FRAMES];
+	static VkSemaphore RenderFinished[MAX_DRAW_FRAMES];
+	static VkFence DrawFences[MAX_DRAW_FRAMES];
+
+	static VkCommandPool GraphicsCommandPool = nullptr;
+
+	static GPUBuffer VertexBuffer;
+	static u32 VertexBufferOffset = 0;
+	static GPUBuffer IndexBuffer;
+	static u32 IndexBufferOffset = 0;
+
+	static VkDescriptorPool MainPool = nullptr;
+
+	static VkSampler DiffuseTextureSampler = nullptr;
+	static VkSampler SpecularTextureSampler = nullptr;
+	static inline ImageBuffer TextureBuffers[MAX_IMAGES];
+	static u32 ImageArraysCount = 0;
+	static inline VkImageView TextureImageViews[MAX_IMAGES];
+
+	static u32 TerrainIndicesCount = 0;
+	static VkDeviceSize TerrainIndexOffset = 0;
+
+	bool Init(GLFWwindow* Window, const RenderConfig& InConfig)
 	{
-		SetConfig(InConfig);
+		Config = InConfig;
 
 		assert(Config.ShadersCount == ShaderNames::ShadersCount);
 
@@ -128,16 +204,14 @@ namespace Core
 		u32 TotalDescriptorCount = TotalDescriptorLayouts * SwapInstance1.ImagesCount;
 		TotalDescriptorCount += Config.MaxTextures;
 
-		MemorySourceDevice MemoryDevice;
+		VulkanMemoryManagementSystem::MemorySourceDevice MemoryDevice;
 		MemoryDevice.PhysicalDevice = Device.PhysicalDevice;
 		MemoryDevice.LogicalDevice = LogicalDevice;
 		MemoryDevice.TransferCommandPool = GraphicsCommandPool;
 		MemoryDevice.TransferQueue = GraphicsQueue;
 
-		auto VulkanMemoryManagement = VulkanMemoryManagementSystem::Get();
-
-		VulkanMemoryManagement->Init(MemoryDevice);
-		MainPool = VulkanMemoryManagement->AllocateDescriptorPool(TotalPassPoolSizes.Data, PoolSizeCount, TotalDescriptorCount);
+		VulkanMemoryManagementSystem::Init(MemoryDevice);
+		MainPool = VulkanMemoryManagementSystem::AllocateDescriptorPool(TotalPassPoolSizes.Data, PoolSizeCount, TotalDescriptorCount);
 
 		ShaderInput ShaderInputs[ShaderNames::ShadersCount];
 		for (u32 i = 0; i < Config.ShadersCount; ++i)
@@ -146,11 +220,11 @@ namespace Core
 			CreateShader(LogicalDevice, Config.RenderShaders[i].Code, Config.RenderShaders[i].CodeSize, ShaderInputs[i].Module);
 		}
 
-		VertexBuffer = VulkanMemoryManagement->CreateBuffer(Mb64, 
+		VertexBuffer = VulkanMemoryManagementSystem::CreateBuffer(Mb64, 
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-		IndexBuffer = VulkanMemoryManagement->CreateBuffer(Mb64,
+		IndexBuffer = VulkanMemoryManagementSystem::CreateBuffer(Mb64,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
@@ -173,38 +247,36 @@ namespace Core
 
 		InitViewport(Window, Surface, &MainViewport, SwapInstance1, MainPass.ColorBufferViews, MainPass.DepthBufferViews);
 
-		TextureUnit.DiffuseTextureSampler = CreateTextureSampler();
-		TextureUnit.SpecularTextureSampler = CreateTextureSampler();
+		DiffuseTextureSampler = CreateTextureSampler();
+		SpecularTextureSampler = CreateTextureSampler();
 
 		return true;
 	}
 
-	void VulkanRenderingSystem::DeInit()
+	void DeInit()
 	{
 		vkDeviceWaitIdle(LogicalDevice);
 		
 		DestroySynchronisation();
 
-		vkDestroySampler(LogicalDevice, TextureUnit.DiffuseTextureSampler, nullptr);
-		vkDestroySampler(LogicalDevice, TextureUnit.SpecularTextureSampler, nullptr);
+		vkDestroySampler(LogicalDevice, DiffuseTextureSampler, nullptr);
+		vkDestroySampler(LogicalDevice, SpecularTextureSampler, nullptr);
 
-		for (u32 i = 0; i < TextureUnit.ImageArraysCount; ++i)
+		for (u32 i = 0; i < ImageArraysCount; ++i)
 		{
-			vkDestroyImageView(LogicalDevice, TextureUnit.DiffuseTextureImageViews[i], nullptr);
-			vkDestroyImageView(LogicalDevice, TextureUnit.SpecularTextureImageViews[i], nullptr);
+			vkDestroyImageView(LogicalDevice, TextureImageViews[i], nullptr);
 		}
 
-		for (u32 i = 0; i < TextureUnit.ImageArraysCount; ++i)
+		for (u32 i = 0; i < ImageArraysCount; ++i)
 		{
-			VulkanMemoryManagementSystem::Get()->DestroyImageBuffer(TextureUnit.DiffuseTextureBuffers[i]);
-			VulkanMemoryManagementSystem::Get()->DestroyImageBuffer(TextureUnit.SpecularTextureBuffers[i]);
+			VulkanMemoryManagementSystem::DestroyImageBuffer(TextureBuffers[i]);
 		}
 
 		vkDestroyDescriptorPool(LogicalDevice, MainPool, nullptr);
 
-		VulkanMemoryManagementSystem::Get()->DestroyBuffer(VertexBuffer);
-		VulkanMemoryManagementSystem::Get()->DestroyBuffer(IndexBuffer);
-		VulkanMemoryManagementSystem::Get()->Deinit();
+		VulkanMemoryManagementSystem::DestroyBuffer(VertexBuffer);
+		VulkanMemoryManagementSystem::DestroyBuffer(IndexBuffer);
+		VulkanMemoryManagementSystem::Deinit();
 
 		vkDestroyCommandPool(LogicalDevice, GraphicsCommandPool, nullptr);
 		MainPass.ClearResources(LogicalDevice, MainViewport.ViewportSwapchain.ImagesCount);
@@ -216,19 +288,16 @@ namespace Core
 		MainInstance::DestroyMainInstance(Instance);
 	}
 
-	void VulkanRenderingSystem::LoadTexture(TextureArrayInfo DiffuseTexture, TextureArrayInfo SpecularTexture)
+	u32 CreateTexture(TextureArrayInfo Info)
 	{
-		auto System = Memory::MemoryManagementSystem::Get();
-		auto Barriers = System->FrameAlloc<VkImageMemoryBarrier>(2);
+		auto Barriers = Memory::MemoryManagementSystem::FrameAlloc<VkImageMemoryBarrier>(1);
 
-		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
-
-		VkImageCreateInfo ImageCreateInfo[2];
+		VkImageCreateInfo ImageCreateInfo[1];
 		ImageCreateInfo[0] = { };
 		ImageCreateInfo[0].sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		ImageCreateInfo[0].imageType = VK_IMAGE_TYPE_2D; // Type of image (1D, 2D, or 3D)
-		ImageCreateInfo[0].extent.width = DiffuseTexture.Width;
-		ImageCreateInfo[0].extent.height = DiffuseTexture.Height;
+		ImageCreateInfo[0].extent.width = Info.Width;
+		ImageCreateInfo[0].extent.height = Info.Height;
 		ImageCreateInfo[0].extent.depth = 1; // Depth of image (just 1, no 3D aspect)
 		ImageCreateInfo[0].mipLevels = 1;
 		ImageCreateInfo[0].arrayLayers = 1;
@@ -239,12 +308,7 @@ namespace Core
 		ImageCreateInfo[0].samples = VK_SAMPLE_COUNT_1_BIT; // Number of samples for multi-sampling
 		ImageCreateInfo[0].sharingMode = VK_SHARING_MODE_EXCLUSIVE; // Whether image can be shared between queues
 
-		ImageCreateInfo[1] = ImageCreateInfo[0];
-		ImageCreateInfo[1].extent.width = SpecularTexture.Width;
-		ImageCreateInfo[1].extent.height = SpecularTexture.Height;
-
-		ImageBuffer DiffuseBuffer = VulkanMemoryManagementSystem::Get()->CreateImageBuffer(&(ImageCreateInfo[0]));
-		ImageBuffer SpecularBuffer = VulkanMemoryManagementSystem::Get()->CreateImageBuffer(&(ImageCreateInfo[1]));
+		ImageBuffer ImageBuffer = VulkanMemoryManagementSystem::CreateImageBuffer(&(ImageCreateInfo[0]));
 
 		Barriers[0] = { };
 		Barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -252,7 +316,7 @@ namespace Core
 		Barriers[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;									// Layout to transition to
 		Barriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition from
 		Barriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition to
-		Barriers[0].image = DiffuseBuffer.Image;											// Image being accessed and modified as part of barrier
+		Barriers[0].image = ImageBuffer.Image;											// Image being accessed and modified as part of barrier
 		Barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;	// Aspect of image being altered
 		Barriers[0].subresourceRange.baseMipLevel = 0;						// First mip level to start alterations on
 		Barriers[0].subresourceRange.levelCount = 1;							// Number of mip levels to alter starting from baseMipLevel
@@ -261,9 +325,6 @@ namespace Core
 
 		Barriers[0].srcAccessMask = 0;								// Memory access stage transition must after...
 		Barriers[0].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;		// Memory access stage transition must before...
-
-		Barriers[1] = Barriers[0];
-		Barriers[1].image = SpecularBuffer.Image;
 
 		// Todo: Create beginCommandBuffer function?
 		VkCommandBuffer CommandBuffer;
@@ -295,7 +356,7 @@ namespace Core
 			0,						// Dependency flags
 			0, nullptr,				// Memory Barrier count + data
 			0, nullptr,				// Buffer Memory Barrier count + data
-			2, Barriers	// Image Memory Barrier count + data
+			1, Barriers	// Image Memory Barrier count + data
 		);
 
 		vkEndCommandBuffer(CommandBuffer);
@@ -303,33 +364,22 @@ namespace Core
 		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
 		vkQueueWaitIdle(GraphicsQueue);
 
-		VkMemoryRequirements DiffuseTextureMemoryRequirements;
-		vkGetImageMemoryRequirements(LogicalDevice, DiffuseBuffer.Image, &DiffuseTextureMemoryRequirements);
+		VkMemoryRequirements MemoryRequirements;
+		vkGetImageMemoryRequirements(LogicalDevice, ImageBuffer.Image, &MemoryRequirements);
 
-		VkMemoryRequirements SpecularTextureMemoryRequirements;
-		vkGetImageMemoryRequirements(LogicalDevice, SpecularBuffer.Image, &SpecularTextureMemoryRequirements);
-
-		VulkanMemorySystem->CopyDataToImage(DiffuseBuffer.Image, DiffuseTexture.Width, DiffuseTexture.Height,
-			DiffuseTextureMemoryRequirements.size, 1, DiffuseTexture.Data);
-
-		VulkanMemorySystem->CopyDataToImage(SpecularBuffer.Image, SpecularTexture.Width, SpecularTexture.Height,
-			SpecularTextureMemoryRequirements.size, 1, SpecularTexture.Data);
+		VulkanMemoryManagementSystem::CopyDataToImage(ImageBuffer.Image, Info.Width, Info.Height,
+			MemoryRequirements.size, 1, Info.Data);
 
 		Barriers[0].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL; // Layout to transition from
 		Barriers[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		Barriers[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 		Barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-		Barriers[1].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		Barriers[1].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		Barriers[1].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		Barriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
 		SrcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 		DstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
 		vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
-		vkCmdPipelineBarrier(CommandBuffer, SrcStage, DstStage, 0, 0, nullptr, 0, nullptr, 2, Barriers);
+		vkCmdPipelineBarrier(CommandBuffer, SrcStage, DstStage, 0, 0, nullptr, 0, nullptr, 1, Barriers);
 		vkEndCommandBuffer(CommandBuffer);
 
 		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
@@ -337,9 +387,29 @@ namespace Core
 
 		vkFreeCommandBuffers(LogicalDevice, GraphicsCommandPool, 1, &CommandBuffer);
 
-		auto TextureWriteData = System->FrameAlloc<VkWriteDescriptorSet>(3);
-		auto TextureImageInfos = System->FrameAlloc<VkDescriptorImageInfo>(2);
-		auto Layouts = System->FrameAlloc<VkDescriptorSetLayout>(2);
+		VkImageView View = CreateImageView(LogicalDevice, ImageBuffer.Image,
+			VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+
+		TextureBuffers[ImageArraysCount] = ImageBuffer;
+		TextureImageViews[ImageArraysCount] = View;
+
+		const u32 CurrentIndex = ImageArraysCount;
+		++ImageArraysCount;
+
+		return CurrentIndex;
+	}
+
+	u32 CreateMaterial(u32 DiffuseTextureIndex, u32 SpecularTextureIndex)
+	{
+		return CreateTextureDescriptorSets(TextureImageViews[DiffuseTextureIndex],
+			TextureImageViews[SpecularTextureIndex]);
+	}
+
+	u32 CreateTextureDescriptorSets(VkImageView DiffuseTexture, VkImageView SpecularTexture)
+	{
+		auto TextureWriteData = Memory::MemoryManagementSystem::FrameAlloc<VkWriteDescriptorSet>(3);
+		auto TextureImageInfos = Memory::MemoryManagementSystem::FrameAlloc<VkDescriptorImageInfo>(2);
+		auto Layouts = Memory::MemoryManagementSystem::FrameAlloc<VkDescriptorSetLayout>(2);
 
 		Layouts[0] = MainPass.EntityPass.EntitySamplerSetLayout;
 		Layouts[1] = MainPass.TerrainPass.TerrainSamplerSetLayout;
@@ -347,28 +417,20 @@ namespace Core
 		VkDescriptorSet EntitySet;
 		VkDescriptorSet TerrainSet;
 
-		VulkanMemoryManagementSystem::Get()->AllocateSets(MainPool, &(Layouts[0]),
+		VulkanMemoryManagementSystem::AllocateSets(MainPool, &(Layouts[0]),
 			1, &EntitySet);
 
-		VulkanMemoryManagementSystem::Get()->AllocateSets(MainPool, &(Layouts[1]),
+		VulkanMemoryManagementSystem::AllocateSets(MainPool, &(Layouts[1]),
 			1, &TerrainSet);
-
-		VkImageView DiffuseView = CreateImageView(LogicalDevice, DiffuseBuffer.Image,
-			VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-
-		VkImageView SpecularView = CreateImageView(LogicalDevice, SpecularBuffer.Image,
-			VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-
 
 		TextureImageInfos[0] = { };
 		TextureImageInfos[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		TextureImageInfos[0].imageView = DiffuseView;
-		TextureImageInfos[0].sampler = TextureUnit.DiffuseTextureSampler;
+		TextureImageInfos[0].imageView = DiffuseTexture;
+		TextureImageInfos[0].sampler = DiffuseTextureSampler;
 
 		TextureImageInfos[1] = TextureImageInfos[0];
-		TextureImageInfos[1].imageView = SpecularView;
-		TextureImageInfos[1].sampler = TextureUnit.SpecularTextureSampler;
-
+		TextureImageInfos[1].imageView = SpecularTexture;
+		TextureImageInfos[1].sampler = SpecularTextureSampler;
 
 		TextureWriteData[0] = { };
 		TextureWriteData[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -389,19 +451,16 @@ namespace Core
 
 		vkUpdateDescriptorSets(LogicalDevice, 3, TextureWriteData, 0, nullptr);
 
-		TextureUnit.DiffuseTextureBuffers[TextureUnit.ImageArraysCount] = DiffuseBuffer;
-		TextureUnit.SpecularTextureBuffers[TextureUnit.ImageArraysCount] = SpecularBuffer;
+		MainPass.EntityPass.EntitySamplerDescriptorSets[MainPass.TextureDescriptorCountTest] = EntitySet;
+		MainPass.TerrainPass.TerrainSamplerDescriptorSets[MainPass.TextureDescriptorCountTest] = TerrainSet;
 
-		TextureUnit.DiffuseTextureImageViews[TextureUnit.ImageArraysCount] = DiffuseView;
-		TextureUnit.SpecularTextureImageViews[TextureUnit.ImageArraysCount] = SpecularView;
+		const u32 CurrentIndex = MainPass.TextureDescriptorCountTest;
+		++MainPass.TextureDescriptorCountTest;
 
-		MainPass.EntityPass.EntitySamplerDescriptorSets[TextureUnit.ImageArraysCount] = EntitySet;
-		MainPass.TerrainPass.TerrainSamplerDescriptorSets[TextureUnit.ImageArraysCount] = TerrainSet;
-
-		++TextureUnit.ImageArraysCount;
+		return CurrentIndex;
 	}
 
-	bool VulkanRenderingSystem::CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, u32 AvailableExtensionsCount,
+	bool CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, u32 AvailableExtensionsCount,
 		const char** RequiredExtensions, u32 RequiredExtensionsCount)
 	{
 		for (u32 i = 0; i < RequiredExtensionsCount; ++i)
@@ -426,7 +485,7 @@ namespace Core
 		return true;
 	}
 
-	bool VulkanRenderingSystem::CheckValidationLayersSupport(VkLayerProperties* Properties, u32 PropertiesSize,
+	bool CheckValidationLayersSupport(VkLayerProperties* Properties, u32 PropertiesSize,
 		const char** ValidationLeyersToCheck, u32 ValidationLeyersToCheckSize)
 	{
 		for (u32 i = 0; i < ValidationLeyersToCheckSize; ++i)
@@ -451,7 +510,7 @@ namespace Core
 		return true;
 	}
 
-	VkExtent2D VulkanRenderingSystem::GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities,
+	VkExtent2D GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities,
 		GLFWwindow* Window)
 	{
 		if (SurfaceCapabilities.currentExtent.width != std::numeric_limits<u32>::max())
@@ -471,7 +530,7 @@ namespace Core
 		}
 	}
 
-	Memory::FrameArray<VkExtensionProperties> VulkanRenderingSystem::GetAvailableExtensionProperties()
+	Memory::FrameArray<VkExtensionProperties> GetAvailableExtensionProperties()
 	{
 		u32 Count;
 		const VkResult Result = vkEnumerateInstanceExtensionProperties(nullptr, &Count, nullptr);
@@ -487,7 +546,7 @@ namespace Core
 		return Data;
 	}
 
-	Memory::FrameArray<VkLayerProperties> VulkanRenderingSystem::GetAvailableInstanceLayerProperties()
+	Memory::FrameArray<VkLayerProperties> GetAvailableInstanceLayerProperties()
 	{
 		u32 Count;
 		const VkResult Result = vkEnumerateInstanceLayerProperties(&Count, nullptr);
@@ -503,7 +562,7 @@ namespace Core
 		return Data;
 	}
 
-	Memory::FrameArray<const char*> VulkanRenderingSystem::GetRequiredInstanceExtensions(const char** ValidationExtensions,
+	Memory::FrameArray<const char*> GetRequiredInstanceExtensions(const char** ValidationExtensions,
 		u32 ValidationExtensionsCount)
 	{
 		u32 RequiredExtensionsCount = 0;
@@ -531,7 +590,7 @@ namespace Core
 		return Data;
 	}
 
-	Memory::FrameArray<VkSurfaceFormatKHR> VulkanRenderingSystem::GetSurfaceFormats(VkSurfaceKHR Surface)
+	Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkSurfaceKHR Surface)
 	{
 		u32 Count;
 		const VkResult Result = vkGetPhysicalDeviceSurfaceFormatsKHR(Device.PhysicalDevice, Surface, &Count, nullptr);
@@ -547,10 +606,10 @@ namespace Core
 		return Data;
 	}
 
-	VkDevice VulkanRenderingSystem::CreateLogicalDevice(PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
+	VkDevice CreateLogicalDevice(PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
 		u32 DeviceExtensionsSize)
 	{
-		const float Priority = 1.0f;
+		const f32 Priority = 1.0f;
 
 		// One family can support graphics and presentation
 		// In that case create multiple VkDeviceQueueCreateInfo
@@ -597,7 +656,7 @@ namespace Core
 		return LogicalDevice;
 	}
 
-	VkSurfaceFormatKHR VulkanRenderingSystem::GetBestSurfaceFormat(VkSurfaceKHR Surface)
+	VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface)
 	{
 		Memory::FrameArray<VkSurfaceFormatKHR> FormatsData = GetSurfaceFormats(Surface);
 
@@ -630,7 +689,7 @@ namespace Core
 		return Format;
 	}
 
-	VkSampler VulkanRenderingSystem::CreateTextureSampler()
+	VkSampler CreateTextureSampler()
 	{
 		VkSamplerCreateInfo SamplerCreateInfo = { };
 		SamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -658,7 +717,7 @@ namespace Core
 		return Sampler;
 	}
 
-	bool VulkanRenderingSystem::SetupQueues()
+	bool SetupQueues()
 	{
 		vkGetDeviceQueue(LogicalDevice, static_cast<u32>(Device.Indices.GraphicsFamily), 0, &GraphicsQueue);
 		vkGetDeviceQueue(LogicalDevice, static_cast<u32>(Device.Indices.PresentationFamily), 0, &PresentationQueue);
@@ -669,7 +728,7 @@ namespace Core
 		}
 	}
 
-	bool VulkanRenderingSystem::IsFormatSupported(VkFormat Format, VkImageTiling Tiling, VkFormatFeatureFlags FeatureFlags)
+	bool IsFormatSupported(VkFormat Format, VkImageTiling Tiling, VkFormatFeatureFlags FeatureFlags)
 	{
 		VkFormatProperties Properties;
 		vkGetPhysicalDeviceFormatProperties(Device.PhysicalDevice, Format, &Properties);
@@ -684,9 +743,8 @@ namespace Core
 		}
 	}
 
-	void VulkanRenderingSystem::CreateDrawEntities(Mesh* Meshes, u32 MeshesCount, DrawEntity* OutEntities)
+	void CreateDrawEntities(Mesh* Meshes, u32 MeshesCount, DrawEntity* OutEntities)
 	{
-		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
 		VkDeviceSize TotalVertexSize = 0;
 		VkDeviceSize TotalIndexSize = 0;
 
@@ -698,8 +756,8 @@ namespace Core
 			OutEntities[i].VertexOffset = TotalVertexSize + VertexBufferOffset;
 			OutEntities[i].IndexOffset = TotalIndexSize + IndexBufferOffset;
 
-			TotalVertexSize += VulkanMemorySystem->CalculateBufferAlignedSize(MeshVerticesSize);
-			TotalIndexSize += VulkanMemorySystem->CalculateBufferAlignedSize(MeshIndicesSize);
+			TotalVertexSize += VulkanMemoryManagementSystem::CalculateBufferAlignedSize(MeshVerticesSize);
+			TotalIndexSize += VulkanMemoryManagementSystem::CalculateBufferAlignedSize(MeshIndicesSize);
 		}
 
 		EntityVertex* AllVertices = Memory::MemoryManagementSystem::Allocate<EntityVertex>(TotalVertexSize);
@@ -716,49 +774,47 @@ namespace Core
 			std::memcpy(VertexCopyPointer, Meshes[i].MeshVertices, MeshVerticesSize);
 			std::memcpy(IndexCopyPointer, Meshes[i].MeshIndices, MeshIndicesSize);
 
-			VertexCopyPointer += VulkanMemorySystem->CalculateBufferAlignedSize(MeshVerticesSize);
-			IndexCopyPointer += VulkanMemorySystem->CalculateBufferAlignedSize(MeshIndicesSize);
+			VertexCopyPointer += VulkanMemoryManagementSystem::CalculateBufferAlignedSize(MeshVerticesSize);
+			IndexCopyPointer += VulkanMemoryManagementSystem::CalculateBufferAlignedSize(MeshIndicesSize);
 
 			OutEntities[i].Model = Meshes[i].Model;
 			OutEntities[i].IndicesCount = Meshes[i].MeshIndicesCount;
+			OutEntities[i].MaterialIndex = Meshes[i].MaterialIndex;
 		}
 
-		VulkanMemorySystem->CopyDataToBuffer(VertexBuffer.Buffer, VertexBufferOffset, TotalVertexSize, AllVertices);
+		VulkanMemoryManagementSystem::CopyDataToBuffer(VertexBuffer.Buffer, VertexBufferOffset, TotalVertexSize, AllVertices);
 		VertexBufferOffset += TotalVertexSize;
-		VulkanMemorySystem->CopyDataToBuffer(IndexBuffer.Buffer, IndexBufferOffset, TotalIndexSize, AllIndices);
+		VulkanMemoryManagementSystem::CopyDataToBuffer(IndexBuffer.Buffer, IndexBufferOffset, TotalIndexSize, AllIndices);
 		IndexBufferOffset += TotalIndexSize;
 
 		Memory::MemoryManagementSystem::Deallocate(AllVertices);
 		Memory::MemoryManagementSystem::Deallocate(AllIndices);
 	}
 
-	void VulkanRenderingSystem::CreateTerrainIndices(u32* Indices, u32 IndicesCount)
+	void CreateTerrainIndices(u32* Indices, u32 IndicesCount)
 	{
 		assert(TerrainIndicesCount == 0);
-
-		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
 
 		TerrainIndexOffset = IndexBufferOffset;
 		TerrainIndicesCount = IndicesCount;
 
 		const VkDeviceSize MeshIndexSize = sizeof(u32) * TerrainIndicesCount;
 
-		VulkanMemorySystem->CopyDataToBuffer(IndexBuffer.Buffer, IndexBufferOffset, MeshIndexSize, Indices);
-		IndexBufferOffset += VulkanMemorySystem->CalculateBufferAlignedSize(MeshIndexSize);
+		VulkanMemoryManagementSystem::CopyDataToBuffer(IndexBuffer.Buffer, IndexBufferOffset, MeshIndexSize, Indices);
+		IndexBufferOffset += VulkanMemoryManagementSystem::CalculateBufferAlignedSize(MeshIndexSize);
 	}
 
-	void VulkanRenderingSystem::CreateTerrainDrawEntity(TerrainVertex* TerrainVertices, u32 TerrainVerticesCount, DrawTerrainEntity& OutTerrain)
+	void CreateTerrainDrawEntity(TerrainVertex* TerrainVertices, u32 TerrainVerticesCount, DrawTerrainEntity& OutTerrain)
 	{
-		auto VulkanMemorySystem = VulkanMemoryManagementSystem::Get();
 		OutTerrain.VertexOffset = VertexBufferOffset;
 
 		const VkDeviceSize MeshVerticesSize = sizeof(TerrainVertex) * TerrainVerticesCount;
 
-		VulkanMemorySystem->CopyDataToBuffer(VertexBuffer.Buffer, VertexBufferOffset, MeshVerticesSize, TerrainVertices);
-		VertexBufferOffset += VulkanMemorySystem->CalculateBufferAlignedSize(MeshVerticesSize);
+		VulkanMemoryManagementSystem::CopyDataToBuffer(VertexBuffer.Buffer, VertexBufferOffset, MeshVerticesSize, TerrainVertices);
+		VertexBufferOffset += VulkanMemoryManagementSystem::CalculateBufferAlignedSize(MeshVerticesSize);
 	}
 
-	void VulkanRenderingSystem::CreateSynchronisation()
+	void CreateSynchronisation()
 	{
 		VkSemaphoreCreateInfo SemaphoreCreateInfo = { };
 		SemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -780,7 +836,7 @@ namespace Core
 		}
 	}
 
-	void VulkanRenderingSystem::DestroySynchronisation()
+	void DestroySynchronisation()
 	{
 		for (u64 i = 0; i < MAX_DRAW_FRAMES; i++)
 		{
@@ -790,7 +846,7 @@ namespace Core
 		}
 	}
 
-	void VulkanRenderingSystem::Draw(const DrawScene& Scene)
+	void Draw(const DrawScene& Scene)
 	{
 		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
 		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -834,8 +890,6 @@ namespace Core
 
 		vkCmdBeginRenderPass(MainViewport.CommandBuffers[ImageIndex], &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-		auto VulkanMemoryManagement = VulkanMemoryManagementSystem::Get();
-
 		{
 			vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.TerrainPass.Pipeline);
 
@@ -872,7 +926,7 @@ namespace Core
 				VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] = 
 				{
 					MainPass.EntityPass.EntitySets[ImageIndex],
-					MainPass.EntityPass.EntitySamplerDescriptorSets[Scene.DrawEntities[j].TextureId],
+					MainPass.EntityPass.EntitySamplerDescriptorSets[Scene.DrawEntities[j].MaterialIndex],
 					MainPass.LightingSets[ImageIndex],
 					MainPass.MaterialSet
 				};
@@ -909,7 +963,7 @@ namespace Core
 		}
 
 		//UpdateUniformBuffer
-		VulkanMemoryManagementSystem::Get()->CopyDataToMemory(MainPass.VpUniformBuffers[ImageIndex].Memory, 0,
+		VulkanMemoryManagementSystem::CopyDataToMemory(MainPass.VpUniformBuffers[ImageIndex].Memory, 0,
 			sizeof(UboViewProjection), &Scene.ViewProjection);
 
 		DrawPointLightEntity TestData;
@@ -918,13 +972,13 @@ namespace Core
 		TestData.Diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
 		TestData.Specular = glm::vec3(1.0f, 1.0f, 1.0f);
 
-		VulkanMemoryManagementSystem::Get()->CopyDataToMemory(MainPass.LightBuffers[ImageIndex].Memory, 0,
+		VulkanMemoryManagementSystem::CopyDataToMemory(MainPass.LightBuffers[ImageIndex].Memory, 0,
 			sizeof(DrawPointLightEntity), &TestData);
 
 		Material Mat;
 		Mat.Shininess = 0.4f;
 
-		VulkanMemoryManagementSystem::Get()->CopyDataToMemory(MainPass.MaterialBuffer.Memory, 0,
+		VulkanMemoryManagementSystem::CopyDataToMemory(MainPass.MaterialBuffer.Memory, 0,
 			sizeof(Material), &Mat);
 
 		// Submit command buffer to queue
@@ -961,7 +1015,7 @@ namespace Core
 		CurrentFrame = (CurrentFrame + 1) % MAX_DRAW_FRAMES;
 	}
 
-	void VulkanRenderingSystem::DeinitViewport(ViewportInstance* Viewport)
+	void DeinitViewport(ViewportInstance* Viewport)
 	{
 		for (u32 i = 0; i < Viewport->ViewportSwapchain.ImagesCount; ++i)
 		{
@@ -972,7 +1026,7 @@ namespace Core
 		vkDestroySurfaceKHR(Instance.VulkanInstance, Viewport->Surface, nullptr);
 	}
 
-	void VulkanRenderingSystem::InitViewport(GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstance* OutViewport,
+	void InitViewport(GLFWwindow* Window, VkSurfaceKHR Surface, ViewportInstance* OutViewport,
 		SwapchainInstance SwapInstance, VkImageView* ColorBuffers, VkImageView* DepthBuffers)
 	{
 		OutViewport->Window = Window;
@@ -1027,7 +1081,7 @@ namespace Core
 		// Function end CreateCommandBuffers
 	}
 
-	void VulkanRenderingSystem::CreateCommandPool(VkDevice LogicalDevice, u32 FamilyIndex)
+	void CreateCommandPool(VkDevice LogicalDevice, u32 FamilyIndex)
 	{
 		VkCommandPoolCreateInfo PoolInfo = { };
 		PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
