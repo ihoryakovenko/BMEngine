@@ -368,7 +368,8 @@ void LoadDrawEntities()
 			int Idx = Material.diffuse_texname.rfind("\\");
 			std::string FileName = "./Resources/Textures/" + Material.diffuse_texname.substr(Idx + 1);
 
-			MaterialToTexture[i] = Core::VulkanRenderingSystemInterface::CreateMaterial(AddTexture(FileName.c_str()), ContainerSpecularTextureIndex);
+			const u32 NewTextureIndex = AddTexture(FileName.c_str());
+			MaterialToTexture[i] = Core::VulkanRenderingSystemInterface::CreateMaterial(NewTextureIndex, NewTextureIndex);
 		}
 	}
 
@@ -432,6 +433,7 @@ void LoadDrawEntities()
 
 	ModelMeshes.emplace_back(CreateCubeMesh(WhiteMaterialIndex));
 	ModelMeshes.emplace_back(CreateCubeMesh(WhiteMaterialIndex));
+	ModelMeshes.emplace_back(CreateCubeMesh(WhiteMaterialIndex));
 	ModelMeshes.emplace_back(CreateCubeMesh(ContainerMaterialIndex));
 
 	DrawEntities.resize(ModelMeshes.size());
@@ -450,6 +452,16 @@ void LoadDrawEntities()
 	}
 
 	Core::VulkanRenderingSystemInterface::CreateDrawEntities(m.data(), m.size(), DrawEntities.data());
+
+	{
+		glm::vec3 CubePos(0.0f, 0.0f, 8.0f);
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, CubePos);
+		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		model = glm::scale(model, glm::vec3(0.5f));
+
+		DrawEntities[ModelMeshes.size() - 4].Model = model;
+	}
 
 	{
 		glm::vec3 LightCubePos(0.0f, 0.0f, 10.0f);
@@ -619,7 +631,7 @@ int main()
 		for (int i = 0; i < Scene.DrawEntitiesCount; ++i)
 		{
 			glm::mat4 TestMat = glm::rotate(Scene.DrawEntities[i].Model, glm::radians(0.5f), glm::vec3(0.0f, 1.0f, 0.0f));
-			//Scene.DrawEntities[i].Model = TestMat;
+			Scene.DrawEntities[i].Model = TestMat;
 		}
 
 		MoveCamera(Window, DeltaTime, MainCamera);

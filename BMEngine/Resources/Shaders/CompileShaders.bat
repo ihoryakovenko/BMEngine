@@ -1,5 +1,6 @@
 @echo off
 
+
 if "%VULKAN_SDK%" == "" (
     echo VULKAN_SDK environment variable is not set.
     exit /b 1
@@ -7,12 +8,12 @@ if "%VULKAN_SDK%" == "" (
 
 set SHADER_PATH=%~dp0
 
-%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%vert.spv -V %SHADER_PATH%Shader.vert
-%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%frag.spv -V %SHADER_PATH%Shader.frag
+%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%vert.spv -V %SHADER_PATH%Entity.vert.glsl
+%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%frag.spv -V %SHADER_PATH%Entity.frag.glsl
 
-%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%second_vert.spv -V %SHADER_PATH%Second.vert
-%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%second_frag.spv -V %SHADER_PATH%Second.frag
+%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%second_vert.spv -V %SHADER_PATH%Deffered.vert.glsl
+%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%second_frag.spv -V %SHADER_PATH%Deffered.frag.glsl
 
-%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%TerrainGenerator_vert.spv -V %SHADER_PATH%TerrainGenerator.vert
-%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%TerrainGenerator_frag.spv -V %SHADER_PATH%TerrainGenerator.frag
+%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%TerrainGenerator_vert.spv -V %SHADER_PATH%TerrainGenerator.vert.glsl
+%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%TerrainGenerator_frag.spv -V %SHADER_PATH%TerrainGenerator.frag.glsl
 pause

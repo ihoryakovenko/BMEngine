@@ -177,8 +177,8 @@
       </Command>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>
-      </Command>
+      <Command>call $(SolutionDir)PostBuildScript.bat</Command>
+      <Message>1</Message>
     </PostBuildEvent>
     <CustomBuildStep>
       <Command>call $(SolutionDir)$(ProjectName)\Resources\Shaders\CompileShaders.bat</Command>
@@ -210,8 +210,8 @@
       </Command>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>
-      </Command>
+      <Command>call $(SolutionDir)PostBuildScript.bat</Command>
+      <Message>1</Message>
     </PostBuildEvent>
     <CustomBuildStep>
       <Command>call $(SolutionDir)$(ProjectName)\Resources\Shaders\CompileShaders.bat</Command>

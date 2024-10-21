@@ -931,7 +931,7 @@ namespace Core::VulkanRenderingSystemInterface
 					MainPass.MaterialSet
 				};
 
-				vkCmdPushConstants(MainViewport.CommandBuffers[ImageIndex], MainPass.EntityPass.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
+				vkCmdPushConstants(MainViewport.CommandBuffers[ImageIndex], MainPass.EntityPass.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 					0, sizeof(Model), &Scene.DrawEntities[j].Model);
 				vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.EntityPass.PipelineLayout,
 					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
@@ -966,17 +966,25 @@ namespace Core::VulkanRenderingSystemInterface
 		VulkanMemoryManagementSystem::CopyDataToMemory(MainPass.VpUniformBuffers[ImageIndex].Memory, 0,
 			sizeof(UboViewProjection), &Scene.ViewProjection);
 
-		DrawPointLightEntity TestData;
-		TestData.Position = glm::vec3(0.0f, 0.0f, 10.0f);
-		TestData.Ambient = glm::vec3(0.2f, 0.2f, 0.2f);
-		TestData.Diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
-		TestData.Specular = glm::vec3(1.0f, 1.0f, 1.0f);
+		LightBuffer TestData;
+		TestData.Light1.Position = glm::vec4(0.0f, 0.0f, 10.0f, 1.0f);
+		TestData.Light1.Ambient = glm::vec3(0.1f, 0.1f, 0.1f);
+		TestData.Light1.Diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
+		TestData.Light1.Specular = glm::vec3(1.0f, 1.0f, 1.0f);
+		TestData.Light1.Constant = 1.0f;
+		TestData.Light1.Linear = 0.09;
+		TestData.Light1.Quadratic = 0.032;
+
+		TestData.DLight.Direction = glm::vec3(0.0f, -1.0f, 0.0f);
+		TestData.DLight.Ambient = glm::vec3(0.1f, 0.1f, 0.1f);
+		TestData.DLight.Diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
+		TestData.DLight.Specular = glm::vec3(1.0f, 1.0f, 1.0f);
 
 		VulkanMemoryManagementSystem::CopyDataToMemory(MainPass.LightBuffers[ImageIndex].Memory, 0,
-			sizeof(DrawPointLightEntity), &TestData);
+			sizeof(LightBuffer), &TestData);
 
 		Material Mat;
-		Mat.Shininess = 0.4f;
+		Mat.Shininess = 32.f;
 
 		VulkanMemoryManagementSystem::CopyDataToMemory(MainPass.MaterialBuffer.Memory, 0,
 			sizeof(Material), &Mat);

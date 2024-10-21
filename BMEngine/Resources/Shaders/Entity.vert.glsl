@@ -27,6 +27,6 @@ void main()
 
 	FragmentColor = Color;
 	FragmentTexture = TextureCoords;
-	FragmentNormal = mat3(transpose(inverse(ViewProjection.View * Model.Model))) * Normal;
-	FragmentPosition = vec3(ViewProjection.View * Model.Model * vec4(Position, 1.0));
+	FragmentNormal = Normal;
+	FragmentPosition = Position;
 }

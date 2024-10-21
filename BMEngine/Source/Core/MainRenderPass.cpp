@@ -201,7 +201,7 @@ namespace Core
 
 	void MainRenderPass::SetupPushConstants()
 	{
-		EntityPass.PushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		EntityPass.PushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 		EntityPass.PushConstantRange.offset = 0;
 		// Todo: check constant and model size?
 		EntityPass.PushConstantRange.size = sizeof(Model);
@@ -734,7 +734,7 @@ namespace Core
 		u32 ImagesCount)
 	{
 		const VkDeviceSize VpBufferSize = sizeof(UboViewProjection);
-		const VkDeviceSize LightBufferSize = sizeof(DrawPointLightEntity);
+		const VkDeviceSize LightBufferSize = sizeof(LightBuffer);
 		const VkDeviceSize MaterialBufferSize = sizeof(Material);
 
 		//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
@@ -784,10 +784,10 @@ namespace Core
 			VpBufferInfo.offset = 0;
 			VpBufferInfo.range = sizeof(UboViewProjection);
 
-			VkDescriptorBufferInfo AmbientLightBufferInfo = { };
-			AmbientLightBufferInfo.buffer = LightBuffers[i].Buffer;
-			AmbientLightBufferInfo.offset = 0;
-			AmbientLightBufferInfo.range = sizeof(DrawPointLightEntity);
+			VkDescriptorBufferInfo LightBufferInfo = { };
+			LightBufferInfo.buffer = LightBuffers[i].Buffer;
+			LightBufferInfo.offset = 0;
+			LightBufferInfo.range = sizeof(LightBuffer);
 
 			VkWriteDescriptorSet VpSetWrite = { };
 			VpSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -805,7 +805,7 @@ namespace Core
 			LightSetWrite.dstArrayElement = 0;
 			LightSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			LightSetWrite.descriptorCount = 1;
-			LightSetWrite.pBufferInfo = &AmbientLightBufferInfo;
+			LightSetWrite.pBufferInfo = &LightBufferInfo;
 
 			VkWriteDescriptorSet VpTerrainWrite = VpSetWrite;
 			VpTerrainWrite.dstSet = TerrainPass.TerrainSets[i];

@@ -128,17 +128,34 @@ namespace Core
 		VkDeviceSize VertexOffset = 0;
 	};
 
-	struct DrawPointLightEntity
+	struct PointLight
 	{
-		alignas(16) glm::vec3 Position;
+		glm::vec4 Position;
+		glm::vec3 Ambient;
+		f32 Constant;
+		glm::vec3 Diffuse;
+		f32 Linear;
+		glm::vec3 Specular;
+		f32 Quadratic;
+	};
+
+	struct DirectionLight
+	{
+		alignas(16) glm::vec3 Direction;
 		alignas(16) glm::vec3 Ambient;
 		alignas(16) glm::vec3 Diffuse;
 		alignas(16) glm::vec3 Specular;
 	};
 
+	struct LightBuffer
+	{
+		PointLight Light1;
+		DirectionLight DLight;
+	};
+
 	struct Material
 	{
-		float Shininess;
+		f32 Shininess;
 	};
 
 	struct DrawScene
