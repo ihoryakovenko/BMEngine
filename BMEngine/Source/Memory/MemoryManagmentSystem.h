@@ -7,12 +7,12 @@
 
 namespace Memory
 {
-	struct MemoryManagementSystem
+	struct BmMemoryManagementSystem
 	{
 	public:
-		static MemoryManagementSystem* Get()
+		static BmMemoryManagementSystem* Get()
 		{
-			static MemoryManagementSystem Instance;
+			static BmMemoryManagementSystem Instance;
 			return &Instance;
 		}
 
@@ -87,7 +87,7 @@ namespace Memory
 		static FramePointer<T> Create(u32 InCount = 1)
 		{
 			FramePointer Pointer;
-			Pointer.Data = MemoryManagementSystem::Get()->FrameAlloc<T>(InCount);
+			Pointer.Data = BmMemoryManagementSystem::Get()->FrameAlloc<T>(InCount);
 			return Pointer;
 		}
 
@@ -116,7 +116,7 @@ namespace Memory
 		{
 			FrameArray Array;
 			Array.Count = InCount;
-			Array.Pointer.Data = MemoryManagementSystem::Get()->FrameAlloc<T>(InCount);
+			Array.Pointer.Data = BmMemoryManagementSystem::Get()->FrameAlloc<T>(InCount);
 			return Array;
 		}
 

@@ -10,13 +10,13 @@ namespace Core::VulkanMemoryManagementSystem
 {
 	static VkDeviceMemory AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex);
 
-	static MemorySourceDevice MemorySource;
-	static GPUBuffer StagingBuffer;
+	static BrMemorySourceDevice MemorySource;
+	static BrGPUBuffer StagingBuffer;
 
-	void Init(MemorySourceDevice Device)
+	void Init(BrMemorySourceDevice Device)
 	{
 		MemorySource = Device;
-		StagingBuffer = CreateBuffer(Mb64, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		StagingBuffer = CreateBuffer(MB64, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	}
 
@@ -28,9 +28,9 @@ namespace Core::VulkanMemoryManagementSystem
 	VkDeviceSize CalculateBufferAlignedSize(VkDeviceSize BufferSize)
 	{
 		u32 Padding = 0;
-		if (BufferSize % BufferAlignment != 0)
+		if (BufferSize % BUFFER_ALIGNMENT != 0)
 		{
-			Padding = BufferAlignment - (BufferSize % BufferAlignment);
+			Padding = BUFFER_ALIGNMENT - (BufferSize % BUFFER_ALIGNMENT);
 		}
 
 		return BufferSize + Padding;
@@ -39,9 +39,9 @@ namespace Core::VulkanMemoryManagementSystem
 	VkDeviceSize CalculateImageAlignedSize(VkDeviceSize BufferSize)
 	{
 		u32 Padding = 0;
-		if (BufferSize % ImageAlignment != 0)
+		if (BufferSize % IMAGE_ALIGNMENT != 0)
 		{
-			Padding = ImageAlignment - (BufferSize % ImageAlignment);
+			Padding = IMAGE_ALIGNMENT - (BufferSize % IMAGE_ALIGNMENT);
 		}
 
 		return BufferSize + Padding;
@@ -94,9 +94,9 @@ namespace Core::VulkanMemoryManagementSystem
 		}
 	}
 
-	ImageBuffer CreateImageBuffer(VkImageCreateInfo* pCreateInfo)
+	BrImageBuffer CreateImageBuffer(VkImageCreateInfo* pCreateInfo)
 	{
-		ImageBuffer Buffer;
+		BrImageBuffer Buffer;
 		VkResult Result = vkCreateImage(MemorySource.LogicalDevice, pCreateInfo, nullptr, &Buffer.Image);
 		if (Result != VK_SUCCESS)
 		{
@@ -116,13 +116,13 @@ namespace Core::VulkanMemoryManagementSystem
 		return Buffer;
 	}
 
-	void DestroyImageBuffer(ImageBuffer Image)
+	void DestroyImageBuffer(BrImageBuffer Image)
 	{
 		vkDestroyImage(MemorySource.LogicalDevice, Image.Image, nullptr);
 		vkFreeMemory(MemorySource.LogicalDevice, Image.Memory, nullptr);
 	}
 
-	GPUBuffer CreateBuffer(VkDeviceSize BufferSize, VkBufferUsageFlags Usage,
+	BrGPUBuffer CreateBuffer(VkDeviceSize BufferSize, VkBufferUsageFlags Usage,
 		VkMemoryPropertyFlags Properties)
 	{
 		Util::Log().Info("Creating buffer. Requested size: {}", BufferSize);
@@ -133,7 +133,7 @@ namespace Core::VulkanMemoryManagementSystem
 		BufferInfo.usage = Usage;
 		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-		GPUBuffer Buffer;
+		BrGPUBuffer Buffer;
 		VkResult Result = vkCreateBuffer(MemorySource.LogicalDevice, &BufferInfo, nullptr, &Buffer.Buffer);
 		if (Result != VK_SUCCESS)
 		{
@@ -159,7 +159,7 @@ namespace Core::VulkanMemoryManagementSystem
 		return Buffer;
 	}
 
-	void DestroyBuffer(GPUBuffer Buffer)
+	void DestroyBuffer(BrGPUBuffer Buffer)
 	{
 		vkDestroyBuffer(MemorySource.LogicalDevice, Buffer.Buffer, nullptr);
 		vkFreeMemory(MemorySource.LogicalDevice, Buffer.Memory, nullptr);
@@ -176,7 +176,7 @@ namespace Core::VulkanMemoryManagementSystem
 
 	void CopyDataToBuffer(VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Size, const void* Data)
 	{
-		assert(Size <= Mb64);
+		assert(Size <= MB64);
 
 		void* MappedMemory;
 		vkMapMemory(MemorySource.LogicalDevice, StagingBuffer.Memory, 0, Size, 0, &MappedMemory);
@@ -222,7 +222,7 @@ namespace Core::VulkanMemoryManagementSystem
 	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, VkDeviceSize Size,
 		u32 LayersCount, const void* Data)
 	{
-		assert(Size <= Mb64);
+		assert(Size <= MB64);
 
 		void* MappedMemory;
 		vkMapMemory(MemorySource.LogicalDevice, StagingBuffer.Memory, 0, Size, 0, &MappedMemory);

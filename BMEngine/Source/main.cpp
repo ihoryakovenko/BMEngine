@@ -39,11 +39,11 @@ u32 TestMaterialIndex;
 u32 WhiteMaterialIndex;
 u32 ContainerMaterialIndex;
 
-Core::TerrainVertex TerrainVerticesData[NumRows][NumCols];
+Core::BrTerrainVertex TerrainVerticesData[NumRows][NumCols];
 
-std::vector<Core::DrawEntity> DrawEntities;
-Core::ShaderCodeDescription ShaderCodeDescriptions[Core::ShaderNames::ShadersCount];
-std::vector<std::vector<char>> ShaderCodes(Core::ShaderNames::ShadersCount);
+std::vector<Core::BrDrawEntity> DrawEntities;
+Core::BrShaderCodeDescription ShaderCodeDescriptions[Core::BrShaderNames::ShadersCount];
+std::vector<std::vector<char>> ShaderCodes(Core::BrShaderNames::ShadersCount);
 
 void GenerateTerrain()
 {
@@ -102,21 +102,21 @@ void GenerateTerrain()
 	}
 }
 
-Core::TerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
+Core::BrTerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
 u32 TerrainVerticesCount = NumRows * NumCols;
 
 struct TestMesh
 {
-	std::vector<Core::EntityVertex> vertices;
+	std::vector<Core::BrEntityVertex> vertices;
 	std::vector<u32> indices;
 	int MaterialIndex;
 };
 
 namespace std
 {
-	template<> struct hash<Core::EntityVertex>
+	template<> struct hash<Core::BrEntityVertex>
 	{
-		size_t operator()(Core::EntityVertex const& vertex) const
+		size_t operator()(Core::BrEntityVertex const& vertex) const
 		{
 			size_t hashPosition = std::hash<glm::vec3>()(vertex.Position);
 			size_t hashColor = std::hash<glm::vec3>()(vertex.Color);
@@ -135,7 +135,7 @@ namespace std
 
 struct VertexEqual
 {
-	bool operator()(const Core::EntityVertex& lhs, const Core::EntityVertex& rhs) const
+	bool operator()(const Core::BrEntityVertex& lhs, const Core::BrEntityVertex& rhs) const
 	{
 		return lhs.Position == rhs.Position && lhs.Color == rhs.Color && lhs.TextureCoords == rhs.TextureCoords;
 	}
@@ -162,7 +162,7 @@ u32 AddTexture(const char* DiffuseTexturePath)
 		assert(false);
 	}
 
-	Core::TextureArrayInfo Info;
+	Core::BrTextureArrayInfo Info;
 	Info.Width = Width;
 	Info.Height = Height;
 	Info.Format = STBI_rgb_alpha;
@@ -275,13 +275,13 @@ TestMesh CreateCubeMesh(int materialIndex)
 		assert(false);
 	}
 
-	std::unordered_map<Core::EntityVertex, u32, std::hash<Core::EntityVertex>, VertexEqual> uniqueVertices{ };
+	std::unordered_map<Core::BrEntityVertex, u32, std::hash<Core::BrEntityVertex>, VertexEqual> uniqueVertices{ };
 
 	for (const auto& Shape : Shapes)
 	{
 		for (const auto& index : Shape.mesh.indices)
 		{
-			Core::EntityVertex vertex{ };
+			Core::BrEntityVertex vertex{ };
 
 			vertex.Position =
 			{
@@ -376,7 +376,7 @@ void LoadDrawEntities()
 	std::vector<TestMesh> ModelMeshes;
 	ModelMeshes.reserve(Shapes.size());
 
-	std::unordered_map<Core::EntityVertex, u32, std::hash<Core::EntityVertex>, VertexEqual> uniqueVertices{ };
+	std::unordered_map<Core::BrEntityVertex, u32, std::hash<Core::BrEntityVertex>, VertexEqual> uniqueVertices{ };
 
 	for (const auto& Shape : Shapes)
 	{
@@ -384,7 +384,7 @@ void LoadDrawEntities()
 
 		for (const auto& index : Shape.mesh.indices)
 		{
-			Core::EntityVertex vertex{ };
+			Core::BrEntityVertex vertex{ };
 
 			vertex.Position =
 			{
@@ -438,7 +438,7 @@ void LoadDrawEntities()
 
 	DrawEntities.resize(ModelMeshes.size());
 	
-	std::vector<Core::Mesh> m(ModelMeshes.size());
+	std::vector<Core::BrMesh> m(ModelMeshes.size());
 
 	for (int i = 0; i < ModelMeshes.size(); ++i)
 	{
@@ -457,7 +457,7 @@ void LoadDrawEntities()
 		glm::vec3 CubePos(0.0f, 0.0f, 8.0f);
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, CubePos);
-		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		model = glm::rotate(model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 		model = glm::scale(model, glm::vec3(0.5f));
 
 		DrawEntities[ModelMeshes.size() - 4].Model = model;
@@ -496,29 +496,29 @@ void LoadDrawEntities()
 void LoadShaders()
 {
 	std::vector<const char*> ShaderPaths;
-	ShaderPaths.reserve(Core::ShaderNames::ShadersCount);
+	ShaderPaths.reserve(Core::BrShaderNames::ShadersCount);
 	std::vector<Core::ShaderName> NameToPath;
-	NameToPath.reserve(Core::ShaderNames::ShadersCount);
+	NameToPath.reserve(Core::BrShaderNames::ShadersCount);
 
 	ShaderPaths.push_back("./Resources/Shaders/TerrainGenerator_vert.spv");
-	NameToPath.push_back(Core::ShaderNames::TerrainVertex);
+	NameToPath.push_back(Core::BrShaderNames::TerrainVertex);
 
 	ShaderPaths.push_back("./Resources/Shaders/TerrainGenerator_frag.spv");
-	NameToPath.push_back(Core::ShaderNames::TerrainFragment);
+	NameToPath.push_back(Core::BrShaderNames::TerrainFragment);
 
 	ShaderPaths.push_back("./Resources/Shaders/vert.spv");
-	NameToPath.push_back(Core::ShaderNames::EntityVertex);
+	NameToPath.push_back(Core::BrShaderNames::EntityVertex);
 
 	ShaderPaths.push_back("./Resources/Shaders/frag.spv");
-	NameToPath.push_back(Core::ShaderNames::EntityFragment);
+	NameToPath.push_back(Core::BrShaderNames::EntityFragment);
 
 	ShaderPaths.push_back("./Resources/Shaders/second_vert.spv");
-	NameToPath.push_back(Core::ShaderNames::DeferredVertex);
+	NameToPath.push_back(Core::BrShaderNames::DeferredVertex);
 
 	ShaderPaths.push_back("./Resources/Shaders/second_frag.spv");
-	NameToPath.push_back(Core::ShaderNames::DeferredFragment);
+	NameToPath.push_back(Core::BrShaderNames::DeferredFragment);
 
-	for (u32 i = 0; i < Core::ShaderNames::ShadersCount; ++i)
+	for (u32 i = 0; i < Core::BrShaderNames::ShadersCount; ++i)
 	{
 		Util::OpenAndReadFileFull(ShaderPaths[i], ShaderCodes[i], "rb");
 		ShaderCodeDescriptions[i].Code = reinterpret_cast<u32*>(ShaderCodes[i].data());
@@ -531,7 +531,7 @@ int main()
 {
 	const u32 FrameAllocSize = 1024 * 1024;
 
-	Memory::MemoryManagementSystem::Init(FrameAllocSize);
+	Memory::BmMemoryManagementSystem::Init(FrameAllocSize);
 
 	if (glfwInit() == GL_FALSE)
 	{
@@ -578,15 +578,15 @@ int main()
 	}
 
 
-	Core::RenderConfig Config;
+	Core::BrConfig Config;
 	Config.RenderShaders = ShaderCodeDescriptions;
-	Config.ShadersCount = Core::ShaderNames::ShadersCount;
+	Config.ShadersCount = Core::BrShaderNames::ShadersCount;
 	Config.MaxTextures = 90;
 
 	Core::VulkanRenderingSystemInterface::Init(Window, Config);
 	LoadDrawEntities();
 
-	Core::DrawScene Scene;
+	Core::BrDrawScene Scene;
 
 	Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
 		static_cast<f32>(1600) / static_cast<f32>(800), 0.1f, 100.0f);
@@ -594,7 +594,7 @@ int main()
 	Scene.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	
-	Core::DrawTerrainEntity TestDrawTerrainEntity;
+	Core::BrDrawTerrainEntity TestDrawTerrainEntity;
 	Core::VulkanRenderingSystemInterface::CreateTerrainDrawEntity(&TerrainVerticesData[0][0], NumRows * NumCols, TestDrawTerrainEntity);
 	Core::VulkanRenderingSystemInterface::CreateTerrainIndices(indices.data(), indices.size());
 
@@ -612,7 +612,35 @@ int main()
 
 	Camera MainCamera;
 
-	Memory::MemoryManagementSystem::FrameDealloc();
+	Memory::BmMemoryManagementSystem::FrameDealloc();
+
+	Core::BrLightBuffer TestData;
+	TestData.PointLight.Position = glm::vec4(0.0f, 0.0f, 10.0f, 1.0f);
+	TestData.PointLight.Ambient = glm::vec3(0.1f, 0.1f, 0.1f);
+	TestData.PointLight.Diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
+	TestData.PointLight.Specular = glm::vec3(1.0f, 1.0f, 1.0f);
+	TestData.PointLight.Constant = 1.0f;
+	TestData.PointLight.Linear = 0.09;
+	TestData.PointLight.Quadratic = 0.032;
+
+	TestData.DirectionLight.Direction = glm::vec3(0.0f, -1.0f, 0.0f);
+	TestData.DirectionLight.Ambient = glm::vec3(0.1f, 0.1f, 0.1f);
+	TestData.DirectionLight.Diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
+	TestData.DirectionLight.Specular = glm::vec3(1.0f, 1.0f, 1.0f);
+
+	TestData.SpotLight.Position = glm::vec4(0.0f, 0.0f, 10.0f, 1.0f);
+	TestData.SpotLight.Ambient = glm::vec3(0.1f, 0.1f, 0.1f);
+	TestData.SpotLight.Diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
+	TestData.SpotLight.Specular = glm::vec3(1.0f, 1.0f, 1.0f);
+	TestData.SpotLight.Constant = 1.0f;
+	TestData.SpotLight.Linear = 0.09;
+	TestData.SpotLight.Quadratic = 0.032;
+	TestData.SpotLight.CutOff = glm::cos(glm::radians(12.5f));
+	TestData.SpotLight.OuterCutOff = glm::cos(glm::radians(17.5f));
+
+	Core::BrMaterial Mat;
+	Mat.Shininess = 32.f;
+	Core::VulkanRenderingSystemInterface::UpdateMaterialBuffer(Mat);
 
 	while (!glfwWindowShouldClose(Window) && !Close)
 	{
@@ -631,15 +659,20 @@ int main()
 		for (int i = 0; i < Scene.DrawEntitiesCount; ++i)
 		{
 			glm::mat4 TestMat = glm::rotate(Scene.DrawEntities[i].Model, glm::radians(0.5f), glm::vec3(0.0f, 1.0f, 0.0f));
-			Scene.DrawEntities[i].Model = TestMat;
+			//Scene.DrawEntities[i].Model = TestMat;
 		}
 
 		MoveCamera(Window, DeltaTime, MainCamera);
 		Scene.ViewProjection.View = glm::lookAt(MainCamera.CameraPosition, MainCamera.CameraPosition + MainCamera.CameraFront, MainCamera.CameraUp);
 
+		TestData.SpotLight.Direction = MainCamera.CameraFront;
+		TestData.SpotLight.Position = MainCamera.CameraPosition;
+
+		Core::VulkanRenderingSystemInterface::UpdateLightBuffer(TestData);
+
 		Core::VulkanRenderingSystemInterface::Draw(Scene);
 
-		Memory::MemoryManagementSystem::FrameDealloc();
+		Memory::BmMemoryManagementSystem::FrameDealloc();
 	}
 	
 	Core::VulkanRenderingSystemInterface::DeInit();
@@ -649,11 +682,11 @@ int main()
 
 	glfwTerminate();
 
-	Memory::MemoryManagementSystem::DeInit();
+	Memory::BmMemoryManagementSystem::DeInit();
 
-	if (Memory::MemoryManagementSystem::AllocateCounter != 0)
+	if (Memory::BmMemoryManagementSystem::AllocateCounter != 0)
 	{
-		Util::Log::Error("AllocateCounter in not equal 0, counter is {}", Memory::MemoryManagementSystem::AllocateCounter);
+		Util::Log::Error("AllocateCounter in not equal 0, counter is {}", Memory::BmMemoryManagementSystem::AllocateCounter);
 		assert(false);
 	}
 
