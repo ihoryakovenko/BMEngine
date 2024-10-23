@@ -49,7 +49,7 @@ namespace Core::VulkanRenderingSystemInterface
 	static BrMainInstance Instance;
 	static VkDevice LogicalDevice = nullptr;
 	static BrDeviceInstance Device;
-	static BrMainRenderPass MainPass;
+	static BrMainRenderPass MainRenderpass;
 
 	static BrViewportInstance MainViewport;
 
@@ -229,24 +229,24 @@ namespace Core::VulkanRenderingSystemInterface
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-		MainPass.CreateVulkanPass(LogicalDevice, ColorFormat, DepthFormat, SurfaceFormat);
-		MainPass.SetupPushConstants();
-		MainPass.CreateSamplerSetLayout(LogicalDevice);
-		MainPass.CreateTerrainSetLayout(LogicalDevice);
-		MainPass.CreateEntitySetLayout(LogicalDevice);
-		MainPass.CreateDeferredSetLayout(LogicalDevice);
-		MainPass.CreatePipelineLayouts(LogicalDevice);
-		MainPass.CreatePipelines(LogicalDevice, Extent1, ShaderInputs, BrShaderNames::ShadersCount);
-		MainPass.CreateAttachments(Device.PhysicalDevice, LogicalDevice, SwapInstance1.ImagesCount, Extent1, DepthFormat, ColorFormat);
-		MainPass.CreateUniformBuffers(Device.PhysicalDevice, LogicalDevice, SwapInstance1.ImagesCount);
-		MainPass.CreateSets(MainPool, LogicalDevice, SwapInstance1.ImagesCount);
+		MainRenderpass.CreateVulkanPass(LogicalDevice, ColorFormat, DepthFormat, SurfaceFormat);
+		MainRenderpass.SetupPushConstants();
+		MainRenderpass.CreateSamplerSetLayout(LogicalDevice);
+		MainRenderpass.CreateTerrainSetLayout(LogicalDevice);
+		MainRenderpass.CreateEntitySetLayout(LogicalDevice);
+		MainRenderpass.CreateDeferredSetLayout(LogicalDevice);
+		MainRenderpass.CreatePipelineLayouts(LogicalDevice);
+		MainRenderpass.CreatePipelines(LogicalDevice, Extent1, ShaderInputs, BrShaderNames::ShadersCount);
+		MainRenderpass.CreateAttachments(Device.PhysicalDevice, LogicalDevice, SwapInstance1.ImagesCount, Extent1, DepthFormat, ColorFormat);
+		MainRenderpass.CreateUniformBuffers(Device.PhysicalDevice, LogicalDevice, SwapInstance1.ImagesCount);
+		MainRenderpass.CreateSets(MainPool, LogicalDevice, SwapInstance1.ImagesCount);
 
 		for (int i = 0; i < BrShaderNames::ShadersCount; ++i)
 		{
 			vkDestroyShaderModule(LogicalDevice, ShaderInputs[i].Module, nullptr);
 		}
 
-		InitViewport(Window, Surface, &MainViewport, SwapInstance1, MainPass.ColorBufferViews, MainPass.DepthBufferViews);
+		InitViewport(Window, Surface, &MainViewport, SwapInstance1, MainRenderpass.ColorBufferViews, MainRenderpass.DepthBufferViews);
 
 		DiffuseTextureSampler = CreateTextureSampler();
 		SpecularTextureSampler = CreateTextureSampler();
@@ -280,7 +280,7 @@ namespace Core::VulkanRenderingSystemInterface
 		VulkanMemoryManagementSystem::Deinit();
 
 		vkDestroyCommandPool(LogicalDevice, GraphicsCommandPool, nullptr);
-		MainPass.ClearResources(LogicalDevice, MainViewport.ViewportSwapchain.ImagesCount);
+		MainRenderpass.ClearResources(LogicalDevice, MainViewport.ViewportSwapchain.ImagesCount);
 
 		DeinitViewport(&MainViewport);
 
@@ -412,8 +412,8 @@ namespace Core::VulkanRenderingSystemInterface
 		auto TextureImageInfos = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorImageInfo>(2);
 		auto Layouts = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorSetLayout>(2);
 
-		Layouts[0] = MainPass.EntityPass.EntitySamplerSetLayout;
-		Layouts[1] = MainPass.TerrainPass.TerrainSamplerSetLayout;
+		Layouts[0] = MainRenderpass.MainSubpass.EntityPipeline.EntitySamplerSetLayout;
+		Layouts[1] = MainRenderpass.MainSubpass.TerrainPipeline.TerrainSamplerSetLayout;
 
 		VkDescriptorSet EntitySet;
 		VkDescriptorSet TerrainSet;
@@ -452,11 +452,11 @@ namespace Core::VulkanRenderingSystemInterface
 
 		vkUpdateDescriptorSets(LogicalDevice, 3, TextureWriteData, 0, nullptr);
 
-		MainPass.EntityPass.EntitySamplerDescriptorSets[MainPass.TextureDescriptorCountTest] = EntitySet;
-		MainPass.TerrainPass.TerrainSamplerDescriptorSets[MainPass.TextureDescriptorCountTest] = TerrainSet;
+		MainRenderpass.MainSubpass.EntityPipeline.EntitySamplerDescriptorSets[MainRenderpass.TextureDescriptorCountTest] = EntitySet;
+		MainRenderpass.MainSubpass.TerrainPipeline.TerrainSamplerDescriptorSets[MainRenderpass.TextureDescriptorCountTest] = TerrainSet;
 
-		const u32 CurrentIndex = MainPass.TextureDescriptorCountTest;
-		++MainPass.TextureDescriptorCountTest;
+		const u32 CurrentIndex = MainRenderpass.TextureDescriptorCountTest;
+		++MainRenderpass.TextureDescriptorCountTest;
 
 		return CurrentIndex;
 	}
@@ -817,17 +817,17 @@ namespace Core::VulkanRenderingSystemInterface
 
 	void UpdateLightBuffer(const BrLightBuffer& Buffer)
 	{
-		const u32 UpdateIndex = (MainPass.ActiveLightSet + 1) % MainViewport.ViewportSwapchain.ImagesCount;
+		const u32 UpdateIndex = (MainRenderpass.ActiveLightSet + 1) % MainViewport.ViewportSwapchain.ImagesCount;
 
-		VulkanMemoryManagementSystem::CopyDataToMemory(MainPass.LightBuffers[UpdateIndex].Memory, 0,
+		VulkanMemoryManagementSystem::CopyDataToMemory(MainRenderpass.LightBuffers[UpdateIndex].Memory, 0,
 			sizeof(BrLightBuffer), &Buffer);
 
-		MainPass.ActiveLightSet = UpdateIndex;
+		MainRenderpass.ActiveLightSet = UpdateIndex;
 	}
 
 	void UpdateMaterialBuffer(const BrMaterial& Buffer)
 	{
-		VulkanMemoryManagementSystem::CopyDataToMemory(MainPass.MaterialBuffer.Memory, 0,
+		VulkanMemoryManagementSystem::CopyDataToMemory(MainRenderpass.MaterialBuffer.Memory, 0,
 			sizeof(BrMaterial), &Buffer);
 	}
 
@@ -879,7 +879,7 @@ namespace Core::VulkanRenderingSystemInterface
 
 		VkRenderPassBeginInfo RenderPassBeginInfo = { };
 		RenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		RenderPassBeginInfo.renderPass = MainPass.RenderPass; // Render Pass to begin
+		RenderPassBeginInfo.renderPass = MainRenderpass.RenderPass; // Render Pass to begin
 		RenderPassBeginInfo.renderArea.offset = { 0, 0 };
 		RenderPassBeginInfo.pClearValues = ClearValues;
 		RenderPassBeginInfo.clearValueCount = ClearValuesSize;
@@ -910,7 +910,7 @@ namespace Core::VulkanRenderingSystemInterface
 		vkCmdBeginRenderPass(MainViewport.CommandBuffers[ImageIndex], &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 		{
-			vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.TerrainPass.Pipeline);
+			vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.MainSubpass.TerrainPipeline.Pipeline);
 
 			//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			VkBuffer TerrainVertexBuffers[] = { VertexBuffer.Buffer };
@@ -918,9 +918,9 @@ namespace Core::VulkanRenderingSystemInterface
 
 			const u32 TerrainDescriptorSetGroupCount = 2;
 			VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = {
-				MainPass.TerrainPass.TerrainSets[MainPass.ActiveVpSet], MainPass.TerrainPass.TerrainSamplerDescriptorSets[0] };
+				MainRenderpass.MainSubpass.TerrainPipeline.TerrainSets[MainRenderpass.ActiveVpSet], MainRenderpass.MainSubpass.TerrainPipeline.TerrainSamplerDescriptorSets[0] };
 
-			vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.TerrainPass.PipelineLayout,
+			vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.MainSubpass.TerrainPipeline.PipelineLayout,
 				0, TerrainDescriptorSetGroupCount, TerrainDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
 
 			vkCmdBindVertexBuffers(MainViewport.CommandBuffers[ImageIndex], 0, 1, TerrainVertexBuffers, TerrainBuffersOffsets);
@@ -929,10 +929,8 @@ namespace Core::VulkanRenderingSystemInterface
 			vkCmdDrawIndexed(MainViewport.CommandBuffers[ImageIndex], TerrainIndicesCount, 1, 0, 0, 0);
 		}
 
-		vkCmdNextSubpass(MainViewport.CommandBuffers[ImageIndex], VK_SUBPASS_CONTENTS_INLINE);
-
 		{
-			vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.EntityPass.Pipeline);
+			vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.MainSubpass.EntityPipeline.Pipeline);
 
 			// TODO: Support rework to not create identical index buffers
 			for (u32 j = 0; j < Scene.DrawEntitiesCount; ++j)
@@ -944,15 +942,15 @@ namespace Core::VulkanRenderingSystemInterface
 				const u32 DescriptorSetGroupCount = 4;
 				VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] = 
 				{
-					MainPass.EntityPass.EntitySets[MainPass.ActiveVpSet],
-					MainPass.EntityPass.EntitySamplerDescriptorSets[Scene.DrawEntities[j].MaterialIndex],
-					MainPass.LightingSets[MainPass.ActiveLightSet],
-					MainPass.MaterialSet
+					MainRenderpass.MainSubpass.EntityPipeline.EntitySets[MainRenderpass.ActiveVpSet],
+					MainRenderpass.MainSubpass.EntityPipeline.EntitySamplerDescriptorSets[Scene.DrawEntities[j].MaterialIndex],
+					MainRenderpass.LightingSets[MainRenderpass.ActiveLightSet],
+					MainRenderpass.MaterialSet
 				};
 
-				vkCmdPushConstants(MainViewport.CommandBuffers[ImageIndex], MainPass.EntityPass.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+				vkCmdPushConstants(MainViewport.CommandBuffers[ImageIndex], MainRenderpass.MainSubpass.EntityPipeline.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 					0, sizeof(BrModel), &Scene.DrawEntities[j].Model);
-				vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.EntityPass.PipelineLayout,
+				vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.MainSubpass.EntityPipeline.PipelineLayout,
 					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
 
 				vkCmdBindVertexBuffers(MainViewport.CommandBuffers[ImageIndex], 0, 1, VertexBuffers, Offsets);
@@ -965,10 +963,10 @@ namespace Core::VulkanRenderingSystemInterface
 		vkCmdNextSubpass(MainViewport.CommandBuffers[ImageIndex], VK_SUBPASS_CONTENTS_INLINE);
 
 		{
-			vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.DeferredPass.Pipeline);
+			vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.DeferredSubpass.Pipeline);
 
-			vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.DeferredPass.PipelineLayout,
-				0, 1, &MainPass.DeferredPass.DeferredSets[ImageIndex], 0, nullptr);
+			vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.DeferredSubpass.PipelineLayout,
+				0, 1, &MainRenderpass.DeferredSubpass.DeferredSets[ImageIndex], 0, nullptr);
 
 			vkCmdDraw(MainViewport.CommandBuffers[ImageIndex], 3, 1, 0, 0); // 3 hardcoded Indices for second "post processing" subpass
 		}
@@ -1049,7 +1047,7 @@ namespace Core::VulkanRenderingSystemInterface
 
 			VkFramebufferCreateInfo FramebufferCreateInfo = { };
 			FramebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-			FramebufferCreateInfo.renderPass = MainPass.RenderPass;								// Render Pass layout the Framebuffer will be used with
+			FramebufferCreateInfo.renderPass = MainRenderpass.RenderPass;								// Render Pass layout the Framebuffer will be used with
 			FramebufferCreateInfo.attachmentCount = AttachmentsCount;
 			FramebufferCreateInfo.pAttachments = Attachments;							// List of attachments (1:1 with Render Pass)
 			FramebufferCreateInfo.width = OutViewport->ViewportSwapchain.SwapExtent.width;								// Framebuffer width
@@ -1100,11 +1098,11 @@ namespace Core::VulkanRenderingSystemInterface
 
 	void UpdateVpBuffer(const BrUboViewProjection& ViewProjection)
 	{
-		const u32 UpdateIndex = (MainPass.ActiveVpSet + 1) % MainViewport.ViewportSwapchain.ImagesCount;
+		const u32 UpdateIndex = (MainRenderpass.ActiveVpSet + 1) % MainViewport.ViewportSwapchain.ImagesCount;
 
-		VulkanMemoryManagementSystem::CopyDataToMemory(MainPass.VpUniformBuffers[UpdateIndex].Memory, 0,
+		VulkanMemoryManagementSystem::CopyDataToMemory(MainRenderpass.VpUniformBuffers[UpdateIndex].Memory, 0,
 			sizeof(BrUboViewProjection), &ViewProjection);
 
-		MainPass.ActiveVpSet = UpdateIndex;
+		MainRenderpass.ActiveVpSet = UpdateIndex;
 	}
 }

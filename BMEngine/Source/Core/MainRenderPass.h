@@ -16,7 +16,7 @@ namespace Core
 		VkShaderModule Module = nullptr;
 	};
 
-	struct BrTerrainSubpass
+	struct BrTerrainPipeline
 	{
 		void ClearResources(VkDevice LogicalDevice);
 
@@ -30,7 +30,7 @@ namespace Core
 		static inline VkDescriptorSet TerrainSamplerDescriptorSets[MAX_IMAGES];
 	};
 
-	struct BrEntitySubpass
+	struct BrEntityPipeline
 	{
 		void ClearResources(VkDevice LogicalDevice);
 
@@ -43,6 +43,14 @@ namespace Core
 
 		VkDescriptorSetLayout EntitySamplerSetLayout = nullptr;
 		static inline VkDescriptorSet EntitySamplerDescriptorSets[MAX_IMAGES];
+	};
+
+	struct BrMainSubpass
+	{
+		void ClearResources(VkDevice LogicalDevice);
+
+		BrTerrainPipeline TerrainPipeline;
+		BrEntityPipeline EntityPipeline;
 	};
 
 	struct BrDeferredSubpass
@@ -77,9 +85,8 @@ namespace Core
 
 		VkRenderPass RenderPass = nullptr;
 
-		BrTerrainSubpass TerrainPass;
-		BrEntitySubpass EntityPass;
-		BrDeferredSubpass DeferredPass;
+		BrMainSubpass MainSubpass;
+		BrDeferredSubpass DeferredSubpass;
 
 		BrImageBuffer ColorBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ColorBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];

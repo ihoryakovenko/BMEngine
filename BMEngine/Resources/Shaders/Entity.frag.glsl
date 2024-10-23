@@ -143,12 +143,12 @@ vec3 CastSpotLigh(vec3 DiffuseTexture, vec3 SpecularTexture)
 
 void main()
 {
-	vec3 DiffuseTexture = vec3(texture(DiffuseTexture, FragmentTexture));
+	vec4 DiffuseTexture = texture(DiffuseTexture, FragmentTexture);
 	vec3 SpecularTexture = vec3(texture(SpecularTexture, FragmentTexture));
 
 	vec3 ResultLightColor = vec3(0.0);
-	ResultLightColor += CastPointLight(DiffuseTexture, SpecularTexture);
-	ResultLightColor += CastDirectionLight(DiffuseTexture, SpecularTexture);
-	ResultLightColor += CastSpotLigh(DiffuseTexture, SpecularTexture);
-	OutColor = vec4(ResultLightColor, 1.0);
+	ResultLightColor += CastPointLight(vec3(DiffuseTexture), SpecularTexture);
+	ResultLightColor += CastDirectionLight(vec3(DiffuseTexture), SpecularTexture);
+	ResultLightColor += CastSpotLigh(vec3(DiffuseTexture), SpecularTexture);
+	OutColor = vec4(ResultLightColor, DiffuseTexture.a);
 }

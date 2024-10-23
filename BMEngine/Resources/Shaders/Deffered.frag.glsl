@@ -1,9 +1,20 @@
 #version 450
 
-layout(input_attachment_index = 0, binding = 0) uniform subpassInput InputColour; // Colour output from subpass 1
+layout(input_attachment_index = 0, binding = 0) uniform subpassInput InputColor; // Color output from subpass 1
 layout(input_attachment_index = 1, binding = 1) uniform subpassInput InputDepth;  // Depth output from subpass 1
 
-layout(location = 0) out vec4 Colour;
+layout(location = 0) out vec4 Color;
+
+vec3 InverseColor(vec3 Color)
+{
+	return vec3(1.0 - Color);
+}
+
+vec3 Grayscale(vec3 Color)
+{
+	float Average = 0.2126 * Color.r + 0.7152 * Color.g + 0.0722 * Color.b;
+	return vec3(Average, Average, Average);
+}
 
 void main()
 {
@@ -13,13 +24,17 @@ void main()
 		float lowerBound = 0.99;
 		float upperBound = 1;
 		
+		vec4 SceneColor = subpassLoad(InputColor).rgba;
 		float depth = subpassLoad(InputDepth).r;
-		float depthColourScaled = 1.0f - ((depth - lowerBound) / (upperBound - lowerBound));
-		Colour = vec4(depthColourScaled, 0.0f, 0.0f, 1.0f);
-		//Colour = vec4(subpassLoad(InputColour).rgb * depthColourScaled, 1.0f);
+		float depthColorScaled = 1.0f - ((depth - lowerBound) / (upperBound - lowerBound));
+		Color = vec4(0.0f, depthColorScaled, 0.0f, SceneColor.a);
+		//Color = vec4(subpassLoad(InputColor).rgb * depthColorScaled, 1.0f);
 	}
 	else
 	{
-		Colour = subpassLoad(InputColour).rgba;
+		vec4 SceneColor = subpassLoad(InputColor).rgba;
+		//Color = vec4(Grayscale(SceneColor.rgb), SceneColor.a);
+		//Color = vec4(InverseColor(SceneColor.rgb), SceneColor.a);
+		Color = SceneColor;
 	}
 }

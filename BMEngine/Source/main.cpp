@@ -34,10 +34,14 @@ u32 TestTextureIndex;
 u32 WhiteTextureIndex;
 u32 ContainerTextureIndex;
 u32 ContainerSpecularTextureIndex;
+u32 BlendWindowIndex;
+u32 GrassTextureIndex;
 
 u32 TestMaterialIndex;
 u32 WhiteMaterialIndex;
 u32 ContainerMaterialIndex;
+u32 BlendWindowMaterial;
+u32 GrassMaterial;
 
 Core::BrTerrainVertex TerrainVerticesData[NumRows][NumCols];
 
@@ -258,11 +262,10 @@ void MoveCamera(GLFWwindow* Window, f32 DeltaTime, Camera& MainCamera)
 	MainCamera.CameraFront = glm::normalize(Front);
 }
 
-TestMesh CreateCubeMesh(int materialIndex)
+TestMesh CreateCubeMesh(const char* Modelpath, int materialIndex)
 {
 	TestMesh cube;
 
-	const char* Modelpath = "./Resources/Models/cube.obj";
 	const char* BaseDir = "./Resources/Models/";
 
 	tinyobj::attrib_t Attrib;
@@ -331,11 +334,16 @@ TestMesh CreateCubeMesh(int materialIndex)
 
 void LoadDrawEntities()
 {
+	const char* Grass = "./Resources/Textures/grass.png";
+	const char* BlendWindow = "./Resources/Textures/blending_transparent_window.png";
 	const char* ContainerSpecularTexture = "./Resources/Textures/container2_specular.png";
 	const char* ContainerTexture = "./Resources/Textures/container2.png";
 	const char* WhiteTexture = "./Resources/Textures/White.png";
 	const char* TestTexture = "./Resources/Textures/1giraffe.jpg";
 	const char* Modelpath = "./Resources/Models/uh60.obj";
+	const char* CubeObj = "./Resources/Models/cube.obj";
+	const char* SkyBoxObj = "./Resources/Models/SkyBox.obj";
+
 	const char* BaseDir = "./Resources/Models/";
 
 	tinyobj::attrib_t Attrib;
@@ -354,14 +362,18 @@ void LoadDrawEntities()
 	WhiteTextureIndex = AddTexture(WhiteTexture);
 	ContainerTextureIndex = AddTexture(ContainerTexture);
 	ContainerSpecularTextureIndex = AddTexture(ContainerSpecularTexture);
+	BlendWindowIndex = AddTexture(BlendWindow);
+	GrassTextureIndex = AddTexture(Grass);
 
 	TestMaterialIndex = Core::VulkanRenderingSystemInterface::CreateMaterial(TestTextureIndex, ContainerSpecularTextureIndex);
 	WhiteMaterialIndex = Core::VulkanRenderingSystemInterface::CreateMaterial(WhiteTextureIndex, WhiteTextureIndex);
 	ContainerMaterialIndex = Core::VulkanRenderingSystemInterface::CreateMaterial(ContainerTextureIndex, ContainerSpecularTextureIndex);
+	BlendWindowMaterial = Core::VulkanRenderingSystemInterface::CreateMaterial(BlendWindowIndex, BlendWindowIndex);
+	GrassMaterial = Core::VulkanRenderingSystemInterface::CreateMaterial(GrassTextureIndex, GrassTextureIndex);
 
 	for (size_t i = 0; i < Materials.size(); i++)
 	{
-		MaterialToTexture[i] = 0;
+		MaterialToTexture[i] = BlendWindowMaterial;
 		const tinyobj::material_t& Material = Materials[i];
 		if (!Material.diffuse_texname.empty())
 		{
@@ -431,10 +443,12 @@ void LoadDrawEntities()
 		ModelMeshes.push_back(Tm);
 	}
 
-	ModelMeshes.emplace_back(CreateCubeMesh(WhiteMaterialIndex));
-	ModelMeshes.emplace_back(CreateCubeMesh(WhiteMaterialIndex));
-	ModelMeshes.emplace_back(CreateCubeMesh(WhiteMaterialIndex));
-	ModelMeshes.emplace_back(CreateCubeMesh(ContainerMaterialIndex));
+	
+	ModelMeshes.emplace_back(CreateCubeMesh(SkyBoxObj, ContainerMaterialIndex));
+	ModelMeshes.emplace_back(CreateCubeMesh(CubeObj, GrassMaterial));
+	ModelMeshes.emplace_back(CreateCubeMesh(CubeObj, WhiteMaterialIndex));
+	ModelMeshes.emplace_back(CreateCubeMesh(CubeObj, WhiteMaterialIndex));
+	ModelMeshes.emplace_back(CreateCubeMesh(CubeObj, ContainerMaterialIndex));
 
 	DrawEntities.resize(ModelMeshes.size());
 	
@@ -452,6 +466,16 @@ void LoadDrawEntities()
 	}
 
 	Core::VulkanRenderingSystemInterface::CreateDrawEntities(m.data(), m.size(), DrawEntities.data());
+
+	{
+		glm::vec3 CubePos(-5.0f, 0.0f, 10.0f);
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, CubePos);
+		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		model = glm::scale(model, glm::vec3(1.5f));
+
+		DrawEntities[ModelMeshes.size() - 5].Model = model;
+	}
 
 	{
 		glm::vec3 CubePos(0.0f, 0.0f, 8.0f);
@@ -669,6 +693,27 @@ int main()
 		TestData.SpotLight.Position = MainCamera.CameraPosition;
 
 		Core::VulkanRenderingSystemInterface::UpdateLightBuffer(TestData);
+
+		// TODO: Need to sort objects by distance to camera
+		int LastOpaqueIndex = Scene.DrawEntitiesCount - 1;
+		for (; LastOpaqueIndex >= 0; --LastOpaqueIndex)
+		{
+			if (Scene.DrawEntities[LastOpaqueIndex].MaterialIndex != GrassMaterial &&
+				Scene.DrawEntities[LastOpaqueIndex].MaterialIndex != BlendWindowMaterial)
+			{
+				break;
+			}
+		}
+
+		for (int i = 0; i < LastOpaqueIndex; ++i)
+		{
+			if (Scene.DrawEntities[i].MaterialIndex == GrassMaterial ||
+				Scene.DrawEntities[i].MaterialIndex == BlendWindowMaterial)
+			{
+				std::swap(Scene.DrawEntities[i], Scene.DrawEntities[LastOpaqueIndex]);
+				--LastOpaqueIndex;
+			}
+		}
 
 		Core::VulkanRenderingSystemInterface::Draw(Scene);
 

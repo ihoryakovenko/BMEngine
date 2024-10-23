@@ -181,6 +181,9 @@ namespace Core
 		BrDrawEntity* DrawEntities;
 		u32 DrawEntitiesCount;
 
+		BrDrawEntity* DrawTransparentEntities;
+		u32 DrawTransparentEntitiesCount;
+
 		BrDrawTerrainEntity* DrawTerrainEntities;
 		u32 DrawTerrainEntitiesCount;
 	};

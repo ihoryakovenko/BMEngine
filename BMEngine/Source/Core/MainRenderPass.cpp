@@ -8,9 +8,12 @@
 
 namespace Core
 {
-	static const u32 TerrainSubpassIndex = 0;  // Terrain will be first
-	static const u32 EntitySubpassIndex = 1;   // Entity subpass comes next
-	static const u32 DeferredSubpassIndex = 2; // Fullscreen effects
+	static const u32 MainSubpassIndex = 0;   // Entity subpass comes next
+	static const u32 DeferredSubpassIndex = 1; // Fullscreen effects
+
+	static const u32 TerrainPipelineIndex = 0;
+	static const u32 EntityPipelineIndex = 1;
+	static const u32 DeferredPipelineIndex = 2;
 
 	void BrMainRenderPass::ClearResources(VkDevice LogicalDevice, u32 ImagesCount)
 	{
@@ -28,9 +31,8 @@ namespace Core
 
 		VulkanMemoryManagementSystem::DestroyBuffer(MaterialBuffer);
 
-		TerrainPass.ClearResources(LogicalDevice);
-		DeferredPass.ClearResources(LogicalDevice);
-		EntityPass.ClearResources(LogicalDevice);
+		DeferredSubpass.ClearResources(LogicalDevice);
+		MainSubpass.ClearResources(LogicalDevice);
 
 		vkDestroyDescriptorSetLayout(LogicalDevice, MaterialLayout, nullptr);
 		vkDestroyDescriptorSetLayout(LogicalDevice, LightingSetLayout, nullptr);
@@ -42,7 +44,7 @@ namespace Core
 	{
 		// TODO: Check AccessMasks
 
-		const u32 SubpassesCount = 3;
+		const u32 SubpassesCount = 2;
 		VkSubpassDescription Subpasses[SubpassesCount];
 
 		const u32 SwapchainColorAttachmentIndex = 0;
@@ -82,22 +84,6 @@ namespace Core
 		AttachmentDescriptions[SubpassDepthAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		AttachmentDescriptions[SubpassDepthAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-		// Color and depth attachment references for the Terrain subpass
-		VkAttachmentReference TerrainColorAttachmentRef = { };
-		TerrainColorAttachmentRef.attachment = SubpassColorAttachmentIndex; // Color attachment index in Attachments array
-		TerrainColorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-		VkAttachmentReference TerrainDepthAttachmentRef = { };
-		TerrainDepthAttachmentRef.attachment = SubpassDepthAttachmentIndex; // Depth attachment index in Attachments array
-		TerrainDepthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-		// Define the Terrain subpass
-		Subpasses[TerrainSubpassIndex] = { };
-		Subpasses[TerrainSubpassIndex].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		Subpasses[TerrainSubpassIndex].colorAttachmentCount = 1;
-		Subpasses[TerrainSubpassIndex].pColorAttachments = &TerrainColorAttachmentRef;
-		Subpasses[TerrainSubpassIndex].pDepthStencilAttachment = &TerrainDepthAttachmentRef;
-
 		// Define the Entity subpass, which will read the color and depth attachments
 		VkAttachmentReference EntitySubpassColourAttachmentReference = { };
 		EntitySubpassColourAttachmentReference.attachment = SubpassColorAttachmentIndex; // Index of the color attachment (shared with Terrain subpass)
@@ -107,11 +93,11 @@ namespace Core
 		EntitySubpassDepthAttachmentReference.attachment = SubpassDepthAttachmentIndex; // Depth attachment (shared with Terrain subpass)
 		EntitySubpassDepthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-		Subpasses[EntitySubpassIndex] = { };
-		Subpasses[EntitySubpassIndex].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		Subpasses[EntitySubpassIndex].colorAttachmentCount = 1;
-		Subpasses[EntitySubpassIndex].pColorAttachments = &EntitySubpassColourAttachmentReference;
-		Subpasses[EntitySubpassIndex].pDepthStencilAttachment = &EntitySubpassDepthAttachmentReference;
+		Subpasses[MainSubpassIndex] = { };
+		Subpasses[MainSubpassIndex].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		Subpasses[MainSubpassIndex].colorAttachmentCount = 1;
+		Subpasses[MainSubpassIndex].pColorAttachments = &EntitySubpassColourAttachmentReference;
+		Subpasses[MainSubpassIndex].pDepthStencilAttachment = &EntitySubpassDepthAttachmentReference;
 
 		// Deferred subpass (Fullscreen effects)
 		VkAttachmentReference SwapchainColorAttachmentReference = { };
@@ -139,29 +125,18 @@ namespace Core
 
 		// Transition from external to Terrain subpass
 		// Transition must happen after...
-		SubpassDependencies[TerrainSubpassIndex].srcSubpass = VK_SUBPASS_EXTERNAL;
-		SubpassDependencies[TerrainSubpassIndex].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-		SubpassDependencies[TerrainSubpassIndex].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+		SubpassDependencies[MainSubpassIndex].srcSubpass = VK_SUBPASS_EXTERNAL;
+		SubpassDependencies[MainSubpassIndex].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+		SubpassDependencies[MainSubpassIndex].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
 		// But must happen before...
-		SubpassDependencies[TerrainSubpassIndex].dstSubpass = TerrainSubpassIndex;
-		SubpassDependencies[TerrainSubpassIndex].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		SubpassDependencies[TerrainSubpassIndex].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		SubpassDependencies[TerrainSubpassIndex].dependencyFlags = 0;
-
-		// Transition from Terrain to Entity subpass
-		// Transition must happen after...
-		SubpassDependencies[EntitySubpassIndex].srcSubpass = TerrainSubpassIndex;
-		SubpassDependencies[EntitySubpassIndex].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		SubpassDependencies[EntitySubpassIndex].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		// But must happen before...
-		SubpassDependencies[EntitySubpassIndex].dstSubpass = EntitySubpassIndex;
-		SubpassDependencies[EntitySubpassIndex].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-		SubpassDependencies[EntitySubpassIndex].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-		SubpassDependencies[EntitySubpassIndex].dependencyFlags = 0;
+		SubpassDependencies[MainSubpassIndex].dstSubpass = DeferredSubpassIndex;
+		SubpassDependencies[MainSubpassIndex].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		SubpassDependencies[MainSubpassIndex].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		SubpassDependencies[MainSubpassIndex].dependencyFlags = 0;
 
 		// Transition from Entity subpass to Deferred subpass
 		// Transition must happen after...
-		SubpassDependencies[DeferredSubpassIndex].srcSubpass = EntitySubpassIndex;
+		SubpassDependencies[DeferredSubpassIndex].srcSubpass = MainSubpassIndex;
 		SubpassDependencies[DeferredSubpassIndex].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 		SubpassDependencies[DeferredSubpassIndex].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		// But must happen before...
@@ -172,7 +147,7 @@ namespace Core
 
 		// Conversion from VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
 		// Transition must happen after...
-		SubpassDependencies[ExitDependenciesIndex].srcSubpass = EntitySubpassIndex;
+		SubpassDependencies[ExitDependenciesIndex].srcSubpass = DeferredSubpassIndex;
 		SubpassDependencies[ExitDependenciesIndex].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 		SubpassDependencies[ExitDependenciesIndex].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		// But must happen before...
@@ -201,10 +176,10 @@ namespace Core
 
 	void BrMainRenderPass::SetupPushConstants()
 	{
-		EntityPass.PushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-		EntityPass.PushConstantRange.offset = 0;
+		MainSubpass.EntityPipeline.PushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		MainSubpass.EntityPipeline.PushConstantRange.offset = 0;
 		// Todo: check constant and model size?
-		EntityPass.PushConstantRange.size = sizeof(BrModel);
+		MainSubpass.EntityPipeline.PushConstantRange.size = sizeof(BrModel);
 	}
 
 	void BrMainRenderPass::CreateSamplerSetLayout(VkDevice LogicalDevice)
@@ -227,7 +202,7 @@ namespace Core
 		EntityTextureLayoutCreateInfo.pBindings = EntitySamplerLayoutBinding;
 
 		VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &EntityTextureLayoutCreateInfo,
-			nullptr, &EntityPass.EntitySamplerSetLayout);
+			nullptr, &MainSubpass.EntityPipeline.EntitySamplerSetLayout);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
@@ -247,7 +222,7 @@ namespace Core
 		TerrainTextureLayoutCreateInfo.pBindings = &TerrainSamplerLayoutBinding;
 
 		Result = vkCreateDescriptorSetLayout(LogicalDevice, &TerrainTextureLayoutCreateInfo,
-			nullptr, &TerrainPass.TerrainSamplerSetLayout);
+			nullptr, &MainSubpass.TerrainPipeline.TerrainSamplerSetLayout);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
@@ -274,7 +249,7 @@ namespace Core
 		LayoutCreateInfo.pBindings = Bindings;		// Array of binding infos
 
 		VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo,
-			nullptr, &TerrainPass.TerrainSetLayout);
+			nullptr, &MainSubpass.TerrainPipeline.TerrainSetLayout);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
@@ -300,7 +275,7 @@ namespace Core
 		LayoutCreateInfo.pBindings = &VpLayoutBinding;		// Array of binding infos
 
 		VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo,
-			nullptr, &EntityPass.EntitySetLayout);
+			nullptr, &MainSubpass.EntityPipeline.EntitySetLayout);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
@@ -379,7 +354,7 @@ namespace Core
 
 		// Create Descriptor Set Layout
 		const VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &InputLayoutCreateInfo,
-			nullptr, &DeferredPass.DeferredLayout);
+			nullptr, &DeferredSubpass.DeferredLayout);
 		if (Result != VK_SUCCESS)
 		{
 			// TODO LOG
@@ -391,7 +366,7 @@ namespace Core
 	{
 		const u32 TerrainPassDescriptorSetLayoutsCount = 2;
 		VkDescriptorSetLayout TerrainPassDescriptorSetLayouts[TerrainPassDescriptorSetLayoutsCount] = {
-			TerrainPass.TerrainSetLayout, TerrainPass.TerrainSamplerSetLayout
+			MainSubpass.TerrainPipeline.TerrainSetLayout, MainSubpass.TerrainPipeline.TerrainSamplerSetLayout
 		};
 
 		VkPipelineLayoutCreateInfo TerrainLayoutCreateInfo = { };
@@ -401,7 +376,7 @@ namespace Core
 		TerrainLayoutCreateInfo.pushConstantRangeCount = 0;
 		TerrainLayoutCreateInfo.pPushConstantRanges = nullptr;
 
-		VkResult Result = vkCreatePipelineLayout(LogicalDevice, &TerrainLayoutCreateInfo, nullptr, &TerrainPass.PipelineLayout);
+		VkResult Result = vkCreatePipelineLayout(LogicalDevice, &TerrainLayoutCreateInfo, nullptr, &MainSubpass.TerrainPipeline.PipelineLayout);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkCreatePipelineLayout result is {}", static_cast<int>(Result));
@@ -410,7 +385,7 @@ namespace Core
 
 		const u32 EntityPassDescriptorSetLayoutsCount = 4;
 		VkDescriptorSetLayout EntityPassDescriptorSetLayouts[EntityPassDescriptorSetLayoutsCount] = {
-			EntityPass.EntitySetLayout, EntityPass.EntitySamplerSetLayout, LightingSetLayout, MaterialLayout
+			MainSubpass.EntityPipeline.EntitySetLayout, MainSubpass.EntityPipeline.EntitySamplerSetLayout, LightingSetLayout, MaterialLayout
 		};
 
 		VkPipelineLayoutCreateInfo EntityLayoutCreateInfo = { };
@@ -418,9 +393,9 @@ namespace Core
 		EntityLayoutCreateInfo.setLayoutCount = EntityPassDescriptorSetLayoutsCount;
 		EntityLayoutCreateInfo.pSetLayouts = EntityPassDescriptorSetLayouts;
 		EntityLayoutCreateInfo.pushConstantRangeCount = 1;
-		EntityLayoutCreateInfo.pPushConstantRanges = &EntityPass.PushConstantRange;
+		EntityLayoutCreateInfo.pPushConstantRanges = &MainSubpass.EntityPipeline.PushConstantRange;
 
-		Result = vkCreatePipelineLayout(LogicalDevice, &EntityLayoutCreateInfo, nullptr, &EntityPass.PipelineLayout);
+		Result = vkCreatePipelineLayout(LogicalDevice, &EntityLayoutCreateInfo, nullptr, &MainSubpass.EntityPipeline.PipelineLayout);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkCreatePipelineLayout result is {}", static_cast<int>(Result));
@@ -430,11 +405,11 @@ namespace Core
 		VkPipelineLayoutCreateInfo DeferredLayoutCreateInfo = { };
 		DeferredLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		DeferredLayoutCreateInfo.setLayoutCount = 1;
-		DeferredLayoutCreateInfo.pSetLayouts = &DeferredPass.DeferredLayout;
+		DeferredLayoutCreateInfo.pSetLayouts = &DeferredSubpass.DeferredLayout;
 		DeferredLayoutCreateInfo.pushConstantRangeCount = 0;
 		DeferredLayoutCreateInfo.pPushConstantRanges = nullptr;
 
-		Result = vkCreatePipelineLayout(LogicalDevice, &DeferredLayoutCreateInfo, nullptr, &DeferredPass.PipelineLayout);
+		Result = vkCreatePipelineLayout(LogicalDevice, &DeferredLayoutCreateInfo, nullptr, &DeferredSubpass.PipelineLayout);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkCreatePipelineLayout result is {}", static_cast<int>(Result));
@@ -625,6 +600,10 @@ namespace Core
 			| VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 		ColorBlendAttachmentState.blendEnable = VK_TRUE;													// Enable blending
 
+		VkPipelineColorBlendAttachmentState DeferredColorBlendAttachmentState = { };
+		DeferredColorBlendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;  // Write to all color components
+		DeferredColorBlendAttachmentState.blendEnable = VK_FALSE;
+
 		// Blending uses equation: (srcColorBlendFactor * new color) colorBlendOp (dstColorBlendFactor * old color)
 		ColorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 		ColorBlendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
@@ -644,57 +623,63 @@ namespace Core
 		ColorBlendingCreateInfo.attachmentCount = 1;
 		ColorBlendingCreateInfo.pAttachments = &ColorBlendAttachmentState;
 
-		// Depth stencil testing
-		VkPipelineDepthStencilStateCreateInfo DepthStencilCreateInfo = { };
-		DepthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-		DepthStencilCreateInfo.depthTestEnable = VK_TRUE;				// Enable checking depth to determine fragment write
-		DepthStencilCreateInfo.depthWriteEnable = VK_TRUE;				// Enable writing to depth buffer (to replace old values)
-		DepthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;		// Comparison operation that allows an overwrite (is in front)
-		DepthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;		// Depth Bounds Test: Does the depth value exist between two bounds
-		DepthStencilCreateInfo.stencilTestEnable = VK_FALSE;			// Enable Stencil Test
+		VkPipelineColorBlendStateCreateInfo DeferredColorBlendingCreateInfo = { };
+		DeferredColorBlendingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		DeferredColorBlendingCreateInfo.logicOpEnable = VK_FALSE;  // No logical operations
+		DeferredColorBlendingCreateInfo.attachmentCount = 1;
+		DeferredColorBlendingCreateInfo.pAttachments = &DeferredColorBlendAttachmentState;
 
-		VkPipelineDepthStencilStateCreateInfo SecondDepthStencilCreateInfo = DepthStencilCreateInfo;
-		// Don't want to write to depth buffer
-		SecondDepthStencilCreateInfo.depthWriteEnable = VK_FALSE;
+		// Depth stencil testing
+		VkPipelineDepthStencilStateCreateInfo EntityDepthStencilCreateInfo = { };
+		EntityDepthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		EntityDepthStencilCreateInfo.depthTestEnable = VK_TRUE;				// Enable checking depth to determine fragment write
+		EntityDepthStencilCreateInfo.depthWriteEnable = VK_TRUE;				// Enable writing to depth buffer (to replace old values)
+		EntityDepthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;		// Comparison operation that allows an overwrite (is in front)
+		EntityDepthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;		// Depth Bounds Test: Does the depth value exist between two bounds
+		EntityDepthStencilCreateInfo.stencilTestEnable = VK_FALSE;			// Enable Stencil Test
+
+		VkPipelineDepthStencilStateCreateInfo DeferredDepthStencilCreateInfo = EntityDepthStencilCreateInfo;
+		DeferredDepthStencilCreateInfo.depthWriteEnable = VK_FALSE;
 
 		// Graphics pipeline creation
 		const u32 GraphicsPipelineCreateInfosCount = 3;
 		VkGraphicsPipelineCreateInfo GraphicsPipelineCreateInfos[GraphicsPipelineCreateInfosCount];
 
-		GraphicsPipelineCreateInfos[EntitySubpassIndex] = { };
-		GraphicsPipelineCreateInfos[EntitySubpassIndex].sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-		GraphicsPipelineCreateInfos[EntitySubpassIndex].stageCount = EntityShaderStagesCount;					// Number of shader stages
-		GraphicsPipelineCreateInfos[EntitySubpassIndex].pStages = EntityShaderStages;							// List of shader stages
-		GraphicsPipelineCreateInfos[EntitySubpassIndex].pVertexInputState = &EntityVertexInputCreateInfo;		// All the fixed function pipeline states
-		GraphicsPipelineCreateInfos[EntitySubpassIndex].pInputAssemblyState = &InputAssemblyStateCreateInfo;
-		GraphicsPipelineCreateInfos[EntitySubpassIndex].pViewportState = &ViewportStateCreateInfo;
-		GraphicsPipelineCreateInfos[EntitySubpassIndex].pDynamicState = nullptr;
-		GraphicsPipelineCreateInfos[EntitySubpassIndex].pRasterizationState = &RasterizationStateCreateInfo;
-		GraphicsPipelineCreateInfos[EntitySubpassIndex].pMultisampleState = &MultisampleStateCreateInfo;
-		GraphicsPipelineCreateInfos[EntitySubpassIndex].pColorBlendState = &ColorBlendingCreateInfo;
-		GraphicsPipelineCreateInfos[EntitySubpassIndex].pDepthStencilState = &DepthStencilCreateInfo;
-		GraphicsPipelineCreateInfos[EntitySubpassIndex].layout = EntityPass.PipelineLayout;							// Pipeline Layout pipeline should use
-		GraphicsPipelineCreateInfos[EntitySubpassIndex].renderPass = RenderPass;							// Render pass description the pipeline is compatible with
-		GraphicsPipelineCreateInfos[EntitySubpassIndex].subpass = EntitySubpassIndex;										// Subpass of render pass to use with pipeline
+		GraphicsPipelineCreateInfos[EntityPipelineIndex] = { };
+		GraphicsPipelineCreateInfos[EntityPipelineIndex].sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		GraphicsPipelineCreateInfos[EntityPipelineIndex].stageCount = EntityShaderStagesCount;					// Number of shader stages
+		GraphicsPipelineCreateInfos[EntityPipelineIndex].pStages = EntityShaderStages;							// List of shader stages
+		GraphicsPipelineCreateInfos[EntityPipelineIndex].pVertexInputState = &EntityVertexInputCreateInfo;		// All the fixed function pipeline states
+		GraphicsPipelineCreateInfos[EntityPipelineIndex].pInputAssemblyState = &InputAssemblyStateCreateInfo;
+		GraphicsPipelineCreateInfos[EntityPipelineIndex].pViewportState = &ViewportStateCreateInfo;
+		GraphicsPipelineCreateInfos[EntityPipelineIndex].pDynamicState = nullptr;
+		GraphicsPipelineCreateInfos[EntityPipelineIndex].pRasterizationState = &RasterizationStateCreateInfo;
+		GraphicsPipelineCreateInfos[EntityPipelineIndex].pMultisampleState = &MultisampleStateCreateInfo;
+		GraphicsPipelineCreateInfos[EntityPipelineIndex].pColorBlendState = &ColorBlendingCreateInfo;
+		GraphicsPipelineCreateInfos[EntityPipelineIndex].pDepthStencilState = &EntityDepthStencilCreateInfo;
+		GraphicsPipelineCreateInfos[EntityPipelineIndex].layout = MainSubpass.EntityPipeline.PipelineLayout;							// Pipeline Layout pipeline should use
+		GraphicsPipelineCreateInfos[EntityPipelineIndex].renderPass = RenderPass;							// Render pass description the pipeline is compatible with
+		GraphicsPipelineCreateInfos[EntityPipelineIndex].subpass = MainSubpassIndex;										// Subpass of render pass to use with pipeline
 
 		// Pipeline Derivatives : Can create multiple pipelines that derive from one another for optimisation
-		GraphicsPipelineCreateInfos[EntitySubpassIndex].basePipelineHandle = VK_NULL_HANDLE;	// Existing pipeline to derive from...
-		GraphicsPipelineCreateInfos[EntitySubpassIndex].basePipelineIndex = -1;				// or index of pipeline being created to derive from (in case creating multiple at once)
+		GraphicsPipelineCreateInfos[EntityPipelineIndex].basePipelineHandle = VK_NULL_HANDLE;	// Existing pipeline to derive from...
+		GraphicsPipelineCreateInfos[EntityPipelineIndex].basePipelineIndex = -1;				// or index of pipeline being created to derive from (in case creating multiple at once)
 
-		GraphicsPipelineCreateInfos[DeferredSubpassIndex] = GraphicsPipelineCreateInfos[EntitySubpassIndex];
-		GraphicsPipelineCreateInfos[DeferredSubpassIndex].pDepthStencilState = &SecondDepthStencilCreateInfo;
-		GraphicsPipelineCreateInfos[DeferredSubpassIndex].pVertexInputState = &DeferredVertexInputCreateInfo;
-		GraphicsPipelineCreateInfos[DeferredSubpassIndex].pStages = DeferredShaderStages;	// Update second shader stage list
-		GraphicsPipelineCreateInfos[DeferredSubpassIndex].layout = DeferredPass.PipelineLayout;	// Change pipeline layout for input attachment descriptor sets
-		GraphicsPipelineCreateInfos[DeferredSubpassIndex].subpass = DeferredSubpassIndex;						// Use second subpass
+		GraphicsPipelineCreateInfos[DeferredPipelineIndex] = GraphicsPipelineCreateInfos[EntityPipelineIndex];
+		GraphicsPipelineCreateInfos[DeferredPipelineIndex].pDepthStencilState = &DeferredDepthStencilCreateInfo;
+		GraphicsPipelineCreateInfos[DeferredPipelineIndex].pVertexInputState = &DeferredVertexInputCreateInfo;
+		GraphicsPipelineCreateInfos[DeferredPipelineIndex].pStages = DeferredShaderStages;	// Update second shader stage list
+		GraphicsPipelineCreateInfos[DeferredPipelineIndex].layout = DeferredSubpass.PipelineLayout;	// Change pipeline layout for input attachment descriptor sets
+		GraphicsPipelineCreateInfos[DeferredPipelineIndex].subpass = DeferredSubpassIndex;						// Use second subpass
+		GraphicsPipelineCreateInfos[DeferredPipelineIndex].pColorBlendState = &DeferredColorBlendingCreateInfo;
 
-		GraphicsPipelineCreateInfos[TerrainSubpassIndex] = GraphicsPipelineCreateInfos[EntitySubpassIndex];
-		GraphicsPipelineCreateInfos[TerrainSubpassIndex].pVertexInputState = &TerrainVertexInputCreateInfo;
-		GraphicsPipelineCreateInfos[TerrainSubpassIndex].pStages = TerrainShaderStages;
-		GraphicsPipelineCreateInfos[TerrainSubpassIndex].layout = TerrainPass.PipelineLayout;
-		GraphicsPipelineCreateInfos[TerrainSubpassIndex].subpass = TerrainSubpassIndex;
+		GraphicsPipelineCreateInfos[TerrainPipelineIndex] = GraphicsPipelineCreateInfos[EntityPipelineIndex];
+		GraphicsPipelineCreateInfos[TerrainPipelineIndex].pVertexInputState = &TerrainVertexInputCreateInfo;
+		GraphicsPipelineCreateInfos[TerrainPipelineIndex].pStages = TerrainShaderStages;
+		GraphicsPipelineCreateInfos[TerrainPipelineIndex].layout = MainSubpass.TerrainPipeline.PipelineLayout;
+		GraphicsPipelineCreateInfos[TerrainPipelineIndex].subpass = MainSubpassIndex;
 
-		VkPipeline Pipelines[3];
+		VkPipeline Pipelines[GraphicsPipelineCreateInfosCount];
 
 		const VkResult Result = vkCreateGraphicsPipelines(LogicalDevice, VK_NULL_HANDLE, GraphicsPipelineCreateInfosCount,
 			GraphicsPipelineCreateInfos, nullptr, Pipelines);
@@ -705,9 +690,9 @@ namespace Core
 			assert(false);
 		}
 
-		TerrainPass.Pipeline = Pipelines[TerrainSubpassIndex];
-		EntityPass.Pipeline = Pipelines[EntitySubpassIndex];
-		DeferredPass.Pipeline = Pipelines[DeferredSubpassIndex];
+		MainSubpass.TerrainPipeline.Pipeline = Pipelines[TerrainPipelineIndex];
+		MainSubpass.EntityPipeline.Pipeline = Pipelines[EntityPipelineIndex];
+		DeferredSubpass.Pipeline = Pipelines[DeferredPipelineIndex];
 	}
 
 	void BrMainRenderPass::CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 ImagesCount, VkExtent2D SwapExtent,
@@ -769,16 +754,16 @@ namespace Core
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
-			SetLayouts[i] = EntityPass.EntitySetLayout;
-			TerrainLayouts[i] = TerrainPass.TerrainSetLayout;
+			SetLayouts[i] = MainSubpass.EntityPipeline.EntitySetLayout;
+			TerrainLayouts[i] = MainSubpass.TerrainPipeline.TerrainSetLayout;
 			LightingSetLayouts[i] = LightingSetLayout;
-			DeferredSetLayouts[i] = DeferredPass.DeferredLayout;
+			DeferredSetLayouts[i] = DeferredSubpass.DeferredLayout;
 		}
 
-		VulkanMemoryManagementSystem::AllocateSets(Pool, SetLayouts, ImagesCount, EntityPass.EntitySets);
-		VulkanMemoryManagementSystem::AllocateSets(Pool, TerrainLayouts, ImagesCount, TerrainPass.TerrainSets);
+		VulkanMemoryManagementSystem::AllocateSets(Pool, SetLayouts, ImagesCount, MainSubpass.EntityPipeline.EntitySets);
+		VulkanMemoryManagementSystem::AllocateSets(Pool, TerrainLayouts, ImagesCount, MainSubpass.TerrainPipeline.TerrainSets);
 		VulkanMemoryManagementSystem::AllocateSets(Pool, LightingSetLayouts, ImagesCount, LightingSets);
-		VulkanMemoryManagementSystem::AllocateSets(Pool, DeferredSetLayouts, ImagesCount, DeferredPass.DeferredSets);
+		VulkanMemoryManagementSystem::AllocateSets(Pool, DeferredSetLayouts, ImagesCount, DeferredSubpass.DeferredSets);
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
@@ -794,7 +779,7 @@ namespace Core
 
 			VkWriteDescriptorSet VpSetWrite = { };
 			VpSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			VpSetWrite.dstSet = EntityPass.EntitySets[i];
+			VpSetWrite.dstSet = MainSubpass.EntityPipeline.EntitySets[i];
 			VpSetWrite.dstBinding = 0;
 			VpSetWrite.dstArrayElement = 0;
 			VpSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -811,7 +796,7 @@ namespace Core
 			LightSetWrite.pBufferInfo = &LightBufferInfo;
 
 			VkWriteDescriptorSet VpTerrainWrite = VpSetWrite;
-			VpTerrainWrite.dstSet = TerrainPass.TerrainSets[i];
+			VpTerrainWrite.dstSet = MainSubpass.TerrainPipeline.TerrainSets[i];
 
 			VkDescriptorImageInfo ColourAttachmentDescriptor = { };
 			ColourAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -820,7 +805,7 @@ namespace Core
 
 			VkWriteDescriptorSet ColourWrite = { };
 			ColourWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			ColourWrite.dstSet = DeferredPass.DeferredSets[i];
+			ColourWrite.dstSet = DeferredSubpass.DeferredSets[i];
 			ColourWrite.dstBinding = 0;
 			ColourWrite.dstArrayElement = 0;
 			ColourWrite.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
@@ -834,7 +819,7 @@ namespace Core
 
 			VkWriteDescriptorSet DepthWrite = { };
 			DepthWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			DepthWrite.dstSet = DeferredPass.DeferredSets[i];
+			DepthWrite.dstSet = DeferredSubpass.DeferredSets[i];
 			DepthWrite.dstBinding = 1;
 			DepthWrite.dstArrayElement = 0;
 			DepthWrite.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
@@ -867,7 +852,7 @@ namespace Core
 		vkUpdateDescriptorSets(LogicalDevice, 1, &MaterialSetWrite, 0, nullptr);
 	}
 
-	void BrEntitySubpass::ClearResources(VkDevice LogicalDevice)
+	void BrEntityPipeline::ClearResources(VkDevice LogicalDevice)
 	{
 		vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
 		vkDestroyPipeline(LogicalDevice, Pipeline, nullptr);
@@ -882,7 +867,7 @@ namespace Core
 		vkDestroyDescriptorSetLayout(LogicalDevice, DeferredLayout, nullptr);
 	}
 
-	void BrTerrainSubpass::ClearResources(VkDevice LogicalDevice)
+	void BrTerrainPipeline::ClearResources(VkDevice LogicalDevice)
 	{
 		vkDestroyPipelineLayout(LogicalDevice, PipelineLayout, nullptr);
 		vkDestroyPipeline(LogicalDevice, Pipeline, nullptr);
@@ -901,5 +886,11 @@ namespace Core
 		}
 
 		assert(false);
+	}
+
+	void BrMainSubpass::ClearResources(VkDevice LogicalDevice)
+	{
+		TerrainPipeline.ClearResources(LogicalDevice);
+		EntityPipeline.ClearResources(LogicalDevice);
 	}
 }
