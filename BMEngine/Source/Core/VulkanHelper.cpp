@@ -124,4 +124,25 @@ namespace Core
 
 		return Image;
 	}
+
+	VkPipelineLayout CreatePipelineLayout(VkDevice LogicalDevice, u32 SetLayoutCount,
+		VkDescriptorSetLayout* SetLayouts, u32 PushConstantRangeCount, VkPushConstantRange* PushConstantRanges)
+	{
+		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
+		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		PipelineLayoutCreateInfo.setLayoutCount = SetLayoutCount;
+		PipelineLayoutCreateInfo.pSetLayouts = SetLayouts;
+		PipelineLayoutCreateInfo.pushConstantRangeCount = PushConstantRangeCount;
+		PipelineLayoutCreateInfo.pPushConstantRanges = PushConstantRanges;
+
+		VkPipelineLayout Layout;
+		const VkResult Result = vkCreatePipelineLayout(LogicalDevice, &PipelineLayoutCreateInfo, nullptr, &Layout);
+		if (Result != VK_SUCCESS)
+		{
+			Util::Log().Error("vkCreatePipelineLayout result is {}", static_cast<int>(Result));
+			assert(false);
+		}
+
+		return Layout;
+	}
 }

@@ -472,7 +472,7 @@ void LoadDrawEntities()
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, CubePos);
 		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		model = glm::scale(model, glm::vec3(1.5f));
+		model = glm::scale(model, glm::vec3(10.5f));
 
 		DrawEntities[ModelMeshes.size() - 5].Model = model;
 	}

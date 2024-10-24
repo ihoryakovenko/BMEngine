@@ -16,53 +16,58 @@ namespace Core
 		VkShaderModule Module = nullptr;
 	};
 
-	struct BrTerrainPipeline
+	namespace DescriptorLayoutHandles
 	{
-		void ClearResources(VkDevice LogicalDevice);
+		enum
+		{
+			TerrainVp = 0, // TODO Same as EntityVpLayout, change or delete
+			TerrainSampler,
+			EntityVp,
+			EntitySampler,
+			Light,
+			Material,
+			DeferredInput,
+			//SkyBoxVb, // TODO Same as EntityVpLayout, change or delete
 
-		VkPipelineLayout PipelineLayout = nullptr;
-		VkPipeline Pipeline = nullptr;
+			Count
+		};
+	}
 
-		VkDescriptorSetLayout TerrainSetLayout = nullptr;
-		VkDescriptorSet TerrainSets[MAX_SWAPCHAIN_IMAGES_COUNT];
-
-		VkDescriptorSetLayout TerrainSamplerSetLayout = nullptr;
-		static inline VkDescriptorSet TerrainSamplerDescriptorSets[MAX_IMAGES];
-	};
-
-	struct BrEntityPipeline
+	namespace PipelineHandles
 	{
-		void ClearResources(VkDevice LogicalDevice);
+		enum
+		{
+			Terrain = 0,
+			Entity,
+			Deferred,
+			//SkyBoxPipeline,
 
-		VkPipelineLayout PipelineLayout = nullptr;
-		VkPipeline Pipeline = nullptr;
+			Count
+		};
+	}
 
-		VkPushConstantRange PushConstantRange;
-		VkDescriptorSetLayout EntitySetLayout = nullptr;
-		VkDescriptorSet EntitySets[MAX_SWAPCHAIN_IMAGES_COUNT];
-
-		VkDescriptorSetLayout EntitySamplerSetLayout = nullptr;
-		static inline VkDescriptorSet EntitySamplerDescriptorSets[MAX_IMAGES];
-	};
-
-	struct BrMainSubpass
+	namespace DescriptorHandles
 	{
-		void ClearResources(VkDevice LogicalDevice);
+		enum
+		{
+			TerrainVp,
+			EntityVp,
+			EntityLigh,
+			DeferredInput,
 
-		BrTerrainPipeline TerrainPipeline;
-		BrEntityPipeline EntityPipeline;
-	};
+			Count
+		};
+	}
 
-	struct BrDeferredSubpass
+	namespace PushConstantHandles
 	{
-		void ClearResources(VkDevice LogicalDevice);
+		enum
+		{
+			Entity,
 
-		VkPipelineLayout PipelineLayout = nullptr;
-		VkPipeline Pipeline = nullptr;
-
-		VkDescriptorSetLayout DeferredLayout = nullptr;
-		VkDescriptorSet DeferredSets[MAX_SWAPCHAIN_IMAGES_COUNT];
-	};
+			Count
+		};
+	}
 
 	struct BrMainRenderPass
 	{
@@ -85,8 +90,15 @@ namespace Core
 
 		VkRenderPass RenderPass = nullptr;
 
-		BrMainSubpass MainSubpass;
-		BrDeferredSubpass DeferredSubpass;
+		VkPipelineLayout PipelineLayouts[PipelineHandles::Count];
+		VkPipeline Pipelines[PipelineHandles::Count];
+
+		VkPushConstantRange PushConstants[PushConstantHandles::Count];
+		VkDescriptorSetLayout DescriptorLayouts[DescriptorLayoutHandles::Count];
+		VkDescriptorSet DescriptorsToImages[DescriptorHandles::Count][MAX_SWAPCHAIN_IMAGES_COUNT];
+
+		u32 ActiveLightSet = 0;
+		u32 ActiveVpSet = 0;
 
 		BrImageBuffer ColorBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ColorBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
@@ -94,18 +106,14 @@ namespace Core
 		BrImageBuffer DepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView DepthBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		u32 ActiveVpSet = 0;
 		BrGPUBuffer VpUniformBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
-
-		VkDescriptorSetLayout LightingSetLayout = nullptr;
-		u32 ActiveLightSet = 0;
-		VkDescriptorSet LightingSets[MAX_SWAPCHAIN_IMAGES_COUNT];
-
 		BrGPUBuffer LightBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 
+		static inline VkDescriptorSet TerrainSamplerDescriptorSets[MAX_IMAGES];
+		static inline VkDescriptorSet EntitySamplerDescriptorSets[MAX_IMAGES];
+
 		BrGPUBuffer MaterialBuffer;
-		VkDescriptorSetLayout MaterialLayout = nullptr;
-		VkDescriptorSet MaterialSet = nullptr;
+		VkDescriptorSet MaterialSet = nullptr; // TODO: Should be with textures
 
 		u32 TextureDescriptorCountTest = 0;
 	};

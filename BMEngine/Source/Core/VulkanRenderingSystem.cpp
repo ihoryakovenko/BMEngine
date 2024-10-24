@@ -321,8 +321,8 @@ namespace Core::VulkanRenderingSystemInterface
 		Barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;	// Aspect of image being altered
 		Barriers[0].subresourceRange.baseMipLevel = 0;						// First mip level to start alterations on
 		Barriers[0].subresourceRange.levelCount = 1;							// Number of mip levels to alter starting from baseMipLevel
-		Barriers[0].subresourceRange.baseArrayLayer = 0;						// First layer to start alterations on
-		Barriers[0].subresourceRange.layerCount = 1; // Number of layers to alter starting from baseArrayLayer
+		Barriers[0].subresourceRange.baseArrayLayer = 0;
+		Barriers[0].subresourceRange.layerCount = 1;
 
 		Barriers[0].srcAccessMask = 0;								// Memory access stage transition must after...
 		Barriers[0].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;		// Memory access stage transition must before...
@@ -412,8 +412,8 @@ namespace Core::VulkanRenderingSystemInterface
 		auto TextureImageInfos = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorImageInfo>(2);
 		auto Layouts = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorSetLayout>(2);
 
-		Layouts[0] = MainRenderpass.MainSubpass.EntityPipeline.EntitySamplerSetLayout;
-		Layouts[1] = MainRenderpass.MainSubpass.TerrainPipeline.TerrainSamplerSetLayout;
+		Layouts[0] = MainRenderpass.DescriptorLayouts[DescriptorLayoutHandles::EntitySampler];
+		Layouts[1] = MainRenderpass.DescriptorLayouts[DescriptorLayoutHandles::TerrainSampler];
 
 		VkDescriptorSet EntitySet;
 		VkDescriptorSet TerrainSet;
@@ -452,8 +452,8 @@ namespace Core::VulkanRenderingSystemInterface
 
 		vkUpdateDescriptorSets(LogicalDevice, 3, TextureWriteData, 0, nullptr);
 
-		MainRenderpass.MainSubpass.EntityPipeline.EntitySamplerDescriptorSets[MainRenderpass.TextureDescriptorCountTest] = EntitySet;
-		MainRenderpass.MainSubpass.TerrainPipeline.TerrainSamplerDescriptorSets[MainRenderpass.TextureDescriptorCountTest] = TerrainSet;
+		MainRenderpass.EntitySamplerDescriptorSets[MainRenderpass.TextureDescriptorCountTest] = EntitySet;
+		MainRenderpass.TerrainSamplerDescriptorSets[MainRenderpass.TextureDescriptorCountTest] = TerrainSet;
 
 		const u32 CurrentIndex = MainRenderpass.TextureDescriptorCountTest;
 		++MainRenderpass.TextureDescriptorCountTest;
@@ -705,7 +705,7 @@ namespace Core::VulkanRenderingSystemInterface
 		SamplerCreateInfo.mipLodBias = 0.0f;								// Level of Details bias for mip level
 		SamplerCreateInfo.minLod = 0.0f;									// Minimum Level of Detail to pick mip level
 		SamplerCreateInfo.maxLod = 0.0f;									// Maximum Level of Detail to pick mip level
-		SamplerCreateInfo.anisotropyEnable = VK_TRUE;						// Enable Anisotropy
+		SamplerCreateInfo.anisotropyEnable = VK_TRUE;
 		SamplerCreateInfo.maxAnisotropy = 16; // Todo: support in config
 
 		VkSampler Sampler;
@@ -836,7 +836,6 @@ namespace Core::VulkanRenderingSystemInterface
 		VkSemaphoreCreateInfo SemaphoreCreateInfo = { };
 		SemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-		// Fence creation information
 		VkFenceCreateInfo FenceCreateInfo = { };
 		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 		FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
@@ -872,17 +871,10 @@ namespace Core::VulkanRenderingSystemInterface
 
 		const u32 ClearValuesSize = 3;
 		VkClearValue ClearValues[ClearValuesSize];
-		// Todo: do not forget about position in array AttachmentDescriptions
+		// Do not forget about position in array AttachmentDescriptions
 		ClearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
 		ClearValues[1].color = { 0.0f, 0.0f, 0.0f, 1.0f };
 		ClearValues[2].depthStencil.depth = 1.0f;
-
-		VkRenderPassBeginInfo RenderPassBeginInfo = { };
-		RenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		RenderPassBeginInfo.renderPass = MainRenderpass.RenderPass; // Render Pass to begin
-		RenderPassBeginInfo.renderArea.offset = { 0, 0 };
-		RenderPassBeginInfo.pClearValues = ClearValues;
-		RenderPassBeginInfo.clearValueCount = ClearValuesSize;
 
 		VkPipelineStageFlags WaitStages[] = {
 			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
@@ -891,11 +883,16 @@ namespace Core::VulkanRenderingSystemInterface
 		vkWaitForFences(LogicalDevice, 1, &DrawFences[CurrentFrame], VK_TRUE, std::numeric_limits<u64>::max());
 		vkResetFences(LogicalDevice, 1, &DrawFences[CurrentFrame]);
 
-		// Get index of next image to be drawn to, and signal semaphore when ready to be drawn to
 		u32 ImageIndex;
 		vkAcquireNextImageKHR(LogicalDevice, MainViewport.ViewportSwapchain.VulkanSwapchain, std::numeric_limits<u64>::max(),
 			ImageAvailable[CurrentFrame], VK_NULL_HANDLE, &ImageIndex);
 
+		VkRenderPassBeginInfo RenderPassBeginInfo = { };
+		RenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		RenderPassBeginInfo.renderPass = MainRenderpass.RenderPass;
+		RenderPassBeginInfo.renderArea.offset = { 0, 0 };
+		RenderPassBeginInfo.pClearValues = ClearValues;
+		RenderPassBeginInfo.clearValueCount = ClearValuesSize;
 		// Start point of render pass in pixels
 		RenderPassBeginInfo.renderArea.extent = MainViewport.ViewportSwapchain.SwapExtent; // Size of region to run render pass on (starting at offset)
 		RenderPassBeginInfo.framebuffer = MainViewport.SwapchainFramebuffers[ImageIndex];
@@ -910,17 +907,17 @@ namespace Core::VulkanRenderingSystemInterface
 		vkCmdBeginRenderPass(MainViewport.CommandBuffers[ImageIndex], &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 		{
-			vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.MainSubpass.TerrainPipeline.Pipeline);
+			vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.Pipelines[PipelineHandles::Terrain]);
 
-			//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			VkBuffer TerrainVertexBuffers[] = { VertexBuffer.Buffer };
 			VkDeviceSize TerrainBuffersOffsets[] = { Scene.DrawTerrainEntities[0].VertexOffset };
 
 			const u32 TerrainDescriptorSetGroupCount = 2;
 			VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = {
-				MainRenderpass.MainSubpass.TerrainPipeline.TerrainSets[MainRenderpass.ActiveVpSet], MainRenderpass.MainSubpass.TerrainPipeline.TerrainSamplerDescriptorSets[0] };
+				MainRenderpass.DescriptorsToImages[DescriptorHandles::TerrainVp][MainRenderpass.ActiveVpSet], MainRenderpass.TerrainSamplerDescriptorSets[0] };
 
-			vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.MainSubpass.TerrainPipeline.PipelineLayout,
+			vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.PipelineLayouts[PipelineHandles::Terrain],
 				0, TerrainDescriptorSetGroupCount, TerrainDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
 
 			vkCmdBindVertexBuffers(MainViewport.CommandBuffers[ImageIndex], 0, 1, TerrainVertexBuffers, TerrainBuffersOffsets);
@@ -930,7 +927,7 @@ namespace Core::VulkanRenderingSystemInterface
 		}
 
 		{
-			vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.MainSubpass.EntityPipeline.Pipeline);
+			vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.Pipelines[PipelineHandles::Entity]);
 
 			// TODO: Support rework to not create identical index buffers
 			for (u32 j = 0; j < Scene.DrawEntitiesCount; ++j)
@@ -938,19 +935,22 @@ namespace Core::VulkanRenderingSystemInterface
 				VkBuffer VertexBuffers[] = { VertexBuffer.Buffer };
 				VkDeviceSize Offsets[] = { Scene.DrawEntities[j].VertexOffset };
 
-				// Todo: do not record textureId on each frame?
 				const u32 DescriptorSetGroupCount = 4;
 				VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] = 
 				{
-					MainRenderpass.MainSubpass.EntityPipeline.EntitySets[MainRenderpass.ActiveVpSet],
-					MainRenderpass.MainSubpass.EntityPipeline.EntitySamplerDescriptorSets[Scene.DrawEntities[j].MaterialIndex],
-					MainRenderpass.LightingSets[MainRenderpass.ActiveLightSet],
+					MainRenderpass.DescriptorsToImages[DescriptorHandles::EntityVp][MainRenderpass.ActiveVpSet],
+					MainRenderpass.EntitySamplerDescriptorSets[Scene.DrawEntities[j].MaterialIndex],
+					MainRenderpass.DescriptorsToImages[DescriptorHandles::EntityLigh][MainRenderpass.ActiveLightSet],
 					MainRenderpass.MaterialSet
 				};
 
-				vkCmdPushConstants(MainViewport.CommandBuffers[ImageIndex], MainRenderpass.MainSubpass.EntityPipeline.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+				vkCmdPushConstants(MainViewport.CommandBuffers[ImageIndex],
+					MainRenderpass.PipelineLayouts[PipelineHandles::Entity],
+					VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+
 					0, sizeof(BrModel), &Scene.DrawEntities[j].Model);
-				vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.MainSubpass.EntityPipeline.PipelineLayout,
+				vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
+					MainRenderpass.PipelineLayouts[PipelineHandles::Entity],
 					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
 
 				vkCmdBindVertexBuffers(MainViewport.CommandBuffers[ImageIndex], 0, 1, VertexBuffers, Offsets);
@@ -963,10 +963,12 @@ namespace Core::VulkanRenderingSystemInterface
 		vkCmdNextSubpass(MainViewport.CommandBuffers[ImageIndex], VK_SUBPASS_CONTENTS_INLINE);
 
 		{
-			vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.DeferredSubpass.Pipeline);
+			vkCmdBindPipeline(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
+				MainRenderpass.Pipelines[PipelineHandles::Deferred]);
 
-			vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.DeferredSubpass.PipelineLayout,
-				0, 1, &MainRenderpass.DeferredSubpass.DeferredSets[ImageIndex], 0, nullptr);
+			vkCmdBindDescriptorSets(MainViewport.CommandBuffers[ImageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
+				MainRenderpass.PipelineLayouts[PipelineHandles::Deferred],
+				0, 1, &MainRenderpass.DescriptorsToImages[DescriptorHandles::DeferredInput][ImageIndex], 0, nullptr);
 
 			vkCmdDraw(MainViewport.CommandBuffers[ImageIndex], 3, 1, 0, 0); // 3 hardcoded Indices for second "post processing" subpass
 		}
@@ -980,16 +982,15 @@ namespace Core::VulkanRenderingSystemInterface
 			assert(false);
 		}
 
-		// Submit command buffer to queue
 		VkSubmitInfo SubmitInfo = { };
 		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.waitSemaphoreCount = 1;										// Number of semaphores to wait on
-		SubmitInfo.pWaitDstStageMask = WaitStages;						// Stages to check semaphores at
-		SubmitInfo.commandBufferCount = 1;								// Number of command buffers to submit
-		SubmitInfo.signalSemaphoreCount = 1;							// Number of semaphores to signal
-		SubmitInfo.pWaitSemaphores = &ImageAvailable[CurrentFrame];				// List of semaphores to wait on
-		SubmitInfo.pCommandBuffers = &MainViewport.CommandBuffers[ImageIndex];		// Command buffer to submit
-		SubmitInfo.pSignalSemaphores = &RenderFinished[CurrentFrame];	// Semaphores to signal when command buffer finishes
+		SubmitInfo.waitSemaphoreCount = 1;
+		SubmitInfo.pWaitDstStageMask = WaitStages;
+		SubmitInfo.commandBufferCount = 1;
+		SubmitInfo.signalSemaphoreCount = 1;
+		SubmitInfo.pWaitSemaphores = &ImageAvailable[CurrentFrame];
+		SubmitInfo.pCommandBuffers = &MainViewport.CommandBuffers[ImageIndex]; // Command buffer to submit
+		SubmitInfo.pSignalSemaphores = &RenderFinished[CurrentFrame]; // Semaphores to signal when command buffer finishes
 		Result = vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, DrawFences[CurrentFrame]);
 		if (Result != VK_SUCCESS)
 		{
@@ -997,15 +998,14 @@ namespace Core::VulkanRenderingSystemInterface
 			assert(false);
 		}
 
-		// -- PRESENT RENDERED IMAGE TO SCREEN --
-		VkPresentInfoKHR presentInfo = { };
-		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		presentInfo.waitSemaphoreCount = 1;										// Number of semaphores to wait on
-		presentInfo.swapchainCount = 1;											// Number of swapchains to present to
-		presentInfo.pWaitSemaphores = &RenderFinished[CurrentFrame];			// Semaphores to wait on
-		presentInfo.pSwapchains = &MainViewport.ViewportSwapchain.VulkanSwapchain;									// Swapchains to present images to
-		presentInfo.pImageIndices = &ImageIndex;								// Index of images in swapchains to present
-		Result = vkQueuePresentKHR(PresentationQueue, &presentInfo);
+		VkPresentInfoKHR PresentInfo = { };
+		PresentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+		PresentInfo.waitSemaphoreCount = 1;
+		PresentInfo.swapchainCount = 1;
+		PresentInfo.pWaitSemaphores = &RenderFinished[CurrentFrame];
+		PresentInfo.pSwapchains = &MainViewport.ViewportSwapchain.VulkanSwapchain; // Swapchains to present images to
+		PresentInfo.pImageIndices = &ImageIndex; // Index of images in swapchains to present
+		Result = vkQueuePresentKHR(PresentationQueue, &PresentInfo);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkQueuePresentKHR result is {}", static_cast<int>(Result));
@@ -1033,26 +1033,25 @@ namespace Core::VulkanRenderingSystemInterface
 		OutViewport->Surface = Surface;
 		OutViewport->ViewportSwapchain = SwapInstance;
 
-		// Function CreateFrameBuffers
 		// Create a framebuffer for each swap chain image
 		for (u32 i = 0; i < OutViewport->ViewportSwapchain.ImagesCount; i++)
 		{
 			const u32 AttachmentsCount = 3;
 			VkImageView Attachments[AttachmentsCount] = {
 				OutViewport->ViewportSwapchain.ImageViews[i],
-				// Todo: do not forget about position in array AttachmentDescriptions
+				// Do not forget about position in array AttachmentDescriptions
 				ColorBuffers[i],
 				DepthBuffers[i]
 			};
 
 			VkFramebufferCreateInfo FramebufferCreateInfo = { };
 			FramebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-			FramebufferCreateInfo.renderPass = MainRenderpass.RenderPass;								// Render Pass layout the Framebuffer will be used with
+			FramebufferCreateInfo.renderPass = MainRenderpass.RenderPass;
 			FramebufferCreateInfo.attachmentCount = AttachmentsCount;
-			FramebufferCreateInfo.pAttachments = Attachments;							// List of attachments (1:1 with Render Pass)
-			FramebufferCreateInfo.width = OutViewport->ViewportSwapchain.SwapExtent.width;								// Framebuffer width
-			FramebufferCreateInfo.height = OutViewport->ViewportSwapchain.SwapExtent.height;							// Framebuffer height
-			FramebufferCreateInfo.layers = 1;											// Framebuffer layers
+			FramebufferCreateInfo.pAttachments = Attachments; // List of attachments (1:1 with Render Pass)
+			FramebufferCreateInfo.width = OutViewport->ViewportSwapchain.SwapExtent.width;
+			FramebufferCreateInfo.height = OutViewport->ViewportSwapchain.SwapExtent.height;
+			FramebufferCreateInfo.layers = 1;
 
 			VkResult Result = vkCreateFramebuffer(LogicalDevice, &FramebufferCreateInfo, nullptr, &OutViewport->SwapchainFramebuffers[i]);
 			if (Result != VK_SUCCESS)
@@ -1061,9 +1060,7 @@ namespace Core::VulkanRenderingSystemInterface
 				assert(false);
 			}
 		}
-		// Function end CreateFrameBuffers
 
-		// Function CreateCommandBuffers
 		VkCommandBufferAllocateInfo CommandBufferAllocateInfo = { };
 		CommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		CommandBufferAllocateInfo.commandPool = GraphicsCommandPool;
@@ -1071,14 +1068,12 @@ namespace Core::VulkanRenderingSystemInterface
 		// VK_COMMAND_BUFFER_LEVEL_SECONARY	: Buffer can't be called directly. Can be called from other buffers via "vkCmdExecuteCommands" when recording commands in primary buffer
 		CommandBufferAllocateInfo.commandBufferCount = static_cast<u32>(OutViewport->ViewportSwapchain.ImagesCount);
 
-		// Allocate command buffers and place handles in array of buffers
 		VkResult Result = vkAllocateCommandBuffers(LogicalDevice, &CommandBufferAllocateInfo, OutViewport->CommandBuffers);
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkAllocateCommandBuffers result is {}", static_cast<int>(Result));
 			assert(false);
 		}
-		// Function end CreateCommandBuffers
 	}
 
 	void CreateCommandPool(VkDevice LogicalDevice, u32 FamilyIndex)
@@ -1086,7 +1081,7 @@ namespace Core::VulkanRenderingSystemInterface
 		VkCommandPoolCreateInfo PoolInfo = { };
 		PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 		PoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		PoolInfo.queueFamilyIndex = FamilyIndex;	// Queue Family type that buffers from this command pool will use
+		PoolInfo.queueFamilyIndex = FamilyIndex;
 
 		VkResult Result = vkCreateCommandPool(LogicalDevice, &PoolInfo, nullptr, &GraphicsCommandPool);
 		if (Result != VK_SUCCESS)
