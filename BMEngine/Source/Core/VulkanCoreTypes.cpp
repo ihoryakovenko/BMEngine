@@ -5,7 +5,7 @@
 
 namespace Core
 {
-	BrMainInstance BrMainInstance::CreateMainInstance(const char** RequiredExtensions, u32 RequiredExtensionsCount,
+	BMRMainInstance BMRMainInstance::CreateMainInstance(const char** RequiredExtensions, u32 RequiredExtensionsCount,
 		bool IsValidationLayersEnabled, const char* ValidationLayers[], u32 ValidationLayersSize)
 	{
 		VkApplicationInfo ApplicationInfo = { };
@@ -47,7 +47,7 @@ namespace Core
 			CreateInfo.pNext = nullptr;
 		}
 
-		BrMainInstance Instance;
+		BMRMainInstance Instance;
 		VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &Instance.VulkanInstance);
 		if (Result != VK_SUCCESS)
 		{
@@ -65,7 +65,7 @@ namespace Core
 		return Instance;
 	}
 
-	void BrMainInstance::DestroyMainInstance(BrMainInstance& Instance)
+	void BMRMainInstance::DestroyMainInstance(BMRMainInstance& Instance)
 	{
 		if (Instance.DebugMessenger != nullptr)
 		{
@@ -75,7 +75,7 @@ namespace Core
 		vkDestroyInstance(Instance.VulkanInstance, nullptr);
 	}
 
-	void BrDeviceInstance::Init(VkInstance VulkanInstance, VkSurfaceKHR Surface, const char** DeviceExtensions,
+	void BMRDeviceInstance::Init(VkInstance VulkanInstance, VkSurfaceKHR Surface, const char** DeviceExtensions,
 		u32 DeviceExtensionsSize)
 	{
 		Memory::FrameArray<VkPhysicalDevice> DeviceList = GetPhysicalDeviceList(VulkanInstance);
@@ -105,7 +105,7 @@ namespace Core
 		assert(IsDeviceFound);
 	}
 
-	Memory::FrameArray<VkPhysicalDevice> BrDeviceInstance::GetPhysicalDeviceList(VkInstance VulkanInstance)
+	Memory::FrameArray<VkPhysicalDevice> BMRDeviceInstance::GetPhysicalDeviceList(VkInstance VulkanInstance)
 	{
 		u32 Count;
 		vkEnumeratePhysicalDevices(VulkanInstance, &Count, nullptr);
@@ -116,7 +116,7 @@ namespace Core
 		return Data;
 	}
 
-	Memory::FrameArray<VkExtensionProperties> BrDeviceInstance::GetDeviceExtensionProperties(VkPhysicalDevice PhysicalDevice)
+	Memory::FrameArray<VkExtensionProperties> BMRDeviceInstance::GetDeviceExtensionProperties(VkPhysicalDevice PhysicalDevice)
 	{
 		u32 Count;
 		const VkResult Result = vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &Count, nullptr);
@@ -132,7 +132,7 @@ namespace Core
 		return Data;
 	}
 
-	Memory::FrameArray<VkQueueFamilyProperties> BrDeviceInstance::GetQueueFamilyProperties(VkPhysicalDevice PhysicalDevice)
+	Memory::FrameArray<VkQueueFamilyProperties> BMRDeviceInstance::GetQueueFamilyProperties(VkPhysicalDevice PhysicalDevice)
 	{
 		u32 Count;
 		vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &Count, nullptr);
@@ -146,10 +146,10 @@ namespace Core
 	// TODO check function
 	// In current realization if GraphicsFamily is valid but if PresentationFamily is not valid
 	// GraphicsFamily could be overridden on next iteration even when it is valid
-	BrPhysicalDeviceIndices BrDeviceInstance::GetPhysicalDeviceIndices(VkQueueFamilyProperties* Properties, u32 PropertiesCount,
+	BMRPhysicalDeviceIndices BMRDeviceInstance::GetPhysicalDeviceIndices(VkQueueFamilyProperties* Properties, u32 PropertiesCount,
 		VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
 	{
-		BrPhysicalDeviceIndices Indices;
+		BMRPhysicalDeviceIndices Indices;
 
 		for (u32 i = 0; i < PropertiesCount; ++i)
 		{
@@ -180,8 +180,8 @@ namespace Core
 		return Indices;
 	}
 
-	bool BrDeviceInstance::CheckDeviceSuitability(const char* DeviceExtensions[], u32 DeviceExtensionsSize,
-		VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount, BrPhysicalDeviceIndices Indices,
+	bool BMRDeviceInstance::CheckDeviceSuitability(const char* DeviceExtensions[], u32 DeviceExtensionsSize,
+		VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount, BMRPhysicalDeviceIndices Indices,
 		VkPhysicalDeviceFeatures AvailableFeatures)
 	{
 		if (!CheckDeviceExtensionsSupport(ExtensionProperties, ExtensionPropertiesCount, DeviceExtensions, DeviceExtensionsSize))
@@ -211,7 +211,7 @@ namespace Core
 		return true;
 	}
 
-	bool BrDeviceInstance::CheckDeviceExtensionsSupport(VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount,
+	bool BMRDeviceInstance::CheckDeviceExtensionsSupport(VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount,
 		const char** ExtensionsToCheck, u32 ExtensionsToCheckSize)
 	{
 		for (u32 i = 0; i < ExtensionsToCheckSize; ++i)
@@ -236,11 +236,11 @@ namespace Core
 		return true;
 	}
 
-	BrSwapchainInstance BrSwapchainInstance::CreateSwapchainInstance(VkPhysicalDevice PhysicalDevice,
-		BrPhysicalDeviceIndices Indices, VkDevice LogicalDevice, VkSurfaceKHR Surface,
+	BMRSwapchainInstance BMRSwapchainInstance::CreateSwapchainInstance(VkPhysicalDevice PhysicalDevice,
+		BMRPhysicalDeviceIndices Indices, VkDevice LogicalDevice, VkSurfaceKHR Surface,
 		VkSurfaceFormatKHR SurfaceFormat, VkExtent2D Extent)
 	{
-		BrSwapchainInstance Instance;
+		BMRSwapchainInstance Instance;
 
 		Instance.SwapExtent = Extent;
 
@@ -275,7 +275,7 @@ namespace Core
 		return Instance;
 	}
 
-	void BrSwapchainInstance::DestroySwapchainInstance(VkDevice LogicalDevice, BrSwapchainInstance& Instance)
+	void BMRSwapchainInstance::DestroySwapchainInstance(VkDevice LogicalDevice, BMRSwapchainInstance& Instance)
 	{
 		for (u32 i = 0; i < Instance.ImagesCount; ++i)
 		{
@@ -285,9 +285,9 @@ namespace Core
 		vkDestroySwapchainKHR(LogicalDevice, Instance.VulkanSwapchain, nullptr);
 	}
 
-	VkSwapchainKHR BrSwapchainInstance::CreateSwapchain(VkDevice LogicalDevice, const VkSurfaceCapabilitiesKHR& SurfaceCapabilities,
+	VkSwapchainKHR BMRSwapchainInstance::CreateSwapchain(VkDevice LogicalDevice, const VkSurfaceCapabilitiesKHR& SurfaceCapabilities,
 		VkSurfaceKHR Surface, VkSurfaceFormatKHR SurfaceFormat, VkExtent2D SwapExtent, VkPresentModeKHR PresentationMode,
-		BrPhysicalDeviceIndices DeviceIndices)
+		BMRPhysicalDeviceIndices DeviceIndices)
 	{
 		// How many images are in the swap chain
 		// Get 1 more then the minimum to allow triple buffering
@@ -347,7 +347,7 @@ namespace Core
 		return Swapchain;
 	}
 
-	VkPresentModeKHR BrSwapchainInstance::GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
+	VkPresentModeKHR BMRSwapchainInstance::GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
 	{
 		Memory::FrameArray<VkPresentModeKHR> PresentModes = GetAvailablePresentModes(PhysicalDevice, Surface);
 
@@ -369,7 +369,7 @@ namespace Core
 		return Mode;
 	}
 
-	Memory::FrameArray<VkPresentModeKHR> BrSwapchainInstance::GetAvailablePresentModes(VkPhysicalDevice PhysicalDevice,
+	Memory::FrameArray<VkPresentModeKHR> BMRSwapchainInstance::GetAvailablePresentModes(VkPhysicalDevice PhysicalDevice,
 		VkSurfaceKHR Surface)
 	{
 		u32 Count;
@@ -386,7 +386,7 @@ namespace Core
 		return Data;
 	}
 
-	Memory::FrameArray<VkImage> BrSwapchainInstance::GetSwapchainImages(VkDevice LogicalDevice,
+	Memory::FrameArray<VkImage> BMRSwapchainInstance::GetSwapchainImages(VkDevice LogicalDevice,
 		VkSwapchainKHR VulkanSwapchain)
 	{
 		u32 Count;

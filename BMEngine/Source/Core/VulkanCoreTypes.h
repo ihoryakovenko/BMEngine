@@ -2,12 +2,15 @@
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 
 #include <stb_image.h>
 
 #include <vector>
 
+#include "BMRInterfaceTypes.h"
 #include "Util/EngineTypes.h"
 #include <Memory/MemoryManagmentSystem.h>
 
@@ -20,204 +23,45 @@ namespace Core
 	static const u32 IMAGE_ALIGNMENT = 4096;
 	static const u32 MAX_DRAW_FRAMES = 3;
 
-	using ShaderName = const char*;
-	struct BrShaderNames
-	{
-		static inline ShaderName TerrainVertex = "TerrainVertex";
-		static inline ShaderName TerrainFragment = "TerrainFragment";
-		static inline ShaderName EntityVertex = "EntityVertex";
-		static inline ShaderName EntityFragment = "EntityFragment";
-		static inline ShaderName DeferredVertex = "DeferredVertex";
-		static inline ShaderName DeferredFragment = "DeferredFragment";
-
-		static inline const u32 ShadersCount = 6;
-	};
-
-	struct BrShaderCodeDescription
-	{
-		u32* Code = nullptr;
-		u32 CodeSize = 0;
-		ShaderName Name = nullptr;
-	};
-
-	struct BrConfig
-	{
-		BrShaderCodeDescription* RenderShaders = nullptr;
-		u32 ShadersCount = 0;
-
-		u32 MaxTextures = 0;
-	};
-
-	using BrModel = glm::mat4;
-
-	struct BrUboViewProjection
-	{
-		glm::mat4 View;
-		glm::mat4 Projection;
-	};
-
-	struct BrPhysicalDeviceIndices
+	struct BMRPhysicalDeviceIndices
 	{
 		int GraphicsFamily = -1;
 		int PresentationFamily = -1;
 	};
 
-	struct BrEntityVertex
-	{
-		glm::vec3 Position;
-		glm::vec3 Color;
-		glm::vec2 TextureCoords;
-		glm::vec3 Normal;
-	};
-
-	struct BrTerrainVertex
-	{
-		float Altitude;
-	};
-
-	struct BrMesh
-	{
-		u32 MeshVerticesCount = 0;
-		BrEntityVertex* MeshVertices = nullptr;
-
-		u32 MeshIndicesCount = 0;
-		u32* MeshIndices = nullptr;
-
-		u32 MaterialIndex = -1;
-
-		BrModel Model = glm::mat4(1.0f);
-	};
-
-	struct BrTerrainMesh
-	{
-		u32 VerticesCount = 0;
-		BrTerrainVertex* Vertices = nullptr;
-	};
-
-	struct BrLoadScene
-	{
-		BrMesh* Meshes = nullptr;
-		u32 MeshesCount = 0;
-
-		BrTerrainMesh* TerrainMeshes = nullptr;
-		u32 TerrainMeshesCount = 0;
-	};
-
-	struct BrImageBuffer
+	struct BMRImageBuffer
 	{
 		VkImage Image = nullptr;
 		VkDeviceMemory Memory = nullptr;
 	};
 
-	struct BrGPUBuffer
+	struct BMRGPUBuffer
 	{
 		VkBuffer Buffer = nullptr;
 		VkDeviceMemory Memory = nullptr;
 	};
-
-	struct BrDrawEntity
-	{
-		VkDeviceSize VertexOffset = 0;
-		VkDeviceSize IndexOffset = 0;
-		u32 IndicesCount = 0;
-		u32 MaterialIndex = -1;
-		BrModel Model;
-	};
-
-	struct BrDrawTerrainEntity
-	{
-		VkDeviceSize VertexOffset = 0;
-	};
-
-	struct BrPointLight
-	{
-		glm::vec4 Position;
-		glm::vec3 Ambient;
-		f32 Constant;
-		glm::vec3 Diffuse;
-		f32 Linear;
-		glm::vec3 Specular;
-		f32 Quadratic;
-	};
-
-	struct BrDirectionLight
-	{
-		alignas(16) glm::vec3 Direction;
-		alignas(16) glm::vec3 Ambient;
-		alignas(16) glm::vec3 Diffuse;
-		alignas(16) glm::vec3 Specular;
-	};
-
-	struct BrSpotLight
-	{
-		glm::vec3 Position;
-		f32 CutOff;
-		glm::vec3 Direction;
-		f32 OuterCutOff;
-		glm::vec3 Ambient;
-		f32 Constant;
-		glm::vec3 Diffuse;
-		f32 Linear;
-		glm::vec3 Specular;
-		f32 Quadratic;
-	};
-
-	struct BrLightBuffer
-	{
-		BrPointLight PointLight;
-		BrDirectionLight DirectionLight;
-		BrSpotLight SpotLight;
-	};
-
-	struct BrMaterial
-	{
-		f32 Shininess;
-	};
-
-	struct BrDrawScene
-	{
-		BrUboViewProjection ViewProjection;
-
-		BrDrawEntity* DrawEntities;
-		u32 DrawEntitiesCount;
-
-		BrDrawEntity* DrawTransparentEntities;
-		u32 DrawTransparentEntitiesCount;
-
-		BrDrawTerrainEntity* DrawTerrainEntities;
-		u32 DrawTerrainEntitiesCount;
-	};
-
-	struct BrTextureArrayInfo
-	{
-		u32 Width = 0;
-		u32 Height = 0;
-		u32 Format = 0;
-		u32 LayersCount = 0;
-		stbi_uc* Data = nullptr;
-	};
 	
-	struct BrMainInstance
+	struct BMRMainInstance
 	{
-		static BrMainInstance CreateMainInstance(const char** RequiredExtensions, u32 RequiredExtensionsCount,
+		static BMRMainInstance CreateMainInstance(const char** RequiredExtensions, u32 RequiredExtensionsCount,
 			bool IsValidationLayersEnabled, const char* ValidationLayers[], u32 ValidationLayersSize);
-		static void DestroyMainInstance(BrMainInstance& Instance);
+		static void DestroyMainInstance(BMRMainInstance& Instance);
 
 		VkInstance VulkanInstance = nullptr;
 		VkDebugUtilsMessengerEXT DebugMessenger = nullptr;
 	};
 
-	struct BrSwapchainInstance
+	struct BMRSwapchainInstance
 	{
-		static BrSwapchainInstance CreateSwapchainInstance(VkPhysicalDevice PhysicalDevice,
-			BrPhysicalDeviceIndices Indices, VkDevice LogicalDevice, VkSurfaceKHR Surface,
+		static BMRSwapchainInstance CreateSwapchainInstance(VkPhysicalDevice PhysicalDevice,
+			BMRPhysicalDeviceIndices Indices, VkDevice LogicalDevice, VkSurfaceKHR Surface,
 			VkSurfaceFormatKHR SurfaceFormat, VkExtent2D Extent);
 
-		static void DestroySwapchainInstance(VkDevice LogicalDevice, BrSwapchainInstance& Instance);
+		static void DestroySwapchainInstance(VkDevice LogicalDevice, BMRSwapchainInstance& Instance);
 
 		static VkSwapchainKHR CreateSwapchain(VkDevice LogicalDevice, const VkSurfaceCapabilitiesKHR& SurfaceCapabilities,
 			VkSurfaceKHR Surface, VkSurfaceFormatKHR SurfaceFormat, VkExtent2D SwapExtent, VkPresentModeKHR PresentationMode,
-			BrPhysicalDeviceIndices DeviceIndices);
+			BMRPhysicalDeviceIndices DeviceIndices);
 		static VkPresentModeKHR GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
 		static Memory::FrameArray<VkPresentModeKHR> GetAvailablePresentModes(VkPhysicalDevice PhysicalDevice,
 			VkSurfaceKHR Surface);
@@ -229,7 +73,7 @@ namespace Core
 		VkExtent2D SwapExtent = { };
 	};
 
-	struct BrDeviceInstance
+	struct BMRDeviceInstance
 	{
 		void Init(VkInstance VulkanInstance, VkSurfaceKHR Surface, const char** DeviceExtensions,
 			u32 DeviceExtensionsSize);
@@ -237,26 +81,26 @@ namespace Core
 		static Memory::FrameArray<VkPhysicalDevice> GetPhysicalDeviceList(VkInstance VulkanInstance);
 		static Memory::FrameArray<VkExtensionProperties> GetDeviceExtensionProperties(VkPhysicalDevice PhysicalDevice);
 		static Memory::FrameArray<VkQueueFamilyProperties> GetQueueFamilyProperties(VkPhysicalDevice PhysicalDevice);
-		static BrPhysicalDeviceIndices GetPhysicalDeviceIndices(VkQueueFamilyProperties* Properties, u32 PropertiesCount,
+		static BMRPhysicalDeviceIndices GetPhysicalDeviceIndices(VkQueueFamilyProperties* Properties, u32 PropertiesCount,
 			VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
 		static bool CheckDeviceSuitability(const char* DeviceExtensions[], u32 DeviceExtensionsSize,
-			VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount, BrPhysicalDeviceIndices Indices,
+			VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount, BMRPhysicalDeviceIndices Indices,
 			VkPhysicalDeviceFeatures AvailableFeatures);
 		static bool CheckDeviceExtensionsSupport(VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount,
 			const char** ExtensionsToCheck, u32 ExtensionsToCheckSize);
 
 		VkPhysicalDevice PhysicalDevice = nullptr;
-		BrPhysicalDeviceIndices Indices;
+		BMRPhysicalDeviceIndices Indices;
 		VkPhysicalDeviceProperties Properties;
 		VkPhysicalDeviceFeatures AvailableFeatures;
 	};
 
-	struct BrViewportInstance
+	struct BMRViewportInstance
 	{
 		GLFWwindow* Window = nullptr;
 		VkSurfaceKHR Surface = nullptr;
 
-		BrSwapchainInstance ViewportSwapchain;
+		BMRSwapchainInstance ViewportSwapchain;
 
 		VkFramebuffer SwapchainFramebuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkCommandBuffer CommandBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];

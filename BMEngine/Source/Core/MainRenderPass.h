@@ -5,14 +5,15 @@
 
 #include "VulkanCoreTypes.h"
 #include "Util/EngineTypes.h"
+#include "BMRInterfaceTypes.h"
 
 namespace Core
 {
-	struct BrShaderInput
+	struct BMRShaderInput
 	{
-		static VkShaderModule FindShaderModuleByName(ShaderName Name, BrShaderInput* ShaderInputs, u32 ShaderInputsCount);
+		static VkShaderModule FindShaderModuleByName(BMRShaderName Name, BMRShaderInput* ShaderInputs, u32 ShaderInputsCount);
 
-		ShaderName ShaderName = nullptr;
+		BMRShaderName ShaderName = nullptr;
 		VkShaderModule Module = nullptr;
 	};
 
@@ -69,7 +70,7 @@ namespace Core
 		};
 	}
 
-	struct BrMainRenderPass
+	struct BMRMainRenderPass
 	{
 		void ClearResources(VkDevice LogicalDevice, u32 ImagesCount);
 
@@ -81,7 +82,7 @@ namespace Core
 		void CreateEntitySetLayout(VkDevice LogicalDevice);
 		void CreateDeferredSetLayout(VkDevice LogicalDevice);
 		void CreatePipelineLayouts(VkDevice LogicalDevice); 
-		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent, BrShaderInput* ShaderInputs, u32 ShaderInputsCount);
+		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent, BMRShaderInput* ShaderInputs, u32 ShaderInputsCount);
 		void CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 ImagesCount, VkExtent2D SwapExtent,
 			VkFormat DepthFormat, VkFormat ColorFormat);
 		void CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
@@ -100,19 +101,19 @@ namespace Core
 		u32 ActiveLightSet = 0;
 		u32 ActiveVpSet = 0;
 
-		BrImageBuffer ColorBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRImageBuffer ColorBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ColorBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		BrImageBuffer DepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRImageBuffer DepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView DepthBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		BrGPUBuffer VpUniformBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
-		BrGPUBuffer LightBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRGPUBuffer VpUniformBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRGPUBuffer LightBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		static inline VkDescriptorSet TerrainSamplerDescriptorSets[MAX_IMAGES];
 		static inline VkDescriptorSet EntitySamplerDescriptorSets[MAX_IMAGES];
 
-		BrGPUBuffer MaterialBuffer;
+		BMRGPUBuffer MaterialBuffer;
 		VkDescriptorSet MaterialSet = nullptr; // TODO: Should be with textures
 
 		u32 TextureDescriptorCountTest = 0;

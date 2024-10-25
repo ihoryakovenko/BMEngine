@@ -2,8 +2,9 @@
 
 #include <stdint.h>
 
-using u32 = uint32_t;
-using u64 = uint64_t;
+typedef uint8_t u8;
+typedef uint32_t u32;
+typedef uint64_t u64;
 
-using f32 = float;
-using f64 = double;
+typedef float f32;
+typedef double f64;

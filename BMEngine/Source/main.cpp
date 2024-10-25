@@ -14,10 +14,9 @@
 #include <cassert>
 #include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
-#include "Core/VulkanRenderingSystem.h"
+#include "Core/BMRInterface.h"
 #include <tiny_obj_loader.h>
 #include <unordered_map>
-#include "Core/VulkanCoreTypes.h"
 #include <random>
 #include "Memory/MemoryManagmentSystem.h"
 #include "Util/EngineTypes.h"
@@ -26,6 +25,8 @@
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
+
+#include "stb_image.h"
 
 const u32 NumRows = 600;
 const u32 NumCols = 600;
@@ -43,11 +44,11 @@ u32 ContainerMaterialIndex;
 u32 BlendWindowMaterial;
 u32 GrassMaterial;
 
-Core::BrTerrainVertex TerrainVerticesData[NumRows][NumCols];
+BMRTerrainVertex TerrainVerticesData[NumRows][NumCols];
 
-std::vector<Core::BrDrawEntity> DrawEntities;
-Core::BrShaderCodeDescription ShaderCodeDescriptions[Core::BrShaderNames::ShadersCount];
-std::vector<std::vector<char>> ShaderCodes(Core::BrShaderNames::ShadersCount);
+std::vector<BMRDrawEntity> DrawEntities;
+BMRShaderCodeDescription ShaderCodeDescriptions[SHADERS_COUNT];
+std::vector<std::vector<char>> ShaderCodes(SHADERS_COUNT);
 
 void GenerateTerrain()
 {
@@ -106,21 +107,21 @@ void GenerateTerrain()
 	}
 }
 
-Core::BrTerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
+BMRTerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
 u32 TerrainVerticesCount = NumRows * NumCols;
 
 struct TestMesh
 {
-	std::vector<Core::BrEntityVertex> vertices;
+	std::vector<BMREntityVertex> vertices;
 	std::vector<u32> indices;
 	int MaterialIndex;
 };
 
 namespace std
 {
-	template<> struct hash<Core::BrEntityVertex>
+	template<> struct hash<BMREntityVertex>
 	{
-		size_t operator()(Core::BrEntityVertex const& vertex) const
+		size_t operator()(BMREntityVertex const& vertex) const
 		{
 			size_t hashPosition = std::hash<glm::vec3>()(vertex.Position);
 			size_t hashColor = std::hash<glm::vec3>()(vertex.Color);
@@ -139,7 +140,7 @@ namespace std
 
 struct VertexEqual
 {
-	bool operator()(const Core::BrEntityVertex& lhs, const Core::BrEntityVertex& rhs) const
+	bool operator()(const BMREntityVertex& lhs, const BMREntityVertex& rhs) const
 	{
 		return lhs.Position == rhs.Position && lhs.Color == rhs.Color && lhs.TextureCoords == rhs.TextureCoords;
 	}
@@ -166,14 +167,14 @@ u32 AddTexture(const char* DiffuseTexturePath)
 		assert(false);
 	}
 
-	Core::BrTextureArrayInfo Info;
+	BMRTextureArrayInfo Info;
 	Info.Width = Width;
 	Info.Height = Height;
 	Info.Format = STBI_rgb_alpha;
 	Info.LayersCount = 1;
 	Info.Data = ImageData;
 
-	return Core::VulkanRenderingSystemInterface::CreateTexture(Info);
+	return BMRLoadTexture(Info);
 }
 
 void WindowCloseCallback(GLFWwindow* Window)
@@ -278,13 +279,13 @@ TestMesh CreateCubeMesh(const char* Modelpath, int materialIndex)
 		assert(false);
 	}
 
-	std::unordered_map<Core::BrEntityVertex, u32, std::hash<Core::BrEntityVertex>, VertexEqual> uniqueVertices{ };
+	std::unordered_map<BMREntityVertex, u32, std::hash<BMREntityVertex>, VertexEqual> uniqueVertices{ };
 
 	for (const auto& Shape : Shapes)
 	{
 		for (const auto& index : Shape.mesh.indices)
 		{
-			Core::BrEntityVertex vertex{ };
+			BMREntityVertex vertex{ };
 
 			vertex.Position =
 			{
@@ -365,11 +366,11 @@ void LoadDrawEntities()
 	BlendWindowIndex = AddTexture(BlendWindow);
 	GrassTextureIndex = AddTexture(Grass);
 
-	TestMaterialIndex = Core::VulkanRenderingSystemInterface::CreateMaterial(TestTextureIndex, ContainerSpecularTextureIndex);
-	WhiteMaterialIndex = Core::VulkanRenderingSystemInterface::CreateMaterial(WhiteTextureIndex, WhiteTextureIndex);
-	ContainerMaterialIndex = Core::VulkanRenderingSystemInterface::CreateMaterial(ContainerTextureIndex, ContainerSpecularTextureIndex);
-	BlendWindowMaterial = Core::VulkanRenderingSystemInterface::CreateMaterial(BlendWindowIndex, BlendWindowIndex);
-	GrassMaterial = Core::VulkanRenderingSystemInterface::CreateMaterial(GrassTextureIndex, GrassTextureIndex);
+	TestMaterialIndex = BMRLoadMaterial(TestTextureIndex, ContainerSpecularTextureIndex);
+	WhiteMaterialIndex = BMRLoadMaterial(WhiteTextureIndex, WhiteTextureIndex);
+	ContainerMaterialIndex = BMRLoadMaterial(ContainerTextureIndex, ContainerSpecularTextureIndex);
+	BlendWindowMaterial = BMRLoadMaterial(BlendWindowIndex, BlendWindowIndex);
+	GrassMaterial = BMRLoadMaterial(GrassTextureIndex, GrassTextureIndex);
 
 	for (size_t i = 0; i < Materials.size(); i++)
 	{
@@ -381,14 +382,14 @@ void LoadDrawEntities()
 			std::string FileName = "./Resources/Textures/" + Material.diffuse_texname.substr(Idx + 1);
 
 			const u32 NewTextureIndex = AddTexture(FileName.c_str());
-			MaterialToTexture[i] = Core::VulkanRenderingSystemInterface::CreateMaterial(NewTextureIndex, NewTextureIndex);
+			MaterialToTexture[i] = BMRLoadMaterial(NewTextureIndex, NewTextureIndex);
 		}
 	}
 
 	std::vector<TestMesh> ModelMeshes;
 	ModelMeshes.reserve(Shapes.size());
 
-	std::unordered_map<Core::BrEntityVertex, u32, std::hash<Core::BrEntityVertex>, VertexEqual> uniqueVertices{ };
+	std::unordered_map<BMREntityVertex, u32, std::hash<BMREntityVertex>, VertexEqual> uniqueVertices{ };
 
 	for (const auto& Shape : Shapes)
 	{
@@ -396,7 +397,7 @@ void LoadDrawEntities()
 
 		for (const auto& index : Shape.mesh.indices)
 		{
-			Core::BrEntityVertex vertex{ };
+			BMREntityVertex vertex{ };
 
 			vertex.Position =
 			{
@@ -451,21 +452,21 @@ void LoadDrawEntities()
 	ModelMeshes.emplace_back(CreateCubeMesh(CubeObj, ContainerMaterialIndex));
 
 	DrawEntities.resize(ModelMeshes.size());
-	
-	std::vector<Core::BrMesh> m(ModelMeshes.size());
 
 	for (int i = 0; i < ModelMeshes.size(); ++i)
 	{
-		m[i].MeshVertices = ModelMeshes[i].vertices.data();
-		m[i].MeshVerticesCount = ModelMeshes[i].vertices.size();
+		DrawEntities[i].VertexOffset = BMRLoadVertices(ModelMeshes[i].vertices.data(),
+			sizeof(BMREntityVertex), ModelMeshes[i].vertices.size());
 
-		m[i].MeshIndices = ModelMeshes[i].indices.data();
-		m[i].MeshIndicesCount = ModelMeshes[i].indices.size();
+		DrawEntities[i].IndexOffset = BMRLoadIndices(ModelMeshes[i].indices.data(),
+			ModelMeshes[i].indices.size());
 
-		m[i].MaterialIndex = ModelMeshes[i].MaterialIndex;
+		DrawEntities[i].IndicesCount = ModelMeshes[i].indices.size();
+		DrawEntities[i].Model = glm::mat3(1);
+		DrawEntities[i].MaterialIndex = ModelMeshes[i].MaterialIndex;
 	}
 
-	Core::VulkanRenderingSystemInterface::CreateDrawEntities(m.data(), m.size(), DrawEntities.data());
+	
 
 	{
 		glm::vec3 CubePos(-5.0f, 0.0f, 10.0f);
@@ -520,29 +521,29 @@ void LoadDrawEntities()
 void LoadShaders()
 {
 	std::vector<const char*> ShaderPaths;
-	ShaderPaths.reserve(Core::BrShaderNames::ShadersCount);
-	std::vector<Core::ShaderName> NameToPath;
-	NameToPath.reserve(Core::BrShaderNames::ShadersCount);
+	ShaderPaths.reserve(SHADERS_COUNT);
+	std::vector<BMRShaderName> NameToPath;
+	NameToPath.reserve(SHADERS_COUNT);
 
 	ShaderPaths.push_back("./Resources/Shaders/TerrainGenerator_vert.spv");
-	NameToPath.push_back(Core::BrShaderNames::TerrainVertex);
+	NameToPath.push_back(TERRAIN_VERTEX);
 
 	ShaderPaths.push_back("./Resources/Shaders/TerrainGenerator_frag.spv");
-	NameToPath.push_back(Core::BrShaderNames::TerrainFragment);
+	NameToPath.push_back(TERRAIN_FRAGMENT);
 
 	ShaderPaths.push_back("./Resources/Shaders/vert.spv");
-	NameToPath.push_back(Core::BrShaderNames::EntityVertex);
+	NameToPath.push_back(ENTITY_VERTEX);
 
 	ShaderPaths.push_back("./Resources/Shaders/frag.spv");
-	NameToPath.push_back(Core::BrShaderNames::EntityFragment);
+	NameToPath.push_back(ENTITY_FRAGMENT);
 
 	ShaderPaths.push_back("./Resources/Shaders/second_vert.spv");
-	NameToPath.push_back(Core::BrShaderNames::DeferredVertex);
+	NameToPath.push_back(DEFERRED_VERTEX);
 
 	ShaderPaths.push_back("./Resources/Shaders/second_frag.spv");
-	NameToPath.push_back(Core::BrShaderNames::DeferredFragment);
+	NameToPath.push_back(DEFERRED_FRAGMENT);
 
-	for (u32 i = 0; i < Core::BrShaderNames::ShadersCount; ++i)
+	for (u32 i = 0; i < SHADERS_COUNT; ++i)
 	{
 		Util::OpenAndReadFileFull(ShaderPaths[i], ShaderCodes[i], "rb");
 		ShaderCodeDescriptions[i].Code = reinterpret_cast<u32*>(ShaderCodes[i].data());
@@ -602,15 +603,15 @@ int main()
 	}
 
 
-	Core::BrConfig Config;
+	BMRConfig Config;
 	Config.RenderShaders = ShaderCodeDescriptions;
-	Config.ShadersCount = Core::BrShaderNames::ShadersCount;
+	Config.ShadersCount = SHADERS_COUNT;
 	Config.MaxTextures = 90;
 
-	Core::VulkanRenderingSystemInterface::Init(Window, Config);
+	BMRInit(Window, Config);
 	LoadDrawEntities();
 
-	Core::BrDrawScene Scene;
+	BMRDrawScene Scene;
 
 	Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
 		static_cast<f32>(1600) / static_cast<f32>(800), 0.1f, 100.0f);
@@ -618,9 +619,13 @@ int main()
 	Scene.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	
-	Core::BrDrawTerrainEntity TestDrawTerrainEntity;
-	Core::VulkanRenderingSystemInterface::CreateTerrainDrawEntity(&TerrainVerticesData[0][0], NumRows * NumCols, TestDrawTerrainEntity);
-	Core::VulkanRenderingSystemInterface::CreateTerrainIndices(indices.data(), indices.size());
+	BMRDrawTerrainEntity TestDrawTerrainEntity;
+	TestDrawTerrainEntity.VertexOffset = BMRLoadVertices(&TerrainVerticesData[0][0],
+		sizeof(BMRTerrainVertex), NumRows * NumCols);
+
+	TestDrawTerrainEntity.IndexOffset = BMRLoadIndices(indices.data(), indices.size());
+
+	TestDrawTerrainEntity.IndicesCount = indices.size();
 
 	Scene.DrawTerrainEntities = &TestDrawTerrainEntity;
 	Scene.DrawTerrainEntitiesCount = 1;
@@ -638,7 +643,7 @@ int main()
 
 	Memory::BmMemoryManagementSystem::FrameDealloc();
 
-	Core::BrLightBuffer TestData;
+	BMRLightBuffer TestData;
 	TestData.PointLight.Position = glm::vec4(0.0f, 0.0f, 10.0f, 1.0f);
 	TestData.PointLight.Ambient = glm::vec3(0.1f, 0.1f, 0.1f);
 	TestData.PointLight.Diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
@@ -662,9 +667,9 @@ int main()
 	TestData.SpotLight.CutOff = glm::cos(glm::radians(12.5f));
 	TestData.SpotLight.OuterCutOff = glm::cos(glm::radians(17.5f));
 
-	Core::BrMaterial Mat;
+	BMRMaterial Mat;
 	Mat.Shininess = 32.f;
-	Core::VulkanRenderingSystemInterface::UpdateMaterialBuffer(Mat);
+	BMRUpdateMaterialBuffer(Mat);
 
 	while (!glfwWindowShouldClose(Window) && !Close)
 	{
@@ -692,7 +697,7 @@ int main()
 		TestData.SpotLight.Direction = MainCamera.CameraFront;
 		TestData.SpotLight.Position = MainCamera.CameraPosition;
 
-		Core::VulkanRenderingSystemInterface::UpdateLightBuffer(TestData);
+		BMRUpdateLightBuffer(TestData);
 
 		// TODO: Need to sort objects by distance to camera
 		int LastOpaqueIndex = Scene.DrawEntitiesCount - 1;
@@ -715,12 +720,12 @@ int main()
 			}
 		}
 
-		Core::VulkanRenderingSystemInterface::Draw(Scene);
+		BMRDraw(Scene);
 
 		Memory::BmMemoryManagementSystem::FrameDealloc();
 	}
 	
-	Core::VulkanRenderingSystemInterface::DeInit();
+	BMRDeInit();
 
 
 	glfwDestroyWindow(Window);

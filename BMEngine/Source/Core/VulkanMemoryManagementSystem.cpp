@@ -10,10 +10,10 @@ namespace Core::VulkanMemoryManagementSystem
 {
 	static VkDeviceMemory AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex);
 
-	static BrMemorySourceDevice MemorySource;
-	static BrGPUBuffer StagingBuffer;
+	static BMRMemorySourceDevice MemorySource;
+	static BMRGPUBuffer StagingBuffer;
 
-	void Init(BrMemorySourceDevice Device)
+	void Init(BMRMemorySourceDevice Device)
 	{
 		MemorySource = Device;
 		StagingBuffer = CreateBuffer(MB64, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -94,9 +94,9 @@ namespace Core::VulkanMemoryManagementSystem
 		}
 	}
 
-	BrImageBuffer CreateImageBuffer(VkImageCreateInfo* pCreateInfo)
+	BMRImageBuffer CreateImageBuffer(VkImageCreateInfo* pCreateInfo)
 	{
-		BrImageBuffer Buffer;
+		BMRImageBuffer Buffer;
 		VkResult Result = vkCreateImage(MemorySource.LogicalDevice, pCreateInfo, nullptr, &Buffer.Image);
 		if (Result != VK_SUCCESS)
 		{
@@ -116,13 +116,13 @@ namespace Core::VulkanMemoryManagementSystem
 		return Buffer;
 	}
 
-	void DestroyImageBuffer(BrImageBuffer Image)
+	void DestroyImageBuffer(BMRImageBuffer Image)
 	{
 		vkDestroyImage(MemorySource.LogicalDevice, Image.Image, nullptr);
 		vkFreeMemory(MemorySource.LogicalDevice, Image.Memory, nullptr);
 	}
 
-	BrGPUBuffer CreateBuffer(VkDeviceSize BufferSize, VkBufferUsageFlags Usage,
+	BMRGPUBuffer CreateBuffer(VkDeviceSize BufferSize, VkBufferUsageFlags Usage,
 		VkMemoryPropertyFlags Properties)
 	{
 		Util::Log().Info("Creating buffer. Requested size: {}", BufferSize);
@@ -133,7 +133,7 @@ namespace Core::VulkanMemoryManagementSystem
 		BufferInfo.usage = Usage;
 		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-		BrGPUBuffer Buffer;
+		BMRGPUBuffer Buffer;
 		VkResult Result = vkCreateBuffer(MemorySource.LogicalDevice, &BufferInfo, nullptr, &Buffer.Buffer);
 		if (Result != VK_SUCCESS)
 		{
@@ -159,7 +159,7 @@ namespace Core::VulkanMemoryManagementSystem
 		return Buffer;
 	}
 
-	void DestroyBuffer(BrGPUBuffer Buffer)
+	void DestroyBuffer(BMRGPUBuffer Buffer)
 	{
 		vkDestroyBuffer(MemorySource.LogicalDevice, Buffer.Buffer, nullptr);
 		vkFreeMemory(MemorySource.LogicalDevice, Buffer.Memory, nullptr);

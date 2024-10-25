@@ -19,7 +19,7 @@ namespace Core
 		};
 	}
 
-	void BrMainRenderPass::ClearResources(VkDevice LogicalDevice, u32 ImagesCount)
+	void BMRMainRenderPass::ClearResources(VkDevice LogicalDevice, u32 ImagesCount)
 	{
 		for (u32 i = 0; i < ImagesCount; ++i)
 		{
@@ -49,7 +49,7 @@ namespace Core
 		vkDestroyRenderPass(LogicalDevice, RenderPass, nullptr);
 	}
 
-	void BrMainRenderPass::CreateVulkanPass(VkDevice LogicalDevice, VkFormat ColorFormat, VkFormat DepthFormat, VkSurfaceFormatKHR SurfaceFormat)
+	void BMRMainRenderPass::CreateVulkanPass(VkDevice LogicalDevice, VkFormat ColorFormat, VkFormat DepthFormat, VkSurfaceFormatKHR SurfaceFormat)
 	{
 		VkSubpassDescription Subpasses[SubpassIndex::Count];
 
@@ -180,15 +180,15 @@ namespace Core
 		}
 	}
 
-	void BrMainRenderPass::SetupPushConstants()
+	void BMRMainRenderPass::SetupPushConstants()
 	{
 		PushConstants[PushConstantHandles::Entity].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 		PushConstants[PushConstantHandles::Entity].offset = 0;
 		// Todo: check constant and model size?
-		PushConstants[PushConstantHandles::Entity].size = sizeof(BrModel);
+		PushConstants[PushConstantHandles::Entity].size = sizeof(BMRModel);
 	}
 
-	void BrMainRenderPass::CreateSamplerSetLayout(VkDevice LogicalDevice)
+	void BMRMainRenderPass::CreateSamplerSetLayout(VkDevice LogicalDevice)
 	{
 		const u32 EntitySamplerLayoutBindingCount = 2;
 		VkDescriptorSetLayoutBinding EntitySamplerLayoutBinding[EntitySamplerLayoutBindingCount];
@@ -236,7 +236,7 @@ namespace Core
 		}
 	}
 
-	void BrMainRenderPass::CreateTerrainSetLayout(VkDevice LogicalDevice)
+	void BMRMainRenderPass::CreateTerrainSetLayout(VkDevice LogicalDevice)
 	{
 		VkDescriptorSetLayoutBinding VpLayoutBinding = { };
 		VpLayoutBinding.binding = 0;											// Binding point in shader (designated by binding number in shader)
@@ -263,7 +263,7 @@ namespace Core
 		}
 	}
 
-	void BrMainRenderPass::CreateEntitySetLayout(VkDevice LogicalDevice)
+	void BMRMainRenderPass::CreateEntitySetLayout(VkDevice LogicalDevice)
 	{
 		VkDescriptorSetLayoutBinding VpLayoutBinding = { };
 		VpLayoutBinding.binding = 0;
@@ -330,7 +330,7 @@ namespace Core
 		}
 	}
 
-	void BrMainRenderPass::CreateDeferredSetLayout(VkDevice LogicalDevice)
+	void BMRMainRenderPass::CreateDeferredSetLayout(VkDevice LogicalDevice)
 	{
 		//Create input attachment image descriptor set layout
 		// Colour Input Binding
@@ -368,7 +368,7 @@ namespace Core
 		}
 	}
 
-	void BrMainRenderPass::CreatePipelineLayouts(VkDevice LogicalDevice)
+	void BMRMainRenderPass::CreatePipelineLayouts(VkDevice LogicalDevice)
 	{
 		const u32 TerrainDescriptorLayoutsCount = 2;
 		VkDescriptorSetLayout TerrainDescriptorLayouts[TerrainDescriptorLayoutsCount] = {
@@ -397,7 +397,7 @@ namespace Core
 		//	&DescriptorLayouts[DescriptorLayoutHandles::SkyBoxVb], 0, nullptr);
 	}
 
-	void BrMainRenderPass::CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent, BrShaderInput* ShaderInputs, u32 ShaderInputsCount)
+	void BMRMainRenderPass::CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent, BMRShaderInput* ShaderInputs, u32 ShaderInputsCount)
 	{
 		VkViewport Viewport;
 		VkRect2D Scissor;
@@ -422,37 +422,37 @@ namespace Core
 		VkPipelineShaderStageCreateInfo TerrainVertexShaderCreateInfo = { };
 		TerrainVertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		TerrainVertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-		TerrainVertexShaderCreateInfo.module = BrShaderInput::FindShaderModuleByName(BrShaderNames::TerrainVertex, ShaderInputs, ShaderInputsCount);
+		TerrainVertexShaderCreateInfo.module = BMRShaderInput::FindShaderModuleByName(TERRAIN_VERTEX, ShaderInputs, ShaderInputsCount);
 		TerrainVertexShaderCreateInfo.pName = "main";
 		
 		VkPipelineShaderStageCreateInfo TerrainFragmentShaderCreateInfo = { };
 		TerrainFragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		TerrainFragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		TerrainFragmentShaderCreateInfo.module = BrShaderInput::FindShaderModuleByName(BrShaderNames::TerrainFragment, ShaderInputs, ShaderInputsCount);
+		TerrainFragmentShaderCreateInfo.module = BMRShaderInput::FindShaderModuleByName(TERRAIN_FRAGMENT, ShaderInputs, ShaderInputsCount);
 		TerrainFragmentShaderCreateInfo.pName = "main";
 		
 		VkPipelineShaderStageCreateInfo EntityVertexShaderCreateInfo = { };
 		EntityVertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		EntityVertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-		EntityVertexShaderCreateInfo.module = BrShaderInput::FindShaderModuleByName(BrShaderNames::EntityVertex, ShaderInputs, ShaderInputsCount);
+		EntityVertexShaderCreateInfo.module = BMRShaderInput::FindShaderModuleByName(ENTITY_VERTEX, ShaderInputs, ShaderInputsCount);
 		EntityVertexShaderCreateInfo.pName = "main";
 		
 		VkPipelineShaderStageCreateInfo EntityFragmentShaderCreateInfo = { };
 		EntityFragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		EntityFragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		EntityFragmentShaderCreateInfo.module = BrShaderInput::FindShaderModuleByName(BrShaderNames::EntityFragment, ShaderInputs, ShaderInputsCount);
+		EntityFragmentShaderCreateInfo.module = BMRShaderInput::FindShaderModuleByName(ENTITY_FRAGMENT, ShaderInputs, ShaderInputsCount);
 		EntityFragmentShaderCreateInfo.pName = "main";
 		
 		VkPipelineShaderStageCreateInfo DeferredVertexShaderCreateInfo = { };
 		DeferredVertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		DeferredVertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-		DeferredVertexShaderCreateInfo.module = BrShaderInput::FindShaderModuleByName(BrShaderNames::DeferredVertex, ShaderInputs, ShaderInputsCount);
+		DeferredVertexShaderCreateInfo.module = BMRShaderInput::FindShaderModuleByName(DEFERRED_VERTEX, ShaderInputs, ShaderInputsCount);
 		DeferredVertexShaderCreateInfo.pName = "main";
 		
 		VkPipelineShaderStageCreateInfo DeferredFragmentShaderCreateInfo = { };
 		DeferredFragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		DeferredFragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		DeferredFragmentShaderCreateInfo.module = BrShaderInput::FindShaderModuleByName(BrShaderNames::DeferredFragment, ShaderInputs, ShaderInputsCount);
+		DeferredFragmentShaderCreateInfo.module = BMRShaderInput::FindShaderModuleByName(DEFERRED_FRAGMENT, ShaderInputs, ShaderInputsCount);
 		DeferredFragmentShaderCreateInfo.pName = "main";
 
 		const u32 TerrainShaderStagesCount = 2;
@@ -472,7 +472,7 @@ namespace Core
 
 		VkVertexInputBindingDescription TerrainVertexInputBindingDescription = { };
 		TerrainVertexInputBindingDescription.binding = 0;
-		TerrainVertexInputBindingDescription.stride = sizeof(BrTerrainVertex);
+		TerrainVertexInputBindingDescription.stride = sizeof(BMRTerrainVertex);
 		TerrainVertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
 		const u32 TerrainVertexInputBindingDescriptionCount = 1;
@@ -481,12 +481,12 @@ namespace Core
 		TerrainAttributeDescriptions[0].binding = 0;
 		TerrainAttributeDescriptions[0].location = 0;
 		TerrainAttributeDescriptions[0].format = VK_FORMAT_R32_SFLOAT;
-		TerrainAttributeDescriptions[0].offset = offsetof(Core::BrTerrainVertex, Altitude);
+		TerrainAttributeDescriptions[0].offset = offsetof(BMRTerrainVertex, Altitude);
 
 		// How the data for a single vertex (including info such as position, color, texture coords, normals, etc) is as a whole
 		VkVertexInputBindingDescription EntityInputBindingDescription = { };
 		EntityInputBindingDescription.binding = 0;									// Can bind multiple streams of data, this defines which one
-		EntityInputBindingDescription.stride = sizeof(Core::BrEntityVertex);						// Size of a single vertex object
+		EntityInputBindingDescription.stride = sizeof(BMREntityVertex);						// Size of a single vertex object
 		EntityInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;		// How to move between data after each vertex.
 		// VK_VERTEX_INPUT_RATE_INDEX		: Move on to the next vertex
 		// VK_VERTEX_INPUT_RATE_INSTANCE	: Move to a vertex for the next instance
@@ -499,25 +499,25 @@ namespace Core
 		EntityAttributeDescriptions[0].binding = 0;							// Which binding the data is at (should be same as above)
 		EntityAttributeDescriptions[0].location = 0;							// Location in shader where data will be read from
 		EntityAttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;	// Format the data will take (also helps define size of data)
-		EntityAttributeDescriptions[0].offset = offsetof(Core::BrEntityVertex, Position);		// Where this attribute is defined in the data for a single vertex
+		EntityAttributeDescriptions[0].offset = offsetof(BMREntityVertex, Position);		// Where this attribute is defined in the data for a single vertex
 
 		// Color Attribute
 		EntityAttributeDescriptions[1].binding = 0;
 		EntityAttributeDescriptions[1].location = 1;
 		EntityAttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-		EntityAttributeDescriptions[1].offset = offsetof(Core::BrEntityVertex, Color);
+		EntityAttributeDescriptions[1].offset = offsetof(BMREntityVertex, Color);
 
 		// Texture Attribute
 		EntityAttributeDescriptions[2].binding = 0;
 		EntityAttributeDescriptions[2].location = 2;
 		EntityAttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-		EntityAttributeDescriptions[2].offset = offsetof(Core::BrEntityVertex, TextureCoords);
+		EntityAttributeDescriptions[2].offset = offsetof(BMREntityVertex, TextureCoords);
 
 		// Normal Attribute
 		EntityAttributeDescriptions[3].binding = 0;
 		EntityAttributeDescriptions[3].location = 3;
 		EntityAttributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
-		EntityAttributeDescriptions[3].offset = offsetof(Core::BrEntityVertex, Normal);
+		EntityAttributeDescriptions[3].offset = offsetof(BMREntityVertex, Normal);
 
 		VkPipelineVertexInputStateCreateInfo TerrainVertexInputCreateInfo = { };
 		TerrainVertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -669,7 +669,7 @@ namespace Core
 		}
 	}
 
-	void BrMainRenderPass::CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 ImagesCount, VkExtent2D SwapExtent,
+	void BMRMainRenderPass::CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 ImagesCount, VkExtent2D SwapExtent,
 		VkFormat DepthFormat, VkFormat ColorFormat)
 	{
 		for (u32 i = 0; i < ImagesCount; ++i)
@@ -689,12 +689,12 @@ namespace Core
 		}
 	}
 
-	void BrMainRenderPass::CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
+	void BMRMainRenderPass::CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
 		u32 ImagesCount)
 	{
-		const VkDeviceSize VpBufferSize = sizeof(BrUboViewProjection);
-		const VkDeviceSize LightBufferSize = sizeof(BrLightBuffer);
-		const VkDeviceSize MaterialBufferSize = sizeof(BrMaterial);
+		const VkDeviceSize VpBufferSize = sizeof(BMRUboViewProjection);
+		const VkDeviceSize LightBufferSize = sizeof(BMRLightBuffer);
+		const VkDeviceSize MaterialBufferSize = sizeof(BMRMaterial);
 
 		//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
 		//const VkDeviceSize AlignedAmbientLightSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(AmbientLightBufferSize);
@@ -719,7 +719,7 @@ namespace Core
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	}
 
-	void BrMainRenderPass::CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount)
+	void BMRMainRenderPass::CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount)
 	{
 		VkDescriptorSetLayout* SetLayouts = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
 		VkDescriptorSetLayout* TerrainLayouts = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
@@ -744,12 +744,12 @@ namespace Core
 			VkDescriptorBufferInfo VpBufferInfo = { };
 			VpBufferInfo.buffer = VpUniformBuffers[i].Buffer;
 			VpBufferInfo.offset = 0;
-			VpBufferInfo.range = sizeof(BrUboViewProjection);
+			VpBufferInfo.range = sizeof(BMRUboViewProjection);
 
 			VkDescriptorBufferInfo LightBufferInfo = { };
 			LightBufferInfo.buffer = LightBuffers[i].Buffer;
 			LightBufferInfo.offset = 0;
-			LightBufferInfo.range = sizeof(BrLightBuffer);
+			LightBufferInfo.range = sizeof(BMRLightBuffer);
 
 			VkWriteDescriptorSet VpSetWrite = { };
 			VpSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -812,7 +812,7 @@ namespace Core
 		VkDescriptorBufferInfo MaterialBufferInfo = { };
 		MaterialBufferInfo.buffer = MaterialBuffer.Buffer;
 		MaterialBufferInfo.offset = 0;
-		MaterialBufferInfo.range = sizeof(BrMaterial);
+		MaterialBufferInfo.range = sizeof(BMRMaterial);
 
 		VkWriteDescriptorSet MaterialSetWrite = { };
 		MaterialSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -825,8 +825,7 @@ namespace Core
 
 		vkUpdateDescriptorSets(LogicalDevice, 1, &MaterialSetWrite, 0, nullptr);
 	}
-
-	VkShaderModule BrShaderInput::FindShaderModuleByName(Core::ShaderName Name, BrShaderInput* ShaderInputs, u32 ShaderInputsCount)
+	VkShaderModule BMRShaderInput::FindShaderModuleByName(BMRShaderName Name, BMRShaderInput* ShaderInputs, u32 ShaderInputsCount)
 	{
 		for (u32 i = 0; i < ShaderInputsCount; ++i)
 		{

@@ -8,7 +8,7 @@
 
 namespace Core::VulkanMemoryManagementSystem
 {
-	struct BrMemorySourceDevice
+	struct BMRMemorySourceDevice
 	{
 		VkPhysicalDevice PhysicalDevice = nullptr;
 		VkDevice LogicalDevice = nullptr;
@@ -16,7 +16,7 @@ namespace Core::VulkanMemoryManagementSystem
 		VkQueue TransferQueue = nullptr;
 	};
 
-	void Init(BrMemorySourceDevice Device);
+	void Init(BMRMemorySourceDevice Device);
 	void Deinit();
 
 	VkDeviceSize CalculateBufferAlignedSize(VkDeviceSize BufferSize);
@@ -26,12 +26,12 @@ namespace Core::VulkanMemoryManagementSystem
 	void AllocateSets(VkDescriptorPool Pool, VkDescriptorSetLayout* Layouts,
 		u32 DescriptorSetCount, VkDescriptorSet* OutSets);
 
-	BrImageBuffer CreateImageBuffer(VkImageCreateInfo* pCreateInfo);
-	void DestroyImageBuffer(BrImageBuffer Image);
+	BMRImageBuffer CreateImageBuffer(VkImageCreateInfo* pCreateInfo);
+	void DestroyImageBuffer(BMRImageBuffer Image);
 
-	BrGPUBuffer CreateBuffer(VkDeviceSize BufferSize, VkBufferUsageFlags Usage,
+	BMRGPUBuffer CreateBuffer(VkDeviceSize BufferSize, VkBufferUsageFlags Usage,
 		VkMemoryPropertyFlags Properties);
-	void DestroyBuffer(BrGPUBuffer Buffer);
+	void DestroyBuffer(BMRGPUBuffer Buffer);
 
 	void CopyDataToMemory(VkDeviceMemory Memory, VkDeviceSize Offset, VkDeviceSize Size, const void* Data);
 	void CopyDataToBuffer(VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Size, const void* Data);
