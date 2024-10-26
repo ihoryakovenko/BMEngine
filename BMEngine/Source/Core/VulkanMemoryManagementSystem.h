@@ -6,7 +6,7 @@
 #include "VulkanCoreTypes.h"
 #include "Util/EngineTypes.h"
 
-namespace Core::VulkanMemoryManagementSystem
+namespace BMR::VulkanMemoryManagementSystem
 {
 	struct BMRMemorySourceDevice
 	{

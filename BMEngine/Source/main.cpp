@@ -44,11 +44,12 @@ u32 ContainerMaterialIndex;
 u32 BlendWindowMaterial;
 u32 GrassMaterial;
 
-BMRTerrainVertex TerrainVerticesData[NumRows][NumCols];
+BMR::BMRTerrainVertex TerrainVerticesData[NumRows][NumCols];
 
-std::vector<BMRDrawEntity> DrawEntities;
-BMRShaderCodeDescription ShaderCodeDescriptions[SHADERS_COUNT];
-std::vector<std::vector<char>> ShaderCodes(SHADERS_COUNT);
+std::vector<BMR::BMRDrawEntity> DrawEntities;
+BMR::BMRConfig Config;
+std::vector<std::vector<char>> ShaderCodes(BMR::BMRShaderNames::ShaderNamesCount); // UB?
+BMR::BMRDrawSkyBoxEntity SkyBox;
 
 void GenerateTerrain()
 {
@@ -107,21 +108,21 @@ void GenerateTerrain()
 	}
 }
 
-BMRTerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
+BMR::BMRTerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
 u32 TerrainVerticesCount = NumRows * NumCols;
 
 struct TestMesh
 {
-	std::vector<BMREntityVertex> vertices;
+	std::vector<BMR::BMREntityVertex> vertices;
 	std::vector<u32> indices;
 	int MaterialIndex;
 };
 
 namespace std
 {
-	template<> struct hash<BMREntityVertex>
+	template<> struct hash<BMR::BMREntityVertex>
 	{
-		size_t operator()(BMREntityVertex const& vertex) const
+		size_t operator()(BMR::BMREntityVertex const& vertex) const
 		{
 			size_t hashPosition = std::hash<glm::vec3>()(vertex.Position);
 			size_t hashColor = std::hash<glm::vec3>()(vertex.Color);
@@ -140,7 +141,7 @@ namespace std
 
 struct VertexEqual
 {
-	bool operator()(const BMREntityVertex& lhs, const BMREntityVertex& rhs) const
+	bool operator()(const BMR::BMREntityVertex& lhs, const BMR::BMREntityVertex& rhs) const
 	{
 		return lhs.Position == rhs.Position && lhs.Color == rhs.Color && lhs.TextureCoords == rhs.TextureCoords;
 	}
@@ -167,14 +168,14 @@ u32 AddTexture(const char* DiffuseTexturePath)
 		assert(false);
 	}
 
-	BMRTextureArrayInfo Info;
+	BMR::BMRTextureArrayInfo Info;
 	Info.Width = Width;
 	Info.Height = Height;
 	Info.Format = STBI_rgb_alpha;
 	Info.LayersCount = 1;
 	Info.Data = ImageData;
 
-	return BMRLoadTexture(Info);
+	return BMR::LoadTexture(Info);
 }
 
 void WindowCloseCallback(GLFWwindow* Window)
@@ -279,13 +280,13 @@ TestMesh CreateCubeMesh(const char* Modelpath, int materialIndex)
 		assert(false);
 	}
 
-	std::unordered_map<BMREntityVertex, u32, std::hash<BMREntityVertex>, VertexEqual> uniqueVertices{ };
+	std::unordered_map<BMR::BMREntityVertex, u32, std::hash<BMR::BMREntityVertex>, VertexEqual> uniqueVertices{ };
 
 	for (const auto& Shape : Shapes)
 	{
 		for (const auto& index : Shape.mesh.indices)
 		{
-			BMREntityVertex vertex{ };
+			BMR::BMREntityVertex vertex{ };
 
 			vertex.Position =
 			{
@@ -366,11 +367,11 @@ void LoadDrawEntities()
 	BlendWindowIndex = AddTexture(BlendWindow);
 	GrassTextureIndex = AddTexture(Grass);
 
-	TestMaterialIndex = BMRLoadMaterial(TestTextureIndex, ContainerSpecularTextureIndex);
-	WhiteMaterialIndex = BMRLoadMaterial(WhiteTextureIndex, WhiteTextureIndex);
-	ContainerMaterialIndex = BMRLoadMaterial(ContainerTextureIndex, ContainerSpecularTextureIndex);
-	BlendWindowMaterial = BMRLoadMaterial(BlendWindowIndex, BlendWindowIndex);
-	GrassMaterial = BMRLoadMaterial(GrassTextureIndex, GrassTextureIndex);
+	TestMaterialIndex = BMR::LoadMaterial(TestTextureIndex, ContainerSpecularTextureIndex);
+	WhiteMaterialIndex = BMR::LoadMaterial(WhiteTextureIndex, WhiteTextureIndex);
+	ContainerMaterialIndex = BMR::LoadMaterial(ContainerTextureIndex, ContainerSpecularTextureIndex);
+	BlendWindowMaterial = BMR::LoadMaterial(BlendWindowIndex, BlendWindowIndex);
+	GrassMaterial = BMR::LoadMaterial(GrassTextureIndex, GrassTextureIndex);
 
 	for (size_t i = 0; i < Materials.size(); i++)
 	{
@@ -382,14 +383,14 @@ void LoadDrawEntities()
 			std::string FileName = "./Resources/Textures/" + Material.diffuse_texname.substr(Idx + 1);
 
 			const u32 NewTextureIndex = AddTexture(FileName.c_str());
-			MaterialToTexture[i] = BMRLoadMaterial(NewTextureIndex, NewTextureIndex);
+			MaterialToTexture[i] = BMR::LoadMaterial(NewTextureIndex, NewTextureIndex);
 		}
 	}
 
 	std::vector<TestMesh> ModelMeshes;
 	ModelMeshes.reserve(Shapes.size());
 
-	std::unordered_map<BMREntityVertex, u32, std::hash<BMREntityVertex>, VertexEqual> uniqueVertices{ };
+	std::unordered_map<BMR::BMREntityVertex, u32, std::hash<BMR::BMREntityVertex>, VertexEqual> uniqueVertices{ };
 
 	for (const auto& Shape : Shapes)
 	{
@@ -397,7 +398,7 @@ void LoadDrawEntities()
 
 		for (const auto& index : Shape.mesh.indices)
 		{
-			BMREntityVertex vertex{ };
+			BMR::BMREntityVertex vertex{ };
 
 			vertex.Position =
 			{
@@ -443,9 +444,7 @@ void LoadDrawEntities()
 
 		ModelMeshes.push_back(Tm);
 	}
-
 	
-	ModelMeshes.emplace_back(CreateCubeMesh(SkyBoxObj, ContainerMaterialIndex));
 	ModelMeshes.emplace_back(CreateCubeMesh(CubeObj, GrassMaterial));
 	ModelMeshes.emplace_back(CreateCubeMesh(CubeObj, WhiteMaterialIndex));
 	ModelMeshes.emplace_back(CreateCubeMesh(CubeObj, WhiteMaterialIndex));
@@ -455,10 +454,10 @@ void LoadDrawEntities()
 
 	for (int i = 0; i < ModelMeshes.size(); ++i)
 	{
-		DrawEntities[i].VertexOffset = BMRLoadVertices(ModelMeshes[i].vertices.data(),
-			sizeof(BMREntityVertex), ModelMeshes[i].vertices.size());
+		DrawEntities[i].VertexOffset = LoadVertices(ModelMeshes[i].vertices.data(),
+			sizeof(BMR::BMREntityVertex), ModelMeshes[i].vertices.size());
 
-		DrawEntities[i].IndexOffset = BMRLoadIndices(ModelMeshes[i].indices.data(),
+		DrawEntities[i].IndexOffset = BMR::LoadIndices(ModelMeshes[i].indices.data(),
 			ModelMeshes[i].indices.size());
 
 		DrawEntities[i].IndicesCount = ModelMeshes[i].indices.size();
@@ -466,16 +465,22 @@ void LoadDrawEntities()
 		DrawEntities[i].MaterialIndex = ModelMeshes[i].MaterialIndex;
 	}
 
-	
+	auto SkyBoxMesh = CreateCubeMesh(SkyBoxObj, ContainerMaterialIndex);
+
+	SkyBox.VertexOffset = LoadVertices(SkyBoxMesh.vertices.data(),
+		sizeof(BMR::BMREntityVertex), SkyBoxMesh.vertices.size());
+	SkyBox.IndexOffset = BMR::LoadIndices(SkyBoxMesh.indices.data(), SkyBoxMesh.indices.size());
+	SkyBox.IndicesCount = SkyBoxMesh.indices.size();
+	SkyBox.MaterialIndex = SkyBoxMesh.MaterialIndex;
 
 	{
-		glm::vec3 CubePos(-5.0f, 0.0f, 10.0f);
+		glm::vec3 CubePos(0.0f, 0.0f, 0.0f);
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, CubePos);
 		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		model = glm::scale(model, glm::vec3(10.5f));
+		model = glm::scale(model, glm::vec3(500.0f));
 
-		DrawEntities[ModelMeshes.size() - 5].Model = model;
+		SkyBox.Model = model;
 	}
 
 	{
@@ -521,34 +526,53 @@ void LoadDrawEntities()
 void LoadShaders()
 {
 	std::vector<const char*> ShaderPaths;
-	ShaderPaths.reserve(SHADERS_COUNT);
-	std::vector<BMRShaderName> NameToPath;
-	NameToPath.reserve(SHADERS_COUNT);
+	std::vector<BMR::BMRPipelineHandles> HandleToPath;
+	std::vector<BMR::BMRShaderStages> StageToStages;
+
+	ShaderPaths.reserve(BMR::BMRShaderNames::ShaderNamesCount);
+	HandleToPath.reserve(BMR::BMRPipelineHandles::PipelineHandlesCount);
+	StageToStages.reserve(BMR::BMRShaderStages::ShaderStagesCount);
 
 	ShaderPaths.push_back("./Resources/Shaders/TerrainGenerator_vert.spv");
-	NameToPath.push_back(TERRAIN_VERTEX);
+	HandleToPath.push_back(BMR::BMRPipelineHandles::Terrain);
+	StageToStages.push_back(BMR::BMRShaderStages::Vertex);
 
 	ShaderPaths.push_back("./Resources/Shaders/TerrainGenerator_frag.spv");
-	NameToPath.push_back(TERRAIN_FRAGMENT);
+	HandleToPath.push_back(BMR::BMRPipelineHandles::Terrain);
+	StageToStages.push_back(BMR::BMRShaderStages::Fragment);
 
 	ShaderPaths.push_back("./Resources/Shaders/vert.spv");
-	NameToPath.push_back(ENTITY_VERTEX);
+	HandleToPath.push_back(BMR::BMRPipelineHandles::Entity);
+	StageToStages.push_back(BMR::BMRShaderStages::Vertex);
 
 	ShaderPaths.push_back("./Resources/Shaders/frag.spv");
-	NameToPath.push_back(ENTITY_FRAGMENT);
+	HandleToPath.push_back(BMR::BMRPipelineHandles::Entity);
+	StageToStages.push_back(BMR::BMRShaderStages::Fragment);
 
 	ShaderPaths.push_back("./Resources/Shaders/second_vert.spv");
-	NameToPath.push_back(DEFERRED_VERTEX);
+	HandleToPath.push_back(BMR::BMRPipelineHandles::Deferred);
+	StageToStages.push_back(BMR::BMRShaderStages::Vertex);
 
 	ShaderPaths.push_back("./Resources/Shaders/second_frag.spv");
-	NameToPath.push_back(DEFERRED_FRAGMENT);
+	HandleToPath.push_back(BMR::BMRPipelineHandles::Deferred);
+	StageToStages.push_back(BMR::BMRShaderStages::Fragment);
 
-	for (u32 i = 0; i < SHADERS_COUNT; ++i)
+	ShaderPaths.push_back("./Resources/Shaders/SkyBox_vert.spv");
+	HandleToPath.push_back(BMR::BMRPipelineHandles::SkyBox);
+	StageToStages.push_back(BMR::BMRShaderStages::Vertex);
+
+	ShaderPaths.push_back("./Resources/Shaders/SkyBox_frag.spv");
+	HandleToPath.push_back(BMR::BMRPipelineHandles::SkyBox);
+	StageToStages.push_back(BMR::BMRShaderStages::Fragment);
+
+
+	for (u32 i = 0; i < BMR::BMRShaderNames::ShaderNamesCount; ++i)
 	{
 		Util::OpenAndReadFileFull(ShaderPaths[i], ShaderCodes[i], "rb");
-		ShaderCodeDescriptions[i].Code = reinterpret_cast<u32*>(ShaderCodes[i].data());
-		ShaderCodeDescriptions[i].CodeSize = ShaderCodes[i].size();
-		ShaderCodeDescriptions[i].Name = NameToPath[i];
+		Config.RenderShaders[i].Code = reinterpret_cast<u32*>(ShaderCodes[i].data());
+		Config.RenderShaders[i].CodeSize = ShaderCodes[i].size();
+		Config.RenderShaders[i].Handle = HandleToPath[i];
+		Config.RenderShaders[i].Stage = StageToStages[i];
 	}
 }
 
@@ -602,30 +626,27 @@ int main()
 		}
 	}
 
-
-	BMRConfig Config;
-	Config.RenderShaders = ShaderCodeDescriptions;
-	Config.ShadersCount = SHADERS_COUNT;
 	Config.MaxTextures = 90;
 
-	BMRInit(Window, Config);
+	BMR::Init(Window, Config);
 	LoadDrawEntities();
 
-	BMRDrawScene Scene;
+	BMR::BMRDrawScene Scene;
+	Scene.SkyBox = SkyBox;
+	Scene.DrawSkyBox = true;
 
 	Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-		static_cast<f32>(1600) / static_cast<f32>(800), 0.1f, 100.0f);
+		static_cast<f32>(1600) / static_cast<f32>(800), 0.1f, 1000.0f);
 	Scene.ViewProjection.Projection[1][1] *= -1;
 	Scene.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	
-	BMRDrawTerrainEntity TestDrawTerrainEntity;
-	TestDrawTerrainEntity.VertexOffset = BMRLoadVertices(&TerrainVerticesData[0][0],
-		sizeof(BMRTerrainVertex), NumRows * NumCols);
-
-	TestDrawTerrainEntity.IndexOffset = BMRLoadIndices(indices.data(), indices.size());
-
+	BMR::BMRDrawTerrainEntity TestDrawTerrainEntity;
+	TestDrawTerrainEntity.VertexOffset = LoadVertices(&TerrainVerticesData[0][0],
+		sizeof(BMR::BMRTerrainVertex), NumRows * NumCols);
+	TestDrawTerrainEntity.IndexOffset = BMR::LoadIndices(indices.data(), indices.size());
 	TestDrawTerrainEntity.IndicesCount = indices.size();
+	TestDrawTerrainEntity.MaterialIndex = TestMaterialIndex;
 
 	Scene.DrawTerrainEntities = &TestDrawTerrainEntity;
 	Scene.DrawTerrainEntitiesCount = 1;
@@ -643,7 +664,7 @@ int main()
 
 	Memory::BmMemoryManagementSystem::FrameDealloc();
 
-	BMRLightBuffer TestData;
+	BMR::BMRLightBuffer TestData;
 	TestData.PointLight.Position = glm::vec4(0.0f, 0.0f, 10.0f, 1.0f);
 	TestData.PointLight.Ambient = glm::vec3(0.1f, 0.1f, 0.1f);
 	TestData.PointLight.Diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
@@ -667,9 +688,9 @@ int main()
 	TestData.SpotLight.CutOff = glm::cos(glm::radians(12.5f));
 	TestData.SpotLight.OuterCutOff = glm::cos(glm::radians(17.5f));
 
-	BMRMaterial Mat;
+	BMR::BMRMaterial Mat;
 	Mat.Shininess = 32.f;
-	BMRUpdateMaterialBuffer(Mat);
+	BMR::UpdateMaterialBuffer(Mat);
 
 	while (!glfwWindowShouldClose(Window) && !Close)
 	{
@@ -697,7 +718,7 @@ int main()
 		TestData.SpotLight.Direction = MainCamera.CameraFront;
 		TestData.SpotLight.Position = MainCamera.CameraPosition;
 
-		BMRUpdateLightBuffer(TestData);
+		UpdateLightBuffer(TestData);
 
 		// TODO: Need to sort objects by distance to camera
 		int LastOpaqueIndex = Scene.DrawEntitiesCount - 1;
@@ -720,12 +741,12 @@ int main()
 			}
 		}
 
-		BMRDraw(Scene);
+		Draw(Scene);
 
 		Memory::BmMemoryManagementSystem::FrameDealloc();
 	}
 	
-	BMRDeInit();
+	BMR::DeInit();
 
 
 	glfwDestroyWindow(Window);

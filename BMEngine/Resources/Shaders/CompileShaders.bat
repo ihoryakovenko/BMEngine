@@ -16,4 +16,7 @@ set SHADER_PATH=%~dp0
 
 %VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%TerrainGenerator_vert.spv -V %SHADER_PATH%TerrainGenerator.vert.glsl
 %VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%TerrainGenerator_frag.spv -V %SHADER_PATH%TerrainGenerator.frag.glsl
+
+%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%SkyBox_vert.spv -V %SHADER_PATH%SkyBox.vert.glsl
+%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_PATH%SkyBox_frag.spv -V %SHADER_PATH%SkyBox.frag.glsl
 pause

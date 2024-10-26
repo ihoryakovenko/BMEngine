@@ -6,7 +6,7 @@
 
 #include "Memory/MemoryManagmentSystem.h"
 
-namespace Core
+namespace BMR
 {
 	namespace SubpassIndex
 	{
@@ -18,6 +18,12 @@ namespace Core
 			Count
 		};
 	}
+
+	struct BMRSPipelineShaderInfo
+	{
+		VkPipelineShaderStageCreateInfo Infos[BMRShaderStages::ShaderStagesCount];
+		u32 InfosCounter = 0;
+	};
 
 	void BMRMainRenderPass::ClearResources(VkDevice LogicalDevice, u32 ImagesCount)
 	{
@@ -38,7 +44,7 @@ namespace Core
 			vkDestroyDescriptorSetLayout(LogicalDevice, DescriptorLayouts[i], nullptr);
 		}
 
-		for (u32 i = 0; i < PipelineHandles::Count; ++i)
+		for (u32 i = 0; i < BMRPipelineHandles::PipelineHandlesCount; ++i)
 		{
 			vkDestroyPipelineLayout(LogicalDevice, PipelineLayouts[i], nullptr);
 			vkDestroyPipeline(LogicalDevice, Pipelines[i], nullptr);
@@ -182,89 +188,15 @@ namespace Core
 
 	void BMRMainRenderPass::SetupPushConstants()
 	{
-		PushConstants[PushConstantHandles::Entity].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-		PushConstants[PushConstantHandles::Entity].offset = 0;
+		PushConstants[PushConstantHandles::Model].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		PushConstants[PushConstantHandles::Model].offset = 0;
 		// Todo: check constant and model size?
-		PushConstants[PushConstantHandles::Entity].size = sizeof(BMRModel);
+		PushConstants[PushConstantHandles::Model].size = sizeof(BMRModel);
 	}
 
-	void BMRMainRenderPass::CreateSamplerSetLayout(VkDevice LogicalDevice)
+	void BMRMainRenderPass::CreateDescriptorLayouts(VkDevice LogicalDevice)
 	{
-		const u32 EntitySamplerLayoutBindingCount = 2;
-		VkDescriptorSetLayoutBinding EntitySamplerLayoutBinding[EntitySamplerLayoutBindingCount];
-		EntitySamplerLayoutBinding[0].binding = 0;
-		EntitySamplerLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		EntitySamplerLayoutBinding[0].descriptorCount = 1;
-		EntitySamplerLayoutBinding[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		EntitySamplerLayoutBinding[0].pImmutableSamplers = nullptr;
-
-		EntitySamplerLayoutBinding[1] = EntitySamplerLayoutBinding[0];
-		EntitySamplerLayoutBinding[1].binding = 1;
-
-
-		VkDescriptorSetLayoutCreateInfo EntityTextureLayoutCreateInfo = { };
-		EntityTextureLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		EntityTextureLayoutCreateInfo.bindingCount = EntitySamplerLayoutBindingCount;
-		EntityTextureLayoutCreateInfo.pBindings = EntitySamplerLayoutBinding;
-
-		VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &EntityTextureLayoutCreateInfo,
-			nullptr, &DescriptorLayouts[DescriptorLayoutHandles::EntitySampler]);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
-			assert(false);
-		}
-
-		VkDescriptorSetLayoutBinding TerrainSamplerLayoutBinding = { };
-		TerrainSamplerLayoutBinding.binding = 0;
-		TerrainSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		TerrainSamplerLayoutBinding.descriptorCount = 1;
-		TerrainSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		TerrainSamplerLayoutBinding.pImmutableSamplers = nullptr;
-
-		VkDescriptorSetLayoutCreateInfo TerrainTextureLayoutCreateInfo = { };
-		TerrainTextureLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		TerrainTextureLayoutCreateInfo.bindingCount = 1;
-		TerrainTextureLayoutCreateInfo.pBindings = &TerrainSamplerLayoutBinding;
-
-		Result = vkCreateDescriptorSetLayout(LogicalDevice, &TerrainTextureLayoutCreateInfo,
-			nullptr, &DescriptorLayouts[DescriptorLayoutHandles::TerrainSampler]);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
-			assert(false);
-		}
-	}
-
-	void BMRMainRenderPass::CreateTerrainSetLayout(VkDevice LogicalDevice)
-	{
-		VkDescriptorSetLayoutBinding VpLayoutBinding = { };
-		VpLayoutBinding.binding = 0;											// Binding point in shader (designated by binding number in shader)
-		VpLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;	// Type of descriptor (uniform, dynamic uniform, image sampler, etc)
-		VpLayoutBinding.descriptorCount = 1;									// Number of descriptors for binding
-		VpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;				// Shader stage to bind to
-		VpLayoutBinding.pImmutableSamplers = nullptr;							// For Texture: Can make sampler data unchangeable (immutable) by specifying in layout
-
-		const u32 BindingCount = 1;
-		VkDescriptorSetLayoutBinding Bindings[BindingCount] = { VpLayoutBinding };
-
-		// Create Descriptor Set Layout with given bindings
-		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
-		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = BindingCount;					// Number of binding infos
-		LayoutCreateInfo.pBindings = Bindings;		// Array of binding infos
-
-		VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo,
-			nullptr, &DescriptorLayouts[DescriptorLayoutHandles::TerrainVp]);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
-			assert(false);
-		}
-	}
-
-	void BMRMainRenderPass::CreateEntitySetLayout(VkDevice LogicalDevice)
-	{
+		const u32 VpLayoutBindingBindingCount = 1;
 		VkDescriptorSetLayoutBinding VpLayoutBinding = { };
 		VpLayoutBinding.binding = 0;
 		VpLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -272,21 +204,22 @@ namespace Core
 		VpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 		VpLayoutBinding.pImmutableSamplers = nullptr; // For Texture: Can make sampler data unchangeable (immutable) by specifying in layout
 
-		const u32 BindingCount = 1;
+		const u32 EntitySamplerLayoutBindingCount = 2;
+		VkDescriptorSetLayoutBinding EntitySamplerLayoutBinding[EntitySamplerLayoutBindingCount];
+		EntitySamplerLayoutBinding[0].binding = 0;
+		EntitySamplerLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		EntitySamplerLayoutBinding[0].descriptorCount = 1;
+		EntitySamplerLayoutBinding[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		EntitySamplerLayoutBinding[0].pImmutableSamplers = nullptr;
+		EntitySamplerLayoutBinding[1] = EntitySamplerLayoutBinding[0];
+		EntitySamplerLayoutBinding[1].binding = 1;
 
-		// Create Descriptor Set Layout with given bindings
-		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
-		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = BindingCount;					// Number of binding infos
-		LayoutCreateInfo.pBindings = &VpLayoutBinding;		// Array of binding infos
-
-		VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo,
-			nullptr, &DescriptorLayouts[DescriptorLayoutHandles::EntityVp]);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
-			assert(false);
-		}
+		VkDescriptorSetLayoutBinding TerrainSamplerLayoutBinding = { };
+		TerrainSamplerLayoutBinding.binding = 0;
+		TerrainSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		TerrainSamplerLayoutBinding.descriptorCount = 1;
+		TerrainSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		TerrainSamplerLayoutBinding.pImmutableSamplers = nullptr;
 
 		const u32 LightBindingsCount = 2;
 		VkDescriptorSetLayoutBinding LightBindings[LightBindingsCount];
@@ -296,75 +229,69 @@ namespace Core
 		LightBindings[0].descriptorCount = 1;
 		LightBindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		LightBindings[0].pImmutableSamplers = nullptr;
-
 		LightBindings[1] = LightBindings[0];
 		LightBindings[1].binding = 1;
 
-		LayoutCreateInfo.bindingCount = LightBindingsCount;
-		LayoutCreateInfo.pBindings = LightBindings;
+		const u32 MaterialBindingsCount = 1;
+		VkDescriptorSetLayoutBinding MaterialLayoutBinding = { };
+		MaterialLayoutBinding.binding = 0;
+		MaterialLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		MaterialLayoutBinding.descriptorCount = 1;
+		MaterialLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		MaterialLayoutBinding.pImmutableSamplers = nullptr;
 
-		Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo,
-			nullptr, &DescriptorLayouts[DescriptorLayoutHandles::Light]);
-		if (Result != VK_SUCCESS)
+		const u32 DeferredInputBindingsCount = 2;
+		VkDescriptorSetLayoutBinding DeferredInputBindings[DeferredInputBindingsCount];
+		DeferredInputBindings[0].binding = 0;
+		DeferredInputBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		DeferredInputBindings[0].descriptorCount = 1;
+		DeferredInputBindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		DeferredInputBindings[1] = DeferredInputBindings[0];
+		DeferredInputBindings[1].binding = 1;
+
+		VkDescriptorSetLayoutBinding SkyBoxSamplerLayoutBinding = { };
+		SkyBoxSamplerLayoutBinding.binding = 0;
+		SkyBoxSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		SkyBoxSamplerLayoutBinding.descriptorCount = 1;
+		SkyBoxSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		SkyBoxSamplerLayoutBinding.pImmutableSamplers = nullptr;
+
+		u32 BindingCountTable[DescriptorLayoutHandles::Count];
+		BindingCountTable[DescriptorLayoutHandles::TerrainVp] = VpLayoutBindingBindingCount;
+		BindingCountTable[DescriptorLayoutHandles::TerrainSampler] = 1;
+		BindingCountTable[DescriptorLayoutHandles::EntityVp] = VpLayoutBindingBindingCount;
+		BindingCountTable[DescriptorLayoutHandles::EntitySampler] = EntitySamplerLayoutBindingCount;
+		BindingCountTable[DescriptorLayoutHandles::Light] = LightBindingsCount;
+		BindingCountTable[DescriptorLayoutHandles::Material] = MaterialBindingsCount;
+		BindingCountTable[DescriptorLayoutHandles::DeferredInput] = DeferredInputBindingsCount;
+		BindingCountTable[DescriptorLayoutHandles::SkyBoxVp] = VpLayoutBindingBindingCount;
+		BindingCountTable[DescriptorLayoutHandles::SkyBoxSampler] = 1;
+
+		const VkDescriptorSetLayoutBinding* BindingsTable[DescriptorLayoutHandles::Count];
+		BindingsTable[DescriptorLayoutHandles::TerrainVp] = &VpLayoutBinding;
+		BindingsTable[DescriptorLayoutHandles::TerrainSampler] = &TerrainSamplerLayoutBinding;
+		BindingsTable[DescriptorLayoutHandles::EntityVp] = &VpLayoutBinding;
+		BindingsTable[DescriptorLayoutHandles::EntitySampler] = EntitySamplerLayoutBinding;
+		BindingsTable[DescriptorLayoutHandles::Light] = LightBindings;
+		BindingsTable[DescriptorLayoutHandles::Material] = &MaterialLayoutBinding;
+		BindingsTable[DescriptorLayoutHandles::DeferredInput] = DeferredInputBindings;
+		BindingsTable[DescriptorLayoutHandles::SkyBoxVp] = &VpLayoutBinding;
+		BindingsTable[DescriptorLayoutHandles::SkyBoxSampler] = &SkyBoxSamplerLayoutBinding;
+
+		VkDescriptorSetLayoutCreateInfo LayoutCreateInfos[DescriptorLayoutHandles::Count];
+		for (u32 i = 0; i < DescriptorLayoutHandles::Count; ++i)
 		{
-			Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
-			assert(false);
-		}
+			LayoutCreateInfos[i] = { };
+			LayoutCreateInfos[i].sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			LayoutCreateInfos[i].bindingCount = BindingCountTable[i];
+			LayoutCreateInfos[i].pBindings = BindingsTable[i];
 
-		VkDescriptorSetLayoutBinding materialLayoutBinding = { };
-		materialLayoutBinding.binding = 0;
-		materialLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		materialLayoutBinding.descriptorCount = 1;
-		materialLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		materialLayoutBinding.pImmutableSamplers = nullptr;
-
-		LayoutCreateInfo.bindingCount = 1;
-		LayoutCreateInfo.pBindings = &materialLayoutBinding;
-
-		Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo,
-			nullptr, &DescriptorLayouts[DescriptorLayoutHandles::Material]);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
-			assert(false);
-		}
-	}
-
-	void BMRMainRenderPass::CreateDeferredSetLayout(VkDevice LogicalDevice)
-	{
-		//Create input attachment image descriptor set layout
-		// Colour Input Binding
-		VkDescriptorSetLayoutBinding ColourInputLayoutBinding = { };
-		ColourInputLayoutBinding.binding = 0;
-		ColourInputLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-		ColourInputLayoutBinding.descriptorCount = 1;
-		ColourInputLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		// Depth Input Binding
-		VkDescriptorSetLayoutBinding DepthInputLayoutBinding = { };
-		DepthInputLayoutBinding.binding = 1;
-		DepthInputLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-		DepthInputLayoutBinding.descriptorCount = 1;
-		DepthInputLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		// Array of input attachment bindings
-		const u32 InputBindingsCount = 2;
-		// Todo: do not copy InputBindings
-		VkDescriptorSetLayoutBinding InputBindings[InputBindingsCount] = { ColourInputLayoutBinding, DepthInputLayoutBinding };
-
-		// Create a descriptor set layout for input attachments
-		VkDescriptorSetLayoutCreateInfo InputLayoutCreateInfo = { };
-		InputLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		InputLayoutCreateInfo.bindingCount = InputBindingsCount;
-		InputLayoutCreateInfo.pBindings = InputBindings;
-
-		// Create Descriptor Set Layout
-		const VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &InputLayoutCreateInfo,
-			nullptr, &DescriptorLayouts[DescriptorLayoutHandles::DeferredInput]);
-		if (Result != VK_SUCCESS)
-		{
-			// TODO LOG
-			assert(false);
+			const VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &(LayoutCreateInfos[i]), nullptr, &(DescriptorLayouts[i]));
+			if (Result != VK_SUCCESS)
+			{
+				Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
+				assert(false);
+			}
 		}
 	}
 
@@ -376,7 +303,7 @@ namespace Core
 			DescriptorLayouts[DescriptorLayoutHandles::TerrainSampler]
 		};
 
-		PipelineLayouts[PipelineHandles::Terrain] = CreatePipelineLayout(LogicalDevice,
+		PipelineLayouts[BMRPipelineHandles::Terrain] = CreatePipelineLayout(LogicalDevice,
 			TerrainDescriptorLayoutsCount, TerrainDescriptorLayouts, 0, nullptr);
 
 		const u32 EntityDescriptorLayoutCount = 4;
@@ -387,17 +314,24 @@ namespace Core
 			DescriptorLayouts[DescriptorLayoutHandles::Material]
 		};
 
-		PipelineLayouts[PipelineHandles::Entity] = CreatePipelineLayout(LogicalDevice,
-			EntityDescriptorLayoutCount, EntityDescriptorLayouts, 1, &PushConstants[PushConstantHandles::Entity]);
+		PipelineLayouts[BMRPipelineHandles::Entity] = CreatePipelineLayout(LogicalDevice,
+			EntityDescriptorLayoutCount, EntityDescriptorLayouts, 1, &PushConstants[PushConstantHandles::Model]);
 
-		PipelineLayouts[PipelineHandles::Deferred] = CreatePipelineLayout(LogicalDevice,
+		PipelineLayouts[BMRPipelineHandles::Deferred] = CreatePipelineLayout(LogicalDevice,
 			1, &DescriptorLayouts[DescriptorLayoutHandles::DeferredInput], 0, nullptr);
 
-		//PipelineLayouts[PipelineHandles::SkyBoxPipeline] = CreatePipelineLayout(LogicalDevice, 1,
-		//	&DescriptorLayouts[DescriptorLayoutHandles::SkyBoxVb], 0, nullptr);
+		const u32 SkyBoxDescriptorLayoutCount = 2;
+		VkDescriptorSetLayout SkyBoxDescriptorLayouts[SkyBoxDescriptorLayoutCount] = {
+			DescriptorLayouts[DescriptorLayoutHandles::SkyBoxVp],
+			DescriptorLayouts[DescriptorLayoutHandles::SkyBoxSampler],
+		};
+
+		PipelineLayouts[BMRPipelineHandles::SkyBox] = CreatePipelineLayout(LogicalDevice, SkyBoxDescriptorLayoutCount,
+			SkyBoxDescriptorLayouts, 1, &PushConstants[PushConstantHandles::Model]);
 	}
 
-	void BMRMainRenderPass::CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent, BMRShaderInput* ShaderInputs, u32 ShaderInputsCount)
+	void BMRMainRenderPass::CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent,
+		BMRPipelineShaderInput ShaderInputs[BMRShaderNames::ShaderNamesCount])
 	{
 		VkViewport Viewport;
 		VkRect2D Scissor;
@@ -419,56 +353,32 @@ namespace Core
 		ViewportStateCreateInfo.scissorCount = 1;
 		ViewportStateCreateInfo.pScissors = &Scissor;
 
-		VkPipelineShaderStageCreateInfo TerrainVertexShaderCreateInfo = { };
-		TerrainVertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		TerrainVertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-		TerrainVertexShaderCreateInfo.module = BMRShaderInput::FindShaderModuleByName(TERRAIN_VERTEX, ShaderInputs, ShaderInputsCount);
-		TerrainVertexShaderCreateInfo.pName = "main";
-		
-		VkPipelineShaderStageCreateInfo TerrainFragmentShaderCreateInfo = { };
-		TerrainFragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		TerrainFragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		TerrainFragmentShaderCreateInfo.module = BMRShaderInput::FindShaderModuleByName(TERRAIN_FRAGMENT, ShaderInputs, ShaderInputsCount);
-		TerrainFragmentShaderCreateInfo.pName = "main";
-		
-		VkPipelineShaderStageCreateInfo EntityVertexShaderCreateInfo = { };
-		EntityVertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		EntityVertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-		EntityVertexShaderCreateInfo.module = BMRShaderInput::FindShaderModuleByName(ENTITY_VERTEX, ShaderInputs, ShaderInputsCount);
-		EntityVertexShaderCreateInfo.pName = "main";
-		
-		VkPipelineShaderStageCreateInfo EntityFragmentShaderCreateInfo = { };
-		EntityFragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		EntityFragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		EntityFragmentShaderCreateInfo.module = BMRShaderInput::FindShaderModuleByName(ENTITY_FRAGMENT, ShaderInputs, ShaderInputsCount);
-		EntityFragmentShaderCreateInfo.pName = "main";
-		
-		VkPipelineShaderStageCreateInfo DeferredVertexShaderCreateInfo = { };
-		DeferredVertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		DeferredVertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-		DeferredVertexShaderCreateInfo.module = BMRShaderInput::FindShaderModuleByName(DEFERRED_VERTEX, ShaderInputs, ShaderInputsCount);
-		DeferredVertexShaderCreateInfo.pName = "main";
-		
-		VkPipelineShaderStageCreateInfo DeferredFragmentShaderCreateInfo = { };
-		DeferredFragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		DeferredFragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		DeferredFragmentShaderCreateInfo.module = BMRShaderInput::FindShaderModuleByName(DEFERRED_FRAGMENT, ShaderInputs, ShaderInputsCount);
-		DeferredFragmentShaderCreateInfo.pName = "main";
-
-		const u32 TerrainShaderStagesCount = 2;
-		VkPipelineShaderStageCreateInfo TerrainShaderStages[TerrainShaderStagesCount] = {
-			TerrainVertexShaderCreateInfo, TerrainFragmentShaderCreateInfo
+		const VkShaderStageFlagBits NamesToStagesTable[] =
+		{
+			VK_SHADER_STAGE_VERTEX_BIT,
+			VK_SHADER_STAGE_FRAGMENT_BIT,
 		};
 
-		const u32 EntityShaderStagesCount = 2;
-		VkPipelineShaderStageCreateInfo EntityShaderStages[EntityShaderStagesCount] = {
-			EntityVertexShaderCreateInfo, EntityFragmentShaderCreateInfo
-		};
+		BMRSPipelineShaderInfo ShaderInfos[BMRPipelineHandles::PipelineHandlesCount];
+		for (u32 i = 0; i < BMRShaderNames::ShaderNamesCount; ++i)
+		{
+			const BMRPipelineShaderInput& Input = ShaderInputs[i];
+			BMRSPipelineShaderInfo& Info = ShaderInfos[Input.Handle];
 
-		const u32 DeferredShaderStagesCount = 2;
-		VkPipelineShaderStageCreateInfo DeferredShaderStages[DeferredShaderStagesCount] = {
-			DeferredVertexShaderCreateInfo, DeferredFragmentShaderCreateInfo
-		};
+			Info.Infos[Info.InfosCounter] = { };
+			Info.Infos[Info.InfosCounter].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			Info.Infos[Info.InfosCounter].stage = NamesToStagesTable[Input.Stage];
+			Info.Infos[Info.InfosCounter].pName = Input.EntryPoint;
+			CreateShader(LogicalDevice, Input.Code, Input.CodeSize, Info.Infos[Info.InfosCounter].module);
+			++Info.InfosCounter;
+		}
+
+		VkVertexInputBindingDescription EntityInputBindingDescription = { };
+		EntityInputBindingDescription.binding = 0; // Can bind multiple streams of data, this defines which one
+		EntityInputBindingDescription.stride = sizeof(BMREntityVertex);
+		EntityInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX; // How to move between data after each vertex.
+		// VK_VERTEX_INPUT_RATE_INDEX		: Move on to the next vertex
+		// VK_VERTEX_INPUT_RATE_INSTANCE	: Move to a vertex for the next instance
 
 		VkVertexInputBindingDescription TerrainVertexInputBindingDescription = { };
 		TerrainVertexInputBindingDescription.binding = 0;
@@ -477,70 +387,53 @@ namespace Core
 
 		const u32 TerrainVertexInputBindingDescriptionCount = 1;
 		VkVertexInputAttributeDescription TerrainAttributeDescriptions[TerrainVertexInputBindingDescriptionCount];
-
 		TerrainAttributeDescriptions[0].binding = 0;
 		TerrainAttributeDescriptions[0].location = 0;
 		TerrainAttributeDescriptions[0].format = VK_FORMAT_R32_SFLOAT;
 		TerrainAttributeDescriptions[0].offset = offsetof(BMRTerrainVertex, Altitude);
 
-		// How the data for a single vertex (including info such as position, color, texture coords, normals, etc) is as a whole
-		VkVertexInputBindingDescription EntityInputBindingDescription = { };
-		EntityInputBindingDescription.binding = 0;									// Can bind multiple streams of data, this defines which one
-		EntityInputBindingDescription.stride = sizeof(BMREntityVertex);						// Size of a single vertex object
-		EntityInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;		// How to move between data after each vertex.
-		// VK_VERTEX_INPUT_RATE_INDEX		: Move on to the next vertex
-		// VK_VERTEX_INPUT_RATE_INSTANCE	: Move to a vertex for the next instance
-
-		// How the data for an attribute is defined within a vertex
 		const u32 EntityVertexInputBindingDescriptionCount = 4;
 		VkVertexInputAttributeDescription EntityAttributeDescriptions[EntityVertexInputBindingDescriptionCount];
-
-		// Position Attribute
-		EntityAttributeDescriptions[0].binding = 0;							// Which binding the data is at (should be same as above)
-		EntityAttributeDescriptions[0].location = 0;							// Location in shader where data will be read from
-		EntityAttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;	// Format the data will take (also helps define size of data)
-		EntityAttributeDescriptions[0].offset = offsetof(BMREntityVertex, Position);		// Where this attribute is defined in the data for a single vertex
-
-		// Color Attribute
+		EntityAttributeDescriptions[0].binding = 0;	
+		EntityAttributeDescriptions[0].location = 0;
+		EntityAttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+		EntityAttributeDescriptions[0].offset = offsetof(BMREntityVertex, Position);
 		EntityAttributeDescriptions[1].binding = 0;
 		EntityAttributeDescriptions[1].location = 1;
 		EntityAttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
 		EntityAttributeDescriptions[1].offset = offsetof(BMREntityVertex, Color);
-
-		// Texture Attribute
 		EntityAttributeDescriptions[2].binding = 0;
 		EntityAttributeDescriptions[2].location = 2;
 		EntityAttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
 		EntityAttributeDescriptions[2].offset = offsetof(BMREntityVertex, TextureCoords);
-
-		// Normal Attribute
 		EntityAttributeDescriptions[3].binding = 0;
 		EntityAttributeDescriptions[3].location = 3;
 		EntityAttributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
 		EntityAttributeDescriptions[3].offset = offsetof(BMREntityVertex, Normal);
 
-		VkPipelineVertexInputStateCreateInfo TerrainVertexInputCreateInfo = { };
-		TerrainVertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		TerrainVertexInputCreateInfo.vertexBindingDescriptionCount = 1;
-		TerrainVertexInputCreateInfo.pVertexBindingDescriptions = &TerrainVertexInputBindingDescription;
-		TerrainVertexInputCreateInfo.vertexAttributeDescriptionCount = TerrainVertexInputBindingDescriptionCount;
-		TerrainVertexInputCreateInfo.pVertexAttributeDescriptions = TerrainAttributeDescriptions;
+		u32 VertexBindingDescriptionCountTable[BMRPipelineHandles::PipelineHandlesCount];
+		VertexBindingDescriptionCountTable[BMRPipelineHandles::Entity] = 1;
+		VertexBindingDescriptionCountTable[BMRPipelineHandles::Terrain] = 1;
+		VertexBindingDescriptionCountTable[BMRPipelineHandles::Deferred] = 0;
+		VertexBindingDescriptionCountTable[BMRPipelineHandles::SkyBox] = 1;
 
-		// Vertex input
-		VkPipelineVertexInputStateCreateInfo EntityVertexInputCreateInfo = { };
-		EntityVertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		EntityVertexInputCreateInfo.vertexBindingDescriptionCount = 1;
-		EntityVertexInputCreateInfo.pVertexBindingDescriptions = &EntityInputBindingDescription;
-		EntityVertexInputCreateInfo.vertexAttributeDescriptionCount = EntityVertexInputBindingDescriptionCount;
-		EntityVertexInputCreateInfo.pVertexAttributeDescriptions = EntityAttributeDescriptions;
+		const VkVertexInputBindingDescription* VertexBindingDescriptionsTable[BMRPipelineHandles::PipelineHandlesCount];
+		VertexBindingDescriptionsTable[BMRPipelineHandles::Entity] = &EntityInputBindingDescription;
+		VertexBindingDescriptionsTable[BMRPipelineHandles::Terrain] = &TerrainVertexInputBindingDescription;
+		VertexBindingDescriptionsTable[BMRPipelineHandles::Deferred] = nullptr;
+		VertexBindingDescriptionsTable[BMRPipelineHandles::SkyBox] = &EntityInputBindingDescription;
 
-		VkPipelineVertexInputStateCreateInfo DeferredVertexInputCreateInfo = { };
-		// No vertex data for second pass
-		DeferredVertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		DeferredVertexInputCreateInfo.vertexBindingDescriptionCount = 0;
-		DeferredVertexInputCreateInfo.pVertexBindingDescriptions = nullptr;
-		DeferredVertexInputCreateInfo.vertexAttributeDescriptionCount = 0;
-		DeferredVertexInputCreateInfo.pVertexAttributeDescriptions = nullptr;
+		u32 VertexAttributeDescriptionCountTable[BMRPipelineHandles::PipelineHandlesCount];
+		VertexAttributeDescriptionCountTable[BMRPipelineHandles::Entity] = EntityVertexInputBindingDescriptionCount;
+		VertexAttributeDescriptionCountTable[BMRPipelineHandles::Terrain] = TerrainVertexInputBindingDescriptionCount;
+		VertexAttributeDescriptionCountTable[BMRPipelineHandles::Deferred] = 0;
+		VertexAttributeDescriptionCountTable[BMRPipelineHandles::SkyBox] = EntityVertexInputBindingDescriptionCount;
+
+		const VkVertexInputAttributeDescription* VertexAttributeDescriptionsTable[BMRPipelineHandles::PipelineHandlesCount];
+		VertexAttributeDescriptionsTable[BMRPipelineHandles::Entity] = EntityAttributeDescriptions;
+		VertexAttributeDescriptionsTable[BMRPipelineHandles::Terrain] = TerrainAttributeDescriptions;
+		VertexAttributeDescriptionsTable[BMRPipelineHandles::Deferred] = nullptr;
+		VertexAttributeDescriptionsTable[BMRPipelineHandles::SkyBox] = EntityAttributeDescriptions;
 
 		// Inputassembly
 		VkPipelineInputAssemblyStateCreateInfo InputAssemblyStateCreateInfo = { };
@@ -558,15 +451,50 @@ namespace Core
 		//DynamicStateCreateInfo.pDynamicStates = DynamicStates;
 
 		// Rasterizer
-		VkPipelineRasterizationStateCreateInfo RasterizationStateCreateInfo = { };
-		RasterizationStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-		RasterizationStateCreateInfo.depthClampEnable = VK_FALSE;			// Change if fragments beyond near/far planes are clipped (default) or clamped to plane
-		RasterizationStateCreateInfo.rasterizerDiscardEnable = VK_FALSE;	// Whether to discard data and skip rasterizer. Never creates fragments, only suitable for pipeline without framebuffer output
-		RasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;	// How to handle filling points between Vertices
-		RasterizationStateCreateInfo.lineWidth = 1.0f;						// How thick lines should be when drawn
-		RasterizationStateCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;		// Which face of a tri to cull
-		RasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;	// Winding to determine which side is front
-		RasterizationStateCreateInfo.depthBiasEnable = VK_FALSE;			// Whether to add depth bias to fragments (good for stopping "shadow acne" in shadow mapping)
+		// Change if fragments beyond near/far planes are clipped (default) or clamped to plane
+		VkBool32 DepthClampEnableTable[BMRPipelineHandles::PipelineHandlesCount];
+		DepthClampEnableTable[BMRPipelineHandles::Entity] = VK_FALSE;
+		DepthClampEnableTable[BMRPipelineHandles::Terrain] = VK_FALSE;
+		DepthClampEnableTable[BMRPipelineHandles::Deferred] = VK_FALSE;
+		DepthClampEnableTable[BMRPipelineHandles::SkyBox] = VK_FALSE;
+
+		// Whether to discard data and skip rasterizer. Never creates fragments, only suitable for pipeline without framebuffer output
+		VkBool32 RasterizerDiscardEnableTable[BMRPipelineHandles::PipelineHandlesCount];
+		RasterizerDiscardEnableTable[BMRPipelineHandles::Entity] = VK_FALSE;
+		RasterizerDiscardEnableTable[BMRPipelineHandles::Terrain] = VK_FALSE;
+		RasterizerDiscardEnableTable[BMRPipelineHandles::Deferred] = VK_FALSE;
+		RasterizerDiscardEnableTable[BMRPipelineHandles::SkyBox] = VK_FALSE;
+
+		VkPolygonMode PolygonModeTable[BMRPipelineHandles::PipelineHandlesCount];
+		PolygonModeTable[BMRPipelineHandles::Entity] = VK_POLYGON_MODE_FILL;
+		PolygonModeTable[BMRPipelineHandles::Terrain] = VK_POLYGON_MODE_FILL;
+		PolygonModeTable[BMRPipelineHandles::Deferred] = VK_POLYGON_MODE_FILL;
+		PolygonModeTable[BMRPipelineHandles::SkyBox] = VK_POLYGON_MODE_FILL;
+
+		f32 LineWidthTable[BMRPipelineHandles::PipelineHandlesCount];
+		LineWidthTable[BMRPipelineHandles::Entity] = 1.0f;
+		LineWidthTable[BMRPipelineHandles::Terrain] = 1.0f;
+		LineWidthTable[BMRPipelineHandles::Deferred] = 1.0f;
+		LineWidthTable[BMRPipelineHandles::SkyBox] = 1.0f;
+
+		VkCullModeFlags CullModeTable[BMRPipelineHandles::PipelineHandlesCount];
+		CullModeTable[BMRPipelineHandles::Entity] = VK_CULL_MODE_BACK_BIT;
+		CullModeTable[BMRPipelineHandles::Terrain] = VK_CULL_MODE_BACK_BIT;
+		CullModeTable[BMRPipelineHandles::Deferred] = VK_CULL_MODE_NONE;
+		CullModeTable[BMRPipelineHandles::SkyBox] = VK_CULL_MODE_FRONT_BIT;
+
+		VkFrontFace FrontFaceTable[BMRPipelineHandles::PipelineHandlesCount];
+		FrontFaceTable[BMRPipelineHandles::Entity] = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		FrontFaceTable[BMRPipelineHandles::Terrain] = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		FrontFaceTable[BMRPipelineHandles::Deferred] = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		FrontFaceTable[BMRPipelineHandles::SkyBox] = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+		// Whether to add depth bias to fragments (good for stopping "shadow acne" in shadow mapping)
+		VkBool32 DepthBiasEnableTable[BMRPipelineHandles::PipelineHandlesCount];
+		DepthBiasEnableTable[BMRPipelineHandles::Entity] = VK_FALSE;
+		DepthBiasEnableTable[BMRPipelineHandles::Terrain] = VK_FALSE;
+		DepthBiasEnableTable[BMRPipelineHandles::Deferred] = VK_FALSE;
+		DepthBiasEnableTable[BMRPipelineHandles::SkyBox] = VK_FALSE;
 
 		// Multisampling
 		VkPipelineMultisampleStateCreateInfo MultisampleStateCreateInfo = { };
@@ -574,98 +502,201 @@ namespace Core
 		MultisampleStateCreateInfo.sampleShadingEnable = VK_FALSE;					// Enable multisample shading or not
 		MultisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;	// Number of samples to use per fragment
 
-		// Blending
-		VkPipelineColorBlendAttachmentState ColorBlendAttachmentState = { };
-		ColorBlendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT	// Colors to apply blending to
-			| VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-		ColorBlendAttachmentState.blendEnable = VK_TRUE;													// Enable blending
+		VkBool32 BlendEnableTable[BMRPipelineHandles::PipelineHandlesCount];
+		BlendEnableTable[BMRPipelineHandles::Entity] = VK_TRUE;
+		BlendEnableTable[BMRPipelineHandles::Terrain] = VK_TRUE;
+		BlendEnableTable[BMRPipelineHandles::Deferred] = VK_FALSE;
+		BlendEnableTable[BMRPipelineHandles::SkyBox] = VK_TRUE;
 
-		VkPipelineColorBlendAttachmentState DeferredColorBlendAttachmentState = { };
-		DeferredColorBlendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;  // Write to all color components
-		DeferredColorBlendAttachmentState.blendEnable = VK_FALSE;
+		// Colors to apply blending to
+		VkColorComponentFlags ColorWriteMaskTable[BMRPipelineHandles::PipelineHandlesCount];
+		ColorWriteMaskTable[BMRPipelineHandles::Entity] = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+			| VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+		ColorWriteMaskTable[BMRPipelineHandles::Terrain] = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+			| VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+		ColorWriteMaskTable[BMRPipelineHandles::Deferred] = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+			| VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+		ColorWriteMaskTable[BMRPipelineHandles::SkyBox] = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+			| VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
 		// Blending uses equation: (srcColorBlendFactor * new color) colorBlendOp (dstColorBlendFactor * old color)
-		ColorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-		ColorBlendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		ColorBlendAttachmentState.colorBlendOp = VK_BLEND_OP_ADD;
+
+		VkBlendFactor SrcColorBlendFactorTable[BMRPipelineHandles::PipelineHandlesCount];
+		SrcColorBlendFactorTable[BMRPipelineHandles::Entity] = VK_BLEND_FACTOR_SRC_ALPHA;
+		SrcColorBlendFactorTable[BMRPipelineHandles::Terrain] = VK_BLEND_FACTOR_SRC_ALPHA;
+		SrcColorBlendFactorTable[BMRPipelineHandles::Deferred] = VK_BLEND_FACTOR_SRC_ALPHA;
+		SrcColorBlendFactorTable[BMRPipelineHandles::SkyBox] = VK_BLEND_FACTOR_SRC_ALPHA;
+
+		VkBlendFactor DstColorBlendFactorTable[BMRPipelineHandles::PipelineHandlesCount];
+		DstColorBlendFactorTable[BMRPipelineHandles::Entity] = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		DstColorBlendFactorTable[BMRPipelineHandles::Terrain] = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		DstColorBlendFactorTable[BMRPipelineHandles::Deferred] = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		DstColorBlendFactorTable[BMRPipelineHandles::SkyBox] = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+
+		VkBlendOp ColorBlendOpTable[BMRPipelineHandles::PipelineHandlesCount];
+		ColorBlendOpTable[BMRPipelineHandles::Entity] = VK_BLEND_OP_ADD;
+		ColorBlendOpTable[BMRPipelineHandles::Terrain] = VK_BLEND_OP_ADD;
+		ColorBlendOpTable[BMRPipelineHandles::Deferred] = VK_BLEND_OP_ADD;
+		ColorBlendOpTable[BMRPipelineHandles::SkyBox] = VK_BLEND_OP_ADD;
+
+		VkBlendFactor SrcAlphaBlendFactorTable[BMRPipelineHandles::PipelineHandlesCount];
+		SrcAlphaBlendFactorTable[BMRPipelineHandles::Entity] = VK_BLEND_FACTOR_ONE;
+		SrcAlphaBlendFactorTable[BMRPipelineHandles::Terrain] = VK_BLEND_FACTOR_ONE;
+		SrcAlphaBlendFactorTable[BMRPipelineHandles::Deferred] = VK_BLEND_FACTOR_ONE;
+		SrcAlphaBlendFactorTable[BMRPipelineHandles::SkyBox] = VK_BLEND_FACTOR_ONE;
 
 		// Summarised: (VK_BLEND_FACTOR_SRC_ALPHA * new color) + (VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA * old color)
-		//			   (new color alpha * new color) + ((1 - new color alpha) * old color)
+//			   (new color alpha * new color) + ((1 - new color alpha) * old color)
 
-		ColorBlendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		ColorBlendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-		ColorBlendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
+		VkBlendFactor DstAlphaBlendFactorTable[BMRPipelineHandles::PipelineHandlesCount];
+		DstAlphaBlendFactorTable[BMRPipelineHandles::Entity] = VK_BLEND_FACTOR_ZERO;
+		DstAlphaBlendFactorTable[BMRPipelineHandles::Terrain] = VK_BLEND_FACTOR_ZERO;
+		DstAlphaBlendFactorTable[BMRPipelineHandles::Deferred] = VK_BLEND_FACTOR_ZERO;
+		DstAlphaBlendFactorTable[BMRPipelineHandles::SkyBox] = VK_BLEND_FACTOR_ZERO;
+
+		VkBlendOp AlphaBlendOpTable[BMRPipelineHandles::PipelineHandlesCount];
+		AlphaBlendOpTable[BMRPipelineHandles::Entity] = VK_BLEND_OP_ADD;
+		AlphaBlendOpTable[BMRPipelineHandles::Terrain] = VK_BLEND_OP_ADD;
+		AlphaBlendOpTable[BMRPipelineHandles::Deferred] = VK_BLEND_OP_ADD;
+		AlphaBlendOpTable[BMRPipelineHandles::SkyBox] = VK_BLEND_OP_ADD;
 		// Summarised: (1 * new alpha) + (0 * old alpha) = new alpharesult != VK_SUCCESS
 
-		VkPipelineColorBlendStateCreateInfo ColorBlendingCreateInfo = { };
-		ColorBlendingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-		ColorBlendingCreateInfo.logicOpEnable = VK_FALSE;				// Alternative to calculations is to use logical operations
-		ColorBlendingCreateInfo.attachmentCount = 1;
-		ColorBlendingCreateInfo.pAttachments = &ColorBlendAttachmentState;
+		VkBool32 LogicOpEnableTable[BMRPipelineHandles::PipelineHandlesCount];
+		LogicOpEnableTable[BMRPipelineHandles::Entity] = VK_FALSE;
+		LogicOpEnableTable[BMRPipelineHandles::Terrain] = VK_FALSE;
+		LogicOpEnableTable[BMRPipelineHandles::Deferred] = VK_FALSE;
+		LogicOpEnableTable[BMRPipelineHandles::SkyBox] = VK_FALSE;
 
-		VkPipelineColorBlendStateCreateInfo DeferredColorBlendingCreateInfo = { };
-		DeferredColorBlendingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-		DeferredColorBlendingCreateInfo.logicOpEnable = VK_FALSE;  // No logical operations
-		DeferredColorBlendingCreateInfo.attachmentCount = 1;
-		DeferredColorBlendingCreateInfo.pAttachments = &DeferredColorBlendAttachmentState;
+		uint32_t AttachmentCountTable[BMRPipelineHandles::PipelineHandlesCount];
+		AttachmentCountTable[BMRPipelineHandles::Entity] = 1;
+		AttachmentCountTable[BMRPipelineHandles::Terrain] = 1;
+		AttachmentCountTable[BMRPipelineHandles::Deferred] = 1;
+		AttachmentCountTable[BMRPipelineHandles::SkyBox] = 1;
 
-		// Depth stencil testing
-		VkPipelineDepthStencilStateCreateInfo EntityDepthStencilCreateInfo = { };
-		EntityDepthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-		EntityDepthStencilCreateInfo.depthTestEnable = VK_TRUE;				// Enable checking depth to determine fragment write
-		EntityDepthStencilCreateInfo.depthWriteEnable = VK_TRUE;				// Enable writing to depth buffer (to replace old values)
-		EntityDepthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;		// Comparison operation that allows an overwrite (is in front)
-		EntityDepthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;		// Depth Bounds Test: Does the depth value exist between two bounds
-		EntityDepthStencilCreateInfo.stencilTestEnable = VK_FALSE;			// Enable Stencil Test
+		uint32_t SubpassesToPipelineTable[BMRPipelineHandles::PipelineHandlesCount];
+		SubpassesToPipelineTable[BMRPipelineHandles::Entity] = SubpassIndex::MainSubpass;
+		SubpassesToPipelineTable[BMRPipelineHandles::Terrain] = SubpassIndex::MainSubpass;
+		SubpassesToPipelineTable[BMRPipelineHandles::Deferred] = SubpassIndex::DeferredSubpas;
+		SubpassesToPipelineTable[BMRPipelineHandles::SkyBox] = SubpassIndex::MainSubpass;
 
-		VkPipelineDepthStencilStateCreateInfo DeferredDepthStencilCreateInfo = EntityDepthStencilCreateInfo;
-		DeferredDepthStencilCreateInfo.depthWriteEnable = VK_FALSE;
+		VkBool32 DepthTestEnableTable[BMRPipelineHandles::PipelineHandlesCount];
+		DepthTestEnableTable[BMRPipelineHandles::Entity] = VK_TRUE;
+		DepthTestEnableTable[BMRPipelineHandles::Terrain] = VK_TRUE;
+		DepthTestEnableTable[BMRPipelineHandles::Deferred] = VK_FALSE;
+		DepthTestEnableTable[BMRPipelineHandles::SkyBox] = VK_TRUE;
 
-		VkGraphicsPipelineCreateInfo PipelineCreateInfos[PipelineHandles::Count];
+		VkBool32 DepthWriteEnableTable[BMRPipelineHandles::PipelineHandlesCount];
+		DepthWriteEnableTable[BMRPipelineHandles::Entity] = VK_TRUE;
+		DepthWriteEnableTable[BMRPipelineHandles::Terrain] = VK_TRUE;
+		DepthWriteEnableTable[BMRPipelineHandles::Deferred] = VK_FALSE;
+		DepthWriteEnableTable[BMRPipelineHandles::SkyBox] = VK_FALSE;
 
-		PipelineCreateInfos[PipelineHandles::Entity] = { };
-		PipelineCreateInfos[PipelineHandles::Entity].sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-		PipelineCreateInfos[PipelineHandles::Entity].stageCount = EntityShaderStagesCount;					// Number of shader stages
-		PipelineCreateInfos[PipelineHandles::Entity].pStages = EntityShaderStages;							// List of shader stages
-		PipelineCreateInfos[PipelineHandles::Entity].pVertexInputState = &EntityVertexInputCreateInfo;		// All the fixed function pipeline states
-		PipelineCreateInfos[PipelineHandles::Entity].pInputAssemblyState = &InputAssemblyStateCreateInfo;
-		PipelineCreateInfos[PipelineHandles::Entity].pViewportState = &ViewportStateCreateInfo;
-		PipelineCreateInfos[PipelineHandles::Entity].pDynamicState = nullptr;
-		PipelineCreateInfos[PipelineHandles::Entity].pRasterizationState = &RasterizationStateCreateInfo;
-		PipelineCreateInfos[PipelineHandles::Entity].pMultisampleState = &MultisampleStateCreateInfo;
-		PipelineCreateInfos[PipelineHandles::Entity].pColorBlendState = &ColorBlendingCreateInfo;
-		PipelineCreateInfos[PipelineHandles::Entity].pDepthStencilState = &EntityDepthStencilCreateInfo;
-		PipelineCreateInfos[PipelineHandles::Entity].layout = PipelineLayouts[PipelineHandles::Entity];							// Pipeline Layout pipeline should use
-		PipelineCreateInfos[PipelineHandles::Entity].renderPass = RenderPass;							// Render pass description the pipeline is compatible with
-		PipelineCreateInfos[PipelineHandles::Entity].subpass = SubpassIndex::MainSubpass;										// Subpass of render pass to use with pipeline
+		VkCompareOp DepthCompareOpTable[BMRPipelineHandles::PipelineHandlesCount];
+		DepthCompareOpTable[BMRPipelineHandles::Entity] = VK_COMPARE_OP_LESS;
+		DepthCompareOpTable[BMRPipelineHandles::Terrain] = VK_COMPARE_OP_LESS;
+		DepthCompareOpTable[BMRPipelineHandles::SkyBox] = VK_COMPARE_OP_LESS;
 
-		// Pipeline Derivatives : Can create multiple pipelines that derive from one another for optimisation
-		PipelineCreateInfos[PipelineHandles::Entity].basePipelineHandle = VK_NULL_HANDLE;	// Existing pipeline to derive from...
-		PipelineCreateInfos[PipelineHandles::Entity].basePipelineIndex = -1;				// or index of pipeline being created to derive from (in case creating multiple at once)
+		VkBool32 DepthBoundsTestEnableTable[BMRPipelineHandles::PipelineHandlesCount];
+		DepthBoundsTestEnableTable[BMRPipelineHandles::Entity] = VK_FALSE;
+		DepthBoundsTestEnableTable[BMRPipelineHandles::Terrain] = VK_FALSE;
+		DepthBoundsTestEnableTable[BMRPipelineHandles::Deferred] = VK_FALSE;
+		DepthBoundsTestEnableTable[BMRPipelineHandles::SkyBox] = VK_FALSE;
 
-		PipelineCreateInfos[PipelineHandles::Deferred] = PipelineCreateInfos[PipelineHandles::Entity];
-		PipelineCreateInfos[PipelineHandles::Deferred].pDepthStencilState = &DeferredDepthStencilCreateInfo;
-		PipelineCreateInfos[PipelineHandles::Deferred].pVertexInputState = &DeferredVertexInputCreateInfo;
-		PipelineCreateInfos[PipelineHandles::Deferred].pStages = DeferredShaderStages;	// Update second shader stage list
-		PipelineCreateInfos[PipelineHandles::Deferred].layout = PipelineLayouts[PipelineHandles::Deferred];	// Change pipeline layout for input attachment descriptor sets
-		PipelineCreateInfos[PipelineHandles::Deferred].subpass = SubpassIndex::DeferredSubpas;						// Use second subpass
-		PipelineCreateInfos[PipelineHandles::Deferred].pColorBlendState = &DeferredColorBlendingCreateInfo;
+		VkBool32 StencilTestEnableTable[BMRPipelineHandles::PipelineHandlesCount];
+		StencilTestEnableTable[BMRPipelineHandles::Entity] = VK_FALSE;
+		StencilTestEnableTable[BMRPipelineHandles::Terrain] = VK_FALSE;
+		StencilTestEnableTable[BMRPipelineHandles::Deferred] = VK_FALSE;
+		StencilTestEnableTable[BMRPipelineHandles::SkyBox] = VK_FALSE;
 
-		PipelineCreateInfos[PipelineHandles::Terrain] = PipelineCreateInfos[PipelineHandles::Entity];
-		PipelineCreateInfos[PipelineHandles::Terrain].pVertexInputState = &TerrainVertexInputCreateInfo;
-		PipelineCreateInfos[PipelineHandles::Terrain].pStages = TerrainShaderStages;
-		PipelineCreateInfos[PipelineHandles::Terrain].layout = PipelineLayouts[PipelineHandles::Terrain];
-		PipelineCreateInfos[PipelineHandles::Terrain].subpass = SubpassIndex::MainSubpass;
+		VkPipelineVertexInputStateCreateInfo VertexInputInfo[BMRPipelineHandles::PipelineHandlesCount];
+		VkPipelineRasterizationStateCreateInfo RasterizationStateCreateInfo[BMRPipelineHandles::PipelineHandlesCount];
+		const VkPipelineColorBlendAttachmentState* AttachmentsTable[BMRPipelineHandles::PipelineHandlesCount];
+		VkPipelineColorBlendAttachmentState ColorBlendAttachmentState[BMRPipelineHandles::PipelineHandlesCount];
+		VkPipelineColorBlendStateCreateInfo ColorBlendInfo[BMRPipelineHandles::PipelineHandlesCount];
+		VkPipelineDepthStencilStateCreateInfo DepthStencilInfo[BMRPipelineHandles::PipelineHandlesCount];
+		VkGraphicsPipelineCreateInfo PipelineCreateInfos[BMRPipelineHandles::PipelineHandlesCount];
+		for (u32 i = 0; i < BMRPipelineHandles::PipelineHandlesCount; ++i)
+		{
+			RasterizationStateCreateInfo[i] = { };
+			RasterizationStateCreateInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+			RasterizationStateCreateInfo[i].depthClampEnable = DepthClampEnableTable[i];
+			RasterizationStateCreateInfo[i].rasterizerDiscardEnable = RasterizerDiscardEnableTable[i];
+			RasterizationStateCreateInfo[i].polygonMode = PolygonModeTable[i];
+			RasterizationStateCreateInfo[i].lineWidth = LineWidthTable[i];
+			RasterizationStateCreateInfo[i].cullMode = CullModeTable[i];
+			RasterizationStateCreateInfo[i].frontFace = FrontFaceTable[i];
+			RasterizationStateCreateInfo[i].depthBiasEnable = DepthBiasEnableTable[i];
 
-		//PipelineCreateInfos[PipelineHandles::SkyBoxPipeline]
+			VertexInputInfo[i] = { };
+			VertexInputInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+			VertexInputInfo[i].vertexBindingDescriptionCount = VertexBindingDescriptionCountTable[i];
+			VertexInputInfo[i].pVertexBindingDescriptions = VertexBindingDescriptionsTable[i];
+			VertexInputInfo[i].vertexAttributeDescriptionCount = VertexAttributeDescriptionCountTable[i];
+			VertexInputInfo[i].pVertexAttributeDescriptions = VertexAttributeDescriptionsTable[i];
 
-		const VkResult Result = vkCreateGraphicsPipelines(LogicalDevice, VK_NULL_HANDLE, PipelineHandles::Count,
+			ColorBlendAttachmentState[i].colorWriteMask = ColorWriteMaskTable[i];
+			ColorBlendAttachmentState[i].blendEnable = BlendEnableTable[i];													// Enable blending
+			ColorBlendAttachmentState[i].srcColorBlendFactor = SrcColorBlendFactorTable[i];
+			ColorBlendAttachmentState[i].dstColorBlendFactor = DstColorBlendFactorTable[i];
+			ColorBlendAttachmentState[i].colorBlendOp = ColorBlendOpTable[i];
+			ColorBlendAttachmentState[i].srcAlphaBlendFactor = SrcAlphaBlendFactorTable[i];
+			ColorBlendAttachmentState[i].dstAlphaBlendFactor = DstAlphaBlendFactorTable[i];
+			ColorBlendAttachmentState[i].alphaBlendOp = AlphaBlendOpTable[i];
+
+			AttachmentsTable[i] = &(ColorBlendAttachmentState[i]);
+			AttachmentsTable[i] = &(ColorBlendAttachmentState[i]);
+			AttachmentsTable[i] = &(ColorBlendAttachmentState[i]);
+
+			ColorBlendInfo[i] = { };
+			ColorBlendInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+			ColorBlendInfo[i].logicOpEnable = LogicOpEnableTable[i]; // Alternative to calculations is to use logical operations
+			ColorBlendInfo[i].attachmentCount = AttachmentCountTable[i];
+			ColorBlendInfo[i].pAttachments = AttachmentsTable[i];
+
+			DepthStencilInfo[i] = { };
+			DepthStencilInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+			DepthStencilInfo[i].depthTestEnable = DepthTestEnableTable[i];
+			DepthStencilInfo[i].depthWriteEnable = DepthWriteEnableTable[i];
+			DepthStencilInfo[i].depthCompareOp = DepthCompareOpTable[i];
+			DepthStencilInfo[i].depthBoundsTestEnable = DepthBoundsTestEnableTable[i];
+			DepthStencilInfo[i].stencilTestEnable = StencilTestEnableTable[i];
+
+			PipelineCreateInfos[i] = { };
+			PipelineCreateInfos[i].sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+			PipelineCreateInfos[i].stageCount = ShaderInfos[i].InfosCounter;
+			PipelineCreateInfos[i].pStages = ShaderInfos[i].Infos;
+			PipelineCreateInfos[i].pVertexInputState = &(VertexInputInfo[i]);
+			PipelineCreateInfos[i].pInputAssemblyState = &InputAssemblyStateCreateInfo;
+			PipelineCreateInfos[i].pViewportState = &ViewportStateCreateInfo;
+			PipelineCreateInfos[i].pDynamicState = nullptr;
+			PipelineCreateInfos[i].pRasterizationState = &(RasterizationStateCreateInfo[i]);
+			PipelineCreateInfos[i].pMultisampleState = &MultisampleStateCreateInfo;
+			PipelineCreateInfos[i].pColorBlendState = &(ColorBlendInfo[i]);
+			PipelineCreateInfos[i].pDepthStencilState = &(DepthStencilInfo[i]);
+			PipelineCreateInfos[i].layout = PipelineLayouts[i];
+			PipelineCreateInfos[i].renderPass = RenderPass;
+			PipelineCreateInfos[i].subpass = SubpassesToPipelineTable[i];
+
+			// Pipeline Derivatives : Can create multiple pipelines that derive from one another for optimisation
+			PipelineCreateInfos[i].basePipelineHandle = VK_NULL_HANDLE;
+			PipelineCreateInfos[i].basePipelineIndex = -1;
+		}
+
+		const VkResult Result = vkCreateGraphicsPipelines(LogicalDevice, VK_NULL_HANDLE, BMRPipelineHandles::PipelineHandlesCount,
 			PipelineCreateInfos, nullptr, Pipelines);
 
 		if (Result != VK_SUCCESS)
 		{
 			Util::Log().Error("vkCreateGraphicsPipelines result is {}", static_cast<int>(Result));
 			assert(false);
+		}
+
+		for (u32 i = 0; i < BMRPipelineHandles::PipelineHandlesCount; ++i)
+		{
+			for (u32 j = 0; j < ShaderInfos[i].InfosCounter; ++j)
+			{
+				vkDestroyShaderModule(LogicalDevice, ShaderInfos[i].Infos[j].module, nullptr);
+			}
 		}
 	}
 
@@ -721,10 +752,11 @@ namespace Core
 
 	void BMRMainRenderPass::CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount)
 	{
-		VkDescriptorSetLayout* SetLayouts = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
-		VkDescriptorSetLayout* TerrainLayouts = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
-		VkDescriptorSetLayout* LightingSetLayouts = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
-		VkDescriptorSetLayout* DeferredSetLayouts = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorSetLayout>(ImagesCount);
+		VkDescriptorSetLayout SetLayouts[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkDescriptorSetLayout TerrainLayouts[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkDescriptorSetLayout LightingSetLayouts[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkDescriptorSetLayout DeferredSetLayouts[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkDescriptorSetLayout SkyBoxVpLayouts[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
@@ -732,12 +764,14 @@ namespace Core
 			TerrainLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::TerrainVp];
 			LightingSetLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::Light];
 			DeferredSetLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::DeferredInput];
+			SkyBoxVpLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::SkyBoxVp];
 		}
 
 		VulkanMemoryManagementSystem::AllocateSets(Pool, SetLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::EntityVp]);
 		VulkanMemoryManagementSystem::AllocateSets(Pool, TerrainLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::TerrainVp]);
 		VulkanMemoryManagementSystem::AllocateSets(Pool, LightingSetLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::EntityLigh]);
 		VulkanMemoryManagementSystem::AllocateSets(Pool, DeferredSetLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::DeferredInput]);
+		VulkanMemoryManagementSystem::AllocateSets(Pool, SkyBoxVpLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::SkyBoxVp]);
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
@@ -772,6 +806,9 @@ namespace Core
 			VkWriteDescriptorSet VpTerrainWrite = VpSetWrite;
 			VpTerrainWrite.dstSet = DescriptorsToImages[DescriptorHandles::TerrainVp][i];
 
+			VkWriteDescriptorSet VpSkyBoxWrite = VpSetWrite;
+			VpSkyBoxWrite.dstSet = DescriptorsToImages[DescriptorHandles::SkyBoxVp][i];
+
 			VkDescriptorImageInfo ColourAttachmentDescriptor = { };
 			ColourAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			ColourAttachmentDescriptor.imageView = ColorBufferViews[i];
@@ -800,9 +837,9 @@ namespace Core
 			DepthWrite.descriptorCount = 1;
 			DepthWrite.pImageInfo = &DepthAttachmentDescriptor;
 
-			const u32 WriteSetsCount = 5;
+			const u32 WriteSetsCount = 6;
 			VkWriteDescriptorSet WriteSets[WriteSetsCount] = { VpSetWrite, VpTerrainWrite, LightSetWrite,
-				ColourWrite, DepthWrite };
+				ColourWrite, DepthWrite, VpSkyBoxWrite };
 
 			vkUpdateDescriptorSets(LogicalDevice, WriteSetsCount, WriteSets, 0, nullptr);
 		}
@@ -824,17 +861,5 @@ namespace Core
 		MaterialSetWrite.pBufferInfo = &MaterialBufferInfo;
 
 		vkUpdateDescriptorSets(LogicalDevice, 1, &MaterialSetWrite, 0, nullptr);
-	}
-	VkShaderModule BMRShaderInput::FindShaderModuleByName(BMRShaderName Name, BMRShaderInput* ShaderInputs, u32 ShaderInputsCount)
-	{
-		for (u32 i = 0; i < ShaderInputsCount; ++i)
-		{
-			if (ShaderInputs[i].ShaderName == Name)
-			{
-				return ShaderInputs[i].Module;
-			}
-		}
-
-		assert(false);
 	}
 }

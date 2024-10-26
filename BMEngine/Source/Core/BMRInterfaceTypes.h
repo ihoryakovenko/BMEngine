@@ -5,30 +5,53 @@
 
 #include "Util/EngineTypes.h"
 
-#define TERRAIN_VERTEX "TerrainVertex"
-#define TERRAIN_FRAGMENT "TerrainFragment"
-#define ENTITY_VERTEX "EntityVertex"
-#define ENTITY_FRAGMENT "EntityFragment"
-#define DEFERRED_VERTEX "DeferredVertex"
-#define DEFERRED_FRAGMENT "DeferredFragment"
-
-#define SHADERS_COUNT 6
-
-extern "C"
+namespace BMR
 {
-	typedef const char* BMRShaderName;
+	enum BMRShaderNames
+	{
+		TerrainVertex,
+		TerrainFragment,
+		EntityVertex,
+		EntityFragment,
+		DeferredVertex,
+		DeferredFragment,
+		SkyBoxVertex,
+		SkyBoxFragment,
+
+		ShaderNamesCount
+	};
+
+	enum BMRShaderStages
+	{
+		Vertex,
+		Fragment,
+
+		ShaderStagesCount,
+		BMRShaderStagesNone
+	};
+
+	enum BMRPipelineHandles
+	{
+		Terrain = 0,
+		Entity,
+		Deferred,
+		SkyBox,
+
+		PipelineHandlesCount,
+		PipelineHandlesNone
+	};
 
 	struct BMRShaderCodeDescription
 	{
+		BMRPipelineHandles Handle = BMRPipelineHandles::PipelineHandlesNone;
+		BMRShaderStages Stage = BMRShaderStages::BMRShaderStagesNone;
 		u32* Code = nullptr;
 		u32 CodeSize = 0;
-		BMRShaderName Name = nullptr;
 	};
 
 	struct BMRConfig
 	{
-		BMRShaderCodeDescription* RenderShaders = nullptr;
-		u32 ShadersCount = 0;
+		BMRShaderCodeDescription RenderShaders[BMRShaderNames::ShaderNamesCount];
 
 		u32 MaxTextures = 0;
 	};
@@ -64,6 +87,16 @@ extern "C"
 		u64 VertexOffset = 0;
 		u64 IndexOffset = 0;
 		u32 IndicesCount = 0;
+		u32 MaterialIndex = -1;
+	};
+
+	struct BMRDrawSkyBoxEntity
+	{
+		u64 VertexOffset = 0;
+		u64 IndexOffset = 0;
+		u32 IndicesCount = 0;
+		u32 MaterialIndex = -1;
+		BMRModel Model;
 	};
 
 	struct BMRPointLight
@@ -111,6 +144,9 @@ extern "C"
 
 		BMRDrawTerrainEntity* DrawTerrainEntities;
 		u32 DrawTerrainEntitiesCount;
+
+		BMRDrawSkyBoxEntity SkyBox;
+		bool DrawSkyBox = false;
 	};
 
 	struct BMRLightBuffer
@@ -135,6 +171,6 @@ extern "C"
 
 	struct BMRTerrainVertex
 	{
-		float Altitude;
+		f32 Altitude;
 	};
 }

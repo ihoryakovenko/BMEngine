@@ -6,7 +6,7 @@
 #include "Util/Util.h"
 #include "VulkanHelper.h"
 
-namespace Core::VulkanMemoryManagementSystem
+namespace BMR::VulkanMemoryManagementSystem
 {
 	static VkDeviceMemory AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex);
 

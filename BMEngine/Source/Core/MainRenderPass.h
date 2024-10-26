@@ -7,16 +7,8 @@
 #include "Util/EngineTypes.h"
 #include "BMRInterfaceTypes.h"
 
-namespace Core
+namespace BMR
 {
-	struct BMRShaderInput
-	{
-		static VkShaderModule FindShaderModuleByName(BMRShaderName Name, BMRShaderInput* ShaderInputs, u32 ShaderInputsCount);
-
-		BMRShaderName ShaderName = nullptr;
-		VkShaderModule Module = nullptr;
-	};
-
 	namespace DescriptorLayoutHandles
 	{
 		enum
@@ -28,20 +20,8 @@ namespace Core
 			Light,
 			Material,
 			DeferredInput,
-			//SkyBoxVb, // TODO Same as EntityVpLayout, change or delete
-
-			Count
-		};
-	}
-
-	namespace PipelineHandles
-	{
-		enum
-		{
-			Terrain = 0,
-			Entity,
-			Deferred,
-			//SkyBoxPipeline,
+			SkyBoxVp, // TODO Same as EntityVpLayout, change or delete
+			SkyBoxSampler, // TODO Same as TerrainSampler
 
 			Count
 		};
@@ -51,6 +31,7 @@ namespace Core
 	{
 		enum
 		{
+			SkyBoxVp,
 			TerrainVp,
 			EntityVp,
 			EntityLigh,
@@ -64,11 +45,20 @@ namespace Core
 	{
 		enum
 		{
-			Entity,
+			Model,
 
 			Count
 		};
 	}
+
+	struct BMRPipelineShaderInput
+	{
+		BMRPipelineHandles Handle = BMRPipelineHandles::PipelineHandlesNone;
+		BMRShaderStages Stage = BMRShaderStages::BMRShaderStagesNone;
+		const char* EntryPoint = nullptr;
+		u32* Code = nullptr;
+		u32 CodeSize = 0; 
+	};
 
 	struct BMRMainRenderPass
 	{
@@ -77,12 +67,10 @@ namespace Core
 		void CreateVulkanPass(VkDevice LogicalDevice, VkFormat ColorFormat, VkFormat DepthFormat,
 			VkSurfaceFormatKHR SurfaceFormat);
 		void SetupPushConstants();
-		void CreateSamplerSetLayout(VkDevice LogicalDevice);
-		void CreateTerrainSetLayout(VkDevice LogicalDevice);
-		void CreateEntitySetLayout(VkDevice LogicalDevice);
-		void CreateDeferredSetLayout(VkDevice LogicalDevice);
+		void CreateDescriptorLayouts(VkDevice LogicalDevice);
 		void CreatePipelineLayouts(VkDevice LogicalDevice); 
-		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent, BMRShaderInput* ShaderInputs, u32 ShaderInputsCount);
+		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent,
+			BMRPipelineShaderInput ShaderInputs[BMRShaderNames::ShaderNamesCount]);
 		void CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 ImagesCount, VkExtent2D SwapExtent,
 			VkFormat DepthFormat, VkFormat ColorFormat);
 		void CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
@@ -91,8 +79,8 @@ namespace Core
 
 		VkRenderPass RenderPass = nullptr;
 
-		VkPipelineLayout PipelineLayouts[PipelineHandles::Count];
-		VkPipeline Pipelines[PipelineHandles::Count];
+		VkPipelineLayout PipelineLayouts[BMRPipelineHandles::PipelineHandlesCount];
+		VkPipeline Pipelines[BMRPipelineHandles::PipelineHandlesCount];
 
 		VkPushConstantRange PushConstants[PushConstantHandles::Count];
 		VkDescriptorSetLayout DescriptorLayouts[DescriptorLayoutHandles::Count];
@@ -110,8 +98,10 @@ namespace Core
 		BMRGPUBuffer VpUniformBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		BMRGPUBuffer LightBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 
+		// TODO: Fix
 		static inline VkDescriptorSet TerrainSamplerDescriptorSets[MAX_IMAGES];
 		static inline VkDescriptorSet EntitySamplerDescriptorSets[MAX_IMAGES];
+		static inline VkDescriptorSet SkyBoxSamplerDescriptorSets[MAX_IMAGES];
 
 		BMRGPUBuffer MaterialBuffer;
 		VkDescriptorSet MaterialSet = nullptr; // TODO: Should be with textures

@@ -5,7 +5,7 @@
 
 #include "Util/EngineTypes.h"
 
-namespace Core
+namespace BMR
 {
 	bool CreateShader(VkDevice LogicalDevice, const u32* Code, u32 CodeSize,
 		VkShaderModule& VertexShaderModule);

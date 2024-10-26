@@ -6,18 +6,18 @@
 #include "Util/EngineTypes.h"
 #include "BMRInterfaceTypes.h"
 
-extern "C"
+namespace BMR
 {
-	bool BMRInit(GLFWwindow* Window, const BMRConfig& InConfig);
-	void BMRDeInit();
+	bool Init(GLFWwindow* Window, const BMRConfig& InConfig);
+	void DeInit();
 
-	u32 BMRLoadTexture(BMRTextureArrayInfo Info);
-	u32 BMRLoadMaterial(u32 DiffuseTextureIndex, u32 SpecularTextureIndex);
-	u64 BMRLoadVertices(const void* Vertices, u32 VertexSize, VkDeviceSize VerticesCount);
-	u64 BMRLoadIndices(const u32* Indices, u32 IndicesCount);
+	u32 LoadTexture(BMRTextureArrayInfo Info);
+	u32 LoadMaterial(u32 DiffuseTextureIndex, u32 SpecularTextureIndex);
+	u64 LoadVertices(const void* Vertices, u32 VertexSize, VkDeviceSize VerticesCount);
+	u64 LoadIndices(const u32* Indices, u32 IndicesCount);
 
-	void BMRUpdateLightBuffer(const BMRLightBuffer& Buffer);
-	void BMRUpdateMaterialBuffer(const BMRMaterial& Buffer);
+	void UpdateLightBuffer(const BMRLightBuffer& Buffer);
+	void UpdateMaterialBuffer(const BMRMaterial& Buffer);
 
-	void BMRDraw(const BMRDrawScene& Scene);
+	void Draw(const BMRDrawScene& Scene);
 }

@@ -3,7 +3,7 @@
 #include "VulkanHelper.h"
 #include "Util/Util.h"
 
-namespace Core
+namespace BMR
 {
 	BMRMainInstance BMRMainInstance::CreateMainInstance(const char** RequiredExtensions, u32 RequiredExtensionsCount,
 		bool IsValidationLayersEnabled, const char* ValidationLayers[], u32 ValidationLayersSize)

@@ -14,7 +14,7 @@
 #include "Util/EngineTypes.h"
 #include <Memory/MemoryManagmentSystem.h>
 
-namespace Core
+namespace BMR
 {
 	static const u32 MAX_SWAPCHAIN_IMAGES_COUNT = 3;
 	static const u32 MAX_IMAGES = 1024;
