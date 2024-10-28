@@ -16,7 +16,7 @@ namespace BMR::VulkanMemoryManagementSystem
 	void Init(BMRMemorySourceDevice Device)
 	{
 		MemorySource = Device;
-		StagingBuffer = CreateBuffer(MB64, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		StagingBuffer = CreateBuffer(MB128, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	}
 
@@ -219,14 +219,30 @@ namespace BMR::VulkanMemoryManagementSystem
 		vkFreeCommandBuffers(MemorySource.LogicalDevice, MemorySource.TransferCommandPool, 1, &TransferCommandBuffer);
 	}
 
-	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, VkDeviceSize Size,
-		u32 LayersCount, const void* Data)
+	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, VkDeviceSize AlignedLayerSize,
+		u32 LayersCount, void* Data)
 	{
-		assert(Size <= MB64);
+		const VkDeviceSize TotalAlignedSize = AlignedLayerSize * LayersCount;
+		assert(TotalAlignedSize <= MB128);
+
+		const VkDeviceSize ActualLayerSize = Width * Height * Format; // Should be TotalAlignedSize in ideal (assert?)
+		if (ActualLayerSize != AlignedLayerSize)
+		{
+			Util::Log().Warning("Image memory requirement size for layer is {}, actual size is {}",
+				AlignedLayerSize, ActualLayerSize);
+		}
+
+		VkDeviceSize CopyOffset = 0;
 
 		void* MappedMemory;
-		vkMapMemory(MemorySource.LogicalDevice, StagingBuffer.Memory, 0, Size, 0, &MappedMemory);
-		std::memcpy(MappedMemory, Data, Size);
+		vkMapMemory(MemorySource.LogicalDevice, StagingBuffer.Memory, 0, TotalAlignedSize, 0, &MappedMemory);
+
+		for (u32 i = 0; i < LayersCount; ++i)
+		{
+			std::memcpy(static_cast<u8*>(MappedMemory) + CopyOffset, reinterpret_cast<u8**>(Data)[i], ActualLayerSize);
+			CopyOffset += AlignedLayerSize;
+		}
+
 		vkUnmapMemory(MemorySource.LogicalDevice, StagingBuffer.Memory);
 
 		VkCommandBuffer TransferCommandBuffer;

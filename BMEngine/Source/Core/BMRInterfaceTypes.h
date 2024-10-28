@@ -41,6 +41,12 @@ namespace BMR
 		PipelineHandlesNone
 	};
 
+	enum BMRTextureType
+	{
+		TextureType_2D,
+		TextureType_CUBE
+	};
+
 	struct BMRShaderCodeDescription
 	{
 		BMRPipelineHandles Handle = BMRPipelineHandles::PipelineHandlesNone;
@@ -70,7 +76,7 @@ namespace BMR
 		u32 Height = 0;
 		u32 Format = 0;
 		u32 LayersCount = 0;
-		u8* Data = nullptr;
+		u8** Data = nullptr;
 	};
 
 	struct BMRDrawEntity
@@ -96,7 +102,6 @@ namespace BMR
 		u64 IndexOffset = 0;
 		u32 IndicesCount = 0;
 		u32 MaterialIndex = -1;
-		BMRModel Model;
 	};
 
 	struct BMRPointLight
@@ -172,5 +177,10 @@ namespace BMR
 	struct BMRTerrainVertex
 	{
 		f32 Altitude;
+	};
+
+	struct BMRSkyBoxVertex
+	{
+		glm::vec3 Position;
 	};
 }

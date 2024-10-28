@@ -24,12 +24,12 @@ namespace BMR
 	}
 
 	VkImageView CreateImageView(VkDevice LogicalDevice, VkImage Image, VkFormat Format,
-		VkImageAspectFlags AspectFlags)
+		VkImageAspectFlags AspectFlags, VkImageViewType Type, u32 LayerCount)
 	{
 		VkImageViewCreateInfo ViewCreateInfo = { };
 		ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		ViewCreateInfo.image = Image;
-		ViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		ViewCreateInfo.viewType = Type;
 		ViewCreateInfo.format = Format;
 		ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 		ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -40,7 +40,7 @@ namespace BMR
 		ViewCreateInfo.subresourceRange.baseMipLevel = 0;
 		ViewCreateInfo.subresourceRange.levelCount = 1;
 		ViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-		ViewCreateInfo.subresourceRange.layerCount = 1;
+		ViewCreateInfo.subresourceRange.layerCount = LayerCount;
 
 		// Create image view and return it
 		VkImageView ImageView;
@@ -123,26 +123,5 @@ namespace BMR
 		vkBindImageMemory(LogicalDevice, Image, *OutImageMemory, 0);
 
 		return Image;
-	}
-
-	VkPipelineLayout CreatePipelineLayout(VkDevice LogicalDevice, u32 SetLayoutCount,
-		VkDescriptorSetLayout* SetLayouts, u32 PushConstantRangeCount, VkPushConstantRange* PushConstantRanges)
-	{
-		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
-		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		PipelineLayoutCreateInfo.setLayoutCount = SetLayoutCount;
-		PipelineLayoutCreateInfo.pSetLayouts = SetLayouts;
-		PipelineLayoutCreateInfo.pushConstantRangeCount = PushConstantRangeCount;
-		PipelineLayoutCreateInfo.pPushConstantRanges = PushConstantRanges;
-
-		VkPipelineLayout Layout;
-		const VkResult Result = vkCreatePipelineLayout(LogicalDevice, &PipelineLayoutCreateInfo, nullptr, &Layout);
-		if (Result != VK_SUCCESS)
-		{
-			Util::Log().Error("vkCreatePipelineLayout result is {}", static_cast<int>(Result));
-			assert(false);
-		}
-
-		return Layout;
 	}
 }

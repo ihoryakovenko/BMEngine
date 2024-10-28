@@ -9,23 +9,20 @@
 
 namespace BMR
 {
-	namespace DescriptorLayoutHandles
+	enum DescriptorLayoutHandles
 	{
-		enum
-		{
-			TerrainVp = 0, // TODO Same as EntityVpLayout, change or delete
-			TerrainSampler,
-			EntityVp,
-			EntitySampler,
-			Light,
-			Material,
-			DeferredInput,
-			SkyBoxVp, // TODO Same as EntityVpLayout, change or delete
-			SkyBoxSampler, // TODO Same as TerrainSampler
+		TerrainVp = 0, // TODO Same as EntityVpLayout, change or delete
+		TerrainSampler,
+		EntityVp,
+		EntitySampler,
+		Light,
+		Material,
+		DeferredInput,
+		SkyBoxVp, // TODO Same as EntityVpLayout, change or delete
+		SkyBoxSampler, // TODO Same as TerrainSampler
 
-			Count
-		};
-	}
+		Count
+	};
 
 	namespace DescriptorHandles
 	{
@@ -99,13 +96,11 @@ namespace BMR
 		BMRGPUBuffer LightBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		// TODO: Fix
-		static inline VkDescriptorSet TerrainSamplerDescriptorSets[MAX_IMAGES];
-		static inline VkDescriptorSet EntitySamplerDescriptorSets[MAX_IMAGES];
-		static inline VkDescriptorSet SkyBoxSamplerDescriptorSets[MAX_IMAGES];
+		static inline VkDescriptorSet SamplerDescriptors[MAX_IMAGES];
 
 		BMRGPUBuffer MaterialBuffer;
 		VkDescriptorSet MaterialSet = nullptr; // TODO: Should be with textures
 
-		u32 TextureDescriptorCountTest = 0;
+		u32 TextureDescriptorCount = 0;
 	};
 }

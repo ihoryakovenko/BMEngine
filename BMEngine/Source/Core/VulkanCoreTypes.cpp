@@ -263,7 +263,8 @@ namespace BMR
 
 		for (u32 i = 0; i < Instance.ImagesCount; ++i)
 		{
-			VkImageView ImageView = CreateImageView(LogicalDevice, Images[i], SurfaceFormat.format, VK_IMAGE_ASPECT_COLOR_BIT);
+			VkImageView ImageView = CreateImageView(LogicalDevice, Images[i],
+				SurfaceFormat.format, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_2D, 1);
 			if (ImageView == nullptr)
 			{
 				assert(false);

@@ -15,7 +15,7 @@
 
 namespace BMR
 {
-	static u32 CreateTextureDescriptorSets(VkImageView DiffuseTexture, VkImageView SpecularTexture);
+	static u32 UpdateTextureDescriptor(u32* ImageViewIndices, u32 Count, DescriptorLayoutHandles LayoutHandle);
 
 	static Memory::FrameArray<VkExtensionProperties> GetAvailableExtensionProperties();
 	static Memory::FrameArray<VkLayerProperties> GetAvailableInstanceLayerProperties();
@@ -79,11 +79,23 @@ namespace BMR
 
 	static VkDescriptorPool MainPool = nullptr;
 
-	static VkSampler DiffuseTextureSampler = nullptr;
-	static VkSampler SpecularTextureSampler = nullptr;
-	static inline BMRImageBuffer TextureBuffers[MAX_IMAGES];
+	static VkSampler Sampler[SamplerType::SamplerType_Count];
+
+	static BMRImageBuffer TextureBuffers[MAX_IMAGES];
 	static u32 ImageArraysCount = 0;
-	static inline VkImageView TextureImageViews[MAX_IMAGES];
+	static VkImageView TextureImageViews[MAX_IMAGES];
+
+	static VkImageViewType ImageViewTypeTable[] =
+	{
+		VK_IMAGE_VIEW_TYPE_2D,
+		VK_IMAGE_VIEW_TYPE_CUBE
+	};
+
+	static VkImageCreateFlagBits ImageFlagsTable[] =
+	{
+		static_cast<VkImageCreateFlagBits>(0),
+		VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT
+	};
 
 	bool Init(GLFWwindow* Window, const BMRConfig& InConfig)
 	{
@@ -244,8 +256,8 @@ namespace BMR
 
 		InitViewport(Window, Surface, &MainViewport, SwapInstance1, MainRenderpass.ColorBufferViews, MainRenderpass.DepthBufferViews);
 
-		DiffuseTextureSampler = CreateTextureSampler();
-		SpecularTextureSampler = CreateTextureSampler();
+		Sampler[SamplerType::SamplerType_Diffuse] = CreateTextureSampler();
+		Sampler[SamplerType::SamplerType_Specular] = CreateTextureSampler();
 
 		return true;
 	}
@@ -256,8 +268,8 @@ namespace BMR
 
 		DestroySynchronisation();
 
-		vkDestroySampler(LogicalDevice, DiffuseTextureSampler, nullptr);
-		vkDestroySampler(LogicalDevice, SpecularTextureSampler, nullptr);
+		vkDestroySampler(LogicalDevice, Sampler[SamplerType::SamplerType_Diffuse], nullptr);
+		vkDestroySampler(LogicalDevice, Sampler[SamplerType::SamplerType_Specular], nullptr);
 
 		for (u32 i = 0; i < ImageArraysCount; ++i)
 		{
@@ -285,43 +297,45 @@ namespace BMR
 		BMRMainInstance::DestroyMainInstance(Instance);
 	}
 
-	u32 LoadTexture(BMRTextureArrayInfo Info)
+	u32 LoadTexture(BMRTextureArrayInfo Info, BMRTextureType TextureType)
 	{
-		auto Barriers = Memory::BmMemoryManagementSystem::FrameAlloc<VkImageMemoryBarrier>(1);
+		const VkImageViewType TextureImageType = ImageViewTypeTable[TextureType];
 
-		VkImageCreateInfo ImageCreateInfo[1];
-		ImageCreateInfo[0] = { };
-		ImageCreateInfo[0].sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		ImageCreateInfo[0].imageType = VK_IMAGE_TYPE_2D; // Type of image (1D, 2D, or 3D)
-		ImageCreateInfo[0].extent.width = Info.Width;
-		ImageCreateInfo[0].extent.height = Info.Height;
-		ImageCreateInfo[0].extent.depth = 1; // Depth of image (just 1, no 3D aspect)
-		ImageCreateInfo[0].mipLevels = 1;
-		ImageCreateInfo[0].arrayLayers = 1;
-		ImageCreateInfo[0].format = VK_FORMAT_R8G8B8A8_UNORM; // Format type of image
-		ImageCreateInfo[0].tiling = VK_IMAGE_TILING_OPTIMAL; // How image data should be "tiled" (arranged for optimal reading)
-		ImageCreateInfo[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Layout of image data on creation
-		ImageCreateInfo[0].usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT; // Bit flags defining what image will be used for
-		ImageCreateInfo[0].samples = VK_SAMPLE_COUNT_1_BIT; // Number of samples for multi-sampling
-		ImageCreateInfo[0].sharingMode = VK_SHARING_MODE_EXCLUSIVE; // Whether image can be shared between queues
+		VkImageCreateInfo ImageCreateInfo;
+		ImageCreateInfo = { };
+		ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D; // Type of image (1D, 2D, or 3D)
+		ImageCreateInfo.extent.width = Info.Width;
+		ImageCreateInfo.extent.height = Info.Height;
+		ImageCreateInfo.extent.depth = 1; // Depth of image (just 1, no 3D aspect)
+		ImageCreateInfo.mipLevels = 1;
+		ImageCreateInfo.arrayLayers = Info.LayersCount;
+		ImageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM; // Format type of image
+		ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL; // How image data should be "tiled" (arranged for optimal reading)
+		ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Layout of image data on creation
+		ImageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT; // Bit flags defining what image will be used for
+		ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT; // Number of samples for multi-sampling
+		ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // Whether image can be shared between queues
+		ImageCreateInfo.flags = ImageFlagsTable[TextureType];
 
-		BMRImageBuffer ImageBuffer = VulkanMemoryManagementSystem::CreateImageBuffer(&(ImageCreateInfo[0]));
+		BMRImageBuffer ImageBuffer = VulkanMemoryManagementSystem::CreateImageBuffer(&ImageCreateInfo);
 
-		Barriers[0] = { };
-		Barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		Barriers[0].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;									// Layout to transition from
-		Barriers[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;									// Layout to transition to
-		Barriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition from
-		Barriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition to
-		Barriers[0].image = ImageBuffer.Image;											// Image being accessed and modified as part of barrier
-		Barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;	// Aspect of image being altered
-		Barriers[0].subresourceRange.baseMipLevel = 0;						// First mip level to start alterations on
-		Barriers[0].subresourceRange.levelCount = 1;							// Number of mip levels to alter starting from baseMipLevel
-		Barriers[0].subresourceRange.baseArrayLayer = 0;
-		Barriers[0].subresourceRange.layerCount = 1;
+		VkImageMemoryBarrier Barrier;
+		Barrier = { };
+		Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		Barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;									// Layout to transition from
+		Barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;									// Layout to transition to
+		Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition from
+		Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition to
+		Barrier.image = ImageBuffer.Image;											// Image being accessed and modified as part of barrier
+		Barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;	// Aspect of image being altered
+		Barrier.subresourceRange.baseMipLevel = 0;						// First mip level to start alterations on
+		Barrier.subresourceRange.levelCount = 1;							// Number of mip levels to alter starting from baseMipLevel
+		Barrier.subresourceRange.baseArrayLayer = 0;
+		Barrier.subresourceRange.layerCount = Info.LayersCount;
 
-		Barriers[0].srcAccessMask = 0;								// Memory access stage transition must after...
-		Barriers[0].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;		// Memory access stage transition must before...
+		Barrier.srcAccessMask = 0;								// Memory access stage transition must after...
+		Barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;		// Memory access stage transition must before...
 
 		// Todo: Create beginCommandBuffer function?
 		VkCommandBuffer CommandBuffer;
@@ -353,7 +367,7 @@ namespace BMR
 			0,						// Dependency flags
 			0, nullptr,				// Memory Barrier count + data
 			0, nullptr,				// Buffer Memory Barrier count + data
-			1, Barriers	// Image Memory Barrier count + data
+			1, &Barrier	// Image Memory Barrier count + data
 		);
 
 		vkEndCommandBuffer(CommandBuffer);
@@ -365,18 +379,18 @@ namespace BMR
 		vkGetImageMemoryRequirements(LogicalDevice, ImageBuffer.Image, &MemoryRequirements);
 
 		VulkanMemoryManagementSystem::CopyDataToImage(ImageBuffer.Image, Info.Width, Info.Height,
-			MemoryRequirements.size, 1, Info.Data);
+			Info.Format, MemoryRequirements.size / Info.LayersCount, Info.LayersCount, Info.Data);
 
-		Barriers[0].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL; // Layout to transition from
-		Barriers[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		Barriers[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		Barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		Barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL; // Layout to transition from
+		Barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		Barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		Barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
 		SrcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 		DstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
 		vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
-		vkCmdPipelineBarrier(CommandBuffer, SrcStage, DstStage, 0, 0, nullptr, 0, nullptr, 1, Barriers);
+		vkCmdPipelineBarrier(CommandBuffer, SrcStage, DstStage, 0, 0, nullptr, 0, nullptr, 1, &Barrier);
 		vkEndCommandBuffer(CommandBuffer);
 
 		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
@@ -385,7 +399,8 @@ namespace BMR
 		vkFreeCommandBuffers(LogicalDevice, GraphicsCommandPool, 1, &CommandBuffer);
 
 		VkImageView View = CreateImageView(LogicalDevice, ImageBuffer.Image,
-			VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+			VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, TextureImageType,
+			Info.LayersCount);
 
 		TextureBuffers[ImageArraysCount] = ImageBuffer;
 		TextureImageViews[ImageArraysCount] = View;
@@ -396,10 +411,57 @@ namespace BMR
 		return CurrentIndex;
 	}
 
-	u32 LoadMaterial(u32 DiffuseTextureIndex, u32 SpecularTextureIndex)
+	// Shit but works for now
+	u32 UpdateTextureDescriptor(u32* ImageViewIndices, u32 Count, DescriptorLayoutHandles LayoutHandle)
 	{
-		return CreateTextureDescriptorSets(TextureImageViews[DiffuseTextureIndex],
-			TextureImageViews[SpecularTextureIndex]);
+		VkWriteDescriptorSet TextureWriteData[SamplerType::SamplerType_Count];
+		VkDescriptorImageInfo TextureImageInfo[SamplerType::SamplerType_Count];
+		VkDescriptorSetLayout Layout = MainRenderpass.DescriptorLayouts[LayoutHandle];
+		VkDescriptorSet& Descriptor = MainRenderpass.SamplerDescriptors[MainRenderpass.TextureDescriptorCount];
+
+		VulkanMemoryManagementSystem::AllocateSets(MainPool, &Layout, 1, &Descriptor);
+
+		for (u32 i = 0; i < Count; ++i)
+		{
+			TextureImageInfo[i] = { };
+			TextureImageInfo[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			TextureImageInfo[i].imageView = TextureImageViews[ImageViewIndices[i]];
+			TextureImageInfo[i].sampler = Sampler[i];
+
+			TextureWriteData[i] = { };
+			TextureWriteData[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			TextureWriteData[i].dstSet = Descriptor;
+			TextureWriteData[i].dstBinding = i;
+			TextureWriteData[i].dstArrayElement = 0;
+			TextureWriteData[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			TextureWriteData[i].descriptorCount = 1;
+			TextureWriteData[i].pImageInfo = TextureImageInfo + i;
+		}
+
+		vkUpdateDescriptorSets(LogicalDevice, Count, TextureWriteData, 0, nullptr);
+
+		const u32 CurrentIndex = MainRenderpass.TextureDescriptorCount;
+		++MainRenderpass.TextureDescriptorCount;
+
+		return CurrentIndex;
+	}
+
+	u32 LoadEntityMaterial(u32 DiffuseTextureIndex, u32 SpecularTextureIndex)
+	{
+		u32 TextureIndices[SamplerType::SamplerType_Count];
+		TextureIndices[SamplerType::SamplerType_Diffuse] = DiffuseTextureIndex;
+		TextureIndices[SamplerType::SamplerType_Specular] = SpecularTextureIndex;
+		return UpdateTextureDescriptor(TextureIndices, SamplerType::SamplerType_Count, DescriptorLayoutHandles::EntitySampler);
+	}
+
+	u32 LoadTerrainMaterial(u32 DiffuseTextureIndex)
+	{
+		return UpdateTextureDescriptor(&DiffuseTextureIndex, 1, DescriptorLayoutHandles::TerrainSampler);
+	}
+
+	u32 LoadSkyBoxMaterial(u32 CubeTextureIndex)
+	{
+		return UpdateTextureDescriptor(&CubeTextureIndex, 1, DescriptorLayoutHandles::TerrainSampler);
 	}
 
 	u64 LoadVertices(const void* Vertices, u32 VertexSize, VkDeviceSize VerticesCount)
@@ -494,31 +556,6 @@ namespace BMR
 		vkCmdBeginRenderPass(CommandBuffer, &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 		{
-			if (Scene.DrawSkyBox)
-			{
-				vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.Pipelines[BMRPipelineHandles::SkyBox]);
-
-				const u32 TerrainDescriptorSetGroupCount = 2;
-				const VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = {
-					MainRenderpass.DescriptorsToImages[DescriptorHandles::SkyBoxVp][MainRenderpass.ActiveVpSet],
-					MainRenderpass.SkyBoxSamplerDescriptorSets[Scene.SkyBox.MaterialIndex],
-				};
-
-				const VkPipelineLayout PipelineLayout = MainRenderpass.PipelineLayouts[BMRPipelineHandles::SkyBox];
-
-				vkCmdPushConstants(CommandBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-					0, sizeof(BMRModel), &Scene.SkyBox.Model);
-
-				vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-					0, TerrainDescriptorSetGroupCount, TerrainDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
-
-				vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &VertexBuffer.Buffer, &Scene.SkyBox.VertexOffset);
-				vkCmdBindIndexBuffer(CommandBuffer, IndexBuffer.Buffer, Scene.SkyBox.IndexOffset, VK_INDEX_TYPE_UINT32);
-				vkCmdDrawIndexed(CommandBuffer, Scene.SkyBox.IndicesCount, 1, 0, 0, 0);
-			}
-		}
-
-		{
 
 			vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.Pipelines[BMRPipelineHandles::Terrain]);
 
@@ -532,7 +569,7 @@ namespace BMR
 				const u32 TerrainDescriptorSetGroupCount = 2;
 				const VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = {
 					MainRenderpass.DescriptorsToImages[DescriptorHandles::TerrainVp][MainRenderpass.ActiveVpSet],
-					MainRenderpass.TerrainSamplerDescriptorSets[DrawTerrainEntity->MaterialIndex]
+					MainRenderpass.SamplerDescriptors[DrawTerrainEntity->MaterialIndex]
 				};
 
 				vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.PipelineLayouts[BMRPipelineHandles::Terrain],
@@ -559,7 +596,7 @@ namespace BMR
 				const VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] =
 				{
 					MainRenderpass.DescriptorsToImages[DescriptorHandles::EntityVp][MainRenderpass.ActiveVpSet],
-					MainRenderpass.EntitySamplerDescriptorSets[DrawEntity->MaterialIndex],
+					MainRenderpass.SamplerDescriptors[DrawEntity->MaterialIndex],
 					MainRenderpass.DescriptorsToImages[DescriptorHandles::EntityLigh][MainRenderpass.ActiveLightSet],
 					MainRenderpass.MaterialSet
 				};
@@ -575,6 +612,28 @@ namespace BMR
 				vkCmdBindVertexBuffers(CommandBuffer, 0, 1, VertexBuffers, Offsets);
 				vkCmdBindIndexBuffer(CommandBuffer, IndexBuffer.Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
 				vkCmdDrawIndexed(CommandBuffer, DrawEntity->IndicesCount, 1, 0, 0, 0);
+			}
+		}
+
+		{
+			if (Scene.DrawSkyBox)
+			{
+				vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.Pipelines[BMRPipelineHandles::SkyBox]);
+
+				const u32 TerrainDescriptorSetGroupCount = 2;
+				const VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = {
+					MainRenderpass.DescriptorsToImages[DescriptorHandles::SkyBoxVp][MainRenderpass.ActiveVpSet],
+					MainRenderpass.SamplerDescriptors[Scene.SkyBox.MaterialIndex],
+				};
+
+				const VkPipelineLayout PipelineLayout = MainRenderpass.PipelineLayouts[BMRPipelineHandles::SkyBox];
+
+				vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
+					0, TerrainDescriptorSetGroupCount, TerrainDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+
+				vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &VertexBuffer.Buffer, &Scene.SkyBox.VertexOffset);
+				vkCmdBindIndexBuffer(CommandBuffer, IndexBuffer.Buffer, Scene.SkyBox.IndexOffset, VK_INDEX_TYPE_UINT32);
+				vkCmdDrawIndexed(CommandBuffer, Scene.SkyBox.IndicesCount, 1, 0, 0, 0);
 			}
 		}
 
@@ -629,71 +688,6 @@ namespace BMR
 		}
 
 		CurrentFrame = (CurrentFrame + 1) % MAX_DRAW_FRAMES;
-	}
-
-	u32 CreateTextureDescriptorSets(VkImageView DiffuseTexture, VkImageView SpecularTexture)
-	{
-		auto TextureWriteData = Memory::BmMemoryManagementSystem::FrameAlloc<VkWriteDescriptorSet>(4);
-		auto TextureImageInfos = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorImageInfo>(2);
-		auto Layouts = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorSetLayout>(3);
-
-		Layouts[0] = MainRenderpass.DescriptorLayouts[DescriptorLayoutHandles::EntitySampler];
-		Layouts[1] = MainRenderpass.DescriptorLayouts[DescriptorLayoutHandles::TerrainSampler];
-		Layouts[2] = MainRenderpass.DescriptorLayouts[DescriptorLayoutHandles::SkyBoxSampler];
-
-		VkDescriptorSet EntitySet;
-		VkDescriptorSet TerrainSet;
-		VkDescriptorSet SkyBoxSet;
-
-		VulkanMemoryManagementSystem::AllocateSets(MainPool, &(Layouts[0]),
-			1, &EntitySet);
-
-		VulkanMemoryManagementSystem::AllocateSets(MainPool, &(Layouts[1]),
-			1, &TerrainSet);
-
-		VulkanMemoryManagementSystem::AllocateSets(MainPool, &(Layouts[2]),
-			1, &SkyBoxSet);
-
-		TextureImageInfos[0] = { };
-		TextureImageInfos[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		TextureImageInfos[0].imageView = DiffuseTexture;
-		TextureImageInfos[0].sampler = DiffuseTextureSampler;
-
-		TextureImageInfos[1] = TextureImageInfos[0];
-		TextureImageInfos[1].imageView = SpecularTexture;
-		TextureImageInfos[1].sampler = SpecularTextureSampler;
-
-		TextureWriteData[0] = { };
-		TextureWriteData[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		TextureWriteData[0].dstSet = EntitySet;
-		TextureWriteData[0].dstBinding = 0;
-		TextureWriteData[0].dstArrayElement = 0;
-		TextureWriteData[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		TextureWriteData[0].descriptorCount = 1;
-		TextureWriteData[0].pImageInfo = &TextureImageInfos[0];
-
-		TextureWriteData[1] = TextureWriteData[0];
-		TextureWriteData[1].dstBinding = 1;
-		TextureWriteData[1].pImageInfo = &TextureImageInfos[1];
-
-		TextureWriteData[2] = TextureWriteData[0];
-		TextureWriteData[2].dstSet = TerrainSet;
-		TextureWriteData[2].dstBinding = 0;
-
-		TextureWriteData[3] = TextureWriteData[0];
-		TextureWriteData[3].dstSet = SkyBoxSet;
-		TextureWriteData[3].dstBinding = 0;
-
-		vkUpdateDescriptorSets(LogicalDevice, 4, TextureWriteData, 0, nullptr);
-
-		MainRenderpass.EntitySamplerDescriptorSets[MainRenderpass.TextureDescriptorCountTest] = EntitySet;
-		MainRenderpass.TerrainSamplerDescriptorSets[MainRenderpass.TextureDescriptorCountTest] = TerrainSet;
-		MainRenderpass.SkyBoxSamplerDescriptorSets[MainRenderpass.TextureDescriptorCountTest] = SkyBoxSet;
-
-		const u32 CurrentIndex = MainRenderpass.TextureDescriptorCountTest;
-		++MainRenderpass.TextureDescriptorCountTest;
-
-		return CurrentIndex;
 	}
 
 	bool CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, u32 AvailableExtensionsCount,
@@ -931,9 +925,9 @@ namespace BMR
 		SamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 		SamplerCreateInfo.magFilter = VK_FILTER_LINEAR;						// How to render when image is magnified on screen
 		SamplerCreateInfo.minFilter = VK_FILTER_LINEAR;						// How to render when image is minified on screen
-		SamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;	// How to handle texture wrap in U (x) direction
-		SamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;	// How to handle texture wrap in V (y) direction
-		SamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;	// How to handle texture wrap in W (z) direction
+		SamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;	// How to handle texture wrap in U (x) direction
+		SamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;	// How to handle texture wrap in V (y) direction
+		SamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;	// How to handle texture wrap in W (z) direction
 		SamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;	// Border beyond texture (only workds for border clamp)
 		SamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;				// Whether coords should be normalized (between 0 and 1)
 		SamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;		// Mipmap interpolation mode

@@ -37,12 +37,15 @@ u32 ContainerTextureIndex;
 u32 ContainerSpecularTextureIndex;
 u32 BlendWindowIndex;
 u32 GrassTextureIndex;
+u32 SkyBoxCubeTextureIndex;
 
 u32 TestMaterialIndex;
 u32 WhiteMaterialIndex;
 u32 ContainerMaterialIndex;
 u32 BlendWindowMaterial;
 u32 GrassMaterial;
+u32 SkyBoxMaterial;
+u32 TerrainMaterial;
 
 BMR::BMRTerrainVertex TerrainVerticesData[NumRows][NumCols];
 
@@ -118,6 +121,13 @@ struct TestMesh
 	int MaterialIndex;
 };
 
+struct SkyBoxMesh
+{
+	std::vector<BMR::BMRSkyBoxVertex> vertices;
+	std::vector<u32> indices;
+	int MaterialIndex;
+};
+
 namespace std
 {
 	template<> struct hash<BMR::BMREntityVertex>
@@ -137,6 +147,16 @@ namespace std
 			return combinedHash;
 		}
 	};
+
+	template<> struct hash<BMR::BMRSkyBoxVertex>
+	{
+		size_t operator()(BMR::BMRSkyBoxVertex const& vertex) const
+		{
+			size_t hashPosition = std::hash<glm::vec3>()(vertex.Position);
+			size_t combinedHash = hashPosition;
+			return combinedHash;
+		}
+	};
 }
 
 struct VertexEqual
@@ -144,6 +164,11 @@ struct VertexEqual
 	bool operator()(const BMR::BMREntityVertex& lhs, const BMR::BMREntityVertex& rhs) const
 	{
 		return lhs.Position == rhs.Position && lhs.Color == rhs.Color && lhs.TextureCoords == rhs.TextureCoords;
+	}
+
+	bool operator()(const BMR::BMRSkyBoxVertex& lhs, const BMR::BMRSkyBoxVertex& rhs) const
+	{
+		return lhs.Position == rhs.Position;
 	}
 };
 
@@ -160,7 +185,6 @@ u32 AddTexture(const char* DiffuseTexturePath)
 	int Height;
 	int Channels;
 
-	// TODO: delete
 	stbi_uc* ImageData = stbi_load(DiffuseTexturePath, &Width, &Height, &Channels, STBI_rgb_alpha);
 
 	if (ImageData == nullptr)
@@ -173,9 +197,59 @@ u32 AddTexture(const char* DiffuseTexturePath)
 	Info.Height = Height;
 	Info.Format = STBI_rgb_alpha;
 	Info.LayersCount = 1;
-	Info.Data = ImageData;
+	Info.Data = &ImageData;
 
-	return BMR::LoadTexture(Info);
+	const u32 Handle = BMR::LoadTexture(Info, BMR::TextureType_2D);
+	stbi_image_free(ImageData);
+
+	return Handle;
+}
+
+u32 LoadCubeTexture()
+{
+	const u32 texCount = 6;
+
+	const char* CubeTexturePaths[texCount] = 
+	{
+		"./Resources/Textures/skybox/right.jpg",
+		"./Resources/Textures/skybox/left.jpg",
+		"./Resources/Textures/skybox/top.jpg",
+		"./Resources/Textures/skybox/bottom.jpg",
+		"./Resources/Textures/skybox/front.jpg",
+		"./Resources/Textures/skybox/back.jpg",
+	};
+
+	stbi_uc* CubeTexture[texCount];
+
+	int Width;
+	int Height;
+	int Channels;
+
+	for (u32 i = 0; i < texCount; ++i)
+	{
+		CubeTexture[i] = stbi_load(CubeTexturePaths[i], &Width, &Height, &Channels, STBI_rgb_alpha);
+
+		if (CubeTexture[i] == nullptr)
+		{
+			assert(false);
+		}
+	}
+
+	BMR::BMRTextureArrayInfo Info;
+	Info.Width = Width;
+	Info.Height = Height;
+	Info.Format = STBI_rgb_alpha;
+	Info.LayersCount = texCount;
+	Info.Data = CubeTexture;
+
+	const u32 Handle = BMR::LoadTexture(Info, BMR::TextureType_CUBE);
+	
+	for (u32 i = 0; i < texCount; ++i)
+	{
+		stbi_image_free(CubeTexture[i]);
+	}
+
+	return Handle;
 }
 
 void WindowCloseCallback(GLFWwindow* Window)
@@ -334,6 +408,52 @@ TestMesh CreateCubeMesh(const char* Modelpath, int materialIndex)
 	return cube;
 }
 
+SkyBoxMesh CreateSkyBoxMesh(const char* Modelpath, int materialIndex)
+{
+	SkyBoxMesh cube;
+
+	const char* BaseDir = "./Resources/Models/";
+
+	tinyobj::attrib_t Attrib;
+	std::vector<tinyobj::shape_t> Shapes;
+	std::vector<tinyobj::material_t> Materials;
+	std::string Warn, Err;
+
+	if (!tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &Warn, &Err, Modelpath, BaseDir))
+	{
+		assert(false);
+	}
+
+	std::unordered_map<BMR::BMRSkyBoxVertex, u32, std::hash<BMR::BMRSkyBoxVertex>, VertexEqual> uniqueVertices{ };
+
+	for (const auto& Shape : Shapes)
+	{
+		for (const auto& index : Shape.mesh.indices)
+		{
+			BMR::BMRSkyBoxVertex vertex{ };
+
+			vertex.Position =
+			{
+				Attrib.vertices[3 * index.vertex_index + 0],
+				Attrib.vertices[3 * index.vertex_index + 1],
+				Attrib.vertices[3 * index.vertex_index + 2]
+			};
+
+			if (uniqueVertices.count(vertex) == 0)
+			{
+				uniqueVertices[vertex] = static_cast<u32>(cube.vertices.size());
+				cube.vertices.push_back(vertex);
+			}
+
+			cube.indices.push_back(uniqueVertices[vertex]);
+		}
+
+		cube.MaterialIndex = materialIndex;
+	}
+
+	return cube;
+}
+
 void LoadDrawEntities()
 {
 	const char* Grass = "./Resources/Textures/grass.png";
@@ -345,6 +465,8 @@ void LoadDrawEntities()
 	const char* Modelpath = "./Resources/Models/uh60.obj";
 	const char* CubeObj = "./Resources/Models/cube.obj";
 	const char* SkyBoxObj = "./Resources/Models/SkyBox.obj";
+
+
 
 	const char* BaseDir = "./Resources/Models/";
 
@@ -367,11 +489,15 @@ void LoadDrawEntities()
 	BlendWindowIndex = AddTexture(BlendWindow);
 	GrassTextureIndex = AddTexture(Grass);
 
-	TestMaterialIndex = BMR::LoadMaterial(TestTextureIndex, ContainerSpecularTextureIndex);
-	WhiteMaterialIndex = BMR::LoadMaterial(WhiteTextureIndex, WhiteTextureIndex);
-	ContainerMaterialIndex = BMR::LoadMaterial(ContainerTextureIndex, ContainerSpecularTextureIndex);
-	BlendWindowMaterial = BMR::LoadMaterial(BlendWindowIndex, BlendWindowIndex);
-	GrassMaterial = BMR::LoadMaterial(GrassTextureIndex, GrassTextureIndex);
+	SkyBoxCubeTextureIndex = LoadCubeTexture();
+
+	TestMaterialIndex = BMR::LoadEntityMaterial(TestTextureIndex, ContainerSpecularTextureIndex);
+	WhiteMaterialIndex = BMR::LoadEntityMaterial(WhiteTextureIndex, WhiteTextureIndex);
+	ContainerMaterialIndex = BMR::LoadEntityMaterial(ContainerTextureIndex, ContainerSpecularTextureIndex);
+	BlendWindowMaterial = BMR::LoadEntityMaterial(BlendWindowIndex, BlendWindowIndex);
+	GrassMaterial = BMR::LoadEntityMaterial(GrassTextureIndex, GrassTextureIndex);
+	SkyBoxMaterial = BMR::LoadSkyBoxMaterial(SkyBoxCubeTextureIndex);
+	TerrainMaterial = BMR::LoadTerrainMaterial(TestTextureIndex);
 
 	for (size_t i = 0; i < Materials.size(); i++)
 	{
@@ -383,7 +509,7 @@ void LoadDrawEntities()
 			std::string FileName = "./Resources/Textures/" + Material.diffuse_texname.substr(Idx + 1);
 
 			const u32 NewTextureIndex = AddTexture(FileName.c_str());
-			MaterialToTexture[i] = BMR::LoadMaterial(NewTextureIndex, NewTextureIndex);
+			MaterialToTexture[i] = BMR::LoadEntityMaterial(NewTextureIndex, NewTextureIndex);
 		}
 	}
 
@@ -465,23 +591,13 @@ void LoadDrawEntities()
 		DrawEntities[i].MaterialIndex = ModelMeshes[i].MaterialIndex;
 	}
 
-	auto SkyBoxMesh = CreateCubeMesh(SkyBoxObj, ContainerMaterialIndex);
+	auto SkyBoxMesh = CreateSkyBoxMesh(SkyBoxObj, SkyBoxMaterial);
 
 	SkyBox.VertexOffset = LoadVertices(SkyBoxMesh.vertices.data(),
-		sizeof(BMR::BMREntityVertex), SkyBoxMesh.vertices.size());
+		sizeof(BMR::BMRSkyBoxVertex), SkyBoxMesh.vertices.size());
 	SkyBox.IndexOffset = BMR::LoadIndices(SkyBoxMesh.indices.data(), SkyBoxMesh.indices.size());
 	SkyBox.IndicesCount = SkyBoxMesh.indices.size();
 	SkyBox.MaterialIndex = SkyBoxMesh.MaterialIndex;
-
-	{
-		glm::vec3 CubePos(0.0f, 0.0f, 0.0f);
-		glm::mat4 model = glm::mat4(1.0f);
-		model = glm::translate(model, CubePos);
-		model = glm::rotate(model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		model = glm::scale(model, glm::vec3(500.0f));
-
-		SkyBox.Model = model;
-	}
 
 	{
 		glm::vec3 CubePos(0.0f, 0.0f, 8.0f);
@@ -646,7 +762,7 @@ int main()
 		sizeof(BMR::BMRTerrainVertex), NumRows * NumCols);
 	TestDrawTerrainEntity.IndexOffset = BMR::LoadIndices(indices.data(), indices.size());
 	TestDrawTerrainEntity.IndicesCount = indices.size();
-	TestDrawTerrainEntity.MaterialIndex = TestMaterialIndex;
+	TestDrawTerrainEntity.MaterialIndex = TerrainMaterial;
 
 	Scene.DrawTerrainEntities = &TestDrawTerrainEntity;
 	Scene.DrawTerrainEntitiesCount = 1;

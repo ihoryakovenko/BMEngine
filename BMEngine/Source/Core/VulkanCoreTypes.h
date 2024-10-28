@@ -19,9 +19,19 @@ namespace BMR
 	static const u32 MAX_SWAPCHAIN_IMAGES_COUNT = 3;
 	static const u32 MAX_IMAGES = 1024;
 	static const u32 MB64 = 1024 * 1024 * 64;
+	static const u32 MB128 = 1024 * 1024 * 128;
 	static const u32 BUFFER_ALIGNMENT = 64;
 	static const u32 IMAGE_ALIGNMENT = 4096;
 	static const u32 MAX_DRAW_FRAMES = 3;
+
+	enum SamplerType
+	{
+		SamplerType_Diffuse,
+		SamplerType_Specular,
+
+		SamplerType_Count,
+		SamplerType_None
+	};
 
 	struct BMRPhysicalDeviceIndices
 	{

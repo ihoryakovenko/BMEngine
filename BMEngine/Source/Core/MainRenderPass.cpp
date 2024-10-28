@@ -303,9 +303,6 @@ namespace BMR
 			DescriptorLayouts[DescriptorLayoutHandles::TerrainSampler]
 		};
 
-		PipelineLayouts[BMRPipelineHandles::Terrain] = CreatePipelineLayout(LogicalDevice,
-			TerrainDescriptorLayoutsCount, TerrainDescriptorLayouts, 0, nullptr);
-
 		const u32 EntityDescriptorLayoutCount = 4;
 		VkDescriptorSetLayout EntityDescriptorLayouts[EntityDescriptorLayoutCount] = {
 			DescriptorLayouts[DescriptorLayoutHandles::EntityVp],
@@ -314,20 +311,48 @@ namespace BMR
 			DescriptorLayouts[DescriptorLayoutHandles::Material]
 		};
 
-		PipelineLayouts[BMRPipelineHandles::Entity] = CreatePipelineLayout(LogicalDevice,
-			EntityDescriptorLayoutCount, EntityDescriptorLayouts, 1, &PushConstants[PushConstantHandles::Model]);
-
-		PipelineLayouts[BMRPipelineHandles::Deferred] = CreatePipelineLayout(LogicalDevice,
-			1, &DescriptorLayouts[DescriptorLayoutHandles::DeferredInput], 0, nullptr);
-
 		const u32 SkyBoxDescriptorLayoutCount = 2;
 		VkDescriptorSetLayout SkyBoxDescriptorLayouts[SkyBoxDescriptorLayoutCount] = {
 			DescriptorLayouts[DescriptorLayoutHandles::SkyBoxVp],
 			DescriptorLayouts[DescriptorLayoutHandles::SkyBoxSampler],
 		};
 
-		PipelineLayouts[BMRPipelineHandles::SkyBox] = CreatePipelineLayout(LogicalDevice, SkyBoxDescriptorLayoutCount,
-			SkyBoxDescriptorLayouts, 1, &PushConstants[PushConstantHandles::Model]);
+		u32 SetLayoutCountTable[BMRPipelineHandles::PipelineHandlesCount];
+		SetLayoutCountTable[BMRPipelineHandles::Entity] = EntityDescriptorLayoutCount;
+		SetLayoutCountTable[BMRPipelineHandles::Terrain] = TerrainDescriptorLayoutsCount;
+		SetLayoutCountTable[BMRPipelineHandles::Deferred] = 1;
+		SetLayoutCountTable[BMRPipelineHandles::SkyBox] = SkyBoxDescriptorLayoutCount;
+
+		const VkDescriptorSetLayout* SetLayouts[BMRPipelineHandles::PipelineHandlesCount];
+		SetLayouts[BMRPipelineHandles::Entity] = EntityDescriptorLayouts;
+		SetLayouts[BMRPipelineHandles::Terrain] = TerrainDescriptorLayouts;
+		SetLayouts[BMRPipelineHandles::Deferred] = DescriptorLayouts + DescriptorLayoutHandles::DeferredInput;
+		SetLayouts[BMRPipelineHandles::SkyBox] = SkyBoxDescriptorLayouts;
+
+		u32 PushConstantRangeCountTable[BMRPipelineHandles::PipelineHandlesCount];
+		PushConstantRangeCountTable[BMRPipelineHandles::Entity] = 1;
+		PushConstantRangeCountTable[BMRPipelineHandles::Terrain] = 0;
+		PushConstantRangeCountTable[BMRPipelineHandles::Deferred] = 0;
+		PushConstantRangeCountTable[BMRPipelineHandles::SkyBox] = 0;
+
+		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo[BMRPipelineHandles::PipelineHandlesCount];
+		for (u32 i = 0; i < BMRPipelineHandles::PipelineHandlesCount; ++i)
+		{
+			PipelineLayoutCreateInfo[i] = { };
+			PipelineLayoutCreateInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			PipelineLayoutCreateInfo[i].setLayoutCount = SetLayoutCountTable[i];
+			PipelineLayoutCreateInfo[i].pSetLayouts = SetLayouts[i];
+			PipelineLayoutCreateInfo[i].pushConstantRangeCount = PushConstantRangeCountTable[i];
+			PipelineLayoutCreateInfo[i].pPushConstantRanges = &PushConstants[PushConstantHandles::Model];
+
+			const VkResult Result = vkCreatePipelineLayout(LogicalDevice, PipelineLayoutCreateInfo + i, nullptr,
+				PipelineLayouts + i);
+			if (Result != VK_SUCCESS)
+			{
+				Util::Log().Error("vkCreatePipelineLayout result is {}", static_cast<int>(Result));
+				assert(false);
+			}
+		}
 	}
 
 	void BMRMainRenderPass::CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent,
@@ -385,6 +410,11 @@ namespace BMR
 		TerrainVertexInputBindingDescription.stride = sizeof(BMRTerrainVertex);
 		TerrainVertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
+		VkVertexInputBindingDescription SkyBoxVertexInputBindingDescription = { };
+		SkyBoxVertexInputBindingDescription.binding = 0;
+		SkyBoxVertexInputBindingDescription.stride = sizeof(BMRSkyBoxVertex);
+		SkyBoxVertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
 		const u32 TerrainVertexInputBindingDescriptionCount = 1;
 		VkVertexInputAttributeDescription TerrainAttributeDescriptions[TerrainVertexInputBindingDescriptionCount];
 		TerrainAttributeDescriptions[0].binding = 0;
@@ -411,6 +441,13 @@ namespace BMR
 		EntityAttributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
 		EntityAttributeDescriptions[3].offset = offsetof(BMREntityVertex, Normal);
 
+		const u32 SkyBoxVertexInputBindingDescriptionCount = 1;
+		VkVertexInputAttributeDescription SkyBoxAttributeDescriptions[SkyBoxVertexInputBindingDescriptionCount];
+		SkyBoxAttributeDescriptions[0].binding = 0;
+		SkyBoxAttributeDescriptions[0].location = 0;
+		SkyBoxAttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+		SkyBoxAttributeDescriptions[0].offset = offsetof(BMRSkyBoxVertex, Position);
+
 		u32 VertexBindingDescriptionCountTable[BMRPipelineHandles::PipelineHandlesCount];
 		VertexBindingDescriptionCountTable[BMRPipelineHandles::Entity] = 1;
 		VertexBindingDescriptionCountTable[BMRPipelineHandles::Terrain] = 1;
@@ -421,19 +458,19 @@ namespace BMR
 		VertexBindingDescriptionsTable[BMRPipelineHandles::Entity] = &EntityInputBindingDescription;
 		VertexBindingDescriptionsTable[BMRPipelineHandles::Terrain] = &TerrainVertexInputBindingDescription;
 		VertexBindingDescriptionsTable[BMRPipelineHandles::Deferred] = nullptr;
-		VertexBindingDescriptionsTable[BMRPipelineHandles::SkyBox] = &EntityInputBindingDescription;
+		VertexBindingDescriptionsTable[BMRPipelineHandles::SkyBox] = &SkyBoxVertexInputBindingDescription;
 
 		u32 VertexAttributeDescriptionCountTable[BMRPipelineHandles::PipelineHandlesCount];
 		VertexAttributeDescriptionCountTable[BMRPipelineHandles::Entity] = EntityVertexInputBindingDescriptionCount;
 		VertexAttributeDescriptionCountTable[BMRPipelineHandles::Terrain] = TerrainVertexInputBindingDescriptionCount;
 		VertexAttributeDescriptionCountTable[BMRPipelineHandles::Deferred] = 0;
-		VertexAttributeDescriptionCountTable[BMRPipelineHandles::SkyBox] = EntityVertexInputBindingDescriptionCount;
+		VertexAttributeDescriptionCountTable[BMRPipelineHandles::SkyBox] = SkyBoxVertexInputBindingDescriptionCount;
 
 		const VkVertexInputAttributeDescription* VertexAttributeDescriptionsTable[BMRPipelineHandles::PipelineHandlesCount];
 		VertexAttributeDescriptionsTable[BMRPipelineHandles::Entity] = EntityAttributeDescriptions;
 		VertexAttributeDescriptionsTable[BMRPipelineHandles::Terrain] = TerrainAttributeDescriptions;
 		VertexAttributeDescriptionsTable[BMRPipelineHandles::Deferred] = nullptr;
-		VertexAttributeDescriptionsTable[BMRPipelineHandles::SkyBox] = EntityAttributeDescriptions;
+		VertexAttributeDescriptionsTable[BMRPipelineHandles::SkyBox] = SkyBoxAttributeDescriptions;
 
 		// Inputassembly
 		VkPipelineInputAssemblyStateCreateInfo InputAssemblyStateCreateInfo = { };
@@ -594,7 +631,7 @@ namespace BMR
 		VkCompareOp DepthCompareOpTable[BMRPipelineHandles::PipelineHandlesCount];
 		DepthCompareOpTable[BMRPipelineHandles::Entity] = VK_COMPARE_OP_LESS;
 		DepthCompareOpTable[BMRPipelineHandles::Terrain] = VK_COMPARE_OP_LESS;
-		DepthCompareOpTable[BMRPipelineHandles::SkyBox] = VK_COMPARE_OP_LESS;
+		DepthCompareOpTable[BMRPipelineHandles::SkyBox] = VK_COMPARE_OP_EQUAL;
 
 		VkBool32 DepthBoundsTestEnableTable[BMRPipelineHandles::PipelineHandlesCount];
 		DepthBoundsTestEnableTable[BMRPipelineHandles::Entity] = VK_FALSE;
@@ -615,6 +652,7 @@ namespace BMR
 		VkPipelineColorBlendStateCreateInfo ColorBlendInfo[BMRPipelineHandles::PipelineHandlesCount];
 		VkPipelineDepthStencilStateCreateInfo DepthStencilInfo[BMRPipelineHandles::PipelineHandlesCount];
 		VkGraphicsPipelineCreateInfo PipelineCreateInfos[BMRPipelineHandles::PipelineHandlesCount];
+
 		for (u32 i = 0; i < BMRPipelineHandles::PipelineHandlesCount; ++i)
 		{
 			RasterizationStateCreateInfo[i] = { };
@@ -643,9 +681,7 @@ namespace BMR
 			ColorBlendAttachmentState[i].dstAlphaBlendFactor = DstAlphaBlendFactorTable[i];
 			ColorBlendAttachmentState[i].alphaBlendOp = AlphaBlendOpTable[i];
 
-			AttachmentsTable[i] = &(ColorBlendAttachmentState[i]);
-			AttachmentsTable[i] = &(ColorBlendAttachmentState[i]);
-			AttachmentsTable[i] = &(ColorBlendAttachmentState[i]);
+			AttachmentsTable[i] = ColorBlendAttachmentState + i;
 
 			ColorBlendInfo[i] = { };
 			ColorBlendInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -665,14 +701,14 @@ namespace BMR
 			PipelineCreateInfos[i].sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 			PipelineCreateInfos[i].stageCount = ShaderInfos[i].InfosCounter;
 			PipelineCreateInfos[i].pStages = ShaderInfos[i].Infos;
-			PipelineCreateInfos[i].pVertexInputState = &(VertexInputInfo[i]);
+			PipelineCreateInfos[i].pVertexInputState = VertexInputInfo + i;
 			PipelineCreateInfos[i].pInputAssemblyState = &InputAssemblyStateCreateInfo;
 			PipelineCreateInfos[i].pViewportState = &ViewportStateCreateInfo;
 			PipelineCreateInfos[i].pDynamicState = nullptr;
-			PipelineCreateInfos[i].pRasterizationState = &(RasterizationStateCreateInfo[i]);
+			PipelineCreateInfos[i].pRasterizationState = RasterizationStateCreateInfo + i;
 			PipelineCreateInfos[i].pMultisampleState = &MultisampleStateCreateInfo;
-			PipelineCreateInfos[i].pColorBlendState = &(ColorBlendInfo[i]);
-			PipelineCreateInfos[i].pDepthStencilState = &(DepthStencilInfo[i]);
+			PipelineCreateInfos[i].pColorBlendState = ColorBlendInfo + i;
+			PipelineCreateInfos[i].pDepthStencilState = DepthStencilInfo + i;
 			PipelineCreateInfos[i].layout = PipelineLayouts[i];
 			PipelineCreateInfos[i].renderPass = RenderPass;
 			PipelineCreateInfos[i].subpass = SubpassesToPipelineTable[i];
@@ -709,14 +745,16 @@ namespace BMR
 				DepthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 				&DepthBuffers[i].Memory);
 
-			DepthBufferViews[i] = CreateImageView(LogicalDevice, DepthBuffers[i].Image, DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+			DepthBufferViews[i] = CreateImageView(LogicalDevice, DepthBuffers[i].Image,
+				DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_VIEW_TYPE_2D, 1);
 
 			// VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT says that image can be used only as attachment. Used only for sub pass
 			ColorBuffers[i].Image = CreateImage(PhysicalDevice, LogicalDevice, SwapExtent.width, SwapExtent.height,
 				ColorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 				&ColorBuffers[i].Memory);
 
-			ColorBufferViews[i] = CreateImageView(LogicalDevice, ColorBuffers[i].Image, ColorFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+			ColorBufferViews[i] = CreateImageView(LogicalDevice, ColorBuffers[i].Image,
+				ColorFormat, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_2D, 1);
 		}
 	}
 
