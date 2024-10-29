@@ -15,6 +15,6 @@ void main()
 	
 	FragDirection = Position;
 
-	vec4 Pos = gl_Position = ViewProjection.Projection * mat4(mat3(ViewProjection.View)) * vec4(Position, 1.0);
+	vec4 Pos = ViewProjection.Projection * mat4(mat3(ViewProjection.View)) * vec4(Position, 1.0);
     gl_Position = Pos.xyww;
 }

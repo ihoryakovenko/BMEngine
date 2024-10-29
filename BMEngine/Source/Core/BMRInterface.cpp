@@ -103,7 +103,7 @@ namespace BMR
 
 		const char* ValidationLayers[] = {
 			"VK_LAYER_KHRONOS_validation",
-			"VK_LAYER_LUNARG_monitor"
+			"VK_LAYER_LUNARG_monitor",
 		};
 		const u32 ValidationLayersSize = sizeof(ValidationLayers) / sizeof(ValidationLayers[0]);
 
@@ -133,7 +133,7 @@ namespace BMR
 			if (!CheckValidationLayersSupport(LayerPropertiesData.Pointer.Data, LayerPropertiesData.Count,
 				ValidationLayers, ValidationLayersSize))
 			{
-				return false;
+				assert(false);
 			}
 		}
 
@@ -310,7 +310,7 @@ namespace BMR
 		ImageCreateInfo.extent.depth = 1; // Depth of image (just 1, no 3D aspect)
 		ImageCreateInfo.mipLevels = 1;
 		ImageCreateInfo.arrayLayers = Info.LayersCount;
-		ImageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM; // Format type of image
+		ImageCreateInfo.format = VK_FORMAT_R8G8B8A8_SRGB; // TODO: use VK_FORMAT_R8G8B8A8_UNORM for specular maps and normal maps
 		ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL; // How image data should be "tiled" (arranged for optimal reading)
 		ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Layout of image data on creation
 		ImageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT; // Bit flags defining what image will be used for
@@ -399,7 +399,7 @@ namespace BMR
 		vkFreeCommandBuffers(LogicalDevice, GraphicsCommandPool, 1, &CommandBuffer);
 
 		VkImageView View = CreateImageView(LogicalDevice, ImageBuffer.Image,
-			VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, TextureImageType,
+			VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, TextureImageType,
 			Info.LayersCount);
 
 		TextureBuffers[ImageArraysCount] = ImageBuffer;
@@ -466,13 +466,13 @@ namespace BMR
 
 	u64 LoadVertices(const void* Vertices, u32 VertexSize, VkDeviceSize VerticesCount)
 	{
-		VkDeviceSize MeshVerticesSize = VertexSize * VerticesCount;
-		MeshVerticesSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(MeshVerticesSize);
+		const VkDeviceSize MeshVerticesSize = VertexSize * VerticesCount;
+		const VkDeviceSize AlignedSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(MeshVerticesSize);
 
 		VulkanMemoryManagementSystem::CopyDataToBuffer(VertexBuffer.Buffer, VertexBufferOffset, MeshVerticesSize, Vertices);
 
 		const VkDeviceSize CurrentOffset = VertexBufferOffset;
-		VertexBufferOffset += MeshVerticesSize;
+		VertexBufferOffset += AlignedSize;
 
 		return CurrentOffset;
 	}
@@ -480,12 +480,12 @@ namespace BMR
 	u64 LoadIndices(const u32* Indices, u32 IndicesCount)
 	{
 		VkDeviceSize MeshIndicesSize = sizeof(u32) * IndicesCount;
-		MeshIndicesSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(MeshIndicesSize);
+		const VkDeviceSize AlignedSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(MeshIndicesSize);
 
 		VulkanMemoryManagementSystem::CopyDataToBuffer(IndexBuffer.Buffer, IndexBufferOffset, MeshIndicesSize, Indices);
 
 		const VkDeviceSize CurrentOffset = IndexBufferOffset;
-		IndexBufferOffset += MeshIndicesSize;
+		IndexBufferOffset += AlignedSize;
 
 		return CurrentOffset;
 	}
@@ -620,8 +620,8 @@ namespace BMR
 			{
 				vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderpass.Pipelines[BMRPipelineHandles::SkyBox]);
 
-				const u32 TerrainDescriptorSetGroupCount = 2;
-				const VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = {
+				const u32 SkyBoxDescriptorSetGroupCount = 2;
+				const VkDescriptorSet SkyBoxDescriptorSetGroup[SkyBoxDescriptorSetGroupCount] = {
 					MainRenderpass.DescriptorsToImages[DescriptorHandles::SkyBoxVp][MainRenderpass.ActiveVpSet],
 					MainRenderpass.SamplerDescriptors[Scene.SkyBox.MaterialIndex],
 				};
@@ -629,7 +629,7 @@ namespace BMR
 				const VkPipelineLayout PipelineLayout = MainRenderpass.PipelineLayouts[BMRPipelineHandles::SkyBox];
 
 				vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-					0, TerrainDescriptorSetGroupCount, TerrainDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+					0, SkyBoxDescriptorSetGroupCount, SkyBoxDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
 
 				vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &VertexBuffer.Buffer, &Scene.SkyBox.VertexOffset);
 				vkCmdBindIndexBuffer(CommandBuffer, IndexBuffer.Buffer, Scene.SkyBox.IndexOffset, VK_INDEX_TYPE_UINT32);

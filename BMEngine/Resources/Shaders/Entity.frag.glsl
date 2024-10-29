@@ -78,9 +78,9 @@ vec3 Diffuse(vec3 LightDirection, vec3 Color, vec3 Texture)
 vec3 Specular(vec3 LightDirection, vec3 Color, vec3 Texture)
 {
 	vec3 ViewDirection = normalize(-FragmentPosition);
-	vec3 ReflectDirection = reflect(-LightDirection, FragmentNormal);
+	vec3 HalfwayDirection = normalize(LightDirection + ViewDirection);
 
-	float SpecularImpact = pow(max(dot(ViewDirection, ReflectDirection), 0.0), materials.Shininess);
+	float SpecularImpact = pow(max(dot(FragmentNormal, HalfwayDirection), 0.0), materials.Shininess);
 	return Color * SpecularImpact * Texture; 
 }
 

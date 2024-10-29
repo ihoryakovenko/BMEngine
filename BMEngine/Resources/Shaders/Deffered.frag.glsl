@@ -18,6 +18,8 @@ vec3 Grayscale(vec3 Color)
 
 void main()
 {
+	float Gamma = 2.2;
+
 	int xHalf = 1200;
 	if (gl_FragCoord.x > xHalf)
 	{
@@ -37,4 +39,6 @@ void main()
 		//Color = vec4(InverseColor(SceneColor.rgb), SceneColor.a);
 		Color = SceneColor;
 	}
+
+	 Color.rgb = pow(Color.rgb, vec3(1.0 / Gamma));
 }

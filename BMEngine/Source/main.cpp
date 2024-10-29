@@ -393,7 +393,7 @@ TestMesh CreateCubeMesh(const char* Modelpath, int materialIndex)
 				vertex.Normal = { 0.0f, 1.0f, 0.0f }; // Default to up-direction, or compute it later
 			}
 
-			if (uniqueVertices.count(vertex) == 0)
+			if (!uniqueVertices.contains(vertex))
 			{
 				uniqueVertices[vertex] = static_cast<u32>(cube.vertices.size());
 				cube.vertices.push_back(vertex);
@@ -439,7 +439,7 @@ SkyBoxMesh CreateSkyBoxMesh(const char* Modelpath, int materialIndex)
 				Attrib.vertices[3 * index.vertex_index + 2]
 			};
 
-			if (uniqueVertices.count(vertex) == 0)
+			if (!uniqueVertices.contains(vertex))
 			{
 				uniqueVertices[vertex] = static_cast<u32>(cube.vertices.size());
 				cube.vertices.push_back(vertex);
@@ -557,7 +557,7 @@ void LoadDrawEntities()
 				vertex.Normal = { 0.0f, 1.0f, 0.0f }; // Default to up-direction, or compute it later
 			}
 
-			if (uniqueVertices.count(vertex) == 0)
+			if (!uniqueVertices.contains(vertex))
 			{
 				uniqueVertices[vertex] = static_cast<u32>(Tm.vertices.size());
 				Tm.vertices.push_back(vertex);
@@ -721,6 +721,7 @@ int main()
 	LoadShaders();
 
 	std::vector<u32> indices;
+	indices.reserve(NumRows * NumCols);
 	for (int row = 0; row < NumRows - 1; ++row)
 	{
 		for (int col = 0; col < NumCols - 1; ++col)
@@ -749,7 +750,7 @@ int main()
 
 	BMR::BMRDrawScene Scene;
 	Scene.SkyBox = SkyBox;
-	Scene.DrawSkyBox = true;
+	Scene.DrawSkyBox = false;
 
 	Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
 		static_cast<f32>(1600) / static_cast<f32>(800), 0.1f, 1000.0f);
@@ -782,7 +783,7 @@ int main()
 
 	BMR::BMRLightBuffer TestData;
 	TestData.PointLight.Position = glm::vec4(0.0f, 0.0f, 10.0f, 1.0f);
-	TestData.PointLight.Ambient = glm::vec3(0.1f, 0.1f, 0.1f);
+	TestData.PointLight.Ambient = glm::vec3(0.01f, 0.01f, 0.01f);
 	TestData.PointLight.Diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
 	TestData.PointLight.Specular = glm::vec3(1.0f, 1.0f, 1.0f);
 	TestData.PointLight.Constant = 1.0f;
@@ -790,12 +791,12 @@ int main()
 	TestData.PointLight.Quadratic = 0.032;
 
 	TestData.DirectionLight.Direction = glm::vec3(0.0f, -1.0f, 0.0f);
-	TestData.DirectionLight.Ambient = glm::vec3(0.1f, 0.1f, 0.1f);
+	TestData.DirectionLight.Ambient = glm::vec3(0.01f, 0.01f, 0.01f);
 	TestData.DirectionLight.Diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
 	TestData.DirectionLight.Specular = glm::vec3(1.0f, 1.0f, 1.0f);
 
 	TestData.SpotLight.Position = glm::vec4(0.0f, 0.0f, 10.0f, 1.0f);
-	TestData.SpotLight.Ambient = glm::vec3(0.1f, 0.1f, 0.1f);
+	TestData.SpotLight.Ambient = glm::vec3(0.01f, 0.01f, 0.01f);
 	TestData.SpotLight.Diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
 	TestData.SpotLight.Specular = glm::vec3(1.0f, 1.0f, 1.0f);
 	TestData.SpotLight.Constant = 1.0f;

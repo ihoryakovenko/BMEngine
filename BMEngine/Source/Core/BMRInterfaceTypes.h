@@ -142,13 +142,13 @@ namespace BMR
 		BMRUboViewProjection ViewProjection;
 
 		BMRDrawEntity* DrawEntities;
-		u32 DrawEntitiesCount;
+		u32 DrawEntitiesCount = 0;
 
 		BMRDrawEntity* DrawTransparentEntities;
-		u32 DrawTransparentEntitiesCount;
+		u32 DrawTransparentEntitiesCount = 0;
 
 		BMRDrawTerrainEntity* DrawTerrainEntities;
-		u32 DrawTerrainEntitiesCount;
+		u32 DrawTerrainEntitiesCount = 0;
 
 		BMRDrawSkyBoxEntity SkyBox;
 		bool DrawSkyBox = false;
