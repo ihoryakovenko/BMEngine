@@ -631,7 +631,7 @@ namespace BMR
 		VkCompareOp DepthCompareOpTable[BMRPipelineHandles::PipelineHandlesCount];
 		DepthCompareOpTable[BMRPipelineHandles::Entity] = VK_COMPARE_OP_LESS;
 		DepthCompareOpTable[BMRPipelineHandles::Terrain] = VK_COMPARE_OP_LESS;
-		DepthCompareOpTable[BMRPipelineHandles::SkyBox] = VK_COMPARE_OP_EQUAL;
+		DepthCompareOpTable[BMRPipelineHandles::SkyBox] = VK_COMPARE_OP_LESS_OR_EQUAL;
 
 		VkBool32 DepthBoundsTestEnableTable[BMRPipelineHandles::PipelineHandlesCount];
 		DepthBoundsTestEnableTable[BMRPipelineHandles::Entity] = VK_FALSE;

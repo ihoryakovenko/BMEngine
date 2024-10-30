@@ -12,7 +12,6 @@ layout(location = 0) out vec3 FragDirection;
 
 void main()
 {
-	
 	FragDirection = Position;
 
 	vec4 Pos = ViewProjection.Projection * mat4(mat3(ViewProjection.View)) * vec4(Position, 1.0);

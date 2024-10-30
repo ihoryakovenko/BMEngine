@@ -750,7 +750,7 @@ int main()
 
 	BMR::BMRDrawScene Scene;
 	Scene.SkyBox = SkyBox;
-	Scene.DrawSkyBox = false;
+	Scene.DrawSkyBox = true;
 
 	Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
 		static_cast<f32>(1600) / static_cast<f32>(800), 0.1f, 1000.0f);
