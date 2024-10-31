@@ -112,7 +112,6 @@ namespace BMR
 
 		BMRSwapchainInstance ViewportSwapchain;
 
-		VkFramebuffer SwapchainFramebuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkCommandBuffer CommandBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 	};
 }

@@ -19,22 +19,22 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source\Core\MainRenderPass.cpp" />
-    <ClCompile Include="Source\Core\VulkanHelper.cpp" />
-    <ClCompile Include="Source\Core\VulkanCoreTypes.cpp" />
-    <ClCompile Include="Source\Core\VulkanMemoryManagementSystem.cpp" />
-    <ClCompile Include="Source\Core\BMRInterface.cpp" />
+    <ClCompile Include="Source\BMR\MainRenderPass.cpp" />
+    <ClCompile Include="Source\BMR\VulkanHelper.cpp" />
+    <ClCompile Include="Source\BMR\VulkanCoreTypes.cpp" />
+    <ClCompile Include="Source\BMR\VulkanMemoryManagementSystem.cpp" />
+    <ClCompile Include="Source\BMR\BMRInterface.cpp" />
     <ClCompile Include="Source\main.cpp" />
     <ClCompile Include="Source\Util\Util.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\Core\BMRInterfaceTypes.h" />
-    <ClInclude Include="Source\Core\MainRenderPass.h" />
+    <ClInclude Include="Source\BMR\BMRInterfaceTypes.h" />
+    <ClInclude Include="Source\BMR\MainRenderPass.h" />
     <ClInclude Include="Source\Memory\MemoryManagmentSystem.h" />
-    <ClInclude Include="Source\Core\VulkanCoreTypes.h" />
-    <ClInclude Include="Source\Core\VulkanHelper.h" />
-    <ClInclude Include="Source\Core\VulkanMemoryManagementSystem.h" />
-    <ClInclude Include="Source\Core\BMRInterface.h" />
+    <ClInclude Include="Source\BMR\VulkanCoreTypes.h" />
+    <ClInclude Include="Source\BMR\VulkanHelper.h" />
+    <ClInclude Include="Source\BMR\VulkanMemoryManagementSystem.h" />
+    <ClInclude Include="Source\BMR\BMRInterface.h" />
     <ClInclude Include="Source\Util\EngineTypes.h" />
     <ClInclude Include="Source\Util\stb_image.h" />
     <ClInclude Include="Source\Util\Util.h" />
@@ -182,7 +182,7 @@
       <Message>1</Message>
     </PostBuildEvent>
     <CustomBuildStep>
-      <Command>call $(SolutionDir)$(ProjectName)\Resources\Shaders\CompileShaders.bat</Command>
+      <Command>call $(SolutionDir)$(ProjectName)\Source\BMR\Shaders\CompileShaders.bat $(ProjectDir)</Command>
       <Outputs>1</Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>
@@ -215,7 +215,7 @@
       <Message>1</Message>
     </PostBuildEvent>
     <CustomBuildStep>
-      <Command>call $(SolutionDir)$(ProjectName)\Resources\Shaders\CompileShaders.bat</Command>
+      <Command>call $(SolutionDir)$(ProjectName)\Source\BMR\Shaders\CompileShaders.bat $(ProjectDir)</Command>
       <Outputs>1</Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>

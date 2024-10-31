@@ -20,6 +20,7 @@ namespace BMR
 
 	void UpdateLightBuffer(const BMRLightBuffer& Buffer);
 	void UpdateMaterialBuffer(const BMRMaterial& Buffer);
+	void UpdateLightSpaceBuffer(const BMRLightSpaceMatrix* LightSpaceMatrix);
 
 	void Draw(const BMRDrawScene& Scene);
 }

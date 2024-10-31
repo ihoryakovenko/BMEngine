@@ -14,7 +14,7 @@
 #include <cassert>
 #include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
-#include "Core/BMRInterface.h"
+#include "BMR/BMRInterface.h"
 #include <tiny_obj_loader.h>
 #include <unordered_map>
 #include <random>
@@ -56,8 +56,8 @@ BMR::BMRDrawSkyBoxEntity SkyBox;
 
 void GenerateTerrain()
 {
-	const f32 MaxAltitude = 10.0f;
-	const f32 MinAltitude = 0.0f;
+	const f32 MaxAltitude = 0.0f;
+	const f32 MinAltitude = -10.0f;
 	const f32 SmoothMin = 7.0f;
 	const f32 SmoothMax = 3.0f;
 	const f32 SmoothFactor = 0.5f;
@@ -119,6 +119,7 @@ struct TestMesh
 	std::vector<BMR::BMREntityVertex> vertices;
 	std::vector<u32> indices;
 	int MaterialIndex;
+	glm::mat4 Model = glm::mat4(1.0f);
 };
 
 struct SkyBoxMesh
@@ -571,6 +572,19 @@ void LoadDrawEntities()
 		ModelMeshes.push_back(Tm);
 	}
 	
+	{
+		auto FloorMesh = CreateCubeMesh(CubeObj, WhiteMaterialIndex);
+
+		glm::vec3 CubePos(0.0f, -5.0f, 0.0f);
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, CubePos);
+		//model = glm::rotate(model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		model = glm::scale(model, glm::vec3(20.0f, 1.0f, 20.0f));
+		FloorMesh.Model = model;
+
+		ModelMeshes.emplace_back(FloorMesh);
+	}
+	
 	ModelMeshes.emplace_back(CreateCubeMesh(CubeObj, GrassMaterial));
 	ModelMeshes.emplace_back(CreateCubeMesh(CubeObj, WhiteMaterialIndex));
 	ModelMeshes.emplace_back(CreateCubeMesh(CubeObj, WhiteMaterialIndex));
@@ -587,7 +601,7 @@ void LoadDrawEntities()
 			ModelMeshes[i].indices.size());
 
 		DrawEntities[i].IndicesCount = ModelMeshes[i].indices.size();
-		DrawEntities[i].Model = glm::mat3(1);
+		DrawEntities[i].Model = ModelMeshes[i].Model;
 		DrawEntities[i].MaterialIndex = ModelMeshes[i].MaterialIndex;
 	}
 
@@ -681,6 +695,14 @@ void LoadShaders()
 	HandleToPath.push_back(BMR::BMRPipelineHandles::SkyBox);
 	StageToStages.push_back(BMR::BMRShaderStages::Fragment);
 
+	ShaderPaths.push_back("./Resources/Shaders/Depth_vert.spv");
+	HandleToPath.push_back(BMR::BMRPipelineHandles::Depth);
+	StageToStages.push_back(BMR::BMRShaderStages::Vertex);
+
+	ShaderPaths.push_back("./Resources/Shaders/Depth_frag.spv");
+	HandleToPath.push_back(BMR::BMRPipelineHandles::Depth);
+	StageToStages.push_back(BMR::BMRShaderStages::Fragment);
+
 
 	for (u32 i = 0; i < BMR::BMRShaderNames::ShaderNamesCount; ++i)
 	{
@@ -707,7 +729,7 @@ int main()
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-	GLFWwindow* Window = glfwCreateWindow(1600, 800, "BMEngine", nullptr, nullptr);
+	GLFWwindow* Window = glfwCreateWindow(1920, 1080, "BMEngine", nullptr, nullptr);
 	if (Window == nullptr)
 	{
 		Util::Log::GlfwLogError();
@@ -753,11 +775,10 @@ int main()
 	Scene.DrawSkyBox = true;
 
 	Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-		static_cast<f32>(1600) / static_cast<f32>(800), 0.1f, 1000.0f);
+		static_cast<f32>(1920) / static_cast<f32>(1080), 0.1f, 1000.0f);
 	Scene.ViewProjection.Projection[1][1] *= -1;
 	Scene.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
-	
 	BMR::BMRDrawTerrainEntity TestDrawTerrainEntity;
 	TestDrawTerrainEntity.VertexOffset = LoadVertices(&TerrainVerticesData[0][0],
 		sizeof(BMR::BMRTerrainVertex), NumRows * NumCols);
@@ -808,6 +829,15 @@ int main()
 	BMR::BMRMaterial Mat;
 	Mat.Shininess = 32.f;
 	BMR::UpdateMaterialBuffer(Mat);
+
+	float near_plane = 1.0f, far_plane = 7.5f;
+	glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+
+	glm::mat4 lightView = glm::lookAt(glm::vec3(-2.0f, 4.0f, -1.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	BMR::BMRLightSpaceMatrix lightSpaceMatrix;
+	lightSpaceMatrix.Matrix = lightProjection * lightView;
+
+	BMR::UpdateLightSpaceBuffer(&lightSpaceMatrix);
 
 	while (!glfwWindowShouldClose(Window) && !Close)
 	{

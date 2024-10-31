@@ -20,7 +20,7 @@ void main()
 {
 	float Gamma = 2.2;
 
-	int xHalf = 1200;
+	int xHalf = 1600;
 	if (gl_FragCoord.x > xHalf)
 	{
 		float lowerBound = 0.99;

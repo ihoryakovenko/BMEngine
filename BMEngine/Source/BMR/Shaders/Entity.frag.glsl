@@ -1,3 +1,5 @@
+//https://openbenchmarking.org/system/1612212-TA-OPENCLING99/GeForce%20GTX%20760/vulkaninfo
+
 #version 450
 
 struct PointLight
