@@ -32,7 +32,7 @@ namespace BMR
 
 	static VkDevice CreateLogicalDevice(BMRPhysicalDeviceIndices Indices, const char* DeviceExtensions[],
 		u32 DeviceExtensionsSize);
-	static VkSampler CreateTextureSampler();
+	static VkSampler CreateTextureSampler(f32 MaxAnisotropy);
 
 	static bool SetupQueues();
 	static bool IsFormatSupported(VkFormat Format, VkImageTiling Tiling, VkFormatFeatureFlags FeatureFlags);
@@ -246,6 +246,10 @@ namespace BMR
 			ShaderInputs[i].Stage = Config.RenderShaders[i].Stage;
 		}
 
+		Sampler[SamplerType::SamplerType_Diffuse] = CreateTextureSampler(16);
+		Sampler[SamplerType::SamplerType_Specular] = CreateTextureSampler(1);
+		Sampler[SamplerType::SamplerType_ShadowMap] = CreateTextureSampler(1);
+
 		MainRenderPass.CreateVulkanPass(LogicalDevice, ColorFormat, DepthFormat, SurfaceFormat);
 		MainRenderPass.SetupPushConstants();
 		MainRenderPass.CreateDescriptorLayouts(LogicalDevice);
@@ -253,13 +257,10 @@ namespace BMR
 		MainRenderPass.CreatePipelines(LogicalDevice, Extent1, ShaderInputs);
 		MainRenderPass.CreateAttachments(Device.PhysicalDevice, LogicalDevice, SwapInstance1.ImagesCount, Extent1, DepthFormat, ColorFormat);
 		MainRenderPass.CreateUniformBuffers(Device.PhysicalDevice, LogicalDevice, SwapInstance1.ImagesCount);
-		MainRenderPass.CreateSets(MainPool, LogicalDevice, SwapInstance1.ImagesCount);
+		MainRenderPass.CreateSets(MainPool, LogicalDevice, SwapInstance1.ImagesCount, Sampler[SamplerType::SamplerType_ShadowMap]);
 		MainRenderPass.CreateFrameBuffer(LogicalDevice, Extent1, SwapInstance1.ImagesCount, SwapInstance1.ImageViews);
 
 		InitViewport(Window, Surface, &MainViewport, SwapInstance1, MainRenderPass.ColorBufferViews, MainRenderPass.DepthBufferViews);
-
-		Sampler[SamplerType::SamplerType_Diffuse] = CreateTextureSampler();
-		Sampler[SamplerType::SamplerType_Specular] = CreateTextureSampler();
 
 		return true;
 	}
@@ -270,8 +271,10 @@ namespace BMR
 
 		DestroySynchronisation();
 
-		vkDestroySampler(LogicalDevice, Sampler[SamplerType::SamplerType_Diffuse], nullptr);
-		vkDestroySampler(LogicalDevice, Sampler[SamplerType::SamplerType_Specular], nullptr);
+		for (u32 i = 0; i < SamplerType::SamplerType_Count; ++i)
+		{
+			vkDestroySampler(LogicalDevice, Sampler[i], nullptr);
+		}
 
 		for (u32 i = 0; i < ImageArraysCount; ++i)
 		{
@@ -453,7 +456,7 @@ namespace BMR
 		u32 TextureIndices[SamplerType::SamplerType_Count];
 		TextureIndices[SamplerType::SamplerType_Diffuse] = DiffuseTextureIndex;
 		TextureIndices[SamplerType::SamplerType_Specular] = SpecularTextureIndex;
-		return UpdateTextureDescriptor(TextureIndices, SamplerType::SamplerType_Count, DescriptorLayoutHandles::EntitySampler);
+		return UpdateTextureDescriptor(TextureIndices, 2, DescriptorLayoutHandles::EntitySampler);
 	}
 
 	u32 LoadTerrainMaterial(u32 DiffuseTextureIndex)
@@ -657,13 +660,15 @@ namespace BMR
 				const VkBuffer VertexBuffers[] = { VertexBuffer.Buffer };
 				const VkDeviceSize Offsets[] = { DrawEntity->VertexOffset };
 
-				const u32 DescriptorSetGroupCount = 4;
+				const u32 DescriptorSetGroupCount = 6;
 				const VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] =
 				{
 					MainRenderPass.DescriptorsToImages[DescriptorHandles::EntityVp][MainRenderPass.ActiveVpSet],
 					MainRenderPass.SamplerDescriptors[DrawEntity->MaterialIndex],
 					MainRenderPass.DescriptorsToImages[DescriptorHandles::EntityLigh][MainRenderPass.ActiveLightSet],
-					MainRenderPass.MaterialSet
+					MainRenderPass.MaterialSet,
+					MainRenderPass.DescriptorsToImages[DescriptorHandles::DepthLightSpace][MainRenderPass.ActiveLightSpaceMatrixSet],
+					MainRenderPass.DescriptorsToImages[DescriptorHandles::ShadowMap][ImageIndex],
 				};
 
 				const VkPipelineLayout PipelineLayout = MainRenderPass.PipelineLayouts[BMRPipelineHandles::Entity];
@@ -984,7 +989,7 @@ namespace BMR
 		return Format;
 	}
 
-	VkSampler CreateTextureSampler()
+	VkSampler CreateTextureSampler(f32 MaxAnisotropy)
 	{
 		VkSamplerCreateInfo SamplerCreateInfo = { };
 		SamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -1000,7 +1005,7 @@ namespace BMR
 		SamplerCreateInfo.minLod = 0.0f;									// Minimum Level of Detail to pick mip level
 		SamplerCreateInfo.maxLod = 0.0f;									// Maximum Level of Detail to pick mip level
 		SamplerCreateInfo.anisotropyEnable = VK_TRUE;
-		SamplerCreateInfo.maxAnisotropy = 16; // Todo: support in config
+		SamplerCreateInfo.maxAnisotropy = MaxAnisotropy; // Todo: support in config
 
 		VkSampler Sampler;
 		VkResult Result = vkCreateSampler(LogicalDevice, &SamplerCreateInfo, nullptr, &Sampler);

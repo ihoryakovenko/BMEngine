@@ -218,7 +218,7 @@ namespace BMR
 			AttachmentDescriptions[SubpassDepthAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 			AttachmentDescriptions[SubpassDepthAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			AttachmentDescriptions[SubpassDepthAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			AttachmentDescriptions[SubpassDepthAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			AttachmentDescriptions[SubpassDepthAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 			VkAttachmentReference EntitySubpassDepthAttachmentReference = { };
 			EntitySubpassDepthAttachmentReference.attachment = SubpassDepthAttachmentIndex; // Depth attachment (shared with Terrain subpass)
@@ -389,8 +389,8 @@ namespace BMR
 		MaterialLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		MaterialLayoutBinding.pImmutableSamplers = nullptr;
 
-		const u32 DeferredInputBindingsCount = 2;
-		VkDescriptorSetLayoutBinding DeferredInputBindings[DeferredInputBindingsCount];
+		const u32 DeferredAttachmentBindingsCount = 2;
+		VkDescriptorSetLayoutBinding DeferredInputBindings[DeferredAttachmentBindingsCount];
 		DeferredInputBindings[0].binding = 0;
 		DeferredInputBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
 		DeferredInputBindings[0].descriptorCount = 1;
@@ -413,6 +413,13 @@ namespace BMR
 		DepthVpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 		DepthVpLayoutBinding.pImmutableSamplers = nullptr;
 
+		VkDescriptorSetLayoutBinding ShadowMapAttachmentSamplerLayoutBinding = { };
+		ShadowMapAttachmentSamplerLayoutBinding.binding = 0;
+		ShadowMapAttachmentSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		ShadowMapAttachmentSamplerLayoutBinding.descriptorCount = 1;
+		ShadowMapAttachmentSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		ShadowMapAttachmentSamplerLayoutBinding.pImmutableSamplers = nullptr;
+
 		u32 BindingCountTable[DescriptorLayoutHandles::Count];
 		BindingCountTable[DescriptorLayoutHandles::TerrainVp] = VpLayoutBindingBindingCount;
 		BindingCountTable[DescriptorLayoutHandles::TerrainSampler] = 1;
@@ -420,10 +427,11 @@ namespace BMR
 		BindingCountTable[DescriptorLayoutHandles::EntitySampler] = EntitySamplerLayoutBindingCount;
 		BindingCountTable[DescriptorLayoutHandles::Light] = LightBindingsCount;
 		BindingCountTable[DescriptorLayoutHandles::Material] = MaterialBindingsCount;
-		BindingCountTable[DescriptorLayoutHandles::DeferredInput] = DeferredInputBindingsCount;
+		BindingCountTable[DescriptorLayoutHandles::DeferredInput] = DeferredAttachmentBindingsCount;
 		BindingCountTable[DescriptorLayoutHandles::SkyBoxVp] = VpLayoutBindingBindingCount;
 		BindingCountTable[DescriptorLayoutHandles::SkyBoxSampler] = 1;
 		BindingCountTable[DescriptorLayoutHandles::DepthLightSpace] = DepthVpLayoutBindingBindingCount;
+		BindingCountTable[DescriptorLayoutHandles::ShadowMapInput] = 1;
 
 		const VkDescriptorSetLayoutBinding* BindingsTable[DescriptorLayoutHandles::Count];
 		BindingsTable[DescriptorLayoutHandles::TerrainVp] = &VpLayoutBinding;
@@ -436,6 +444,7 @@ namespace BMR
 		BindingsTable[DescriptorLayoutHandles::SkyBoxVp] = &VpLayoutBinding;
 		BindingsTable[DescriptorLayoutHandles::SkyBoxSampler] = &SkyBoxSamplerLayoutBinding;
 		BindingsTable[DescriptorLayoutHandles::DepthLightSpace] = &DepthVpLayoutBinding;
+		BindingsTable[DescriptorLayoutHandles::ShadowMapInput] = &ShadowMapAttachmentSamplerLayoutBinding;
 
 		VkDescriptorSetLayoutCreateInfo LayoutCreateInfos[DescriptorLayoutHandles::Count];
 		for (u32 i = 0; i < DescriptorLayoutHandles::Count; ++i)
@@ -462,12 +471,14 @@ namespace BMR
 			DescriptorLayouts[DescriptorLayoutHandles::TerrainSampler]
 		};
 
-		const u32 EntityDescriptorLayoutCount = 4;
+		const u32 EntityDescriptorLayoutCount = 6;
 		VkDescriptorSetLayout EntityDescriptorLayouts[EntityDescriptorLayoutCount] = {
 			DescriptorLayouts[DescriptorLayoutHandles::EntityVp],
 			DescriptorLayouts[DescriptorLayoutHandles::EntitySampler],
 			DescriptorLayouts[DescriptorLayoutHandles::Light],
-			DescriptorLayouts[DescriptorLayoutHandles::Material]
+			DescriptorLayouts[DescriptorLayoutHandles::Material],
+			DescriptorLayouts[DescriptorLayoutHandles::DepthLightSpace],
+			DescriptorLayouts[DescriptorLayoutHandles::ShadowMapInput],
 		};
 
 		const u32 SkyBoxDescriptorLayoutCount = 2;
@@ -964,7 +975,9 @@ namespace BMR
 		for (u32 i = 0; i < ImagesCount; ++i)
 		{
 			DepthBuffers[i].Image = CreateImage(PhysicalDevice, LogicalDevice, SwapExtent.width, SwapExtent.height,
-				DepthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+				DepthFormat, VK_IMAGE_TILING_OPTIMAL,
+				VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT,
+				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 				&DepthBuffers[i].Memory);
 
 			DepthBufferViews[i] = CreateImageView(LogicalDevice, DepthBuffers[i].Image,
@@ -972,7 +985,9 @@ namespace BMR
 
 			// VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT says that image can be used only as attachment. Used only for sub pass
 			ColorBuffers[i].Image = CreateImage(PhysicalDevice, LogicalDevice, SwapExtent.width, SwapExtent.height,
-				ColorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+				ColorFormat, VK_IMAGE_TILING_OPTIMAL,
+				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT,
+				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 				&ColorBuffers[i].Memory);
 
 			ColorBufferViews[i] = CreateImageView(LogicalDevice, ColorBuffers[i].Image,
@@ -981,7 +996,9 @@ namespace BMR
 
 
 			ShadowDepthBuffers[i].Image = CreateImage(PhysicalDevice, LogicalDevice, 1024, 1024,
-				DepthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+				DepthFormat, VK_IMAGE_TILING_OPTIMAL,
+				VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 				&ShadowDepthBuffers[i].Memory);
 
 			ShadowDepthBufferViews[i] = CreateImageView(LogicalDevice, ShadowDepthBuffers[i].Image,
@@ -1022,7 +1039,8 @@ namespace BMR
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	}
 
-	void BMRMainRenderPass::CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount)
+	void BMRMainRenderPass::CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount,
+		VkSampler ShadowMapSampler)
 	{
 		VkDescriptorSetLayout SetLayouts[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkDescriptorSetLayout TerrainLayouts[MAX_SWAPCHAIN_IMAGES_COUNT];
@@ -1030,6 +1048,7 @@ namespace BMR
 		VkDescriptorSetLayout DeferredSetLayouts[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkDescriptorSetLayout SkyBoxVpLayouts[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkDescriptorSetLayout DepthLightSpaceLayouts[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkDescriptorSetLayout ShadowMapLayouts[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
@@ -1039,6 +1058,7 @@ namespace BMR
 			DeferredSetLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::DeferredInput];
 			SkyBoxVpLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::SkyBoxVp];
 			DepthLightSpaceLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::DepthLightSpace];
+			ShadowMapLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::ShadowMapInput];
 		}
 
 		VulkanMemoryManagementSystem::AllocateSets(Pool, SetLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::EntityVp]);
@@ -1047,6 +1067,7 @@ namespace BMR
 		VulkanMemoryManagementSystem::AllocateSets(Pool, DeferredSetLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::DeferredInput]);
 		VulkanMemoryManagementSystem::AllocateSets(Pool, SkyBoxVpLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::SkyBoxVp]);
 		VulkanMemoryManagementSystem::AllocateSets(Pool, DepthLightSpaceLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::DepthLightSpace]);
+		VulkanMemoryManagementSystem::AllocateSets(Pool, ShadowMapLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::ShadowMap]);
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
@@ -1064,6 +1085,30 @@ namespace BMR
 			LightBufferInfo.buffer = LightBuffers[i].Buffer;
 			LightBufferInfo.offset = 0;
 			LightBufferInfo.range = sizeof(BMRLightBuffer);
+
+			VkDescriptorImageInfo ColourAttachmentDescriptor = { };
+			ColourAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			ColourAttachmentDescriptor.imageView = ColorBufferViews[i];
+			ColourAttachmentDescriptor.sampler = VK_NULL_HANDLE;
+
+			VkDescriptorImageInfo DepthAttachmentDescriptor = { };
+			DepthAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			DepthAttachmentDescriptor.imageView = DepthBufferViews[i];
+			DepthAttachmentDescriptor.sampler = VK_NULL_HANDLE;
+
+			VkDescriptorImageInfo ShadowMapTextureDescriptor = { };
+			ShadowMapTextureDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			ShadowMapTextureDescriptor.imageView = ShadowDepthBufferViews[i];
+			ShadowMapTextureDescriptor.sampler = ShadowMapSampler;
+
+			VkWriteDescriptorSet ShadowDepthWrite = { };
+			ShadowDepthWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			ShadowDepthWrite.dstSet = DescriptorsToImages[DescriptorHandles::ShadowMap][i];
+			ShadowDepthWrite.dstBinding = 0;
+			ShadowDepthWrite.dstArrayElement = 0;
+			ShadowDepthWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			ShadowDepthWrite.descriptorCount = 1;
+			ShadowDepthWrite.pImageInfo = &ShadowMapTextureDescriptor;
 
 			VkWriteDescriptorSet DepthLightSpaceWrite = { };
 			DepthLightSpaceWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1098,11 +1143,6 @@ namespace BMR
 			VkWriteDescriptorSet VpSkyBoxWrite = VpSetWrite;
 			VpSkyBoxWrite.dstSet = DescriptorsToImages[DescriptorHandles::SkyBoxVp][i];
 
-			VkDescriptorImageInfo ColourAttachmentDescriptor = { };
-			ColourAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			ColourAttachmentDescriptor.imageView = ColorBufferViews[i];
-			ColourAttachmentDescriptor.sampler = VK_NULL_HANDLE;
-
 			VkWriteDescriptorSet ColourWrite = { };
 			ColourWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 			ColourWrite.dstSet = DescriptorsToImages[DescriptorHandles::DeferredInput][i];
@@ -1111,11 +1151,6 @@ namespace BMR
 			ColourWrite.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
 			ColourWrite.descriptorCount = 1;
 			ColourWrite.pImageInfo = &ColourAttachmentDescriptor;
-
-			VkDescriptorImageInfo DepthAttachmentDescriptor = { };
-			DepthAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			DepthAttachmentDescriptor.imageView = DepthBufferViews[i];
-			DepthAttachmentDescriptor.sampler = VK_NULL_HANDLE;
 
 			VkWriteDescriptorSet DepthWrite = { };
 			DepthWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1126,9 +1161,9 @@ namespace BMR
 			DepthWrite.descriptorCount = 1;
 			DepthWrite.pImageInfo = &DepthAttachmentDescriptor;
 
-			const u32 WriteSetsCount = 7;
+			const u32 WriteSetsCount = 8;
 			VkWriteDescriptorSet WriteSets[WriteSetsCount] = { VpSetWrite, VpTerrainWrite, LightSetWrite,
-				ColourWrite, DepthWrite, VpSkyBoxWrite, DepthLightSpaceWrite };
+				ColourWrite, DepthWrite, VpSkyBoxWrite, DepthLightSpaceWrite, ShadowDepthWrite };
 
 			vkUpdateDescriptorSets(LogicalDevice, WriteSetsCount, WriteSets, 0, nullptr);
 		}

@@ -28,6 +28,7 @@ namespace BMR
 	{
 		SamplerType_Diffuse,
 		SamplerType_Specular,
+		SamplerType_ShadowMap,
 
 		SamplerType_Count,
 		SamplerType_None

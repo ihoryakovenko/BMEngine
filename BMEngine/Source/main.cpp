@@ -1,12 +1,12 @@
-//#define GLM_FORCE_RADIANS
-//#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-//#include <glm/glm.hpp>
-//#include <glm/mat4x4.hpp>
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include <glm/glm.hpp>
+#include <glm/mat4x4.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
 #define TINYOBJLOADER_IMPLEMENTATION
 
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -830,10 +830,15 @@ int main()
 	Mat.Shininess = 32.f;
 	BMR::UpdateMaterialBuffer(Mat);
 
-	float near_plane = 1.0f, far_plane = 7.5f;
-	glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+	float near_plane = 1.0f, far_plane = 30.5f;
+	glm::mat4 lightProjection = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, near_plane, far_plane);
 
-	glm::mat4 lightView = glm::lookAt(glm::vec3(-2.0f, 4.0f, -1.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::vec3 eye = glm::vec3(10.0f, 10.0f, 0.0f);
+	glm::vec3 center = eye + TestData.DirectionLight.Direction;
+	glm::vec3 up = glm::vec3(0.0f, 0.0f, -1.0f);
+
+	glm::mat4 lightView = glm::lookAt(eye, center, up);
+
 	BMR::BMRLightSpaceMatrix lightSpaceMatrix;
 	lightSpaceMatrix.Matrix = lightProjection * lightView;
 

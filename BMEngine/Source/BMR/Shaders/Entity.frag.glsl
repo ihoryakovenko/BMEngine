@@ -1,5 +1,3 @@
-//https://openbenchmarking.org/system/1612212-TA-OPENCLING99/GeForce%20GTX%20760/vulkaninfo
-
 #version 450
 
 struct PointLight
@@ -39,6 +37,7 @@ layout(location = 0) in vec3 FragmentColor;
 layout(location = 1) in vec2 FragmentTexture;
 layout(location = 2) in vec3 FragmentNormal;
 layout(location = 3) in vec3 FragmentPosition;
+layout(location = 4) in vec4 FragPosLightSpace;
 
 layout(set = 0, binding = 0) uniform UboViewProjection
 {
@@ -63,6 +62,8 @@ layout(set = 3, binding = 0) uniform Materials
 	float Shininess;
 }
 materials;
+
+layout(set = 5, binding = 0) uniform sampler2D ShadowMap;
 
 layout(push_constant) uniform PushModel
 {
@@ -92,6 +93,31 @@ float LightDistanceAttenuation(vec3 LightPosition, float Constant, float Linear,
 	return 1.0 / (Constant + Linear * Distance + Quadratic * (Distance * Distance)); 
 }
 
+float ShadowCalculation()
+{
+	vec3 projCoords = FragPosLightSpace.xyz / FragPosLightSpace.w;
+	projCoords.xy = projCoords.xy * 0.5 + 0.5;
+
+	float currentDepth = projCoords.z;
+	float closestDepth = texture(ShadowMap, projCoords.xy).r;
+	float shadow = closestDepth < currentDepth ? 1.0 : 0.0;
+
+	return shadow;
+}
+
+vec3 CastDirectionLight(vec3 DiffuseTexture, vec3 SpecularTexture)
+{
+	vec3 LightDirection = normalize(mat3(ViewProjection.View) * (-lightCasters.directionLight.Direction));
+
+	vec3 AmbientColor = lightCasters.directionLight.Ambient * DiffuseTexture;
+	vec3 DiffuseColor = Diffuse(LightDirection, lightCasters.directionLight.Diffuse, DiffuseTexture);
+	vec3 SpecularColor = Specular(LightDirection, lightCasters.directionLight.Specular, SpecularTexture);
+
+	float Shadow = ShadowCalculation();
+
+	return AmbientColor + (1.0 - Shadow) * (DiffuseColor + SpecularColor);
+}
+
 vec3 CastPointLight(vec3 DiffuseTexture, vec3 SpecularTexture)
 {
 	vec3 LightPosition = vec3(ViewProjection.View * lightCasters.pointlight.Position);
@@ -104,18 +130,9 @@ vec3 CastPointLight(vec3 DiffuseTexture, vec3 SpecularTexture)
 	float Attenuation = LightDistanceAttenuation(LightPosition, lightCasters.pointlight.Constant, 
 		lightCasters.pointlight.Linear, lightCasters.pointlight.Quadratic);
 
+	float Shadow = ShadowCalculation();
+
 	return AmbientColor * Attenuation + DiffuseColor * Attenuation + SpecularColor * Attenuation;
-}
-
-vec3 CastDirectionLight(vec3 DiffuseTexture, vec3 SpecularTexture)
-{
-	vec3 LightDirection = normalize(mat3(ViewProjection.View) * (-lightCasters.directionLight.Direction));
-
-	vec3 AmbientColor = lightCasters.directionLight.Ambient * DiffuseTexture;
-	vec3 DiffuseColor = Diffuse(LightDirection, lightCasters.directionLight.Diffuse, DiffuseTexture);
-	vec3 SpecularColor = Specular(LightDirection, lightCasters.directionLight.Specular, SpecularTexture);
-
-	return AmbientColor + DiffuseColor + SpecularColor;
 }
 
 vec3 CastSpotLigh(vec3 DiffuseTexture, vec3 SpecularTexture)
@@ -149,8 +166,8 @@ void main()
 	vec3 SpecularTexture = vec3(texture(SpecularTexture, FragmentTexture));
 
 	vec3 ResultLightColor = vec3(0.0);
-	ResultLightColor += CastPointLight(vec3(DiffuseTexture), SpecularTexture);
 	ResultLightColor += CastDirectionLight(vec3(DiffuseTexture), SpecularTexture);
+	ResultLightColor += CastPointLight(vec3(DiffuseTexture), SpecularTexture);
 	ResultLightColor += CastSpotLigh(vec3(DiffuseTexture), SpecularTexture);
 	OutColor = vec4(ResultLightColor, DiffuseTexture.a);
 }

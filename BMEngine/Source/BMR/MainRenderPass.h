@@ -21,6 +21,7 @@ namespace BMR
 		SkyBoxVp, // TODO Same as EntityVpLayout, change or delete
 		SkyBoxSampler, // TODO Same as TerrainSampler
 		DepthLightSpace,
+		ShadowMapInput,
 
 		Count
 	};
@@ -30,6 +31,7 @@ namespace BMR
 		enum
 		{
 			DepthLightSpace,
+			ShadowMap,
 			SkyBoxVp,
 			TerrainVp,
 			EntityVp,
@@ -74,7 +76,8 @@ namespace BMR
 			VkFormat DepthFormat, VkFormat ColorFormat);
 		void CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
 			u32 ImagesCount);
-		void CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount);
+		// TODO: ShadowMapSampler == shit
+		void CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount, VkSampler ShadowMapSampler);
 		void CreateFrameBuffer(VkDevice LogicalDevice, VkExtent2D FrameBufferSizes, u32 ImagesCount,
 			VkImageView SwapchainImageViews[MAX_SWAPCHAIN_IMAGES_COUNT]);
 
