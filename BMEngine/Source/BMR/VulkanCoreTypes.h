@@ -34,6 +34,8 @@ namespace BMR
 		SamplerType_None
 	};
 
+	static const VkExtent2D DepthPassSwapExtent = { 1024, 1024 };
+
 	struct BMRPhysicalDeviceIndices
 	{
 		int GraphicsFamily = -1;

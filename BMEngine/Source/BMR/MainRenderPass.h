@@ -52,6 +52,17 @@ namespace BMR
 		};
 	}
 
+	namespace RenderPasses
+	{
+		enum
+		{
+			Depth,
+			Main,
+
+			Count
+		};
+	}
+
 	struct BMRPipelineShaderInput
 	{
 		BMRPipelineHandles Handle = BMRPipelineHandles::PipelineHandlesNone;
@@ -81,8 +92,7 @@ namespace BMR
 		void CreateFrameBuffer(VkDevice LogicalDevice, VkExtent2D FrameBufferSizes, u32 ImagesCount,
 			VkImageView SwapchainImageViews[MAX_SWAPCHAIN_IMAGES_COUNT]);
 
-		VkRenderPass RenderPass = nullptr;
-		VkRenderPass DepthRenderPass = nullptr;
+		VkRenderPass RenderPasses[RenderPasses::Count];
 
 		VkPipelineLayout PipelineLayouts[BMRPipelineHandles::PipelineHandlesCount];
 		VkPipeline Pipelines[BMRPipelineHandles::PipelineHandlesCount];
@@ -90,6 +100,7 @@ namespace BMR
 		VkPushConstantRange PushConstants[PushConstantHandles::Count];
 		VkDescriptorSetLayout DescriptorLayouts[DescriptorLayoutHandles::Count];
 		VkDescriptorSet DescriptorsToImages[DescriptorHandles::Count][MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkFramebuffer Framebuffers[RenderPasses::Count][MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		u32 ActiveLightSet = 0;
 		u32 ActiveVpSet = 0;
@@ -107,8 +118,6 @@ namespace BMR
 		BMRImageBuffer ShadowDepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ShadowDepthBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		VkFramebuffer Framebuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
-		VkFramebuffer DepthPassFramebuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		BMRGPUBuffer DepthLightSpaceBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 

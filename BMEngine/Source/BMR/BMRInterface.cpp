@@ -564,19 +564,14 @@ namespace BMR
 		}
 
 		{
-			VkExtent2D SwapExtent;
-			SwapExtent.height = 1024;
-			SwapExtent.width = 1024;
-
-
 			VkRenderPassBeginInfo DepthRenderPassBeginInfo = { };
 			DepthRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-			DepthRenderPassBeginInfo.renderPass = MainRenderPass.DepthRenderPass;
+			DepthRenderPassBeginInfo.renderPass = MainRenderPass.RenderPasses[RenderPasses::Depth];
 			DepthRenderPassBeginInfo.renderArea.offset = { 0, 0 };
 			DepthRenderPassBeginInfo.pClearValues = DepthPassClearValues;
 			DepthRenderPassBeginInfo.clearValueCount = DepthPassClearValuesSize;
-			DepthRenderPassBeginInfo.renderArea.extent = SwapExtent; // Size of region to run render pass on (starting at offset)
-			DepthRenderPassBeginInfo.framebuffer = MainRenderPass.DepthPassFramebuffers[ImageIndex];
+			DepthRenderPassBeginInfo.renderArea.extent = DepthPassSwapExtent; // Size of region to run render pass on (starting at offset)
+			DepthRenderPassBeginInfo.framebuffer = MainRenderPass.Framebuffers[RenderPasses::Depth][ImageIndex];
 
 			vkCmdBeginRenderPass(CommandBuffer, &DepthRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 		
@@ -614,12 +609,12 @@ namespace BMR
 
 		VkRenderPassBeginInfo MainRenderPassBeginInfo = { };
 		MainRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		MainRenderPassBeginInfo.renderPass = MainRenderPass.RenderPass;
+		MainRenderPassBeginInfo.renderPass = MainRenderPass.RenderPasses[RenderPasses::Main];
 		MainRenderPassBeginInfo.renderArea.offset = { 0, 0 };
 		MainRenderPassBeginInfo.pClearValues = MainPassClearValues;
 		MainRenderPassBeginInfo.clearValueCount = MainPassClearValuesSize;
 		MainRenderPassBeginInfo.renderArea.extent = MainViewport.ViewportSwapchain.SwapExtent; // Size of region to run render pass on (starting at offset)
-		MainRenderPassBeginInfo.framebuffer = MainRenderPass.Framebuffers[ImageIndex];
+		MainRenderPassBeginInfo.framebuffer = MainRenderPass.Framebuffers[RenderPasses::Main][ImageIndex];
 
 		vkCmdBeginRenderPass(CommandBuffer, &MainRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
