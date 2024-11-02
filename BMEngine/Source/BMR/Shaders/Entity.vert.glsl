@@ -11,6 +11,11 @@ layout(set = 0, binding = 0) uniform UboViewProjection
 	mat4 Projection;
 } ViewProjection;
 
+layout(set = 4, binding = 0) uniform UBOLightSpaceMatrix
+{
+	mat4 Matrix;
+} LightSpaceMatrix;
+
 layout(push_constant) uniform PushModel
 {
 	mat4 Model;
@@ -20,13 +25,17 @@ layout(location = 0) out vec3 FragmentColor;
 layout(location = 1) out vec2 FragmentTexture;
 layout(location = 2) out vec3 FragmentNormal;
 layout(location = 3) out vec3 FragmentPosition;
+layout(location = 4) out vec4 FragPosLightSpace;
 
 void main()
 {
-	gl_Position = ViewProjection.Projection * ViewProjection.View * Model.Model * vec4(Position, 1.0);
+	vec4 WorldFragPos = Model.Model * vec4(Position, 1.0);
 
 	FragmentColor = Color;
 	FragmentTexture = TextureCoords;
 	FragmentNormal = normalize(mat3(transpose(inverse(ViewProjection.View * Model.Model))) * Normal);
-	FragmentPosition = vec3(ViewProjection.View * Model.Model * vec4(Position, 1.0));
+	FragmentPosition = vec3(ViewProjection.View * WorldFragPos);
+	FragPosLightSpace = LightSpaceMatrix.Matrix * WorldFragPos;
+
+	gl_Position = ViewProjection.Projection * ViewProjection.View * Model.Model * vec4(Position, 1.0);
 }

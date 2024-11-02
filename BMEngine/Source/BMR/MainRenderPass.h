@@ -20,6 +20,8 @@ namespace BMR
 		DeferredInput,
 		SkyBoxVp, // TODO Same as EntityVpLayout, change or delete
 		SkyBoxSampler, // TODO Same as TerrainSampler
+		DepthLightSpace,
+		ShadowMapInput,
 
 		Count
 	};
@@ -28,6 +30,8 @@ namespace BMR
 	{
 		enum
 		{
+			DepthLightSpace,
+			ShadowMap,
 			SkyBoxVp,
 			TerrainVp,
 			EntityVp,
@@ -43,6 +47,17 @@ namespace BMR
 		enum
 		{
 			Model,
+
+			Count
+		};
+	}
+
+	namespace RenderPasses
+	{
+		enum
+		{
+			Depth,
+			Main,
 
 			Count
 		};
@@ -72,9 +87,12 @@ namespace BMR
 			VkFormat DepthFormat, VkFormat ColorFormat);
 		void CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
 			u32 ImagesCount);
-		void CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount);
+		// TODO: ShadowMapSampler == shit
+		void CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount, VkSampler ShadowMapSampler);
+		void CreateFrameBuffer(VkDevice LogicalDevice, VkExtent2D FrameBufferSizes, u32 ImagesCount,
+			VkImageView SwapchainImageViews[MAX_SWAPCHAIN_IMAGES_COUNT]);
 
-		VkRenderPass RenderPass = nullptr;
+		VkRenderPass RenderPasses[RenderPasses::Count];
 
 		VkPipelineLayout PipelineLayouts[BMRPipelineHandles::PipelineHandlesCount];
 		VkPipeline Pipelines[BMRPipelineHandles::PipelineHandlesCount];
@@ -82,9 +100,11 @@ namespace BMR
 		VkPushConstantRange PushConstants[PushConstantHandles::Count];
 		VkDescriptorSetLayout DescriptorLayouts[DescriptorLayoutHandles::Count];
 		VkDescriptorSet DescriptorsToImages[DescriptorHandles::Count][MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkFramebuffer Framebuffers[RenderPasses::Count][MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		u32 ActiveLightSet = 0;
 		u32 ActiveVpSet = 0;
+		u32 ActiveLightSpaceMatrixSet = 0;
 
 		BMRImageBuffer ColorBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ColorBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
@@ -94,6 +114,12 @@ namespace BMR
 
 		BMRGPUBuffer VpUniformBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		BMRGPUBuffer LightBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+
+		BMRImageBuffer ShadowDepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkImageView ShadowDepthBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
+
+
+		BMRGPUBuffer DepthLightSpaceBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		// TODO: Fix
 		static inline VkDescriptorSet SamplerDescriptors[MAX_IMAGES];

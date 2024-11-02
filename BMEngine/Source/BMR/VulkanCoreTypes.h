@@ -28,10 +28,13 @@ namespace BMR
 	{
 		SamplerType_Diffuse,
 		SamplerType_Specular,
+		SamplerType_ShadowMap,
 
 		SamplerType_Count,
 		SamplerType_None
 	};
+
+	static const VkExtent2D DepthPassSwapExtent = { 1024, 1024 };
 
 	struct BMRPhysicalDeviceIndices
 	{
@@ -112,7 +115,6 @@ namespace BMR
 
 		BMRSwapchainInstance ViewportSwapchain;
 
-		VkFramebuffer SwapchainFramebuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkCommandBuffer CommandBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 	};
 }

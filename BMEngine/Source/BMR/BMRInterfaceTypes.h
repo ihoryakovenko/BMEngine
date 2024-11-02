@@ -17,6 +17,8 @@ namespace BMR
 		DeferredFragment,
 		SkyBoxVertex,
 		SkyBoxFragment,
+		DepthVertex,
+		DepthFragment,
 
 		ShaderNamesCount
 	};
@@ -36,6 +38,7 @@ namespace BMR
 		Entity,
 		Deferred,
 		SkyBox,
+		Depth,
 
 		PipelineHandlesCount,
 		PipelineHandlesNone
@@ -68,6 +71,11 @@ namespace BMR
 	{
 		glm::mat4 View;
 		glm::mat4 Projection;
+	};
+
+	struct BMRLightSpaceMatrix
+	{
+		glm::mat4 Matrix;
 	};
 
 	struct BMRTextureArrayInfo
