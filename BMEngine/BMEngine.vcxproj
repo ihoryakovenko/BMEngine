@@ -19,17 +19,34 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\External\imgui\backends\imgui_impl_glfw.cpp" />
+    <ClCompile Include="..\External\imgui\backends\imgui_impl_vulkan.cpp" />
+    <ClCompile Include="..\External\imgui\imgui.cpp" />
+    <ClCompile Include="..\External\imgui\imgui_demo.cpp" />
+    <ClCompile Include="..\External\imgui\imgui_draw.cpp" />
+    <ClCompile Include="..\External\imgui\imgui_tables.cpp" />
+    <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Source\BMR\MainRenderPass.cpp" />
     <ClCompile Include="Source\BMR\VulkanHelper.cpp" />
     <ClCompile Include="Source\BMR\VulkanCoreTypes.cpp" />
     <ClCompile Include="Source\BMR\VulkanMemoryManagementSystem.cpp" />
     <ClCompile Include="Source\BMR\BMRInterface.cpp" />
+    <ClCompile Include="Source\ImguiIntegration.cpp" />
     <ClCompile Include="Source\main.cpp" />
     <ClCompile Include="Source\Util\Util.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\External\imgui\backends\imgui_impl_glfw.h" />
+    <ClInclude Include="..\External\imgui\backends\imgui_impl_vulkan.h" />
+    <ClInclude Include="..\External\imgui\imconfig.h" />
+    <ClInclude Include="..\External\imgui\imgui.h" />
+    <ClInclude Include="..\External\imgui\imgui_internal.h" />
+    <ClInclude Include="..\External\imgui\imstb_rectpack.h" />
+    <ClInclude Include="..\External\imgui\imstb_textedit.h" />
+    <ClInclude Include="..\External\imgui\imstb_truetype.h" />
     <ClInclude Include="Source\BMR\BMRInterfaceTypes.h" />
     <ClInclude Include="Source\BMR\MainRenderPass.h" />
+    <ClInclude Include="Source\ImguiIntegration.h" />
     <ClInclude Include="Source\Memory\MemoryManagmentSystem.h" />
     <ClInclude Include="Source\BMR\VulkanCoreTypes.h" />
     <ClInclude Include="Source\BMR\VulkanHelper.h" />
@@ -164,7 +181,7 @@
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;GLM_FORCE_DEPTH_ZERO_TO_ONE;GLM_FORCE_RADIANS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_NONSTDC_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)External\GLFW\include;$(VULKAN_SDK)\Include;$(ProjectDir)Source;$(SolutionDir)External;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)External\GLFW\include;$(VULKAN_SDK)\Include;$(ProjectDir)Source;$(SolutionDir)External;$(SolutionDir)External\imgui;$(SolutionDir)External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <Link>
@@ -195,7 +212,7 @@
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;GLM_FORCE_DEPTH_ZERO_TO_ONE;GLM_FORCE_RADIANS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_NONSTDC_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)External\GLFW\include;$(VULKAN_SDK)\Include;$(ProjectDir)Source;$(SolutionDir)External;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)External\GLFW\include;$(VULKAN_SDK)\Include;$(ProjectDir)Source;$(SolutionDir)External;$(SolutionDir)External\imgui;$(SolutionDir)External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <Link>
