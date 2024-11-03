@@ -1,10 +1,28 @@
 #include "VulkanHelper.h"
 
-#include "Util/Util.h"
 #include <cassert>
+#include <stdarg.h>
 
 namespace BMR
 {
+	static BMRLogHandler LogHandler = nullptr;
+
+	void SetLogHandler(BMRLogHandler Handler)
+	{
+		LogHandler = Handler;
+	}
+
+	void HandleLog(BMRLogType LogType, const char* Format, ...)
+	{
+		if (LogHandler != nullptr)
+		{
+			va_list Args;
+			va_start(Args, Format);
+			LogHandler(LogType, Format, Args);
+			va_end(Args);
+		}
+	}
+
 	bool CreateShader(VkDevice LogicalDevice, const u32* Code, u32 CodeSize,
 		VkShaderModule &VertexShaderModule)
 	{
@@ -16,7 +34,7 @@ namespace BMR
 		VkResult Result = vkCreateShaderModule(LogicalDevice, &ShaderModuleCreateInfo, nullptr, &VertexShaderModule);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkCreateShaderModule result is {}", static_cast<int>(Result));
+			HandleLog(BMRLogType::LogType_Error, "vkCreateShaderModule result is %d", Result);
 			return false;
 		}
 
@@ -71,57 +89,5 @@ namespace BMR
 
 		assert(false);
 		return 0;
-	}
-
-	VkImage CreateImage(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 Width, u32 Height,
-		VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags,
-		VkDeviceMemory* OutImageMemory)
-	{
-		VkImageCreateInfo ImageCreateInfo = { };
-		ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;						// Type of image (1D, 2D, or 3D)
-		ImageCreateInfo.extent.width = Width;								// Width of image extent
-		ImageCreateInfo.extent.height = Height;								// Height of image extent
-		ImageCreateInfo.extent.depth = 1;									// Depth of image (just 1, no 3D aspect)
-		ImageCreateInfo.mipLevels = 1;										// Number of mipmap levels
-		ImageCreateInfo.arrayLayers = 1;									// Number of levels in image array
-		ImageCreateInfo.format = Format;									// Format type of image
-		ImageCreateInfo.tiling = Tiling;									// How image data should be "tiled" (arranged for optimal reading)
-		ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;			// Layout of image data on creation
-		ImageCreateInfo.usage = UseFlags;									// Bit flags defining what image will be used for
-		ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;					// Number of samples for multi-sampling
-		ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;			// Whether image can be shared between queues
-
-		// Create image
-		VkImage Image;
-		VkResult Result = vkCreateImage(LogicalDevice, &ImageCreateInfo, nullptr, &Image);
-		if (Result != VK_SUCCESS)
-		{
-			return nullptr;
-		}
-
-		// CREATE MEMORY FOR IMAGE
-
-		// Get memory requirements for a type of image
-		VkMemoryRequirements MemoryRequirements;
-		vkGetImageMemoryRequirements(LogicalDevice, Image, &MemoryRequirements);
-
-		// Allocate memory using image requirements and user defined properties
-		VkMemoryAllocateInfo MemoryAllocInfo = { };
-		MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		MemoryAllocInfo.allocationSize = MemoryRequirements.size;
-		MemoryAllocInfo.memoryTypeIndex = GetMemoryTypeIndex(PhysicalDevice, MemoryRequirements.memoryTypeBits,
-			PropFlags);
-
-		Result = vkAllocateMemory(LogicalDevice, &MemoryAllocInfo, nullptr, OutImageMemory);
-		if (Result != VK_SUCCESS)
-		{
-			return nullptr;
-		}
-
-		// Connect memory to image
-		vkBindImageMemory(LogicalDevice, Image, *OutImageMemory, 0);
-
-		return Image;
 	}
 }

@@ -1,9 +1,8 @@
 #include "BMRInterface.h"
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include <Windows.h>
 
-#include <algorithm>
+#include <vulkan/vulkan_win32.h>
 
 #include "Memory/MemoryManagmentSystem.h"
 #include "VulkanMemoryManagementSystem.h"
@@ -11,7 +10,6 @@
 #include "VulkanCoreTypes.h"
 #include "MainRenderPass.h"
 #include "VulkanHelper.h"
-#include "Util/Util.h"
 
 namespace BMR
 {
@@ -22,7 +20,7 @@ namespace BMR
 	static Memory::FrameArray<const char*> GetRequiredInstanceExtensions(const char** ValidationExtensions, u32 ValidationExtensionsCount);
 	static Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkSurfaceKHR Surface);
 
-	static VkExtent2D GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities, GLFWwindow* Window);
+	static VkExtent2D GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities, HWND WindowHandler);
 
 	static bool CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, u32 AvailableExtensionsCount,
 		const char** RequiredExtensions, u32 RequiredExtensionsCount);
@@ -40,13 +38,20 @@ namespace BMR
 	static void CreateSynchronisation();
 	static void DestroySynchronisation();
 
-	static void InitViewport(GLFWwindow* Window, VkSurfaceKHR Surface, BMRViewportInstance* OutViewport,
+	static void InitViewport(VkSurfaceKHR Surface, BMRViewportInstance* OutViewport,
 		BMRSwapchainInstance SwapInstance, VkImageView* ColorBuffers, VkImageView* DepthBuffers);
 	static void DeinitViewport(BMRViewportInstance* Viewport);
 
 	static void CreateCommandPool(VkDevice LogicalDevice, u32 FamilyIndex);
 
 	static void UpdateVpBuffer(const BMRUboViewProjection& ViewProjection);
+
+	static const u32 RequiredExtensionsCount = 2;
+	const char* RequiredInstanceExtensions[RequiredExtensionsCount] =
+	{
+		VK_KHR_SURFACE_EXTENSION_NAME,
+		VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+	};
 
 	static BMRConfig Config;
 
@@ -60,11 +65,10 @@ namespace BMR
 	static VkQueue GraphicsQueue = nullptr;
 	static VkQueue PresentationQueue = nullptr;
 
-	// Todo: pass as AddViewport params? 
 	static VkFormat ColorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Todo: check if VK_FORMAT_R8G8B8A8_UNORM supported
 	static VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
 
-	static int CurrentFrame = 0;
+	static u32 CurrentFrame = 0;
 
 	static VkSemaphore ImagesAvailable[MAX_DRAW_FRAMES];
 	static VkSemaphore RenderFinished[MAX_DRAW_FRAMES];
@@ -97,9 +101,11 @@ namespace BMR
 		VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT
 	};
 
-	bool Init(GLFWwindow* Window, const BMRConfig& InConfig)
+	bool Init(HWND WindowHandler, const BMRConfig& InConfig)
 	{
 		Config = InConfig;
+
+		SetLogHandler(Config.LogHandler);
 
 		const char* ValidationLayers[] = {
 			"VK_LAYER_KHRONOS_validation",
@@ -110,7 +116,7 @@ namespace BMR
 		const char* ValidationExtensions[] = {
 			VK_EXT_DEBUG_UTILS_EXTENSION_NAME
 		};
-		const u32 ValidationExtensionsSize = Util::EnableValidationLayers ? sizeof(ValidationExtensions) / sizeof(ValidationExtensions[0]) : 0;
+		const u32 ValidationExtensionsSize = Config.EnableValidationLayers ? sizeof(ValidationExtensions) / sizeof(ValidationExtensions[0]) : 0;
 
 		const char* DeviceExtensions[] = {
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME
@@ -126,7 +132,7 @@ namespace BMR
 			return false;
 		}
 
-		if (Util::EnableValidationLayers)
+		if (Config.EnableValidationLayers)
 		{
 			Memory::FrameArray<VkLayerProperties> LayerPropertiesData = GetAvailableInstanceLayerProperties();
 
@@ -138,13 +144,18 @@ namespace BMR
 		}
 
 		Instance = BMRMainInstance::CreateMainInstance(RequiredExtensions.Pointer.Data, RequiredExtensions.Count,
-			Util::EnableValidationLayers, ValidationLayers, ValidationLayersSize);
+			Config.EnableValidationLayers, ValidationLayers, ValidationLayersSize);
+
+		VkWin32SurfaceCreateInfoKHR surfaceCreateInfo = { };
+		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+		surfaceCreateInfo.hwnd = WindowHandler;
+		surfaceCreateInfo.hinstance = GetModuleHandle(nullptr);
 
 		VkSurfaceKHR Surface = nullptr;
-		if (glfwCreateWindowSurface(Instance.VulkanInstance, Window, nullptr, &Surface) != VK_SUCCESS)
+		VkResult Result = vkCreateWin32SurfaceKHR(Instance.VulkanInstance, &surfaceCreateInfo, nullptr, &Surface);
+		if (Result != VK_SUCCESS)
 		{
-			Util::Log().GlfwLogError();
-			assert(false);
+			HandleLog(BMRLogType::LogType_Error, "vkCreateWin32SurfaceKHR result is %d", Result);
 		}
 
 		Device.Init(Instance.VulkanInstance, Surface, DeviceExtensions, DeviceExtensionsSize);
@@ -157,7 +168,7 @@ namespace BMR
 		VkFormat FormatPriority[FormatPrioritySize] = { VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT };
 
 		bool IsSupportedFormatFound = false;
-		for (int i = 0; i < FormatPrioritySize; ++i)
+		for (u32 i = 0; i < FormatPrioritySize; ++i)
 		{
 			VkFormat FormatToCheck = FormatPriority[i];
 			if (IsFormatSupported(FormatToCheck, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT))
@@ -166,7 +177,7 @@ namespace BMR
 				break;
 			}
 
-			Util::Log().Warning("Format {} is not supported", static_cast<int>(FormatToCheck));
+			HandleLog(BMRLogType::LogType_Warning, "Format %d is not supported", Result);
 		}
 
 		assert(IsSupportedFormatFound);
@@ -174,14 +185,14 @@ namespace BMR
 
 		VkSurfaceCapabilitiesKHR SurfaceCapabilities = { };
 
-		VkResult Result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Device.PhysicalDevice, Surface, &SurfaceCapabilities);
+		Result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Device.PhysicalDevice, Surface, &SurfaceCapabilities);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Warning("vkGetPhysicalDeviceSurfaceCapabilitiesKHR result is {}", static_cast<int>(Result));
+			HandleLog(BMRLogType::LogType_Warning, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR result is %d", Result);
 			return false;
 		}
 
-		VkExtent2D Extent1 = GetBestSwapExtent(SurfaceCapabilities, Window);
+		VkExtent2D Extent1 = GetBestSwapExtent(SurfaceCapabilities, WindowHandler);
 
 		CreateSynchronisation();
 		SetupQueues();
@@ -260,7 +271,7 @@ namespace BMR
 		MainRenderPass.CreateSets(MainPool, LogicalDevice, SwapInstance1.ImagesCount, Sampler[SamplerType::SamplerType_ShadowMap]);
 		MainRenderPass.CreateFrameBuffer(LogicalDevice, Extent1, SwapInstance1.ImagesCount, SwapInstance1.ImageViews);
 
-		InitViewport(Window, Surface, &MainViewport, SwapInstance1, MainRenderPass.ColorBufferViews, MainRenderPass.DepthBufferViews);
+		InitViewport(Surface, &MainViewport, SwapInstance1, MainRenderPass.ColorBufferViews, MainRenderPass.DepthBufferViews);
 
 		return true;
 	}
@@ -309,7 +320,7 @@ namespace BMR
 		VkImageCreateInfo ImageCreateInfo;
 		ImageCreateInfo = { };
 		ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D; // Type of image (1D, 2D, or 3D)
+		ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 		ImageCreateInfo.extent.width = Info.Width;
 		ImageCreateInfo.extent.height = Info.Height;
 		ImageCreateInfo.extent.depth = 1; // Depth of image (just 1, no 3D aspect)
@@ -471,6 +482,8 @@ namespace BMR
 
 	u64 LoadVertices(const void* Vertices, u32 VertexSize, VkDeviceSize VerticesCount)
 	{
+		assert(Vertices);
+
 		const VkDeviceSize MeshVerticesSize = VertexSize * VerticesCount;
 		const VkDeviceSize AlignedSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(MeshVerticesSize);
 
@@ -484,6 +497,8 @@ namespace BMR
 
 	u64 LoadIndices(const u32* Indices, u32 IndicesCount)
 	{
+		assert(Indices);
+
 		VkDeviceSize MeshIndicesSize = sizeof(u32) * IndicesCount;
 		const VkDeviceSize AlignedSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(MeshIndicesSize);
 
@@ -495,20 +510,23 @@ namespace BMR
 		return CurrentOffset;
 	}
 
-	void UpdateLightBuffer(const BMRLightBuffer& Buffer)
+	void UpdateLightBuffer(const BMRLightBuffer* Buffer)
 	{
+		assert(Buffer);
+
 		const u32 UpdateIndex = (MainRenderPass.ActiveLightSet + 1) % MainViewport.ViewportSwapchain.ImagesCount;
 
 		VulkanMemoryManagementSystem::CopyDataToMemory(MainRenderPass.LightBuffers[UpdateIndex].Memory, 0,
-			sizeof(BMRLightBuffer), &Buffer);
+			sizeof(BMRLightBuffer), Buffer);
 
 		MainRenderPass.ActiveLightSet = UpdateIndex;
 	}
 
-	void UpdateMaterialBuffer(const BMRMaterial& Buffer)
+	void UpdateMaterialBuffer(const BMRMaterial* Buffer)
 	{
+		assert(Buffer);
 		VulkanMemoryManagementSystem::CopyDataToMemory(MainRenderPass.MaterialBuffer.Memory, 0,
-			sizeof(BMRMaterial), &Buffer);
+			sizeof(BMRMaterial), Buffer);
 	}
 
 	void UpdateLightSpaceBuffer(const BMRLightSpaceMatrix* LightSpaceMatrix)
@@ -547,11 +565,11 @@ namespace BMR
 		VkFence Fence = DrawFences[CurrentFrame];
 		VkSemaphore ImageAvailable = ImagesAvailable[CurrentFrame];
 
-		vkWaitForFences(LogicalDevice, 1, &Fence, VK_TRUE, std::numeric_limits<u64>::max());
+		vkWaitForFences(LogicalDevice, 1, &Fence, VK_TRUE, UINT64_MAX);
 		vkResetFences(LogicalDevice, 1, &Fence);
 
 		u32 ImageIndex;
-		vkAcquireNextImageKHR(LogicalDevice, MainViewport.ViewportSwapchain.VulkanSwapchain, std::numeric_limits<u64>::max(),
+		vkAcquireNextImageKHR(LogicalDevice, MainViewport.ViewportSwapchain.VulkanSwapchain, UINT64_MAX,
 			ImageAvailable, VK_NULL_HANDLE, &ImageIndex);
 
 		VkCommandBuffer CommandBuffer = MainViewport.CommandBuffers[ImageIndex];
@@ -559,8 +577,7 @@ namespace BMR
 		VkResult Result = vkBeginCommandBuffer(CommandBuffer, &CommandBufferBeginInfo);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkBeginCommandBuffer result is {}", static_cast<int>(Result));
-			assert(false);
+			HandleLog(BMRLogType::LogType_Error, "vkBeginCommandBuffer result is %d", Result);
 		}
 
 		{
@@ -718,8 +735,7 @@ namespace BMR
 		Result = vkEndCommandBuffer(CommandBuffer);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkBeginCommandBuffer result is {}", static_cast<int>(Result));
-			assert(false);
+			HandleLog(BMRLogType::LogType_Error, "vkBeginCommandBuffer result is %d", Result);
 		}
 
 		VkSubmitInfo SubmitInfo = { };
@@ -734,7 +750,7 @@ namespace BMR
 		Result = vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, Fence);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkQueueSubmit result is {}", static_cast<int>(Result));
+			HandleLog(BMRLogType::LogType_Error, "vkQueueSubmit result is %d", Result);
 			assert(false);
 		}
 
@@ -748,8 +764,7 @@ namespace BMR
 		Result = vkQueuePresentKHR(PresentationQueue, &PresentInfo);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkQueuePresentKHR result is {}", static_cast<int>(Result));
-			assert(false);
+			HandleLog(BMRLogType::LogType_Error, "vkQueuePresentKHR result is %d", Result);
 		}
 
 		CurrentFrame = (CurrentFrame + 1) % MAX_DRAW_FRAMES;
@@ -772,7 +787,7 @@ namespace BMR
 
 			if (!IsExtensionSupported)
 			{
-				Util::Log().Error("Extension {} unsupported", RequiredExtensions[i]);
+				HandleLog(BMRLogType::LogType_Error, "Extension %s unsupported", RequiredExtensions[i]);
 				return false;
 			}
 		}
@@ -797,7 +812,7 @@ namespace BMR
 
 			if (!IsLayerAvalible)
 			{
-				Util::Log().Error("Validation layer {} unsupported", ValidationLeyersToCheck[i]);
+				HandleLog(BMRLogType::LogType_Error, "Validation layer %s unsupported", ValidationLeyersToCheck[i]);
 				return false;
 			}
 		}
@@ -805,21 +820,26 @@ namespace BMR
 		return true;
 	}
 
-	VkExtent2D GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities,
-		GLFWwindow* Window)
+	VkExtent2D GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities, HWND WindowHandler)
 	{
-		if (SurfaceCapabilities.currentExtent.width != std::numeric_limits<u32>::max())
+		if (SurfaceCapabilities.currentExtent.width != UINT32_MAX)
 		{
 			return SurfaceCapabilities.currentExtent;
 		}
 		else
 		{
-			int Width;
-			int Height;
-			glfwGetFramebufferSize(Window, &Width, &Height);
+			RECT Rect;
+			if (!GetClientRect(WindowHandler, &Rect))
+			{
+				assert(false);
+			}
 
-			Width = std::clamp(static_cast<u32>(Width), SurfaceCapabilities.minImageExtent.width, SurfaceCapabilities.maxImageExtent.width);
-			Height = std::clamp(static_cast<u32>(Height), SurfaceCapabilities.minImageExtent.height, SurfaceCapabilities.maxImageExtent.height);
+			u32 Width = Rect.right - Rect.left;
+			u32 Height = Rect.bottom - Rect.top;
+
+			
+			Width = glm::clamp(static_cast<u32>(Width), SurfaceCapabilities.minImageExtent.width, SurfaceCapabilities.maxImageExtent.width);
+			Height = glm::clamp(static_cast<u32>(Height), SurfaceCapabilities.minImageExtent.height, SurfaceCapabilities.maxImageExtent.height);
 
 			return { static_cast<u32>(Width), static_cast<u32>(Height) };
 		}
@@ -831,8 +851,7 @@ namespace BMR
 		const VkResult Result = vkEnumerateInstanceExtensionProperties(nullptr, &Count, nullptr);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkEnumerateInstanceExtensionProperties result is {}", static_cast<int>(Result));
-			assert(false);
+			HandleLog(BMRLogType::LogType_Error, "vkEnumerateInstanceExtensionProperties result is %d", static_cast<int>(Result));
 		}
 
 		auto Data = Memory::FrameArray<VkExtensionProperties>::Create(Count);
@@ -847,8 +866,7 @@ namespace BMR
 		const VkResult Result = vkEnumerateInstanceLayerProperties(&Count, nullptr);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkEnumerateInstanceLayerProperties result is {}", static_cast<int>(Result));
-			assert(false);
+			HandleLog(BMRLogType::LogType_Error, "vkEnumerateInstanceLayerProperties result is %d", Result);
 		}
 
 		auto Data = Memory::FrameArray<VkLayerProperties>::Create(Count);
@@ -860,26 +878,18 @@ namespace BMR
 	Memory::FrameArray<const char*> GetRequiredInstanceExtensions(const char** ValidationExtensions,
 		u32 ValidationExtensionsCount)
 	{
-		u32 RequiredExtensionsCount = 0;
-		const char** RequiredInstanceExtensions = glfwGetRequiredInstanceExtensions(&RequiredExtensionsCount);
-		if (RequiredExtensionsCount == 0)
-		{
-			Util::Log().GlfwLogError();
-			assert(false);
-		}
-
 		auto Data = Memory::FrameArray<const char*>::Create(RequiredExtensionsCount + ValidationExtensionsCount);
 
 		for (u32 i = 0; i < RequiredExtensionsCount; ++i)
 		{
 			Data[i] = RequiredInstanceExtensions[i];
-			Util::Log().Info("Requested {} extension", Data[i]);
+			HandleLog(BMRLogType::LogType_Info, "Requested %s extension", Data[i]);
 		}
 
 		for (u32 i = 0; i < ValidationExtensionsCount; ++i)
 		{
 			Data[i + RequiredExtensionsCount] = ValidationExtensions[i];
-			Util::Log().Info("Requested {} extension", Data[i]);
+			HandleLog(BMRLogType::LogType_Info, "Requested %s extension", Data[i]);
 		}
 
 		return Data;
@@ -891,8 +901,7 @@ namespace BMR
 		const VkResult Result = vkGetPhysicalDeviceSurfaceFormatsKHR(Device.PhysicalDevice, Surface, &Count, nullptr);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkGetPhysicalDeviceSurfaceFormatsKHR result is {}", static_cast<int>(Result));
-			assert(false);
+			HandleLog(BMRLogType::LogType_Error, "vkGetPhysicalDeviceSurfaceFormatsKHR result is %d", Result);
 		}
 
 		auto Data = Memory::FrameArray<VkSurfaceFormatKHR>::Create(Count);
@@ -944,7 +953,7 @@ namespace BMR
 		VkResult Result = vkCreateDevice(Device.PhysicalDevice, &DeviceCreateInfo, nullptr, &LogicalDevice);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkCreateDevice result is {}", static_cast<int>(Result));
+			HandleLog(BMRLogType::LogType_Error, "vkCreateDevice result is %d", Result);
 			assert(false);
 		}
 
@@ -978,7 +987,7 @@ namespace BMR
 
 		if (Format.format == VK_FORMAT_UNDEFINED)
 		{
-			Util::Log().Error("SurfaceFormat is undefined");
+			HandleLog(BMRLogType::LogType_Error, "SurfaceFormat is undefined");
 		}
 
 		return Format;
@@ -1053,7 +1062,7 @@ namespace BMR
 				vkCreateSemaphore(LogicalDevice, &SemaphoreCreateInfo, nullptr, &RenderFinished[i]) != VK_SUCCESS ||
 				vkCreateFence(LogicalDevice, &FenceCreateInfo, nullptr, &DrawFences[i]) != VK_SUCCESS)
 			{
-				Util::Log().Error("CreateSynchronisation error");
+				HandleLog(BMRLogType::LogType_Error, "CreateSynchronisation error");
 				assert(false);
 			}
 		}
@@ -1075,10 +1084,9 @@ namespace BMR
 		vkDestroySurfaceKHR(Instance.VulkanInstance, Viewport->Surface, nullptr);
 	}
 
-	void InitViewport(GLFWwindow* Window, VkSurfaceKHR Surface, BMRViewportInstance* OutViewport,
+	void InitViewport(VkSurfaceKHR Surface, BMRViewportInstance* OutViewport,
 		BMRSwapchainInstance SwapInstance, VkImageView* ColorBuffers, VkImageView* DepthBuffers)
 	{
-		OutViewport->Window = Window;
 		OutViewport->Surface = Surface;
 		OutViewport->ViewportSwapchain = SwapInstance;
 
@@ -1092,8 +1100,7 @@ namespace BMR
 		VkResult Result = vkAllocateCommandBuffers(LogicalDevice, &CommandBufferAllocateInfo, OutViewport->CommandBuffers);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkAllocateCommandBuffers result is {}", static_cast<int>(Result));
-			assert(false);
+			HandleLog(BMRLogType::LogType_Error, "vkAllocateCommandBuffers result is %d", Result);
 		}
 	}
 
@@ -1107,8 +1114,7 @@ namespace BMR
 		VkResult Result = vkCreateCommandPool(LogicalDevice, &PoolInfo, nullptr, &GraphicsCommandPool);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkCreateCommandPool result is {}", static_cast<int>(Result));
-			assert(false);
+			HandleLog(BMRLogType::LogType_Error, "vkCreateCommandPool result is %d", Result);
 		}
 	}
 

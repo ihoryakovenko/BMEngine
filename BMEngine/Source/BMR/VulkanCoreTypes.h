@@ -1,14 +1,8 @@
 #pragma once
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <glm/glm.hpp>
+#include <vulkan/vulkan.h>
 
 #include <stb_image.h>
-
-#include <vector>
 
 #include "BMRInterfaceTypes.h"
 #include "Util/EngineTypes.h"
@@ -110,7 +104,6 @@ namespace BMR
 
 	struct BMRViewportInstance
 	{
-		GLFWwindow* Window = nullptr;
 		VkSurfaceKHR Surface = nullptr;
 
 		BMRSwapchainInstance ViewportSwapchain;

@@ -1,12 +1,20 @@
 #pragma once
 
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 
 #include "Util/EngineTypes.h"
 
 namespace BMR
 {
+	enum BMRLogType
+	{
+		LogType_Error,
+		LogType_Warning,
+		LogType_Info
+	};
+
+	typedef void (*BMRLogHandler)(BMRLogType, const char*, va_list);
+
 	enum BMRShaderNames
 	{
 		TerrainVertex,
@@ -60,8 +68,9 @@ namespace BMR
 
 	struct BMRConfig
 	{
+		BMRLogHandler LogHandler = nullptr;
+		bool EnableValidationLayers = false;
 		BMRShaderCodeDescription RenderShaders[BMRShaderNames::ShaderNamesCount];
-
 		u32 MaxTextures = 0;
 	};
 

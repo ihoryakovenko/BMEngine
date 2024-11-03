@@ -2,7 +2,6 @@
 
 #include <cstdint>
 
-#include "Util/Util.h"
 #include "Util/EngineTypes.h"
 
 namespace Memory

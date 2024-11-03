@@ -1,12 +1,16 @@
 #pragma once
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include <vulkan/vulkan.h>
 
 #include "Util/EngineTypes.h"
+#include "BMR/BMRInterfaceTypes.h"
 
 namespace BMR
 {
+	void SetLogHandler(BMRLogHandler Handler);
+
+	void HandleLog(BMRLogType LogType, const char* Format, ...);
+
 	bool CreateShader(VkDevice LogicalDevice, const u32* Code, u32 CodeSize,
 		VkShaderModule& VertexShaderModule);
 
@@ -14,9 +18,4 @@ namespace BMR
 		VkImageAspectFlags AspectFlags, VkImageViewType Type, u32 LayerCount);
 
 	u32 GetMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, u32 AllowedTypes, VkMemoryPropertyFlags Properties);
-
-	// todo: Delete
-	VkImage CreateImage(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 Width, u32 Height,
-		VkFormat Format, VkImageTiling Tiling, VkImageUsageFlags UseFlags, VkMemoryPropertyFlags PropFlags,
-		VkDeviceMemory* OutImageMemory);
 }

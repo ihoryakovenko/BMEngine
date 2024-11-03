@@ -3,7 +3,6 @@
 #include <cassert>
 #include <cstring>
 
-#include "Util/Util.h"
 #include "VulkanHelper.h"
 
 namespace BMR::VulkanMemoryManagementSystem
@@ -49,14 +48,14 @@ namespace BMR::VulkanMemoryManagementSystem
 
 	VkDescriptorPool AllocateDescriptorPool(VkDescriptorPoolSize* PoolSizes, u32 PoolSizeCount, u32 MaxDescriptorCount)
 	{
-		Util::Log().Info("Creating descriptor pool. Size count: {}", PoolSizeCount);
+		HandleLog(BMRLogType::LogType_Info, "Creating descriptor pool. Size count: %d", PoolSizeCount);
 
 		for (u32 i = 0; i < PoolSizeCount; ++i)
 		{
-			Util::Log().Info("Type: {}, Count: {}", static_cast<int>(PoolSizes[i].type), PoolSizes[i].descriptorCount);
+			HandleLog(BMRLogType::LogType_Info, "Type: %d, Count: %d", PoolSizes[i].type, PoolSizes[i].descriptorCount);
 		}
 
-		Util::Log().Info("Maximum descriptor count: {}", MaxDescriptorCount);
+		HandleLog(BMRLogType::LogType_Info, "Maximum descriptor count: %d", MaxDescriptorCount);
 
 		VkDescriptorPoolCreateInfo PoolCreateInfo = { };
 		PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -68,8 +67,7 @@ namespace BMR::VulkanMemoryManagementSystem
 		VkResult Result = vkCreateDescriptorPool(MemorySource.LogicalDevice, &PoolCreateInfo, nullptr, &Pool);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkCreateDescriptorPool result is {}", static_cast<int>(Result));
-			assert(false);
+			HandleLog(BMRLogType::LogType_Error, "vkCreateDescriptorPool result is %d", Result);
 		}
 
 		return Pool;
@@ -78,7 +76,7 @@ namespace BMR::VulkanMemoryManagementSystem
 	void AllocateSets(VkDescriptorPool Pool, VkDescriptorSetLayout* Layouts,
 		u32 DescriptorSetCount, VkDescriptorSet* OutSets)
 	{
-		Util::Log().Info("Allocating descriptor sets. Size count: {}", DescriptorSetCount);
+		HandleLog(BMRLogType::LogType_Info, "Allocating descriptor sets. Size count: %d", DescriptorSetCount);
 
 		VkDescriptorSetAllocateInfo SetAllocInfo = { };
 		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -89,8 +87,7 @@ namespace BMR::VulkanMemoryManagementSystem
 		VkResult Result = vkAllocateDescriptorSets(MemorySource.LogicalDevice, &SetAllocInfo, OutSets);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkAllocateCommandBuffers result is {}", static_cast<int>(Result));
-			assert(false);
+			HandleLog(BMRLogType::LogType_Error, "vkAllocateDescriptorSets result is %d", Result);
 		}
 	}
 
@@ -100,8 +97,7 @@ namespace BMR::VulkanMemoryManagementSystem
 		VkResult Result = vkCreateImage(MemorySource.LogicalDevice, pCreateInfo, nullptr, &Buffer.Image);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("CreateImage result is {}", static_cast<int>(Result));
-			assert(false);
+			HandleLog(BMRLogType::LogType_Error, "CreateImage result is %d", Result);
 		}
 
 		VkMemoryRequirements MemoryRequirements;
@@ -125,7 +121,7 @@ namespace BMR::VulkanMemoryManagementSystem
 	BMRGPUBuffer CreateBuffer(VkDeviceSize BufferSize, VkBufferUsageFlags Usage,
 		VkMemoryPropertyFlags Properties)
 	{
-		Util::Log().Info("Creating buffer. Requested size: {}", BufferSize);
+		HandleLog(BMRLogType::LogType_Info, "Creating buffer. Requested size: %d", BufferSize);
 
 		VkBufferCreateInfo BufferInfo = { };
 		BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -137,8 +133,7 @@ namespace BMR::VulkanMemoryManagementSystem
 		VkResult Result = vkCreateBuffer(MemorySource.LogicalDevice, &BufferInfo, nullptr, &Buffer.Buffer);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkCreateBuffer result is {}", static_cast<int>(Result));
-			assert(false);
+			HandleLog(BMRLogType::LogType_Error, "vkCreateBuffer result is %d", Result);
 		}
 
 		VkMemoryRequirements MemoryRequirements;
@@ -149,7 +144,7 @@ namespace BMR::VulkanMemoryManagementSystem
 
 		if (BufferSize != MemoryRequirements.size)
 		{
-			Util::Log().Warning("Buffer memory requirement size is {}, allocating {} more then buffer size",
+			HandleLog(BMRLogType::LogType_Warning, "Buffer memory requirement size is %d, allocating %d more then buffer size",
 				MemoryRequirements.size, MemoryRequirements.size - BufferSize);
 		}
 
@@ -228,7 +223,7 @@ namespace BMR::VulkanMemoryManagementSystem
 		const VkDeviceSize ActualLayerSize = Width * Height * Format; // Should be TotalAlignedSize in ideal (assert?)
 		if (ActualLayerSize != AlignedLayerSize)
 		{
-			Util::Log().Warning("Image memory requirement size for layer is {}, actual size is {}",
+			HandleLog(BMRLogType::LogType_Warning, "Image memory requirement size for layer is %d, actual size is %d",
 				AlignedLayerSize, ActualLayerSize);
 		}
 
@@ -290,7 +285,7 @@ namespace BMR::VulkanMemoryManagementSystem
 
 	VkDeviceMemory AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex)
 	{
-		Util::Log().Info("Allocating Device memory. Buffer type: Image, Size count: {}, Index: {}",
+		HandleLog(BMRLogType::LogType_Info, "Allocating Device memory. Buffer type: Image, Size count: %d, Index: %d",
 			AllocationSize, MemoryTypeIndex);
 
 		VkMemoryAllocateInfo MemoryAllocInfo = { };
@@ -302,8 +297,7 @@ namespace BMR::VulkanMemoryManagementSystem
 		VkResult Result = vkAllocateMemory(MemorySource.LogicalDevice, &MemoryAllocInfo, nullptr, &Memory);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkAllocateMemory result is {}", static_cast<int>(Result));
-			assert(false);
+			HandleLog(BMRLogType::LogType_Error, "vkAllocateMemory result is %d", Result);
 		}
 
 		return Memory;

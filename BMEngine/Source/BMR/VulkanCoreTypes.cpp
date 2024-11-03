@@ -1,10 +1,19 @@
 #include "VulkanCoreTypes.h"
 
 #include "VulkanHelper.h"
-#include "Util/Util.h"
 
 namespace BMR
 {
+	static bool CreateDebugUtilsMessengerEXT(VkInstance Instance, const VkDebugUtilsMessengerCreateInfoEXT* CreateInfo,
+		const VkAllocationCallbacks* Allocator, VkDebugUtilsMessengerEXT* InDebugMessenger);
+
+	static bool DestroyDebugMessenger(VkInstance Instance, VkDebugUtilsMessengerEXT InDebugMessenger,
+		const VkAllocationCallbacks* Allocator);
+
+	static VKAPI_ATTR VkBool32 VKAPI_CALL MessengerDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
+		VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
+		void* UserData);
+
 	BMRMainInstance BMRMainInstance::CreateMainInstance(const char** RequiredExtensions, u32 RequiredExtensionsCount,
 		bool IsValidationLayersEnabled, const char* ValidationLayers[], u32 ValidationLayersSize)
 	{
@@ -33,7 +42,7 @@ namespace BMR
 			MessengerCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
 				| VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 
-			MessengerCreateInfo.pfnUserCallback = Util::MessengerDebugCallback;
+			MessengerCreateInfo.pfnUserCallback = MessengerDebugCallback;
 			MessengerCreateInfo.pUserData = nullptr;
 
 			CreateInfo.pNext = &MessengerCreateInfo;
@@ -51,14 +60,13 @@ namespace BMR
 		VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &Instance.VulkanInstance);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkCreateInstance result is {}", static_cast<int>(Result));
-			assert(false);
+			HandleLog(BMRLogType::LogType_Error, "vkCreateInstance result is %d", Result);
 		}
 
 		if (IsValidationLayersEnabled)
 		{
 			const bool CreateDebugUtilsMessengerResult =
-				Util::CreateDebugUtilsMessengerEXT(Instance.VulkanInstance, &MessengerCreateInfo, nullptr, &Instance.DebugMessenger);
+				CreateDebugUtilsMessengerEXT(Instance.VulkanInstance, &MessengerCreateInfo, nullptr, &Instance.DebugMessenger);
 			assert(CreateDebugUtilsMessengerResult);
 		}
 
@@ -69,7 +77,7 @@ namespace BMR
 	{
 		if (Instance.DebugMessenger != nullptr)
 		{
-			Util::DestroyDebugMessenger(Instance.VulkanInstance, Instance.DebugMessenger, nullptr);
+			DestroyDebugMessenger(Instance.VulkanInstance, Instance.DebugMessenger, nullptr);
 		}
 
 		vkDestroyInstance(Instance.VulkanInstance, nullptr);
@@ -122,8 +130,7 @@ namespace BMR
 		const VkResult Result = vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &Count, nullptr);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkEnumerateDeviceExtensionProperties result is {}", static_cast<int>(Result));
-			assert(false);
+			HandleLog(BMRLogType::LogType_Error, "vkEnumerateDeviceExtensionProperties result is %d", Result);
 		}
 
 		auto Data = Memory::FrameArray<VkExtensionProperties>::Create(Count);
@@ -186,25 +193,25 @@ namespace BMR
 	{
 		if (!CheckDeviceExtensionsSupport(ExtensionProperties, ExtensionPropertiesCount, DeviceExtensions, DeviceExtensionsSize))
 		{
-			Util::Log().Warning("PhysicalDeviceIndices are not initialized");
+			HandleLog(BMRLogType::LogType_Warning, "PhysicalDeviceIndices are not initialized");
 			return false;
 		}
 
 		if (Indices.GraphicsFamily < 0 || Indices.PresentationFamily < 0)
 		{
-			Util::Log().Warning("PhysicalDeviceIndices are not initialized");
+			HandleLog(BMRLogType::LogType_Warning, "PhysicalDeviceIndices are not initialized");
 			return false;
 		}
 
 		if (!AvailableFeatures.samplerAnisotropy)
 		{
-			Util::Log().Warning("Feature samplerAnisotropy is not supported");
+			HandleLog(BMRLogType::LogType_Warning, "Feature samplerAnisotropy is not supported");
 			return false;
 		}
 
 		if (!AvailableFeatures.multiViewport)
 		{
-			Util::Log().Warning("Feature samplerAnisotropy is not supported");
+			HandleLog(BMRLogType::LogType_Warning, "Feature multiViewport is not supported");
 			return false;
 		}
 
@@ -228,7 +235,7 @@ namespace BMR
 
 			if (!IsDeviceExtensionSupported)
 			{
-				Util::Log().Error("Device extension {} unsupported", ExtensionsToCheck[i]);
+				HandleLog(BMRLogType::LogType_Error, "extension %s unsupported", ExtensionsToCheck[i]);
 				return false;
 			}
 		}
@@ -248,7 +255,7 @@ namespace BMR
 		VkResult Result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(PhysicalDevice, Surface, &SurfaceCapabilities);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Warning("vkGetPhysicalDeviceSurfaceCapabilitiesKHR result is {}", static_cast<int>(Result));
+			HandleLog(BMRLogType::LogType_Warning, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR result is %d", Result);
 			assert(false);
 		}
 
@@ -341,7 +348,7 @@ namespace BMR
 		VkResult Result = vkCreateSwapchainKHR(LogicalDevice, &SwapchainCreateInfo, nullptr, &Swapchain);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkCreateSwapchainKHR result is {}", static_cast<int>(Result));
+			HandleLog(BMRLogType::LogType_Error, "vkCreateSwapchainKHR result is %d", Result);
 			assert(false);
 		}
 
@@ -364,7 +371,7 @@ namespace BMR
 		// Has to be present by spec
 		if (Mode != VK_PRESENT_MODE_MAILBOX_KHR)
 		{
-			Util::Log().Warning("Using default VK_PRESENT_MODE_FIFO_KHR");
+			HandleLog(BMRLogType::LogType_Warning, "Using default VK_PRESENT_MODE_FIFO_KHR");
 		}
 
 		return Mode;
@@ -377,7 +384,7 @@ namespace BMR
 		const VkResult Result = vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Count, nullptr);
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkGetPhysicalDeviceSurfacePresentModesKHR result is {}", static_cast<int>(Result));
+			HandleLog(BMRLogType::LogType_Error, "vkGetPhysicalDeviceSurfacePresentModesKHR result is %d", Result);
 			assert(false);
 		}
 
@@ -397,5 +404,59 @@ namespace BMR
 		vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &Count, Data.Pointer.Data);
 
 		return Data;
+	}
+
+	bool CreateDebugUtilsMessengerEXT(VkInstance Instance, const VkDebugUtilsMessengerCreateInfoEXT* CreateInfo,
+		const VkAllocationCallbacks* Allocator, VkDebugUtilsMessengerEXT* InDebugMessenger)
+	{
+		auto CreateMessengerFunc = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(Instance, "vkCreateDebugUtilsMessengerEXT");
+		if (CreateMessengerFunc != nullptr)
+		{
+			const VkResult Result = CreateMessengerFunc(Instance, CreateInfo, Allocator, InDebugMessenger);
+			if (Result != VK_SUCCESS)
+			{
+				HandleLog(BMRLogType::LogType_Error, "CreateMessengerFunc result is %d", Result);
+				return false;
+			}
+		}
+		else
+		{
+			HandleLog(BMRLogType::LogType_Error, "CreateMessengerFunc is nullptr");
+			return false;
+		}
+
+		return true;
+	}
+
+	bool DestroyDebugMessenger(VkInstance Instance, VkDebugUtilsMessengerEXT InDebugMessenger,
+		const VkAllocationCallbacks* Allocator)
+	{
+		auto DestroyMessengerFunc = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(Instance, "vkDestroyDebugUtilsMessengerEXT");
+		if (DestroyMessengerFunc != nullptr)
+		{
+			DestroyMessengerFunc(Instance, InDebugMessenger, Allocator);
+			return true;
+		}
+		else
+		{
+			HandleLog(BMRLogType::LogType_Error, "DestroyMessengerFunc is nullptr");
+			return false;
+		}
+	}
+
+	VKAPI_ATTR VkBool32 VKAPI_CALL MessengerDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
+		[[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
+		[[maybe_unused]] void* UserData)
+	{
+		if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+		{
+			HandleLog(BMRLogType::LogType_Error, CallbackData->pMessage);
+		}
+		else
+		{
+			HandleLog(BMRLogType::LogType_Info, CallbackData->pMessage);
+		}
+
+		return VK_FALSE;
 	}
 }

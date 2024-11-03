@@ -11,21 +11,6 @@
 
 namespace Util
 {
-	struct UtilHelper
-	{
-		// TODO FIX!!!
-		static std::string_view GetVertexShaderPath()
-		{
-			return "./Resources/Shaders/vert.spv";
-		}
-
-		static std::string_view GetFragmentShaderPath()
-		{
-			return "./Resources/Shaders/frag.spv";
-		}
-
-	};
-
 	bool ReadFileFull(FILE* File, std::vector<char>& OutFileData);
 	bool OpenAndReadFileFull(const char* FileName, std::vector<char>& OutFileData, const char* Mode);
 
@@ -42,9 +27,9 @@ namespace Util
 		template <typename... TArgs>
 		static void Warning(std::string_view Message, TArgs&&... Args)
 		{
-			std::cout << "\033[33;5m"; // Set red color
+			std::cout << "\033[33;5m";
 			Print("Warning", Message, Args...);
-			std::cout << "\033[m"; // Reset red color
+			std::cout << "\033[m";
 		}
 
 		template <typename... TArgs>
@@ -68,16 +53,6 @@ namespace Util
 			std::cout << std::format("{}: {}\n", Type, std::vformat(Message, std::make_format_args(Args...)));
 		}
 	};
-
-	bool CreateDebugUtilsMessengerEXT(VkInstance Instance, const VkDebugUtilsMessengerCreateInfoEXT* CreateInfo,
-		const VkAllocationCallbacks* Allocator, VkDebugUtilsMessengerEXT* InDebugMessenger);
-
-	bool DestroyDebugMessenger(VkInstance Instance, VkDebugUtilsMessengerEXT InDebugMessenger,
-		const VkAllocationCallbacks* Allocator);
-
-	VKAPI_ATTR VkBool32 VKAPI_CALL MessengerDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
-		VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
-		void* UserData);
 
 #ifdef NDEBUG
 	static bool EnableValidationLayers = false;

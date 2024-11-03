@@ -1,6 +1,5 @@
 #include "MainRenderPass.h"
 
-#include "Util/Util.h"
 #include "VulkanHelper.h"
 #include "VulkanMemoryManagementSystem.h"
 
@@ -281,8 +280,7 @@ namespace BMR
 			VkResult Result = vkCreateRenderPass(LogicalDevice, RenderPassCreateInfo + i, nullptr, RenderPasses + i);
 			if (Result != VK_SUCCESS)
 			{
-				Util::Log().Error("vkCreateRenderPass result is {}", static_cast<int>(Result));
-				assert(false);
+				HandleLog(BMRLogType::LogType_Error, "vkCreateRenderPass result is %d", Result);
 			}
 		}
 	}
@@ -336,8 +334,7 @@ namespace BMR
 				VkResult Result = vkCreateFramebuffer(LogicalDevice, &CreateInfo, nullptr, &(Framebuffers[i][j]));
 				if (Result != VK_SUCCESS)
 				{
-					Util::Log().Error("vkCreateFramebuffer result is {}", static_cast<int>(Result));
-					assert(false);
+					HandleLog(BMRLogType::LogType_Error, "vkCreateFramebuffer result is %d", Result);
 				}
 			}
 		}
@@ -465,8 +462,7 @@ namespace BMR
 			const VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &(LayoutCreateInfos[i]), nullptr, &(DescriptorLayouts[i]));
 			if (Result != VK_SUCCESS)
 			{
-				Util::Log().Error("vkCreateDescriptorSetLayout result is {}", static_cast<int>(Result));
-				assert(false);
+				HandleLog(BMRLogType::LogType_Error, "vkCreateDescriptorSetLayout result is %d", Result);
 			}
 		}
 	}
@@ -530,8 +526,7 @@ namespace BMR
 				PipelineLayouts + i);
 			if (Result != VK_SUCCESS)
 			{
-				Util::Log().Error("vkCreatePipelineLayout result is {}", static_cast<int>(Result));
-				assert(false);
+				HandleLog(BMRLogType::LogType_Error, "vkCreatePipelineLayout result is %d", Result);
 			}
 		}
 	}
@@ -972,43 +967,50 @@ namespace BMR
 
 		if (Result != VK_SUCCESS)
 		{
-			Util::Log().Error("vkCreateGraphicsPipelines result is {}", static_cast<int>(Result));
-			assert(false);
+			HandleLog(BMRLogType::LogType_Error, "vkCreateGraphicsPipelines result is %d", Result);
 		}
 	}
 
 	void BMRMainRenderPass::CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 ImagesCount, VkExtent2D SwapExtent,
 		VkFormat DepthFormat, VkFormat ColorFormat)
 	{
+		VkImageCreateInfo ImageCreateInfo;
+		ImageCreateInfo = { };
+		ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+		ImageCreateInfo.extent.depth = 1;
+		ImageCreateInfo.mipLevels = 1;
+		ImageCreateInfo.arrayLayers = 1;
+		ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		ImageCreateInfo.flags = 0;
+
 		for (u32 i = 0; i < ImagesCount; ++i)
 		{
-			DepthBuffers[i].Image = CreateImage(PhysicalDevice, LogicalDevice, SwapExtent.width, SwapExtent.height,
-				DepthFormat, VK_IMAGE_TILING_OPTIMAL,
-				VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT,
-				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-				&DepthBuffers[i].Memory);
+			ImageCreateInfo.extent.width = SwapExtent.width;
+			ImageCreateInfo.extent.height = SwapExtent.height;
+			ImageCreateInfo.format = DepthFormat;
+			ImageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
 
+			DepthBuffers[i] = VulkanMemoryManagementSystem::CreateImageBuffer(&ImageCreateInfo);
 			DepthBufferViews[i] = CreateImageView(LogicalDevice, DepthBuffers[i].Image,
 				DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_VIEW_TYPE_2D, 1);
 
-			// VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT says that image can be used only as attachment. Used only for sub pass
-			ColorBuffers[i].Image = CreateImage(PhysicalDevice, LogicalDevice, SwapExtent.width, SwapExtent.height,
-				ColorFormat, VK_IMAGE_TILING_OPTIMAL,
-				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT,
-				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-				&ColorBuffers[i].Memory);
+			ImageCreateInfo.format = ColorFormat;
+			ImageCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
 
+			ColorBuffers[i] = VulkanMemoryManagementSystem::CreateImageBuffer(&ImageCreateInfo);
 			ColorBufferViews[i] = CreateImageView(LogicalDevice, ColorBuffers[i].Image,
 				ColorFormat, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_2D, 1);
 
+			ImageCreateInfo.extent.width = DepthPassSwapExtent.width;
+			ImageCreateInfo.extent.height = DepthPassSwapExtent.height;
+			ImageCreateInfo.format = DepthFormat;
+			ImageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
-
-			ShadowDepthBuffers[i].Image = CreateImage(PhysicalDevice, LogicalDevice, DepthPassSwapExtent.width, DepthPassSwapExtent.height,
-				DepthFormat, VK_IMAGE_TILING_OPTIMAL,
-				VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-				&ShadowDepthBuffers[i].Memory);
-
+			ShadowDepthBuffers[i] = VulkanMemoryManagementSystem::CreateImageBuffer(&ImageCreateInfo);
 			ShadowDepthBufferViews[i] = CreateImageView(LogicalDevice, ShadowDepthBuffers[i].Image,
 				DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_VIEW_TYPE_2D, 1);
 		}

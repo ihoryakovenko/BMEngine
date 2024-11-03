@@ -1,14 +1,14 @@
 #pragma once
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h> // TODO use something instead of GLFWwindow
+#include <vulkan/vulkan.h>
+#include <Windows.h>
 
 #include "Util/EngineTypes.h"
 #include "BMRInterfaceTypes.h"
 
 namespace BMR
 {
-	bool Init(GLFWwindow* Window, const BMRConfig& InConfig);
+	bool Init(HWND WindowHandler, const BMRConfig& InConfig);
 	void DeInit();
 
 	u32 LoadTexture(BMRTextureArrayInfo Info, BMRTextureType TextureType);
@@ -18,8 +18,8 @@ namespace BMR
 	u64 LoadVertices(const void* Vertices, u32 VertexSize, VkDeviceSize VerticesCount);
 	u64 LoadIndices(const u32* Indices, u32 IndicesCount);
 
-	void UpdateLightBuffer(const BMRLightBuffer& Buffer);
-	void UpdateMaterialBuffer(const BMRMaterial& Buffer);
+	void UpdateLightBuffer(const BMRLightBuffer* Buffer);
+	void UpdateMaterialBuffer(const BMRMaterial* Buffer);
 	void UpdateLightSpaceBuffer(const BMRLightSpaceMatrix* LightSpaceMatrix);
 
 	void Draw(const BMRDrawScene& Scene);

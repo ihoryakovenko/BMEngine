@@ -1,5 +1,3 @@
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/mat4x4.hpp>
 
@@ -9,6 +7,9 @@
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
 
 #include "Util/Util.h"
 #include <cassert>
@@ -51,10 +52,10 @@ BMR::BMRTerrainVertex TerrainVerticesData[NumRows][NumCols];
 
 std::vector<BMR::BMRDrawEntity> DrawEntities;
 BMR::BMRConfig Config;
-std::vector<std::vector<char>> ShaderCodes(BMR::BMRShaderNames::ShaderNamesCount); // UB?
+std::vector<std::vector<char>> ShaderCodes(BMR::BMRShaderNames::ShaderNamesCount);
 BMR::BMRDrawSkyBoxEntity SkyBox;
 
-void GenerateTerrain()
+void GenerateTerrain(std::vector<u32>& Indices)
 {
 	const f32 MaxAltitude = 0.0f;
 	const f32 MinAltitude = -10.0f;
@@ -107,6 +108,28 @@ void GenerateTerrain()
 				UpFactor = true;
 				DownFactor = false;
 			}
+		}
+	}
+
+	Indices.reserve(NumRows * NumCols);
+	for (int row = 0; row < NumRows - 1; ++row)
+	{
+		for (int col = 0; col < NumCols - 1; ++col)
+		{
+			u32 topLeft = row * NumCols + col;
+			u32 topRight = topLeft + 1;
+			u32 bottomLeft = (row + 1) * NumCols + col;
+			u32 bottomRight = bottomLeft + 1;
+
+			// First triangle (Top-left, Bottom-left, Bottom-right)
+			Indices.push_back(topLeft);
+			Indices.push_back(bottomLeft);
+			Indices.push_back(bottomRight);
+
+			// Second triangle (Top-left, Bottom-right, Top-right)
+			Indices.push_back(topLeft);
+			Indices.push_back(bottomRight);
+			Indices.push_back(topRight);
 		}
 	}
 }
@@ -179,6 +202,51 @@ struct Camera
 	glm::vec3 CameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
 	glm::vec3 CameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 };
+
+template <typename... TArgs>
+static void Error(std::string_view Message, TArgs&&... Args)
+{
+	std::cout << "\033[31;5m"; // Set red color
+	Print("Error", Message, Args...);
+	std::cout << "\033[m"; // Reset red color
+}
+
+template <typename... TArgs>
+static void Warning(std::string_view Message, TArgs&&... Args)
+{
+	std::cout << "\033[33;5m";
+	Print("Warning", Message, Args...);
+	std::cout << "\033[m";
+}
+
+void BMRLog(BMR::BMRLogType LogType, const char* Format, va_list Args)
+{
+	switch (LogType)
+	{
+		case BMR::LogType_Error:
+		{
+			std::cout << "\033[31;5mError: "; // Set red color
+			vprintf(Format, Args);
+			std::cout << "\n\033[m"; // Reset red color
+			assert(false);
+			break;
+		}
+		case BMR::LogType_Warning:
+		{
+			std::cout << "\033[33;5mWarning: "; // Set red color
+			vprintf(Format, Args);
+			std::cout << "\n\033[m"; // Reset red color
+			break;
+		}
+		case BMR::LogType_Info:
+		{
+			std::cout << "Info: ";
+			vprintf(Format, Args);
+			std::cout << '\n';
+			break;
+		}
+	}
+}
 
 u32 AddTexture(const char* DiffuseTexturePath)
 {
@@ -466,22 +534,7 @@ void LoadDrawEntities()
 	const char* Modelpath = "./Resources/Models/uh60.obj";
 	const char* CubeObj = "./Resources/Models/cube.obj";
 	const char* SkyBoxObj = "./Resources/Models/SkyBox.obj";
-
-
-
 	const char* BaseDir = "./Resources/Models/";
-
-	tinyobj::attrib_t Attrib;
-	std::vector<tinyobj::shape_t> Shapes;
-	std::vector<tinyobj::material_t> Materials;
-	std::string Warn, Err;
-
-	if (!tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &Warn, &Err, Modelpath, BaseDir))
-	{
-		assert(false);
-	}
-
-	std::vector<int> MaterialToTexture(Materials.size());
 
 	TestTextureIndex = AddTexture(TestTexture);
 	WhiteTextureIndex = AddTexture(WhiteTexture);
@@ -499,6 +552,18 @@ void LoadDrawEntities()
 	GrassMaterial = BMR::LoadEntityMaterial(GrassTextureIndex, GrassTextureIndex);
 	SkyBoxMaterial = BMR::LoadSkyBoxMaterial(SkyBoxCubeTextureIndex);
 	TerrainMaterial = BMR::LoadTerrainMaterial(TestTextureIndex);
+
+	tinyobj::attrib_t Attrib;
+	std::vector<tinyobj::shape_t> Shapes;
+	std::vector<tinyobj::material_t> Materials;
+	std::string Warn, Err;
+
+	if (!tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &Warn, &Err, Modelpath, BaseDir))
+	{
+		assert(false);
+	}
+
+	std::vector<int> MaterialToTexture(Materials.size());
 
 	for (size_t i = 0; i < Materials.size(); i++)
 	{
@@ -714,6 +779,47 @@ void LoadShaders()
 	}
 }
 
+void SortDrawObjects(BMR::BMRDrawScene& Scene)
+{
+	// TODO: Need to sort objects by distance to camera
+	int LastOpaqueIndex = Scene.DrawEntitiesCount - 1;
+	for (; LastOpaqueIndex >= 0; --LastOpaqueIndex)
+	{
+		if (Scene.DrawEntities[LastOpaqueIndex].MaterialIndex != GrassMaterial &&
+			Scene.DrawEntities[LastOpaqueIndex].MaterialIndex != BlendWindowMaterial)
+		{
+			break;
+		}
+	}
+
+	for (int i = 0; i < LastOpaqueIndex; ++i)
+	{
+		if (Scene.DrawEntities[i].MaterialIndex == GrassMaterial ||
+			Scene.DrawEntities[i].MaterialIndex == BlendWindowMaterial)
+		{
+			std::swap(Scene.DrawEntities[i], Scene.DrawEntities[LastOpaqueIndex]);
+			--LastOpaqueIndex;
+		}
+	}
+}
+
+void UpdateScene(BMR::BMRDrawScene& Scene, f32 DeltaTime)
+{
+	static f32 Angle = 0.0f;
+
+	Angle += 0.5f * static_cast<f32>(DeltaTime);
+	if (Angle > 360.0f)
+	{
+		Angle -= 360.0f;
+	}
+
+	for (int i = 0; i < Scene.DrawEntitiesCount; ++i)
+	{
+		glm::mat4 TestMat = glm::rotate(Scene.DrawEntities[i].Model, glm::radians(0.5f), glm::vec3(0.0f, 1.0f, 0.0f));
+		//Scene.DrawEntities[i].Model = TestMat;
+	}
+}
+
 int main()
 {
 	const u32 FrameAllocSize = 1024 * 1024;
@@ -739,35 +845,19 @@ int main()
 
 	glfwSetInputMode(Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-	GenerateTerrain();
+	std::vector<u32> TerrainIndices;
+	GenerateTerrain(TerrainIndices);
 	LoadShaders();
 
-	std::vector<u32> indices;
-	indices.reserve(NumRows * NumCols);
-	for (int row = 0; row < NumRows - 1; ++row)
-	{
-		for (int col = 0; col < NumCols - 1; ++col)
-		{
-			u32 topLeft = row * NumCols + col;
-			u32 topRight = topLeft + 1;
-			u32 bottomLeft = (row + 1) * NumCols + col;
-			u32 bottomRight = bottomLeft + 1;
-
-			// First triangle (Top-left, Bottom-left, Bottom-right)
-			indices.push_back(topLeft);
-			indices.push_back(bottomLeft);
-			indices.push_back(bottomRight);
-
-			// Second triangle (Top-left, Bottom-right, Top-right)
-			indices.push_back(topLeft);
-			indices.push_back(bottomRight);
-			indices.push_back(topRight);
-		}
-	}
-
 	Config.MaxTextures = 90;
+	Config.LogHandler = BMRLog;
+	Config.EnableValidationLayers = true;
 
-	BMR::Init(Window, Config);
+	BMR::Init(glfwGetWin32Window(Window), Config);
+
+	ShaderCodes.clear();
+	ShaderCodes.shrink_to_fit();
+
 	LoadDrawEntities();
 
 	BMR::BMRDrawScene Scene;
@@ -782,9 +872,12 @@ int main()
 	BMR::BMRDrawTerrainEntity TestDrawTerrainEntity;
 	TestDrawTerrainEntity.VertexOffset = LoadVertices(&TerrainVerticesData[0][0],
 		sizeof(BMR::BMRTerrainVertex), NumRows * NumCols);
-	TestDrawTerrainEntity.IndexOffset = BMR::LoadIndices(indices.data(), indices.size());
-	TestDrawTerrainEntity.IndicesCount = indices.size();
+	TestDrawTerrainEntity.IndexOffset = BMR::LoadIndices(TerrainIndices.data(), TerrainIndices.size());
+	TestDrawTerrainEntity.IndicesCount = TerrainIndices.size();
 	TestDrawTerrainEntity.MaterialIndex = TerrainMaterial;
+
+	TerrainIndices.clear();
+	TerrainIndices.shrink_to_fit();
 
 	Scene.DrawTerrainEntities = &TestDrawTerrainEntity;
 	Scene.DrawTerrainEntitiesCount = 1;
@@ -795,8 +888,6 @@ int main()
 
 	f64 DeltaTime = 0.0f;
 	f64 LastTime = 0.0f;
-
-	f32 Angle = 0.0f;
 
 	Camera MainCamera;
 
@@ -828,7 +919,7 @@ int main()
 
 	BMR::BMRMaterial Mat;
 	Mat.Shininess = 32.f;
-	BMR::UpdateMaterialBuffer(Mat);
+	BMR::UpdateMaterialBuffer(&Mat);
 
 	float near_plane = 1.0f, far_plane = 30.5f;
 	glm::mat4 lightProjection = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, near_plane, far_plane);
@@ -852,47 +943,18 @@ int main()
 		DeltaTime = CurrentTime - LastTime;
 		LastTime = static_cast<f32>(CurrentTime);
 
-		Angle += 0.5f * static_cast<f32>(DeltaTime);
-		if (Angle > 360.0f)
-		{
-			Angle -= 360.0f;
-		}
-
-		for (int i = 0; i < Scene.DrawEntitiesCount; ++i)
-		{
-			glm::mat4 TestMat = glm::rotate(Scene.DrawEntities[i].Model, glm::radians(0.5f), glm::vec3(0.0f, 1.0f, 0.0f));
-			//Scene.DrawEntities[i].Model = TestMat;
-		}
+		UpdateScene(Scene, DeltaTime);
 
 		MoveCamera(Window, DeltaTime, MainCamera);
+
 		Scene.ViewProjection.View = glm::lookAt(MainCamera.CameraPosition, MainCamera.CameraPosition + MainCamera.CameraFront, MainCamera.CameraUp);
 
 		TestData.SpotLight.Direction = MainCamera.CameraFront;
 		TestData.SpotLight.Position = MainCamera.CameraPosition;
 
-		UpdateLightBuffer(TestData);
+		UpdateLightBuffer(&TestData);
 
-		// TODO: Need to sort objects by distance to camera
-		int LastOpaqueIndex = Scene.DrawEntitiesCount - 1;
-		for (; LastOpaqueIndex >= 0; --LastOpaqueIndex)
-		{
-			if (Scene.DrawEntities[LastOpaqueIndex].MaterialIndex != GrassMaterial &&
-				Scene.DrawEntities[LastOpaqueIndex].MaterialIndex != BlendWindowMaterial)
-			{
-				break;
-			}
-		}
-
-		for (int i = 0; i < LastOpaqueIndex; ++i)
-		{
-			if (Scene.DrawEntities[i].MaterialIndex == GrassMaterial ||
-				Scene.DrawEntities[i].MaterialIndex == BlendWindowMaterial)
-			{
-				std::swap(Scene.DrawEntities[i], Scene.DrawEntities[LastOpaqueIndex]);
-				--LastOpaqueIndex;
-			}
-		}
-
+		SortDrawObjects(Scene);
 		Draw(Scene);
 
 		Memory::BmMemoryManagementSystem::FrameDealloc();
