@@ -547,8 +547,13 @@ namespace BMR
 		Scissor.extent = SwapExtent;
 
 		VkViewport DepthViewport = Viewport;
+		VkRect2D DepthScissor;
 		DepthViewport.width = DepthPassSwapExtent.width;
 		DepthViewport.height = DepthPassSwapExtent.height;
+		DepthScissor.offset = { 0, 0 };
+		DepthScissor.extent = DepthPassSwapExtent;
+
+		
 
 		const VkShaderStageFlagBits NamesToStagesTable[] =
 		{
@@ -639,7 +644,7 @@ namespace BMR
 		ScissorTable[BMRPipelineHandles::Terrain] = &Scissor;
 		ScissorTable[BMRPipelineHandles::Deferred] = &Scissor;
 		ScissorTable[BMRPipelineHandles::SkyBox] = &Scissor;
-		ScissorTable[BMRPipelineHandles::Depth] = &Scissor;
+		ScissorTable[BMRPipelineHandles::Depth] = &DepthScissor;
 
 		u32 VertexBindingDescriptionCountTable[BMRPipelineHandles::PipelineHandlesCount];
 		VertexBindingDescriptionCountTable[BMRPipelineHandles::Entity] = 1;
@@ -887,9 +892,9 @@ namespace BMR
 			ViewportStateCreateInfo[i] = { };
 			ViewportStateCreateInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 			ViewportStateCreateInfo[i].viewportCount = 1;
-			ViewportStateCreateInfo[i].pViewports = &Viewport;
+			ViewportStateCreateInfo[i].pViewports = ViewportTable[i];
 			ViewportStateCreateInfo[i].scissorCount = 1;
-			ViewportStateCreateInfo[i].pScissors = &Scissor;
+			ViewportStateCreateInfo[i].pScissors = ScissorTable[i];
 
 			RasterizationStateCreateInfo[i] = { };
 			RasterizationStateCreateInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -939,7 +944,7 @@ namespace BMR
 			PipelineCreateInfos[i].pStages = ShaderInfos[i].Infos;
 			PipelineCreateInfos[i].pVertexInputState = VertexInputInfo + i;
 			PipelineCreateInfos[i].pInputAssemblyState = &InputAssemblyStateCreateInfo;
-			PipelineCreateInfos[i].pViewportState = ViewportStateCreateInfo;
+			PipelineCreateInfos[i].pViewportState = ViewportStateCreateInfo + i;
 			PipelineCreateInfos[i].pDynamicState = nullptr;
 			PipelineCreateInfos[i].pRasterizationState = RasterizationStateCreateInfo + i;
 			PipelineCreateInfos[i].pMultisampleState = &MultisampleStateCreateInfo;

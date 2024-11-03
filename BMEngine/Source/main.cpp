@@ -29,6 +29,10 @@
 
 #include "stb_image.h"
 
+#include "ImguiIntegration.h"
+
+#include <thread>
+
 const u32 NumRows = 600;
 const u32 NumCols = 600;
 
@@ -649,6 +653,18 @@ void LoadDrawEntities()
 
 		ModelMeshes.emplace_back(FloorMesh);
 	}
+
+	{
+		auto CenterMesh = CreateCubeMesh(CubeObj, TestMaterialIndex);
+
+		glm::vec3 CubePos(0.0f, 0.0f, 0.0f);
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, CubePos);
+		model = glm::scale(model, glm::vec3(0.2f, 5.0f, 0.2f));
+		CenterMesh.Model = model;
+
+		ModelMeshes.emplace_back(CenterMesh);
+	}
 	
 	ModelMeshes.emplace_back(CreateCubeMesh(CubeObj, GrassMaterial));
 	ModelMeshes.emplace_back(CreateCubeMesh(CubeObj, WhiteMaterialIndex));
@@ -921,19 +937,22 @@ int main()
 	Mat.Shininess = 32.f;
 	BMR::UpdateMaterialBuffer(&Mat);
 
-	float near_plane = 1.0f, far_plane = 30.5f;
-	glm::mat4 lightProjection = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, near_plane, far_plane);
+	float near_plane = 0.1f, far_plane = 100.0f;
+	float halfSize = 30.0f;
+	glm::mat4 lightProjection = glm::ortho(-halfSize, halfSize, -halfSize, halfSize, near_plane, far_plane);
 
-	glm::vec3 eye = glm::vec3(10.0f, 10.0f, 0.0f);
-	glm::vec3 center = eye + TestData.DirectionLight.Direction;
+	glm::vec3 eye = glm::vec3(0.0f, 10.0f, 0.0f);
 	glm::vec3 up = glm::vec3(0.0f, 0.0f, -1.0f);
 
-	glm::mat4 lightView = glm::lookAt(eye, center, up);
+	ImguiIntegration::GuiData GuiData;
+	GuiData.DirectionLightDirection = &TestData.DirectionLight.Direction;
 
-	BMR::BMRLightSpaceMatrix lightSpaceMatrix;
-	lightSpaceMatrix.Matrix = lightProjection * lightView;
-
-	BMR::UpdateLightSpaceBuffer(&lightSpaceMatrix);
+	bool DrawImgui = true;
+	std::thread ImguiThread([&]()
+	{
+		// UB 2 threads to variables
+		ImguiIntegration::DrawLoop(DrawImgui, GuiData);
+	});
 
 	while (!glfwWindowShouldClose(Window) && !Close)
 	{
@@ -941,7 +960,7 @@ int main()
 
 		const f64 CurrentTime = glfwGetTime();
 		DeltaTime = CurrentTime - LastTime;
-		LastTime = static_cast<f32>(CurrentTime);
+		LastTime = CurrentTime;
 
 		UpdateScene(Scene, DeltaTime);
 
@@ -952,6 +971,14 @@ int main()
 		TestData.SpotLight.Direction = MainCamera.CameraFront;
 		TestData.SpotLight.Position = MainCamera.CameraPosition;
 
+		glm::vec3 center = eye + TestData.DirectionLight.Direction;
+		glm::mat4 lightView = glm::lookAt(eye, center, up);
+
+		BMR::BMRLightSpaceMatrix lightSpaceMatrix;
+		lightSpaceMatrix.Matrix = lightProjection * lightView;
+
+		BMR::UpdateLightSpaceBuffer(&lightSpaceMatrix);
+
 		UpdateLightBuffer(&TestData);
 
 		SortDrawObjects(Scene);
@@ -959,9 +986,11 @@ int main()
 
 		Memory::BmMemoryManagementSystem::FrameDealloc();
 	}
+
+	DrawImgui = false;
+	ImguiThread.join();
 	
 	BMR::DeInit();
-
 
 	glfwDestroyWindow(Window);
 

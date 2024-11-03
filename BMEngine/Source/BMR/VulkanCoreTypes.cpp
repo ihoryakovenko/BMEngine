@@ -391,6 +391,11 @@ namespace BMR
 		auto Data = Memory::FrameArray<VkPresentModeKHR>::Create(Count);
 		vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Count, Data.Pointer.Data);
 
+		for (u32 i = 0; i < Count; ++i)
+		{
+			HandleLog(BMRLogType::LogType_Info, "Present mode %d is available", Data[i]);
+		}
+
 		return Data;
 	}
 
