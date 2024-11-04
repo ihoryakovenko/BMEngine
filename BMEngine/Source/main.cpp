@@ -780,11 +780,6 @@ void LoadShaders()
 	HandleToPath.push_back(BMR::BMRPipelineHandles::Depth);
 	StageToStages.push_back(BMR::BMRShaderStages::Vertex);
 
-	ShaderPaths.push_back("./Resources/Shaders/Depth_frag.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::Depth);
-	StageToStages.push_back(BMR::BMRShaderStages::Fragment);
-
-
 	for (u32 i = 0; i < BMR::BMRShaderNames::ShaderNamesCount; ++i)
 	{
 		Util::OpenAndReadFileFull(ShaderPaths[i], ShaderCodes[i], "rb");
@@ -946,6 +941,7 @@ int main()
 
 	ImguiIntegration::GuiData GuiData;
 	GuiData.DirectionLightDirection = &TestData.DirectionLight.Direction;
+	GuiData.eye = &eye;
 
 	bool DrawImgui = true;
 	std::thread ImguiThread([&]()
@@ -974,10 +970,7 @@ int main()
 		glm::vec3 center = eye + TestData.DirectionLight.Direction;
 		glm::mat4 lightView = glm::lookAt(eye, center, up);
 
-		BMR::BMRLightSpaceMatrix lightSpaceMatrix;
-		lightSpaceMatrix.Matrix = lightProjection * lightView;
-
-		BMR::UpdateLightSpaceBuffer(&lightSpaceMatrix);
+		Scene.DirectionalLightSpaceMatrix.Matrix = lightProjection * lightView;
 
 		UpdateLightBuffer(&TestData);
 

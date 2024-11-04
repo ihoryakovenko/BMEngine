@@ -13,13 +13,13 @@ namespace BMR
 		TerrainSampler,
 		EntityVp,
 		EntitySampler,
-		Light,
-		Material,
-		DeferredInput,
+		EntityLigh,
+		EntityMaterial,
+		EntityShadowMapSampler,
+		DepthEntityLightSpaceMatrix,
+		DeferredInputAttachments,
 		SkyBoxVp, // TODO Same as EntityVpLayout, change or delete
 		SkyBoxSampler, // TODO Same as TerrainSampler
-		DepthLightSpace,
-		ShadowMapInput,
 
 		Count
 	};
@@ -28,13 +28,13 @@ namespace BMR
 	{
 		enum
 		{
-			DepthLightSpace,
-			ShadowMap,
+			DepthEntityLightSpaceMatrix = 0,
+			ShadowMapSampler,
 			SkyBoxVp,
 			TerrainVp,
 			EntityVp,
 			EntityLigh,
-			DeferredInput,
+			DeferredInputAttachments,
 
 			Count
 		};
@@ -81,7 +81,7 @@ namespace BMR
 		void CreatePipelineLayouts(VkDevice LogicalDevice); 
 		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent,
 			BMRPipelineShaderInput ShaderInputs[BMRShaderNames::ShaderNamesCount]);
-		void CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 ImagesCount, VkExtent2D SwapExtent,
+		void CreateImages(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 ImagesCount, VkExtent2D SwapExtent,
 			VkFormat DepthFormat, VkFormat ColorFormat);
 		void CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
 			u32 ImagesCount);
@@ -116,8 +116,7 @@ namespace BMR
 		BMRImageBuffer ShadowDepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ShadowDepthBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-
-		BMRGPUBuffer DepthLightSpaceBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRGPUBuffer DepthLightSpaceMatrixBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		// TODO: Fix
 		static inline VkDescriptorSet SamplerDescriptors[MAX_IMAGES];

@@ -96,13 +96,28 @@ float LightDistanceAttenuation(vec3 LightPosition, float Constant, float Linear,
 float ShadowCalculation()
 {
 	vec3 projCoords = FragPosLightSpace.xyz / FragPosLightSpace.w;
+	if (projCoords.z > 1.0f)
+	{
+		return 0;
+	}
+
 	projCoords.xy = projCoords.xy * 0.5 + 0.5;
 
 	float currentDepth = projCoords.z;
-	float closestDepth = texture(ShadowMap, projCoords.xy).r;
-	float shadow = closestDepth < currentDepth ? 1.0 : 0.0;
 
-	return shadow;
+	float shadow = 0;
+	vec2 texelSize = 1.0 / textureSize(ShadowMap, 0);
+
+	for(int x = -1; x <= 1; ++x)
+	{
+		for(int y = -1; y <= 1; ++y)
+		{
+			float pcfDepth = texture(ShadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
+			shadow += currentDepth > pcfDepth ? 1.0 : 0.0;        
+		}    
+	}
+
+	return shadow /= 9.0;
 }
 
 vec3 CastDirectionLight(vec3 DiffuseTexture, vec3 SpecularTexture)

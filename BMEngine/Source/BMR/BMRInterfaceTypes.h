@@ -26,7 +26,6 @@ namespace BMR
 		SkyBoxVertex,
 		SkyBoxFragment,
 		DepthVertex,
-		DepthFragment,
 
 		ShaderNamesCount
 	};
@@ -169,6 +168,8 @@ namespace BMR
 
 		BMRDrawSkyBoxEntity SkyBox;
 		bool DrawSkyBox = false;
+
+		BMR::BMRLightSpaceMatrix DirectionalLightSpaceMatrix;
 	};
 
 	struct BMRLightBuffer
