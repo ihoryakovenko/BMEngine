@@ -6,6 +6,7 @@ namespace ImguiIntegration
 {
 	struct GuiData
 	{
+		glm::vec3* eye = nullptr;
 		glm::vec3* DirectionLightDirection = nullptr;
 	};
 

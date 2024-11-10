@@ -29,5 +29,4 @@ set SHADER_OUTPUT=%PROJECT_DIR%/Resources/Shaders/
 %VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_OUTPUT%SkyBox_frag.spv -V %SHADER_PATH%SkyBox.frag.glsl
 
 %VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_OUTPUT%Depth_vert.spv -V %SHADER_PATH%Depth.vert.glsl
-%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_OUTPUT%Depth_frag.spv -V %SHADER_PATH%Depth.frag.glsl
 pause

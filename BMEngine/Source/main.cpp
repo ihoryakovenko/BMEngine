@@ -780,11 +780,6 @@ void LoadShaders()
 	HandleToPath.push_back(BMR::BMRPipelineHandles::Depth);
 	StageToStages.push_back(BMR::BMRShaderStages::Vertex);
 
-	ShaderPaths.push_back("./Resources/Shaders/Depth_frag.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::Depth);
-	StageToStages.push_back(BMR::BMRShaderStages::Fragment);
-
-
 	for (u32 i = 0; i < BMR::BMRShaderNames::ShaderNamesCount; ++i)
 	{
 		Util::OpenAndReadFileFull(ShaderPaths[i], ShaderCodes[i], "rb");
@@ -880,8 +875,11 @@ int main()
 	Scene.SkyBox = SkyBox;
 	Scene.DrawSkyBox = true;
 
+	const f32 Near = 1.0f;
+	const f32 Far = 100.0f;
+
 	Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-		static_cast<f32>(1920) / static_cast<f32>(1080), 0.1f, 1000.0f);
+		static_cast<f32>(1920) / static_cast<f32>(1080), Near, Far);
 	Scene.ViewProjection.Projection[1][1] *= -1;
 	Scene.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -946,6 +944,7 @@ int main()
 
 	ImguiIntegration::GuiData GuiData;
 	GuiData.DirectionLightDirection = &TestData.DirectionLight.Direction;
+	GuiData.eye = &eye;
 
 	bool DrawImgui = true;
 	std::thread ImguiThread([&]()
@@ -968,19 +967,16 @@ int main()
 
 		Scene.ViewProjection.View = glm::lookAt(MainCamera.CameraPosition, MainCamera.CameraPosition + MainCamera.CameraFront, MainCamera.CameraUp);
 
-		TestData.SpotLight.Direction = MainCamera.CameraFront;
-		TestData.SpotLight.Position = MainCamera.CameraPosition;
-
 		glm::vec3 center = eye + TestData.DirectionLight.Direction;
 		glm::mat4 lightView = glm::lookAt(eye, center, up);
 
-		BMR::BMRLightSpaceMatrix lightSpaceMatrix;
-		lightSpaceMatrix.Matrix = lightProjection * lightView;
+		TestData.DirectionLight.LightSpaceMatrix = lightProjection * lightView;
+		TestData.SpotLight.Direction = MainCamera.CameraFront;
+		TestData.SpotLight.Position = MainCamera.CameraPosition;
+		TestData.SpotLight.Planes = glm::vec2(Near, Far);
+		TestData.SpotLight.LightSpaceMatrix = Scene.ViewProjection.Projection * Scene.ViewProjection.View;
 
-		BMR::UpdateLightSpaceBuffer(&lightSpaceMatrix);
-
-		UpdateLightBuffer(&TestData);
-
+		Scene.LightEntity = &TestData;
 		SortDrawObjects(Scene);
 		Draw(Scene);
 

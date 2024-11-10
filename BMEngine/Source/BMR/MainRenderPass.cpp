@@ -38,9 +38,11 @@ namespace BMR
 
 			VulkanMemoryManagementSystem::DestroyBuffer(VpUniformBuffers[i]);
 			VulkanMemoryManagementSystem::DestroyBuffer(LightBuffers[i]);
-			VulkanMemoryManagementSystem::DestroyBuffer(DepthLightSpaceBuffers[i]);
+			VulkanMemoryManagementSystem::DestroyBuffer(DepthLightSpaceMatrixBuffers[i]);
 
-			vkDestroyImageView(LogicalDevice, ShadowDepthBufferViews[i], nullptr);
+			vkDestroyImageView(LogicalDevice, ShadowArrayViews[i], nullptr);
+			vkDestroyImageView(LogicalDevice, ShadowDepthBufferViews2[i], nullptr);
+			vkDestroyImageView(LogicalDevice, ShadowDepthBufferViews1[i], nullptr);
 			VulkanMemoryManagementSystem::DestroyImageBuffer(ShadowDepthBuffers[i]);
 		}
 
@@ -57,10 +59,13 @@ namespace BMR
 
 		VulkanMemoryManagementSystem::DestroyBuffer(MaterialBuffer);
 
-		for (u32 i = 0; i < RenderPasses::Count; ++i)
+		for (u32 i = 0; i < RenderPassHandles::Count; ++i)
 		{
 			vkDestroyRenderPass(LogicalDevice, RenderPasses[i], nullptr);
+		}
 
+		for (u32 i = 0; i < FrameBuffersHandles::Count; ++i)
+		{
 			for (u32 j = 0; j < ImagesCount; ++j)
 			{
 				vkDestroyFramebuffer(LogicalDevice, Framebuffers[i][j], nullptr);
@@ -241,32 +246,32 @@ namespace BMR
 		DepthPassSubpassDependencies[DepthPassExitDependenciesIndex].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
 		DepthPassSubpassDependencies[DepthPassExitDependenciesIndex].dependencyFlags = 0;
 
-		u32 AttachmentCountTable[RenderPasses::Count];
-		AttachmentCountTable[RenderPasses::Depth] = DepthPassAttachmentDescriptionsCount;
-		AttachmentCountTable[RenderPasses::Main] = MainPathAttachmentDescriptionsCount;
+		u32 AttachmentCountTable[RenderPassHandles::Count];
+		AttachmentCountTable[RenderPassHandles::Depth] = DepthPassAttachmentDescriptionsCount;
+		AttachmentCountTable[RenderPassHandles::Main] = MainPathAttachmentDescriptionsCount;
 
-		const VkAttachmentDescription* AttachmentsTable[RenderPasses::Count];
-		AttachmentsTable[RenderPasses::Depth] = DepthPassAttachmentDescriptions;
-		AttachmentsTable[RenderPasses::Main] = MainPathAttachmentDescriptions;
+		const VkAttachmentDescription* AttachmentsTable[RenderPassHandles::Count];
+		AttachmentsTable[RenderPassHandles::Depth] = DepthPassAttachmentDescriptions;
+		AttachmentsTable[RenderPassHandles::Main] = MainPathAttachmentDescriptions;
 
-		u32 SubpassCountTable[RenderPasses::Count];
-		SubpassCountTable[RenderPasses::Depth] = Subpasses::Count;
-		SubpassCountTable[RenderPasses::Main] = SubpassIndex::Count;
+		u32 SubpassCountTable[RenderPassHandles::Count];
+		SubpassCountTable[RenderPassHandles::Depth] = Subpasses::Count;
+		SubpassCountTable[RenderPassHandles::Main] = SubpassIndex::Count;
 
-		const VkSubpassDescription* SubPassesTable[RenderPasses::Count];
-		SubPassesTable[RenderPasses::Depth] = DepthSubpasses;
-		SubPassesTable[RenderPasses::Main] = MainSubpasses;
+		const VkSubpassDescription* SubPassesTable[RenderPassHandles::Count];
+		SubPassesTable[RenderPassHandles::Depth] = DepthSubpasses;
+		SubPassesTable[RenderPassHandles::Main] = MainSubpasses;
 
-		u32 DependenciesCountTable[RenderPasses::Count];
-		DependenciesCountTable[RenderPasses::Depth] = DepthPassSubpassDependenciesCount;
-		DependenciesCountTable[RenderPasses::Main] = MainPassSubpassDependenciesCount;
+		u32 DependenciesCountTable[RenderPassHandles::Count];
+		DependenciesCountTable[RenderPassHandles::Depth] = DepthPassSubpassDependenciesCount;
+		DependenciesCountTable[RenderPassHandles::Main] = MainPassSubpassDependenciesCount;
 
-		VkSubpassDependency* SubpassDependenciesTable[RenderPasses::Count];
-		SubpassDependenciesTable[RenderPasses::Depth] = DepthPassSubpassDependencies;
-		SubpassDependenciesTable[RenderPasses::Main] = MainPassSubpassDependencies;
+		VkSubpassDependency* SubpassDependenciesTable[RenderPassHandles::Count];
+		SubpassDependenciesTable[RenderPassHandles::Depth] = DepthPassSubpassDependencies;
+		SubpassDependenciesTable[RenderPassHandles::Main] = MainPassSubpassDependencies;
 			
-		VkRenderPassCreateInfo RenderPassCreateInfo[RenderPasses::Count];
-		for (u32 i = 0; i < RenderPasses::Count; ++i)
+		VkRenderPassCreateInfo RenderPassCreateInfo[RenderPassHandles::Count];
+		for (u32 i = 0; i < RenderPassHandles::Count; ++i)
 		{
 			RenderPassCreateInfo[i] = { };
 			RenderPassCreateInfo[i].sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -288,18 +293,20 @@ namespace BMR
 	void BMRMainRenderPass::CreateFrameBuffer(VkDevice LogicalDevice, VkExtent2D FrameBufferSizes, u32 ImagesCount,
 		VkImageView SwapchainImageViews[MAX_SWAPCHAIN_IMAGES_COUNT])
 	{
-		VkRenderPass RenderPassTable[RenderPasses::Count];
-		RenderPassTable[RenderPasses::Depth] = RenderPasses[RenderPasses::Depth];
-		RenderPassTable[RenderPasses::Main] = RenderPasses[RenderPasses::Main];
+		VkRenderPass RenderPassTable[FrameBuffersHandles::Count];
+		RenderPassTable[FrameBuffersHandles::Tex1] = RenderPasses[RenderPassHandles::Depth];
+		RenderPassTable[FrameBuffersHandles::Tex2] = RenderPasses[RenderPassHandles::Depth];
+		RenderPassTable[FrameBuffersHandles::Main] = RenderPasses[RenderPassHandles::Main];
 
-		VkExtent2D ExtentTable[RenderPasses::Count];
-		ExtentTable[RenderPasses::Depth] = DepthPassSwapExtent;
-		ExtentTable[RenderPasses::Main] = FrameBufferSizes;
+		VkExtent2D ExtentTable[FrameBuffersHandles::Count];
+		ExtentTable[FrameBuffersHandles::Tex1] = DepthPassSwapExtent;
+		ExtentTable[FrameBuffersHandles::Tex2] = DepthPassSwapExtent;
+		ExtentTable[FrameBuffersHandles::Main] = FrameBufferSizes;
 
 		VkFramebufferCreateInfo CreateInfo = { };
 		CreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 
-		for (u32 i = 0; i < RenderPasses::Count; ++i)
+		for (u32 i = 0; i < FrameBuffersHandles::Count; ++i)
 		{
 			for (u32 j = 0; j < ImagesCount; j++)
 			{
@@ -313,16 +320,22 @@ namespace BMR
 
 				const u32 DepthAttachmentsCount = 1;
 				VkImageView DepthAttachments[DepthAttachmentsCount] = {
-					ShadowDepthBufferViews[j]
+					ShadowDepthBufferViews1[j]
 				};
 
-				u32 AttachmentCountTable[RenderPasses::Count];
-				AttachmentCountTable[RenderPasses::Depth] = DepthAttachmentsCount;
-				AttachmentCountTable[RenderPasses::Main] = MainPassAttachmentsCount;
+				VkImageView DepthAttachments2[DepthAttachmentsCount] = {
+					ShadowDepthBufferViews2[j]
+				};
 
-				const VkImageView* AttachmentsTable[RenderPasses::Count];
-				AttachmentsTable[RenderPasses::Depth] = DepthAttachments;
-				AttachmentsTable[RenderPasses::Main] = MainPassAttachments;
+				u32 AttachmentCountTable[FrameBuffersHandles::Count];
+				AttachmentCountTable[FrameBuffersHandles::Tex1] = DepthAttachmentsCount;
+				AttachmentCountTable[FrameBuffersHandles::Tex2] = DepthAttachmentsCount;
+				AttachmentCountTable[FrameBuffersHandles::Main] = MainPassAttachmentsCount;
+
+				const VkImageView* AttachmentsTable[FrameBuffersHandles::Count];
+				AttachmentsTable[FrameBuffersHandles::Tex1] = DepthAttachments;
+				AttachmentsTable[FrameBuffersHandles::Tex2] = DepthAttachments2;
+				AttachmentsTable[FrameBuffersHandles::Main] = MainPassAttachments;
 
 				CreateInfo.renderPass = RenderPassTable[i];
 				CreateInfo.attachmentCount = AttachmentCountTable[i];
@@ -415,7 +428,7 @@ namespace BMR
 		DepthVpLayoutBinding.binding = 0;
 		DepthVpLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		DepthVpLayoutBinding.descriptorCount = 1;
-		DepthVpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		DepthVpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 		DepthVpLayoutBinding.pImmutableSamplers = nullptr;
 
 		VkDescriptorSetLayoutBinding ShadowMapAttachmentSamplerLayoutBinding = { };
@@ -430,26 +443,26 @@ namespace BMR
 		BindingCountTable[DescriptorLayoutHandles::TerrainSampler] = 1;
 		BindingCountTable[DescriptorLayoutHandles::EntityVp] = VpLayoutBindingBindingCount;
 		BindingCountTable[DescriptorLayoutHandles::EntitySampler] = EntitySamplerLayoutBindingCount;
-		BindingCountTable[DescriptorLayoutHandles::Light] = LightBindingsCount;
-		BindingCountTable[DescriptorLayoutHandles::Material] = MaterialBindingsCount;
-		BindingCountTable[DescriptorLayoutHandles::DeferredInput] = DeferredAttachmentBindingsCount;
+		BindingCountTable[DescriptorLayoutHandles::EntityLigh] = LightBindingsCount;
+		BindingCountTable[DescriptorLayoutHandles::EntityMaterial] = MaterialBindingsCount;
+		BindingCountTable[DescriptorLayoutHandles::DeferredInputAttachments] = DeferredAttachmentBindingsCount;
 		BindingCountTable[DescriptorLayoutHandles::SkyBoxVp] = VpLayoutBindingBindingCount;
 		BindingCountTable[DescriptorLayoutHandles::SkyBoxSampler] = 1;
-		BindingCountTable[DescriptorLayoutHandles::DepthLightSpace] = DepthVpLayoutBindingBindingCount;
-		BindingCountTable[DescriptorLayoutHandles::ShadowMapInput] = 1;
+		BindingCountTable[DescriptorLayoutHandles::DepthLightSpaceMatrix] = DepthVpLayoutBindingBindingCount;
+		BindingCountTable[DescriptorLayoutHandles::EntityShadowMapSampler] = 1;
 
 		const VkDescriptorSetLayoutBinding* BindingsTable[DescriptorLayoutHandles::Count];
 		BindingsTable[DescriptorLayoutHandles::TerrainVp] = &VpLayoutBinding;
 		BindingsTable[DescriptorLayoutHandles::TerrainSampler] = &TerrainSamplerLayoutBinding;
 		BindingsTable[DescriptorLayoutHandles::EntityVp] = &VpLayoutBinding;
 		BindingsTable[DescriptorLayoutHandles::EntitySampler] = EntitySamplerLayoutBinding;
-		BindingsTable[DescriptorLayoutHandles::Light] = LightBindings;
-		BindingsTable[DescriptorLayoutHandles::Material] = &MaterialLayoutBinding;
-		BindingsTable[DescriptorLayoutHandles::DeferredInput] = DeferredInputBindings;
+		BindingsTable[DescriptorLayoutHandles::EntityLigh] = LightBindings;
+		BindingsTable[DescriptorLayoutHandles::EntityMaterial] = &MaterialLayoutBinding;
+		BindingsTable[DescriptorLayoutHandles::DeferredInputAttachments] = DeferredInputBindings;
 		BindingsTable[DescriptorLayoutHandles::SkyBoxVp] = &VpLayoutBinding;
 		BindingsTable[DescriptorLayoutHandles::SkyBoxSampler] = &SkyBoxSamplerLayoutBinding;
-		BindingsTable[DescriptorLayoutHandles::DepthLightSpace] = &DepthVpLayoutBinding;
-		BindingsTable[DescriptorLayoutHandles::ShadowMapInput] = &ShadowMapAttachmentSamplerLayoutBinding;
+		BindingsTable[DescriptorLayoutHandles::DepthLightSpaceMatrix] = &DepthVpLayoutBinding;
+		BindingsTable[DescriptorLayoutHandles::EntityShadowMapSampler] = &ShadowMapAttachmentSamplerLayoutBinding;
 
 		VkDescriptorSetLayoutCreateInfo LayoutCreateInfos[DescriptorLayoutHandles::Count];
 		for (u32 i = 0; i < DescriptorLayoutHandles::Count; ++i)
@@ -475,14 +488,13 @@ namespace BMR
 			DescriptorLayouts[DescriptorLayoutHandles::TerrainSampler]
 		};
 
-		const u32 EntityDescriptorLayoutCount = 6;
+		const u32 EntityDescriptorLayoutCount = 5;
 		VkDescriptorSetLayout EntityDescriptorLayouts[EntityDescriptorLayoutCount] = {
 			DescriptorLayouts[DescriptorLayoutHandles::EntityVp],
 			DescriptorLayouts[DescriptorLayoutHandles::EntitySampler],
-			DescriptorLayouts[DescriptorLayoutHandles::Light],
-			DescriptorLayouts[DescriptorLayoutHandles::Material],
-			DescriptorLayouts[DescriptorLayoutHandles::DepthLightSpace],
-			DescriptorLayouts[DescriptorLayoutHandles::ShadowMapInput],
+			DescriptorLayouts[DescriptorLayoutHandles::EntityLigh],
+			DescriptorLayouts[DescriptorLayoutHandles::EntityMaterial],
+			DescriptorLayouts[DescriptorLayoutHandles::EntityShadowMapSampler],
 		};
 
 		const u32 SkyBoxDescriptorLayoutCount = 2;
@@ -501,9 +513,9 @@ namespace BMR
 		const VkDescriptorSetLayout* SetLayouts[BMRPipelineHandles::PipelineHandlesCount];
 		SetLayouts[BMRPipelineHandles::Entity] = EntityDescriptorLayouts;
 		SetLayouts[BMRPipelineHandles::Terrain] = TerrainDescriptorLayouts;
-		SetLayouts[BMRPipelineHandles::Deferred] = DescriptorLayouts + DescriptorLayoutHandles::DeferredInput;
+		SetLayouts[BMRPipelineHandles::Deferred] = DescriptorLayouts + DescriptorLayoutHandles::DeferredInputAttachments;
 		SetLayouts[BMRPipelineHandles::SkyBox] = SkyBoxDescriptorLayouts;
-		SetLayouts[BMRPipelineHandles::Depth] = DescriptorLayouts + DescriptorLayoutHandles::DepthLightSpace;
+		SetLayouts[BMRPipelineHandles::Depth] = DescriptorLayouts + DescriptorLayoutHandles::DepthLightSpaceMatrix;
 
 		u32 PushConstantRangeCountTable[BMRPipelineHandles::PipelineHandlesCount];
 		PushConstantRangeCountTable[BMRPipelineHandles::Entity] = 1;
@@ -552,8 +564,6 @@ namespace BMR
 		DepthViewport.height = DepthPassSwapExtent.height;
 		DepthScissor.offset = { 0, 0 };
 		DepthScissor.extent = DepthPassSwapExtent;
-
-		
 
 		const VkShaderStageFlagBits NamesToStagesTable[] =
 		{
@@ -831,11 +841,11 @@ namespace BMR
 		AttachmentCountTable[BMRPipelineHandles::Depth] = 1;
 
 		VkRenderPass RenderPassToPipelineTable[BMRPipelineHandles::PipelineHandlesCount];
-		RenderPassToPipelineTable[BMRPipelineHandles::Entity] = RenderPasses[RenderPasses::Main];
-		RenderPassToPipelineTable[BMRPipelineHandles::Terrain] = RenderPasses[RenderPasses::Main];
-		RenderPassToPipelineTable[BMRPipelineHandles::Deferred] = RenderPasses[RenderPasses::Main];
-		RenderPassToPipelineTable[BMRPipelineHandles::SkyBox] = RenderPasses[RenderPasses::Main];
-		RenderPassToPipelineTable[BMRPipelineHandles::Depth] = RenderPasses[RenderPasses::Depth];
+		RenderPassToPipelineTable[BMRPipelineHandles::Entity] = RenderPasses[RenderPassHandles::Main];
+		RenderPassToPipelineTable[BMRPipelineHandles::Terrain] = RenderPasses[RenderPassHandles::Main];
+		RenderPassToPipelineTable[BMRPipelineHandles::Deferred] = RenderPasses[RenderPassHandles::Main];
+		RenderPassToPipelineTable[BMRPipelineHandles::SkyBox] = RenderPasses[RenderPassHandles::Main];
+		RenderPassToPipelineTable[BMRPipelineHandles::Depth] = RenderPasses[RenderPassHandles::Depth];
 
 		u32 SubpassesToPipelineTable[BMRPipelineHandles::PipelineHandlesCount];
 		SubpassesToPipelineTable[BMRPipelineHandles::Entity] = SubpassIndex::MainSubpass;
@@ -976,7 +986,7 @@ namespace BMR
 		}
 	}
 
-	void BMRMainRenderPass::CreateAttachments(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 ImagesCount, VkExtent2D SwapExtent,
+	void BMRMainRenderPass::CreateImages(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 ImagesCount, VkExtent2D SwapExtent,
 		VkFormat DepthFormat, VkFormat ColorFormat)
 	{
 		VkImageCreateInfo ImageCreateInfo;
@@ -1014,10 +1024,16 @@ namespace BMR
 			ImageCreateInfo.extent.height = DepthPassSwapExtent.height;
 			ImageCreateInfo.format = DepthFormat;
 			ImageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+			ImageCreateInfo.arrayLayers = MAX_LIGHT_SOURCES;
 
 			ShadowDepthBuffers[i] = VulkanMemoryManagementSystem::CreateImageBuffer(&ImageCreateInfo);
-			ShadowDepthBufferViews[i] = CreateImageView(LogicalDevice, ShadowDepthBuffers[i].Image,
-				DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_VIEW_TYPE_2D, 1);
+			ShadowArrayViews[i] = CreateImageView(LogicalDevice, ShadowDepthBuffers[i].Image,
+				DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_VIEW_TYPE_2D_ARRAY, MAX_LIGHT_SOURCES);
+
+			ShadowDepthBufferViews1[i] = CreateImageView(LogicalDevice, ShadowDepthBuffers[i].Image,
+				DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_VIEW_TYPE_2D_ARRAY, 1, 0);
+			ShadowDepthBufferViews2[i] = CreateImageView(LogicalDevice, ShadowDepthBuffers[i].Image,
+				DepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_VIEW_TYPE_2D_ARRAY, 1, 1);
 		}
 	}
 
@@ -1044,7 +1060,7 @@ namespace BMR
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 
-			DepthLightSpaceBuffers[i] = VulkanMemoryManagementSystem::CreateBuffer(LightSpaceBufferSize,
+			DepthLightSpaceMatrixBuffers[i] = VulkanMemoryManagementSystem::CreateBuffer(LightSpaceBufferSize,
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 		}
@@ -1071,25 +1087,25 @@ namespace BMR
 		{
 			SetLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::EntityVp];
 			TerrainLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::TerrainVp];
-			LightingSetLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::Light];
-			DeferredSetLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::DeferredInput];
+			LightingSetLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::EntityLigh];
+			DeferredSetLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::DeferredInputAttachments];
 			SkyBoxVpLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::SkyBoxVp];
-			DepthLightSpaceLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::DepthLightSpace];
-			ShadowMapLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::ShadowMapInput];
+			DepthLightSpaceLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::DepthLightSpaceMatrix];
+			ShadowMapLayouts[i] = DescriptorLayouts[DescriptorLayoutHandles::EntityShadowMapSampler];
 		}
 
 		VulkanMemoryManagementSystem::AllocateSets(Pool, SetLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::EntityVp]);
 		VulkanMemoryManagementSystem::AllocateSets(Pool, TerrainLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::TerrainVp]);
 		VulkanMemoryManagementSystem::AllocateSets(Pool, LightingSetLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::EntityLigh]);
-		VulkanMemoryManagementSystem::AllocateSets(Pool, DeferredSetLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::DeferredInput]);
+		VulkanMemoryManagementSystem::AllocateSets(Pool, DeferredSetLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::DeferredInputAttachments]);
 		VulkanMemoryManagementSystem::AllocateSets(Pool, SkyBoxVpLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::SkyBoxVp]);
-		VulkanMemoryManagementSystem::AllocateSets(Pool, DepthLightSpaceLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::DepthLightSpace]);
-		VulkanMemoryManagementSystem::AllocateSets(Pool, ShadowMapLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::ShadowMap]);
+		VulkanMemoryManagementSystem::AllocateSets(Pool, DepthLightSpaceLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::DepthLightSpaceMatrix]);
+		VulkanMemoryManagementSystem::AllocateSets(Pool, ShadowMapLayouts, ImagesCount, DescriptorsToImages[DescriptorHandles::ShadowMapSampler]);
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
 			VkDescriptorBufferInfo DepthLightSpaceBufferInfo = { };
-			DepthLightSpaceBufferInfo.buffer = DepthLightSpaceBuffers[i].Buffer;
+			DepthLightSpaceBufferInfo.buffer = DepthLightSpaceMatrixBuffers[i].Buffer;
 			DepthLightSpaceBufferInfo.offset = 0;
 			DepthLightSpaceBufferInfo.range = sizeof(BMRLightSpaceMatrix);
 
@@ -1115,12 +1131,12 @@ namespace BMR
 
 			VkDescriptorImageInfo ShadowMapTextureDescriptor = { };
 			ShadowMapTextureDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			ShadowMapTextureDescriptor.imageView = ShadowDepthBufferViews[i];
+			ShadowMapTextureDescriptor.imageView = ShadowArrayViews[i];
 			ShadowMapTextureDescriptor.sampler = ShadowMapSampler;
 
 			VkWriteDescriptorSet ShadowDepthWrite = { };
 			ShadowDepthWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			ShadowDepthWrite.dstSet = DescriptorsToImages[DescriptorHandles::ShadowMap][i];
+			ShadowDepthWrite.dstSet = DescriptorsToImages[DescriptorHandles::ShadowMapSampler][i];
 			ShadowDepthWrite.dstBinding = 0;
 			ShadowDepthWrite.dstArrayElement = 0;
 			ShadowDepthWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -1129,7 +1145,7 @@ namespace BMR
 
 			VkWriteDescriptorSet DepthLightSpaceWrite = { };
 			DepthLightSpaceWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			DepthLightSpaceWrite.dstSet = DescriptorsToImages[DescriptorHandles::DepthLightSpace][i];
+			DepthLightSpaceWrite.dstSet = DescriptorsToImages[DescriptorHandles::DepthLightSpaceMatrix][i];
 			DepthLightSpaceWrite.dstBinding = 0;
 			DepthLightSpaceWrite.dstArrayElement = 0;
 			DepthLightSpaceWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1162,7 +1178,7 @@ namespace BMR
 
 			VkWriteDescriptorSet ColourWrite = { };
 			ColourWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			ColourWrite.dstSet = DescriptorsToImages[DescriptorHandles::DeferredInput][i];
+			ColourWrite.dstSet = DescriptorsToImages[DescriptorHandles::DeferredInputAttachments][i];
 			ColourWrite.dstBinding = 0;
 			ColourWrite.dstArrayElement = 0;
 			ColourWrite.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
@@ -1171,7 +1187,7 @@ namespace BMR
 
 			VkWriteDescriptorSet DepthWrite = { };
 			DepthWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			DepthWrite.dstSet = DescriptorsToImages[DescriptorHandles::DeferredInput][i];
+			DepthWrite.dstSet = DescriptorsToImages[DescriptorHandles::DeferredInputAttachments][i];
 			DepthWrite.dstBinding = 1;
 			DepthWrite.dstArrayElement = 0;
 			DepthWrite.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
@@ -1185,7 +1201,7 @@ namespace BMR
 			vkUpdateDescriptorSets(LogicalDevice, WriteSetsCount, WriteSets, 0, nullptr);
 		}
 
-		VulkanMemoryManagementSystem::AllocateSets(Pool, &DescriptorLayouts[DescriptorLayoutHandles::Material], 1, &MaterialSet);
+		VulkanMemoryManagementSystem::AllocateSets(Pool, &DescriptorLayouts[DescriptorLayoutHandles::EntityMaterial], 1, &MaterialSet);
 
 		VkDescriptorBufferInfo MaterialBufferInfo = { };
 		MaterialBufferInfo.buffer = MaterialBuffer.Buffer;
