@@ -875,8 +875,11 @@ int main()
 	Scene.SkyBox = SkyBox;
 	Scene.DrawSkyBox = true;
 
+	const f32 Near = 1.0f;
+	const f32 Far = 100.0f;
+
 	Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-		static_cast<f32>(1920) / static_cast<f32>(1080), 0.1f, 1000.0f);
+		static_cast<f32>(1920) / static_cast<f32>(1080), Near, Far);
 	Scene.ViewProjection.Projection[1][1] *= -1;
 	Scene.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -964,16 +967,16 @@ int main()
 
 		Scene.ViewProjection.View = glm::lookAt(MainCamera.CameraPosition, MainCamera.CameraPosition + MainCamera.CameraFront, MainCamera.CameraUp);
 
-		TestData.SpotLight.Direction = MainCamera.CameraFront;
-		TestData.SpotLight.Position = MainCamera.CameraPosition;
-
 		glm::vec3 center = eye + TestData.DirectionLight.Direction;
 		glm::mat4 lightView = glm::lookAt(eye, center, up);
 
-		Scene.DirectionalLightSpaceMatrix.Matrix = lightProjection * lightView;
+		TestData.DirectionLight.LightSpaceMatrix = lightProjection * lightView;
+		TestData.SpotLight.Direction = MainCamera.CameraFront;
+		TestData.SpotLight.Position = MainCamera.CameraPosition;
+		TestData.SpotLight.Planes = glm::vec2(Near, Far);
+		TestData.SpotLight.LightSpaceMatrix = Scene.ViewProjection.Projection * Scene.ViewProjection.View;
 
-		UpdateLightBuffer(&TestData);
-
+		Scene.LightEntity = &TestData;
 		SortDrawObjects(Scene);
 		Draw(Scene);
 

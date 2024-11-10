@@ -18,9 +18,7 @@ namespace BMR
 	u64 LoadVertices(const void* Vertices, u32 VertexSize, VkDeviceSize VerticesCount);
 	u64 LoadIndices(const u32* Indices, u32 IndicesCount);
 
-	void UpdateLightBuffer(const BMRLightBuffer* Buffer);
 	void UpdateMaterialBuffer(const BMRMaterial* Buffer);
-	void UpdateLightSpaceBuffer(const BMRLightSpaceMatrix* LightSpaceMatrix);
 
 	void Draw(const BMRDrawScene& Scene);
 }

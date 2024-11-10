@@ -45,6 +45,8 @@ namespace BMR
 	static void CreateCommandPool(VkDevice LogicalDevice, u32 FamilyIndex);
 
 	static void UpdateVpBuffer(const BMRUboViewProjection& ViewProjection);
+	static void UpdateLightBuffer(const BMRLightBuffer* Buffer);
+	static void UpdateLightSpaceBuffer(const BMRLightSpaceMatrix* LightSpaceMatrix);
 
 	static const u32 RequiredExtensionsCount = 2;
 	const char* RequiredInstanceExtensions[RequiredExtensionsCount] =
@@ -541,6 +543,8 @@ namespace BMR
 
 	void Draw(const BMRDrawScene& Scene)
 	{
+		// Todo Update only when changed
+		UpdateLightBuffer(Scene.LightEntity);
 		UpdateVpBuffer(Scene.ViewProjection);
 
 		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
@@ -581,62 +585,77 @@ namespace BMR
 		}
 
 		{
-			VkRenderPassBeginInfo DepthRenderPassBeginInfo = { };
-			DepthRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-			DepthRenderPassBeginInfo.renderPass = MainRenderPass.RenderPasses[RenderPasses::Depth];
-			DepthRenderPassBeginInfo.renderArea.offset = { 0, 0 };
-			DepthRenderPassBeginInfo.pClearValues = DepthPassClearValues;
-			DepthRenderPassBeginInfo.clearValueCount = DepthPassClearValuesSize;
-			DepthRenderPassBeginInfo.renderArea.extent = DepthPassSwapExtent; // Size of region to run render pass on (starting at offset)
-			DepthRenderPassBeginInfo.framebuffer = MainRenderPass.Framebuffers[RenderPasses::Depth][ImageIndex];
-
-			vkCmdBeginRenderPass(CommandBuffer, &DepthRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-		
-			vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderPass.Pipelines[BMRPipelineHandles::Depth]);
-
-			BMR::UpdateLightSpaceBuffer(&Scene.DirectionalLightSpaceMatrix);
-			for (u32 i = 0; i < Scene.DrawEntitiesCount; ++i)
+			const BMRLightSpaceMatrix* LightViews[] =
 			{
-				BMRDrawEntity* DrawEntity = Scene.DrawEntities + i;
+				&Scene.LightEntity->DirectionLight.LightSpaceMatrix,
+				&Scene.LightEntity->SpotLight.LightSpaceMatrix,
+			};
 
-				const VkBuffer VertexBuffers[] = { VertexBuffer.Buffer };
-				const VkDeviceSize Offsets[] = { DrawEntity->VertexOffset };
+			const u32 FramebufferHandle[] =
+			{
+				FrameBuffersHandles::Tex1,
+				FrameBuffersHandles::Tex2
+			};
 
-				const u32 DescriptorSetGroupCount = 1;
-				const VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] =
+			for (u32 LightCaster = 0; LightCaster < MAX_LIGHT_SOURCES; ++LightCaster)
+			{
+				UpdateLightSpaceBuffer(LightViews[LightCaster]);
+
+				VkRenderPassBeginInfo DepthRenderPassBeginInfo = { };
+				DepthRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+				DepthRenderPassBeginInfo.renderPass = MainRenderPass.RenderPasses[RenderPassHandles::Depth];
+				DepthRenderPassBeginInfo.renderArea.offset = { 0, 0 };
+				DepthRenderPassBeginInfo.pClearValues = DepthPassClearValues;
+				DepthRenderPassBeginInfo.clearValueCount = DepthPassClearValuesSize;
+				DepthRenderPassBeginInfo.renderArea.extent = DepthPassSwapExtent; // Size of region to run render pass on (starting at offset)
+				DepthRenderPassBeginInfo.framebuffer = MainRenderPass.Framebuffers[FramebufferHandle[LightCaster]][ImageIndex];
+
+				vkCmdBeginRenderPass(CommandBuffer, &DepthRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+		
+				vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderPass.Pipelines[BMRPipelineHandles::Depth]);
+
+				for (u32 i = 0; i < Scene.DrawEntitiesCount; ++i)
 				{
-					MainRenderPass.DescriptorsToImages[DescriptorHandles::DepthEntityLightSpaceMatrix][MainRenderPass.ActiveLightSpaceMatrixSet],
-				};
+					BMRDrawEntity* DrawEntity = Scene.DrawEntities + i;
 
-				const VkPipelineLayout PipelineLayout = MainRenderPass.PipelineLayouts[BMRPipelineHandles::Depth];
+					const VkBuffer VertexBuffers[] = { VertexBuffer.Buffer };
+					const VkDeviceSize Offsets[] = { DrawEntity->VertexOffset };
 
-				vkCmdPushConstants(CommandBuffer, PipelineLayout,
-					VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BMRModel), &DrawEntity->Model);
+					const u32 DescriptorSetGroupCount = 1;
+					const VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] =
+					{
+						MainRenderPass.DescriptorsToImages[DescriptorHandles::DepthLightSpaceMatrix][MainRenderPass.ActiveLightSpaceMatrixSet],
+					};
 
-				vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+					const VkPipelineLayout PipelineLayout = MainRenderPass.PipelineLayouts[BMRPipelineHandles::Depth];
 
-				vkCmdBindVertexBuffers(CommandBuffer, 0, 1, VertexBuffers, Offsets);
-				vkCmdBindIndexBuffer(CommandBuffer, IndexBuffer.Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
-				vkCmdDrawIndexed(CommandBuffer, DrawEntity->IndicesCount, 1, 0, 0, 0);
+					vkCmdPushConstants(CommandBuffer, PipelineLayout,
+						VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BMRModel), &DrawEntity->Model);
+
+					vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
+						0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+
+					vkCmdBindVertexBuffers(CommandBuffer, 0, 1, VertexBuffers, Offsets);
+					vkCmdBindIndexBuffer(CommandBuffer, IndexBuffer.Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
+					vkCmdDrawIndexed(CommandBuffer, DrawEntity->IndicesCount, 1, 0, 0, 0);
+				}
+
+				vkCmdEndRenderPass(CommandBuffer);
 			}
-
-			vkCmdEndRenderPass(CommandBuffer);
 		}
 
 		VkRenderPassBeginInfo MainRenderPassBeginInfo = { };
 		MainRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		MainRenderPassBeginInfo.renderPass = MainRenderPass.RenderPasses[RenderPasses::Main];
+		MainRenderPassBeginInfo.renderPass = MainRenderPass.RenderPasses[RenderPassHandles::Main];
 		MainRenderPassBeginInfo.renderArea.offset = { 0, 0 };
 		MainRenderPassBeginInfo.pClearValues = MainPassClearValues;
 		MainRenderPassBeginInfo.clearValueCount = MainPassClearValuesSize;
 		MainRenderPassBeginInfo.renderArea.extent = MainViewport.ViewportSwapchain.SwapExtent; // Size of region to run render pass on (starting at offset)
-		MainRenderPassBeginInfo.framebuffer = MainRenderPass.Framebuffers[RenderPasses::Main][ImageIndex];
+		MainRenderPassBeginInfo.framebuffer = MainRenderPass.Framebuffers[FrameBuffersHandles::Main][ImageIndex];
 
 		vkCmdBeginRenderPass(CommandBuffer, &MainRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 		{
-
 			vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderPass.Pipelines[BMRPipelineHandles::Terrain]);
 
 			for (u32 i = 0; i < Scene.DrawTerrainEntitiesCount; ++i)
@@ -672,16 +691,15 @@ namespace BMR
 				const VkBuffer VertexBuffers[] = { VertexBuffer.Buffer };
 				const VkDeviceSize Offsets[] = { DrawEntity->VertexOffset };
 
-				const u32 DescriptorSetGroupCount = 6;
-				const VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] =
+				const VkDescriptorSet DescriptorSetGroup[] =
 				{
 					MainRenderPass.DescriptorsToImages[DescriptorHandles::EntityVp][MainRenderPass.ActiveVpSet],
 					MainRenderPass.SamplerDescriptors[DrawEntity->MaterialIndex],
 					MainRenderPass.DescriptorsToImages[DescriptorHandles::EntityLigh][MainRenderPass.ActiveLightSet],
 					MainRenderPass.MaterialSet,
-					MainRenderPass.DescriptorsToImages[DescriptorHandles::DepthEntityLightSpaceMatrix][MainRenderPass.ActiveLightSpaceMatrixSet],
 					MainRenderPass.DescriptorsToImages[DescriptorHandles::ShadowMapSampler][ImageIndex],
 				};
+				const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
 				const VkPipelineLayout PipelineLayout = MainRenderPass.PipelineLayouts[BMRPipelineHandles::Entity];
 

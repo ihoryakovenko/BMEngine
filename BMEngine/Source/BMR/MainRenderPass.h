@@ -16,7 +16,7 @@ namespace BMR
 		EntityLigh,
 		EntityMaterial,
 		EntityShadowMapSampler,
-		DepthEntityLightSpaceMatrix,
+		DepthLightSpaceMatrix,
 		DeferredInputAttachments,
 		SkyBoxVp, // TODO Same as EntityVpLayout, change or delete
 		SkyBoxSampler, // TODO Same as TerrainSampler
@@ -28,7 +28,7 @@ namespace BMR
 	{
 		enum
 		{
-			DepthEntityLightSpaceMatrix = 0,
+			DepthLightSpaceMatrix = 0,
 			ShadowMapSampler,
 			SkyBoxVp,
 			TerrainVp,
@@ -50,11 +50,23 @@ namespace BMR
 		};
 	}
 
-	namespace RenderPasses
+	namespace RenderPassHandles
 	{
 		enum
 		{
 			Depth,
+			Main,
+
+			Count
+		};
+	}
+
+	namespace FrameBuffersHandles
+	{
+		enum
+		{
+			Tex1,
+			Tex2,
 			Main,
 
 			Count
@@ -90,7 +102,7 @@ namespace BMR
 		void CreateFrameBuffer(VkDevice LogicalDevice, VkExtent2D FrameBufferSizes, u32 ImagesCount,
 			VkImageView SwapchainImageViews[MAX_SWAPCHAIN_IMAGES_COUNT]);
 
-		VkRenderPass RenderPasses[RenderPasses::Count];
+		VkRenderPass RenderPasses[RenderPassHandles::Count];
 
 		VkPipelineLayout PipelineLayouts[BMRPipelineHandles::PipelineHandlesCount];
 		VkPipeline Pipelines[BMRPipelineHandles::PipelineHandlesCount];
@@ -98,7 +110,7 @@ namespace BMR
 		VkPushConstantRange PushConstants[PushConstantHandles::Count];
 		VkDescriptorSetLayout DescriptorLayouts[DescriptorLayoutHandles::Count];
 		VkDescriptorSet DescriptorsToImages[DescriptorHandles::Count][MAX_SWAPCHAIN_IMAGES_COUNT];
-		VkFramebuffer Framebuffers[RenderPasses::Count][MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkFramebuffer Framebuffers[FrameBuffersHandles::Count][MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		u32 ActiveLightSet = 0;
 		u32 ActiveVpSet = 0;
@@ -114,7 +126,9 @@ namespace BMR
 		BMRGPUBuffer LightBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		BMRImageBuffer ShadowDepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
-		VkImageView ShadowDepthBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkImageView ShadowArrayViews[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkImageView ShadowDepthBufferViews1[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkImageView ShadowDepthBufferViews2[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		BMRGPUBuffer DepthLightSpaceMatrixBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 

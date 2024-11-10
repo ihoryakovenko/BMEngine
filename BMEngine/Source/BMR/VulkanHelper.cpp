@@ -42,7 +42,7 @@ namespace BMR
 	}
 
 	VkImageView CreateImageView(VkDevice LogicalDevice, VkImage Image, VkFormat Format,
-		VkImageAspectFlags AspectFlags, VkImageViewType Type, u32 LayerCount)
+		VkImageAspectFlags AspectFlags, VkImageViewType Type, u32 LayerCount, u32 BaseArrayLayer)
 	{
 		VkImageViewCreateInfo ViewCreateInfo = { };
 		ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -57,7 +57,7 @@ namespace BMR
 		ViewCreateInfo.subresourceRange.aspectMask = AspectFlags;
 		ViewCreateInfo.subresourceRange.baseMipLevel = 0;
 		ViewCreateInfo.subresourceRange.levelCount = 1;
-		ViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+		ViewCreateInfo.subresourceRange.baseArrayLayer = BaseArrayLayer;
 		ViewCreateInfo.subresourceRange.layerCount = LayerCount;
 
 		// Create image view and return it

@@ -17,6 +17,7 @@ namespace BMR
 	static const u32 BUFFER_ALIGNMENT = 64;
 	static const u32 IMAGE_ALIGNMENT = 4096;
 	static const u32 MAX_DRAW_FRAMES = 3;
+	static const u32 MAX_LIGHT_SOURCES = 2;
 
 	enum SamplerType
 	{
