@@ -626,7 +626,7 @@ namespace BMR
 		PipelineSettings[BMRPipelineHandles::Terrain] = TerrainPipelineSettings;
 		PipelineSettings[BMRPipelineHandles::Deferred] = DeferredPipelineSettings;
 		PipelineSettings[BMRPipelineHandles::SkyBox] = SkyBoxPipelineSettings;
-		PipelineSettings[BMRPipelineHandles::Depth] = DeferredPipelineSettings;
+		PipelineSettings[BMRPipelineHandles::Depth] = DepthPipelineSettings;
 
 
 		BMRPipelineResourceInfo PipelineResourceInfo[BMRPipelineHandles::PipelineHandlesCount];

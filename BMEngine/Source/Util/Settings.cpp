@@ -114,6 +114,7 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	// Depth testing
 	DeferredPipelineSettings.DepthTestEnable = VK_FALSE;
 	DeferredPipelineSettings.DepthWriteEnable = VK_FALSE;
+	DeferredPipelineSettings.DepthCompareOp = VK_COMPARE_OP_LESS;
 	DeferredPipelineSettings.DepthBoundsTestEnable = VK_FALSE;
 	DeferredPipelineSettings.StencilTestEnable = VK_FALSE;
 
@@ -125,7 +126,7 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	SkyBoxPipelineSettings.RasterizerDiscardEnable = VK_FALSE;
 	SkyBoxPipelineSettings.PolygonMode = VK_POLYGON_MODE_FILL;
 	SkyBoxPipelineSettings.LineWidth = 1.0f;
-	SkyBoxPipelineSettings.CullMode = VK_CULL_MODE_BACK_BIT;
+	SkyBoxPipelineSettings.CullMode = VK_CULL_MODE_FRONT_BIT;
 	SkyBoxPipelineSettings.FrontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	SkyBoxPipelineSettings.DepthBiasEnable = VK_FALSE;
 	// Multisampling

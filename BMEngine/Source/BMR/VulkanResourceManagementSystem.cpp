@@ -67,7 +67,7 @@ namespace BMR::VulkanResourceManagementSystem
 	}
 
 	VkPipeline* CreatePipelines(const BMRSPipelineShaderInfo* ShaderInputs, const BMRVertexInput* VertexInputs,
-		const BMRPipelineSettings* Settings, const BMRPipelineResourceInfo* ResourceInfos,
+		const BMRPipelineSettings* PipelinesSettings, const BMRPipelineResourceInfo* ResourceInfos,
 		u32 PipelinesCount)
 	{
 		assert(NextPipelineLayoutIndex < MaxPipelines);
@@ -98,6 +98,7 @@ namespace BMR::VulkanResourceManagementSystem
 		{
 			// VERTEX INPUT
 			const BMRVertexInput* VertexInput = VertexInputs + PipelineIndex;
+			const BMRPipelineSettings* Settings = PipelinesSettings + PipelineIndex;
 
 			VertexInputInfo[PipelineIndex] = { };
 			VertexInputInfo[PipelineIndex].sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -155,7 +156,7 @@ namespace BMR::VulkanResourceManagementSystem
 			DepthStencilInfo[PipelineIndex].depthWriteEnable = Settings->DepthWriteEnable;
 			DepthStencilInfo[PipelineIndex].depthCompareOp = Settings->DepthCompareOp;
 			DepthStencilInfo[PipelineIndex].depthBoundsTestEnable = Settings->DepthBoundsTestEnable;
-			DepthStencilInfo[PipelineIndex].stencilTestEnable = Settings->DepthTestEnable;
+			DepthStencilInfo[PipelineIndex].stencilTestEnable = Settings->StencilTestEnable;
 
 			// CREATE INFO
 			const BMRPipelineResourceInfo* ResourceInfo = ResourceInfos + PipelineIndex;

@@ -14,6 +14,6 @@ namespace BMR::VulkanResourceManagementSystem
 		u32 DescriptorLayoutsCount, const VkPushConstantRange* PushConstant, u32 PushConstantsCount);
 
 	VkPipeline* CreatePipelines(const BMRSPipelineShaderInfo* ShaderInputs, const BMRVertexInput* VertexInputs,
-		const BMRPipelineSettings* Settings, const BMRPipelineResourceInfo* ResourceInfos,
+		const BMRPipelineSettings* PipelinesSettings, const BMRPipelineResourceInfo* ResourceInfos,
 		u32 PipelineCount);
 }
