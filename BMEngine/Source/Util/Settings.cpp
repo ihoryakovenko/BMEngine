@@ -1,10 +1,7 @@
 #include "Settings.h"
 
-VkExtent2D MainScreenExtent;
-VkExtent2D DepthViewportExtent = { 1024, 1024 };
-
-VkViewport MainViewport;
-VkViewport DepthViewport;
+BMR::BMRExtent2D MainScreenExtent;
+BMR::BMRExtent2D DepthViewportExtent = { 1024, 1024 };
 
 BMR::BMRPipelineSettings EntityPipelineSettings;
 BMR::BMRPipelineSettings TerrainPipelineSettings;
@@ -25,154 +22,143 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 
 	MainScreenExtent = { WindowWidth, WindowHeight };
 
-	MainViewport = { 0.0f, 0.0f, (float)MainScreenExtent.width, (float)MainScreenExtent.height, 0.0f, 1.0f };
-	DepthViewport = { 0.0f, 0.0f, (float)DepthViewportExtent.width, (float)DepthViewportExtent.height, 0.0f, 1.0f };
-
-	VkRect2D MainViewportScissor = { { 0, 0 }, { MainScreenExtent.width, MainScreenExtent.height } };
-	VkRect2D DepthViewportScissor = { { 0, 0 }, { DepthViewportExtent.width, DepthViewportExtent.height } };
-
 	// MainPipeline
 	// Rasterizer
-	EntityPipelineSettings.Viewport = MainViewport;
-	EntityPipelineSettings.Scissor = MainViewportScissor;
-	EntityPipelineSettings.DepthClampEnable = VK_FALSE;
-	EntityPipelineSettings.RasterizerDiscardEnable = VK_FALSE;
-	EntityPipelineSettings.PolygonMode = VK_POLYGON_MODE_FILL;
+	EntityPipelineSettings.Extent = MainScreenExtent;
+	EntityPipelineSettings.DepthClampEnable = false;
+	EntityPipelineSettings.RasterizerDiscardEnable = false;
+	EntityPipelineSettings.PolygonMode = BMR::BMRPolygonMode::Fill;
 	EntityPipelineSettings.LineWidth = 1.0f;
-	EntityPipelineSettings.CullMode = VK_CULL_MODE_BACK_BIT;
-	EntityPipelineSettings.FrontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	EntityPipelineSettings.DepthBiasEnable = VK_FALSE;
+	EntityPipelineSettings.CullMode = BMR::BMRCullMode::Back;
+	EntityPipelineSettings.FrontFace = BMR::BMRFrontFace::CounterClockwise;
+	EntityPipelineSettings.DepthBiasEnable = false;
 	// Multisampling
-	EntityPipelineSettings.BlendEnable = VK_TRUE;
-	EntityPipelineSettings.LogicOpEnable = VK_FALSE;
+	EntityPipelineSettings.BlendEnable = true;
+	EntityPipelineSettings.LogicOpEnable = false;
 	EntityPipelineSettings.AttachmentCount = 1;
-	EntityPipelineSettings.ColorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	EntityPipelineSettings.SrcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	EntityPipelineSettings.DstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	EntityPipelineSettings.ColorBlendOp = VK_BLEND_OP_ADD;
-	EntityPipelineSettings.SrcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-	EntityPipelineSettings.DstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	EntityPipelineSettings.AlphaBlendOp = VK_BLEND_OP_ADD;
+	EntityPipelineSettings.ColorWriteMask = BMR::BMRColorComponentFlagBits::All;
+	EntityPipelineSettings.SrcColorBlendFactor = BMR::BMRBlendFactor::SrcAlpha;
+	EntityPipelineSettings.DstColorBlendFactor = BMR::BMRBlendFactor::OneMinusSrcAlpha;
+	EntityPipelineSettings.ColorBlendOp = BMR::BMRBlendOp::Add;
+	EntityPipelineSettings.SrcAlphaBlendFactor = BMR::BMRBlendFactor::One;
+	EntityPipelineSettings.DstAlphaBlendFactor = BMR::BMRBlendFactor::Zero;
+	EntityPipelineSettings.AlphaBlendOp = BMR::BMRBlendOp::Add;
 	// Depth testing
-	EntityPipelineSettings.DepthTestEnable = VK_TRUE;
-	EntityPipelineSettings.DepthWriteEnable = VK_TRUE;
-	EntityPipelineSettings.DepthCompareOp = VK_COMPARE_OP_LESS;
-	EntityPipelineSettings.DepthBoundsTestEnable = VK_FALSE;
-	EntityPipelineSettings.StencilTestEnable = VK_FALSE;
+	EntityPipelineSettings.DepthTestEnable = true;
+	EntityPipelineSettings.DepthWriteEnable = true;
+	EntityPipelineSettings.DepthCompareOp = BMR::BMRCompareOp::Less;
+	EntityPipelineSettings.DepthBoundsTestEnable = false;
+	EntityPipelineSettings.StencilTestEnable = false;
 
 	// TerrainPipeline
 	// Rasterizer
-	TerrainPipelineSettings.Viewport = MainViewport;
-	TerrainPipelineSettings.Scissor = MainViewportScissor;
-	TerrainPipelineSettings.DepthClampEnable = VK_FALSE;
-	TerrainPipelineSettings.RasterizerDiscardEnable = VK_FALSE;
-	TerrainPipelineSettings.PolygonMode = VK_POLYGON_MODE_FILL;
+	TerrainPipelineSettings.Extent = MainScreenExtent;
+	TerrainPipelineSettings.DepthClampEnable = false;
+	TerrainPipelineSettings.RasterizerDiscardEnable = false;
+	TerrainPipelineSettings.PolygonMode = BMR::BMRPolygonMode::Fill;
 	TerrainPipelineSettings.LineWidth = 1.0f;
-	TerrainPipelineSettings.CullMode = VK_CULL_MODE_BACK_BIT;
-	TerrainPipelineSettings.FrontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	TerrainPipelineSettings.DepthBiasEnable = VK_FALSE;
+	TerrainPipelineSettings.CullMode = BMR::BMRCullMode::Back;
+	TerrainPipelineSettings.FrontFace = BMR::BMRFrontFace::CounterClockwise;
+	TerrainPipelineSettings.DepthBiasEnable = false;
 	// Multisampling
-	TerrainPipelineSettings.BlendEnable = VK_TRUE;
-	TerrainPipelineSettings.LogicOpEnable = VK_FALSE;
+	TerrainPipelineSettings.BlendEnable = true;
+	TerrainPipelineSettings.LogicOpEnable = false;
 	TerrainPipelineSettings.AttachmentCount = 1;
-	TerrainPipelineSettings.ColorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	TerrainPipelineSettings.SrcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	TerrainPipelineSettings.DstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	TerrainPipelineSettings.ColorBlendOp = VK_BLEND_OP_ADD;
-	TerrainPipelineSettings.SrcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-	TerrainPipelineSettings.DstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	TerrainPipelineSettings.AlphaBlendOp = VK_BLEND_OP_ADD;
+	TerrainPipelineSettings.ColorWriteMask = BMR::BMRColorComponentFlagBits::All;
+	TerrainPipelineSettings.SrcColorBlendFactor = BMR::BMRBlendFactor::SrcAlpha;
+	TerrainPipelineSettings.DstColorBlendFactor = BMR::BMRBlendFactor::OneMinusSrcAlpha;
+	TerrainPipelineSettings.ColorBlendOp = BMR::BMRBlendOp::Add;
+	TerrainPipelineSettings.SrcAlphaBlendFactor = BMR::BMRBlendFactor::One;
+	TerrainPipelineSettings.DstAlphaBlendFactor = BMR::BMRBlendFactor::Zero;
+	TerrainPipelineSettings.AlphaBlendOp = BMR::BMRBlendOp::Add;
 	// Depth testing
-	TerrainPipelineSettings.DepthTestEnable = VK_TRUE;
-	TerrainPipelineSettings.DepthWriteEnable = VK_TRUE;
-	TerrainPipelineSettings.DepthCompareOp = VK_COMPARE_OP_LESS;
-	TerrainPipelineSettings.DepthBoundsTestEnable = VK_FALSE;
-	TerrainPipelineSettings.StencilTestEnable = VK_FALSE;
+	TerrainPipelineSettings.DepthTestEnable = true;
+	TerrainPipelineSettings.DepthWriteEnable = true;
+	TerrainPipelineSettings.DepthCompareOp = BMR::BMRCompareOp::Less;
+	TerrainPipelineSettings.DepthBoundsTestEnable = false;
+	TerrainPipelineSettings.StencilTestEnable = false;
 
 	// DeferredPipelineSettings
 	// Rasterizer
-	DeferredPipelineSettings.Viewport = MainViewport;
-	DeferredPipelineSettings.Scissor = MainViewportScissor;
-	DeferredPipelineSettings.DepthClampEnable = VK_FALSE;
-	DeferredPipelineSettings.RasterizerDiscardEnable = VK_FALSE;
-	DeferredPipelineSettings.PolygonMode = VK_POLYGON_MODE_FILL;
+	DeferredPipelineSettings.Extent = MainScreenExtent;
+	DeferredPipelineSettings.DepthClampEnable = false;
+	DeferredPipelineSettings.RasterizerDiscardEnable = false;
+	DeferredPipelineSettings.PolygonMode = BMR::BMRPolygonMode::Fill;
 	DeferredPipelineSettings.LineWidth = 1.0f;
-	DeferredPipelineSettings.CullMode = VK_CULL_MODE_NONE;
-	DeferredPipelineSettings.FrontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	DeferredPipelineSettings.DepthBiasEnable = VK_FALSE;
+	DeferredPipelineSettings.CullMode = BMR::BMRCullMode::None;
+	DeferredPipelineSettings.FrontFace = BMR::BMRFrontFace::CounterClockwise;
+	DeferredPipelineSettings.DepthBiasEnable = false;
 	// Multisampling
-	DeferredPipelineSettings.BlendEnable = VK_FALSE;
-	DeferredPipelineSettings.LogicOpEnable = VK_FALSE;
+	DeferredPipelineSettings.BlendEnable = false;
+	DeferredPipelineSettings.LogicOpEnable = false;
 	DeferredPipelineSettings.AttachmentCount = 1;
-	DeferredPipelineSettings.ColorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	DeferredPipelineSettings.SrcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	DeferredPipelineSettings.DstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	DeferredPipelineSettings.ColorBlendOp = VK_BLEND_OP_ADD;
-	DeferredPipelineSettings.SrcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-	DeferredPipelineSettings.DstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	DeferredPipelineSettings.AlphaBlendOp = VK_BLEND_OP_ADD;
+	DeferredPipelineSettings.ColorWriteMask = BMR::BMRColorComponentFlagBits::All;
+	DeferredPipelineSettings.SrcColorBlendFactor = BMR::BMRBlendFactor::SrcAlpha;
+	DeferredPipelineSettings.DstColorBlendFactor = BMR::BMRBlendFactor::OneMinusSrcAlpha;
+	DeferredPipelineSettings.ColorBlendOp = BMR::BMRBlendOp::Add;
+	DeferredPipelineSettings.SrcAlphaBlendFactor = BMR::BMRBlendFactor::One;
+	DeferredPipelineSettings.DstAlphaBlendFactor = BMR::BMRBlendFactor::Zero;
+	DeferredPipelineSettings.AlphaBlendOp = BMR::BMRBlendOp::Add;
 	// Depth testing
-	DeferredPipelineSettings.DepthTestEnable = VK_FALSE;
-	DeferredPipelineSettings.DepthWriteEnable = VK_FALSE;
-	DeferredPipelineSettings.DepthCompareOp = VK_COMPARE_OP_LESS;
-	DeferredPipelineSettings.DepthBoundsTestEnable = VK_FALSE;
-	DeferredPipelineSettings.StencilTestEnable = VK_FALSE;
+	DeferredPipelineSettings.DepthTestEnable = false;
+	DeferredPipelineSettings.DepthWriteEnable = false;
+	DeferredPipelineSettings.DepthCompareOp = BMR::BMRCompareOp::Less;
+	DeferredPipelineSettings.DepthBoundsTestEnable = false;
+	DeferredPipelineSettings.StencilTestEnable = false;
 
 	// SkyBoxPipelineSettings
 	// Rasterizer
-	SkyBoxPipelineSettings.Viewport = MainViewport;
-	SkyBoxPipelineSettings.Scissor = MainViewportScissor;
-	SkyBoxPipelineSettings.DepthClampEnable = VK_FALSE;
-	SkyBoxPipelineSettings.RasterizerDiscardEnable = VK_FALSE;
-	SkyBoxPipelineSettings.PolygonMode = VK_POLYGON_MODE_FILL;
+	SkyBoxPipelineSettings.Extent = MainScreenExtent;
+	SkyBoxPipelineSettings.DepthClampEnable = false;
+	SkyBoxPipelineSettings.RasterizerDiscardEnable = false;
+	SkyBoxPipelineSettings.PolygonMode = BMR::BMRPolygonMode::Fill;
 	SkyBoxPipelineSettings.LineWidth = 1.0f;
-	SkyBoxPipelineSettings.CullMode = VK_CULL_MODE_FRONT_BIT;
-	SkyBoxPipelineSettings.FrontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	SkyBoxPipelineSettings.DepthBiasEnable = VK_FALSE;
+	SkyBoxPipelineSettings.CullMode = BMR::BMRCullMode::Front;
+	SkyBoxPipelineSettings.FrontFace = BMR::BMRFrontFace::CounterClockwise;
+	SkyBoxPipelineSettings.DepthBiasEnable = false;
 	// Multisampling
-	SkyBoxPipelineSettings.BlendEnable = VK_TRUE;
-	SkyBoxPipelineSettings.LogicOpEnable = VK_FALSE;
+	SkyBoxPipelineSettings.BlendEnable = true;
+	SkyBoxPipelineSettings.LogicOpEnable = false;
 	SkyBoxPipelineSettings.AttachmentCount = 1;
-	SkyBoxPipelineSettings.ColorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	SkyBoxPipelineSettings.SrcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	SkyBoxPipelineSettings.DstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	SkyBoxPipelineSettings.ColorBlendOp = VK_BLEND_OP_ADD;
-	SkyBoxPipelineSettings.SrcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-	SkyBoxPipelineSettings.DstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	SkyBoxPipelineSettings.AlphaBlendOp = VK_BLEND_OP_ADD;
+	SkyBoxPipelineSettings.ColorWriteMask = BMR::BMRColorComponentFlagBits::All;
+	SkyBoxPipelineSettings.SrcColorBlendFactor = BMR::BMRBlendFactor::SrcAlpha;
+	SkyBoxPipelineSettings.DstColorBlendFactor = BMR::BMRBlendFactor::OneMinusSrcAlpha;
+	SkyBoxPipelineSettings.ColorBlendOp = BMR::BMRBlendOp::Add;
+	SkyBoxPipelineSettings.SrcAlphaBlendFactor = BMR::BMRBlendFactor::One;
+	SkyBoxPipelineSettings.DstAlphaBlendFactor = BMR::BMRBlendFactor::Zero;
+	SkyBoxPipelineSettings.AlphaBlendOp = BMR::BMRBlendOp::Add;
 	// Depth testing
-	SkyBoxPipelineSettings.DepthTestEnable = VK_TRUE;
-	SkyBoxPipelineSettings.DepthWriteEnable = VK_FALSE;
-	SkyBoxPipelineSettings.DepthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-	SkyBoxPipelineSettings.DepthBoundsTestEnable = VK_FALSE;
-	SkyBoxPipelineSettings.StencilTestEnable = VK_FALSE;
+	SkyBoxPipelineSettings.DepthTestEnable = true;
+	SkyBoxPipelineSettings.DepthWriteEnable = false;
+	SkyBoxPipelineSettings.DepthCompareOp = BMR::BMRCompareOp::LessOrEqual;
+	SkyBoxPipelineSettings.DepthBoundsTestEnable = false;
+	SkyBoxPipelineSettings.StencilTestEnable = false;
 
 	// DepthPipelineSettings
 	// Rasterizer
-	DepthPipelineSettings.Viewport = DepthViewport;
-	DepthPipelineSettings.Scissor = DepthViewportScissor;
-	DepthPipelineSettings.DepthClampEnable = VK_FALSE;
-	DepthPipelineSettings.RasterizerDiscardEnable = VK_FALSE;
-	DepthPipelineSettings.PolygonMode = VK_POLYGON_MODE_FILL;
+	DepthPipelineSettings.Extent = DepthViewportExtent;
+	DepthPipelineSettings.DepthClampEnable = false;
+	DepthPipelineSettings.RasterizerDiscardEnable = false;
+	DepthPipelineSettings.PolygonMode = BMR::BMRPolygonMode::Fill;
 	DepthPipelineSettings.LineWidth = 1.0f;
-	DepthPipelineSettings.CullMode = VK_CULL_MODE_BACK_BIT;
-	DepthPipelineSettings.FrontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	DepthPipelineSettings.DepthBiasEnable = VK_FALSE;
+	DepthPipelineSettings.CullMode = BMR::BMRCullMode::Back;
+	DepthPipelineSettings.FrontFace = BMR::BMRFrontFace::CounterClockwise;
+	DepthPipelineSettings.DepthBiasEnable = false;
 	// Multisampling
-	DepthPipelineSettings.BlendEnable = VK_TRUE;
-	DepthPipelineSettings.LogicOpEnable = VK_FALSE;
+	DepthPipelineSettings.BlendEnable = true;
+	DepthPipelineSettings.LogicOpEnable = false;
 	DepthPipelineSettings.AttachmentCount = 1;
-	DepthPipelineSettings.ColorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	DepthPipelineSettings.SrcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	DepthPipelineSettings.DstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	DepthPipelineSettings.ColorBlendOp = VK_BLEND_OP_ADD;
-	DepthPipelineSettings.SrcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-	DepthPipelineSettings.DstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	DepthPipelineSettings.AlphaBlendOp = VK_BLEND_OP_ADD;
+	DepthPipelineSettings.ColorWriteMask = BMR::BMRColorComponentFlagBits::All;
+	DepthPipelineSettings.SrcColorBlendFactor = BMR::BMRBlendFactor::SrcAlpha;
+	DepthPipelineSettings.DstColorBlendFactor = BMR::BMRBlendFactor::OneMinusSrcAlpha;
+	DepthPipelineSettings.ColorBlendOp = BMR::BMRBlendOp::Add;
+	DepthPipelineSettings.SrcAlphaBlendFactor = BMR::BMRBlendFactor::One;
+	DepthPipelineSettings.DstAlphaBlendFactor = BMR::BMRBlendFactor::Zero;
+	DepthPipelineSettings.AlphaBlendOp = BMR::BMRBlendOp::Add;
 	// Depth testing
-	DepthPipelineSettings.DepthTestEnable = VK_TRUE;
-	DepthPipelineSettings.DepthWriteEnable = VK_TRUE;
-	DepthPipelineSettings.DepthCompareOp = VK_COMPARE_OP_LESS;
-	DepthPipelineSettings.DepthBoundsTestEnable = VK_FALSE;
-	DepthPipelineSettings.StencilTestEnable = VK_FALSE;
+	DepthPipelineSettings.DepthTestEnable = true;
+	DepthPipelineSettings.DepthWriteEnable = true;
+	DepthPipelineSettings.DepthCompareOp = BMR::BMRCompareOp::Less;
+	DepthPipelineSettings.DepthBoundsTestEnable = false;
+	DepthPipelineSettings.StencilTestEnable = false;
 }

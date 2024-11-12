@@ -2,6 +2,7 @@
 
 #include <Windows.h>
 
+#include <vulkan/vulkan.h>
 #include <vulkan/vulkan_win32.h>
 
 #include "Memory/MemoryManagmentSystem.h"
@@ -614,7 +615,7 @@ namespace BMR
 				DepthRenderPassBeginInfo.renderArea.offset = { 0, 0 };
 				DepthRenderPassBeginInfo.pClearValues = DepthPassClearValues;
 				DepthRenderPassBeginInfo.clearValueCount = DepthPassClearValuesSize;
-				DepthRenderPassBeginInfo.renderArea.extent = DepthViewportExtent; // Size of region to run render pass on (starting at offset)
+				DepthRenderPassBeginInfo.renderArea.extent = ToVkExtent2D(DepthViewportExtent); // Size of region to run render pass on (starting at offset)
 				DepthRenderPassBeginInfo.framebuffer = MainRenderPass.Framebuffers[FramebufferHandle[LightCaster]][ImageIndex];
 
 				vkCmdBeginRenderPass(CommandBuffer, &DepthRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);

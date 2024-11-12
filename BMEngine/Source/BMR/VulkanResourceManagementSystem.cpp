@@ -79,7 +79,8 @@ namespace BMR::VulkanResourceManagementSystem
 		auto ColorBlendAttachmentState = Memory::BmMemoryManagementSystem::FrameAlloc<VkPipelineColorBlendAttachmentState>(PipelinesCount);
 		auto ColorBlendInfo = Memory::BmMemoryManagementSystem::FrameAlloc<VkPipelineColorBlendStateCreateInfo>(PipelinesCount);
 		auto DepthStencilInfo = Memory::BmMemoryManagementSystem::FrameAlloc<VkPipelineDepthStencilStateCreateInfo>(PipelinesCount);
-
+		auto Viewports = Memory::BmMemoryManagementSystem::FrameAlloc<VkViewport>(PipelinesCount);
+		auto Scissors = Memory::BmMemoryManagementSystem::FrameAlloc<VkRect2D>(PipelinesCount);
 
 		// INPUTASSEMBLY
 		VkPipelineInputAssemblyStateCreateInfo InputAssemblyStateCreateInfo = { };
@@ -99,6 +100,19 @@ namespace BMR::VulkanResourceManagementSystem
 			// VERTEX INPUT
 			const BMRVertexInput* VertexInput = VertexInputs + PipelineIndex;
 			const BMRPipelineSettings* Settings = PipelinesSettings + PipelineIndex;
+			VkViewport* Viewport = Viewports + PipelineIndex;
+			VkRect2D* Scissor = Scissors + PipelineIndex;
+
+			Viewport->width = Settings->Extent.Width;
+			Viewport->height = Settings->Extent.Height;
+			Viewport->minDepth = 0.0f;
+			Viewport->maxDepth = 1.0f;
+			Viewport->x = 0.0f;
+			Viewport->y = 0.0f;
+
+			Scissor->extent.width = Settings->Extent.Width;
+			Scissor->extent.height = Settings->Extent.Height;
+			Scissor->offset = { };
 
 			VertexInputInfo[PipelineIndex] = { };
 			VertexInputInfo[PipelineIndex].sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -111,9 +125,9 @@ namespace BMR::VulkanResourceManagementSystem
 			ViewportStateCreateInfo[PipelineIndex] = { };
 			ViewportStateCreateInfo[PipelineIndex].sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 			ViewportStateCreateInfo[PipelineIndex].viewportCount = 1;
-			ViewportStateCreateInfo[PipelineIndex].pViewports = &Settings->Viewport;
+			ViewportStateCreateInfo[PipelineIndex].pViewports = Viewport;
 			ViewportStateCreateInfo[PipelineIndex].scissorCount = 1;
-			ViewportStateCreateInfo[PipelineIndex].pScissors = &Settings->Scissor;
+			ViewportStateCreateInfo[PipelineIndex].pScissors = Scissor;
 
 			// RASTERIZATION
 			RasterizationStateCreateInfo[PipelineIndex] = { };
@@ -121,10 +135,10 @@ namespace BMR::VulkanResourceManagementSystem
 			RasterizationStateCreateInfo[PipelineIndex].depthClampEnable = Settings->DepthClampEnable;
 			// Whether to discard data and skip rasterizer. Never creates fragments, only suitable for pipeline without framebuffer output
 			RasterizationStateCreateInfo[PipelineIndex].rasterizerDiscardEnable = Settings->RasterizerDiscardEnable;
-			RasterizationStateCreateInfo[PipelineIndex].polygonMode = Settings->PolygonMode;
+			RasterizationStateCreateInfo[PipelineIndex].polygonMode = ToVkPolygonMode(Settings->PolygonMode);
 			RasterizationStateCreateInfo[PipelineIndex].lineWidth = Settings->LineWidth;
 			RasterizationStateCreateInfo[PipelineIndex].cullMode = Settings->CullMode;
-			RasterizationStateCreateInfo[PipelineIndex].frontFace = Settings->FrontFace;
+			RasterizationStateCreateInfo[PipelineIndex].frontFace = ToVkFrontFace(Settings->FrontFace);
 			// Whether to add depth bias to fragments (good for stopping "shadow acne" in shadow mapping)
 			RasterizationStateCreateInfo[PipelineIndex].depthBiasEnable = Settings->DepthBiasEnable;
 
@@ -133,14 +147,14 @@ namespace BMR::VulkanResourceManagementSystem
 			ColorBlendAttachmentState[PipelineIndex].colorWriteMask = Settings->ColorWriteMask;
 			ColorBlendAttachmentState[PipelineIndex].blendEnable = Settings->BlendEnable;
 			// Blending uses equation: (srcColorBlendFactor * new color) colorBlendOp (dstColorBlendFactor * old color)// Enable blending
-			ColorBlendAttachmentState[PipelineIndex].srcColorBlendFactor = Settings->SrcColorBlendFactor;
-			ColorBlendAttachmentState[PipelineIndex].dstColorBlendFactor = Settings->DstColorBlendFactor;
-			ColorBlendAttachmentState[PipelineIndex].colorBlendOp = Settings->ColorBlendOp;
-			ColorBlendAttachmentState[PipelineIndex].srcAlphaBlendFactor = Settings->SrcAlphaBlendFactor;
+			ColorBlendAttachmentState[PipelineIndex].srcColorBlendFactor = ToVkBlendFactor(Settings->SrcColorBlendFactor);
+			ColorBlendAttachmentState[PipelineIndex].dstColorBlendFactor = ToVkBlendFactor(Settings->DstColorBlendFactor);
+			ColorBlendAttachmentState[PipelineIndex].colorBlendOp = ToVkBlendOp(Settings->ColorBlendOp);
+			ColorBlendAttachmentState[PipelineIndex].srcAlphaBlendFactor = ToVkBlendFactor(Settings->SrcAlphaBlendFactor);
 			// Summarised: (VK_BLEND_FACTOR_SRC_ALPHA * new color) + (VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA * old color)
 //			   (new color alpha * new color) + ((1 - new color alpha) * old color)
-			ColorBlendAttachmentState[PipelineIndex].dstAlphaBlendFactor = Settings->DstAlphaBlendFactor;
-			ColorBlendAttachmentState[PipelineIndex].alphaBlendOp = Settings->AlphaBlendOp;
+			ColorBlendAttachmentState[PipelineIndex].dstAlphaBlendFactor = ToVkBlendFactor(Settings->DstAlphaBlendFactor);
+			ColorBlendAttachmentState[PipelineIndex].alphaBlendOp = ToVkBlendOp(Settings->AlphaBlendOp);
 			// Summarised: (1 * new alpha) + (0 * old alpha) = new alpharesult != VK_SUCCESS
 
 			ColorBlendInfo[PipelineIndex] = { };
@@ -154,7 +168,7 @@ namespace BMR::VulkanResourceManagementSystem
 			DepthStencilInfo[PipelineIndex].sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 			DepthStencilInfo[PipelineIndex].depthTestEnable = Settings->DepthTestEnable;
 			DepthStencilInfo[PipelineIndex].depthWriteEnable = Settings->DepthWriteEnable;
-			DepthStencilInfo[PipelineIndex].depthCompareOp = Settings->DepthCompareOp;
+			DepthStencilInfo[PipelineIndex].depthCompareOp = ToVkCompareOp(Settings->DepthCompareOp);
 			DepthStencilInfo[PipelineIndex].depthBoundsTestEnable = Settings->DepthBoundsTestEnable;
 			DepthStencilInfo[PipelineIndex].stencilTestEnable = Settings->StencilTestEnable;
 

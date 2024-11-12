@@ -90,4 +90,86 @@ namespace BMR
 		assert(false);
 		return 0;
 	}
+
+	VkExtent2D ToVkExtent2D(BMRExtent2D Extent)
+	{
+		return { Extent.Width, Extent.Height };
+	}
+
+	VkPolygonMode ToVkPolygonMode(BMRPolygonMode Mode)
+	{
+		switch (Mode)
+		{
+			case Fill: return VK_POLYGON_MODE_FILL;
+			case Line: return VK_POLYGON_MODE_LINE;
+			case Point: return VK_POLYGON_MODE_POINT;
+			default: return VK_POLYGON_MODE_FILL;
+		}
+	}
+
+	VkCullModeFlags ToVkCullMode(BMRCullMode Mode)
+	{
+		switch (Mode)
+		{
+			case None: return VK_CULL_MODE_NONE;
+			case Front: return VK_CULL_MODE_FRONT_BIT;
+			case Back: return VK_CULL_MODE_BACK_BIT;
+			case FrontAndBack: return VK_CULL_MODE_FRONT_AND_BACK;
+			default: return VK_CULL_MODE_NONE;
+		}
+	}
+
+	VkFrontFace ToVkFrontFace(BMRFrontFace Face)
+	{
+		switch (Face)
+		{
+			case CounterClockwise: return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+			case Clockwise: return VK_FRONT_FACE_CLOCKWISE;
+			default: return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		}
+	}
+
+	VkBlendFactor ToVkBlendFactor(BMRBlendFactor Factor)
+	{
+		switch (Factor)
+		{
+			case Zero: return VK_BLEND_FACTOR_ZERO;
+			case One: return VK_BLEND_FACTOR_ONE;
+			case SrcAlpha: return VK_BLEND_FACTOR_SRC_ALPHA;
+			case DstAlpha: return VK_BLEND_FACTOR_DST_ALPHA;
+			case OneMinusSrcAlpha: return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			default: return VK_BLEND_FACTOR_ONE;
+		}
+	}
+
+	VkBlendOp ToVkBlendOp(BMRBlendOp Op)
+	{
+		switch (Op)
+		{
+			case Add: return VK_BLEND_OP_ADD;
+			case Subtract: return VK_BLEND_OP_SUBTRACT;
+			case ReverseSubtract: return VK_BLEND_OP_REVERSE_SUBTRACT;
+			case Min: return VK_BLEND_OP_MIN;
+			default: return VK_BLEND_OP_ADD;
+		}
+	}
+
+	VkCompareOp ToVkCompareOp(BMRCompareOp Op)
+	{
+		switch (Op)
+		{
+			case Never: return VK_COMPARE_OP_NEVER;
+			case Less: return VK_COMPARE_OP_LESS;
+			case Equal: return VK_COMPARE_OP_EQUAL;
+			case LessOrEqual: return VK_COMPARE_OP_LESS_OR_EQUAL;
+			case Greater: return VK_COMPARE_OP_GREATER;
+			default: return VK_COMPARE_OP_ALWAYS; // or an appropriate default
+		}
+	}
+
+	// Convert BMRColorComponentFlagBits to VkColorComponentFlags
+	VkColorComponentFlags ToVkColorComponentFlags(BMRColorComponentFlagBits flags)
+	{
+		return static_cast<VkColorComponentFlags>(flags); // Direct bitmask conversion
+	}
 }

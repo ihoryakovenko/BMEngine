@@ -290,8 +290,8 @@ namespace BMR
 		RenderPassTable[FrameBuffersHandles::Main] = RenderPasses[RenderPassHandles::Main];
 
 		VkExtent2D ExtentTable[FrameBuffersHandles::Count];
-		ExtentTable[FrameBuffersHandles::Tex1] = DepthViewportExtent;
-		ExtentTable[FrameBuffersHandles::Tex2] = DepthViewportExtent;
+		ExtentTable[FrameBuffersHandles::Tex1] = ToVkExtent2D(DepthViewportExtent);
+		ExtentTable[FrameBuffersHandles::Tex2] = ToVkExtent2D(DepthViewportExtent);
 		ExtentTable[FrameBuffersHandles::Main] = FrameBufferSizes;
 
 		VkFramebufferCreateInfo CreateInfo = { };
@@ -694,8 +694,8 @@ namespace BMR
 			ColorBufferViews[i] = CreateImageView(LogicalDevice, ColorBuffers[i].Image,
 				ColorFormat, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_2D, 1);
 
-			ImageCreateInfo.extent.width = DepthViewportExtent.width;
-			ImageCreateInfo.extent.height = DepthViewportExtent.height;
+			ImageCreateInfo.extent.width = DepthViewportExtent.Width;
+			ImageCreateInfo.extent.height = DepthViewportExtent.Height;
 			ImageCreateInfo.format = DepthFormat;
 			ImageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 			ImageCreateInfo.arrayLayers = MAX_LIGHT_SOURCES;

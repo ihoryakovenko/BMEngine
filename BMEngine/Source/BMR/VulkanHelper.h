@@ -18,4 +18,13 @@ namespace BMR
 		VkImageAspectFlags AspectFlags, VkImageViewType Type, u32 LayerCount, u32 BaseArrayLayer = 0);
 
 	u32 GetMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, u32 AllowedTypes, VkMemoryPropertyFlags Properties);
+
+	VkExtent2D ToVkExtent2D(BMRExtent2D Extent);
+	VkPolygonMode ToVkPolygonMode(BMRPolygonMode Mode);
+	VkCullModeFlags ToVkCullMode(BMRCullMode Mode);
+	VkFrontFace ToVkFrontFace(BMRFrontFace Face);
+	VkBlendFactor ToVkBlendFactor(BMRBlendFactor Factor);
+	VkBlendOp ToVkBlendOp(BMRBlendOp Op);
+	VkCompareOp ToVkCompareOp(BMRCompareOp Op);
+	VkColorComponentFlags ToVkColorComponentFlags(BMRColorComponentFlagBits Flags);
 }

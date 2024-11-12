@@ -57,6 +57,69 @@ namespace BMR
 		TextureType_CUBE
 	};
 
+	enum BMRPolygonMode
+	{
+		Fill = 0,        // Corresponds to VK_POLYGON_MODE_FILL
+		Line = 1,        // Corresponds to VK_POLYGON_MODE_LINE
+		Point = 2,       // Corresponds to VK_POLYGON_MODE_POINT
+		BMRPolygonMode_Max = 3          // Invalid or uninitialized state
+	};
+
+	enum BMRCullMode
+	{
+		None = 0,               // Corresponds to VK_CULL_MODE_NONE
+		Front = 1,              // Corresponds to VK_CULL_MODE_FRONT_BIT
+		Back = 2,               // Corresponds to VK_CULL_MODE_BACK_BIT
+		FrontAndBack = 3,       // Corresponds to VK_CULL_MODE_FRONT_AND_BACK
+		BMRCullMode_Max = 4                 // Invalid or uninitialized state
+	};
+
+	enum BMRFrontFace
+	{
+		CounterClockwise = 0,  // Corresponds to VK_FRONT_FACE_COUNTER_CLOCKWISE
+		Clockwise = 1,         // Corresponds to VK_FRONT_FACE_CLOCKWISE
+		BMRFrontFace_Max = 2                // Invalid or uninitialized state
+	};
+
+	enum BMRBlendFactor
+	{
+		Zero = 0,               // Corresponds to VK_BLEND_FACTOR_ZERO
+		One = 1,                // Corresponds to VK_BLEND_FACTOR_ONE
+		SrcAlpha = 2,           // Corresponds to VK_BLEND_FACTOR_SRC_ALPHA
+		DstAlpha = 3,           // Corresponds to VK_BLEND_FACTOR_DST_ALPHA
+		OneMinusSrcAlpha = 4,   // Corresponds to VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA
+		BMRBlendFactor_Max = 5                 // Invalid or uninitialized state
+	};
+
+	enum BMRBlendOp
+	{
+		Add = 0,                // Corresponds to VK_BLEND_OP_ADD
+		Subtract = 1,           // Corresponds to VK_BLEND_OP_SUBTRACT
+		ReverseSubtract = 2,    // Corresponds to VK_BLEND_OP_REVERSE_SUBTRACT
+		Min = 3,                // Corresponds to VK_BLEND_OP_MIN
+		BMRBlendOp_Max = 4                 // Corresponds to VK_BLEND_OP_MAX
+	};
+
+	enum BMRCompareOp
+	{
+		Never = 0,              // Corresponds to VK_COMPARE_OP_NEVER
+		Less = 1,               // Corresponds to VK_COMPARE_OP_LESS
+		Equal = 2,              // Corresponds to VK_COMPARE_OP_EQUAL
+		LessOrEqual = 3,        // Corresponds to VK_COMPARE_OP_LESS_OR_EQUAL
+		Greater = 4,            // Corresponds to VK_COMPARE_OP_GREATER
+		BMRCompareOp_Max = 5                 // Invalid or uninitialized state
+	};
+
+	enum BMRColorComponentFlagBits
+	{
+		R = 0x00000001,        // Corresponds to VK_COLOR_COMPONENT_R_BIT
+		G = 0x00000002,        // Corresponds to VK_COLOR_COMPONENT_G_BIT
+		B = 0x00000004,        // Corresponds to VK_COLOR_COMPONENT_B_BIT
+		A = 0x00000008,        // Corresponds to VK_COLOR_COMPONENT_A_BIT
+		All = R | G | B | A,   // Represents all color components
+		BMRColorComponentFlagBits_MaxEnum = 0x7FFFFFFF   // Invalid or uninitialized state
+	};
+
 	struct BMRShaderCodeDescription
 	{
 		BMRPipelineHandles Handle = BMRPipelineHandles::PipelineHandlesNone;
@@ -202,34 +265,39 @@ namespace BMR
 		glm::vec3 Position;
 	};
 
+	struct BMRExtent2D
+	{
+		u32 Width = 0;
+		u32 Height = 0;
+	};
+
 	struct BMRPipelineSettings
 	{
-		VkViewport Viewport = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
-		VkRect2D Scissor = { { 0, 0 }, { 0, 0 } };
+		BMRExtent2D Extent;
 
-		VkBool32 DepthClampEnable = VK_FALSE;
-		VkBool32 RasterizerDiscardEnable = VK_FALSE;
-		VkPolygonMode PolygonMode = VK_POLYGON_MODE_MAX_ENUM;
+		bool DepthClampEnable = false;
+		bool RasterizerDiscardEnable = false;
+		BMRPolygonMode PolygonMode = BMRPolygonMode::BMRPolygonMode_Max;
 		f32 LineWidth = 0.0f;
-		VkCullModeFlags CullMode = VK_CULL_MODE_FLAG_BITS_MAX_ENUM;
-		VkFrontFace FrontFace = VK_FRONT_FACE_MAX_ENUM;
-		VkBool32 DepthBiasEnable = VK_FALSE;
+		BMRCullMode CullMode = BMRCullMode::BMRCullMode_Max;
+		BMRFrontFace FrontFace = BMRFrontFace::BMRFrontFace_Max;
+		bool DepthBiasEnable = false;
 
-		VkBool32 LogicOpEnable = VK_FALSE;
+		bool LogicOpEnable = false;
 		u32 AttachmentCount = 0;
-		VkColorComponentFlags ColorWriteMask = 0;
-		VkBool32 BlendEnable = VK_FALSE;
-		VkBlendFactor SrcColorBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
-		VkBlendFactor DstColorBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
-		VkBlendOp ColorBlendOp = VK_BLEND_OP_MAX_ENUM;
-		VkBlendFactor SrcAlphaBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
-		VkBlendFactor DstAlphaBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
-		VkBlendOp AlphaBlendOp = VK_BLEND_OP_MAX_ENUM;
+		u32 ColorWriteMask = 0;
+		bool BlendEnable = false;
+		BMRBlendFactor SrcColorBlendFactor = BMRBlendFactor::BMRBlendFactor_Max;
+		BMRBlendFactor DstColorBlendFactor = BMRBlendFactor::BMRBlendFactor_Max;
+		BMRBlendOp ColorBlendOp = BMRBlendOp::BMRBlendOp_Max;
+		BMRBlendFactor SrcAlphaBlendFactor = BMRBlendFactor::BMRBlendFactor_Max;
+		BMRBlendFactor DstAlphaBlendFactor = BMRBlendFactor::BMRBlendFactor_Max;
+		BMRBlendOp AlphaBlendOp = BMRBlendOp::BMRBlendOp_Max;
 
-		VkBool32 DepthTestEnable = VK_FALSE;
-		VkBool32 DepthWriteEnable = VK_FALSE;
-		VkCompareOp DepthCompareOp = VK_COMPARE_OP_MAX_ENUM;
-		VkBool32 DepthBoundsTestEnable = VK_FALSE;
-		VkBool32 StencilTestEnable = VK_FALSE;
+		bool DepthTestEnable = false;
+		bool DepthWriteEnable = false;
+		BMRCompareOp DepthCompareOp = BMRCompareOp::BMRCompareOp_Max;
+		bool DepthBoundsTestEnable = false;
+		bool StencilTestEnable = false;
 	};
 }

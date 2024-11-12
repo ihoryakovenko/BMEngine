@@ -1,6 +1,5 @@
 #pragma once
 
-#include <vulkan/vulkan.h>
 #include <Windows.h>
 
 #include "Util/EngineTypes.h"
