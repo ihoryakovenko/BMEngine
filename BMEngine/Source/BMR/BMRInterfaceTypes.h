@@ -201,4 +201,35 @@ namespace BMR
 	{
 		glm::vec3 Position;
 	};
+
+	struct BMRPipelineSettings
+	{
+		VkViewport Viewport = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+		VkRect2D Scissor = { { 0, 0 }, { 0, 0 } };
+
+		VkBool32 DepthClampEnable = VK_FALSE;
+		VkBool32 RasterizerDiscardEnable = VK_FALSE;
+		VkPolygonMode PolygonMode = VK_POLYGON_MODE_MAX_ENUM;
+		f32 LineWidth = 0.0f;
+		VkCullModeFlags CullMode = VK_CULL_MODE_FLAG_BITS_MAX_ENUM;
+		VkFrontFace FrontFace = VK_FRONT_FACE_MAX_ENUM;
+		VkBool32 DepthBiasEnable = VK_FALSE;
+
+		VkBool32 LogicOpEnable = VK_FALSE;
+		u32 AttachmentCount = 0;
+		VkColorComponentFlags ColorWriteMask = 0;
+		VkBool32 BlendEnable = VK_FALSE;
+		VkBlendFactor SrcColorBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
+		VkBlendFactor DstColorBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
+		VkBlendOp ColorBlendOp = VK_BLEND_OP_MAX_ENUM;
+		VkBlendFactor SrcAlphaBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
+		VkBlendFactor DstAlphaBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
+		VkBlendOp AlphaBlendOp = VK_BLEND_OP_MAX_ENUM;
+
+		VkBool32 DepthTestEnable = VK_FALSE;
+		VkBool32 DepthWriteEnable = VK_FALSE;
+		VkCompareOp DepthCompareOp = VK_COMPARE_OP_MAX_ENUM;
+		VkBool32 DepthBoundsTestEnable = VK_FALSE;
+		VkBool32 StencilTestEnable = VK_FALSE;
+	};
 }

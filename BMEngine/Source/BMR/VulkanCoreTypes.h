@@ -18,6 +18,8 @@ namespace BMR
 	static const u32 IMAGE_ALIGNMENT = 4096;
 	static const u32 MAX_DRAW_FRAMES = 3;
 	static const u32 MAX_LIGHT_SOURCES = 2;
+	static const u32 MAX_DESCRIPTOR_SET_LAYOUTS_PER_PIPELINE = 8;
+	static const u32 MAX_DESCRIPTOR_BINDING_PER_SET = 16;
 
 	enum SamplerType
 	{
@@ -28,8 +30,6 @@ namespace BMR
 		SamplerType_Count,
 		SamplerType_None
 	};
-
-	static const VkExtent2D DepthPassSwapExtent = { 1024, 1024 };
 
 	struct BMRPhysicalDeviceIndices
 	{
@@ -110,5 +110,76 @@ namespace BMR
 		BMRSwapchainInstance ViewportSwapchain;
 
 		VkCommandBuffer CommandBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+	};
+
+	struct BMRVertexInput
+	{
+		const VkVertexInputBindingDescription* VertexInputBindings = nullptr;
+		u32 VertexInputBindingsCount = 0;
+
+		const VkVertexInputAttributeDescription* VertexInputAttributes = nullptr;
+		u32 VertexInputAttributesCount = 0;
+	};
+
+
+	struct BMRUniformBuffer
+	{
+		union
+		{
+			VkBuffer Buffer = nullptr;
+			VkImageView ImageView;
+		};
+
+		VkDescriptorType Type = VkDescriptorType::VK_DESCRIPTOR_TYPE_MAX_ENUM;
+	};
+
+	struct BMRUniformSet
+	{
+		VkDescriptorSetLayout Layout = nullptr;
+		const BMRUniformBuffer* BMRUniformBuffers = nullptr;
+		u32 BuffersCount = 0;
+	};
+
+	struct BMRUniformPushBufferDescription
+	{
+		VkShaderStageFlags StageFlags = 0;
+		u32 Offset = 0;
+		u32 Size = 0;
+	};
+
+	struct BMRUniformInput
+	{
+		const VkDescriptorSetLayout* UniformLayout = nullptr;
+		u32 layoutCount = 0;
+
+		VkPushConstantRange PushConstants;
+	};
+
+	struct BMRPipelineShaderDescription
+	{
+		VkShaderStageFlagBits Stage = VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
+		const char* EntryPoint = nullptr;
+		u32* Code = nullptr;
+		u32 CodeSize = 0;
+	};
+
+	struct BMRSPipelineShaderInfo
+	{
+		VkPipelineShaderStageCreateInfo Infos[BMRShaderStages::ShaderStagesCount];
+		u32 InfosCounter = 0;
+	};
+
+	struct BMRPipelineResourceInfo
+	{
+		VkRenderPass RenderPass = nullptr;
+		u32 SubpassIndex = -1;
+
+		VkPipelineLayout PipelineLayout = nullptr;
+	};
+
+	struct BMRPipeline
+	{
+		VkPipeline Pipeline = nullptr;
+		VkPipelineLayout PipelineLayout = nullptr;
 	};
 }

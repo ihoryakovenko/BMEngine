@@ -31,8 +31,10 @@
     <ClCompile Include="Source\BMR\VulkanCoreTypes.cpp" />
     <ClCompile Include="Source\BMR\VulkanMemoryManagementSystem.cpp" />
     <ClCompile Include="Source\BMR\BMRInterface.cpp" />
+    <ClCompile Include="Source\BMR\VulkanResourceManagementSystem.cpp" />
     <ClCompile Include="Source\ImguiIntegration.cpp" />
     <ClCompile Include="Source\main.cpp" />
+    <ClCompile Include="Source\Util\Settings.cpp" />
     <ClCompile Include="Source\Util\Util.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -46,6 +48,8 @@
     <ClInclude Include="..\External\imgui\imstb_truetype.h" />
     <ClInclude Include="Source\BMR\BMRInterfaceTypes.h" />
     <ClInclude Include="Source\BMR\MainRenderPass.h" />
+    <ClInclude Include="Source\Util\Settings.h" />
+    <ClInclude Include="Source\BMR\VulkanResourceManagementSystem.h" />
     <ClInclude Include="Source\ImguiIntegration.h" />
     <ClInclude Include="Source\Memory\MemoryManagmentSystem.h" />
     <ClInclude Include="Source\BMR\VulkanCoreTypes.h" />

@@ -9,23 +9,44 @@
   <ItemGroup>
     <ClCompile Include="Source\main.cpp" />
     <ClCompile Include="Source\Util\Util.cpp" />
-    <ClCompile Include="Source\Core\BMRInterface.cpp" />
-    <ClCompile Include="Source\Core\MainRenderPass.cpp" />
-    <ClCompile Include="Source\Core\VulkanHelper.cpp" />
-    <ClCompile Include="Source\Core\VulkanCoreTypes.cpp" />
-    <ClCompile Include="Source\Core\VulkanMemoryManagementSystem.cpp" />
+    <ClCompile Include="..\External\imgui\backends\imgui_impl_glfw.cpp" />
+    <ClCompile Include="..\External\imgui\backends\imgui_impl_vulkan.cpp" />
+    <ClCompile Include="..\External\imgui\imgui.cpp" />
+    <ClCompile Include="..\External\imgui\imgui_demo.cpp" />
+    <ClCompile Include="..\External\imgui\imgui_draw.cpp" />
+    <ClCompile Include="..\External\imgui\imgui_tables.cpp" />
+    <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="Source\BMR\MainRenderPass.cpp" />
+    <ClCompile Include="Source\BMR\VulkanHelper.cpp" />
+    <ClCompile Include="Source\BMR\VulkanCoreTypes.cpp" />
+    <ClCompile Include="Source\BMR\VulkanMemoryManagementSystem.cpp" />
+    <ClCompile Include="Source\BMR\BMRInterface.cpp" />
+    <ClCompile Include="Source\ImguiIntegration.cpp" />
+    <ClCompile Include="Source\BMR\VulkanResourceManagementSystem.cpp" />
+    <ClCompile Include="Source\Util\Settings.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\Core\VulkanCoreTypes.h" />
     <ClInclude Include="Source\Util\Util.h" />
     <ClInclude Include="Source\Util\stb_image.h" />
-    <ClInclude Include="Source\Core\BMRInterface.h" />
-    <ClInclude Include="Source\Core\MainRenderPass.h" />
-    <ClInclude Include="Source\Core\VulkanHelper.h" />
-    <ClInclude Include="Source\Core\VulkanMemoryManagementSystem.h" />
     <ClInclude Include="Source\Memory\MemoryManagmentSystem.h" />
     <ClInclude Include="Source\Util\EngineTypes.h" />
-    <ClInclude Include="Source\Core\BMRInterfaceTypes.h" />
+    <ClInclude Include="..\External\imgui\backends\imgui_impl_glfw.h" />
+    <ClInclude Include="..\External\imgui\backends\imgui_impl_vulkan.h" />
+    <ClInclude Include="..\External\imgui\imconfig.h" />
+    <ClInclude Include="..\External\imgui\imgui.h" />
+    <ClInclude Include="..\External\imgui\imgui_internal.h" />
+    <ClInclude Include="..\External\imgui\imstb_rectpack.h" />
+    <ClInclude Include="..\External\imgui\imstb_textedit.h" />
+    <ClInclude Include="..\External\imgui\imstb_truetype.h" />
+    <ClInclude Include="Source\BMR\BMRInterfaceTypes.h" />
+    <ClInclude Include="Source\BMR\MainRenderPass.h" />
+    <ClInclude Include="Source\ImguiIntegration.h" />
+    <ClInclude Include="Source\BMR\VulkanCoreTypes.h" />
+    <ClInclude Include="Source\BMR\VulkanHelper.h" />
+    <ClInclude Include="Source\BMR\VulkanMemoryManagementSystem.h" />
+    <ClInclude Include="Source\BMR\BMRInterface.h" />
+    <ClInclude Include="Source\BMR\VulkanResourceManagementSystem.h" />
+    <ClInclude Include="Source\Util\Settings.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />

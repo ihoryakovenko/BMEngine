@@ -2,8 +2,11 @@
 
 #include "VulkanHelper.h"
 #include "VulkanMemoryManagementSystem.h"
+#include "VulkanResourceManagementSystem.h"
 
 #include "Memory/MemoryManagmentSystem.h"
+
+#include "Util/Settings.h"
 
 namespace BMR
 {
@@ -19,12 +22,6 @@ namespace BMR
 	}
 
 	static const u32 TmpDepthSubpassIndex = 0;
-
-	struct BMRSPipelineShaderInfo
-	{
-		VkPipelineShaderStageCreateInfo Infos[BMRShaderStages::ShaderStagesCount];
-		u32 InfosCounter = 0;
-	};
 
 	void BMRMainRenderPass::ClearResources(VkDevice LogicalDevice, u32 ImagesCount)
 	{
@@ -49,12 +46,6 @@ namespace BMR
 		for (u32 i = 0; i < DescriptorLayoutHandles::Count; ++i)
 		{
 			vkDestroyDescriptorSetLayout(LogicalDevice, DescriptorLayouts[i], nullptr);
-		}
-
-		for (u32 i = 0; i < BMRPipelineHandles::PipelineHandlesCount; ++i)
-		{
-			vkDestroyPipelineLayout(LogicalDevice, PipelineLayouts[i], nullptr);
-			vkDestroyPipeline(LogicalDevice, Pipelines[i], nullptr);
 		}
 
 		VulkanMemoryManagementSystem::DestroyBuffer(MaterialBuffer);
@@ -299,8 +290,8 @@ namespace BMR
 		RenderPassTable[FrameBuffersHandles::Main] = RenderPasses[RenderPassHandles::Main];
 
 		VkExtent2D ExtentTable[FrameBuffersHandles::Count];
-		ExtentTable[FrameBuffersHandles::Tex1] = DepthPassSwapExtent;
-		ExtentTable[FrameBuffersHandles::Tex2] = DepthPassSwapExtent;
+		ExtentTable[FrameBuffersHandles::Tex1] = DepthViewportExtent;
+		ExtentTable[FrameBuffersHandles::Tex2] = DepthViewportExtent;
 		ExtentTable[FrameBuffersHandles::Main] = FrameBufferSizes;
 
 		VkFramebufferCreateInfo CreateInfo = { };
@@ -388,7 +379,7 @@ namespace BMR
 		TerrainSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		TerrainSamplerLayoutBinding.pImmutableSamplers = nullptr;
 
-		const u32 LightBindingsCount = 2;
+		const u32 LightBindingsCount = 1;
 		VkDescriptorSetLayoutBinding LightBindings[LightBindingsCount];
 		LightBindings[0] = { };
 		LightBindings[0].binding = 0;
@@ -396,8 +387,6 @@ namespace BMR
 		LightBindings[0].descriptorCount = 1;
 		LightBindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		LightBindings[0].pImmutableSamplers = nullptr;
-		LightBindings[1] = LightBindings[0];
-		LightBindings[1].binding = 1;
 
 		const u32 MaterialBindingsCount = 1;
 		VkDescriptorSetLayoutBinding MaterialLayoutBinding = { };
@@ -524,47 +513,17 @@ namespace BMR
 		PushConstantRangeCountTable[BMRPipelineHandles::SkyBox] = 0;
 		PushConstantRangeCountTable[BMRPipelineHandles::Depth] = 1;
 
-		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo[BMRPipelineHandles::PipelineHandlesCount];
+
 		for (u32 i = 0; i < BMRPipelineHandles::PipelineHandlesCount; ++i)
 		{
-			PipelineLayoutCreateInfo[i] = { };
-			PipelineLayoutCreateInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-			PipelineLayoutCreateInfo[i].setLayoutCount = SetLayoutCountTable[i];
-			PipelineLayoutCreateInfo[i].pSetLayouts = SetLayouts[i];
-			PipelineLayoutCreateInfo[i].pushConstantRangeCount = PushConstantRangeCountTable[i];
-			PipelineLayoutCreateInfo[i].pPushConstantRanges = &PushConstants[PushConstantHandles::Model];
-
-			const VkResult Result = vkCreatePipelineLayout(LogicalDevice, PipelineLayoutCreateInfo + i, nullptr,
-				PipelineLayouts + i);
-			if (Result != VK_SUCCESS)
-			{
-				HandleLog(BMRLogType::LogType_Error, "vkCreatePipelineLayout result is %d", Result);
-			}
+			Pipelines[i].PipelineLayout = VulkanResourceManagementSystem::CreatePipelineLayout(SetLayouts[i],
+				SetLayoutCountTable[i], &PushConstants[PushConstantHandles::Model], PushConstantRangeCountTable[i]);
 		}
 	}
 
 	void BMRMainRenderPass::CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent,
-		BMRPipelineShaderInput ShaderInputs[BMRShaderNames::ShaderNamesCount])
+		BMRPipelineShaderInputDepr ShaderInputs[BMRShaderNames::ShaderNamesCount])
 	{
-		VkViewport Viewport;
-		VkRect2D Scissor;
-
-		Viewport.x = 0.0f;
-		Viewport.y = 0.0f;
-		Viewport.width = static_cast<f32>(SwapExtent.width);
-		Viewport.height = static_cast<f32>(SwapExtent.height);
-		Viewport.minDepth = 0.0f;
-		Viewport.maxDepth = 1.0f;
-		Scissor.offset = { 0, 0 };
-		Scissor.extent = SwapExtent;
-
-		VkViewport DepthViewport = Viewport;
-		VkRect2D DepthScissor;
-		DepthViewport.width = DepthPassSwapExtent.width;
-		DepthViewport.height = DepthPassSwapExtent.height;
-		DepthScissor.offset = { 0, 0 };
-		DepthScissor.extent = DepthPassSwapExtent;
-
 		const VkShaderStageFlagBits NamesToStagesTable[] =
 		{
 			VK_SHADER_STAGE_VERTEX_BIT,
@@ -574,7 +533,7 @@ namespace BMR
 		BMRSPipelineShaderInfo ShaderInfos[BMRPipelineHandles::PipelineHandlesCount];
 		for (u32 i = 0; i < BMRShaderNames::ShaderNamesCount; ++i)
 		{
-			const BMRPipelineShaderInput& Input = ShaderInputs[i];
+			const BMRPipelineShaderInputDepr& Input = ShaderInputs[i];
 			BMRSPipelineShaderInfo& Info = ShaderInfos[Input.Handle];
 
 			Info.Infos[Info.InfosCounter] = { };
@@ -635,354 +594,69 @@ namespace BMR
 		SkyBoxAttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
 		SkyBoxAttributeDescriptions[0].offset = offsetof(BMRSkyBoxVertex, Position);
 
-		u32 ViewportCountTable[BMRPipelineHandles::PipelineHandlesCount];
-		ViewportCountTable[BMRPipelineHandles::Entity] = 1;
-		ViewportCountTable[BMRPipelineHandles::Terrain] = 1;
-		ViewportCountTable[BMRPipelineHandles::Deferred] = 1;
-		ViewportCountTable[BMRPipelineHandles::SkyBox] = 1;
-		ViewportCountTable[BMRPipelineHandles::Depth] = 1;
+		BMRVertexInput VertexInput[BMRPipelineHandles::PipelineHandlesCount];
+		VertexInput[BMRPipelineHandles::Entity].VertexInputAttributes = EntityAttributeDescriptions;
+		VertexInput[BMRPipelineHandles::Entity].VertexInputAttributesCount = EntityVertexInputBindingDescriptionCount;
+		VertexInput[BMRPipelineHandles::Entity].VertexInputBindings = &EntityInputBindingDescription;
+		VertexInput[BMRPipelineHandles::Entity].VertexInputBindingsCount = 1;
 
-		const VkViewport* ViewportTable[BMRPipelineHandles::PipelineHandlesCount];
-		ViewportTable[BMRPipelineHandles::Entity] = &Viewport;
-		ViewportTable[BMRPipelineHandles::Terrain] = &Viewport;
-		ViewportTable[BMRPipelineHandles::Deferred] = &Viewport;
-		ViewportTable[BMRPipelineHandles::SkyBox] = &Viewport;
-		ViewportTable[BMRPipelineHandles::Depth] = &DepthViewport;
+		VertexInput[BMRPipelineHandles::Terrain].VertexInputAttributes = TerrainAttributeDescriptions;
+		VertexInput[BMRPipelineHandles::Terrain].VertexInputAttributesCount = TerrainVertexInputBindingDescriptionCount;
+		VertexInput[BMRPipelineHandles::Terrain].VertexInputBindings = &TerrainVertexInputBindingDescription;
+		VertexInput[BMRPipelineHandles::Terrain].VertexInputBindingsCount = 1;
 
-		const VkRect2D* ScissorTable[BMRPipelineHandles::PipelineHandlesCount];
-		ScissorTable[BMRPipelineHandles::Entity] = &Scissor;
-		ScissorTable[BMRPipelineHandles::Terrain] = &Scissor;
-		ScissorTable[BMRPipelineHandles::Deferred] = &Scissor;
-		ScissorTable[BMRPipelineHandles::SkyBox] = &Scissor;
-		ScissorTable[BMRPipelineHandles::Depth] = &DepthScissor;
+		VertexInput[BMRPipelineHandles::Deferred].VertexInputAttributes = nullptr;
+		VertexInput[BMRPipelineHandles::Deferred].VertexInputAttributesCount = 0;
+		VertexInput[BMRPipelineHandles::Deferred].VertexInputBindings = nullptr;
+		VertexInput[BMRPipelineHandles::Deferred].VertexInputBindingsCount = 0;
 
-		u32 VertexBindingDescriptionCountTable[BMRPipelineHandles::PipelineHandlesCount];
-		VertexBindingDescriptionCountTable[BMRPipelineHandles::Entity] = 1;
-		VertexBindingDescriptionCountTable[BMRPipelineHandles::Terrain] = 1;
-		VertexBindingDescriptionCountTable[BMRPipelineHandles::Deferred] = 0;
-		VertexBindingDescriptionCountTable[BMRPipelineHandles::SkyBox] = 1;
-		VertexBindingDescriptionCountTable[BMRPipelineHandles::Depth] = 1;
+		VertexInput[BMRPipelineHandles::SkyBox].VertexInputAttributes = SkyBoxAttributeDescriptions;
+		VertexInput[BMRPipelineHandles::SkyBox].VertexInputAttributesCount = SkyBoxVertexInputBindingDescriptionCount;
+		VertexInput[BMRPipelineHandles::SkyBox].VertexInputBindings = &SkyBoxVertexInputBindingDescription;
+		VertexInput[BMRPipelineHandles::SkyBox].VertexInputBindingsCount = 1;
 
-		const VkVertexInputBindingDescription* VertexBindingDescriptionsTable[BMRPipelineHandles::PipelineHandlesCount];
-		VertexBindingDescriptionsTable[BMRPipelineHandles::Entity] = &EntityInputBindingDescription;
-		VertexBindingDescriptionsTable[BMRPipelineHandles::Terrain] = &TerrainVertexInputBindingDescription;
-		VertexBindingDescriptionsTable[BMRPipelineHandles::Deferred] = nullptr;
-		VertexBindingDescriptionsTable[BMRPipelineHandles::SkyBox] = &SkyBoxVertexInputBindingDescription;
-		VertexBindingDescriptionsTable[BMRPipelineHandles::Depth] = &EntityInputBindingDescription;
+		VertexInput[BMRPipelineHandles::Depth].VertexInputAttributes = EntityAttributeDescriptions;
+		VertexInput[BMRPipelineHandles::Depth].VertexInputAttributesCount = 1;
+		VertexInput[BMRPipelineHandles::Depth].VertexInputBindings = &EntityInputBindingDescription;
+		VertexInput[BMRPipelineHandles::Depth].VertexInputBindingsCount = 1;
 
-		u32 VertexAttributeDescriptionCountTable[BMRPipelineHandles::PipelineHandlesCount];
-		VertexAttributeDescriptionCountTable[BMRPipelineHandles::Entity] = EntityVertexInputBindingDescriptionCount;
-		VertexAttributeDescriptionCountTable[BMRPipelineHandles::Terrain] = TerrainVertexInputBindingDescriptionCount;
-		VertexAttributeDescriptionCountTable[BMRPipelineHandles::Deferred] = 0;
-		VertexAttributeDescriptionCountTable[BMRPipelineHandles::SkyBox] = SkyBoxVertexInputBindingDescriptionCount;
-		VertexAttributeDescriptionCountTable[BMRPipelineHandles::Depth] = 1;
 
-		const VkVertexInputAttributeDescription* VertexAttributeDescriptionsTable[BMRPipelineHandles::PipelineHandlesCount];
-		VertexAttributeDescriptionsTable[BMRPipelineHandles::Entity] = EntityAttributeDescriptions;
-		VertexAttributeDescriptionsTable[BMRPipelineHandles::Terrain] = TerrainAttributeDescriptions;
-		VertexAttributeDescriptionsTable[BMRPipelineHandles::Deferred] = nullptr;
-		VertexAttributeDescriptionsTable[BMRPipelineHandles::SkyBox] = SkyBoxAttributeDescriptions;
-		VertexAttributeDescriptionsTable[BMRPipelineHandles::Depth] = EntityAttributeDescriptions;
+		BMRPipelineSettings PipelineSettings[BMRPipelineHandles::PipelineHandlesCount];
+		PipelineSettings[BMRPipelineHandles::Entity] = EntityPipelineSettings;
+		PipelineSettings[BMRPipelineHandles::Terrain] = TerrainPipelineSettings;
+		PipelineSettings[BMRPipelineHandles::Deferred] = DeferredPipelineSettings;
+		PipelineSettings[BMRPipelineHandles::SkyBox] = SkyBoxPipelineSettings;
+		PipelineSettings[BMRPipelineHandles::Depth] = DeferredPipelineSettings;
 
-		// Inputassembly
-		VkPipelineInputAssemblyStateCreateInfo InputAssemblyStateCreateInfo = { };
-		InputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-		InputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-		InputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;
 
-		// Dynamic states TODO
-		// Use vkCmdSetViewport(Commandbuffer, 0, 1, &Viewport) and vkCmdSetScissor(Commandbuffer, 0, 1, &Scissor)
-		//VkDynamicState DynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+		BMRPipelineResourceInfo PipelineResourceInfo[BMRPipelineHandles::PipelineHandlesCount];
+		PipelineResourceInfo[BMRPipelineHandles::Entity].PipelineLayout = Pipelines[BMRPipelineHandles::Entity].PipelineLayout;
+		PipelineResourceInfo[BMRPipelineHandles::Entity].RenderPass = RenderPasses[RenderPassHandles::Main];
+		PipelineResourceInfo[BMRPipelineHandles::Entity].SubpassIndex = SubpassIndex::MainSubpass;
 
-		//VkPipelineDynamicStateCreateInfo DynamicStateCreateInfo = {};
-		//DynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-		//DynamicStateCreateInfo.dynamicStateCount = static_cast<u32>(2);
-		//DynamicStateCreateInfo.pDynamicStates = DynamicStates;
+		PipelineResourceInfo[BMRPipelineHandles::Terrain].PipelineLayout = Pipelines[BMRPipelineHandles::Terrain].PipelineLayout;
+		PipelineResourceInfo[BMRPipelineHandles::Terrain].RenderPass = RenderPasses[RenderPassHandles::Main];
+		PipelineResourceInfo[BMRPipelineHandles::Terrain].SubpassIndex = SubpassIndex::MainSubpass;
 
-		// Rasterizer
-		// Change if fragments beyond near/far planes are clipped (default) or clamped to plane
-		VkBool32 DepthClampEnableTable[BMRPipelineHandles::PipelineHandlesCount];
-		DepthClampEnableTable[BMRPipelineHandles::Entity] = VK_FALSE;
-		DepthClampEnableTable[BMRPipelineHandles::Terrain] = VK_FALSE;
-		DepthClampEnableTable[BMRPipelineHandles::Deferred] = VK_FALSE;
-		DepthClampEnableTable[BMRPipelineHandles::SkyBox] = VK_FALSE;
-		DepthClampEnableTable[BMRPipelineHandles::Depth] = VK_FALSE;
+		PipelineResourceInfo[BMRPipelineHandles::Deferred].PipelineLayout = Pipelines[BMRPipelineHandles::Deferred].PipelineLayout;
+		PipelineResourceInfo[BMRPipelineHandles::Deferred].RenderPass = RenderPasses[RenderPassHandles::Main];
+		PipelineResourceInfo[BMRPipelineHandles::Deferred].SubpassIndex = SubpassIndex::DeferredSubpas;
 
-		// Whether to discard data and skip rasterizer. Never creates fragments, only suitable for pipeline without framebuffer output
-		VkBool32 RasterizerDiscardEnableTable[BMRPipelineHandles::PipelineHandlesCount];
-		RasterizerDiscardEnableTable[BMRPipelineHandles::Entity] = VK_FALSE;
-		RasterizerDiscardEnableTable[BMRPipelineHandles::Terrain] = VK_FALSE;
-		RasterizerDiscardEnableTable[BMRPipelineHandles::Deferred] = VK_FALSE;
-		RasterizerDiscardEnableTable[BMRPipelineHandles::SkyBox] = VK_FALSE;
-		RasterizerDiscardEnableTable[BMRPipelineHandles::Depth] = VK_FALSE;
+		PipelineResourceInfo[BMRPipelineHandles::SkyBox].PipelineLayout = Pipelines[BMRPipelineHandles::SkyBox].PipelineLayout;
+		PipelineResourceInfo[BMRPipelineHandles::SkyBox].RenderPass = RenderPasses[RenderPassHandles::Main];
+		PipelineResourceInfo[BMRPipelineHandles::SkyBox].SubpassIndex = SubpassIndex::MainSubpass;
 
-		VkPolygonMode PolygonModeTable[BMRPipelineHandles::PipelineHandlesCount];
-		PolygonModeTable[BMRPipelineHandles::Entity] = VK_POLYGON_MODE_FILL;
-		PolygonModeTable[BMRPipelineHandles::Terrain] = VK_POLYGON_MODE_FILL;
-		PolygonModeTable[BMRPipelineHandles::Deferred] = VK_POLYGON_MODE_FILL;
-		PolygonModeTable[BMRPipelineHandles::SkyBox] = VK_POLYGON_MODE_FILL;
-		PolygonModeTable[BMRPipelineHandles::Depth] = VK_POLYGON_MODE_FILL;
+		PipelineResourceInfo[BMRPipelineHandles::Depth].PipelineLayout = Pipelines[BMRPipelineHandles::Depth].PipelineLayout;
+		PipelineResourceInfo[BMRPipelineHandles::Depth].RenderPass = RenderPasses[RenderPassHandles::Depth];
+		PipelineResourceInfo[BMRPipelineHandles::Depth].SubpassIndex = TmpDepthSubpassIndex;
 
-		f32 LineWidthTable[BMRPipelineHandles::PipelineHandlesCount];
-		LineWidthTable[BMRPipelineHandles::Entity] = 1.0f;
-		LineWidthTable[BMRPipelineHandles::Terrain] = 1.0f;
-		LineWidthTable[BMRPipelineHandles::Deferred] = 1.0f;
-		LineWidthTable[BMRPipelineHandles::SkyBox] = 1.0f;
-		LineWidthTable[BMRPipelineHandles::Depth] = 1.0f;
 
-		VkCullModeFlags CullModeTable[BMRPipelineHandles::PipelineHandlesCount];
-		CullModeTable[BMRPipelineHandles::Entity] = VK_CULL_MODE_BACK_BIT;
-		CullModeTable[BMRPipelineHandles::Terrain] = VK_CULL_MODE_BACK_BIT;
-		CullModeTable[BMRPipelineHandles::Deferred] = VK_CULL_MODE_NONE;
-		CullModeTable[BMRPipelineHandles::SkyBox] = VK_CULL_MODE_FRONT_BIT;
-		CullModeTable[BMRPipelineHandles::Depth] = VK_CULL_MODE_BACK_BIT;
-
-		VkFrontFace FrontFaceTable[BMRPipelineHandles::PipelineHandlesCount];
-		FrontFaceTable[BMRPipelineHandles::Entity] = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-		FrontFaceTable[BMRPipelineHandles::Terrain] = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-		FrontFaceTable[BMRPipelineHandles::Deferred] = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-		FrontFaceTable[BMRPipelineHandles::SkyBox] = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-		FrontFaceTable[BMRPipelineHandles::Depth] = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-
-		// Whether to add depth bias to fragments (good for stopping "shadow acne" in shadow mapping)
-		VkBool32 DepthBiasEnableTable[BMRPipelineHandles::PipelineHandlesCount];
-		DepthBiasEnableTable[BMRPipelineHandles::Entity] = VK_FALSE;
-		DepthBiasEnableTable[BMRPipelineHandles::Terrain] = VK_FALSE;
-		DepthBiasEnableTable[BMRPipelineHandles::Deferred] = VK_FALSE;
-		DepthBiasEnableTable[BMRPipelineHandles::SkyBox] = VK_FALSE;
-		DepthBiasEnableTable[BMRPipelineHandles::Depth] = VK_FALSE;
-
-		// Multisampling
-		VkPipelineMultisampleStateCreateInfo MultisampleStateCreateInfo = { };
-		MultisampleStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-		MultisampleStateCreateInfo.sampleShadingEnable = VK_FALSE;					// Enable multisample shading or not
-		MultisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;	// Number of samples to use per fragment
-
-		VkBool32 BlendEnableTable[BMRPipelineHandles::PipelineHandlesCount];
-		BlendEnableTable[BMRPipelineHandles::Entity] = VK_TRUE;
-		BlendEnableTable[BMRPipelineHandles::Terrain] = VK_TRUE;
-		BlendEnableTable[BMRPipelineHandles::Deferred] = VK_FALSE;
-		BlendEnableTable[BMRPipelineHandles::SkyBox] = VK_TRUE;
-		BlendEnableTable[BMRPipelineHandles::Depth] = VK_TRUE;
-
-		// Colors to apply blending to
-		VkColorComponentFlags ColorWriteMaskTable[BMRPipelineHandles::PipelineHandlesCount];
-		ColorWriteMaskTable[BMRPipelineHandles::Entity] = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
-			| VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-		ColorWriteMaskTable[BMRPipelineHandles::Terrain] = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
-			| VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-		ColorWriteMaskTable[BMRPipelineHandles::Deferred] = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
-			| VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-		ColorWriteMaskTable[BMRPipelineHandles::SkyBox] = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
-			| VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-		ColorWriteMaskTable[BMRPipelineHandles::Depth] = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
-			| VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-
-		// Blending uses equation: (srcColorBlendFactor * new color) colorBlendOp (dstColorBlendFactor * old color)
-
-		VkBlendFactor SrcColorBlendFactorTable[BMRPipelineHandles::PipelineHandlesCount];
-		SrcColorBlendFactorTable[BMRPipelineHandles::Entity] = VK_BLEND_FACTOR_SRC_ALPHA;
-		SrcColorBlendFactorTable[BMRPipelineHandles::Terrain] = VK_BLEND_FACTOR_SRC_ALPHA;
-		SrcColorBlendFactorTable[BMRPipelineHandles::Deferred] = VK_BLEND_FACTOR_SRC_ALPHA;
-		SrcColorBlendFactorTable[BMRPipelineHandles::SkyBox] = VK_BLEND_FACTOR_SRC_ALPHA;
-		SrcColorBlendFactorTable[BMRPipelineHandles::Depth] = VK_BLEND_FACTOR_SRC_ALPHA;
-
-		VkBlendFactor DstColorBlendFactorTable[BMRPipelineHandles::PipelineHandlesCount];
-		DstColorBlendFactorTable[BMRPipelineHandles::Entity] = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		DstColorBlendFactorTable[BMRPipelineHandles::Terrain] = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		DstColorBlendFactorTable[BMRPipelineHandles::Deferred] = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		DstColorBlendFactorTable[BMRPipelineHandles::SkyBox] = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		DstColorBlendFactorTable[BMRPipelineHandles::Depth] = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-
-		VkBlendOp ColorBlendOpTable[BMRPipelineHandles::PipelineHandlesCount];
-		ColorBlendOpTable[BMRPipelineHandles::Entity] = VK_BLEND_OP_ADD;
-		ColorBlendOpTable[BMRPipelineHandles::Terrain] = VK_BLEND_OP_ADD;
-		ColorBlendOpTable[BMRPipelineHandles::Deferred] = VK_BLEND_OP_ADD;
-		ColorBlendOpTable[BMRPipelineHandles::SkyBox] = VK_BLEND_OP_ADD;
-		ColorBlendOpTable[BMRPipelineHandles::Depth] = VK_BLEND_OP_ADD;
-
-		VkBlendFactor SrcAlphaBlendFactorTable[BMRPipelineHandles::PipelineHandlesCount];
-		SrcAlphaBlendFactorTable[BMRPipelineHandles::Entity] = VK_BLEND_FACTOR_ONE;
-		SrcAlphaBlendFactorTable[BMRPipelineHandles::Terrain] = VK_BLEND_FACTOR_ONE;
-		SrcAlphaBlendFactorTable[BMRPipelineHandles::Deferred] = VK_BLEND_FACTOR_ONE;
-		SrcAlphaBlendFactorTable[BMRPipelineHandles::SkyBox] = VK_BLEND_FACTOR_ONE;
-		SrcAlphaBlendFactorTable[BMRPipelineHandles::Depth] = VK_BLEND_FACTOR_ONE;
-
-		// Summarised: (VK_BLEND_FACTOR_SRC_ALPHA * new color) + (VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA * old color)
-//			   (new color alpha * new color) + ((1 - new color alpha) * old color)
-
-		VkBlendFactor DstAlphaBlendFactorTable[BMRPipelineHandles::PipelineHandlesCount];
-		DstAlphaBlendFactorTable[BMRPipelineHandles::Entity] = VK_BLEND_FACTOR_ZERO;
-		DstAlphaBlendFactorTable[BMRPipelineHandles::Terrain] = VK_BLEND_FACTOR_ZERO;
-		DstAlphaBlendFactorTable[BMRPipelineHandles::Deferred] = VK_BLEND_FACTOR_ZERO;
-		DstAlphaBlendFactorTable[BMRPipelineHandles::SkyBox] = VK_BLEND_FACTOR_ZERO;
-		DstAlphaBlendFactorTable[BMRPipelineHandles::Depth] = VK_BLEND_FACTOR_ZERO;
-
-		VkBlendOp AlphaBlendOpTable[BMRPipelineHandles::PipelineHandlesCount];
-		AlphaBlendOpTable[BMRPipelineHandles::Entity] = VK_BLEND_OP_ADD;
-		AlphaBlendOpTable[BMRPipelineHandles::Terrain] = VK_BLEND_OP_ADD;
-		AlphaBlendOpTable[BMRPipelineHandles::Deferred] = VK_BLEND_OP_ADD;
-		AlphaBlendOpTable[BMRPipelineHandles::SkyBox] = VK_BLEND_OP_ADD;
-		AlphaBlendOpTable[BMRPipelineHandles::Depth] = VK_BLEND_OP_ADD;
-		// Summarised: (1 * new alpha) + (0 * old alpha) = new alpharesult != VK_SUCCESS
-
-		VkBool32 LogicOpEnableTable[BMRPipelineHandles::PipelineHandlesCount];
-		LogicOpEnableTable[BMRPipelineHandles::Entity] = VK_FALSE;
-		LogicOpEnableTable[BMRPipelineHandles::Terrain] = VK_FALSE;
-		LogicOpEnableTable[BMRPipelineHandles::Deferred] = VK_FALSE;
-		LogicOpEnableTable[BMRPipelineHandles::SkyBox] = VK_FALSE;
-		LogicOpEnableTable[BMRPipelineHandles::Depth] = VK_FALSE;
-
-		u32 AttachmentCountTable[BMRPipelineHandles::PipelineHandlesCount];
-		AttachmentCountTable[BMRPipelineHandles::Entity] = 1;
-		AttachmentCountTable[BMRPipelineHandles::Terrain] = 1;
-		AttachmentCountTable[BMRPipelineHandles::Deferred] = 1;
-		AttachmentCountTable[BMRPipelineHandles::SkyBox] = 1;
-		AttachmentCountTable[BMRPipelineHandles::Depth] = 1;
-
-		VkRenderPass RenderPassToPipelineTable[BMRPipelineHandles::PipelineHandlesCount];
-		RenderPassToPipelineTable[BMRPipelineHandles::Entity] = RenderPasses[RenderPassHandles::Main];
-		RenderPassToPipelineTable[BMRPipelineHandles::Terrain] = RenderPasses[RenderPassHandles::Main];
-		RenderPassToPipelineTable[BMRPipelineHandles::Deferred] = RenderPasses[RenderPassHandles::Main];
-		RenderPassToPipelineTable[BMRPipelineHandles::SkyBox] = RenderPasses[RenderPassHandles::Main];
-		RenderPassToPipelineTable[BMRPipelineHandles::Depth] = RenderPasses[RenderPassHandles::Depth];
-
-		u32 SubpassesToPipelineTable[BMRPipelineHandles::PipelineHandlesCount];
-		SubpassesToPipelineTable[BMRPipelineHandles::Entity] = SubpassIndex::MainSubpass;
-		SubpassesToPipelineTable[BMRPipelineHandles::Terrain] = SubpassIndex::MainSubpass;
-		SubpassesToPipelineTable[BMRPipelineHandles::Deferred] = SubpassIndex::DeferredSubpas;
-		SubpassesToPipelineTable[BMRPipelineHandles::SkyBox] = SubpassIndex::MainSubpass;
-		SubpassesToPipelineTable[BMRPipelineHandles::Depth] = TmpDepthSubpassIndex;
-
-		VkBool32 DepthTestEnableTable[BMRPipelineHandles::PipelineHandlesCount];
-		DepthTestEnableTable[BMRPipelineHandles::Entity] = VK_TRUE;
-		DepthTestEnableTable[BMRPipelineHandles::Terrain] = VK_TRUE;
-		DepthTestEnableTable[BMRPipelineHandles::Deferred] = VK_FALSE;
-		DepthTestEnableTable[BMRPipelineHandles::SkyBox] = VK_TRUE;
-		DepthTestEnableTable[BMRPipelineHandles::Depth] = VK_TRUE;
-
-		VkBool32 DepthWriteEnableTable[BMRPipelineHandles::PipelineHandlesCount];
-		DepthWriteEnableTable[BMRPipelineHandles::Entity] = VK_TRUE;
-		DepthWriteEnableTable[BMRPipelineHandles::Terrain] = VK_TRUE;
-		DepthWriteEnableTable[BMRPipelineHandles::Deferred] = VK_FALSE;
-		DepthWriteEnableTable[BMRPipelineHandles::SkyBox] = VK_FALSE;
-		DepthWriteEnableTable[BMRPipelineHandles::Depth] = VK_TRUE;
-
-		VkCompareOp DepthCompareOpTable[BMRPipelineHandles::PipelineHandlesCount];
-		DepthCompareOpTable[BMRPipelineHandles::Entity] = VK_COMPARE_OP_LESS;
-		DepthCompareOpTable[BMRPipelineHandles::Terrain] = VK_COMPARE_OP_LESS;
-		DepthCompareOpTable[BMRPipelineHandles::SkyBox] = VK_COMPARE_OP_LESS_OR_EQUAL;
-		DepthCompareOpTable[BMRPipelineHandles::Depth] = VK_COMPARE_OP_LESS;
-
-		VkBool32 DepthBoundsTestEnableTable[BMRPipelineHandles::PipelineHandlesCount];
-		DepthBoundsTestEnableTable[BMRPipelineHandles::Entity] = VK_FALSE;
-		DepthBoundsTestEnableTable[BMRPipelineHandles::Terrain] = VK_FALSE;
-		DepthBoundsTestEnableTable[BMRPipelineHandles::Deferred] = VK_FALSE;
-		DepthBoundsTestEnableTable[BMRPipelineHandles::SkyBox] = VK_FALSE;
-		DepthBoundsTestEnableTable[BMRPipelineHandles::Depth] = VK_FALSE;
-
-		VkBool32 StencilTestEnableTable[BMRPipelineHandles::PipelineHandlesCount];
-		StencilTestEnableTable[BMRPipelineHandles::Entity] = VK_FALSE;
-		StencilTestEnableTable[BMRPipelineHandles::Terrain] = VK_FALSE;
-		StencilTestEnableTable[BMRPipelineHandles::Deferred] = VK_FALSE;
-		StencilTestEnableTable[BMRPipelineHandles::SkyBox] = VK_FALSE;
-		StencilTestEnableTable[BMRPipelineHandles::Depth] = VK_FALSE;
-
-		VkPipelineViewportStateCreateInfo ViewportStateCreateInfo[BMRPipelineHandles::PipelineHandlesCount];
-		VkPipelineVertexInputStateCreateInfo VertexInputInfo[BMRPipelineHandles::PipelineHandlesCount];
-		VkPipelineRasterizationStateCreateInfo RasterizationStateCreateInfo[BMRPipelineHandles::PipelineHandlesCount];
-		const VkPipelineColorBlendAttachmentState* AttachmentsTable[BMRPipelineHandles::PipelineHandlesCount];
-		VkPipelineColorBlendAttachmentState ColorBlendAttachmentState[BMRPipelineHandles::PipelineHandlesCount];
-		VkPipelineColorBlendStateCreateInfo ColorBlendInfo[BMRPipelineHandles::PipelineHandlesCount];
-		VkPipelineDepthStencilStateCreateInfo DepthStencilInfo[BMRPipelineHandles::PipelineHandlesCount];
-		VkGraphicsPipelineCreateInfo PipelineCreateInfos[BMRPipelineHandles::PipelineHandlesCount];
+		VkPipeline* NewPipelines = VulkanResourceManagementSystem::CreatePipelines(ShaderInfos, VertexInput, PipelineSettings,
+			PipelineResourceInfo, BMRPipelineHandles::PipelineHandlesCount);
 
 		for (u32 i = 0; i < BMRPipelineHandles::PipelineHandlesCount; ++i)
 		{
-			ViewportStateCreateInfo[i] = { };
-			ViewportStateCreateInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-			ViewportStateCreateInfo[i].viewportCount = 1;
-			ViewportStateCreateInfo[i].pViewports = ViewportTable[i];
-			ViewportStateCreateInfo[i].scissorCount = 1;
-			ViewportStateCreateInfo[i].pScissors = ScissorTable[i];
-
-			RasterizationStateCreateInfo[i] = { };
-			RasterizationStateCreateInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-			RasterizationStateCreateInfo[i].depthClampEnable = DepthClampEnableTable[i];
-			RasterizationStateCreateInfo[i].rasterizerDiscardEnable = RasterizerDiscardEnableTable[i];
-			RasterizationStateCreateInfo[i].polygonMode = PolygonModeTable[i];
-			RasterizationStateCreateInfo[i].lineWidth = LineWidthTable[i];
-			RasterizationStateCreateInfo[i].cullMode = CullModeTable[i];
-			RasterizationStateCreateInfo[i].frontFace = FrontFaceTable[i];
-			RasterizationStateCreateInfo[i].depthBiasEnable = DepthBiasEnableTable[i];
-
-			VertexInputInfo[i] = { };
-			VertexInputInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-			VertexInputInfo[i].vertexBindingDescriptionCount = VertexBindingDescriptionCountTable[i];
-			VertexInputInfo[i].pVertexBindingDescriptions = VertexBindingDescriptionsTable[i];
-			VertexInputInfo[i].vertexAttributeDescriptionCount = VertexAttributeDescriptionCountTable[i];
-			VertexInputInfo[i].pVertexAttributeDescriptions = VertexAttributeDescriptionsTable[i];
-
-			ColorBlendAttachmentState[i].colorWriteMask = ColorWriteMaskTable[i];
-			ColorBlendAttachmentState[i].blendEnable = BlendEnableTable[i];													// Enable blending
-			ColorBlendAttachmentState[i].srcColorBlendFactor = SrcColorBlendFactorTable[i];
-			ColorBlendAttachmentState[i].dstColorBlendFactor = DstColorBlendFactorTable[i];
-			ColorBlendAttachmentState[i].colorBlendOp = ColorBlendOpTable[i];
-			ColorBlendAttachmentState[i].srcAlphaBlendFactor = SrcAlphaBlendFactorTable[i];
-			ColorBlendAttachmentState[i].dstAlphaBlendFactor = DstAlphaBlendFactorTable[i];
-			ColorBlendAttachmentState[i].alphaBlendOp = AlphaBlendOpTable[i];
-
-			AttachmentsTable[i] = ColorBlendAttachmentState + i;
-
-			ColorBlendInfo[i] = { };
-			ColorBlendInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-			ColorBlendInfo[i].logicOpEnable = LogicOpEnableTable[i]; // Alternative to calculations is to use logical operations
-			ColorBlendInfo[i].attachmentCount = AttachmentCountTable[i];
-			ColorBlendInfo[i].pAttachments = AttachmentsTable[i];
-
-			DepthStencilInfo[i] = { };
-			DepthStencilInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-			DepthStencilInfo[i].depthTestEnable = DepthTestEnableTable[i];
-			DepthStencilInfo[i].depthWriteEnable = DepthWriteEnableTable[i];
-			DepthStencilInfo[i].depthCompareOp = DepthCompareOpTable[i];
-			DepthStencilInfo[i].depthBoundsTestEnable = DepthBoundsTestEnableTable[i];
-			DepthStencilInfo[i].stencilTestEnable = StencilTestEnableTable[i];
-
-			PipelineCreateInfos[i] = { };
-			PipelineCreateInfos[i].sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-			PipelineCreateInfos[i].stageCount = ShaderInfos[i].InfosCounter;
-			PipelineCreateInfos[i].pStages = ShaderInfos[i].Infos;
-			PipelineCreateInfos[i].pVertexInputState = VertexInputInfo + i;
-			PipelineCreateInfos[i].pInputAssemblyState = &InputAssemblyStateCreateInfo;
-			PipelineCreateInfos[i].pViewportState = ViewportStateCreateInfo + i;
-			PipelineCreateInfos[i].pDynamicState = nullptr;
-			PipelineCreateInfos[i].pRasterizationState = RasterizationStateCreateInfo + i;
-			PipelineCreateInfos[i].pMultisampleState = &MultisampleStateCreateInfo;
-			PipelineCreateInfos[i].pColorBlendState = ColorBlendInfo + i;
-			PipelineCreateInfos[i].pDepthStencilState = DepthStencilInfo + i;
-			PipelineCreateInfos[i].layout = PipelineLayouts[i];
-			PipelineCreateInfos[i].renderPass = RenderPassToPipelineTable[i];
-			PipelineCreateInfos[i].subpass = SubpassesToPipelineTable[i];
-
-			// Pipeline Derivatives : Can create multiple pipelines that derive from one another for optimisation
-			PipelineCreateInfos[i].basePipelineHandle = VK_NULL_HANDLE;
-			PipelineCreateInfos[i].basePipelineIndex = -1;
-		}
-
-		const VkResult Result = vkCreateGraphicsPipelines(LogicalDevice, VK_NULL_HANDLE, BMRPipelineHandles::PipelineHandlesCount,
-			PipelineCreateInfos, nullptr, Pipelines);
-
-		for (u32 i = 0; i < BMRPipelineHandles::PipelineHandlesCount; ++i)
-		{
-			for (u32 j = 0; j < ShaderInfos[i].InfosCounter; ++j)
-			{
-				vkDestroyShaderModule(LogicalDevice, ShaderInfos[i].Infos[j].module, nullptr);
-			}
-		}
-
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkCreateGraphicsPipelines result is %d", Result);
+			Pipelines[i].Pipeline = NewPipelines[i];
 		}
 	}
 
@@ -1020,8 +694,8 @@ namespace BMR
 			ColorBufferViews[i] = CreateImageView(LogicalDevice, ColorBuffers[i].Image,
 				ColorFormat, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_2D, 1);
 
-			ImageCreateInfo.extent.width = DepthPassSwapExtent.width;
-			ImageCreateInfo.extent.height = DepthPassSwapExtent.height;
+			ImageCreateInfo.extent.width = DepthViewportExtent.width;
+			ImageCreateInfo.extent.height = DepthViewportExtent.height;
 			ImageCreateInfo.format = DepthFormat;
 			ImageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 			ImageCreateInfo.arrayLayers = MAX_LIGHT_SOURCES;

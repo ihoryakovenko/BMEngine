@@ -32,6 +32,7 @@
 #include "ImguiIntegration.h"
 
 #include <thread>
+#include "Util/Settings.h"
 
 const u32 NumRows = 600;
 const u32 NumCols = 600;
@@ -846,13 +847,21 @@ int main()
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-	GLFWwindow* Window = glfwCreateWindow(1920, 1080, "BMEngine", nullptr, nullptr);
+	s32 WindowWidth = 1920;
+	s32 WindowHeight = 1080;
+
+	GLFWwindow* Window = glfwCreateWindow(WindowWidth, WindowHeight, "BMEngine", nullptr, nullptr);
 	if (Window == nullptr)
 	{
 		Util::Log::GlfwLogError();
 		glfwTerminate();
 		return -1;
 	}
+
+	
+	glfwGetWindowSize(Window, &WindowWidth, &WindowHeight);
+
+	LoadSettings(WindowWidth, WindowHeight);
 
 	glfwSetInputMode(Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
@@ -878,8 +887,10 @@ int main()
 	const f32 Near = 1.0f;
 	const f32 Far = 100.0f;
 
+	const float Aspect = MainViewport.width / MainViewport.height;
+
 	Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-		static_cast<f32>(1920) / static_cast<f32>(1080), Near, Far);
+		Aspect, Near, Far);
 	Scene.ViewProjection.Projection[1][1] *= -1;
 	Scene.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 

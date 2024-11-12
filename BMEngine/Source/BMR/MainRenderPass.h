@@ -73,7 +73,7 @@ namespace BMR
 		};
 	}
 
-	struct BMRPipelineShaderInput
+	struct BMRPipelineShaderInputDepr
 	{
 		BMRPipelineHandles Handle = BMRPipelineHandles::PipelineHandlesNone;
 		BMRShaderStages Stage = BMRShaderStages::BMRShaderStagesNone;
@@ -92,7 +92,7 @@ namespace BMR
 		void CreateDescriptorLayouts(VkDevice LogicalDevice);
 		void CreatePipelineLayouts(VkDevice LogicalDevice); 
 		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent,
-			BMRPipelineShaderInput ShaderInputs[BMRShaderNames::ShaderNamesCount]);
+			BMRPipelineShaderInputDepr ShaderInputs[BMRShaderNames::ShaderNamesCount]);
 		void CreateImages(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 ImagesCount, VkExtent2D SwapExtent,
 			VkFormat DepthFormat, VkFormat ColorFormat);
 		void CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
@@ -104,8 +104,7 @@ namespace BMR
 
 		VkRenderPass RenderPasses[RenderPassHandles::Count];
 
-		VkPipelineLayout PipelineLayouts[BMRPipelineHandles::PipelineHandlesCount];
-		VkPipeline Pipelines[BMRPipelineHandles::PipelineHandlesCount];
+		BMRPipeline Pipelines[BMRPipelineHandles::PipelineHandlesCount];
 
 		VkPushConstantRange PushConstants[PushConstantHandles::Count];
 		VkDescriptorSetLayout DescriptorLayouts[DescriptorLayoutHandles::Count];
