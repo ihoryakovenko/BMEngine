@@ -192,4 +192,41 @@ namespace BMR
 			default:              return VK_FORMAT_UNDEFINED;
 		}
 	}
+
+	VkShaderStageFlags ToVkShaderStageFlags(u32 Stage)
+	{
+		VkShaderStageFlags VkStageFlags = 0;
+
+		if (Stage & BMRShaderStages_Vertex)
+		{
+			VkStageFlags |= VK_SHADER_STAGE_VERTEX_BIT;
+		}
+		if (Stage & BMRShaderStages_TessellationControl)
+		{
+			VkStageFlags |= VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+		}
+		if (Stage & BMRShaderStages_TessellationEvaluation)
+		{
+			VkStageFlags |= VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+		}
+		if (Stage & BMRShaderStages_Geometry)
+		{
+			VkStageFlags |= VK_SHADER_STAGE_GEOMETRY_BIT;
+		}
+		if (Stage & BMRShaderStages_Fragment)
+		{
+			VkStageFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+		}
+
+		return VkStageFlags;
+	}
+
+	VkDescriptorType ToVkDescriptorType(BMRUniformBufferType Type)
+	{
+		switch (Type)
+		{
+			case BMR::UniformInputType_Data:	return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			default:							return VK_DESCRIPTOR_TYPE_MAX_ENUM;
+		}
+	}
 }

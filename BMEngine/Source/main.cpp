@@ -739,47 +739,47 @@ void LoadShaders()
 {
 	std::vector<const char*> ShaderPaths;
 	std::vector<BMR::BMRPipelineHandles> HandleToPath;
-	std::vector<BMR::BMRShaderStages> StageToStages;
+	std::vector<BMR::BMRShaderStage> StageToStages;
 
 	ShaderPaths.reserve(BMR::BMRShaderNames::ShaderNamesCount);
 	HandleToPath.reserve(BMR::BMRPipelineHandles::PipelineHandlesCount);
-	StageToStages.reserve(BMR::BMRShaderStages::ShaderStagesCount);
+	StageToStages.reserve(BMR::BMRShaderStage::ShaderStagesCount);
 
 	ShaderPaths.push_back("./Resources/Shaders/TerrainGenerator_vert.spv");
 	HandleToPath.push_back(BMR::BMRPipelineHandles::Terrain);
-	StageToStages.push_back(BMR::BMRShaderStages::Vertex);
+	StageToStages.push_back(BMR::BMRShaderStage::Vertex);
 
 	ShaderPaths.push_back("./Resources/Shaders/TerrainGenerator_frag.spv");
 	HandleToPath.push_back(BMR::BMRPipelineHandles::Terrain);
-	StageToStages.push_back(BMR::BMRShaderStages::Fragment);
+	StageToStages.push_back(BMR::BMRShaderStage::Fragment);
 
 	ShaderPaths.push_back("./Resources/Shaders/vert.spv");
 	HandleToPath.push_back(BMR::BMRPipelineHandles::Entity);
-	StageToStages.push_back(BMR::BMRShaderStages::Vertex);
+	StageToStages.push_back(BMR::BMRShaderStage::Vertex);
 
 	ShaderPaths.push_back("./Resources/Shaders/frag.spv");
 	HandleToPath.push_back(BMR::BMRPipelineHandles::Entity);
-	StageToStages.push_back(BMR::BMRShaderStages::Fragment);
+	StageToStages.push_back(BMR::BMRShaderStage::Fragment);
 
 	ShaderPaths.push_back("./Resources/Shaders/second_vert.spv");
 	HandleToPath.push_back(BMR::BMRPipelineHandles::Deferred);
-	StageToStages.push_back(BMR::BMRShaderStages::Vertex);
+	StageToStages.push_back(BMR::BMRShaderStage::Vertex);
 
 	ShaderPaths.push_back("./Resources/Shaders/second_frag.spv");
 	HandleToPath.push_back(BMR::BMRPipelineHandles::Deferred);
-	StageToStages.push_back(BMR::BMRShaderStages::Fragment);
+	StageToStages.push_back(BMR::BMRShaderStage::Fragment);
 
 	ShaderPaths.push_back("./Resources/Shaders/SkyBox_vert.spv");
 	HandleToPath.push_back(BMR::BMRPipelineHandles::SkyBox);
-	StageToStages.push_back(BMR::BMRShaderStages::Vertex);
+	StageToStages.push_back(BMR::BMRShaderStage::Vertex);
 
 	ShaderPaths.push_back("./Resources/Shaders/SkyBox_frag.spv");
 	HandleToPath.push_back(BMR::BMRPipelineHandles::SkyBox);
-	StageToStages.push_back(BMR::BMRShaderStages::Fragment);
+	StageToStages.push_back(BMR::BMRShaderStage::Fragment);
 
 	ShaderPaths.push_back("./Resources/Shaders/Depth_vert.spv");
 	HandleToPath.push_back(BMR::BMRPipelineHandles::Depth);
-	StageToStages.push_back(BMR::BMRShaderStages::Vertex);
+	StageToStages.push_back(BMR::BMRShaderStage::Vertex);
 
 	for (u32 i = 0; i < BMR::BMRShaderNames::ShaderNamesCount; ++i)
 	{

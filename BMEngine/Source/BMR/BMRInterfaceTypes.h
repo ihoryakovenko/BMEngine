@@ -33,7 +33,7 @@ namespace BMR
 		ShaderNamesCount
 	};
 
-	enum BMRShaderStages
+	enum BMRShaderStage
 	{
 		Vertex,
 		Fragment,
@@ -145,10 +145,27 @@ namespace BMR
 		sizeof(float) * 3,
 	};
 
+	enum BMRUniformBufferType
+	{
+		UniformInputType_Data,
+
+		UniformInputType_None
+	};
+
+	enum BMRShaderStageFlags
+	{
+		BMRShaderStages_Vertex = 0x00000001,                   // Corresponds to VK_SHADER_STAGE_VERTEX_BIT
+		BMRShaderStages_TessellationControl = 0x00000002,      // Corresponds to VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT
+		BMRShaderStages_TessellationEvaluation = 0x00000004,   // Corresponds to VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT
+		BMRShaderStages_Geometry = 0x00000008,                 // Corresponds to VK_SHADER_STAGE_GEOMETRY_BIT
+		BMRShaderStages_Fragment = 0x00000010,                 // Corresponds to VK_SHADER_STAGE_FRAGMENT_BIT
+		BMRShaderStages_Max = 0x7FFFFFFF                       // Invalid or uninitialized state
+	};
+
 	struct BMRShaderCodeDescription
 	{
 		BMRPipelineHandles Handle = BMRPipelineHandles::PipelineHandlesNone;
-		BMRShaderStages Stage = BMRShaderStages::BMRShaderStagesNone;
+		BMRShaderStage Stage = BMRShaderStage::BMRShaderStagesNone;
 		u32* Code = nullptr;
 		u32 CodeSize = 0;
 	};
@@ -297,8 +314,21 @@ namespace BMR
 
 	struct BMRVertexInput
 	{
-		BMRVertexInputBinding VertexInputBinding[1];
+		BMRVertexInputBinding VertexInputBinding[MAX_VERTEX_INPUT_BINDINGS];
 		u32 VertexInputBindingCount = 0;
+	};
+
+	struct BMRUniformBuffer
+	{
+		void* Buffer = nullptr;
+		void* Memory = nullptr;
+		BMRUniformBufferType Type = BMRUniformBufferType::UniformInputType_None;
+	};
+
+	struct BMRUniformSet
+	{
+		void* Set = nullptr;
+		void* Layout = nullptr;
 	};
 
 	struct BMRPipelineSettings

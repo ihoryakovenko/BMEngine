@@ -52,6 +52,14 @@ namespace BMR
 	static void UpdateLightBuffer(const BMRLightBuffer* Buffer);
 	static void UpdateLightSpaceBuffer(const BMRLightSpaceMatrix* LightSpaceMatrix);
 
+	static VkBuffer CreateBuffer(VkDeviceSize BufferSize, VkBufferUsageFlags Usage,
+		VkMemoryPropertyFlags Properties);
+
+	VkDeviceMemory CreateDeviceMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex);
+
+	void AllocateSets(VkDescriptorPool Pool, VkDescriptorSetLayout* Layouts,
+		u32 DescriptorSetCount, VkDescriptorSet* OutSets);
+
 	static const u32 RequiredExtensionsCount = 2;
 	const char* RequiredInstanceExtensions[RequiredExtensionsCount] =
 	{
@@ -321,6 +329,112 @@ namespace BMR
 		vkDestroyDevice(LogicalDevice, nullptr);
 
 		BMRMainInstance::DestroyMainInstance(Instance);
+	}
+
+	BMRUniformBuffer CreateUniformBuffer(BMRUniformBufferType Type, u64 Size)
+	{
+		BMRUniformBuffer UniformBuffer;
+		UniformBuffer.Buffer = CreateBuffer(Size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+		VkMemoryRequirements MemoryRequirements;
+		vkGetBufferMemoryRequirements(LogicalDevice, (VkBuffer)UniformBuffer.Buffer, &MemoryRequirements);
+
+		const u32 MemoryTypeIndex = GetMemoryTypeIndex(Device.PhysicalDevice, MemoryRequirements.memoryTypeBits,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+		if (Size != MemoryRequirements.size)
+		{
+			HandleLog(BMRLogType::LogType_Warning, "Buffer memory requirement size is %d, allocating %d more then buffer size",
+				MemoryRequirements.size, MemoryRequirements.size - Size);
+		}
+
+		UniformBuffer.Memory = CreateDeviceMemory(MemoryRequirements.size, MemoryTypeIndex);
+		vkBindBufferMemory(LogicalDevice, (VkBuffer)UniformBuffer.Buffer, (VkDeviceMemory)UniformBuffer.Memory, 0);
+
+		return UniformBuffer;
+	}
+
+	void UpdateUniformBuffer(BMRUniformBuffer Buffer, u64 DataSize, u64 Offset, const void* Data)
+	{
+		void* MappedMemory;
+		vkMapMemory(LogicalDevice, (VkDeviceMemory)Buffer.Memory, Offset, DataSize, 0, &MappedMemory);
+		std::memcpy(MappedMemory, Data, DataSize);
+		vkUnmapMemory(LogicalDevice, (VkDeviceMemory)Buffer.Memory);
+	}
+
+	void DestroyUniformBuffer(BMRUniformBuffer Buffer)
+	{
+		vkDestroyBuffer(LogicalDevice, (VkBuffer)Buffer.Buffer, nullptr);
+		vkFreeMemory(LogicalDevice, (VkDeviceMemory)Buffer.Memory, nullptr);
+	}
+
+	BMRUniformSet CreateUniformSet(const BMRUniformBufferType* Types, const u32* Stages, u32 Count)
+	{
+		auto LayoutBindings = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorSetLayoutBinding>(Count);
+		for (u32 BindingIndex = 0; BindingIndex < Count; ++BindingIndex)
+		{
+			VkDescriptorSetLayoutBinding* LayoutBinding = LayoutBindings + BindingIndex;
+			*LayoutBinding = { };
+			LayoutBinding->binding = BindingIndex;
+			LayoutBinding->descriptorType = ToVkDescriptorType(Types[BindingIndex]);
+			LayoutBinding->descriptorCount = 1;
+			LayoutBinding->stageFlags = ToVkShaderStageFlags(Stages[BindingIndex]);
+			LayoutBinding->pImmutableSamplers = nullptr; // For Texture: Can make sampler data unchangeable (immutable) by specifying in layout	
+		}
+
+		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
+		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		LayoutCreateInfo.bindingCount = Count;
+		LayoutCreateInfo.pBindings = LayoutBindings;
+
+		VkDescriptorSetLayout Layout;
+		const VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo, nullptr, &Layout);
+		if (Result != VK_SUCCESS)
+		{
+			HandleLog(BMRLogType::LogType_Error, "vkCreateDescriptorSetLayout result is %d", Result);
+		}
+
+		VkDescriptorSet Set;
+		AllocateSets(MainPool, &Layout, 1, &Set);
+
+		BMRUniformSet UniformSet;
+		UniformSet.Layout = Layout;
+		UniformSet.Set = Set;
+
+		return UniformSet;
+	}
+
+	void DestroyUniformSet(BMRUniformSet Set)
+	{
+		vkDestroyDescriptorSetLayout(LogicalDevice, (VkDescriptorSetLayout)Set.Layout, nullptr);
+	}
+
+	void AttachBuffersToSet(BMRUniformSet Set, const BMRUniformBuffer* Buffers, const u32* BuffersSizes, u32 BufferCount)
+	{
+		auto BufferInfos = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorBufferInfo>(BufferCount);
+		auto SetWrites = Memory::BmMemoryManagementSystem::FrameAlloc<VkWriteDescriptorSet>(BufferCount);
+		for (u32 BufferIndex = 0; BufferIndex < BufferCount; ++BufferIndex)
+		{
+			const BMRUniformBuffer* Buffer = Buffers + BufferIndex;
+
+			VkDescriptorBufferInfo* BufferInfo = BufferInfos + BufferIndex;
+			BufferInfo->buffer = (VkBuffer)Buffer->Buffer;
+			BufferInfo->offset = 0;
+			BufferInfo->range = BuffersSizes[BufferIndex];
+
+			VkWriteDescriptorSet* SetWrite = SetWrites + BufferIndex;
+			*SetWrite = { };
+			SetWrite->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			SetWrite->dstSet = (VkDescriptorSet)Set.Set;
+			SetWrite->dstBinding = 0;
+			SetWrite->dstArrayElement = 0;
+			SetWrite->descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			SetWrite->descriptorCount = 1;
+			SetWrite->pBufferInfo = BufferInfo;
+		}
+
+		vkUpdateDescriptorSets(LogicalDevice, BufferCount, SetWrites, 0, nullptr);
 	}
 
 	u32 LoadTexture(BMRTextureArrayInfo Info, BMRTextureType TextureType)
@@ -675,7 +789,7 @@ namespace BMR
 
 				const u32 TerrainDescriptorSetGroupCount = 2;
 				const VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = {
-					MainRenderPass.DescriptorsToImages[DescriptorHandles::TerrainVp][MainRenderPass.ActiveVpSet],
+					(VkDescriptorSet)MainRenderPass.TestVpSet[MainRenderPass.ActiveVpSet].Set,
 					MainRenderPass.SamplerDescriptors[DrawTerrainEntity->MaterialIndex]
 				};
 
@@ -701,7 +815,7 @@ namespace BMR
 
 				const VkDescriptorSet DescriptorSetGroup[] =
 				{
-					MainRenderPass.DescriptorsToImages[DescriptorHandles::EntityVp][MainRenderPass.ActiveVpSet],
+					(VkDescriptorSet)MainRenderPass.TestVpSet[MainRenderPass.ActiveVpSet].Set,
 					MainRenderPass.SamplerDescriptors[DrawEntity->MaterialIndex],
 					MainRenderPass.DescriptorsToImages[DescriptorHandles::EntityLigh][MainRenderPass.ActiveLightSet],
 					MainRenderPass.MaterialSet,
@@ -730,7 +844,7 @@ namespace BMR
 
 				const u32 SkyBoxDescriptorSetGroupCount = 2;
 				const VkDescriptorSet SkyBoxDescriptorSetGroup[SkyBoxDescriptorSetGroupCount] = {
-					MainRenderPass.DescriptorsToImages[DescriptorHandles::SkyBoxVp][MainRenderPass.ActiveVpSet],
+					(VkDescriptorSet)MainRenderPass.TestVpSet[MainRenderPass.ActiveVpSet].Set,
 					MainRenderPass.SamplerDescriptors[Scene.SkyBox.MaterialIndex],
 				};
 
@@ -1148,9 +1262,68 @@ namespace BMR
 	{
 		const u32 UpdateIndex = (MainRenderPass.ActiveVpSet + 1) % MainViewport.ViewportSwapchain.ImagesCount;
 
-		VulkanMemoryManagementSystem::CopyDataToMemory(MainRenderPass.VpUniformBuffers[UpdateIndex].Memory, 0,
-			sizeof(BMRUboViewProjection), &ViewProjection);
+		UpdateUniformBuffer(MainRenderPass.TestVpBuffer[UpdateIndex], sizeof(BMRUboViewProjection), 0,
+			&ViewProjection);
 
 		MainRenderPass.ActiveVpSet = UpdateIndex;
+	}
+
+	VkBuffer CreateBuffer(VkDeviceSize BufferSize, VkBufferUsageFlags Usage,
+		VkMemoryPropertyFlags Properties)
+	{
+		HandleLog(BMRLogType::LogType_Info, "Creating VkBuffer. Requested size: %d", BufferSize);
+
+		VkBufferCreateInfo BufferInfo = { };
+		BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		BufferInfo.size = BufferSize;
+		BufferInfo.usage = Usage;
+		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		VkBuffer Buffer;
+		VkResult Result = vkCreateBuffer(LogicalDevice, &BufferInfo, nullptr, &Buffer);
+		if (Result != VK_SUCCESS)
+		{
+			HandleLog(BMRLogType::LogType_Error, "vkCreateBuffer result is %d", Result);
+		}
+
+		return Buffer;
+	}
+
+	VkDeviceMemory CreateDeviceMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex)
+	{
+		HandleLog(BMRLogType::LogType_Info, "Allocating Device memory. Buffer type: Image, Size count: %d, Index: %d",
+			AllocationSize, MemoryTypeIndex);
+
+		VkMemoryAllocateInfo MemoryAllocInfo = { };
+		MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		MemoryAllocInfo.allocationSize = AllocationSize;
+		MemoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;
+
+		VkDeviceMemory Memory;
+		VkResult Result = vkAllocateMemory(LogicalDevice, &MemoryAllocInfo, nullptr, &Memory);
+		if (Result != VK_SUCCESS)
+		{
+			HandleLog(BMRLogType::LogType_Error, "vkAllocateMemory result is %d", Result);
+		}
+
+		return Memory;
+	}
+
+	void AllocateSets(VkDescriptorPool Pool, VkDescriptorSetLayout* Layouts,
+		u32 DescriptorSetCount, VkDescriptorSet* OutSets)
+	{
+		HandleLog(BMRLogType::LogType_Info, "Allocating descriptor sets. Size count: %d", DescriptorSetCount);
+
+		VkDescriptorSetAllocateInfo SetAllocInfo = { };
+		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		SetAllocInfo.descriptorPool = Pool; // Pool to allocate Descriptor Set from
+		SetAllocInfo.descriptorSetCount = DescriptorSetCount; // Number of sets to allocate
+		SetAllocInfo.pSetLayouts = Layouts; // Layouts to use to allocate sets (1:1 relationship)
+
+		VkResult Result = vkAllocateDescriptorSets(LogicalDevice, &SetAllocInfo, OutSets);
+		if (Result != VK_SUCCESS)
+		{
+			HandleLog(BMRLogType::LogType_Error, "vkAllocateDescriptorSets result is %d", Result);
+		}
 	}
 }

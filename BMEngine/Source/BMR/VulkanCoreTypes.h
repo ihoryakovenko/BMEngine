@@ -112,39 +112,27 @@ namespace BMR
 		VkCommandBuffer CommandBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 	};
 
+	//struct BMRUniformSet
+	//{
+	//	VkDescriptorSetLayout Layout = nullptr;
+	//	const BMRUniformBuffer* BMRUniformBuffers = nullptr;
+	//	u32 BuffersCount = 0;
+	//};
 
-	struct BMRUniformBuffer
-	{
-		union
-		{
-			VkBuffer Buffer = nullptr;
-			VkImageView ImageView;
-		};
+	//struct BMRUniformPushBufferDescription
+	//{
+	//	VkShaderStageFlags StageFlags = 0;
+	//	u32 Offset = 0;
+	//	u32 Size = 0;
+	//};
 
-		VkDescriptorType Type = VkDescriptorType::VK_DESCRIPTOR_TYPE_MAX_ENUM;
-	};
+	//struct BMRUniformInput
+	//{
+	//	const VkDescriptorSetLayout* UniformLayout = nullptr;
+	//	u32 layoutCount = 0;
 
-	struct BMRUniformSet
-	{
-		VkDescriptorSetLayout Layout = nullptr;
-		const BMRUniformBuffer* BMRUniformBuffers = nullptr;
-		u32 BuffersCount = 0;
-	};
-
-	struct BMRUniformPushBufferDescription
-	{
-		VkShaderStageFlags StageFlags = 0;
-		u32 Offset = 0;
-		u32 Size = 0;
-	};
-
-	struct BMRUniformInput
-	{
-		const VkDescriptorSetLayout* UniformLayout = nullptr;
-		u32 layoutCount = 0;
-
-		VkPushConstantRange PushConstants;
-	};
+	//	VkPushConstantRange PushConstants;
+	//};
 
 	struct BMRPipelineShaderDescription
 	{
@@ -156,7 +144,7 @@ namespace BMR
 
 	struct BMRSPipelineShaderInfo
 	{
-		VkPipelineShaderStageCreateInfo Infos[BMRShaderStages::ShaderStagesCount];
+		VkPipelineShaderStageCreateInfo Infos[BMRShaderStage::ShaderStagesCount];
 		u32 InfosCounter = 0;
 	};
 

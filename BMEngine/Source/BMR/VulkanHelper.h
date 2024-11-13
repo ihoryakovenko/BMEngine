@@ -29,4 +29,6 @@ namespace BMR
 	VkColorComponentFlags ToVkColorComponentFlags(BMRColorComponentFlagBits Flags);
 	VkVertexInputRate ToVkVertexInputRate(BMRVertexInputRate Rare);
 	VkFormat ToVkFormat(BMRFormat Format);
+	VkShaderStageFlags ToVkShaderStageFlags(u32 Stage);
+	VkDescriptorType ToVkDescriptorType(BMRUniformBufferType Type);
 }

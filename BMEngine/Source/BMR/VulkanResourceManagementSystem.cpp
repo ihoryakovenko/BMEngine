@@ -6,19 +6,22 @@
 
 namespace BMR::VulkanResourceManagementSystem
 {
-	static u32 MaxPipelines = 0;
-
 	static VkDevice LogicalDevice = nullptr;
 
-	static VkPipelineLayout* PipelineLayouts = nullptr;
-	static u32 NextPipelineLayoutIndex = 0;
+	static u32 MaxPipelines = 0;
+	static u32 MaxBuffers = 0;
+	static u32 MaxDeviceMemorySources = 0;
 
+	static VkPipelineLayout* PipelineLayouts = nullptr;
 	static VkPipeline* Pipelines = nullptr;
+
+	static u32 NextPipelineLayoutIndex = 0;
 	static u32 NextPipelineIndex = 0;
 
 	void Init(VkDevice ActiveLogicalDevice, u32 MaximumPipelines)
 	{
 		LogicalDevice = ActiveLogicalDevice;
+
 		MaxPipelines = MaximumPipelines;
 
 		PipelineLayouts = Memory::BmMemoryManagementSystem::Allocate<VkPipelineLayout>(MaxPipelines);
@@ -44,7 +47,7 @@ namespace BMR::VulkanResourceManagementSystem
 	VkPipelineLayout CreatePipelineLayout(const VkDescriptorSetLayout* DescriptorLayouts,
 		u32 DescriptorLayoutsCount, const VkPushConstantRange* PushConstant, u32 PushConstantsCount)
 	{
-		assert(NextPipelineLayoutIndex < MaxPipelines);
+		assert(NextPipelineIndex < MaxPipelines);
 		assert(DescriptorLayoutsCount <= MAX_DESCRIPTOR_SET_LAYOUTS_PER_PIPELINE);
 
 		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };

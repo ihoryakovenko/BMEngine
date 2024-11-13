@@ -9,16 +9,13 @@ namespace BMR
 {
 	enum DescriptorLayoutHandles
 	{
-		TerrainVp = 0, // TODO Same as EntityVpLayout, change or delete
 		TerrainSampler,
-		EntityVp,
 		EntitySampler,
 		EntityLigh,
 		EntityMaterial,
 		EntityShadowMapSampler,
 		DepthLightSpaceMatrix,
 		DeferredInputAttachments,
-		SkyBoxVp, // TODO Same as EntityVpLayout, change or delete
 		SkyBoxSampler, // TODO Same as TerrainSampler
 
 		Count
@@ -30,9 +27,6 @@ namespace BMR
 		{
 			DepthLightSpaceMatrix = 0,
 			ShadowMapSampler,
-			SkyBoxVp,
-			TerrainVp,
-			EntityVp,
 			EntityLigh,
 			DeferredInputAttachments,
 
@@ -76,7 +70,7 @@ namespace BMR
 	struct BMRPipelineShaderInputDepr
 	{
 		BMRPipelineHandles Handle = BMRPipelineHandles::PipelineHandlesNone;
-		BMRShaderStages Stage = BMRShaderStages::BMRShaderStagesNone;
+		BMRShaderStage Stage = BMRShaderStage::BMRShaderStagesNone;
 		const char* EntryPoint = nullptr;
 		u32* Code = nullptr;
 		u32 CodeSize = 0; 
@@ -102,6 +96,9 @@ namespace BMR
 		void CreateFrameBuffer(VkDevice LogicalDevice, VkExtent2D FrameBufferSizes, u32 ImagesCount,
 			VkImageView SwapchainImageViews[MAX_SWAPCHAIN_IMAGES_COUNT]);
 
+		BMRUniformBuffer TestVpBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRUniformSet TestVpSet[MAX_SWAPCHAIN_IMAGES_COUNT];
+
 		VkRenderPass RenderPasses[RenderPassHandles::Count];
 
 		BMRPipeline Pipelines[BMRPipelineHandles::PipelineHandlesCount];
@@ -121,7 +118,6 @@ namespace BMR
 		BMRImageBuffer DepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView DepthBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		BMRGPUBuffer VpUniformBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		BMRGPUBuffer LightBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		BMRImageBuffer ShadowDepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
