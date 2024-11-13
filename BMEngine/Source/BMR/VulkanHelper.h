@@ -27,4 +27,6 @@ namespace BMR
 	VkBlendOp ToVkBlendOp(BMRBlendOp Op);
 	VkCompareOp ToVkCompareOp(BMRCompareOp Op);
 	VkColorComponentFlags ToVkColorComponentFlags(BMRColorComponentFlagBits Flags);
+	VkVertexInputRate ToVkVertexInputRate(BMRVertexInputRate Rare);
+	VkFormat ToVkFormat(BMRFormat Format);
 }

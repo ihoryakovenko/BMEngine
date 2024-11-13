@@ -94,15 +94,89 @@ namespace BMR::VulkanResourceManagementSystem
 		MultisampleStateCreateInfo.sampleShadingEnable = VK_FALSE;					// Enable multisample shading or not
 		MultisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;	// Number of samples to use per fragment
 
-
 		for (u32 PipelineIndex = 0; PipelineIndex < PipelinesCount; ++PipelineIndex)
 		{
-			// VERTEX INPUT
 			const BMRVertexInput* VertexInput = VertexInputs + PipelineIndex;
 			const BMRPipelineSettings* Settings = PipelinesSettings + PipelineIndex;
 			VkViewport* Viewport = Viewports + PipelineIndex;
 			VkRect2D* Scissor = Scissors + PipelineIndex;
 
+			// VERTEX INPUT
+			auto VertexInputBindings = Memory::BmMemoryManagementSystem::FrameAlloc<VkVertexInputBindingDescription>(VertexInput->VertexInputBindingCount);
+			auto VertexInputAttributes = Memory::BmMemoryManagementSystem::FrameAlloc<VkVertexInputAttributeDescription>(VertexInput->VertexInputBindingCount * MAX_VERTEX_INPUTS_ATTRIBUTES);
+			u32 VertexInputAttributesIndex = 0;
+
+			HandleLog(BMR::BMRLogType::LogType_Info,
+				"CREATING PIPELINE %s\n"
+				"Extent - Width: %d, Height: %d\n"
+				"DepthClampEnable: %d, RasterizerDiscardEnable: %d\n"
+				"PolygonMode: %d, LineWidth: %f, CullMode: %d, FrontFace: %d, DepthBiasEnable: %d\n"
+				"LogicOpEnable: %d, AttachmentCount: %d, ColorWriteMask: %d\n"
+				"BlendEnable: %d, SrcColorBlendFactor: %d, DstColorBlendFactor: %d, ColorBlendOp: %d\n"
+				"SrcAlphaBlendFactor: %d, DstAlphaBlendFactor: %d, AlphaBlendOp: %d\n"
+				"DepthTestEnable: %d, DepthWriteEnable: %d, DepthCompareOp: %d\n"
+				"DepthBoundsTestEnable: %d, StencilTestEnable: %d",
+				Settings->PipelineName,
+				Settings->Extent.Width, Settings->Extent.Height,
+				Settings->DepthClampEnable, Settings->RasterizerDiscardEnable,
+				Settings->PolygonMode, Settings->LineWidth, Settings->CullMode,
+				Settings->FrontFace, Settings->DepthBiasEnable,
+				Settings->LogicOpEnable, Settings->AttachmentCount, Settings->ColorWriteMask,
+				Settings->BlendEnable, Settings->SrcColorBlendFactor,
+				Settings->DstColorBlendFactor, Settings->ColorBlendOp,
+				Settings->SrcAlphaBlendFactor, Settings->DstAlphaBlendFactor,
+				Settings->AlphaBlendOp,
+				Settings->DepthTestEnable, Settings->DepthWriteEnable,
+				Settings->DepthCompareOp, Settings->DepthBoundsTestEnable,
+				Settings->StencilTestEnable
+			);
+
+			HandleLog(BMR::BMRLogType::LogType_Info, "Creating vertex input, VertexInputBindingCount: %d", VertexInput->VertexInputBindingCount);
+
+			for (u32 BindingIndex = 0; BindingIndex < VertexInput->VertexInputBindingCount; ++BindingIndex)
+			{
+				const BMRVertexInputBinding* BMRBinding = VertexInput->VertexInputBinding + BindingIndex;
+				VkVertexInputBindingDescription* VertexInputBinding = VertexInputBindings + BindingIndex;
+
+				VertexInputBinding->binding = BindingIndex;
+				VertexInputBinding->inputRate = ToVkVertexInputRate(BMRBinding->InputRate);
+				VertexInputBinding->stride = BMRBinding->Stride;
+
+				HandleLog(BMR::BMRLogType::LogType_Info, "Initialized VkVertexInputBindingDescription, BindingName: %s, "
+					"BindingIndex: %d, VkInputRate: %d, Stride: %d, InputAttributesCount: %d",
+					BMRBinding->VertexInputBindingName, VertexInputBinding->binding, VertexInputBinding->inputRate,
+					VertexInputBinding->stride, BMRBinding->InputAttributesCount);
+
+				u32 AttributeOffset = 0;
+				for (u32 CurrentAttributeIndex = 0; CurrentAttributeIndex < BMRBinding->InputAttributesCount; ++CurrentAttributeIndex)
+				{
+					const BMRVertexInputAttribute* BMRAttribute = BMRBinding->InputAttributes + CurrentAttributeIndex;
+					VkVertexInputAttributeDescription* VertexInputAttribute = VertexInputAttributes + VertexInputAttributesIndex;
+
+					VertexInputAttribute->binding = BindingIndex;
+					VertexInputAttribute->location = CurrentAttributeIndex;
+					VertexInputAttribute->format = ToVkFormat(BMRAttribute->Format);
+					VertexInputAttribute->offset = AttributeOffset;
+
+					AttributeOffset += BMRFormatSizesTable[BMRAttribute->Format];
+
+					HandleLog(BMR::BMRLogType::LogType_Info, "Initialized VkVertexInputAttributeDescription, "
+						"AttributeName: %s, BindingIndex: %d, Location: %d, VkFormat: %d, Offset: %d, Index in creation array: %d",
+						BMRAttribute->VertexInputAttributeName, BindingIndex, CurrentAttributeIndex,
+						VertexInputAttribute->format, VertexInputAttribute->offset, VertexInputAttributesIndex);
+
+					++VertexInputAttributesIndex;
+				}
+			}
+
+			VertexInputInfo[PipelineIndex] = { };
+			VertexInputInfo[PipelineIndex].sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+			VertexInputInfo[PipelineIndex].vertexBindingDescriptionCount = VertexInput->VertexInputBindingCount;
+			VertexInputInfo[PipelineIndex].pVertexBindingDescriptions = VertexInputBindings;
+			VertexInputInfo[PipelineIndex].vertexAttributeDescriptionCount = VertexInputAttributesIndex;
+			VertexInputInfo[PipelineIndex].pVertexAttributeDescriptions = VertexInputAttributes;
+
+			// VIEWPORT
 			Viewport->width = Settings->Extent.Width;
 			Viewport->height = Settings->Extent.Height;
 			Viewport->minDepth = 0.0f;
@@ -114,14 +188,6 @@ namespace BMR::VulkanResourceManagementSystem
 			Scissor->extent.height = Settings->Extent.Height;
 			Scissor->offset = { };
 
-			VertexInputInfo[PipelineIndex] = { };
-			VertexInputInfo[PipelineIndex].sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-			VertexInputInfo[PipelineIndex].vertexBindingDescriptionCount = VertexInput->VertexInputBindingsCount;
-			VertexInputInfo[PipelineIndex].pVertexBindingDescriptions = VertexInput->VertexInputBindings;
-			VertexInputInfo[PipelineIndex].vertexAttributeDescriptionCount = VertexInput->VertexInputAttributesCount;
-			VertexInputInfo[PipelineIndex].pVertexAttributeDescriptions = VertexInput->VertexInputAttributes;
-
-			// VIEWPORT
 			ViewportStateCreateInfo[PipelineIndex] = { };
 			ViewportStateCreateInfo[PipelineIndex].sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 			ViewportStateCreateInfo[PipelineIndex].viewportCount = 1;

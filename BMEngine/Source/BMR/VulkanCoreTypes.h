@@ -112,15 +112,6 @@ namespace BMR
 		VkCommandBuffer CommandBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 	};
 
-	struct BMRVertexInput
-	{
-		const VkVertexInputBindingDescription* VertexInputBindings = nullptr;
-		u32 VertexInputBindingsCount = 0;
-
-		const VkVertexInputAttributeDescription* VertexInputAttributes = nullptr;
-		u32 VertexInputAttributesCount = 0;
-	};
-
 
 	struct BMRUniformBuffer
 	{

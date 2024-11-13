@@ -6,6 +6,9 @@
 
 namespace BMR
 {
+	static const u32 MAX_VERTEX_INPUTS_ATTRIBUTES = 16;
+	static const u32 MAX_VERTEX_INPUT_BINDINGS = 16;
+
 	enum BMRLogType
 	{
 		LogType_Error,
@@ -118,6 +121,28 @@ namespace BMR
 		A = 0x00000008,        // Corresponds to VK_COLOR_COMPONENT_A_BIT
 		All = R | G | B | A,   // Represents all color components
 		BMRColorComponentFlagBits_MaxEnum = 0x7FFFFFFF   // Invalid or uninitialized state
+	};
+
+	enum BMRVertexInputRate
+	{
+		BMRVertexInputRate_Vertex = 0,           // Corresponds to VK_VERTEX_INPUT_RATE_VERTEX
+		BMRVertexInputRate_Instance = 1,         // Corresponds to VK_VERTEX_INPUT_RATE_INSTANCE
+		BMRVertexInputRate_Max = 0x7FFFFFFF // Invalid or uninitialized state
+	};
+
+	enum BMRFormat
+	{
+		R32_SF,
+		R32G32_SF,
+		R32G32B32_SF,
+		BMRFormat_Max
+	};
+
+	static const u32 BMRFormatSizesTable[] =
+	{
+		sizeof(float),
+		sizeof(float) * 2,
+		sizeof(float) * 3,
 	};
 
 	struct BMRShaderCodeDescription
@@ -247,32 +272,39 @@ namespace BMR
 		f32 Shininess;
 	};
 
-	struct BMREntityVertex
-	{
-		glm::vec3 Position;
-		glm::vec3 Color;
-		glm::vec2 TextureCoords;
-		glm::vec3 Normal;
-	};
-
-	struct BMRTerrainVertex
-	{
-		f32 Altitude;
-	};
-
-	struct BMRSkyBoxVertex
-	{
-		glm::vec3 Position;
-	};
-
 	struct BMRExtent2D
 	{
 		u32 Width = 0;
 		u32 Height = 0;
 	};
 
+	struct BMRVertexInputAttribute
+	{
+		const char* VertexInputAttributeName = nullptr;
+		BMRFormat Format = BMRFormat::BMRFormat_Max;
+	};
+
+	struct BMRVertexInputBinding
+	{
+		const char* VertexInputBindingName = nullptr;
+
+		BMRVertexInputAttribute InputAttributes[MAX_VERTEX_INPUTS_ATTRIBUTES];
+		u32 InputAttributesCount = 0;
+
+		u32 Stride = 0;
+		BMRVertexInputRate InputRate = BMRVertexInputRate::BMRVertexInputRate_Max;
+	};
+
+	struct BMRVertexInput
+	{
+		BMRVertexInputBinding VertexInputBinding[1];
+		u32 VertexInputBindingCount = 0;
+	};
+
 	struct BMRPipelineSettings
 	{
+		const char* PipelineName = nullptr;
+
 		BMRExtent2D Extent;
 
 		bool DepthClampEnable = false;

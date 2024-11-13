@@ -544,82 +544,12 @@ namespace BMR
 			++Info.InfosCounter;
 		}
 
-		VkVertexInputBindingDescription EntityInputBindingDescription = { };
-		EntityInputBindingDescription.binding = 0; // Can bind multiple streams of data, this defines which one
-		EntityInputBindingDescription.stride = sizeof(BMREntityVertex);
-		EntityInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX; // How to move between data after each vertex.
-		// VK_VERTEX_INPUT_RATE_INDEX		: Move on to the next vertex
-		// VK_VERTEX_INPUT_RATE_INSTANCE	: Move to a vertex for the next instance
-
-		VkVertexInputBindingDescription TerrainVertexInputBindingDescription = { };
-		TerrainVertexInputBindingDescription.binding = 0;
-		TerrainVertexInputBindingDescription.stride = sizeof(BMRTerrainVertex);
-		TerrainVertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-		VkVertexInputBindingDescription SkyBoxVertexInputBindingDescription = { };
-		SkyBoxVertexInputBindingDescription.binding = 0;
-		SkyBoxVertexInputBindingDescription.stride = sizeof(BMRSkyBoxVertex);
-		SkyBoxVertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-		const u32 TerrainVertexInputBindingDescriptionCount = 1;
-		VkVertexInputAttributeDescription TerrainAttributeDescriptions[TerrainVertexInputBindingDescriptionCount];
-		TerrainAttributeDescriptions[0].binding = 0;
-		TerrainAttributeDescriptions[0].location = 0;
-		TerrainAttributeDescriptions[0].format = VK_FORMAT_R32_SFLOAT;
-		TerrainAttributeDescriptions[0].offset = offsetof(BMRTerrainVertex, Altitude);
-
-		const u32 EntityVertexInputBindingDescriptionCount = 4;
-		VkVertexInputAttributeDescription EntityAttributeDescriptions[EntityVertexInputBindingDescriptionCount];
-		EntityAttributeDescriptions[0].binding = 0;	
-		EntityAttributeDescriptions[0].location = 0;
-		EntityAttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-		EntityAttributeDescriptions[0].offset = offsetof(BMREntityVertex, Position);
-		EntityAttributeDescriptions[1].binding = 0;
-		EntityAttributeDescriptions[1].location = 1;
-		EntityAttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-		EntityAttributeDescriptions[1].offset = offsetof(BMREntityVertex, Color);
-		EntityAttributeDescriptions[2].binding = 0;
-		EntityAttributeDescriptions[2].location = 2;
-		EntityAttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-		EntityAttributeDescriptions[2].offset = offsetof(BMREntityVertex, TextureCoords);
-		EntityAttributeDescriptions[3].binding = 0;
-		EntityAttributeDescriptions[3].location = 3;
-		EntityAttributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
-		EntityAttributeDescriptions[3].offset = offsetof(BMREntityVertex, Normal);
-
-		const u32 SkyBoxVertexInputBindingDescriptionCount = 1;
-		VkVertexInputAttributeDescription SkyBoxAttributeDescriptions[SkyBoxVertexInputBindingDescriptionCount];
-		SkyBoxAttributeDescriptions[0].binding = 0;
-		SkyBoxAttributeDescriptions[0].location = 0;
-		SkyBoxAttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-		SkyBoxAttributeDescriptions[0].offset = offsetof(BMRSkyBoxVertex, Position);
-
 		BMRVertexInput VertexInput[BMRPipelineHandles::PipelineHandlesCount];
-		VertexInput[BMRPipelineHandles::Entity].VertexInputAttributes = EntityAttributeDescriptions;
-		VertexInput[BMRPipelineHandles::Entity].VertexInputAttributesCount = EntityVertexInputBindingDescriptionCount;
-		VertexInput[BMRPipelineHandles::Entity].VertexInputBindings = &EntityInputBindingDescription;
-		VertexInput[BMRPipelineHandles::Entity].VertexInputBindingsCount = 1;
-
-		VertexInput[BMRPipelineHandles::Terrain].VertexInputAttributes = TerrainAttributeDescriptions;
-		VertexInput[BMRPipelineHandles::Terrain].VertexInputAttributesCount = TerrainVertexInputBindingDescriptionCount;
-		VertexInput[BMRPipelineHandles::Terrain].VertexInputBindings = &TerrainVertexInputBindingDescription;
-		VertexInput[BMRPipelineHandles::Terrain].VertexInputBindingsCount = 1;
-
-		VertexInput[BMRPipelineHandles::Deferred].VertexInputAttributes = nullptr;
-		VertexInput[BMRPipelineHandles::Deferred].VertexInputAttributesCount = 0;
-		VertexInput[BMRPipelineHandles::Deferred].VertexInputBindings = nullptr;
-		VertexInput[BMRPipelineHandles::Deferred].VertexInputBindingsCount = 0;
-
-		VertexInput[BMRPipelineHandles::SkyBox].VertexInputAttributes = SkyBoxAttributeDescriptions;
-		VertexInput[BMRPipelineHandles::SkyBox].VertexInputAttributesCount = SkyBoxVertexInputBindingDescriptionCount;
-		VertexInput[BMRPipelineHandles::SkyBox].VertexInputBindings = &SkyBoxVertexInputBindingDescription;
-		VertexInput[BMRPipelineHandles::SkyBox].VertexInputBindingsCount = 1;
-
-		VertexInput[BMRPipelineHandles::Depth].VertexInputAttributes = EntityAttributeDescriptions;
-		VertexInput[BMRPipelineHandles::Depth].VertexInputAttributesCount = 1;
-		VertexInput[BMRPipelineHandles::Depth].VertexInputBindings = &EntityInputBindingDescription;
-		VertexInput[BMRPipelineHandles::Depth].VertexInputBindingsCount = 1;
-
+		VertexInput[BMRPipelineHandles::Entity] = EntityVertexInput;
+		VertexInput[BMRPipelineHandles::Terrain] = TerrainVertexInput;
+		VertexInput[BMRPipelineHandles::Deferred] = { };
+		VertexInput[BMRPipelineHandles::SkyBox] = SkyBoxVertexInput;
+		VertexInput[BMRPipelineHandles::Depth] = DepthVertexInput;
 
 		BMRPipelineSettings PipelineSettings[BMRPipelineHandles::PipelineHandlesCount];
 		PipelineSettings[BMRPipelineHandles::Entity] = EntityPipelineSettings;

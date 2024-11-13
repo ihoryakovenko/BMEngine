@@ -3,11 +3,32 @@
 BMR::BMRExtent2D MainScreenExtent;
 BMR::BMRExtent2D DepthViewportExtent = { 1024, 1024 };
 
+BMR::BMRVertexInput EntityVertexInput;
+BMR::BMRVertexInput TerrainVertexInput;
+BMR::BMRVertexInput SkyBoxVertexInput;
+BMR::BMRVertexInput DepthVertexInput;
+
 BMR::BMRPipelineSettings EntityPipelineSettings;
 BMR::BMRPipelineSettings TerrainPipelineSettings;
 BMR::BMRPipelineSettings DeferredPipelineSettings;
 BMR::BMRPipelineSettings SkyBoxPipelineSettings;
 BMR::BMRPipelineSettings DepthPipelineSettings;
+
+static const char EntityPipelineName[] = "Entity";
+static const char TerrainPipelineName[] = "Terrain";
+static const char DeferredPipelineName[] = "Deferred";
+static const char SkyBoxPipelineName[] = "SkyBox";
+static const char DepthPipelineName[] = "Depth";
+
+static const char EntityVertexInputName[] = "EntityVertex";
+static const char TerrainVertexInputName[] = "TerrainVertex";
+static const char SkyBoxVertexInputName[] = "SkyBoxVertex";
+
+static const char PositionAttributeName[] = "Position";
+static const char ColorAttributeName[] = "Color";
+static const char TextureCoordsAttributeName[] = "TextureCoords";
+static const char NormalAttributeName[] = "Normal";
+static const char AltitudeAttributeName[] = "Altitude";
 
 void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 {
@@ -23,6 +44,7 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	MainScreenExtent = { WindowWidth, WindowHeight };
 
 	// MainPipeline
+	EntityPipelineSettings.PipelineName = EntityPipelineName;
 	// Rasterizer
 	EntityPipelineSettings.Extent = MainScreenExtent;
 	EntityPipelineSettings.DepthClampEnable = false;
@@ -51,6 +73,7 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	EntityPipelineSettings.StencilTestEnable = false;
 
 	// TerrainPipeline
+	TerrainPipelineSettings.PipelineName = TerrainPipelineName;
 	// Rasterizer
 	TerrainPipelineSettings.Extent = MainScreenExtent;
 	TerrainPipelineSettings.DepthClampEnable = false;
@@ -79,6 +102,7 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	TerrainPipelineSettings.StencilTestEnable = false;
 
 	// DeferredPipelineSettings
+	DeferredPipelineSettings.PipelineName = DeferredPipelineName;
 	// Rasterizer
 	DeferredPipelineSettings.Extent = MainScreenExtent;
 	DeferredPipelineSettings.DepthClampEnable = false;
@@ -107,6 +131,7 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	DeferredPipelineSettings.StencilTestEnable = false;
 
 	// SkyBoxPipelineSettings
+	SkyBoxPipelineSettings.PipelineName = SkyBoxPipelineName;
 	// Rasterizer
 	SkyBoxPipelineSettings.Extent = MainScreenExtent;
 	SkyBoxPipelineSettings.DepthClampEnable = false;
@@ -135,6 +160,7 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	SkyBoxPipelineSettings.StencilTestEnable = false;
 
 	// DepthPipelineSettings
+	DepthPipelineSettings.PipelineName = DepthPipelineName;
 	// Rasterizer
 	DepthPipelineSettings.Extent = DepthViewportExtent;
 	DepthPipelineSettings.DepthClampEnable = false;
@@ -161,4 +187,32 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	DepthPipelineSettings.DepthCompareOp = BMR::BMRCompareOp::Less;
 	DepthPipelineSettings.DepthBoundsTestEnable = false;
 	DepthPipelineSettings.StencilTestEnable = false;
+
+	// Vertices
+	EntityVertexInput.VertexInputBinding[0].InputAttributes[0] = { PositionAttributeName, BMR::BMRFormat::R32G32B32_SF };
+	EntityVertexInput.VertexInputBinding[0].InputAttributes[1] = { ColorAttributeName, BMR::BMRFormat::R32G32B32_SF };
+	EntityVertexInput.VertexInputBinding[0].InputAttributes[2] = { TextureCoordsAttributeName, BMR::BMRFormat::R32G32_SF };
+	EntityVertexInput.VertexInputBinding[0].InputAttributes[3] = { NormalAttributeName, BMR::BMRFormat::R32G32B32_SF };
+	EntityVertexInput.VertexInputBinding[0].InputAttributesCount = 4;
+	EntityVertexInput.VertexInputBinding[0].InputRate = BMR::BMRVertexInputRate::BMRVertexInputRate_Vertex;
+	EntityVertexInput.VertexInputBinding[0].Stride = sizeof(EntityVertex);
+	EntityVertexInput.VertexInputBinding[0].VertexInputBindingName = EntityVertexInputName;
+	EntityVertexInput.VertexInputBindingCount = 1;
+
+	TerrainVertexInput.VertexInputBinding[0].InputAttributes[0] = { AltitudeAttributeName, BMR::BMRFormat::R32_SF };
+	TerrainVertexInput.VertexInputBinding[0].InputAttributesCount = 1;
+	TerrainVertexInput.VertexInputBinding[0].InputRate = BMR::BMRVertexInputRate::BMRVertexInputRate_Vertex;
+	TerrainVertexInput.VertexInputBinding[0].Stride = sizeof(TerrainVertex);
+	TerrainVertexInput.VertexInputBinding[0].VertexInputBindingName = TerrainVertexInputName;
+	TerrainVertexInput.VertexInputBindingCount = 1;
+
+	SkyBoxVertexInput.VertexInputBinding[0].InputAttributes[0] = { PositionAttributeName, BMR::BMRFormat::R32G32B32_SF };
+	SkyBoxVertexInput.VertexInputBinding[0].InputAttributesCount = 1;
+	SkyBoxVertexInput.VertexInputBinding[0].InputRate = BMR::BMRVertexInputRate::BMRVertexInputRate_Vertex;
+	SkyBoxVertexInput.VertexInputBinding[0].Stride = sizeof(SkyBoxVertex);
+	SkyBoxVertexInput.VertexInputBinding[0].VertexInputBindingName = SkyBoxVertexInputName;
+	SkyBoxVertexInput.VertexInputBindingCount = 1;
+
+	DepthVertexInput = EntityVertexInput;
+	DepthVertexInput.VertexInputBinding[0].InputAttributesCount = 1;
 }

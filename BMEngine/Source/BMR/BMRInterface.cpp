@@ -490,7 +490,7 @@ namespace BMR
 		return UpdateTextureDescriptor(&CubeTextureIndex, 1, DescriptorLayoutHandles::TerrainSampler);
 	}
 
-	u64 LoadVertices(const void* Vertices, u32 VertexSize, VkDeviceSize VerticesCount)
+	u64 LoadVertices(const void* Vertices, u32 VertexSize, u64 VerticesCount)
 	{
 		assert(Vertices);
 

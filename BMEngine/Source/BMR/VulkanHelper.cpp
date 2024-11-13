@@ -163,13 +163,33 @@ namespace BMR
 			case Equal: return VK_COMPARE_OP_EQUAL;
 			case LessOrEqual: return VK_COMPARE_OP_LESS_OR_EQUAL;
 			case Greater: return VK_COMPARE_OP_GREATER;
-			default: return VK_COMPARE_OP_ALWAYS; // or an appropriate default
+			default: return VK_COMPARE_OP_ALWAYS;
 		}
 	}
 
-	// Convert BMRColorComponentFlagBits to VkColorComponentFlags
 	VkColorComponentFlags ToVkColorComponentFlags(BMRColorComponentFlagBits flags)
 	{
-		return static_cast<VkColorComponentFlags>(flags); // Direct bitmask conversion
+		return static_cast<VkColorComponentFlags>(flags);
+	}
+
+	VkVertexInputRate ToVkVertexInputRate(BMRVertexInputRate Rare)
+	{
+		switch (Rare)
+		{
+			case BMRVertexInputRate_Vertex:   return VK_VERTEX_INPUT_RATE_VERTEX;
+			case BMRVertexInputRate_Instance: return VK_VERTEX_INPUT_RATE_INSTANCE;
+			default:       return VK_VERTEX_INPUT_RATE_MAX_ENUM;
+		}
+	}
+
+	VkFormat ToVkFormat(BMRFormat Format)
+	{
+		switch (Format)
+		{
+			case R32_SF:		  return VK_FORMAT_R32_SFLOAT;
+			case R32G32_SF:       return VK_FORMAT_R32G32_SFLOAT;
+			case R32G32B32_SF:    return VK_FORMAT_R32G32B32_SFLOAT;
+			default:              return VK_FORMAT_UNDEFINED;
+		}
 	}
 }

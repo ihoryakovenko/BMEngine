@@ -53,7 +53,7 @@ u32 GrassMaterial;
 u32 SkyBoxMaterial;
 u32 TerrainMaterial;
 
-BMR::BMRTerrainVertex TerrainVerticesData[NumRows][NumCols];
+TerrainVertex TerrainVerticesData[NumRows][NumCols];
 
 std::vector<BMR::BMRDrawEntity> DrawEntities;
 BMR::BMRConfig Config;
@@ -139,12 +139,12 @@ void GenerateTerrain(std::vector<u32>& Indices)
 	}
 }
 
-BMR::BMRTerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
+TerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
 u32 TerrainVerticesCount = NumRows * NumCols;
 
 struct TestMesh
 {
-	std::vector<BMR::BMREntityVertex> vertices;
+	std::vector<EntityVertex> vertices;
 	std::vector<u32> indices;
 	int MaterialIndex;
 	glm::mat4 Model = glm::mat4(1.0f);
@@ -152,16 +152,16 @@ struct TestMesh
 
 struct SkyBoxMesh
 {
-	std::vector<BMR::BMRSkyBoxVertex> vertices;
+	std::vector<SkyBoxVertex> vertices;
 	std::vector<u32> indices;
 	int MaterialIndex;
 };
 
 namespace std
 {
-	template<> struct hash<BMR::BMREntityVertex>
+	template<> struct hash<EntityVertex>
 	{
-		size_t operator()(BMR::BMREntityVertex const& vertex) const
+		size_t operator()(EntityVertex const& vertex) const
 		{
 			size_t hashPosition = std::hash<glm::vec3>()(vertex.Position);
 			size_t hashColor = std::hash<glm::vec3>()(vertex.Color);
@@ -177,9 +177,9 @@ namespace std
 		}
 	};
 
-	template<> struct hash<BMR::BMRSkyBoxVertex>
+	template<> struct hash<SkyBoxVertex>
 	{
-		size_t operator()(BMR::BMRSkyBoxVertex const& vertex) const
+		size_t operator()(SkyBoxVertex const& vertex) const
 		{
 			size_t hashPosition = std::hash<glm::vec3>()(vertex.Position);
 			size_t combinedHash = hashPosition;
@@ -190,12 +190,12 @@ namespace std
 
 struct VertexEqual
 {
-	bool operator()(const BMR::BMREntityVertex& lhs, const BMR::BMREntityVertex& rhs) const
+	bool operator()(const EntityVertex& lhs, const EntityVertex& rhs) const
 	{
 		return lhs.Position == rhs.Position && lhs.Color == rhs.Color && lhs.TextureCoords == rhs.TextureCoords;
 	}
 
-	bool operator()(const BMR::BMRSkyBoxVertex& lhs, const BMR::BMRSkyBoxVertex& rhs) const
+	bool operator()(const SkyBoxVertex& lhs, const SkyBoxVertex& rhs) const
 	{
 		return lhs.Position == rhs.Position;
 	}
@@ -428,13 +428,13 @@ TestMesh CreateCubeMesh(const char* Modelpath, int materialIndex)
 		assert(false);
 	}
 
-	std::unordered_map<BMR::BMREntityVertex, u32, std::hash<BMR::BMREntityVertex>, VertexEqual> uniqueVertices{ };
+	std::unordered_map<EntityVertex, u32, std::hash<EntityVertex>, VertexEqual> uniqueVertices{ };
 
 	for (const auto& Shape : Shapes)
 	{
 		for (const auto& index : Shape.mesh.indices)
 		{
-			BMR::BMREntityVertex vertex{ };
+			EntityVertex vertex{ };
 
 			vertex.Position =
 			{
@@ -498,13 +498,13 @@ SkyBoxMesh CreateSkyBoxMesh(const char* Modelpath, int materialIndex)
 		assert(false);
 	}
 
-	std::unordered_map<BMR::BMRSkyBoxVertex, u32, std::hash<BMR::BMRSkyBoxVertex>, VertexEqual> uniqueVertices{ };
+	std::unordered_map<SkyBoxVertex, u32, std::hash<SkyBoxVertex>, VertexEqual> uniqueVertices{ };
 
 	for (const auto& Shape : Shapes)
 	{
 		for (const auto& index : Shape.mesh.indices)
 		{
-			BMR::BMRSkyBoxVertex vertex{ };
+			SkyBoxVertex vertex{ };
 
 			vertex.Position =
 			{
@@ -587,7 +587,7 @@ void LoadDrawEntities()
 	std::vector<TestMesh> ModelMeshes;
 	ModelMeshes.reserve(Shapes.size());
 
-	std::unordered_map<BMR::BMREntityVertex, u32, std::hash<BMR::BMREntityVertex>, VertexEqual> uniqueVertices{ };
+	std::unordered_map<EntityVertex, u32, std::hash<EntityVertex>, VertexEqual> uniqueVertices{ };
 
 	for (const auto& Shape : Shapes)
 	{
@@ -595,7 +595,7 @@ void LoadDrawEntities()
 
 		for (const auto& index : Shape.mesh.indices)
 		{
-			BMR::BMREntityVertex vertex{ };
+			EntityVertex vertex{ };
 
 			vertex.Position =
 			{
@@ -676,8 +676,8 @@ void LoadDrawEntities()
 
 	for (int i = 0; i < ModelMeshes.size(); ++i)
 	{
-		DrawEntities[i].VertexOffset = LoadVertices(ModelMeshes[i].vertices.data(),
-			sizeof(BMR::BMREntityVertex), ModelMeshes[i].vertices.size());
+		DrawEntities[i].VertexOffset = BMR::LoadVertices(ModelMeshes[i].vertices.data(),
+			sizeof(EntityVertex), ModelMeshes[i].vertices.size());
 
 		DrawEntities[i].IndexOffset = BMR::LoadIndices(ModelMeshes[i].indices.data(),
 			ModelMeshes[i].indices.size());
@@ -689,8 +689,8 @@ void LoadDrawEntities()
 
 	auto SkyBoxMesh = CreateSkyBoxMesh(SkyBoxObj, SkyBoxMaterial);
 
-	SkyBox.VertexOffset = LoadVertices(SkyBoxMesh.vertices.data(),
-		sizeof(BMR::BMRSkyBoxVertex), SkyBoxMesh.vertices.size());
+	SkyBox.VertexOffset = BMR::LoadVertices(SkyBoxMesh.vertices.data(),
+		sizeof(SkyBoxVertex), SkyBoxMesh.vertices.size());
 	SkyBox.IndexOffset = BMR::LoadIndices(SkyBoxMesh.indices.data(), SkyBoxMesh.indices.size());
 	SkyBox.IndicesCount = SkyBoxMesh.indices.size();
 	SkyBox.MaterialIndex = SkyBoxMesh.MaterialIndex;
@@ -895,8 +895,8 @@ int main()
 	Scene.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	BMR::BMRDrawTerrainEntity TestDrawTerrainEntity;
-	TestDrawTerrainEntity.VertexOffset = LoadVertices(&TerrainVerticesData[0][0],
-		sizeof(BMR::BMRTerrainVertex), NumRows * NumCols);
+	TestDrawTerrainEntity.VertexOffset = BMR::LoadVertices(&TerrainVerticesData[0][0],
+		sizeof(TerrainVertex), NumRows * NumCols);
 	TestDrawTerrainEntity.IndexOffset = BMR::LoadIndices(TerrainIndices.data(), TerrainIndices.size());
 	TestDrawTerrainEntity.IndicesCount = TerrainIndices.size();
 	TestDrawTerrainEntity.MaterialIndex = TerrainMaterial;
