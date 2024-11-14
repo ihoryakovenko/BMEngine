@@ -10,15 +10,17 @@ namespace BMR
 	bool Init(HWND WindowHandler, const BMRConfig& InConfig);
 	void DeInit();
 
-	BMRUniformBuffer CreateUniformBuffer(BMRUniformBufferType Type, u64 Size);
-	void DestroyUniformBuffer(BMRUniformBuffer Buffer);
-	void UpdateUniformBuffer(BMRUniformBuffer Buffer, u64 DataSize, u64 Offset, const void* Data);
+	BMRRenderPass CreateRenderPass(const BMRRenderPassSettings* Settings, VkSurfaceFormatKHR SurfaceFormat);
 
-	BMRUniformLayout CreateUniformLayout(const BMRUniformBufferType* Types, const u32* Stages, u32 Count);
+	BMRUniformBuffer CreateUniformBuffer(VkBufferUsageFlags Type, VkMemoryPropertyFlags Usage, VkDeviceSize Size);
+	void DestroyUniformBuffer(BMRUniformBuffer Buffer);
+	void UpdateUniformBuffer(BMRUniformBuffer Buffer, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);
+
+	BMRUniformLayout CreateUniformLayout(const VkDescriptorType* Types, const VkShaderStageFlags* Stages, u32 Count);
+	void DestroyUniformLayout(BMRUniformLayout Layout);
 
 	void CreateUniformSets(const BMRUniformLayout* Layouts, u32 Count, BMRUniformSet* OutSets);
-	void DestroyUniformLayout(BMRUniformLayout Layout);
-	void AttachBuffersToSet(BMRUniformSet Set, const BMRUniformBuffer* Buffers, const u32* BuffersSizes, u32 BufferCount);
+	void AttachBuffersToSet(BMRUniformSet Set, const BMRUniformBuffer* Buffers, const VkDeviceSize* BuffersSizes, u32 BufferCount);
 
 	u32 LoadTexture(BMRTextureArrayInfo Info, BMRTextureType TextureType);
 	u32 LoadEntityMaterial(u32 DiffuseTextureIndex, u32 SpecularTextureIndex);

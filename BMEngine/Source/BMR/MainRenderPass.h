@@ -113,25 +113,25 @@ namespace BMR
 		u32 ActiveVpSet = 0;
 		u32 ActiveLightSpaceMatrixSet = 0;
 
-		BMRImageBuffer ColorBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRIUniformImage ColorBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ColorBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		BMRImageBuffer DepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRIUniformImage DepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView DepthBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		BMRGPUBuffer LightBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRUniformBuffer LightBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		BMRImageBuffer ShadowDepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRIUniformImage ShadowDepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ShadowArrayViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ShadowDepthBufferViews1[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ShadowDepthBufferViews2[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		BMRGPUBuffer DepthLightSpaceMatrixBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRUniformBuffer DepthLightSpaceMatrixBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		// TODO: Fix
 		static inline VkDescriptorSet SamplerDescriptors[MAX_IMAGES];
 
-		BMRGPUBuffer MaterialBuffer;
+		BMRUniformBuffer MaterialBuffer;
 		VkDescriptorSet MaterialSet = nullptr; // TODO: Should be with textures
 
 		u32 TextureDescriptorCount = 0;

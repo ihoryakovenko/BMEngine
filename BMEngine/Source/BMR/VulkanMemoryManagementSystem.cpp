@@ -5,23 +5,25 @@
 
 #include "VulkanHelper.h"
 
+#include "BMRInterface.h"
+
 namespace BMR::VulkanMemoryManagementSystem
 {
 	static VkDeviceMemory AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex);
 
 	static BMRMemorySourceDevice MemorySource;
-	static BMRGPUBuffer StagingBuffer;
+	static BMRUniformBuffer StagingBuffer;
 
 	void Init(BMRMemorySourceDevice Device)
 	{
 		MemorySource = Device;
-		StagingBuffer = CreateBuffer(MB128, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		StagingBuffer = CreateUniformBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, MB128);
 	}
 
 	void Deinit()
 	{
-		DestroyBuffer(StagingBuffer);
+		DestroyUniformBuffer(StagingBuffer);
 	}
 
 	VkDeviceSize CalculateBufferAlignedSize(VkDeviceSize BufferSize)
@@ -91,9 +93,9 @@ namespace BMR::VulkanMemoryManagementSystem
 		}
 	}
 
-	BMRImageBuffer CreateImageBuffer(VkImageCreateInfo* pCreateInfo)
+	BMRIUniformImage CreateImageBuffer(VkImageCreateInfo* pCreateInfo)
 	{
-		BMRImageBuffer Buffer;
+		BMRIUniformImage Buffer;
 		VkResult Result = vkCreateImage(MemorySource.LogicalDevice, pCreateInfo, nullptr, &Buffer.Image);
 		if (Result != VK_SUCCESS)
 		{
@@ -112,52 +114,10 @@ namespace BMR::VulkanMemoryManagementSystem
 		return Buffer;
 	}
 
-	void DestroyImageBuffer(BMRImageBuffer Image)
+	void DestroyImageBuffer(BMRIUniformImage Image)
 	{
 		vkDestroyImage(MemorySource.LogicalDevice, Image.Image, nullptr);
 		vkFreeMemory(MemorySource.LogicalDevice, Image.Memory, nullptr);
-	}
-
-	BMRGPUBuffer CreateBuffer(VkDeviceSize BufferSize, VkBufferUsageFlags Usage,
-		VkMemoryPropertyFlags Properties)
-	{
-		HandleLog(BMRLogType::LogType_Info, "Creating buffer. Requested size: %d", BufferSize);
-
-		VkBufferCreateInfo BufferInfo = { };
-		BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		BufferInfo.size = BufferSize;
-		BufferInfo.usage = Usage;
-		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-		BMRGPUBuffer Buffer;
-		VkResult Result = vkCreateBuffer(MemorySource.LogicalDevice, &BufferInfo, nullptr, &Buffer.Buffer);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkCreateBuffer result is %d", Result);
-		}
-
-		VkMemoryRequirements MemoryRequirements;
-		vkGetBufferMemoryRequirements(MemorySource.LogicalDevice, Buffer.Buffer, &MemoryRequirements);
-
-		const u32 MemoryTypeIndex = GetMemoryTypeIndex(MemorySource.PhysicalDevice, MemoryRequirements.memoryTypeBits,
-			Properties);
-
-		if (BufferSize != MemoryRequirements.size)
-		{
-			HandleLog(BMRLogType::LogType_Warning, "Buffer memory requirement size is %d, allocating %d more then buffer size",
-				MemoryRequirements.size, MemoryRequirements.size - BufferSize);
-		}
-
-		Buffer.Memory = AllocateMemory(MemoryRequirements.size, MemoryTypeIndex);
-		vkBindBufferMemory(MemorySource.LogicalDevice, Buffer.Buffer, Buffer.Memory, 0);
-
-		return Buffer;
-	}
-
-	void DestroyBuffer(BMRGPUBuffer Buffer)
-	{
-		vkDestroyBuffer(MemorySource.LogicalDevice, Buffer.Buffer, nullptr);
-		vkFreeMemory(MemorySource.LogicalDevice, Buffer.Memory, nullptr);
 	}
 
 	void CopyDataToMemory(VkDeviceMemory Memory,

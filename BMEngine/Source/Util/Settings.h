@@ -27,11 +27,17 @@ extern BMR::BMRVertexInput TerrainVertexInput;
 extern BMR::BMRVertexInput SkyBoxVertexInput;
 extern BMR::BMRVertexInput DepthVertexInput;
 
-extern BMR::BMRExtent2D MainScreenExtent;
-extern BMR::BMRExtent2D DepthViewportExtent;
+extern VkExtent2D MainScreenExtent;
+extern VkExtent2D DepthViewportExtent;
+
+extern VkFormat ColorFormat;
+extern VkFormat DepthFormat;
 
 extern BMR::BMRPipelineSettings EntityPipelineSettings;
 extern BMR::BMRPipelineSettings TerrainPipelineSettings;
 extern BMR::BMRPipelineSettings DeferredPipelineSettings;
 extern BMR::BMRPipelineSettings SkyBoxPipelineSettings;
 extern BMR::BMRPipelineSettings DepthPipelineSettings;
+
+extern BMR::BMRRenderPassSettings MainRenderPassSettings;
+extern BMR::BMRRenderPassSettings DepthRenderPassSettings;

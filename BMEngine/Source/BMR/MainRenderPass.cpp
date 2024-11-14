@@ -37,8 +37,8 @@ namespace BMR
 			VulkanMemoryManagementSystem::DestroyImageBuffer(ColorBuffers[i]);
 
 			//VulkanMemoryManagementSystem::DestroyBuffer(VpUniformBuffers[i]); TODO:Destroy set
-			VulkanMemoryManagementSystem::DestroyBuffer(LightBuffers[i]);
-			VulkanMemoryManagementSystem::DestroyBuffer(DepthLightSpaceMatrixBuffers[i]);
+			DestroyUniformBuffer(LightBuffers[i]);
+			DestroyUniformBuffer(DepthLightSpaceMatrixBuffers[i]);
 
 			vkDestroyImageView(LogicalDevice, ShadowArrayViews[i], nullptr);
 			vkDestroyImageView(LogicalDevice, ShadowDepthBufferViews2[i], nullptr);
@@ -51,7 +51,7 @@ namespace BMR
 			vkDestroyDescriptorSetLayout(LogicalDevice, DescriptorLayouts[i], nullptr);
 		}
 
-		VulkanMemoryManagementSystem::DestroyBuffer(MaterialBuffer);
+		DestroyUniformBuffer(MaterialBuffer);
 
 		for (u32 i = 0; i < RenderPassHandles::Count; ++i)
 		{
@@ -69,219 +69,8 @@ namespace BMR
 
 	void BMRMainRenderPass::CreateVulkanPass(VkDevice LogicalDevice, VkFormat ColorFormat, VkFormat DepthFormat, VkSurfaceFormatKHR SurfaceFormat)
 	{
-		VkSubpassDescription MainSubpasses[SubpassIndex::Count];
-
-		const u32 SwapchainColorAttachmentIndex = 0;
-		const u32 SubpassColorAttachmentIndex = 1;
-		const u32 SubpassDepthAttachmentIndex = 2;
-
-		const u32 MainPathAttachmentDescriptionsCount = 3;
-		VkAttachmentDescription MainPathAttachmentDescriptions[MainPathAttachmentDescriptionsCount];
-
-		MainPathAttachmentDescriptions[SwapchainColorAttachmentIndex] = { };
-		MainPathAttachmentDescriptions[SwapchainColorAttachmentIndex].format = SurfaceFormat.format;  // Use the appropriate surface format
-		MainPathAttachmentDescriptions[SwapchainColorAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;  // Typically single sample for swapchain
-		MainPathAttachmentDescriptions[SwapchainColorAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;  // Clear the color buffer at the beginning
-		MainPathAttachmentDescriptions[SwapchainColorAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_STORE;  // Store the result so it can be presented
-		MainPathAttachmentDescriptions[SwapchainColorAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		MainPathAttachmentDescriptions[SwapchainColorAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		MainPathAttachmentDescriptions[SwapchainColorAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;  // No need for initial content
-		MainPathAttachmentDescriptions[SwapchainColorAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;  // Make it ready for presentation
-
-		MainPathAttachmentDescriptions[SubpassColorAttachmentIndex] = { };
-		MainPathAttachmentDescriptions[SubpassColorAttachmentIndex].format = ColorFormat;
-		MainPathAttachmentDescriptions[SubpassColorAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
-		MainPathAttachmentDescriptions[SubpassColorAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		MainPathAttachmentDescriptions[SubpassColorAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		MainPathAttachmentDescriptions[SubpassColorAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		MainPathAttachmentDescriptions[SubpassColorAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		MainPathAttachmentDescriptions[SubpassColorAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		MainPathAttachmentDescriptions[SubpassColorAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-		MainPathAttachmentDescriptions[SubpassDepthAttachmentIndex] = { };
-		MainPathAttachmentDescriptions[SubpassDepthAttachmentIndex].format = DepthFormat;
-		MainPathAttachmentDescriptions[SubpassDepthAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
-		MainPathAttachmentDescriptions[SubpassDepthAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		MainPathAttachmentDescriptions[SubpassDepthAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		MainPathAttachmentDescriptions[SubpassDepthAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		MainPathAttachmentDescriptions[SubpassDepthAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		MainPathAttachmentDescriptions[SubpassDepthAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		MainPathAttachmentDescriptions[SubpassDepthAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-		// Define the Entity subpass, which will read the color and depth attachments
-		VkAttachmentReference EntitySubpassColourAttachmentReference = { };
-		EntitySubpassColourAttachmentReference.attachment = SubpassColorAttachmentIndex; // Index of the color attachment (shared with Terrain subpass)
-		EntitySubpassColourAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-		VkAttachmentReference EntitySubpassDepthAttachmentReference = { };
-		EntitySubpassDepthAttachmentReference.attachment = SubpassDepthAttachmentIndex; // Depth attachment (shared with Terrain subpass)
-		EntitySubpassDepthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-		MainSubpasses[SubpassIndex::MainSubpass] = { };
-		MainSubpasses[SubpassIndex::MainSubpass].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		MainSubpasses[SubpassIndex::MainSubpass].colorAttachmentCount = 1;
-		MainSubpasses[SubpassIndex::MainSubpass].pColorAttachments = &EntitySubpassColourAttachmentReference;
-		MainSubpasses[SubpassIndex::MainSubpass].pDepthStencilAttachment = &EntitySubpassDepthAttachmentReference;
-
-		// Deferred subpass (Fullscreen effects)
-		VkAttachmentReference SwapchainColorAttachmentReference = { };
-		SwapchainColorAttachmentReference.attachment = SwapchainColorAttachmentIndex; // Swapchain color attachment
-		SwapchainColorAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-		const u32 InputReferencesCount = 2;
-		VkAttachmentReference InputReferences[InputReferencesCount];
-		InputReferences[0].attachment = 1;
-		InputReferences[0].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		InputReferences[1].attachment = 2;
-		InputReferences[1].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-		MainSubpasses[SubpassIndex::DeferredSubpas] = { };
-		MainSubpasses[SubpassIndex::DeferredSubpas].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		MainSubpasses[SubpassIndex::DeferredSubpas].colorAttachmentCount = 1;
-		MainSubpasses[SubpassIndex::DeferredSubpas].pColorAttachments = &SwapchainColorAttachmentReference;
-		MainSubpasses[SubpassIndex::DeferredSubpas].inputAttachmentCount = InputReferencesCount;
-		MainSubpasses[SubpassIndex::DeferredSubpas].pInputAttachments = InputReferences;
-
-		// Subpass dependencies
-		const u32 ExitDependenciesIndex = SubpassIndex::Count;
-		const u32 MainPassSubpassDependenciesCount = SubpassIndex::Count + 1;
-		VkSubpassDependency MainPassSubpassDependencies[MainPassSubpassDependenciesCount];
-
-		// Transition from external to Terrain subpass
-		// Transition must happen after...
-		MainPassSubpassDependencies[SubpassIndex::MainSubpass].srcSubpass = VK_SUBPASS_EXTERNAL;
-		MainPassSubpassDependencies[SubpassIndex::MainSubpass].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-		MainPassSubpassDependencies[SubpassIndex::MainSubpass].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-		// But must happen before...
-		MainPassSubpassDependencies[SubpassIndex::MainSubpass].dstSubpass = SubpassIndex::DeferredSubpas;
-		MainPassSubpassDependencies[SubpassIndex::MainSubpass].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		MainPassSubpassDependencies[SubpassIndex::MainSubpass].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		MainPassSubpassDependencies[SubpassIndex::MainSubpass].dependencyFlags = 0;
-
-		// Transition from Entity subpass to Deferred subpass
-		// Transition must happen after...
-		MainPassSubpassDependencies[SubpassIndex::DeferredSubpas].srcSubpass = SubpassIndex::MainSubpass;
-		MainPassSubpassDependencies[SubpassIndex::DeferredSubpas].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		MainPassSubpassDependencies[SubpassIndex::DeferredSubpas].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		// But must happen before...
-		MainPassSubpassDependencies[SubpassIndex::DeferredSubpas].dstSubpass = SubpassIndex::DeferredSubpas;
-		MainPassSubpassDependencies[SubpassIndex::DeferredSubpas].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-		MainPassSubpassDependencies[SubpassIndex::DeferredSubpas].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-		MainPassSubpassDependencies[SubpassIndex::DeferredSubpas].dependencyFlags = 0;
-
-		// Conversion from VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-		// Transition must happen after...
-		MainPassSubpassDependencies[ExitDependenciesIndex].srcSubpass = SubpassIndex::DeferredSubpas;
-		MainPassSubpassDependencies[ExitDependenciesIndex].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		MainPassSubpassDependencies[ExitDependenciesIndex].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		// But must happen before...
-		MainPassSubpassDependencies[ExitDependenciesIndex].dstSubpass = VK_SUBPASS_EXTERNAL;
-		MainPassSubpassDependencies[ExitDependenciesIndex].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-		MainPassSubpassDependencies[ExitDependenciesIndex].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-		MainPassSubpassDependencies[ExitDependenciesIndex].dependencyFlags = 0;
-
-		enum Subpasses
-		{
-			Depth,
-
-			Count
-		};
-
-		VkSubpassDescription DepthSubpasses[Subpasses::Count];
-
-		const u32 DepthSubpassAttachmentIndex = 0;
-
-		const u32 DepthPassAttachmentDescriptionsCount = 1;
-		VkAttachmentDescription DepthPassAttachmentDescriptions[DepthPassAttachmentDescriptionsCount];
-
-		DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex] = { };
-		DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex].format = DepthFormat;
-		DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
-		DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-		VkAttachmentReference DepthSubpassDepthAttachmentReference = { };
-		DepthSubpassDepthAttachmentReference.attachment = DepthSubpassAttachmentIndex; // Depth attachment (shared with Terrain subpass)
-		DepthSubpassDepthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-		DepthSubpasses[Subpasses::Depth] = { };
-		DepthSubpasses[Subpasses::Depth].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		DepthSubpasses[Subpasses::Depth].colorAttachmentCount = 0;
-		DepthSubpasses[Subpasses::Depth].pColorAttachments = nullptr;
-		DepthSubpasses[Subpasses::Depth].pDepthStencilAttachment = &DepthSubpassDepthAttachmentReference;
-
-		// Subpass dependencies
-		const u32 DepthPassExitDependenciesIndex = Subpasses::Count;
-		const u32 DepthPassSubpassDependenciesCount = Subpasses::Count + 1;
-		VkSubpassDependency DepthPassSubpassDependencies[DepthPassSubpassDependenciesCount];
-
-		// Transition must happen after...
-		DepthPassSubpassDependencies[Subpasses::Depth].srcSubpass = VK_SUBPASS_EXTERNAL;
-		DepthPassSubpassDependencies[Subpasses::Depth].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-		DepthPassSubpassDependencies[Subpasses::Depth].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-		// But must happen before...
-		DepthPassSubpassDependencies[Subpasses::Depth].dstSubpass = Subpasses::Depth;
-		DepthPassSubpassDependencies[Subpasses::Depth].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-		DepthPassSubpassDependencies[Subpasses::Depth].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-		DepthPassSubpassDependencies[Subpasses::Depth].dependencyFlags = 0;
-
-		// Conversion from VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-		// Transition must happen after...
-		DepthPassSubpassDependencies[DepthPassExitDependenciesIndex].srcSubpass = Subpasses::Depth;
-		DepthPassSubpassDependencies[DepthPassExitDependenciesIndex].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		DepthPassSubpassDependencies[DepthPassExitDependenciesIndex].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		// But must happen before...
-		DepthPassSubpassDependencies[DepthPassExitDependenciesIndex].dstSubpass = VK_SUBPASS_EXTERNAL;
-		DepthPassSubpassDependencies[DepthPassExitDependenciesIndex].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-		DepthPassSubpassDependencies[DepthPassExitDependenciesIndex].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-		DepthPassSubpassDependencies[DepthPassExitDependenciesIndex].dependencyFlags = 0;
-
-		u32 AttachmentCountTable[RenderPassHandles::Count];
-		AttachmentCountTable[RenderPassHandles::Depth] = DepthPassAttachmentDescriptionsCount;
-		AttachmentCountTable[RenderPassHandles::Main] = MainPathAttachmentDescriptionsCount;
-
-		const VkAttachmentDescription* AttachmentsTable[RenderPassHandles::Count];
-		AttachmentsTable[RenderPassHandles::Depth] = DepthPassAttachmentDescriptions;
-		AttachmentsTable[RenderPassHandles::Main] = MainPathAttachmentDescriptions;
-
-		u32 SubpassCountTable[RenderPassHandles::Count];
-		SubpassCountTable[RenderPassHandles::Depth] = Subpasses::Count;
-		SubpassCountTable[RenderPassHandles::Main] = SubpassIndex::Count;
-
-		const VkSubpassDescription* SubPassesTable[RenderPassHandles::Count];
-		SubPassesTable[RenderPassHandles::Depth] = DepthSubpasses;
-		SubPassesTable[RenderPassHandles::Main] = MainSubpasses;
-
-		u32 DependenciesCountTable[RenderPassHandles::Count];
-		DependenciesCountTable[RenderPassHandles::Depth] = DepthPassSubpassDependenciesCount;
-		DependenciesCountTable[RenderPassHandles::Main] = MainPassSubpassDependenciesCount;
-
-		VkSubpassDependency* SubpassDependenciesTable[RenderPassHandles::Count];
-		SubpassDependenciesTable[RenderPassHandles::Depth] = DepthPassSubpassDependencies;
-		SubpassDependenciesTable[RenderPassHandles::Main] = MainPassSubpassDependencies;
-			
-		VkRenderPassCreateInfo RenderPassCreateInfo[RenderPassHandles::Count];
-		for (u32 i = 0; i < RenderPassHandles::Count; ++i)
-		{
-			RenderPassCreateInfo[i] = { };
-			RenderPassCreateInfo[i].sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-			RenderPassCreateInfo[i].attachmentCount = AttachmentCountTable[i];
-			RenderPassCreateInfo[i].pAttachments = AttachmentsTable[i];
-			RenderPassCreateInfo[i].subpassCount = SubpassCountTable[i];
-			RenderPassCreateInfo[i].pSubpasses = SubPassesTable[i];
-			RenderPassCreateInfo[i].dependencyCount = DependenciesCountTable[i];
-			RenderPassCreateInfo[i].pDependencies = SubpassDependenciesTable[i];
-
-			VkResult Result = vkCreateRenderPass(LogicalDevice, RenderPassCreateInfo + i, nullptr, RenderPasses + i);
-			if (Result != VK_SUCCESS)
-			{
-				HandleLog(BMRLogType::LogType_Error, "vkCreateRenderPass result is %d", Result);
-			}
-		}
+		RenderPasses[RenderPassHandles::Main] = CreateRenderPass(&MainRenderPassSettings, SurfaceFormat);
+		RenderPasses[RenderPassHandles::Depth] = CreateRenderPass(&DepthRenderPassSettings, SurfaceFormat);
 	}
 
 	void BMRMainRenderPass::CreateFrameBuffer(VkDevice LogicalDevice, VkExtent2D FrameBufferSizes, u32 ImagesCount,
@@ -293,8 +82,8 @@ namespace BMR
 		RenderPassTable[FrameBuffersHandles::Main] = RenderPasses[RenderPassHandles::Main];
 
 		VkExtent2D ExtentTable[FrameBuffersHandles::Count];
-		ExtentTable[FrameBuffersHandles::Tex1] = ToVkExtent2D(DepthViewportExtent);
-		ExtentTable[FrameBuffersHandles::Tex2] = ToVkExtent2D(DepthViewportExtent);
+		ExtentTable[FrameBuffersHandles::Tex1] = DepthViewportExtent;
+		ExtentTable[FrameBuffersHandles::Tex2] = DepthViewportExtent;
 		ExtentTable[FrameBuffersHandles::Main] = FrameBufferSizes;
 
 		VkFramebufferCreateInfo CreateInfo = { };
@@ -465,8 +254,8 @@ namespace BMR
 			}
 		}
 
-		BMRUniformBufferType bt[] = { BMRUniformBufferType::UniformInputType_Data };
-		u32 st[] = { BMRShaderStages_Vertex | BMRShaderStages_Fragment };
+		VkDescriptorType bt[] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER };
+		u32 st[] = { VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT };
 
 
 		TestVpLayout = CreateUniformLayout(bt, st, 1);
@@ -476,13 +265,13 @@ namespace BMR
 	{
 		const u32 TerrainDescriptorLayoutsCount = 2;
 		VkDescriptorSetLayout TerrainDescriptorLayouts[TerrainDescriptorLayoutsCount] = {
-			(VkDescriptorSetLayout)TestVpLayout.Layout,
+			(VkDescriptorSetLayout)TestVpLayout,
 			DescriptorLayouts[DescriptorLayoutHandles::TerrainSampler]
 		};
 
 		const u32 EntityDescriptorLayoutCount = 5;
 		VkDescriptorSetLayout EntityDescriptorLayouts[EntityDescriptorLayoutCount] = {
-			(VkDescriptorSetLayout)TestVpLayout.Layout,
+			(VkDescriptorSetLayout)TestVpLayout,
 			DescriptorLayouts[DescriptorLayoutHandles::EntitySampler],
 			DescriptorLayouts[DescriptorLayoutHandles::EntityLigh],
 			DescriptorLayouts[DescriptorLayoutHandles::EntityMaterial],
@@ -491,7 +280,7 @@ namespace BMR
 
 		const u32 SkyBoxDescriptorLayoutCount = 2;
 		VkDescriptorSetLayout SkyBoxDescriptorLayouts[SkyBoxDescriptorLayoutCount] = {
-			(VkDescriptorSetLayout)TestVpLayout.Layout,
+			(VkDescriptorSetLayout)TestVpLayout,
 			DescriptorLayouts[DescriptorLayoutHandles::SkyBoxSampler],
 		};
 
@@ -627,8 +416,8 @@ namespace BMR
 			ColorBufferViews[i] = CreateImageView(LogicalDevice, ColorBuffers[i].Image,
 				ColorFormat, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_2D, 1);
 
-			ImageCreateInfo.extent.width = DepthViewportExtent.Width;
-			ImageCreateInfo.extent.height = DepthViewportExtent.Height;
+			ImageCreateInfo.extent.width = DepthViewportExtent.width;
+			ImageCreateInfo.extent.height = DepthViewportExtent.height;
 			ImageCreateInfo.format = DepthFormat;
 			ImageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 			ImageCreateInfo.arrayLayers = MAX_LIGHT_SOURCES;
@@ -658,22 +447,20 @@ namespace BMR
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
-			TestVpBuffer[i] = CreateUniformBuffer(BMRUniformBufferType::UniformInputType_Data,
+			TestVpBuffer[i] = CreateUniformBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 				VpBufferSize);
 
-			LightBuffers[i] = VulkanMemoryManagementSystem::CreateBuffer(LightBufferSize,
-				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			LightBuffers[i] = CreateUniformBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, LightBufferSize);
 
 
-			DepthLightSpaceMatrixBuffers[i] = VulkanMemoryManagementSystem::CreateBuffer(LightSpaceBufferSize,
-				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			DepthLightSpaceMatrixBuffers[i] = CreateUniformBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, LightSpaceBufferSize);
 		}
 
-		MaterialBuffer = VulkanMemoryManagementSystem::CreateBuffer(MaterialBufferSize,
-			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		MaterialBuffer = CreateUniformBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, MaterialBufferSize);
 	}
 
 	void BMRMainRenderPass::CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount,
@@ -781,7 +568,7 @@ namespace BMR
 			vkUpdateDescriptorSets(LogicalDevice, WriteSetsCount, WriteSets, 0, nullptr);
 
 			CreateUniformSets(&TestVpLayout, 1, TestVpSet + i);
-			u32 test = sizeof(BMRUboViewProjection);
+			VkDeviceSize test = sizeof(BMRUboViewProjection);
 			AttachBuffersToSet(TestVpSet[i], &(TestVpBuffer[i]), &test, 1);
 		}
 

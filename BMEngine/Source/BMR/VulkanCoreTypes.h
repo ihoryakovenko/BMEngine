@@ -36,18 +36,6 @@ namespace BMR
 		int GraphicsFamily = -1;
 		int PresentationFamily = -1;
 	};
-
-	struct BMRImageBuffer
-	{
-		VkImage Image = nullptr;
-		VkDeviceMemory Memory = nullptr;
-	};
-
-	struct BMRGPUBuffer
-	{
-		VkBuffer Buffer = nullptr;
-		VkDeviceMemory Memory = nullptr;
-	};
 	
 	struct BMRMainInstance
 	{

@@ -25,12 +25,8 @@ namespace BMR::VulkanMemoryManagementSystem
 	void AllocateSets(VkDescriptorPool Pool, VkDescriptorSetLayout* Layouts,
 		u32 DescriptorSetCount, VkDescriptorSet* OutSets);
 
-	BMRImageBuffer CreateImageBuffer(VkImageCreateInfo* pCreateInfo);
-	void DestroyImageBuffer(BMRImageBuffer Image);
-
-	BMRGPUBuffer CreateBuffer(VkDeviceSize BufferSize, VkBufferUsageFlags Usage,
-		VkMemoryPropertyFlags Properties);
-	void DestroyBuffer(BMRGPUBuffer Buffer);
+	BMRIUniformImage CreateImageBuffer(VkImageCreateInfo* pCreateInfo);
+	void DestroyImageBuffer(BMRIUniformImage Image);
 
 	void CopyDataToMemory(VkDeviceMemory Memory, VkDeviceSize Offset, VkDeviceSize Size, const void* Data);
 	void CopyDataToBuffer(VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Size, const void* Data);

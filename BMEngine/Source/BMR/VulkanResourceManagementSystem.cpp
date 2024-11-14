@@ -120,7 +120,7 @@ namespace BMR::VulkanResourceManagementSystem
 				"DepthTestEnable: %d, DepthWriteEnable: %d, DepthCompareOp: %d\n"
 				"DepthBoundsTestEnable: %d, StencilTestEnable: %d",
 				Settings->PipelineName,
-				Settings->Extent.Width, Settings->Extent.Height,
+				Settings->Extent.width, Settings->Extent.height,
 				Settings->DepthClampEnable, Settings->RasterizerDiscardEnable,
 				Settings->PolygonMode, Settings->LineWidth, Settings->CullMode,
 				Settings->FrontFace, Settings->DepthBiasEnable,
@@ -142,7 +142,7 @@ namespace BMR::VulkanResourceManagementSystem
 				VkVertexInputBindingDescription* VertexInputBinding = VertexInputBindings + BindingIndex;
 
 				VertexInputBinding->binding = BindingIndex;
-				VertexInputBinding->inputRate = ToVkVertexInputRate(BMRBinding->InputRate);
+				VertexInputBinding->inputRate = BMRBinding->InputRate;
 				VertexInputBinding->stride = BMRBinding->Stride;
 
 				HandleLog(BMR::BMRLogType::LogType_Info, "Initialized VkVertexInputBindingDescription, BindingName: %s, "
@@ -150,7 +150,6 @@ namespace BMR::VulkanResourceManagementSystem
 					BMRBinding->VertexInputBindingName, VertexInputBinding->binding, VertexInputBinding->inputRate,
 					VertexInputBinding->stride, BMRBinding->InputAttributesCount);
 
-				u32 AttributeOffset = 0;
 				for (u32 CurrentAttributeIndex = 0; CurrentAttributeIndex < BMRBinding->InputAttributesCount; ++CurrentAttributeIndex)
 				{
 					const BMRVertexInputAttribute* BMRAttribute = BMRBinding->InputAttributes + CurrentAttributeIndex;
@@ -158,10 +157,8 @@ namespace BMR::VulkanResourceManagementSystem
 
 					VertexInputAttribute->binding = BindingIndex;
 					VertexInputAttribute->location = CurrentAttributeIndex;
-					VertexInputAttribute->format = ToVkFormat(BMRAttribute->Format);
-					VertexInputAttribute->offset = AttributeOffset;
-
-					AttributeOffset += BMRFormatSizesTable[BMRAttribute->Format];
+					VertexInputAttribute->format = BMRAttribute->Format;
+					VertexInputAttribute->offset = BMRAttribute->AttributeOffset;
 
 					HandleLog(BMR::BMRLogType::LogType_Info, "Initialized VkVertexInputAttributeDescription, "
 						"AttributeName: %s, BindingIndex: %d, Location: %d, VkFormat: %d, Offset: %d, Index in creation array: %d",
@@ -180,15 +177,15 @@ namespace BMR::VulkanResourceManagementSystem
 			VertexInputInfo[PipelineIndex].pVertexAttributeDescriptions = VertexInputAttributes;
 
 			// VIEWPORT
-			Viewport->width = Settings->Extent.Width;
-			Viewport->height = Settings->Extent.Height;
+			Viewport->width = Settings->Extent.width;
+			Viewport->height = Settings->Extent.height;
 			Viewport->minDepth = 0.0f;
 			Viewport->maxDepth = 1.0f;
 			Viewport->x = 0.0f;
 			Viewport->y = 0.0f;
 
-			Scissor->extent.width = Settings->Extent.Width;
-			Scissor->extent.height = Settings->Extent.Height;
+			Scissor->extent.width = Settings->Extent.width;
+			Scissor->extent.height = Settings->Extent.height;
 			Scissor->offset = { };
 
 			ViewportStateCreateInfo[PipelineIndex] = { };
@@ -204,10 +201,10 @@ namespace BMR::VulkanResourceManagementSystem
 			RasterizationStateCreateInfo[PipelineIndex].depthClampEnable = Settings->DepthClampEnable;
 			// Whether to discard data and skip rasterizer. Never creates fragments, only suitable for pipeline without framebuffer output
 			RasterizationStateCreateInfo[PipelineIndex].rasterizerDiscardEnable = Settings->RasterizerDiscardEnable;
-			RasterizationStateCreateInfo[PipelineIndex].polygonMode = ToVkPolygonMode(Settings->PolygonMode);
+			RasterizationStateCreateInfo[PipelineIndex].polygonMode = Settings->PolygonMode;
 			RasterizationStateCreateInfo[PipelineIndex].lineWidth = Settings->LineWidth;
 			RasterizationStateCreateInfo[PipelineIndex].cullMode = Settings->CullMode;
-			RasterizationStateCreateInfo[PipelineIndex].frontFace = ToVkFrontFace(Settings->FrontFace);
+			RasterizationStateCreateInfo[PipelineIndex].frontFace = Settings->FrontFace;
 			// Whether to add depth bias to fragments (good for stopping "shadow acne" in shadow mapping)
 			RasterizationStateCreateInfo[PipelineIndex].depthBiasEnable = Settings->DepthBiasEnable;
 
@@ -216,14 +213,14 @@ namespace BMR::VulkanResourceManagementSystem
 			ColorBlendAttachmentState[PipelineIndex].colorWriteMask = Settings->ColorWriteMask;
 			ColorBlendAttachmentState[PipelineIndex].blendEnable = Settings->BlendEnable;
 			// Blending uses equation: (srcColorBlendFactor * new color) colorBlendOp (dstColorBlendFactor * old color)// Enable blending
-			ColorBlendAttachmentState[PipelineIndex].srcColorBlendFactor = ToVkBlendFactor(Settings->SrcColorBlendFactor);
-			ColorBlendAttachmentState[PipelineIndex].dstColorBlendFactor = ToVkBlendFactor(Settings->DstColorBlendFactor);
-			ColorBlendAttachmentState[PipelineIndex].colorBlendOp = ToVkBlendOp(Settings->ColorBlendOp);
-			ColorBlendAttachmentState[PipelineIndex].srcAlphaBlendFactor = ToVkBlendFactor(Settings->SrcAlphaBlendFactor);
+			ColorBlendAttachmentState[PipelineIndex].srcColorBlendFactor = Settings->SrcColorBlendFactor;
+			ColorBlendAttachmentState[PipelineIndex].dstColorBlendFactor = Settings->DstColorBlendFactor;
+			ColorBlendAttachmentState[PipelineIndex].colorBlendOp = Settings->ColorBlendOp;
+			ColorBlendAttachmentState[PipelineIndex].srcAlphaBlendFactor = Settings->SrcAlphaBlendFactor;
 			// Summarised: (VK_BLEND_FACTOR_SRC_ALPHA * new color) + (VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA * old color)
 //			   (new color alpha * new color) + ((1 - new color alpha) * old color)
-			ColorBlendAttachmentState[PipelineIndex].dstAlphaBlendFactor = ToVkBlendFactor(Settings->DstAlphaBlendFactor);
-			ColorBlendAttachmentState[PipelineIndex].alphaBlendOp = ToVkBlendOp(Settings->AlphaBlendOp);
+			ColorBlendAttachmentState[PipelineIndex].dstAlphaBlendFactor = Settings->DstAlphaBlendFactor;
+			ColorBlendAttachmentState[PipelineIndex].alphaBlendOp = Settings->AlphaBlendOp;
 			// Summarised: (1 * new alpha) + (0 * old alpha) = new alpharesult != VK_SUCCESS
 
 			ColorBlendInfo[PipelineIndex] = { };
@@ -237,7 +234,7 @@ namespace BMR::VulkanResourceManagementSystem
 			DepthStencilInfo[PipelineIndex].sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 			DepthStencilInfo[PipelineIndex].depthTestEnable = Settings->DepthTestEnable;
 			DepthStencilInfo[PipelineIndex].depthWriteEnable = Settings->DepthWriteEnable;
-			DepthStencilInfo[PipelineIndex].depthCompareOp = ToVkCompareOp(Settings->DepthCompareOp);
+			DepthStencilInfo[PipelineIndex].depthCompareOp = Settings->DepthCompareOp;
 			DepthStencilInfo[PipelineIndex].depthBoundsTestEnable = Settings->DepthBoundsTestEnable;
 			DepthStencilInfo[PipelineIndex].stencilTestEnable = Settings->StencilTestEnable;
 

@@ -887,7 +887,7 @@ int main()
 	const f32 Near = 1.0f;
 	const f32 Far = 100.0f;
 
-	const float Aspect = (float)MainScreenExtent.Width / (float)MainScreenExtent.Height;
+	const float Aspect = (float)MainScreenExtent.width / (float)MainScreenExtent.height;
 
 	Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
 		Aspect, Near, Far);

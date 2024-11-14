@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vulkan\vulkan.h>
+
 #include <glm/glm.hpp>
 
 #include "Util/EngineTypes.h"
@@ -58,108 +60,6 @@ namespace BMR
 	{
 		TextureType_2D,
 		TextureType_CUBE
-	};
-
-	enum BMRPolygonMode
-	{
-		Fill = 0,        // Corresponds to VK_POLYGON_MODE_FILL
-		Line = 1,        // Corresponds to VK_POLYGON_MODE_LINE
-		Point = 2,       // Corresponds to VK_POLYGON_MODE_POINT
-		BMRPolygonMode_Max = 3          // Invalid or uninitialized state
-	};
-
-	enum BMRCullMode
-	{
-		None = 0,               // Corresponds to VK_CULL_MODE_NONE
-		Front = 1,              // Corresponds to VK_CULL_MODE_FRONT_BIT
-		Back = 2,               // Corresponds to VK_CULL_MODE_BACK_BIT
-		FrontAndBack = 3,       // Corresponds to VK_CULL_MODE_FRONT_AND_BACK
-		BMRCullMode_Max = 4                 // Invalid or uninitialized state
-	};
-
-	enum BMRFrontFace
-	{
-		CounterClockwise = 0,  // Corresponds to VK_FRONT_FACE_COUNTER_CLOCKWISE
-		Clockwise = 1,         // Corresponds to VK_FRONT_FACE_CLOCKWISE
-		BMRFrontFace_Max = 2                // Invalid or uninitialized state
-	};
-
-	enum BMRBlendFactor
-	{
-		Zero = 0,               // Corresponds to VK_BLEND_FACTOR_ZERO
-		One = 1,                // Corresponds to VK_BLEND_FACTOR_ONE
-		SrcAlpha = 2,           // Corresponds to VK_BLEND_FACTOR_SRC_ALPHA
-		DstAlpha = 3,           // Corresponds to VK_BLEND_FACTOR_DST_ALPHA
-		OneMinusSrcAlpha = 4,   // Corresponds to VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA
-		BMRBlendFactor_Max = 5                 // Invalid or uninitialized state
-	};
-
-	enum BMRBlendOp
-	{
-		Add = 0,                // Corresponds to VK_BLEND_OP_ADD
-		Subtract = 1,           // Corresponds to VK_BLEND_OP_SUBTRACT
-		ReverseSubtract = 2,    // Corresponds to VK_BLEND_OP_REVERSE_SUBTRACT
-		Min = 3,                // Corresponds to VK_BLEND_OP_MIN
-		BMRBlendOp_Max = 4                 // Corresponds to VK_BLEND_OP_MAX
-	};
-
-	enum BMRCompareOp
-	{
-		Never = 0,              // Corresponds to VK_COMPARE_OP_NEVER
-		Less = 1,               // Corresponds to VK_COMPARE_OP_LESS
-		Equal = 2,              // Corresponds to VK_COMPARE_OP_EQUAL
-		LessOrEqual = 3,        // Corresponds to VK_COMPARE_OP_LESS_OR_EQUAL
-		Greater = 4,            // Corresponds to VK_COMPARE_OP_GREATER
-		BMRCompareOp_Max = 5                 // Invalid or uninitialized state
-	};
-
-	enum BMRColorComponentFlagBits
-	{
-		R = 0x00000001,        // Corresponds to VK_COLOR_COMPONENT_R_BIT
-		G = 0x00000002,        // Corresponds to VK_COLOR_COMPONENT_G_BIT
-		B = 0x00000004,        // Corresponds to VK_COLOR_COMPONENT_B_BIT
-		A = 0x00000008,        // Corresponds to VK_COLOR_COMPONENT_A_BIT
-		All = R | G | B | A,   // Represents all color components
-		BMRColorComponentFlagBits_MaxEnum = 0x7FFFFFFF   // Invalid or uninitialized state
-	};
-
-	enum BMRVertexInputRate
-	{
-		BMRVertexInputRate_Vertex = 0,           // Corresponds to VK_VERTEX_INPUT_RATE_VERTEX
-		BMRVertexInputRate_Instance = 1,         // Corresponds to VK_VERTEX_INPUT_RATE_INSTANCE
-		BMRVertexInputRate_Max = 0x7FFFFFFF // Invalid or uninitialized state
-	};
-
-	enum BMRFormat
-	{
-		R32_SF,
-		R32G32_SF,
-		R32G32B32_SF,
-		BMRFormat_Max
-	};
-
-	static const u32 BMRFormatSizesTable[] =
-	{
-		sizeof(float),
-		sizeof(float) * 2,
-		sizeof(float) * 3,
-	};
-
-	enum BMRUniformBufferType
-	{
-		UniformInputType_Data,
-
-		UniformInputType_None
-	};
-
-	enum BMRShaderStageFlags
-	{
-		BMRShaderStages_Vertex = 0x00000001,                   // Corresponds to VK_SHADER_STAGE_VERTEX_BIT
-		BMRShaderStages_TessellationControl = 0x00000002,      // Corresponds to VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT
-		BMRShaderStages_TessellationEvaluation = 0x00000004,   // Corresponds to VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT
-		BMRShaderStages_Geometry = 0x00000008,                 // Corresponds to VK_SHADER_STAGE_GEOMETRY_BIT
-		BMRShaderStages_Fragment = 0x00000010,                 // Corresponds to VK_SHADER_STAGE_FRAGMENT_BIT
-		BMRShaderStages_Max = 0x7FFFFFFF                       // Invalid or uninitialized state
 	};
 
 	struct BMRShaderCodeDescription
@@ -289,16 +189,11 @@ namespace BMR
 		f32 Shininess;
 	};
 
-	struct BMRExtent2D
-	{
-		u32 Width = 0;
-		u32 Height = 0;
-	};
-
 	struct BMRVertexInputAttribute
 	{
 		const char* VertexInputAttributeName = nullptr;
-		BMRFormat Format = BMRFormat::BMRFormat_Max;
+		VkFormat Format = VK_FORMAT_UNDEFINED;
+		u32 AttributeOffset = 0;
 	};
 
 	struct BMRVertexInputBinding
@@ -309,7 +204,7 @@ namespace BMR
 		u32 InputAttributesCount = 0;
 
 		u32 Stride = 0;
-		BMRVertexInputRate InputRate = BMRVertexInputRate::BMRVertexInputRate_Max;
+		VkVertexInputRate InputRate = VK_VERTEX_INPUT_RATE_MAX_ENUM;
 	};
 
 	struct BMRVertexInput
@@ -320,50 +215,79 @@ namespace BMR
 
 	struct BMRUniformBuffer
 	{
-		void* Buffer = nullptr;
-		void* Memory = nullptr;
-		BMRUniformBufferType Type = BMRUniformBufferType::UniformInputType_None;
+		VkBuffer Buffer = nullptr;
+		VkDeviceMemory Memory = nullptr;
 	};
 
-	struct BMRUniformSet
+	struct BMRIUniformImage
 	{
-		void* Set = nullptr;
+		VkImage Image = nullptr;
+		VkDeviceMemory Memory = nullptr;
 	};
 
-	struct BMRUniformLayout
-	{
-		void* Layout = nullptr;
-	};
+	typedef VkDescriptorSet BMRUniformSet;
+	typedef VkDescriptorSetLayout BMRUniformLayout;
+	typedef VkRenderPass BMRRenderPass;
 
 	struct BMRPipelineSettings
 	{
 		const char* PipelineName = nullptr;
 
-		BMRExtent2D Extent;
+		VkExtent2D Extent;
 
-		bool DepthClampEnable = false;
-		bool RasterizerDiscardEnable = false;
-		BMRPolygonMode PolygonMode = BMRPolygonMode::BMRPolygonMode_Max;
+		VkBool32 DepthClampEnable = VK_FALSE;
+		VkBool32 RasterizerDiscardEnable = VK_FALSE;
+		VkPolygonMode PolygonMode = VK_POLYGON_MODE_MAX_ENUM;
 		f32 LineWidth = 0.0f;
-		BMRCullMode CullMode = BMRCullMode::BMRCullMode_Max;
-		BMRFrontFace FrontFace = BMRFrontFace::BMRFrontFace_Max;
-		bool DepthBiasEnable = false;
+		VkCullModeFlags CullMode = VK_CULL_MODE_NONE;
+		VkFrontFace FrontFace = VK_FRONT_FACE_MAX_ENUM;
+		VkBool32 DepthBiasEnable = VK_FALSE;
 
-		bool LogicOpEnable = false;
+		VkBool32 LogicOpEnable = VK_FALSE;
 		u32 AttachmentCount = 0;
 		u32 ColorWriteMask = 0;
-		bool BlendEnable = false;
-		BMRBlendFactor SrcColorBlendFactor = BMRBlendFactor::BMRBlendFactor_Max;
-		BMRBlendFactor DstColorBlendFactor = BMRBlendFactor::BMRBlendFactor_Max;
-		BMRBlendOp ColorBlendOp = BMRBlendOp::BMRBlendOp_Max;
-		BMRBlendFactor SrcAlphaBlendFactor = BMRBlendFactor::BMRBlendFactor_Max;
-		BMRBlendFactor DstAlphaBlendFactor = BMRBlendFactor::BMRBlendFactor_Max;
-		BMRBlendOp AlphaBlendOp = BMRBlendOp::BMRBlendOp_Max;
+		VkBool32 BlendEnable = VK_FALSE;
+		VkBlendFactor SrcColorBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
+		VkBlendFactor DstColorBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
+		VkBlendOp ColorBlendOp = VK_BLEND_OP_MAX_ENUM;
+		VkBlendFactor SrcAlphaBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
+		VkBlendFactor DstAlphaBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
+		VkBlendOp AlphaBlendOp = VK_BLEND_OP_MAX_ENUM;
 
-		bool DepthTestEnable = false;
-		bool DepthWriteEnable = false;
-		BMRCompareOp DepthCompareOp = BMRCompareOp::BMRCompareOp_Max;
-		bool DepthBoundsTestEnable = false;
-		bool StencilTestEnable = false;
+		VkBool32 DepthTestEnable = VK_FALSE;
+		VkBool32 DepthWriteEnable = VK_FALSE;
+		VkCompareOp DepthCompareOp = VK_COMPARE_OP_MAX_ENUM;
+		VkBool32 DepthBoundsTestEnable = VK_FALSE;
+		VkBool32 StencilTestEnable = VK_FALSE;
+	};
+
+	struct BMRSubpassSettings
+	{
+		const char* SubpassName = nullptr;
+
+		const VkAttachmentReference* ColorAttachmentsReferences = nullptr;
+		u32 ColorAttachmentsReferencesCount = 0;
+
+		const VkAttachmentReference* DepthAttachmentReferences = nullptr;
+
+		// First subpass has to not contain InputAttachments
+		const VkAttachmentReference* InputAttachmentsReferences = nullptr;
+		u32 InputAttachmentsReferencesCount = 0;
+	};
+
+	struct BMRRenderPassSettings
+	{
+		const char* RenderPassName = nullptr;
+
+		// AttachmentDescriptions can be modified if contain undefined format
+		VkAttachmentDescription* AttachmentDescriptions = nullptr;
+		u32 AttachmentDescriptionsCount = 0;
+
+		const BMRSubpassSettings* SubpassesSettings = nullptr;
+		u32 SubpassSettingsCount = 0;
+
+		VkSubpassDependency* SubpassDependencies = nullptr;
+		// Has to be 1 more then SubpassSettingsCount
+		u32 SubpassDependenciesCount = 0;
 	};
 }
