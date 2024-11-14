@@ -57,9 +57,6 @@ namespace BMR
 
 	VkDeviceMemory CreateDeviceMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex);
 
-	void AllocateSets(VkDescriptorPool Pool, VkDescriptorSetLayout* Layouts,
-		u32 DescriptorSetCount, VkDescriptorSet* OutSets);
-
 	static const u32 RequiredExtensionsCount = 2;
 	const char* RequiredInstanceExtensions[RequiredExtensionsCount] =
 	{
@@ -363,13 +360,7 @@ namespace BMR
 		vkUnmapMemory(LogicalDevice, (VkDeviceMemory)Buffer.Memory);
 	}
 
-	void DestroyUniformBuffer(BMRUniformBuffer Buffer)
-	{
-		vkDestroyBuffer(LogicalDevice, (VkBuffer)Buffer.Buffer, nullptr);
-		vkFreeMemory(LogicalDevice, (VkDeviceMemory)Buffer.Memory, nullptr);
-	}
-
-	BMRUniformSet CreateUniformSet(const BMRUniformBufferType* Types, const u32* Stages, u32 Count)
+	BMRUniformLayout CreateUniformLayout(const BMRUniformBufferType* Types, const u32* Stages, u32 Count)
 	{
 		auto LayoutBindings = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorSetLayoutBinding>(Count);
 		for (u32 BindingIndex = 0; BindingIndex < Count; ++BindingIndex)
@@ -395,19 +386,38 @@ namespace BMR
 			HandleLog(BMRLogType::LogType_Error, "vkCreateDescriptorSetLayout result is %d", Result);
 		}
 
-		VkDescriptorSet Set;
-		AllocateSets(MainPool, &Layout, 1, &Set);
+		BMRUniformLayout UniformLayout;
+		UniformLayout.Layout = Layout;
 
-		BMRUniformSet UniformSet;
-		UniformSet.Layout = Layout;
-		UniformSet.Set = Set;
-
-		return UniformSet;
+		return UniformLayout;
 	}
 
-	void DestroyUniformSet(BMRUniformSet Set)
+	void DestroyUniformBuffer(BMRUniformBuffer Buffer)
 	{
-		vkDestroyDescriptorSetLayout(LogicalDevice, (VkDescriptorSetLayout)Set.Layout, nullptr);
+		vkDestroyBuffer(LogicalDevice, (VkBuffer)Buffer.Buffer, nullptr);
+		vkFreeMemory(LogicalDevice, (VkDeviceMemory)Buffer.Memory, nullptr);
+	}
+
+	void CreateUniformSets(const BMRUniformLayout* Layouts, u32 Count, BMRUniformSet* OutSets)
+	{
+		HandleLog(BMRLogType::LogType_Info, "Allocating descriptor sets. Size count: %d", Count);
+
+		VkDescriptorSetAllocateInfo SetAllocInfo = { };
+		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		SetAllocInfo.descriptorPool = MainPool; // Pool to allocate Descriptor Set from
+		SetAllocInfo.descriptorSetCount = Count; // Number of sets to allocate
+		SetAllocInfo.pSetLayouts = (VkDescriptorSetLayout*)Layouts; // Layouts to use to allocate sets (1:1 relationship)
+
+		VkResult Result = vkAllocateDescriptorSets(LogicalDevice, &SetAllocInfo, (VkDescriptorSet*)OutSets);
+		if (Result != VK_SUCCESS)
+		{
+			HandleLog(BMRLogType::LogType_Error, "vkAllocateDescriptorSets result is %d", Result);
+		}
+	}
+
+	void DestroyUniformLayout(BMRUniformLayout Layout)
+	{
+		vkDestroyDescriptorSetLayout(LogicalDevice, (VkDescriptorSetLayout)Layout.Layout, nullptr);
 	}
 
 	void AttachBuffersToSet(BMRUniformSet Set, const BMRUniformBuffer* Buffers, const u32* BuffersSizes, u32 BufferCount)
@@ -1307,23 +1317,5 @@ namespace BMR
 		}
 
 		return Memory;
-	}
-
-	void AllocateSets(VkDescriptorPool Pool, VkDescriptorSetLayout* Layouts,
-		u32 DescriptorSetCount, VkDescriptorSet* OutSets)
-	{
-		HandleLog(BMRLogType::LogType_Info, "Allocating descriptor sets. Size count: %d", DescriptorSetCount);
-
-		VkDescriptorSetAllocateInfo SetAllocInfo = { };
-		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		SetAllocInfo.descriptorPool = Pool; // Pool to allocate Descriptor Set from
-		SetAllocInfo.descriptorSetCount = DescriptorSetCount; // Number of sets to allocate
-		SetAllocInfo.pSetLayouts = Layouts; // Layouts to use to allocate sets (1:1 relationship)
-
-		VkResult Result = vkAllocateDescriptorSets(LogicalDevice, &SetAllocInfo, OutSets);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkAllocateDescriptorSets result is %d", Result);
-		}
 	}
 }

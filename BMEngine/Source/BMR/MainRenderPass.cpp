@@ -468,23 +468,21 @@ namespace BMR
 		BMRUniformBufferType bt[] = { BMRUniformBufferType::UniformInputType_Data };
 		u32 st[] = { BMRShaderStages_Vertex | BMRShaderStages_Fragment };
 
-		for (int i = 0; i < 3; ++i)
-		{
-			TestVpSet[i] = CreateUniformSet(bt, st, 1);
-		}
+
+		TestVpLayout = CreateUniformLayout(bt, st, 1);
 	}
 
 	void BMRMainRenderPass::CreatePipelineLayouts(VkDevice LogicalDevice)
 	{
 		const u32 TerrainDescriptorLayoutsCount = 2;
 		VkDescriptorSetLayout TerrainDescriptorLayouts[TerrainDescriptorLayoutsCount] = {
-			(VkDescriptorSetLayout)TestVpSet[0].Layout,
+			(VkDescriptorSetLayout)TestVpLayout.Layout,
 			DescriptorLayouts[DescriptorLayoutHandles::TerrainSampler]
 		};
 
 		const u32 EntityDescriptorLayoutCount = 5;
 		VkDescriptorSetLayout EntityDescriptorLayouts[EntityDescriptorLayoutCount] = {
-			(VkDescriptorSetLayout)TestVpSet[0].Layout,
+			(VkDescriptorSetLayout)TestVpLayout.Layout,
 			DescriptorLayouts[DescriptorLayoutHandles::EntitySampler],
 			DescriptorLayouts[DescriptorLayoutHandles::EntityLigh],
 			DescriptorLayouts[DescriptorLayoutHandles::EntityMaterial],
@@ -493,7 +491,7 @@ namespace BMR
 
 		const u32 SkyBoxDescriptorLayoutCount = 2;
 		VkDescriptorSetLayout SkyBoxDescriptorLayouts[SkyBoxDescriptorLayoutCount] = {
-			(VkDescriptorSetLayout)TestVpSet[0].Layout,
+			(VkDescriptorSetLayout)TestVpLayout.Layout,
 			DescriptorLayouts[DescriptorLayoutHandles::SkyBoxSampler],
 		};
 
@@ -706,9 +704,6 @@ namespace BMR
 
 		for (u32 i = 0; i < ImagesCount; i++)
 		{
-			u32 test = sizeof(BMRUboViewProjection);
-			AttachBuffersToSet(TestVpSet[i], &(TestVpBuffer[i]), &test, 1);
-
 			VkDescriptorBufferInfo DepthLightSpaceBufferInfo = { };
 			DepthLightSpaceBufferInfo.buffer = DepthLightSpaceMatrixBuffers[i].Buffer;
 			DepthLightSpaceBufferInfo.offset = 0;
@@ -784,6 +779,10 @@ namespace BMR
 				ColourWrite, DepthWrite, DepthLightSpaceWrite, ShadowDepthWrite };
 
 			vkUpdateDescriptorSets(LogicalDevice, WriteSetsCount, WriteSets, 0, nullptr);
+
+			CreateUniformSets(&TestVpLayout, 1, TestVpSet + i);
+			u32 test = sizeof(BMRUboViewProjection);
+			AttachBuffersToSet(TestVpSet[i], &(TestVpBuffer[i]), &test, 1);
 		}
 
 		VulkanMemoryManagementSystem::AllocateSets(Pool, &DescriptorLayouts[DescriptorLayoutHandles::EntityMaterial], 1, &MaterialSet);

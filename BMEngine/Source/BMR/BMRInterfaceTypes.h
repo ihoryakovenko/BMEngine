@@ -328,6 +328,10 @@ namespace BMR
 	struct BMRUniformSet
 	{
 		void* Set = nullptr;
+	};
+
+	struct BMRUniformLayout
+	{
 		void* Layout = nullptr;
 	};
 

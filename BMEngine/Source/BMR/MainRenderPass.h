@@ -97,6 +97,7 @@ namespace BMR
 			VkImageView SwapchainImageViews[MAX_SWAPCHAIN_IMAGES_COUNT]);
 
 		BMRUniformBuffer TestVpBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRUniformLayout TestVpLayout;
 		BMRUniformSet TestVpSet[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		VkRenderPass RenderPasses[RenderPassHandles::Count];

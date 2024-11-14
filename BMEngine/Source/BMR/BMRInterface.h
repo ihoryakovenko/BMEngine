@@ -14,8 +14,10 @@ namespace BMR
 	void DestroyUniformBuffer(BMRUniformBuffer Buffer);
 	void UpdateUniformBuffer(BMRUniformBuffer Buffer, u64 DataSize, u64 Offset, const void* Data);
 
-	BMRUniformSet CreateUniformSet(const BMRUniformBufferType* Types, const u32* Stages, u32 Count);
-	void DestroyUniformSet(BMRUniformSet Set);
+	BMRUniformLayout CreateUniformLayout(const BMRUniformBufferType* Types, const u32* Stages, u32 Count);
+
+	void CreateUniformSets(const BMRUniformLayout* Layouts, u32 Count, BMRUniformSet* OutSets);
+	void DestroyUniformLayout(BMRUniformLayout Layout);
 	void AttachBuffersToSet(BMRUniformSet Set, const BMRUniformBuffer* Buffers, const u32* BuffersSizes, u32 BufferCount);
 
 	u32 LoadTexture(BMRTextureArrayInfo Info, BMRTextureType TextureType);
