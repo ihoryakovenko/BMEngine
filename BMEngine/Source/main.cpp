@@ -885,22 +885,27 @@ int main()
 	VkDescriptorType VpDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	VkDescriptorType EntityLightDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	VkDescriptorType LightSpaceMatrixDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	VkDescriptorType MaterialDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 
 	VkShaderStageFlags VpStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 	VkShaderStageFlags EntityLightStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 	VkShaderStageFlags LightSpaceMatrixStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-
+	VkShaderStageFlags MaterialStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	
 	BMR::BMRUniformLayout VpLayout = BMR::CreateUniformLayout(&VpDescriptorType, &VpStageFlags, 1);
 	BMR::BMRUniformLayout EntityLightLayout = BMR::CreateUniformLayout(&EntityLightDescriptorType, &EntityLightStageFlags, 1);
 	BMR::BMRUniformLayout LightSpaceMatrixLayout = BMR::CreateUniformLayout(&LightSpaceMatrixDescriptorType, &LightSpaceMatrixStageFlags, 1);
+	BMR::BMRUniformLayout MaterialLayout = BMR::CreateUniformLayout(&MaterialDescriptorType, &MaterialStageFlags, 1);
 
-	BMR::BMRUniformBuffer VpBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
-	BMR::BMRUniformBuffer EntityLightBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
-	BMR::BMRUniformBuffer LightSpaceMatrixBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
+	BMR::BMRUniform VpBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
+	BMR::BMRUniform EntityLightBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
+	BMR::BMRUniform LightSpaceMatrixBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
+	BMR::BMRUniform MaterialBuffer;
 
 	BMR::BMRUniformSet VpSet[MAX_SWAPCHAIN_IMAGES_COUNT];
 	BMR::BMRUniformSet EntityLightSet[MAX_SWAPCHAIN_IMAGES_COUNT];
 	BMR::BMRUniformSet LightSpaceMatrixSet[MAX_SWAPCHAIN_IMAGES_COUNT];
+	BMR::BMRUniformSet MaterialSet;
 
 	for (u32 i = 0; i < BMR::GetImageCount(); i++)
 	{
@@ -925,15 +930,49 @@ int main()
 		BMR::CreateUniformSets(&EntityLightLayout, 1, EntityLightSet + i);
 		BMR::CreateUniformSets(&LightSpaceMatrixLayout, 1, LightSpaceMatrixSet + i);
 
-		BMR::AttachUniformsToSet(VpSet[i], &(VpBuffer[i]), &VpBufferSize, 1);
-		BMR::AttachUniformsToSet(EntityLightSet[i], &(EntityLightBuffer[i]), &LightBufferSize, 1);
-		BMR::AttachUniformsToSet(LightSpaceMatrixSet[i], &(LightSpaceMatrixBuffer[i]), &LightSpaceMatrixSize, 1);
+		BMR::BMRUniformSetAttachmentInfo VpBufferAttachmentInfo;
+		VpBufferAttachmentInfo.BufferInfo.buffer = VpBuffer[i].Buffer;
+		VpBufferAttachmentInfo.BufferInfo.offset = 0;
+		VpBufferAttachmentInfo.BufferInfo.range = VpBufferSize;
+		VpBufferAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+		BMR::BMRUniformSetAttachmentInfo EntityLightAttachmentInfo;
+		EntityLightAttachmentInfo.BufferInfo.buffer = EntityLightBuffer[i].Buffer;
+		EntityLightAttachmentInfo.BufferInfo.offset = 0;
+		EntityLightAttachmentInfo.BufferInfo.range = LightBufferSize;
+		EntityLightAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+		BMR::BMRUniformSetAttachmentInfo LightSpaceMatrixAttachmentInfo;
+		LightSpaceMatrixAttachmentInfo.BufferInfo.buffer = LightSpaceMatrixBuffer[i].Buffer;
+		LightSpaceMatrixAttachmentInfo.BufferInfo.offset = 0;
+		LightSpaceMatrixAttachmentInfo.BufferInfo.range = LightSpaceMatrixSize;
+		LightSpaceMatrixAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+		BMR::AttachUniformsToSet(VpSet[i], &VpBufferAttachmentInfo, 1);
+		BMR::AttachUniformsToSet(EntityLightSet[i], &EntityLightAttachmentInfo, 1);
+		BMR::AttachUniformsToSet(LightSpaceMatrixSet[i], &LightSpaceMatrixAttachmentInfo, 1);
 	}
+
+	const VkDeviceSize MaterialSize = sizeof(BMR::BMRMaterial);
+	MaterialBuffer = BMR::CreateUniformBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		MaterialSize);
+
+	BMR::CreateUniformSets(&MaterialLayout, 1, &MaterialSet);
+
+	BMR::BMRUniformSetAttachmentInfo MaterialAttachmentInfo;
+	MaterialAttachmentInfo.BufferInfo.buffer = MaterialBuffer.Buffer;
+	MaterialAttachmentInfo.BufferInfo.offset = 0;
+	MaterialAttachmentInfo.BufferInfo.range = MaterialSize;
+	MaterialAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+	BMR::AttachUniformsToSet(MaterialSet, &MaterialAttachmentInfo, 1);
 
 	BMR::TestSetRendeRpasses(RenderPasses[0], RenderPasses[1],
 		VpBuffer, VpLayout, VpSet,
 		EntityLightBuffer, EntityLightLayout, EntityLightSet,
-		LightSpaceMatrixBuffer, LightSpaceMatrixLayout, LightSpaceMatrixSet);
+		LightSpaceMatrixBuffer, LightSpaceMatrixLayout, LightSpaceMatrixSet,
+		MaterialBuffer, MaterialLayout, MaterialSet);
 
 
 
@@ -1078,9 +1117,12 @@ int main()
 		BMR::DestroyUniformBuffer(LightSpaceMatrixBuffer[i]);
 	}
 
+	BMR::DestroyUniformBuffer(MaterialBuffer);
+
 	BMR::DestroyUniformLayout(VpLayout);
 	BMR::DestroyUniformLayout(EntityLightLayout);
 	BMR::DestroyUniformLayout(LightSpaceMatrixLayout);
+	BMR::DestroyUniformLayout(MaterialLayout);
 
 	for (auto Pass : RenderPasses)
 	{

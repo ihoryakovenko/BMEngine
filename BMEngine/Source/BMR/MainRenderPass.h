@@ -11,7 +11,6 @@ namespace BMR
 	{
 		TerrainSampler,
 		EntitySampler,
-		EntityMaterial,
 		EntityShadowMapSampler,
 		DeferredInputAttachments,
 		SkyBoxSampler, // TODO Same as TerrainSampler
@@ -79,13 +78,11 @@ namespace BMR
 		void SetupPushConstants();
 		void CreateDescriptorLayouts(VkDevice LogicalDevice);
 		void CreatePipelineLayouts(VkDevice LogicalDevice, BMRUniformLayout VpLayout,
-			BMRUniformLayout EntityLightLayout, BMRUniformLayout LightSpaceMatrixLayout);
+			BMRUniformLayout EntityLightLayout, BMRUniformLayout LightSpaceMatrixLayout, BMRUniformLayout Material);
 		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent,
 			BMRPipelineShaderInputDepr ShaderInputs[BMRShaderNames::ShaderNamesCount], VkRenderPass main, VkRenderPass depth);
 		void CreateImages(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 ImagesCount, VkExtent2D SwapExtent,
 			VkFormat DepthFormat, VkFormat ColorFormat);
-		void CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
-			u32 ImagesCount);
 		// TODO: ShadowMapSampler == shit
 		void CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount, VkSampler ShadowMapSampler);
 		void CreateFrameBuffer(VkDevice LogicalDevice, VkExtent2D FrameBufferSizes, u32 ImagesCount,
@@ -102,22 +99,19 @@ namespace BMR
 		u32 ActiveVpSet = 0;
 		u32 ActiveLightSpaceMatrixSet = 0;
 
-		BMRUniformImage ColorBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRUniform ColorBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ColorBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		BMRUniformImage DepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRUniform DepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView DepthBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		BMRUniformImage ShadowDepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRUniform ShadowDepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ShadowArrayViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ShadowDepthBufferViews1[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ShadowDepthBufferViews2[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		// TODO: Fix
 		static inline VkDescriptorSet SamplerDescriptors[MAX_IMAGES];
-
-		BMRUniformBuffer MaterialBuffer;
-		VkDescriptorSet MaterialSet = nullptr; // TODO: Should be with textures
 
 		u32 TextureDescriptorCount = 0;
 	};

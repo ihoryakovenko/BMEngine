@@ -12,7 +12,7 @@ namespace BMR::VulkanMemoryManagementSystem
 	static VkDeviceMemory AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex);
 
 	static BMRMemorySourceDevice MemorySource;
-	static BMRUniformBuffer StagingBuffer;
+	static BMRUniform StagingBuffer;
 
 	void Init(BMRMemorySourceDevice Device)
 	{
@@ -93,9 +93,9 @@ namespace BMR::VulkanMemoryManagementSystem
 		}
 	}
 
-	BMRUniformImage CreateImageBuffer(VkImageCreateInfo* pCreateInfo)
+	BMRUniform CreateImageBuffer(VkImageCreateInfo* pCreateInfo)
 	{
-		BMRUniformImage Buffer;
+		BMRUniform Buffer;
 		VkResult Result = vkCreateImage(MemorySource.LogicalDevice, pCreateInfo, nullptr, &Buffer.Image);
 		if (Result != VK_SUCCESS)
 		{
@@ -114,7 +114,7 @@ namespace BMR::VulkanMemoryManagementSystem
 		return Buffer;
 	}
 
-	void DestroyImageBuffer(BMRUniformImage Image)
+	void DestroyImageBuffer(BMRUniform Image)
 	{
 		vkDestroyImage(MemorySource.LogicalDevice, Image.Image, nullptr);
 		vkFreeMemory(MemorySource.LogicalDevice, Image.Memory, nullptr);

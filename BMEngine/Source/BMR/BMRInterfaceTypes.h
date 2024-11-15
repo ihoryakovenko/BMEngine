@@ -194,16 +194,26 @@ namespace BMR
 		u32 VertexInputBindingCount = 0;
 	};
 
-	struct BMRUniformBuffer
+	struct BMRUniform
 	{
-		VkBuffer Buffer = nullptr;
+		union
+		{
+			VkBuffer Buffer = nullptr;
+			VkImage Image;
+		};
+
 		VkDeviceMemory Memory = nullptr;
 	};
 
-	struct BMRUniformImage
+	struct BMRUniformSetAttachmentInfo
 	{
-		VkImage Image = nullptr;
-		VkDeviceMemory Memory = nullptr;
+		union
+		{
+			VkDescriptorBufferInfo BufferInfo;
+			VkDescriptorImageInfo ImageInfo;
+		};
+
+		VkDescriptorType Type = VK_DESCRIPTOR_TYPE_MAX_ENUM;
 	};
 
 	typedef VkDescriptorSet BMRUniformSet;

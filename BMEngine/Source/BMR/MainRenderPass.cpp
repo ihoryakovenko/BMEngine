@@ -47,8 +47,6 @@ namespace BMR
 			vkDestroyDescriptorSetLayout(LogicalDevice, DescriptorLayouts[i], nullptr);
 		}
 
-		DestroyUniformBuffer(MaterialBuffer);
-
 
 		for (u32 i = 0; i < FrameBuffersHandles::Count; ++i)
 		{
@@ -149,14 +147,6 @@ namespace BMR
 		TerrainSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		TerrainSamplerLayoutBinding.pImmutableSamplers = nullptr;
 
-		const u32 MaterialBindingsCount = 1;
-		VkDescriptorSetLayoutBinding MaterialLayoutBinding = { };
-		MaterialLayoutBinding.binding = 0;
-		MaterialLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		MaterialLayoutBinding.descriptorCount = 1;
-		MaterialLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		MaterialLayoutBinding.pImmutableSamplers = nullptr;
-
 		const u32 DeferredAttachmentBindingsCount = 2;
 		VkDescriptorSetLayoutBinding DeferredInputBindings[DeferredAttachmentBindingsCount];
 		DeferredInputBindings[0].binding = 0;
@@ -183,7 +173,6 @@ namespace BMR
 		u32 BindingCountTable[DescriptorLayoutHandles::Count];
 		BindingCountTable[DescriptorLayoutHandles::TerrainSampler] = 1;
 		BindingCountTable[DescriptorLayoutHandles::EntitySampler] = EntitySamplerLayoutBindingCount;
-		BindingCountTable[DescriptorLayoutHandles::EntityMaterial] = MaterialBindingsCount;
 		BindingCountTable[DescriptorLayoutHandles::DeferredInputAttachments] = DeferredAttachmentBindingsCount;
 		BindingCountTable[DescriptorLayoutHandles::SkyBoxSampler] = 1;
 		BindingCountTable[DescriptorLayoutHandles::EntityShadowMapSampler] = 1;
@@ -191,7 +180,6 @@ namespace BMR
 		const VkDescriptorSetLayoutBinding* BindingsTable[DescriptorLayoutHandles::Count];
 		BindingsTable[DescriptorLayoutHandles::TerrainSampler] = &TerrainSamplerLayoutBinding;
 		BindingsTable[DescriptorLayoutHandles::EntitySampler] = EntitySamplerLayoutBinding;
-		BindingsTable[DescriptorLayoutHandles::EntityMaterial] = &MaterialLayoutBinding;
 		BindingsTable[DescriptorLayoutHandles::DeferredInputAttachments] = DeferredInputBindings;
 		BindingsTable[DescriptorLayoutHandles::SkyBoxSampler] = &SkyBoxSamplerLayoutBinding;
 		BindingsTable[DescriptorLayoutHandles::EntityShadowMapSampler] = &ShadowMapAttachmentSamplerLayoutBinding;
@@ -213,7 +201,7 @@ namespace BMR
 	}
 
 	void BMRMainRenderPass::CreatePipelineLayouts(VkDevice LogicalDevice, BMRUniformLayout VpLayout,
-		BMRUniformLayout EntityLightLayout, BMRUniformLayout LightSpaceMatrixLayout)
+		BMRUniformLayout EntityLightLayout, BMRUniformLayout LightSpaceMatrixLayout, BMRUniformLayout Material)
 	{
 		const u32 TerrainDescriptorLayoutsCount = 2;
 		VkDescriptorSetLayout TerrainDescriptorLayouts[TerrainDescriptorLayoutsCount] = {
@@ -226,7 +214,7 @@ namespace BMR
 			VpLayout,
 			DescriptorLayouts[DescriptorLayoutHandles::EntitySampler],
 			EntityLightLayout,
-			DescriptorLayouts[DescriptorLayoutHandles::EntityMaterial],
+			Material,
 			DescriptorLayouts[DescriptorLayoutHandles::EntityShadowMapSampler],
 		};
 
@@ -385,16 +373,6 @@ namespace BMR
 		}
 	}
 
-	void BMRMainRenderPass::CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
-		u32 ImagesCount)
-	{
-		const VkDeviceSize MaterialBufferSize = sizeof(BMRMaterial);
-		const VkDeviceSize LightSpaceBufferSize = sizeof(BMRLightSpaceMatrix);
-
-		MaterialBuffer = CreateUniformBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, MaterialBufferSize);
-	}
-
 	void BMRMainRenderPass::CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount,
 		VkSampler ShadowMapSampler)
 	{
@@ -465,23 +443,5 @@ namespace BMR
 
 			vkUpdateDescriptorSets(LogicalDevice, WriteSetsCount, WriteSets, 0, nullptr);
 		}
-
-		VulkanMemoryManagementSystem::AllocateSets(Pool, &DescriptorLayouts[DescriptorLayoutHandles::EntityMaterial], 1, &MaterialSet);
-
-		VkDescriptorBufferInfo MaterialBufferInfo = { };
-		MaterialBufferInfo.buffer = MaterialBuffer.Buffer;
-		MaterialBufferInfo.offset = 0;
-		MaterialBufferInfo.range = sizeof(BMRMaterial);
-
-		VkWriteDescriptorSet MaterialSetWrite = { };
-		MaterialSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		MaterialSetWrite.dstSet = MaterialSet;
-		MaterialSetWrite.dstBinding = 0;
-		MaterialSetWrite.dstArrayElement = 0;
-		MaterialSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		MaterialSetWrite.descriptorCount = 1;
-		MaterialSetWrite.pBufferInfo = &MaterialBufferInfo;
-
-		vkUpdateDescriptorSets(LogicalDevice, 1, &MaterialSetWrite, 0, nullptr);
 	}
 }
