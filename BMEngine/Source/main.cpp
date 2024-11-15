@@ -342,44 +342,20 @@ void MoveCamera(GLFWwindow* Window, f32 DeltaTime, Camera& MainCamera)
 {
 	const f32 RotationSpeed = 0.1f;
 	const f32 CameraSpeed = 10.0f;
-
-	f32 CameraDeltaSpeed = CameraSpeed * DeltaTime;
+	const f32 CameraDeltaSpeed = CameraSpeed * DeltaTime;
 
 	// Handle camera movement with keys
-	if (glfwGetKey(Window, GLFW_KEY_W) == GLFW_PRESS)
-	{
-		MainCamera.CameraPosition += CameraDeltaSpeed * MainCamera.CameraFront;
-	}
+	glm::vec3 movement = glm::vec3(0.0f);
+	if (glfwGetKey(Window, GLFW_KEY_W) == GLFW_PRESS) movement += MainCamera.CameraFront;
+	if (glfwGetKey(Window, GLFW_KEY_S) == GLFW_PRESS) movement -= MainCamera.CameraFront;
+	if (glfwGetKey(Window, GLFW_KEY_A) == GLFW_PRESS) movement -= glm::normalize(glm::cross(MainCamera.CameraFront, MainCamera.CameraUp));
+	if (glfwGetKey(Window, GLFW_KEY_D) == GLFW_PRESS) movement += glm::normalize(glm::cross(MainCamera.CameraFront, MainCamera.CameraUp));
+	if (glfwGetKey(Window, GLFW_KEY_SPACE) == GLFW_PRESS) movement += MainCamera.CameraUp;
+	if (glfwGetKey(Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) movement -= MainCamera.CameraUp;
 
-	if (glfwGetKey(Window, GLFW_KEY_S) == GLFW_PRESS)
-	{
-		MainCamera.CameraPosition -= CameraDeltaSpeed * MainCamera.CameraFront;
-	}
+	MainCamera.CameraPosition += movement * CameraDeltaSpeed;
 
-	if (glfwGetKey(Window, GLFW_KEY_A) == GLFW_PRESS)
-	{
-		MainCamera.CameraPosition -= glm::normalize(glm::cross(MainCamera.CameraFront, MainCamera.CameraUp)) * CameraDeltaSpeed;
-	}
-
-	if (glfwGetKey(Window, GLFW_KEY_D) == GLFW_PRESS)
-	{
-		MainCamera.CameraPosition += glm::normalize(glm::cross(MainCamera.CameraFront, MainCamera.CameraUp)) * CameraDeltaSpeed;
-	}
-
-	if (glfwGetKey(Window, GLFW_KEY_SPACE) == GLFW_PRESS)
-	{
-		MainCamera.CameraPosition += CameraDeltaSpeed * MainCamera.CameraUp;
-	}
-
-	if (glfwGetKey(Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
-	{
-		MainCamera.CameraPosition -= CameraDeltaSpeed * MainCamera.CameraUp;
-	}
-
-	if (glfwGetKey(Window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-	{
-		Close = true;
-	}
+	if (glfwGetKey(Window, GLFW_KEY_ESCAPE) == GLFW_PRESS) Close = true;
 
 	f64 MouseX, MouseY;
 	glfwGetCursorPos(Window, &MouseX, &MouseY);
@@ -396,14 +372,10 @@ void MoveCamera(GLFWwindow* Window, f32 DeltaTime, Camera& MainCamera)
 	LastX = MouseX;
 	LastY = MouseY;
 
-	OffsetX *= RotationSpeed;
-	OffsetY *= RotationSpeed;
+	Yaw += OffsetX * RotationSpeed;
+	Pitch += OffsetY * RotationSpeed;
 
-	Yaw += OffsetX;
-	Pitch += OffsetY;
-
-	if (Pitch > 89.0f) Pitch = 89.0f;
-	if (Pitch < -89.0f) Pitch = -89.0f;
+	Pitch = glm::clamp(Pitch, -89.0f, 89.0f);
 
 	glm::vec3 Front;
 	Front.x = cos(glm::radians(Yaw)) * cos(glm::radians(Pitch));
@@ -880,32 +852,28 @@ int main()
 	RenderPasses.push_back(BMR::CreateRenderPass(&DepthRenderPassSettings));
 
 
-
-
-	VkDescriptorType VpDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	VkDescriptorType EntityLightDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	VkDescriptorType LightSpaceMatrixDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	VkDescriptorType MaterialDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-
-	VkShaderStageFlags VpStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-	VkShaderStageFlags EntityLightStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-	VkShaderStageFlags LightSpaceMatrixStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-	VkShaderStageFlags MaterialStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	
 	BMR::BMRUniformLayout VpLayout = BMR::CreateUniformLayout(&VpDescriptorType, &VpStageFlags, 1);
 	BMR::BMRUniformLayout EntityLightLayout = BMR::CreateUniformLayout(&EntityLightDescriptorType, &EntityLightStageFlags, 1);
 	BMR::BMRUniformLayout LightSpaceMatrixLayout = BMR::CreateUniformLayout(&LightSpaceMatrixDescriptorType, &LightSpaceMatrixStageFlags, 1);
 	BMR::BMRUniformLayout MaterialLayout = BMR::CreateUniformLayout(&MaterialDescriptorType, &MaterialStageFlags, 1);
+	BMR::BMRUniformLayout DeferredInputLayout = BMR::CreateUniformLayout(DeferredInputDescriptorType, DeferredInputFlags, 2);
 
 	BMR::BMRUniform VpBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
 	BMR::BMRUniform EntityLightBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
 	BMR::BMRUniform LightSpaceMatrixBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
 	BMR::BMRUniform MaterialBuffer;
+	BMR::BMRUniform DeferredInputDepthImage[MAX_SWAPCHAIN_IMAGES_COUNT];
+	BMR::BMRUniform DeferredInputColorImage[MAX_SWAPCHAIN_IMAGES_COUNT];
+
+	BMR::BMRUniformImageInterface DeferredInputDepthImageInterface[MAX_SWAPCHAIN_IMAGES_COUNT];
+	BMR::BMRUniformImageInterface DeferredInputColorImageInterface[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 	BMR::BMRUniformSet VpSet[MAX_SWAPCHAIN_IMAGES_COUNT];
 	BMR::BMRUniformSet EntityLightSet[MAX_SWAPCHAIN_IMAGES_COUNT];
 	BMR::BMRUniformSet LightSpaceMatrixSet[MAX_SWAPCHAIN_IMAGES_COUNT];
 	BMR::BMRUniformSet MaterialSet;
+	BMR::BMRUniformSet DeferredInputSet[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 	for (u32 i = 0; i < BMR::GetImageCount(); i++)
 	{
@@ -914,21 +882,28 @@ int main()
 		const VkDeviceSize LightBufferSize = sizeof(BMR::BMRLightBuffer);
 		const VkDeviceSize LightSpaceMatrixSize = sizeof(BMR::BMRLightSpaceMatrix);
 
-		VpBuffer[i] = BMR::CreateUniformBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			VpBufferSize);
+		VpBufferInfo.size = VpBufferSize;
+		VpBuffer[i] = BMR::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-		EntityLightBuffer[i] = BMR::CreateUniformBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			LightBufferSize);
+		VpBufferInfo.size = LightBufferSize;
+		EntityLightBuffer[i] = BMR::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-		LightSpaceMatrixBuffer[i] = BMR::CreateUniformBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			LightSpaceMatrixSize);
+		VpBufferInfo.size = LightSpaceMatrixSize;
+		LightSpaceMatrixBuffer[i] = BMR::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+		DeferredInputDepthImage[i] = BMR::CreateUniformImage(&DeferredInputDepthUniformCreateInfo);
+		DeferredInputColorImage[i] = BMR::CreateUniformImage(&DeferredInputColorUniformCreateInfo);
+
+		DeferredInputDepthImageInterface[i] = BMR::CreateImageInterface(&DeferredInputUniformInterfaceCreateInfo,
+			DeferredInputDepthImage[i].Image);
+
+		DeferredInputColorImageInterface[i] = BMR::CreateImageInterface(&DeferredInputUniformColorInterfaceCreateInfo,
+			DeferredInputColorImage[i].Image);
 
 		BMR::CreateUniformSets(&VpLayout, 1, VpSet + i);
 		BMR::CreateUniformSets(&EntityLightLayout, 1, EntityLightSet + i);
 		BMR::CreateUniformSets(&LightSpaceMatrixLayout, 1, LightSpaceMatrixSet + i);
+		BMR::CreateUniformSets(&DeferredInputLayout, 1, DeferredInputSet + i);
 
 		BMR::BMRUniformSetAttachmentInfo VpBufferAttachmentInfo;
 		VpBufferAttachmentInfo.BufferInfo.buffer = VpBuffer[i].Buffer;
@@ -948,15 +923,26 @@ int main()
 		LightSpaceMatrixAttachmentInfo.BufferInfo.range = LightSpaceMatrixSize;
 		LightSpaceMatrixAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 
+		BMR::BMRUniformSetAttachmentInfo DeferredInputAttachmentInfo[2];
+		DeferredInputAttachmentInfo[0].ImageInfo.imageView = DeferredInputColorImageInterface[i];
+		DeferredInputAttachmentInfo[0].ImageInfo.sampler = nullptr;
+		DeferredInputAttachmentInfo[0].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		DeferredInputAttachmentInfo[0].Type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+
+		DeferredInputAttachmentInfo[1].ImageInfo.imageView = DeferredInputDepthImageInterface[i];
+		DeferredInputAttachmentInfo[1].ImageInfo.sampler = nullptr;
+		DeferredInputAttachmentInfo[1].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		DeferredInputAttachmentInfo[1].Type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+
 		BMR::AttachUniformsToSet(VpSet[i], &VpBufferAttachmentInfo, 1);
 		BMR::AttachUniformsToSet(EntityLightSet[i], &EntityLightAttachmentInfo, 1);
 		BMR::AttachUniformsToSet(LightSpaceMatrixSet[i], &LightSpaceMatrixAttachmentInfo, 1);
+		BMR::AttachUniformsToSet(DeferredInputSet[i], DeferredInputAttachmentInfo, 2);
 	}
 
 	const VkDeviceSize MaterialSize = sizeof(BMR::BMRMaterial);
-	MaterialBuffer = BMR::CreateUniformBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		MaterialSize);
+	VpBufferInfo.size = MaterialSize;
+	MaterialBuffer = BMR::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 	BMR::CreateUniformSets(&MaterialLayout, 1, &MaterialSet);
 
@@ -972,7 +958,9 @@ int main()
 		VpBuffer, VpLayout, VpSet,
 		EntityLightBuffer, EntityLightLayout, EntityLightSet,
 		LightSpaceMatrixBuffer, LightSpaceMatrixLayout, LightSpaceMatrixSet,
-		MaterialBuffer, MaterialLayout, MaterialSet);
+		MaterialBuffer, MaterialLayout, MaterialSet,
+		DeferredInputDepthImageInterface, DeferredInputColorImageInterface,
+		DeferredInputLayout, DeferredInputSet);
 
 
 
@@ -1115,6 +1103,10 @@ int main()
 		BMR::DestroyUniformBuffer(VpBuffer[i]);
 		BMR::DestroyUniformBuffer(EntityLightBuffer[i]);
 		BMR::DestroyUniformBuffer(LightSpaceMatrixBuffer[i]);
+		BMR::DestroyUniformImage(DeferredInputColorImage[i]);
+		BMR::DestroyUniformImage(DeferredInputDepthImage[i]);
+		BMR::DestroyImageInterface(DeferredInputColorImageInterface[i]);
+		BMR::DestroyImageInterface(DeferredInputDepthImageInterface[i]);
 	}
 
 	BMR::DestroyUniformBuffer(MaterialBuffer);
@@ -1123,6 +1115,7 @@ int main()
 	BMR::DestroyUniformLayout(EntityLightLayout);
 	BMR::DestroyUniformLayout(LightSpaceMatrixLayout);
 	BMR::DestroyUniformLayout(MaterialLayout);
+	BMR::DestroyUniformLayout(DeferredInputLayout);
 
 	for (auto Pass : RenderPasses)
 	{

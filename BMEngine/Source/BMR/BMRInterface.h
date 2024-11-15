@@ -16,22 +16,24 @@ namespace BMR
 		BMRUniform* inVpBuffer, BMRUniformLayout iVpLayout, BMRUniformSet* iVpSet,
 		BMRUniform* inEntityLight, BMRUniformLayout iEntityLightLayout, BMRUniformSet* iEntityLightSet,
 		BMRUniform* iLightSpaceBuffer, BMRUniformLayout iLightSpaceLayout, BMRUniformSet* iLightSpaceSet,
-		BMRUniform iMaterial, BMRUniformLayout iMaterialLayout, BMRUniformSet iMaterialSet);
+		BMRUniform iMaterial, BMRUniformLayout iMaterialLayout, BMRUniformSet iMaterialSet,
+		BMRUniformImageInterface* iDeferredInputDepthImage, BMRUniformImageInterface* iDeferredInputColorImage,
+		BMRUniformLayout iDeferredInputLayout, BMRUniformSet* iDeferredInputSet);
 
 	u32 GetImageCount();
 
 	BMRRenderPass CreateRenderPass(const BMRRenderPassSettings* Settings);
-	BMRUniform CreateUniformBuffer(VkBufferUsageFlags Type, VkMemoryPropertyFlags Usage, VkDeviceSize Size);
+	BMRUniform CreateUniformBuffer(const VkBufferCreateInfo* BufferInfo, VkMemoryPropertyFlags Properties);
 	BMRUniform CreateUniformImage(const VkImageCreateInfo* ImageCreateInfo);
 	BMRUniformLayout CreateUniformLayout(const VkDescriptorType* Types, const VkShaderStageFlags* Stages, u32 Count);
 	void CreateUniformSets(const BMRUniformLayout* Layouts, u32 Count, BMRUniformSet* OutSets);
-	BMRImageInterface CreateImageInterface(const VkImageViewCreateInfo* ViewCreateInfo);
+	BMRUniformImageInterface CreateImageInterface(const BMRUniformImageInterfaceCreateInfo* InterfaceCreateInfo, VkImage Image);
 
 	void DestroyRenderPass(BMRRenderPass Pass);
 	void DestroyUniformBuffer(BMRUniform Buffer);
 	void DestroyUniformImage(BMRUniform Image);
 	void DestroyUniformLayout(BMRUniformLayout Layout);
-	void DestroyImageInterface(BMRImageInterface Interface);
+	void DestroyImageInterface(BMRUniformImageInterface Interface);
 
 	void AttachUniformsToSet(BMRUniformSet Set, const BMRUniformSetAttachmentInfo* Infos, u32 BufferCount);
 	void UpdateUniformBuffer(BMRUniform Buffer, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);

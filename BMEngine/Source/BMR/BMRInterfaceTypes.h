@@ -216,10 +216,20 @@ namespace BMR
 		VkDescriptorType Type = VK_DESCRIPTOR_TYPE_MAX_ENUM;
 	};
 
+	struct BMRUniformImageInterfaceCreateInfo
+	{
+		const void* pNext = nullptr;
+		VkImageViewCreateFlags Flags = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
+		VkImageViewType ViewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
+		VkFormat Format = VK_FORMAT_UNDEFINED;
+		VkComponentMapping Components;
+		VkImageSubresourceRange SubresourceRange;
+	};
+
 	typedef VkDescriptorSet BMRUniformSet;
 	typedef VkDescriptorSetLayout BMRUniformLayout;
 	typedef VkRenderPass BMRRenderPass;
-	typedef VkImageView BMRImageInterface;
+	typedef VkImageView BMRUniformImageInterface;
 
 	struct BMRPipeline
 	{

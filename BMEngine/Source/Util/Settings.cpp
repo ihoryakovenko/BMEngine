@@ -20,6 +20,14 @@ BMR::BMRPipelineSettings DepthPipelineSettings;
 BMR::BMRRenderPassSettings MainRenderPassSettings;
 BMR::BMRRenderPassSettings DepthRenderPassSettings;
 
+VkImageCreateInfo DeferredInputDepthUniformCreateInfo;
+VkImageCreateInfo DeferredInputColorUniformCreateInfo;
+
+BMR::BMRUniformImageInterfaceCreateInfo DeferredInputUniformInterfaceCreateInfo;
+BMR::BMRUniformImageInterfaceCreateInfo DeferredInputUniformColorInterfaceCreateInfo;
+
+VkBufferCreateInfo VpBufferInfo;
+
 enum SubpassIndex
 {
 	MainSubpass = 0,
@@ -51,9 +59,9 @@ static const u32 DepthPassAttachmentDescriptionsCount = 1;
 static VkAttachmentDescription DepthPassAttachmentDescriptions[DepthPassAttachmentDescriptionsCount];
 static VkAttachmentReference DepthSubpassDepthAttachmentReference = { };
 static BMR::BMRSubpassSettings DepthSubpasses[Subpasses_Count];
-const u32 DepthPassExitDependenciesIndex = Subpasses::Subpasses_Count;
-const u32 DepthPassSubpassDependenciesCount = Subpasses::Subpasses_Count + 1;
-VkSubpassDependency DepthPassSubpassDependencies[DepthPassSubpassDependenciesCount];
+static const u32 DepthPassExitDependenciesIndex = Subpasses::Subpasses_Count;
+static const u32 DepthPassSubpassDependenciesCount = Subpasses::Subpasses_Count + 1;
+static VkSubpassDependency DepthPassSubpassDependencies[DepthPassSubpassDependenciesCount];
 
 static const char EntityPipelineName[] = "Entity";
 static const char TerrainPipelineName[] = "Terrain";
@@ -80,6 +88,50 @@ static const char DepthSubpassName[] = "DepthSubpass";
 
 void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 {
+	MainScreenExtent = { WindowWidth, WindowHeight };
+
+	VpBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	VpBufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+	VpBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	DeferredInputDepthUniformCreateInfo = { };
+	DeferredInputDepthUniformCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	DeferredInputDepthUniformCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	DeferredInputDepthUniformCreateInfo.extent.depth = 1;
+	DeferredInputDepthUniformCreateInfo.mipLevels = 1;
+	DeferredInputDepthUniformCreateInfo.arrayLayers = 1;
+	DeferredInputDepthUniformCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	DeferredInputDepthUniformCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	DeferredInputDepthUniformCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	DeferredInputDepthUniformCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	DeferredInputDepthUniformCreateInfo.flags = 0;
+	DeferredInputDepthUniformCreateInfo.extent.width = MainScreenExtent.width;
+	DeferredInputDepthUniformCreateInfo.extent.height = MainScreenExtent.height;
+	DeferredInputDepthUniformCreateInfo.format = DepthFormat;
+	DeferredInputDepthUniformCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+
+	DeferredInputColorUniformCreateInfo = DeferredInputDepthUniformCreateInfo;
+	DeferredInputColorUniformCreateInfo.format = ColorFormat;
+	DeferredInputColorUniformCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+
+	DeferredInputUniformInterfaceCreateInfo = { };
+	DeferredInputUniformInterfaceCreateInfo.Flags = 0; // No flags
+	DeferredInputUniformInterfaceCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D;
+	DeferredInputUniformInterfaceCreateInfo.Format = DepthFormat;
+	DeferredInputUniformInterfaceCreateInfo.Components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	DeferredInputUniformInterfaceCreateInfo.Components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	DeferredInputUniformInterfaceCreateInfo.Components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	DeferredInputUniformInterfaceCreateInfo.Components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	DeferredInputUniformInterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	DeferredInputUniformInterfaceCreateInfo.SubresourceRange.baseMipLevel = 0;
+	DeferredInputUniformInterfaceCreateInfo.SubresourceRange.levelCount = 1;
+	DeferredInputUniformInterfaceCreateInfo.SubresourceRange.baseArrayLayer = 0;
+	DeferredInputUniformInterfaceCreateInfo.SubresourceRange.layerCount = 1;
+
+	DeferredInputUniformColorInterfaceCreateInfo = DeferredInputUniformInterfaceCreateInfo;
+	DeferredInputUniformColorInterfaceCreateInfo.Format = ColorFormat;
+	DeferredInputUniformColorInterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
 	// MAIN RENDERPASS
 	const u32 SwapchainColorAttachmentIndex = 0;
 	const u32 SubpassColorAttachmentIndex = 1;
@@ -237,8 +289,6 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 //DynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 //DynamicStateCreateInfo.dynamicStateCount = static_cast<u32>(2);
 //DynamicStateCreateInfo.pDynamicStates = DynamicStates;
-
-	MainScreenExtent = { WindowWidth, WindowHeight };
 
 	// MainPipeline
 	EntityPipelineSettings.PipelineName = EntityPipelineName;

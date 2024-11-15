@@ -12,7 +12,6 @@ namespace BMR
 		TerrainSampler,
 		EntitySampler,
 		EntityShadowMapSampler,
-		DeferredInputAttachments,
 		SkyBoxSampler, // TODO Same as TerrainSampler
 
 		Count
@@ -23,7 +22,6 @@ namespace BMR
 		enum
 		{
 			ShadowMapSampler,
-			DeferredInputAttachments,
 
 			Count
 		};
@@ -78,7 +76,8 @@ namespace BMR
 		void SetupPushConstants();
 		void CreateDescriptorLayouts(VkDevice LogicalDevice);
 		void CreatePipelineLayouts(VkDevice LogicalDevice, BMRUniformLayout VpLayout,
-			BMRUniformLayout EntityLightLayout, BMRUniformLayout LightSpaceMatrixLayout, BMRUniformLayout Material);
+			BMRUniformLayout EntityLightLayout, BMRUniformLayout LightSpaceMatrixLayout, BMRUniformLayout Material,
+			BMRUniformLayout Deferred);
 		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent,
 			BMRPipelineShaderInputDepr ShaderInputs[BMRShaderNames::ShaderNamesCount], VkRenderPass main, VkRenderPass depth);
 		void CreateImages(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 ImagesCount, VkExtent2D SwapExtent,
@@ -86,7 +85,8 @@ namespace BMR
 		// TODO: ShadowMapSampler == shit
 		void CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount, VkSampler ShadowMapSampler);
 		void CreateFrameBuffer(VkDevice LogicalDevice, VkExtent2D FrameBufferSizes, u32 ImagesCount,
-			VkImageView SwapchainImageViews[MAX_SWAPCHAIN_IMAGES_COUNT], VkRenderPass main, VkRenderPass depth);
+			VkImageView SwapchainImageViews[MAX_SWAPCHAIN_IMAGES_COUNT], VkRenderPass main, VkRenderPass depth,
+			VkImageView* ColorBufferViews, VkImageView* DepthBufferViews);
 
 		BMRPipeline Pipelines[BMRPipelineHandles::PipelineHandlesCount];
 
@@ -98,12 +98,6 @@ namespace BMR
 		u32 ActiveLightSet = 0;
 		u32 ActiveVpSet = 0;
 		u32 ActiveLightSpaceMatrixSet = 0;
-
-		BMRUniform ColorBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
-		VkImageView ColorBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
-
-		BMRUniform DepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
-		VkImageView DepthBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		BMRUniform ShadowDepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ShadowArrayViews[MAX_SWAPCHAIN_IMAGES_COUNT];
