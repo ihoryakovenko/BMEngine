@@ -875,6 +875,76 @@ int main()
 
 	BMR::Init(glfwGetWin32Window(Window), Config);
 
+	std::vector<BMR::BMRRenderPass> RenderPasses;
+	RenderPasses.push_back(BMR::CreateRenderPass(&MainRenderPassSettings));
+	RenderPasses.push_back(BMR::CreateRenderPass(&DepthRenderPassSettings));
+
+
+
+
+	VkDescriptorType VpDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	VkDescriptorType EntityLightDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	VkDescriptorType LightSpaceMatrixDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+	VkShaderStageFlags VpStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+	VkShaderStageFlags EntityLightStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+	VkShaderStageFlags LightSpaceMatrixStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	BMR::BMRUniformLayout VpLayout = BMR::CreateUniformLayout(&VpDescriptorType, &VpStageFlags, 1);
+	BMR::BMRUniformLayout EntityLightLayout = BMR::CreateUniformLayout(&EntityLightDescriptorType, &EntityLightStageFlags, 1);
+	BMR::BMRUniformLayout LightSpaceMatrixLayout = BMR::CreateUniformLayout(&LightSpaceMatrixDescriptorType, &LightSpaceMatrixStageFlags, 1);
+
+	BMR::BMRUniformBuffer VpBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
+	BMR::BMRUniformBuffer EntityLightBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
+	BMR::BMRUniformBuffer LightSpaceMatrixBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
+
+	BMR::BMRUniformSet VpSet[MAX_SWAPCHAIN_IMAGES_COUNT];
+	BMR::BMRUniformSet EntityLightSet[MAX_SWAPCHAIN_IMAGES_COUNT];
+	BMR::BMRUniformSet LightSpaceMatrixSet[MAX_SWAPCHAIN_IMAGES_COUNT];
+
+	for (u32 i = 0; i < BMR::GetImageCount(); i++)
+	{
+		//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
+		const VkDeviceSize VpBufferSize = sizeof(BMR::BMRUboViewProjection);
+		const VkDeviceSize LightBufferSize = sizeof(BMR::BMRLightBuffer);
+		const VkDeviceSize LightSpaceMatrixSize = sizeof(BMR::BMRLightSpaceMatrix);
+
+		VpBuffer[i] = BMR::CreateUniformBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			VpBufferSize);
+
+		EntityLightBuffer[i] = BMR::CreateUniformBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			LightBufferSize);
+
+		LightSpaceMatrixBuffer[i] = BMR::CreateUniformBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			LightSpaceMatrixSize);
+
+		BMR::CreateUniformSets(&VpLayout, 1, VpSet + i);
+		BMR::CreateUniformSets(&EntityLightLayout, 1, EntityLightSet + i);
+		BMR::CreateUniformSets(&LightSpaceMatrixLayout, 1, LightSpaceMatrixSet + i);
+
+		BMR::AttachUniformsToSet(VpSet[i], &(VpBuffer[i]), &VpBufferSize, 1);
+		BMR::AttachUniformsToSet(EntityLightSet[i], &(EntityLightBuffer[i]), &LightBufferSize, 1);
+		BMR::AttachUniformsToSet(LightSpaceMatrixSet[i], &(LightSpaceMatrixBuffer[i]), &LightSpaceMatrixSize, 1);
+	}
+
+	BMR::TestSetRendeRpasses(RenderPasses[0], RenderPasses[1],
+		VpBuffer, VpLayout, VpSet,
+		EntityLightBuffer, EntityLightLayout, EntityLightSet,
+		LightSpaceMatrixBuffer, LightSpaceMatrixLayout, LightSpaceMatrixSet);
+
+
+
+
+
+
+
+
+
+
+
 	ShaderCodes.clear();
 	ShaderCodes.shrink_to_fit();
 
@@ -996,6 +1066,29 @@ int main()
 
 	DrawImgui = false;
 	ImguiThread.join();
+
+
+
+
+
+	for (u32 i = 0; i < BMR::GetImageCount(); i++)
+	{
+		BMR::DestroyUniformBuffer(VpBuffer[i]);
+		BMR::DestroyUniformBuffer(EntityLightBuffer[i]);
+		BMR::DestroyUniformBuffer(LightSpaceMatrixBuffer[i]);
+	}
+
+	BMR::DestroyUniformLayout(VpLayout);
+	BMR::DestroyUniformLayout(EntityLightLayout);
+	BMR::DestroyUniformLayout(LightSpaceMatrixLayout);
+
+	for (auto Pass : RenderPasses)
+	{
+		BMR::DestroyRenderPass(Pass);
+	}
+
+
+
 	
 	BMR::DeInit();
 

@@ -143,10 +143,4 @@ namespace BMR
 
 		VkPipelineLayout PipelineLayout = nullptr;
 	};
-
-	struct BMRPipeline
-	{
-		VkPipeline Pipeline = nullptr;
-		VkPipelineLayout PipelineLayout = nullptr;
-	};
 }

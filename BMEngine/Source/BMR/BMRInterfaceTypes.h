@@ -165,25 +165,6 @@ namespace BMR
 		BMRSpotLight SpotLight;
 	};
 
-	struct BMRDrawScene
-	{
-		BMRUboViewProjection ViewProjection;
-
-		BMRDrawEntity* DrawEntities = nullptr;
-		u32 DrawEntitiesCount = 0;
-
-		BMRDrawEntity* DrawTransparentEntities = nullptr;
-		u32 DrawTransparentEntitiesCount = 0;
-
-		BMRDrawTerrainEntity* DrawTerrainEntities = nullptr;
-		u32 DrawTerrainEntitiesCount = 0;
-
-		BMRDrawSkyBoxEntity SkyBox;
-		bool DrawSkyBox = false;
-
-		BMRLightBuffer* LightEntity = nullptr;
-	};
-
 	struct BMRMaterial
 	{
 		f32 Shininess;
@@ -219,7 +200,7 @@ namespace BMR
 		VkDeviceMemory Memory = nullptr;
 	};
 
-	struct BMRIUniformImage
+	struct BMRUniformImage
 	{
 		VkImage Image = nullptr;
 		VkDeviceMemory Memory = nullptr;
@@ -228,6 +209,32 @@ namespace BMR
 	typedef VkDescriptorSet BMRUniformSet;
 	typedef VkDescriptorSetLayout BMRUniformLayout;
 	typedef VkRenderPass BMRRenderPass;
+	typedef VkImageView BMRImageInterface;
+
+	struct BMRPipeline
+	{
+		VkPipeline Pipeline = nullptr;
+		VkPipelineLayout PipelineLayout = nullptr;
+	};
+
+	struct BMRDrawScene
+	{
+		BMRUboViewProjection ViewProjection;
+
+		BMRDrawEntity* DrawEntities = nullptr;
+		u32 DrawEntitiesCount = 0;
+
+		BMRDrawEntity* DrawTransparentEntities = nullptr;
+		u32 DrawTransparentEntitiesCount = 0;
+
+		BMRDrawTerrainEntity* DrawTerrainEntities = nullptr;
+		u32 DrawTerrainEntitiesCount = 0;
+
+		BMRDrawSkyBoxEntity SkyBox;
+		bool DrawSkyBox = false;
+
+		BMRLightBuffer* LightEntity = nullptr;
+	};
 
 	struct BMRPipelineSettings
 	{

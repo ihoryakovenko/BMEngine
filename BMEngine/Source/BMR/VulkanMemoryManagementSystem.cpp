@@ -93,9 +93,9 @@ namespace BMR::VulkanMemoryManagementSystem
 		}
 	}
 
-	BMRIUniformImage CreateImageBuffer(VkImageCreateInfo* pCreateInfo)
+	BMRUniformImage CreateImageBuffer(VkImageCreateInfo* pCreateInfo)
 	{
-		BMRIUniformImage Buffer;
+		BMRUniformImage Buffer;
 		VkResult Result = vkCreateImage(MemorySource.LogicalDevice, pCreateInfo, nullptr, &Buffer.Image);
 		if (Result != VK_SUCCESS)
 		{
@@ -114,7 +114,7 @@ namespace BMR::VulkanMemoryManagementSystem
 		return Buffer;
 	}
 
-	void DestroyImageBuffer(BMRIUniformImage Image)
+	void DestroyImageBuffer(BMRUniformImage Image)
 	{
 		vkDestroyImage(MemorySource.LogicalDevice, Image.Image, nullptr);
 		vkFreeMemory(MemorySource.LogicalDevice, Image.Memory, nullptr);

@@ -11,10 +11,8 @@ namespace BMR
 	{
 		TerrainSampler,
 		EntitySampler,
-		EntityLigh,
 		EntityMaterial,
 		EntityShadowMapSampler,
-		DepthLightSpaceMatrix,
 		DeferredInputAttachments,
 		SkyBoxSampler, // TODO Same as TerrainSampler
 
@@ -25,9 +23,7 @@ namespace BMR
 	{
 		enum
 		{
-			DepthLightSpaceMatrix = 0,
 			ShadowMapSampler,
-			EntityLigh,
 			DeferredInputAttachments,
 
 			Count
@@ -80,13 +76,12 @@ namespace BMR
 	{
 		void ClearResources(VkDevice LogicalDevice, u32 ImagesCount);
 
-		void CreateVulkanPass(VkDevice LogicalDevice, VkFormat ColorFormat, VkFormat DepthFormat,
-			VkSurfaceFormatKHR SurfaceFormat);
 		void SetupPushConstants();
 		void CreateDescriptorLayouts(VkDevice LogicalDevice);
-		void CreatePipelineLayouts(VkDevice LogicalDevice); 
+		void CreatePipelineLayouts(VkDevice LogicalDevice, BMRUniformLayout VpLayout,
+			BMRUniformLayout EntityLightLayout, BMRUniformLayout LightSpaceMatrixLayout);
 		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent,
-			BMRPipelineShaderInputDepr ShaderInputs[BMRShaderNames::ShaderNamesCount]);
+			BMRPipelineShaderInputDepr ShaderInputs[BMRShaderNames::ShaderNamesCount], VkRenderPass main, VkRenderPass depth);
 		void CreateImages(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 ImagesCount, VkExtent2D SwapExtent,
 			VkFormat DepthFormat, VkFormat ColorFormat);
 		void CreateUniformBuffers(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice,
@@ -94,13 +89,7 @@ namespace BMR
 		// TODO: ShadowMapSampler == shit
 		void CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount, VkSampler ShadowMapSampler);
 		void CreateFrameBuffer(VkDevice LogicalDevice, VkExtent2D FrameBufferSizes, u32 ImagesCount,
-			VkImageView SwapchainImageViews[MAX_SWAPCHAIN_IMAGES_COUNT]);
-
-		BMRUniformBuffer TestVpBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
-		BMRUniformLayout TestVpLayout;
-		BMRUniformSet TestVpSet[MAX_SWAPCHAIN_IMAGES_COUNT];
-
-		VkRenderPass RenderPasses[RenderPassHandles::Count];
+			VkImageView SwapchainImageViews[MAX_SWAPCHAIN_IMAGES_COUNT], VkRenderPass main, VkRenderPass depth);
 
 		BMRPipeline Pipelines[BMRPipelineHandles::PipelineHandlesCount];
 
@@ -113,20 +102,16 @@ namespace BMR
 		u32 ActiveVpSet = 0;
 		u32 ActiveLightSpaceMatrixSet = 0;
 
-		BMRIUniformImage ColorBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRUniformImage ColorBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ColorBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		BMRIUniformImage DepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRUniformImage DepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView DepthBufferViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		BMRUniformBuffer LightBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
-
-		BMRIUniformImage ShadowDepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRUniformImage ShadowDepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ShadowArrayViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ShadowDepthBufferViews1[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ShadowDepthBufferViews2[MAX_SWAPCHAIN_IMAGES_COUNT];
-
-		BMRUniformBuffer DepthLightSpaceMatrixBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		// TODO: Fix
 		static inline VkDescriptorSet SamplerDescriptors[MAX_IMAGES];
