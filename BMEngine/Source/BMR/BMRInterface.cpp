@@ -123,6 +123,9 @@ namespace BMR
 	BMRUniformImageInterface* DeferredInputColorImage;
 	BMRUniformLayout DeferredInputLayout;
 	BMRUniformSet* DeferredInputSet;
+	BMRUniform* ShadowArray;
+	BMRUniformLayout ShadowArrayLayout;
+	BMRUniformSet* ShadowArraySet;
 
 	VkExtent2D Extent1;
 	BMRPipelineShaderInputDepr ShaderInputs[BMR::BMRShaderNames::ShaderNamesCount];
@@ -312,7 +315,6 @@ namespace BMR
 
 		Sampler[SamplerType::SamplerType_Diffuse] = CreateTextureSampler(16, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 		Sampler[SamplerType::SamplerType_Specular] = CreateTextureSampler(1, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
-		Sampler[SamplerType::SamplerType_ShadowMap] = CreateTextureSampler(1, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER);
 
 		
 
@@ -364,7 +366,8 @@ namespace BMR
 		BMRUniform* iLightSpaceBuffer, BMRUniformLayout iLightSpaceLayout, BMRUniformSet* iLightSpaceSet,
 		BMRUniform iMaterial, BMRUniformLayout iMaterialLayout, BMRUniformSet iMaterialSet,
 		BMRUniformImageInterface* iDeferredInputDepthImage, BMRUniformImageInterface* iDeferredInputColorImage,
-		BMRUniformLayout iDeferredInputLayout, BMRUniformSet* iDeferredInputSet)
+		BMRUniformLayout iDeferredInputLayout, BMRUniformSet* iDeferredInputSet,
+		BMRUniform* iShadowArray, BMRUniformLayout iShadowArrayLayout, BMRUniformSet* iShadowArraySet)
 	{
 		MainPass = Main;
 		DepthPass = Depth;
@@ -384,16 +387,15 @@ namespace BMR
 		DeferredInputColorImage = iDeferredInputColorImage;
 		DeferredInputLayout = iDeferredInputLayout;
 		DeferredInputSet = iDeferredInputSet;
+		ShadowArray = iShadowArray;
+		ShadowArrayLayout = iShadowArrayLayout;
+		ShadowArraySet = iShadowArraySet;
 
 		MainRenderPass.SetupPushConstants();
 		MainRenderPass.CreateDescriptorLayouts(LogicalDevice);
 		MainRenderPass.CreatePipelineLayouts(LogicalDevice, VpLayout, EntityLightLayout, LightSpaceLayout, materialLayout,
-			DeferredInputLayout);
-		MainRenderPass.CreatePipelines(LogicalDevice, Extent1, ShaderInputs, MainPass, DepthPass);
-		MainRenderPass.CreateImages(Device.PhysicalDevice, LogicalDevice, SwapInstance1.ImagesCount, Extent1, DepthFormat, ColorFormat);
-		MainRenderPass.CreateSets(MainPool, LogicalDevice, SwapInstance1.ImagesCount, Sampler[SamplerType::SamplerType_ShadowMap]);
-		MainRenderPass.CreateFrameBuffer(LogicalDevice, Extent1, SwapInstance1.ImagesCount, SwapInstance1.ImageViews, MainPass, DepthPass,
-			DeferredInputColorImage, DeferredInputDepthImage);
+			DeferredInputLayout, ShadowArrayLayout);
+		MainRenderPass.CreatePipelines(LogicalDevice, Extent1, ShaderInputs, MainPass.Pass, DepthPass.Pass);
 
 		InitViewport(Surface, &MainViewport, SwapInstance1, iDeferredInputColorImage, iDeferredInputDepthImage);
 	}
@@ -403,11 +405,18 @@ namespace BMR
 		return SwapInstance1.ImagesCount;
 	}
 
-	BMRRenderPass CreateRenderPass(const BMRRenderPassSettings* Settings)
+	VkImageView* GetSwapchainImageViews()
+	{
+		return SwapInstance1.ImageViews;
+	}
+
+	void CreateRenderPass(const BMRRenderPassSettings* Settings, const BMRRenderTarget* Targets,
+		VkExtent2D TargetExtent, u32 TargetCount, u32 SwapchainImagesCount, BMRRenderPass* OutPass)
 	{
 		HandleLog(BMRLogType::LogType_Info, "Initializing RenderPass, Name: %s, Subpass count: %d, Attachments count: %d",
 			Settings->RenderPassName, Settings->SubpassSettingsCount, Settings->AttachmentDescriptionsCount);
 
+		// RenderPass create info
 		auto Subpasses = Memory::BmMemoryManagementSystem::FrameAlloc<VkSubpassDescription>(Settings->SubpassSettingsCount);
 		for (u32 SubpassIndex = 0; SubpassIndex < Settings->SubpassSettingsCount; ++SubpassIndex)
 		{
@@ -455,19 +464,62 @@ namespace BMR
 		RenderPassCreateInfo.dependencyCount = Settings->SubpassDependenciesCount;
 		RenderPassCreateInfo.pDependencies = Settings->SubpassDependencies;
 
-		BMRRenderPass RenderPass;
-		const VkResult Result = vkCreateRenderPass(LogicalDevice, &RenderPassCreateInfo, nullptr, &RenderPass);
+		const VkResult Result = vkCreateRenderPass(LogicalDevice, &RenderPassCreateInfo, nullptr, &OutPass->Pass);
 		if (Result != VK_SUCCESS)
 		{
 			HandleLog(BMRLogType::LogType_Error, "vkCreateRenderPass result is %d", Result);
 		}
 
-		return RenderPass;
+		// Set clear values
+		OutPass->ClearValues = Memory::BmMemoryManagementSystem::Allocate<VkClearValue>(Settings->AttachmentDescriptionsCount);
+		OutPass->ClearValuesCount = Settings->AttachmentDescriptionsCount;
+		std::memcpy(OutPass->ClearValues, Settings->ClearValues, Settings->AttachmentDescriptionsCount * sizeof(VkClearValue));
+
+		// Creating framebuffers
+		OutPass->FramebufferSets = Memory::BmMemoryManagementSystem::Allocate<BMRFramebufferSet>(TargetCount);
+		for (u32 TargetIndex = 0; TargetIndex < TargetCount; ++TargetIndex)
+		{
+			BMRFramebufferSet* FramebufferSet = OutPass->FramebufferSets + TargetIndex;
+			const BMRRenderTarget* Target = Targets + TargetIndex;
+
+			for (u32 SwapchainImageIndex = 0; SwapchainImageIndex < SwapchainImagesCount; ++SwapchainImageIndex)
+			{
+				VkFramebuffer* Framebuffer = FramebufferSet->FrameBuffers + SwapchainImageIndex;
+				const BMRAttachmentView* AttachmentView = Target->AttachmentViews + SwapchainImageIndex;
+
+				VkFramebufferCreateInfo Info = { };
+				Info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+				Info.renderPass = OutPass->Pass;
+				Info.attachmentCount = Settings->AttachmentDescriptionsCount;
+				Info.pAttachments = AttachmentView->ImageViews; // List of attachments (1:1 with Render Pass)
+				Info.width = TargetExtent.width;
+				Info.height = TargetExtent.height;
+				Info.layers = 1;
+
+				const VkResult Result = vkCreateFramebuffer(LogicalDevice, &Info, nullptr, Framebuffer);
+				if (Result != VK_SUCCESS)
+				{
+					HandleLog(BMRLogType::LogType_Error, "vkCreateFramebuffer result is %d", Result);
+				}
+			}
+		}
+
+		OutPass->FramebufferSetCount = TargetCount;
 	}
 
-	void DestroyRenderPass(BMRRenderPass Pass)
+	void DestroyRenderPass(BMRRenderPass* Pass)
 	{
-		vkDestroyRenderPass(LogicalDevice, Pass, nullptr);
+		for (u32 TargetIndex = 0; TargetIndex < Pass->FramebufferSetCount; ++TargetIndex)
+		{
+			for (u32 SwapchainImageIndex = 0; SwapchainImageIndex < SwapInstance1.ImagesCount; ++SwapchainImageIndex)
+			{
+				vkDestroyFramebuffer(LogicalDevice, Pass->FramebufferSets[TargetIndex].FrameBuffers[SwapchainImageIndex], nullptr);
+			}
+		}
+
+		vkDestroyRenderPass(LogicalDevice, Pass->Pass, nullptr);
+		Memory::BmMemoryManagementSystem::Deallocate(Pass->ClearValues);
+		Memory::BmMemoryManagementSystem::Deallocate(Pass->FramebufferSets);
 	}
 
 	BMRUniform CreateUniformBuffer(const VkBufferCreateInfo* BufferInfo, VkMemoryPropertyFlags Properties)
@@ -498,6 +550,18 @@ namespace BMR
 		vkMapMemory(LogicalDevice, Buffer.Memory, Offset, DataSize, 0, &MappedMemory);
 		std::memcpy(MappedMemory, Data, DataSize);
 		vkUnmapMemory(LogicalDevice, Buffer.Memory);
+	}
+
+	VkSampler CreateSampler(const VkSamplerCreateInfo* CreateInfo)
+	{
+		VkSampler Sampler;
+		VkResult Result = vkCreateSampler(LogicalDevice, CreateInfo, nullptr, &Sampler);
+		if (Result != VK_SUCCESS)
+		{
+			HandleLog(BMRLogType::LogType_Error, "vkCreateSampler result is %d", Result);
+		}
+
+		return Sampler;
 	}
 
 	BMRUniform CreateUniformImage(const VkImageCreateInfo* ImageCreateInfo)
@@ -613,6 +677,11 @@ namespace BMR
 	void DestroyImageInterface(BMRUniformImageInterface Interface)
 	{
 		vkDestroyImageView(LogicalDevice, Interface, nullptr);
+	}
+
+	void DestroySampler(VkSampler Sampler)
+	{
+		vkDestroySampler(LogicalDevice, Sampler, nullptr);
 	}
 
 	void AttachUniformsToSet(BMRUniformSet Set, const BMRUniformSetAttachmentInfo* Infos, u32 BufferCount)
@@ -913,25 +982,19 @@ namespace BMR
 				&Scene.LightEntity->SpotLight.LightSpaceMatrix,
 			};
 
-			const u32 FramebufferHandle[] =
-			{
-				FrameBuffersHandles::Tex1,
-				FrameBuffersHandles::Tex2
-			};
-
 			for (u32 LightCaster = 0; LightCaster < MAX_LIGHT_SOURCES; ++LightCaster)
 			{
 				UpdateLightSpaceBuffer(LightViews[LightCaster]);
 
 				VkRenderPassBeginInfo DepthRenderPassBeginInfo = { };
 				DepthRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-				DepthRenderPassBeginInfo.renderPass = DepthPass;
+				DepthRenderPassBeginInfo.renderPass = DepthPass.Pass;
 				DepthRenderPassBeginInfo.renderArea.offset = { 0, 0 };
 				DepthRenderPassBeginInfo.pClearValues = DepthPassClearValues;
 				DepthRenderPassBeginInfo.clearValueCount = DepthPassClearValuesSize;
 				DepthRenderPassBeginInfo.renderArea.extent = DepthViewportExtent; // Size of region to run render pass on (starting at offset)
-				DepthRenderPassBeginInfo.framebuffer = MainRenderPass.Framebuffers[FramebufferHandle[LightCaster]][ImageIndex];
-
+				DepthRenderPassBeginInfo.framebuffer = DepthPass.FramebufferSets[LightCaster].FrameBuffers[ImageIndex];
+				
 				vkCmdBeginRenderPass(CommandBuffer, &DepthRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 		
 				vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderPass.Pipelines[BMRPipelineHandles::Depth].Pipeline);
@@ -968,12 +1031,12 @@ namespace BMR
 
 		VkRenderPassBeginInfo MainRenderPassBeginInfo = { };
 		MainRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		MainRenderPassBeginInfo.renderPass = MainPass;
+		MainRenderPassBeginInfo.renderPass = MainPass.Pass;
 		MainRenderPassBeginInfo.renderArea.offset = { 0, 0 };
 		MainRenderPassBeginInfo.pClearValues = MainPassClearValues;
 		MainRenderPassBeginInfo.clearValueCount = MainPassClearValuesSize;
 		MainRenderPassBeginInfo.renderArea.extent = MainViewport.ViewportSwapchain.SwapExtent; // Size of region to run render pass on (starting at offset)
-		MainRenderPassBeginInfo.framebuffer = MainRenderPass.Framebuffers[FrameBuffersHandles::Main][ImageIndex];
+		MainRenderPassBeginInfo.framebuffer = MainPass.FramebufferSets[0].FrameBuffers[ImageIndex];
 
 		vkCmdBeginRenderPass(CommandBuffer, &MainRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -1019,7 +1082,7 @@ namespace BMR
 					MainRenderPass.SamplerDescriptors[DrawEntity->MaterialIndex],
 					EntityLightSet[MainRenderPass.ActiveLightSet],
 					MaterialSet,
-					MainRenderPass.DescriptorsToImages[DescriptorHandles::ShadowMapSampler][ImageIndex],
+					ShadowArraySet[ImageIndex],
 				};
 				const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 

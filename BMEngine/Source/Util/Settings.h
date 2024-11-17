@@ -47,17 +47,28 @@ static VkDescriptorType EntityLightDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_B
 static VkDescriptorType LightSpaceMatrixDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 static VkDescriptorType MaterialDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 static VkDescriptorType DeferredInputDescriptorType[2] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT };
+static VkDescriptorType ShadowMapArrayDescriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
 static VkShaderStageFlags VpStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 static VkShaderStageFlags EntityLightStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 static VkShaderStageFlags LightSpaceMatrixStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 static VkShaderStageFlags MaterialStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 static VkShaderStageFlags DeferredInputFlags[2] = { VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
+static VkShaderStageFlags ShadowMapArrayFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+extern VkClearValue MainPassClearValues[3];
+extern VkClearValue DepthPassClearValues;
 
 extern VkImageCreateInfo DeferredInputDepthUniformCreateInfo;
 extern VkImageCreateInfo DeferredInputColorUniformCreateInfo;
+extern VkImageCreateInfo ShadowMapArrayCreateInfo;
 
-extern BMR::BMRUniformImageInterfaceCreateInfo DeferredInputUniformInterfaceCreateInfo;
+extern BMR::BMRUniformImageInterfaceCreateInfo DeferredInputDepthUniformInterfaceCreateInfo;
 extern BMR::BMRUniformImageInterfaceCreateInfo DeferredInputUniformColorInterfaceCreateInfo;
+extern BMR::BMRUniformImageInterfaceCreateInfo ShadowMapArrayInterfaceCreateInfo;
+extern BMR::BMRUniformImageInterfaceCreateInfo ShadowMapElement1InterfaceCreateInfo;
+extern BMR::BMRUniformImageInterfaceCreateInfo ShadowMapElement2InterfaceCreateInfo;
+
+extern VkSamplerCreateInfo ShadowMapSamplerCreateInfo;
 
 extern VkBufferCreateInfo VpBufferInfo;

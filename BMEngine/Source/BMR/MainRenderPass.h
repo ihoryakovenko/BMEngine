@@ -11,21 +11,10 @@ namespace BMR
 	{
 		TerrainSampler,
 		EntitySampler,
-		EntityShadowMapSampler,
 		SkyBoxSampler, // TODO Same as TerrainSampler
 
 		Count
 	};
-
-	namespace DescriptorHandles
-	{
-		enum
-		{
-			ShadowMapSampler,
-
-			Count
-		};
-	}
 
 	namespace PushConstantHandles
 	{
@@ -77,32 +66,18 @@ namespace BMR
 		void CreateDescriptorLayouts(VkDevice LogicalDevice);
 		void CreatePipelineLayouts(VkDevice LogicalDevice, BMRUniformLayout VpLayout,
 			BMRUniformLayout EntityLightLayout, BMRUniformLayout LightSpaceMatrixLayout, BMRUniformLayout Material,
-			BMRUniformLayout Deferred);
+			BMRUniformLayout Deferred, BMRUniformLayout ShadowArray);
 		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent,
 			BMRPipelineShaderInputDepr ShaderInputs[BMRShaderNames::ShaderNamesCount], VkRenderPass main, VkRenderPass depth);
-		void CreateImages(VkPhysicalDevice PhysicalDevice, VkDevice LogicalDevice, u32 ImagesCount, VkExtent2D SwapExtent,
-			VkFormat DepthFormat, VkFormat ColorFormat);
-		// TODO: ShadowMapSampler == shit
-		void CreateSets(VkDescriptorPool Pool, VkDevice LogicalDevice, u32 ImagesCount, VkSampler ShadowMapSampler);
-		void CreateFrameBuffer(VkDevice LogicalDevice, VkExtent2D FrameBufferSizes, u32 ImagesCount,
-			VkImageView SwapchainImageViews[MAX_SWAPCHAIN_IMAGES_COUNT], VkRenderPass main, VkRenderPass depth,
-			VkImageView* ColorBufferViews, VkImageView* DepthBufferViews);
 
 		BMRPipeline Pipelines[BMRPipelineHandles::PipelineHandlesCount];
 
 		VkPushConstantRange PushConstants[PushConstantHandles::Count];
 		VkDescriptorSetLayout DescriptorLayouts[DescriptorLayoutHandles::Count];
-		VkDescriptorSet DescriptorsToImages[DescriptorHandles::Count][MAX_SWAPCHAIN_IMAGES_COUNT];
-		VkFramebuffer Framebuffers[FrameBuffersHandles::Count][MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		u32 ActiveLightSet = 0;
 		u32 ActiveVpSet = 0;
 		u32 ActiveLightSpaceMatrixSet = 0;
-
-		BMRUniform ShadowDepthBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
-		VkImageView ShadowArrayViews[MAX_SWAPCHAIN_IMAGES_COUNT];
-		VkImageView ShadowDepthBufferViews1[MAX_SWAPCHAIN_IMAGES_COUNT];
-		VkImageView ShadowDepthBufferViews2[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		// TODO: Fix
 		static inline VkDescriptorSet SamplerDescriptors[MAX_IMAGES];

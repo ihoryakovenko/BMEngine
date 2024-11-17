@@ -847,33 +847,37 @@ int main()
 
 	BMR::Init(glfwGetWin32Window(Window), Config);
 
-	std::vector<BMR::BMRRenderPass> RenderPasses;
-	RenderPasses.push_back(BMR::CreateRenderPass(&MainRenderPassSettings));
-	RenderPasses.push_back(BMR::CreateRenderPass(&DepthRenderPassSettings));
 
 
+	VkSampler ShadowMapSampler = BMR::CreateSampler(&ShadowMapSamplerCreateInfo);
 	
 	BMR::BMRUniformLayout VpLayout = BMR::CreateUniformLayout(&VpDescriptorType, &VpStageFlags, 1);
 	BMR::BMRUniformLayout EntityLightLayout = BMR::CreateUniformLayout(&EntityLightDescriptorType, &EntityLightStageFlags, 1);
 	BMR::BMRUniformLayout LightSpaceMatrixLayout = BMR::CreateUniformLayout(&LightSpaceMatrixDescriptorType, &LightSpaceMatrixStageFlags, 1);
 	BMR::BMRUniformLayout MaterialLayout = BMR::CreateUniformLayout(&MaterialDescriptorType, &MaterialStageFlags, 1);
 	BMR::BMRUniformLayout DeferredInputLayout = BMR::CreateUniformLayout(DeferredInputDescriptorType, DeferredInputFlags, 2);
+	BMR::BMRUniformLayout ShadowMapArrayLayout = BMR::CreateUniformLayout(&ShadowMapArrayDescriptorType, &ShadowMapArrayFlags, 1);
 
-	BMR::BMRUniform VpBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
-	BMR::BMRUniform EntityLightBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
-	BMR::BMRUniform LightSpaceMatrixBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
+	BMR::BMRUniform VpBuffer[3];
+	BMR::BMRUniform EntityLightBuffer[3];
+	BMR::BMRUniform LightSpaceMatrixBuffer[3];
 	BMR::BMRUniform MaterialBuffer;
-	BMR::BMRUniform DeferredInputDepthImage[MAX_SWAPCHAIN_IMAGES_COUNT];
-	BMR::BMRUniform DeferredInputColorImage[MAX_SWAPCHAIN_IMAGES_COUNT];
+	BMR::BMRUniform DeferredInputDepthImage[3];
+	BMR::BMRUniform DeferredInputColorImage[3];
+	BMR::BMRUniform ShadowMapArray[3];
 
-	BMR::BMRUniformImageInterface DeferredInputDepthImageInterface[MAX_SWAPCHAIN_IMAGES_COUNT];
-	BMR::BMRUniformImageInterface DeferredInputColorImageInterface[MAX_SWAPCHAIN_IMAGES_COUNT];
+	BMR::BMRUniformImageInterface DeferredInputDepthImageInterface[3];
+	BMR::BMRUniformImageInterface DeferredInputColorImageInterface[3];
+	BMR::BMRUniformImageInterface ShadowMapArrayImageInterface[3];
+	BMR::BMRUniformImageInterface ShadowMapElement1ImageInterface[3];
+	BMR::BMRUniformImageInterface ShadowMapElement2ImageInterface[3];
 
-	BMR::BMRUniformSet VpSet[MAX_SWAPCHAIN_IMAGES_COUNT];
-	BMR::BMRUniformSet EntityLightSet[MAX_SWAPCHAIN_IMAGES_COUNT];
-	BMR::BMRUniformSet LightSpaceMatrixSet[MAX_SWAPCHAIN_IMAGES_COUNT];
+	BMR::BMRUniformSet VpSet[3];
+	BMR::BMRUniformSet EntityLightSet[3];
+	BMR::BMRUniformSet LightSpaceMatrixSet[3];
 	BMR::BMRUniformSet MaterialSet;
-	BMR::BMRUniformSet DeferredInputSet[MAX_SWAPCHAIN_IMAGES_COUNT];
+	BMR::BMRUniformSet DeferredInputSet[3];
+	BMR::BMRUniformSet ShadowMapArraySet[3];
 
 	for (u32 i = 0; i < BMR::GetImageCount(); i++)
 	{
@@ -884,26 +888,31 @@ int main()
 
 		VpBufferInfo.size = VpBufferSize;
 		VpBuffer[i] = BMR::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
 		VpBufferInfo.size = LightBufferSize;
 		EntityLightBuffer[i] = BMR::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
 		VpBufferInfo.size = LightSpaceMatrixSize;
 		LightSpaceMatrixBuffer[i] = BMR::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 		DeferredInputDepthImage[i] = BMR::CreateUniformImage(&DeferredInputDepthUniformCreateInfo);
 		DeferredInputColorImage[i] = BMR::CreateUniformImage(&DeferredInputColorUniformCreateInfo);
+		ShadowMapArray[i] = BMR::CreateUniformImage(&ShadowMapArrayCreateInfo);
 
-		DeferredInputDepthImageInterface[i] = BMR::CreateImageInterface(&DeferredInputUniformInterfaceCreateInfo,
+		DeferredInputDepthImageInterface[i] = BMR::CreateImageInterface(&DeferredInputDepthUniformInterfaceCreateInfo,
 			DeferredInputDepthImage[i].Image);
-
 		DeferredInputColorImageInterface[i] = BMR::CreateImageInterface(&DeferredInputUniformColorInterfaceCreateInfo,
 			DeferredInputColorImage[i].Image);
-
+		ShadowMapArrayImageInterface[i] = BMR::CreateImageInterface(&ShadowMapArrayInterfaceCreateInfo,
+			ShadowMapArray[i].Image);
+		ShadowMapElement1ImageInterface[i] = BMR::CreateImageInterface(&ShadowMapElement1InterfaceCreateInfo,
+			ShadowMapArray[i].Image);
+		ShadowMapElement2ImageInterface[i] = BMR::CreateImageInterface(&ShadowMapElement2InterfaceCreateInfo,
+			ShadowMapArray[i].Image);
+	
 		BMR::CreateUniformSets(&VpLayout, 1, VpSet + i);
 		BMR::CreateUniformSets(&EntityLightLayout, 1, EntityLightSet + i);
 		BMR::CreateUniformSets(&LightSpaceMatrixLayout, 1, LightSpaceMatrixSet + i);
 		BMR::CreateUniformSets(&DeferredInputLayout, 1, DeferredInputSet + i);
+		BMR::CreateUniformSets(&ShadowMapArrayLayout, 1, ShadowMapArraySet + i);
 
 		BMR::BMRUniformSetAttachmentInfo VpBufferAttachmentInfo;
 		VpBufferAttachmentInfo.BufferInfo.buffer = VpBuffer[i].Buffer;
@@ -934,10 +943,17 @@ int main()
 		DeferredInputAttachmentInfo[1].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		DeferredInputAttachmentInfo[1].Type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
 
+		BMR::BMRUniformSetAttachmentInfo ShadowMapArrayAttachmentInfo;
+		ShadowMapArrayAttachmentInfo.ImageInfo.imageView = ShadowMapArrayImageInterface[i];
+		ShadowMapArrayAttachmentInfo.ImageInfo.sampler = ShadowMapSampler;
+		ShadowMapArrayAttachmentInfo.ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		ShadowMapArrayAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
 		BMR::AttachUniformsToSet(VpSet[i], &VpBufferAttachmentInfo, 1);
 		BMR::AttachUniformsToSet(EntityLightSet[i], &EntityLightAttachmentInfo, 1);
 		BMR::AttachUniformsToSet(LightSpaceMatrixSet[i], &LightSpaceMatrixAttachmentInfo, 1);
 		BMR::AttachUniformsToSet(DeferredInputSet[i], DeferredInputAttachmentInfo, 2);
+		BMR::AttachUniformsToSet(ShadowMapArraySet[i], &ShadowMapArrayAttachmentInfo, 1);
 	}
 
 	const VkDeviceSize MaterialSize = sizeof(BMR::BMRMaterial);
@@ -954,13 +970,47 @@ int main()
 
 	BMR::AttachUniformsToSet(MaterialSet, &MaterialAttachmentInfo, 1);
 
+	std::vector<BMR::BMRRenderPass> RenderPasses(2);
+	{
+		BMR::BMRRenderTarget RenderTarget;
+		for (u32 ImageIndex = 0; ImageIndex < BMR::GetImageCount(); ImageIndex++)
+		{
+			BMR::BMRAttachmentView* AttachmentView = RenderTarget.AttachmentViews + ImageIndex;
+
+			AttachmentView->ImageViews = Memory::BmMemoryManagementSystem::FrameAlloc<VkImageView>(MainRenderPassSettings.AttachmentDescriptionsCount);
+			AttachmentView->ImageViews[0] = BMR::GetSwapchainImageViews()[ImageIndex];
+			AttachmentView->ImageViews[1] = DeferredInputColorImageInterface[ImageIndex];
+			AttachmentView->ImageViews[2] = DeferredInputDepthImageInterface[ImageIndex];
+		
+		}
+
+		BMR::CreateRenderPass(&MainRenderPassSettings, &RenderTarget, MainScreenExtent, 1, BMR::GetImageCount(), &RenderPasses[0]);
+	}
+	{
+		BMR::BMRRenderTarget RenderTargets[2];
+		for (u32 ImageIndex = 0; ImageIndex < BMR::GetImageCount(); ImageIndex++)
+		{
+			BMR::BMRAttachmentView* Target1AttachmentView = RenderTargets[0].AttachmentViews + ImageIndex;
+			BMR::BMRAttachmentView* Target2AttachmentView = RenderTargets[1].AttachmentViews + ImageIndex;
+
+			Target1AttachmentView->ImageViews = Memory::BmMemoryManagementSystem::FrameAlloc<VkImageView>(DepthRenderPassSettings.AttachmentDescriptionsCount);
+			Target2AttachmentView->ImageViews = Memory::BmMemoryManagementSystem::FrameAlloc<VkImageView>(DepthRenderPassSettings.AttachmentDescriptionsCount);
+
+			Target1AttachmentView->ImageViews[0] = ShadowMapElement1ImageInterface[ImageIndex];
+			Target2AttachmentView->ImageViews[0] = ShadowMapElement2ImageInterface[ImageIndex];
+		}
+
+		BMR::CreateRenderPass(&DepthRenderPassSettings, RenderTargets, DepthViewportExtent, 2, BMR::GetImageCount(), &RenderPasses[1]);
+	}
+
 	BMR::TestSetRendeRpasses(RenderPasses[0], RenderPasses[1],
 		VpBuffer, VpLayout, VpSet,
 		EntityLightBuffer, EntityLightLayout, EntityLightSet,
 		LightSpaceMatrixBuffer, LightSpaceMatrixLayout, LightSpaceMatrixSet,
 		MaterialBuffer, MaterialLayout, MaterialSet,
 		DeferredInputDepthImageInterface, DeferredInputColorImageInterface,
-		DeferredInputLayout, DeferredInputSet);
+		DeferredInputLayout, DeferredInputSet,
+		ShadowMapArray, ShadowMapArrayLayout, ShadowMapArraySet);
 
 
 
@@ -1105,8 +1155,13 @@ int main()
 		BMR::DestroyUniformBuffer(LightSpaceMatrixBuffer[i]);
 		BMR::DestroyUniformImage(DeferredInputColorImage[i]);
 		BMR::DestroyUniformImage(DeferredInputDepthImage[i]);
+		BMR::DestroyUniformImage(ShadowMapArray[i]);
+
 		BMR::DestroyImageInterface(DeferredInputColorImageInterface[i]);
 		BMR::DestroyImageInterface(DeferredInputDepthImageInterface[i]);
+		BMR::DestroyImageInterface(ShadowMapArrayImageInterface[i]);
+		BMR::DestroyImageInterface(ShadowMapElement1ImageInterface[i]);
+		BMR::DestroyImageInterface(ShadowMapElement2ImageInterface[i]);
 	}
 
 	BMR::DestroyUniformBuffer(MaterialBuffer);
@@ -1116,10 +1171,13 @@ int main()
 	BMR::DestroyUniformLayout(LightSpaceMatrixLayout);
 	BMR::DestroyUniformLayout(MaterialLayout);
 	BMR::DestroyUniformLayout(DeferredInputLayout);
+	BMR::DestroyUniformLayout(ShadowMapArrayLayout);
 
-	for (auto Pass : RenderPasses)
+	BMR::DestroySampler(ShadowMapSampler);
+
+	for (auto& Pass : RenderPasses)
 	{
-		BMR::DestroyRenderPass(Pass);
+		BMR::DestroyRenderPass(&Pass);
 	}
 
 

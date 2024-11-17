@@ -5,8 +5,6 @@
 #include "Util/EngineTypes.h"
 #include "BMRInterfaceTypes.h"
 
-static const u32 MAX_SWAPCHAIN_IMAGES_COUNT = 3;
-
 namespace BMR
 {
 	bool Init(HWND WindowHandler, const BMRConfig& InConfig);
@@ -18,22 +16,27 @@ namespace BMR
 		BMRUniform* iLightSpaceBuffer, BMRUniformLayout iLightSpaceLayout, BMRUniformSet* iLightSpaceSet,
 		BMRUniform iMaterial, BMRUniformLayout iMaterialLayout, BMRUniformSet iMaterialSet,
 		BMRUniformImageInterface* iDeferredInputDepthImage, BMRUniformImageInterface* iDeferredInputColorImage,
-		BMRUniformLayout iDeferredInputLayout, BMRUniformSet* iDeferredInputSet);
+		BMRUniformLayout iDeferredInputLayout, BMRUniformSet* iDeferredInputSet,
+		BMRUniform* iShadowArray, BMRUniformLayout iShadowArrayLayout, BMRUniformSet* iShadowArraySet);
 
 	u32 GetImageCount();
+	VkImageView* GetSwapchainImageViews();
 
-	BMRRenderPass CreateRenderPass(const BMRRenderPassSettings* Settings);
+	void CreateRenderPass(const BMRRenderPassSettings* Settings, const BMRRenderTarget* Targets,
+		VkExtent2D TargetExtent, u32 TargetCount, u32 SwapchainImagesCount, BMRRenderPass* OutPass);
 	BMRUniform CreateUniformBuffer(const VkBufferCreateInfo* BufferInfo, VkMemoryPropertyFlags Properties);
 	BMRUniform CreateUniformImage(const VkImageCreateInfo* ImageCreateInfo);
 	BMRUniformLayout CreateUniformLayout(const VkDescriptorType* Types, const VkShaderStageFlags* Stages, u32 Count);
 	void CreateUniformSets(const BMRUniformLayout* Layouts, u32 Count, BMRUniformSet* OutSets);
 	BMRUniformImageInterface CreateImageInterface(const BMRUniformImageInterfaceCreateInfo* InterfaceCreateInfo, VkImage Image);
+	VkSampler CreateSampler(const VkSamplerCreateInfo* CreateInfo);
 
-	void DestroyRenderPass(BMRRenderPass Pass);
+	void DestroyRenderPass(BMRRenderPass* Pass);
 	void DestroyUniformBuffer(BMRUniform Buffer);
 	void DestroyUniformImage(BMRUniform Image);
 	void DestroyUniformLayout(BMRUniformLayout Layout);
 	void DestroyImageInterface(BMRUniformImageInterface Interface);
+	void DestroySampler(VkSampler Sampler);
 
 	void AttachUniformsToSet(BMRUniformSet Set, const BMRUniformSetAttachmentInfo* Infos, u32 BufferCount);
 	void UpdateUniformBuffer(BMRUniform Buffer, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);

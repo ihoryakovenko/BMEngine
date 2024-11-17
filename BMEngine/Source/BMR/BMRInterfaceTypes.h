@@ -8,6 +8,7 @@
 
 namespace BMR
 {
+	static const u32 MAX_SWAPCHAIN_IMAGES_COUNT = 3;
 	static const u32 MAX_VERTEX_INPUTS_ATTRIBUTES = 16;
 	static const u32 MAX_VERTEX_INPUT_BINDINGS = 16;
 
@@ -226,9 +227,35 @@ namespace BMR
 		VkImageSubresourceRange SubresourceRange;
 	};
 
+	struct BMRAttachmentView
+	{
+		// Count should be equal to AttachmentDescriptionsCount
+		VkImageView* ImageViews = nullptr;
+	};
+
+	struct BMRRenderTarget
+	{
+		BMRAttachmentView AttachmentViews[MAX_SWAPCHAIN_IMAGES_COUNT];
+	};
+
+	struct BMRFramebufferSet
+	{
+		VkFramebuffer FrameBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+	};
+
+	struct BMRRenderPass
+	{
+		VkRenderPass Pass = nullptr;
+
+		VkClearValue* ClearValues = nullptr;
+		u32 ClearValuesCount = 0;
+
+		BMRFramebufferSet* FramebufferSets = nullptr;
+		u32 FramebufferSetCount = 0;
+	};
+
 	typedef VkDescriptorSet BMRUniformSet;
 	typedef VkDescriptorSetLayout BMRUniformLayout;
-	typedef VkRenderPass BMRRenderPass;
 	typedef VkImageView BMRUniformImageInterface;
 
 	struct BMRPipeline
@@ -316,5 +343,8 @@ namespace BMR
 		VkSubpassDependency* SubpassDependencies = nullptr;
 		// Has to be 1 more then SubpassSettingsCount
 		u32 SubpassDependenciesCount = 0;
+
+		const VkClearValue* ClearValues = nullptr;
+		u32 ClearValuesCount = 0;
 	};
 }

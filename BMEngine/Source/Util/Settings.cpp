@@ -22,9 +22,18 @@ BMR::BMRRenderPassSettings DepthRenderPassSettings;
 
 VkImageCreateInfo DeferredInputDepthUniformCreateInfo;
 VkImageCreateInfo DeferredInputColorUniformCreateInfo;
+VkImageCreateInfo ShadowMapArrayCreateInfo;
 
-BMR::BMRUniformImageInterfaceCreateInfo DeferredInputUniformInterfaceCreateInfo;
+BMR::BMRUniformImageInterfaceCreateInfo DeferredInputDepthUniformInterfaceCreateInfo;
 BMR::BMRUniformImageInterfaceCreateInfo DeferredInputUniformColorInterfaceCreateInfo;
+BMR::BMRUniformImageInterfaceCreateInfo ShadowMapArrayInterfaceCreateInfo;
+BMR::BMRUniformImageInterfaceCreateInfo ShadowMapElement1InterfaceCreateInfo;
+BMR::BMRUniformImageInterfaceCreateInfo ShadowMapElement2InterfaceCreateInfo;
+
+VkSamplerCreateInfo ShadowMapSamplerCreateInfo;
+
+VkClearValue MainPassClearValues[3];
+VkClearValue DepthPassClearValues;
 
 VkBufferCreateInfo VpBufferInfo;
 
@@ -94,6 +103,24 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	VpBufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 	VpBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
+	// Samplers
+	ShadowMapSamplerCreateInfo = { };
+	ShadowMapSamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	ShadowMapSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;						// How to render when image is magnified on screen
+	ShadowMapSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;						// How to render when image is minified on screen
+	ShadowMapSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;	// How to handle texture wrap in U (x) direction
+	ShadowMapSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;	// How to handle texture wrap in V (y) direction
+	ShadowMapSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;	// How to handle texture wrap in W (z) direction
+	ShadowMapSamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;	// Border beyond texture (only workds for border clamp)
+	ShadowMapSamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;				// Whether coords should be normalized (between 0 and 1)
+	ShadowMapSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;		// Mipmap interpolation mode
+	ShadowMapSamplerCreateInfo.mipLodBias = 0.0f;								// Level of Details bias for mip level
+	ShadowMapSamplerCreateInfo.minLod = 0.0f;									// Minimum Level of Detail to pick mip level
+	ShadowMapSamplerCreateInfo.maxLod = 0.0f;									// Maximum Level of Detail to pick mip level
+	ShadowMapSamplerCreateInfo.anisotropyEnable = VK_TRUE;
+	ShadowMapSamplerCreateInfo.maxAnisotropy = 1; // Todo: support in config
+
+	// Images
 	DeferredInputDepthUniformCreateInfo = { };
 	DeferredInputDepthUniformCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	DeferredInputDepthUniformCreateInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -114,25 +141,59 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	DeferredInputColorUniformCreateInfo.format = ColorFormat;
 	DeferredInputColorUniformCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
 
-	DeferredInputUniformInterfaceCreateInfo = { };
-	DeferredInputUniformInterfaceCreateInfo.Flags = 0; // No flags
-	DeferredInputUniformInterfaceCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D;
-	DeferredInputUniformInterfaceCreateInfo.Format = DepthFormat;
-	DeferredInputUniformInterfaceCreateInfo.Components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-	DeferredInputUniformInterfaceCreateInfo.Components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-	DeferredInputUniformInterfaceCreateInfo.Components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-	DeferredInputUniformInterfaceCreateInfo.Components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-	DeferredInputUniformInterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-	DeferredInputUniformInterfaceCreateInfo.SubresourceRange.baseMipLevel = 0;
-	DeferredInputUniformInterfaceCreateInfo.SubresourceRange.levelCount = 1;
-	DeferredInputUniformInterfaceCreateInfo.SubresourceRange.baseArrayLayer = 0;
-	DeferredInputUniformInterfaceCreateInfo.SubresourceRange.layerCount = 1;
+	ShadowMapArrayCreateInfo = { };
+	ShadowMapArrayCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	ShadowMapArrayCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	ShadowMapArrayCreateInfo.extent.depth = 1;
+	ShadowMapArrayCreateInfo.mipLevels = 1;
+	ShadowMapArrayCreateInfo.arrayLayers = 1;
+	ShadowMapArrayCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	ShadowMapArrayCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	ShadowMapArrayCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	ShadowMapArrayCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	ShadowMapArrayCreateInfo.flags = 0;
+	ShadowMapArrayCreateInfo.format = ColorFormat;
+	ShadowMapArrayCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+	ShadowMapArrayCreateInfo.extent.width = DepthViewportExtent.width;
+	ShadowMapArrayCreateInfo.extent.height = DepthViewportExtent.height;
+	ShadowMapArrayCreateInfo.format = DepthFormat;
+	ShadowMapArrayCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	ShadowMapArrayCreateInfo.arrayLayers = 2;
 
-	DeferredInputUniformColorInterfaceCreateInfo = DeferredInputUniformInterfaceCreateInfo;
+	// Image views
+	DeferredInputDepthUniformInterfaceCreateInfo = { };
+	DeferredInputDepthUniformInterfaceCreateInfo.Flags = 0; // No flags
+	DeferredInputDepthUniformInterfaceCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D;
+	DeferredInputDepthUniformInterfaceCreateInfo.Format = DepthFormat;
+	DeferredInputDepthUniformInterfaceCreateInfo.Components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	DeferredInputDepthUniformInterfaceCreateInfo.Components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	DeferredInputDepthUniformInterfaceCreateInfo.Components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	DeferredInputDepthUniformInterfaceCreateInfo.Components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	DeferredInputDepthUniformInterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	DeferredInputDepthUniformInterfaceCreateInfo.SubresourceRange.baseMipLevel = 0;
+	DeferredInputDepthUniformInterfaceCreateInfo.SubresourceRange.levelCount = 1;
+	DeferredInputDepthUniformInterfaceCreateInfo.SubresourceRange.baseArrayLayer = 0;
+	DeferredInputDepthUniformInterfaceCreateInfo.SubresourceRange.layerCount = 1;
+
+	DeferredInputUniformColorInterfaceCreateInfo = DeferredInputDepthUniformInterfaceCreateInfo;
 	DeferredInputUniformColorInterfaceCreateInfo.Format = ColorFormat;
 	DeferredInputUniformColorInterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
+	ShadowMapArrayInterfaceCreateInfo = DeferredInputDepthUniformInterfaceCreateInfo;
+	ShadowMapArrayInterfaceCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+	ShadowMapArrayInterfaceCreateInfo.SubresourceRange.layerCount = 2;
+
+	ShadowMapElement1InterfaceCreateInfo = DeferredInputDepthUniformInterfaceCreateInfo;
+	ShadowMapElement1InterfaceCreateInfo.SubresourceRange.baseArrayLayer = 0;
+
+	ShadowMapElement2InterfaceCreateInfo = ShadowMapElement1InterfaceCreateInfo;
+	ShadowMapElement2InterfaceCreateInfo.SubresourceRange.baseArrayLayer = 1;
+
 	// MAIN RENDERPASS
+	MainPassClearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
+	MainPassClearValues[1].color = { 0.0f, 0.0f, 0.0f, 1.0f };
+	MainPassClearValues[2].depthStencil.depth = 1.0f;
+
 	const u32 SwapchainColorAttachmentIndex = 0;
 	const u32 SubpassColorAttachmentIndex = 1;
 	const u32 SubpassDepthAttachmentIndex = 2;
@@ -231,8 +292,12 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	MainRenderPassSettings.RenderPassName = MainRenderPassName;
 	MainRenderPassSettings.SubpassDependencies = MainPassSubpassDependencies;
 	MainRenderPassSettings.SubpassDependenciesCount = MainPassSubpassDependenciesCount;
+	MainRenderPassSettings.ClearValues = MainPassClearValues;
+	MainRenderPassSettings.ClearValuesCount = 3;
 
 	// DEPTH RENDERPASS
+	DepthPassClearValues.depthStencil.depth = 1.0f;
+
 	const u32 DepthSubpassAttachmentIndex = 0;
 
 	DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex] = { };
@@ -280,6 +345,8 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	DepthRenderPassSettings.RenderPassName = DepthRenderPassName;
 	DepthRenderPassSettings.SubpassDependencies = DepthPassSubpassDependencies;
 	DepthRenderPassSettings.SubpassDependenciesCount = DepthPassSubpassDependenciesCount;
+	DepthRenderPassSettings.ClearValues = &DepthPassClearValues;
+	DepthRenderPassSettings.ClearValuesCount = 1;
 
 	// Dynamic states TODO
 // Use vkCmdSetViewport(Commandbuffer, 0, 1, &Viewport) and vkCmdSetScissor(Commandbuffer, 0, 1, &Scissor)
