@@ -34,24 +34,30 @@
 #include <thread>
 #include "Util/Settings.h"
 
+struct Texture
+{
+	BMR::BMRUniform UniformData;
+	VkImageView ImageView = nullptr;
+};
+
 const u32 NumRows = 600;
 const u32 NumCols = 600;
 
-u32 TestTextureIndex;
-u32 WhiteTextureIndex;
-u32 ContainerTextureIndex;
-u32 ContainerSpecularTextureIndex;
-u32 BlendWindowIndex;
-u32 GrassTextureIndex;
-u32 SkyBoxCubeTextureIndex;
+Texture TestTextureIndex;
+Texture WhiteTextureIndex;
+Texture ContainerTextureIndex;
+Texture ContainerSpecularTextureIndex;
+Texture BlendWindowIndex;
+Texture GrassTextureIndex;
+Texture SkyBoxCubeTextureIndex;
 
-u32 TestMaterialIndex;
-u32 WhiteMaterialIndex;
-u32 ContainerMaterialIndex;
-u32 BlendWindowMaterial;
-u32 GrassMaterial;
-u32 SkyBoxMaterial;
-u32 TerrainMaterial;
+VkDescriptorSet TestMaterialIndex;
+VkDescriptorSet WhiteMaterialIndex;
+VkDescriptorSet ContainerMaterialIndex;
+VkDescriptorSet BlendWindowMaterial;
+VkDescriptorSet GrassMaterial;
+VkDescriptorSet SkyBoxMaterial;
+VkDescriptorSet TerrainMaterial;
 
 TerrainVertex TerrainVerticesData[NumRows][NumCols];
 
@@ -59,6 +65,15 @@ std::vector<BMR::BMRDrawEntity> DrawEntities;
 BMR::BMRConfig Config;
 std::vector<std::vector<char>> ShaderCodes(BMR::BMRShaderNames::ShaderNamesCount);
 BMR::BMRDrawSkyBoxEntity SkyBox;
+
+
+VkSampler ShadowMapSampler;
+VkSampler DiffuseSampler;
+VkSampler SpecularSampler;
+
+VkDescriptorSetLayout EntitySamplerLayout;
+
+std::vector<Texture> Textures;
 
 void GenerateTerrain(std::vector<u32>& Indices)
 {
@@ -146,7 +161,7 @@ struct TestMesh
 {
 	std::vector<EntityVertex> vertices;
 	std::vector<u32> indices;
-	int MaterialIndex;
+	VkDescriptorSet MaterialIndex;
 	glm::mat4 Model = glm::mat4(1.0f);
 };
 
@@ -154,7 +169,7 @@ struct SkyBoxMesh
 {
 	std::vector<SkyBoxVertex> vertices;
 	std::vector<u32> indices;
-	int MaterialIndex;
+	VkDescriptorSet MaterialIndex;
 };
 
 namespace std
@@ -253,7 +268,7 @@ void BMRLog(BMR::BMRLogType LogType, const char* Format, va_list Args)
 	}
 }
 
-u32 AddTexture(const char* DiffuseTexturePath)
+Texture AddTexture(const char* DiffuseTexturePath)
 {
 	int Width;
 	int Height;
@@ -273,13 +288,50 @@ u32 AddTexture(const char* DiffuseTexturePath)
 	Info.LayersCount = 1;
 	Info.Data = &ImageData;
 
-	const u32 Handle = BMR::LoadTexture(Info, BMR::TextureType_2D);
+	VkImageCreateInfo ImageCreateInfo;
+	ImageCreateInfo = { };
+	ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	ImageCreateInfo.extent.width = Info.Width;
+	ImageCreateInfo.extent.height = Info.Height;
+	ImageCreateInfo.extent.depth = 1;
+	ImageCreateInfo.mipLevels = 1;
+	ImageCreateInfo.arrayLayers = Info.LayersCount;
+	ImageCreateInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+	ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	ImageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	BMR::BMRUniform TextureUniform = BMR::CreateUniformImage(&ImageCreateInfo);
+	BMR::CopyDataToImage(TextureUniform.Image, Info.Width, Info.Height, Info.Format, Info.LayersCount, Info.Data);
+
 	stbi_image_free(ImageData);
 
-	return Handle;
+	BMR::BMRUniformImageInterfaceCreateInfo InterfaceCreateInfo = { };
+	InterfaceCreateInfo.Flags = 0;
+	InterfaceCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D;
+	InterfaceCreateInfo.Format = VK_FORMAT_R8G8B8A8_SRGB;
+	InterfaceCreateInfo.Components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	InterfaceCreateInfo.Components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	InterfaceCreateInfo.Components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	InterfaceCreateInfo.Components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	InterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	InterfaceCreateInfo.SubresourceRange.baseMipLevel = 0;
+	InterfaceCreateInfo.SubresourceRange.levelCount = 1;
+	InterfaceCreateInfo.SubresourceRange.baseArrayLayer = 0;
+	InterfaceCreateInfo.SubresourceRange.layerCount = 1;
+
+	VkImageView TextureInterface = BMR::CreateImageInterface(&InterfaceCreateInfo, TextureUniform.Image);
+
+	Texture Tex;
+	Tex.UniformData = TextureUniform;
+	Tex.ImageView = TextureInterface;
+	return Tex;
 }
 
-u32 LoadCubeTexture()
+Texture LoadCubeTexture()
 {
 	const u32 texCount = 6;
 
@@ -316,14 +368,51 @@ u32 LoadCubeTexture()
 	Info.LayersCount = texCount;
 	Info.Data = CubeTexture;
 
-	const u32 Handle = BMR::LoadTexture(Info, BMR::TextureType_CUBE);
-	
+	VkImageCreateInfo ImageCreateInfo;
+	ImageCreateInfo = { };
+	ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	ImageCreateInfo.extent.width = Info.Width;
+	ImageCreateInfo.extent.height = Info.Height;
+	ImageCreateInfo.extent.depth = 1;
+	ImageCreateInfo.mipLevels = 1;
+	ImageCreateInfo.arrayLayers = Info.LayersCount;
+	ImageCreateInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+	ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	ImageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	ImageCreateInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+
+	BMR::BMRUniform TextureUniform = BMR::CreateUniformImage(&ImageCreateInfo);
+	BMR::CopyDataToImage(TextureUniform.Image, Info.Width, Info.Height, Info.Format, Info.LayersCount, Info.Data);
+
 	for (u32 i = 0; i < texCount; ++i)
 	{
 		stbi_image_free(CubeTexture[i]);
-	}
+	};
 
-	return Handle;
+	BMR::BMRUniformImageInterfaceCreateInfo InterfaceCreateInfo = { };
+	InterfaceCreateInfo.Flags = 0;
+	InterfaceCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_CUBE;
+	InterfaceCreateInfo.Format = VK_FORMAT_R8G8B8A8_SRGB;
+	InterfaceCreateInfo.Components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	InterfaceCreateInfo.Components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	InterfaceCreateInfo.Components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	InterfaceCreateInfo.Components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	InterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	InterfaceCreateInfo.SubresourceRange.baseMipLevel = 0;
+	InterfaceCreateInfo.SubresourceRange.levelCount = 1;
+	InterfaceCreateInfo.SubresourceRange.baseArrayLayer = 0;
+	InterfaceCreateInfo.SubresourceRange.layerCount = Info.LayersCount;
+
+	VkImageView TextureInterface = BMR::CreateImageInterface(&InterfaceCreateInfo, TextureUniform.Image);
+
+	Texture Tex;
+	Tex.UniformData = TextureUniform;
+	Tex.ImageView = TextureInterface;
+	return Tex;
 }
 
 void WindowCloseCallback(GLFWwindow* Window)
@@ -384,7 +473,7 @@ void MoveCamera(GLFWwindow* Window, f32 DeltaTime, Camera& MainCamera)
 	MainCamera.CameraFront = glm::normalize(Front);
 }
 
-TestMesh CreateCubeMesh(const char* Modelpath, int materialIndex)
+TestMesh CreateCubeMesh(const char* Modelpath, VkDescriptorSet materialIndex)
 {
 	TestMesh cube;
 
@@ -454,7 +543,7 @@ TestMesh CreateCubeMesh(const char* Modelpath, int materialIndex)
 	return cube;
 }
 
-SkyBoxMesh CreateSkyBoxMesh(const char* Modelpath, int materialIndex)
+SkyBoxMesh CreateSkyBoxMesh(const char* Modelpath, VkDescriptorSet materialIndex)
 {
 	SkyBoxMesh cube;
 
@@ -522,13 +611,42 @@ void LoadDrawEntities()
 
 	SkyBoxCubeTextureIndex = LoadCubeTexture();
 
-	TestMaterialIndex = BMR::LoadEntityMaterial(TestTextureIndex, ContainerSpecularTextureIndex);
-	WhiteMaterialIndex = BMR::LoadEntityMaterial(WhiteTextureIndex, WhiteTextureIndex);
-	ContainerMaterialIndex = BMR::LoadEntityMaterial(ContainerTextureIndex, ContainerSpecularTextureIndex);
-	BlendWindowMaterial = BMR::LoadEntityMaterial(BlendWindowIndex, BlendWindowIndex);
-	GrassMaterial = BMR::LoadEntityMaterial(GrassTextureIndex, GrassTextureIndex);
-	SkyBoxMaterial = BMR::LoadSkyBoxMaterial(SkyBoxCubeTextureIndex);
-	TerrainMaterial = BMR::LoadTerrainMaterial(TestTextureIndex);
+
+
+	BMR::BMRUniformSetAttachmentInfo SetInfo[2];
+	SetInfo[0].ImageInfo.imageView = TestTextureIndex.ImageView;
+	SetInfo[0].ImageInfo.sampler = DiffuseSampler;
+	SetInfo[0].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	SetInfo[0].Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+	SetInfo[1].ImageInfo.imageView = TestTextureIndex.ImageView;
+	SetInfo[1].ImageInfo.sampler = SpecularSampler;
+	SetInfo[1].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	SetInfo[1].Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+	BMR::AttachUniformsToSet(TestMaterialIndex, SetInfo, 2);
+
+	SetInfo[0].ImageInfo.imageView = WhiteTextureIndex.ImageView;
+	SetInfo[1].ImageInfo.imageView = WhiteTextureIndex.ImageView;
+	BMR::AttachUniformsToSet(WhiteMaterialIndex, SetInfo, 2);
+
+	SetInfo[0].ImageInfo.imageView = ContainerTextureIndex.ImageView;
+	SetInfo[1].ImageInfo.imageView = ContainerSpecularTextureIndex.ImageView;
+	BMR::AttachUniformsToSet(ContainerMaterialIndex, SetInfo, 2);
+
+	SetInfo[0].ImageInfo.imageView = BlendWindowIndex.ImageView;
+	SetInfo[1].ImageInfo.imageView = BlendWindowIndex.ImageView;
+	BMR::AttachUniformsToSet(BlendWindowMaterial, SetInfo, 2);
+
+	SetInfo[0].ImageInfo.imageView = GrassTextureIndex.ImageView;
+	SetInfo[1].ImageInfo.imageView = GrassTextureIndex.ImageView;
+	BMR::AttachUniformsToSet(GrassMaterial, SetInfo, 2);
+
+	SetInfo[0].ImageInfo.imageView = SkyBoxCubeTextureIndex.ImageView;
+	BMR::AttachUniformsToSet(SkyBoxMaterial, SetInfo, 1);
+
+	SetInfo[0].ImageInfo.imageView = TestTextureIndex.ImageView;
+	BMR::AttachUniformsToSet(TerrainMaterial, SetInfo, 1);
 
 	tinyobj::attrib_t Attrib;
 	std::vector<tinyobj::shape_t> Shapes;
@@ -540,19 +658,36 @@ void LoadDrawEntities()
 		assert(false);
 	}
 
-	std::vector<int> MaterialToTexture(Materials.size());
+	std::vector<VkDescriptorSet> MaterialToTexture(Materials.size());
 
 	for (size_t i = 0; i < Materials.size(); i++)
 	{
-		MaterialToTexture[i] = BlendWindowMaterial;
 		const tinyobj::material_t& Material = Materials[i];
 		if (!Material.diffuse_texname.empty())
 		{
 			int Idx = Material.diffuse_texname.rfind("\\");
 			std::string FileName = "./Resources/Textures/" + Material.diffuse_texname.substr(Idx + 1);
 
-			const u32 NewTextureIndex = AddTexture(FileName.c_str());
-			MaterialToTexture[i] = BMR::LoadEntityMaterial(NewTextureIndex, NewTextureIndex);
+			const Texture NewTextureIndex = AddTexture(FileName.c_str());
+
+			BMR::CreateUniformSets(&EntitySamplerLayout, 1, &MaterialToTexture[i]);
+
+			BMR::BMRUniformSetAttachmentInfo SetInfo[2];
+			SetInfo[0].ImageInfo.imageView = NewTextureIndex.ImageView;
+			SetInfo[0].ImageInfo.sampler = DiffuseSampler;
+			SetInfo[0].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			SetInfo[0].Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+			SetInfo[1].ImageInfo.imageView = NewTextureIndex.ImageView;
+			SetInfo[1].ImageInfo.sampler = SpecularSampler;
+			SetInfo[1].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			SetInfo[1].Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+			BMR::AttachUniformsToSet(MaterialToTexture[i], SetInfo, 2);
+		}
+		else
+		{
+			MaterialToTexture[i] = BlendWindowMaterial;
 		}
 	}
 
@@ -656,7 +791,7 @@ void LoadDrawEntities()
 
 		DrawEntities[i].IndicesCount = ModelMeshes[i].indices.size();
 		DrawEntities[i].Model = ModelMeshes[i].Model;
-		DrawEntities[i].MaterialIndex = ModelMeshes[i].MaterialIndex;
+		DrawEntities[i].TextureSet = ModelMeshes[i].MaterialIndex;
 	}
 
 	auto SkyBoxMesh = CreateSkyBoxMesh(SkyBoxObj, SkyBoxMaterial);
@@ -665,7 +800,7 @@ void LoadDrawEntities()
 		sizeof(SkyBoxVertex), SkyBoxMesh.vertices.size());
 	SkyBox.IndexOffset = BMR::LoadIndices(SkyBoxMesh.indices.data(), SkyBoxMesh.indices.size());
 	SkyBox.IndicesCount = SkyBoxMesh.indices.size();
-	SkyBox.MaterialIndex = SkyBoxMesh.MaterialIndex;
+	SkyBox.TextureSet = SkyBoxMesh.MaterialIndex;
 
 	{
 		glm::vec3 CubePos(0.0f, 0.0f, 8.0f);
@@ -763,30 +898,6 @@ void LoadShaders()
 	}
 }
 
-void SortDrawObjects(BMR::BMRDrawScene& Scene)
-{
-	// TODO: Need to sort objects by distance to camera
-	int LastOpaqueIndex = Scene.DrawEntitiesCount - 1;
-	for (; LastOpaqueIndex >= 0; --LastOpaqueIndex)
-	{
-		if (Scene.DrawEntities[LastOpaqueIndex].MaterialIndex != GrassMaterial &&
-			Scene.DrawEntities[LastOpaqueIndex].MaterialIndex != BlendWindowMaterial)
-		{
-			break;
-		}
-	}
-
-	for (int i = 0; i < LastOpaqueIndex; ++i)
-	{
-		if (Scene.DrawEntities[i].MaterialIndex == GrassMaterial ||
-			Scene.DrawEntities[i].MaterialIndex == BlendWindowMaterial)
-		{
-			std::swap(Scene.DrawEntities[i], Scene.DrawEntities[LastOpaqueIndex]);
-			--LastOpaqueIndex;
-		}
-	}
-}
-
 void UpdateScene(BMR::BMRDrawScene& Scene, f32 DeltaTime)
 {
 	static f32 Angle = 0.0f;
@@ -849,14 +960,18 @@ int main()
 
 
 
-	VkSampler ShadowMapSampler = BMR::CreateSampler(&ShadowMapSamplerCreateInfo);
+	ShadowMapSampler = BMR::CreateSampler(&ShadowMapSamplerCreateInfo);
+	DiffuseSampler = BMR::CreateSampler(&DiffuseSamplerCreateInfo);
+	SpecularSampler = BMR::CreateSampler(&SpecularSamplerCreateInfo);
 	
-	BMR::BMRUniformLayout VpLayout = BMR::CreateUniformLayout(&VpDescriptorType, &VpStageFlags, 1);
-	BMR::BMRUniformLayout EntityLightLayout = BMR::CreateUniformLayout(&EntityLightDescriptorType, &EntityLightStageFlags, 1);
-	BMR::BMRUniformLayout LightSpaceMatrixLayout = BMR::CreateUniformLayout(&LightSpaceMatrixDescriptorType, &LightSpaceMatrixStageFlags, 1);
-	BMR::BMRUniformLayout MaterialLayout = BMR::CreateUniformLayout(&MaterialDescriptorType, &MaterialStageFlags, 1);
-	BMR::BMRUniformLayout DeferredInputLayout = BMR::CreateUniformLayout(DeferredInputDescriptorType, DeferredInputFlags, 2);
-	BMR::BMRUniformLayout ShadowMapArrayLayout = BMR::CreateUniformLayout(&ShadowMapArrayDescriptorType, &ShadowMapArrayFlags, 1);
+	VkDescriptorSetLayout VpLayout = BMR::CreateUniformLayout(&VpDescriptorType, &VpStageFlags, 1);
+	VkDescriptorSetLayout EntityLightLayout = BMR::CreateUniformLayout(&EntityLightDescriptorType, &EntityLightStageFlags, 1);
+	VkDescriptorSetLayout LightSpaceMatrixLayout = BMR::CreateUniformLayout(&LightSpaceMatrixDescriptorType, &LightSpaceMatrixStageFlags, 1);
+	VkDescriptorSetLayout MaterialLayout = BMR::CreateUniformLayout(&MaterialDescriptorType, &MaterialStageFlags, 1);
+	VkDescriptorSetLayout DeferredInputLayout = BMR::CreateUniformLayout(DeferredInputDescriptorType, DeferredInputFlags, 2);
+	VkDescriptorSetLayout ShadowMapArrayLayout = BMR::CreateUniformLayout(&ShadowMapArrayDescriptorType, &ShadowMapArrayFlags, 1);
+	EntitySamplerLayout = BMR::CreateUniformLayout(EntitySamplerDescriptorType, EntitySamplerInputFlags, 2);
+	VkDescriptorSetLayout TerrainSkyBoxLayout = BMR::CreateUniformLayout(&TerrainSkyBoxSamplerDescriptorType, &TerrainSkyBoxArrayFlags, 1);
 
 	BMR::BMRUniform VpBuffer[3];
 	BMR::BMRUniform EntityLightBuffer[3];
@@ -866,18 +981,18 @@ int main()
 	BMR::BMRUniform DeferredInputColorImage[3];
 	BMR::BMRUniform ShadowMapArray[3];
 
-	BMR::BMRUniformImageInterface DeferredInputDepthImageInterface[3];
-	BMR::BMRUniformImageInterface DeferredInputColorImageInterface[3];
-	BMR::BMRUniformImageInterface ShadowMapArrayImageInterface[3];
-	BMR::BMRUniformImageInterface ShadowMapElement1ImageInterface[3];
-	BMR::BMRUniformImageInterface ShadowMapElement2ImageInterface[3];
+	VkImageView DeferredInputDepthImageInterface[3];
+	VkImageView DeferredInputColorImageInterface[3];
+	VkImageView ShadowMapArrayImageInterface[3];
+	VkImageView ShadowMapElement1ImageInterface[3];
+	VkImageView ShadowMapElement2ImageInterface[3];
 
-	BMR::BMRUniformSet VpSet[3];
-	BMR::BMRUniformSet EntityLightSet[3];
-	BMR::BMRUniformSet LightSpaceMatrixSet[3];
-	BMR::BMRUniformSet MaterialSet;
-	BMR::BMRUniformSet DeferredInputSet[3];
-	BMR::BMRUniformSet ShadowMapArraySet[3];
+	VkDescriptorSet VpSet[3];
+	VkDescriptorSet EntityLightSet[3];
+	VkDescriptorSet LightSpaceMatrixSet[3];
+	VkDescriptorSet MaterialSet;
+	VkDescriptorSet DeferredInputSet[3];
+	VkDescriptorSet ShadowMapArraySet[3];
 
 	for (u32 i = 0; i < BMR::GetImageCount(); i++)
 	{
@@ -970,6 +1085,14 @@ int main()
 
 	BMR::AttachUniformsToSet(MaterialSet, &MaterialAttachmentInfo, 1);
 
+	BMR::CreateUniformSets(&EntitySamplerLayout, 1, &TestMaterialIndex);
+	BMR::CreateUniformSets(&EntitySamplerLayout, 1, &WhiteMaterialIndex);
+	BMR::CreateUniformSets(&EntitySamplerLayout, 1, &ContainerMaterialIndex);
+	BMR::CreateUniformSets(&EntitySamplerLayout, 1, &BlendWindowMaterial);
+	BMR::CreateUniformSets(&EntitySamplerLayout, 1, &GrassMaterial);
+	BMR::CreateUniformSets(&TerrainSkyBoxLayout, 1, &SkyBoxMaterial);
+	BMR::CreateUniformSets(&TerrainSkyBoxLayout, 1, &TerrainMaterial);
+
 	std::vector<BMR::BMRRenderPass> RenderPasses(2);
 	{
 		BMR::BMRRenderTarget RenderTarget;
@@ -1010,7 +1133,8 @@ int main()
 		MaterialBuffer, MaterialLayout, MaterialSet,
 		DeferredInputDepthImageInterface, DeferredInputColorImageInterface,
 		DeferredInputLayout, DeferredInputSet,
-		ShadowMapArray, ShadowMapArrayLayout, ShadowMapArraySet);
+		ShadowMapArray, ShadowMapArrayLayout, ShadowMapArraySet,
+		EntitySamplerLayout, TerrainSkyBoxLayout);
 
 
 
@@ -1031,7 +1155,7 @@ int main()
 	Scene.SkyBox = SkyBox;
 	Scene.DrawSkyBox = true;
 
-	const f32 Near = 1.0f;
+	const f32 Near = 0.1f;
 	const f32 Far = 100.0f;
 
 	const float Aspect = (float)MainScreenExtent.width / (float)MainScreenExtent.height;
@@ -1046,7 +1170,7 @@ int main()
 		sizeof(TerrainVertex), NumRows * NumCols);
 	TestDrawTerrainEntity.IndexOffset = BMR::LoadIndices(TerrainIndices.data(), TerrainIndices.size());
 	TestDrawTerrainEntity.IndicesCount = TerrainIndices.size();
-	TestDrawTerrainEntity.MaterialIndex = TerrainMaterial;
+	TestDrawTerrainEntity.TextureSet = TerrainMaterial;
 
 	TerrainIndices.clear();
 	TerrainIndices.shrink_to_fit();
@@ -1135,7 +1259,6 @@ int main()
 		TestData.SpotLight.LightSpaceMatrix = Scene.ViewProjection.Projection * Scene.ViewProjection.View;
 
 		Scene.LightEntity = &TestData;
-		SortDrawObjects(Scene);
 		Draw(Scene);
 
 		Memory::BmMemoryManagementSystem::FrameDealloc();
@@ -1172,8 +1295,11 @@ int main()
 	BMR::DestroyUniformLayout(MaterialLayout);
 	BMR::DestroyUniformLayout(DeferredInputLayout);
 	BMR::DestroyUniformLayout(ShadowMapArrayLayout);
+	BMR::DestroyUniformLayout(EntitySamplerLayout);
+	BMR::DestroyUniformLayout(TerrainSkyBoxLayout);
 
 	BMR::DestroySampler(ShadowMapSampler);
+	BMR::DestroySampler(DiffuseSampler);
 
 	for (auto& Pass : RenderPasses)
 	{

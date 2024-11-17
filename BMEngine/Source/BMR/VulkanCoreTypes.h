@@ -20,15 +20,6 @@ namespace BMR
 	static const u32 MAX_DESCRIPTOR_SET_LAYOUTS_PER_PIPELINE = 8;
 	static const u32 MAX_DESCRIPTOR_BINDING_PER_SET = 16;
 
-	enum SamplerType
-	{
-		SamplerType_Diffuse,
-		SamplerType_Specular,
-
-		SamplerType_Count,
-		SamplerType_None
-	};
-
 	struct BMRPhysicalDeviceIndices
 	{
 		int GraphicsFamily = -1;

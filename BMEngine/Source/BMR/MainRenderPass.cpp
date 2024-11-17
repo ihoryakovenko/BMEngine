@@ -26,14 +26,6 @@ namespace BMR
 
 	static const u32 TmpDepthSubpassIndex = 0;
 
-	void BMRMainRenderPass::ClearResources(VkDevice LogicalDevice, u32 ImagesCount)
-	{
-		for (u32 i = 0; i < DescriptorLayoutHandles::Count; ++i)
-		{
-			vkDestroyDescriptorSetLayout(LogicalDevice, DescriptorLayouts[i], nullptr);
-		}
-	}
-
 	void BMRMainRenderPass::SetupPushConstants()
 	{
 		PushConstants[PushConstantHandles::Model].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -42,72 +34,21 @@ namespace BMR
 		PushConstants[PushConstantHandles::Model].size = sizeof(BMRModel);
 	}
 
-	void BMRMainRenderPass::CreateDescriptorLayouts(VkDevice LogicalDevice)
-	{
-		const u32 EntitySamplerLayoutBindingCount = 2;
-		VkDescriptorSetLayoutBinding EntitySamplerLayoutBinding[EntitySamplerLayoutBindingCount];
-		EntitySamplerLayoutBinding[0].binding = 0;
-		EntitySamplerLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		EntitySamplerLayoutBinding[0].descriptorCount = 1;
-		EntitySamplerLayoutBinding[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		EntitySamplerLayoutBinding[0].pImmutableSamplers = nullptr;
-		EntitySamplerLayoutBinding[1] = EntitySamplerLayoutBinding[0];
-		EntitySamplerLayoutBinding[1].binding = 1;
-
-		VkDescriptorSetLayoutBinding TerrainSamplerLayoutBinding = { };
-		TerrainSamplerLayoutBinding.binding = 0;
-		TerrainSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		TerrainSamplerLayoutBinding.descriptorCount = 1;
-		TerrainSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		TerrainSamplerLayoutBinding.pImmutableSamplers = nullptr;
-
-		VkDescriptorSetLayoutBinding SkyBoxSamplerLayoutBinding = { };
-		SkyBoxSamplerLayoutBinding.binding = 0;
-		SkyBoxSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		SkyBoxSamplerLayoutBinding.descriptorCount = 1;
-		SkyBoxSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		SkyBoxSamplerLayoutBinding.pImmutableSamplers = nullptr;
-
-		u32 BindingCountTable[DescriptorLayoutHandles::Count];
-		BindingCountTable[DescriptorLayoutHandles::TerrainSampler] = 1;
-		BindingCountTable[DescriptorLayoutHandles::EntitySampler] = EntitySamplerLayoutBindingCount;
-		BindingCountTable[DescriptorLayoutHandles::SkyBoxSampler] = 1;
-
-		const VkDescriptorSetLayoutBinding* BindingsTable[DescriptorLayoutHandles::Count];
-		BindingsTable[DescriptorLayoutHandles::TerrainSampler] = &TerrainSamplerLayoutBinding;
-		BindingsTable[DescriptorLayoutHandles::EntitySampler] = EntitySamplerLayoutBinding;
-		BindingsTable[DescriptorLayoutHandles::SkyBoxSampler] = &SkyBoxSamplerLayoutBinding;
-
-		VkDescriptorSetLayoutCreateInfo LayoutCreateInfos[DescriptorLayoutHandles::Count];
-		for (u32 i = 0; i < DescriptorLayoutHandles::Count; ++i)
-		{
-			LayoutCreateInfos[i] = { };
-			LayoutCreateInfos[i].sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			LayoutCreateInfos[i].bindingCount = BindingCountTable[i];
-			LayoutCreateInfos[i].pBindings = BindingsTable[i];
-
-			const VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &(LayoutCreateInfos[i]), nullptr, &(DescriptorLayouts[i]));
-			if (Result != VK_SUCCESS)
-			{
-				HandleLog(BMRLogType::LogType_Error, "vkCreateDescriptorSetLayout result is %d", Result);
-			}
-		}
-	}
-
-	void BMRMainRenderPass::CreatePipelineLayouts(VkDevice LogicalDevice, BMRUniformLayout VpLayout,
-		BMRUniformLayout EntityLightLayout, BMRUniformLayout LightSpaceMatrixLayout, BMRUniformLayout Material,
-		BMRUniformLayout Deferred, BMRUniformLayout ShadowArray)
+	void BMRMainRenderPass::CreatePipelineLayouts(VkDevice LogicalDevice, VkDescriptorSetLayout VpLayout,
+		VkDescriptorSetLayout EntityLightLayout, VkDescriptorSetLayout LightSpaceMatrixLayout, VkDescriptorSetLayout Material,
+		VkDescriptorSetLayout Deferred, VkDescriptorSetLayout ShadowArray, VkDescriptorSetLayout EntitySampler,
+		VkDescriptorSetLayout TerrainSkyBoxSampler)
 	{
 		const u32 TerrainDescriptorLayoutsCount = 2;
 		VkDescriptorSetLayout TerrainDescriptorLayouts[TerrainDescriptorLayoutsCount] = {
 			VpLayout,
-			DescriptorLayouts[DescriptorLayoutHandles::TerrainSampler]
+			TerrainSkyBoxSampler
 		};
 
 		const u32 EntityDescriptorLayoutCount = 5;
 		VkDescriptorSetLayout EntityDescriptorLayouts[EntityDescriptorLayoutCount] = {
 			VpLayout,
-			DescriptorLayouts[DescriptorLayoutHandles::EntitySampler],
+			EntitySampler,
 			EntityLightLayout,
 			Material,
 			ShadowArray
@@ -116,7 +57,7 @@ namespace BMR
 		const u32 SkyBoxDescriptorLayoutCount = 2;
 		VkDescriptorSetLayout SkyBoxDescriptorLayouts[SkyBoxDescriptorLayoutCount] = {
 			VpLayout,
-			DescriptorLayouts[DescriptorLayoutHandles::SkyBoxSampler],
+			TerrainSkyBoxSampler,
 		};
 
 		u32 SetLayoutCountTable[BMRPipelineHandles::PipelineHandlesCount];

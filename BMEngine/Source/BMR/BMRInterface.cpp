@@ -17,8 +17,6 @@
 
 namespace BMR
 {
-	static u32 UpdateTextureDescriptor(u32* ImageViewIndices, u32 Count, DescriptorLayoutHandles LayoutHandle);
-
 	static Memory::FrameArray<VkExtensionProperties> GetAvailableExtensionProperties();
 	static Memory::FrameArray<VkLayerProperties> GetAvailableInstanceLayerProperties();
 	static Memory::FrameArray<const char*> GetRequiredInstanceExtensions(const char** ValidationExtensions, u32 ValidationExtensionsCount);
@@ -92,12 +90,6 @@ namespace BMR
 
 	static VkDescriptorPool MainPool = nullptr;
 
-	static VkSampler Sampler[SamplerType::SamplerType_Count];
-
-	static BMRUniform TextureBuffers[MAX_IMAGES];
-	static u32 ImageArraysCount = 0;
-	static VkImageView TextureImageViews[MAX_IMAGES];
-
 	static VkSurfaceFormatKHR SurfaceFormat;
 
 
@@ -108,24 +100,25 @@ namespace BMR
 	BMRRenderPass MainPass;
 	BMRRenderPass DepthPass;
 	BMR::BMRUniform* VpBuffer;
-	BMR::BMRUniformLayout VpLayout;
-	BMR::BMRUniformSet* VpSet;
+	VkDescriptorSetLayout VpLayout;
+	VkDescriptorSet* VpSet;
 	BMRUniform* EntityLight;
-	BMRUniformLayout EntityLightLayout;
-	BMRUniformSet* EntityLightSet;
+	VkDescriptorSetLayout EntityLightLayout;
+	VkDescriptorSet* EntityLightSet;
 	BMRUniform* LightSpaceBuffer;
-	BMRUniformLayout LightSpaceLayout;
-	BMRUniformSet* LightSpaceSet;
+	VkDescriptorSetLayout LightSpaceLayout;
+	VkDescriptorSet* LightSpaceSet;
 	BMRUniform Material;
-	BMRUniformLayout materialLayout;
-	BMRUniformSet MaterialSet;
-	BMRUniformImageInterface* DeferredInputDepthImage;
-	BMRUniformImageInterface* DeferredInputColorImage;
-	BMRUniformLayout DeferredInputLayout;
-	BMRUniformSet* DeferredInputSet;
+	VkDescriptorSetLayout materialLayout;
+	VkDescriptorSet MaterialSet;
+	VkImageView* DeferredInputDepthImage;
+	VkImageView* DeferredInputColorImage;
+	VkDescriptorSetLayout DeferredInputLayout;
+	VkDescriptorSet* DeferredInputSet;
 	BMRUniform* ShadowArray;
-	BMRUniformLayout ShadowArrayLayout;
-	BMRUniformSet* ShadowArraySet;
+	VkDescriptorSetLayout ShadowArrayLayout;
+	VkDescriptorSet* ShadowArraySet;
+	VkDescriptorSetLayout EntitySamplerLayout;
 
 	VkExtent2D Extent1;
 	BMRPipelineShaderInputDepr ShaderInputs[BMR::BMRShaderNames::ShaderNamesCount];
@@ -140,17 +133,7 @@ namespace BMR
 
 
 
-	static VkImageViewType ImageViewTypeTable[] =
-	{
-		VK_IMAGE_VIEW_TYPE_2D,
-		VK_IMAGE_VIEW_TYPE_CUBE
-	};
 
-	static VkImageCreateFlagBits ImageFlagsTable[] =
-	{
-		static_cast<VkImageCreateFlagBits>(0),
-		VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT
-	};
 
 	bool Init(HWND WindowHandler, const BMRConfig& InConfig)
 	{
@@ -313,11 +296,6 @@ namespace BMR
 			ShaderInputs[i].Stage = Config.RenderShaders[i].Stage;
 		}
 
-		Sampler[SamplerType::SamplerType_Diffuse] = CreateTextureSampler(16, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
-		Sampler[SamplerType::SamplerType_Specular] = CreateTextureSampler(1, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
-
-		
-
 		return true;
 	}
 
@@ -326,21 +304,6 @@ namespace BMR
 		vkDeviceWaitIdle(LogicalDevice);
 
 		DestroySynchronisation();
-
-		for (u32 i = 0; i < SamplerType::SamplerType_Count; ++i)
-		{
-			vkDestroySampler(LogicalDevice, Sampler[i], nullptr);
-		}
-
-		for (u32 i = 0; i < ImageArraysCount; ++i)
-		{
-			vkDestroyImageView(LogicalDevice, TextureImageViews[i], nullptr);
-		}
-
-		for (u32 i = 0; i < ImageArraysCount; ++i)
-		{
-			VulkanMemoryManagementSystem::DestroyImageBuffer(TextureBuffers[i]);
-		}
 
 		vkDestroyDescriptorPool(LogicalDevice, MainPool, nullptr);
 
@@ -351,7 +314,6 @@ namespace BMR
 		VulkanResourceManagementSystem::DeInit();
 
 		vkDestroyCommandPool(LogicalDevice, GraphicsCommandPool, nullptr);
-		MainRenderPass.ClearResources(LogicalDevice, MainViewport.ViewportSwapchain.ImagesCount);
 
 		DeinitViewport(&MainViewport);
 
@@ -361,13 +323,14 @@ namespace BMR
 	}
 
 	void TestSetRendeRpasses(BMRRenderPass Main, BMRRenderPass Depth,
-		BMRUniform* inVpBuffer, BMRUniformLayout iVpLayout, BMRUniformSet* iVpSet,
-		BMRUniform* inEntityLight, BMRUniformLayout iEntityLightLayout, BMRUniformSet* iEntityLightSet,
-		BMRUniform* iLightSpaceBuffer, BMRUniformLayout iLightSpaceLayout, BMRUniformSet* iLightSpaceSet,
-		BMRUniform iMaterial, BMRUniformLayout iMaterialLayout, BMRUniformSet iMaterialSet,
-		BMRUniformImageInterface* iDeferredInputDepthImage, BMRUniformImageInterface* iDeferredInputColorImage,
-		BMRUniformLayout iDeferredInputLayout, BMRUniformSet* iDeferredInputSet,
-		BMRUniform* iShadowArray, BMRUniformLayout iShadowArrayLayout, BMRUniformSet* iShadowArraySet)
+		BMRUniform* inVpBuffer, VkDescriptorSetLayout iVpLayout, VkDescriptorSet* iVpSet,
+		BMRUniform* inEntityLight, VkDescriptorSetLayout iEntityLightLayout, VkDescriptorSet* iEntityLightSet,
+		BMRUniform* iLightSpaceBuffer, VkDescriptorSetLayout iLightSpaceLayout, VkDescriptorSet* iLightSpaceSet,
+		BMRUniform iMaterial, VkDescriptorSetLayout iMaterialLayout, VkDescriptorSet iMaterialSet,
+		VkImageView* iDeferredInputDepthImage, VkImageView* iDeferredInputColorImage,
+		VkDescriptorSetLayout iDeferredInputLayout, VkDescriptorSet* iDeferredInputSet,
+		BMRUniform* iShadowArray, VkDescriptorSetLayout iShadowArrayLayout, VkDescriptorSet* iShadowArraySet,
+		VkDescriptorSetLayout iEntitySamplerLayout, VkDescriptorSetLayout iTerrainSkyBoxSamplerLayout)
 	{
 		MainPass = Main;
 		DepthPass = Depth;
@@ -390,11 +353,11 @@ namespace BMR
 		ShadowArray = iShadowArray;
 		ShadowArrayLayout = iShadowArrayLayout;
 		ShadowArraySet = iShadowArraySet;
+		EntitySamplerLayout = iEntitySamplerLayout;
 
 		MainRenderPass.SetupPushConstants();
-		MainRenderPass.CreateDescriptorLayouts(LogicalDevice);
 		MainRenderPass.CreatePipelineLayouts(LogicalDevice, VpLayout, EntityLightLayout, LightSpaceLayout, materialLayout,
-			DeferredInputLayout, ShadowArrayLayout);
+			DeferredInputLayout, ShadowArrayLayout, EntitySamplerLayout, iTerrainSkyBoxSamplerLayout);
 		MainRenderPass.CreatePipelines(LogicalDevice, Extent1, ShaderInputs, MainPass.Pass, DepthPass.Pass);
 
 		InitViewport(Surface, &MainViewport, SwapInstance1, iDeferredInputColorImage, iDeferredInputDepthImage);
@@ -552,197 +515,22 @@ namespace BMR
 		vkUnmapMemory(LogicalDevice, Buffer.Memory);
 	}
 
-	VkSampler CreateSampler(const VkSamplerCreateInfo* CreateInfo)
+
+	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, u32 LayersCount, void* Data)
 	{
-		VkSampler Sampler;
-		VkResult Result = vkCreateSampler(LogicalDevice, CreateInfo, nullptr, &Sampler);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkCreateSampler result is %d", Result);
-		}
-
-		return Sampler;
-	}
-
-	BMRUniform CreateUniformImage(const VkImageCreateInfo* ImageCreateInfo)
-	{
-		BMRUniform Buffer;
-		VkResult Result = vkCreateImage(LogicalDevice, ImageCreateInfo, nullptr, &Buffer.Image);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "CreateImage result is %d", Result);
-		}
-
-		VkMemoryRequirements MemoryRequirements;
-		vkGetImageMemoryRequirements(LogicalDevice, Buffer.Image, &MemoryRequirements);
-
-		const u32 MemoryTypeIndex = GetMemoryTypeIndex(Device.PhysicalDevice, MemoryRequirements.memoryTypeBits,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-		Buffer.Memory = AllocateMemory(MemoryRequirements.size, MemoryTypeIndex);
-		vkBindImageMemory(LogicalDevice, Buffer.Image, Buffer.Memory, 0);
-
-		return Buffer;
-	}
-
-	void DestroyUniformImage(BMRUniform Image)
-	{
-		vkDestroyImage(LogicalDevice, Image.Image, nullptr);
-		vkFreeMemory(LogicalDevice, Image.Memory, nullptr);
-	}
-
-	BMRUniformLayout CreateUniformLayout(const VkDescriptorType* Types, const VkShaderStageFlags* Stages, u32 Count)
-	{
-		auto LayoutBindings = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorSetLayoutBinding>(Count);
-		for (u32 BindingIndex = 0; BindingIndex < Count; ++BindingIndex)
-		{
-			VkDescriptorSetLayoutBinding* LayoutBinding = LayoutBindings + BindingIndex;
-			*LayoutBinding = { };
-			LayoutBinding->binding = BindingIndex;
-			LayoutBinding->descriptorType = Types[BindingIndex];
-			LayoutBinding->descriptorCount = 1;
-			LayoutBinding->stageFlags = Stages[BindingIndex];
-			LayoutBinding->pImmutableSamplers = nullptr; // For Texture: Can make sampler data unchangeable (immutable) by specifying in layout	
-		}
-
-		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
-		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = Count;
-		LayoutCreateInfo.pBindings = LayoutBindings;
-
-		BMRUniformLayout Layout;
-		const VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo, nullptr, &Layout);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkCreateDescriptorSetLayout result is %d", Result);
-		}
-
-		return Layout;
-	}
-
-	void DestroyUniformBuffer(BMRUniform Buffer)
-	{
-		vkDeviceWaitIdle(LogicalDevice); // TODO!!!!!!!!!!!
-
-
-
-		vkDestroyBuffer(LogicalDevice, Buffer.Buffer, nullptr);
-		vkFreeMemory(LogicalDevice, Buffer.Memory, nullptr);
-	}
-
-	void CreateUniformSets(const BMRUniformLayout* Layouts, u32 Count, BMRUniformSet* OutSets)
-	{
-		HandleLog(BMRLogType::LogType_Info, "Allocating descriptor sets. Size count: %d", Count);
-
-		VkDescriptorSetAllocateInfo SetAllocInfo = { };
-		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		SetAllocInfo.descriptorPool = MainPool; // Pool to allocate Descriptor Set from
-		SetAllocInfo.descriptorSetCount = Count; // Number of sets to allocate
-		SetAllocInfo.pSetLayouts = Layouts; // Layouts to use to allocate sets (1:1 relationship)
-
-		const VkResult Result = vkAllocateDescriptorSets(LogicalDevice, &SetAllocInfo, (VkDescriptorSet*)OutSets);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkAllocateDescriptorSets result is %d", Result);
-		}
-	}
-
-	BMRUniformImageInterface CreateImageInterface(const BMRUniformImageInterfaceCreateInfo* InterfaceCreateInfo, VkImage Image)
-	{
-		VkImageViewCreateInfo ViewCreateInfo = { };
-		ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		ViewCreateInfo.image = Image;
-		ViewCreateInfo.viewType = InterfaceCreateInfo->ViewType;
-		ViewCreateInfo.format = InterfaceCreateInfo->Format;
-		ViewCreateInfo.components = InterfaceCreateInfo->Components;
-		ViewCreateInfo.subresourceRange = InterfaceCreateInfo->SubresourceRange;
-		ViewCreateInfo.subresourceRange = InterfaceCreateInfo->SubresourceRange;
-		ViewCreateInfo.pNext = InterfaceCreateInfo->pNext;
-
-		VkImageView ImageView;
-		const VkResult Result = vkCreateImageView(LogicalDevice, &ViewCreateInfo, nullptr, &ImageView);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkCreateImageView result is %d", Result);
-		}
-
-		return ImageView;
-	}
-
-	void DestroyUniformLayout(BMRUniformLayout Layout)
-	{
-		vkDestroyDescriptorSetLayout(LogicalDevice, Layout, nullptr);
-	}
-
-	void DestroyImageInterface(BMRUniformImageInterface Interface)
-	{
-		vkDestroyImageView(LogicalDevice, Interface, nullptr);
-	}
-
-	void DestroySampler(VkSampler Sampler)
-	{
-		vkDestroySampler(LogicalDevice, Sampler, nullptr);
-	}
-
-	void AttachUniformsToSet(BMRUniformSet Set, const BMRUniformSetAttachmentInfo* Infos, u32 BufferCount)
-	{
-		auto SetWrites = Memory::BmMemoryManagementSystem::FrameAlloc<VkWriteDescriptorSet>(BufferCount);
-		for (u32 BufferIndex = 0; BufferIndex < BufferCount; ++BufferIndex)
-		{
-			const BMRUniformSetAttachmentInfo* Info = Infos + BufferIndex;
-
-			VkWriteDescriptorSet* SetWrite = SetWrites + BufferIndex;
-			*SetWrite = { };
-			SetWrite->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			SetWrite->dstSet = Set;
-			SetWrite->dstBinding = BufferIndex;
-			SetWrite->dstArrayElement = 0;
-			SetWrite->descriptorType = Info->Type;
-			SetWrite->descriptorCount = 1;
-			SetWrite->pBufferInfo = &Info->BufferInfo;
-			SetWrite->pImageInfo = &Info->ImageInfo;
-		}
-
-		vkUpdateDescriptorSets(LogicalDevice, BufferCount, SetWrites, 0, nullptr);
-	}
-
-	u32 LoadTexture(BMRTextureArrayInfo Info, BMRTextureType TextureType)
-	{
-		const VkImageViewType TextureImageType = ImageViewTypeTable[TextureType];
-
-		VkImageCreateInfo ImageCreateInfo;
-		ImageCreateInfo = { };
-		ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-		ImageCreateInfo.extent.width = Info.Width;
-		ImageCreateInfo.extent.height = Info.Height;
-		ImageCreateInfo.extent.depth = 1; // Depth of image (just 1, no 3D aspect)
-		ImageCreateInfo.mipLevels = 1;
-		ImageCreateInfo.arrayLayers = Info.LayersCount;
-		ImageCreateInfo.format = VK_FORMAT_R8G8B8A8_SRGB; // TODO: use VK_FORMAT_R8G8B8A8_UNORM for specular maps and normal maps
-		ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL; // How image data should be "tiled" (arranged for optimal reading)
-		ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Layout of image data on creation
-		ImageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT; // Bit flags defining what image will be used for
-		ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT; // Number of samples for multi-sampling
-		ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // Whether image can be shared between queues
-		ImageCreateInfo.flags = ImageFlagsTable[TextureType];
-
-		BMRUniform ImageBuffer = VulkanMemoryManagementSystem::CreateImageBuffer(&ImageCreateInfo);
-
-		VkImageMemoryBarrier Barrier;
-		Barrier = { };
+		// FIRST TRANSITION
+		VkImageMemoryBarrier Barrier = { };
 		Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 		Barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;									// Layout to transition from
 		Barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;									// Layout to transition to
 		Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition from
 		Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition to
-		Barrier.image = ImageBuffer.Image;											// Image being accessed and modified as part of barrier
+		Barrier.image = Image;											// Image being accessed and modified as part of barrier
 		Barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;	// Aspect of image being altered
 		Barrier.subresourceRange.baseMipLevel = 0;						// First mip level to start alterations on
 		Barrier.subresourceRange.levelCount = 1;							// Number of mip levels to alter starting from baseMipLevel
 		Barrier.subresourceRange.baseArrayLayer = 0;
-		Barrier.subresourceRange.layerCount = Info.LayersCount;
-
+		Barrier.subresourceRange.layerCount = LayersCount;
 		Barrier.srcAccessMask = 0;								// Memory access stage transition must after...
 		Barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;		// Memory access stage transition must before...
 
@@ -784,12 +572,14 @@ namespace BMR
 		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
 		vkQueueWaitIdle(GraphicsQueue);
 
+		// Copy data to image
 		VkMemoryRequirements MemoryRequirements;
-		vkGetImageMemoryRequirements(LogicalDevice, ImageBuffer.Image, &MemoryRequirements);
+		vkGetImageMemoryRequirements(LogicalDevice, Image, &MemoryRequirements);
 
-		VulkanMemoryManagementSystem::CopyDataToImage(ImageBuffer.Image, Info.Width, Info.Height,
-			Info.Format, MemoryRequirements.size / Info.LayersCount, Info.LayersCount, Info.Data);
+		VulkanMemoryManagementSystem::CopyDataToImage(Image, Width, Height,
+			Format, MemoryRequirements.size / LayersCount, LayersCount, Data);
 
+		// SECOND TRANSITION
 		Barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL; // Layout to transition from
 		Barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		Barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -806,71 +596,159 @@ namespace BMR
 		vkQueueWaitIdle(GraphicsQueue);
 
 		vkFreeCommandBuffers(LogicalDevice, GraphicsCommandPool, 1, &CommandBuffer);
-
-		VkImageView View = CreateImageView(LogicalDevice, ImageBuffer.Image,
-			VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, TextureImageType,
-			Info.LayersCount);
-
-		TextureBuffers[ImageArraysCount] = ImageBuffer;
-		TextureImageViews[ImageArraysCount] = View;
-
-		const u32 CurrentIndex = ImageArraysCount;
-		++ImageArraysCount;
-
-		return CurrentIndex;
 	}
 
-	// Shit but works for now
-	u32 UpdateTextureDescriptor(u32* ImageViewIndices, u32 Count, DescriptorLayoutHandles LayoutHandle)
+	VkSampler CreateSampler(const VkSamplerCreateInfo* CreateInfo)
 	{
-		VkWriteDescriptorSet TextureWriteData[SamplerType::SamplerType_Count];
-		VkDescriptorImageInfo TextureImageInfo[SamplerType::SamplerType_Count];
-		VkDescriptorSetLayout Layout = MainRenderPass.DescriptorLayouts[LayoutHandle];
-		VkDescriptorSet& Descriptor = MainRenderPass.SamplerDescriptors[MainRenderPass.TextureDescriptorCount];
-
-		VulkanMemoryManagementSystem::AllocateSets(MainPool, &Layout, 1, &Descriptor);
-
-		for (u32 i = 0; i < Count; ++i)
+		VkSampler Sampler;
+		VkResult Result = vkCreateSampler(LogicalDevice, CreateInfo, nullptr, &Sampler);
+		if (Result != VK_SUCCESS)
 		{
-			TextureImageInfo[i] = { };
-			TextureImageInfo[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			TextureImageInfo[i].imageView = TextureImageViews[ImageViewIndices[i]];
-			TextureImageInfo[i].sampler = Sampler[i];
-
-			TextureWriteData[i] = { };
-			TextureWriteData[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			TextureWriteData[i].dstSet = Descriptor;
-			TextureWriteData[i].dstBinding = i;
-			TextureWriteData[i].dstArrayElement = 0;
-			TextureWriteData[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			TextureWriteData[i].descriptorCount = 1;
-			TextureWriteData[i].pImageInfo = TextureImageInfo + i;
+			HandleLog(BMRLogType::LogType_Error, "vkCreateSampler result is %d", Result);
 		}
 
-		vkUpdateDescriptorSets(LogicalDevice, Count, TextureWriteData, 0, nullptr);
-
-		const u32 CurrentIndex = MainRenderPass.TextureDescriptorCount;
-		++MainRenderPass.TextureDescriptorCount;
-
-		return CurrentIndex;
+		return Sampler;
 	}
 
-	u32 LoadEntityMaterial(u32 DiffuseTextureIndex, u32 SpecularTextureIndex)
+	BMRUniform CreateUniformImage(const VkImageCreateInfo* ImageCreateInfo)
 	{
-		u32 TextureIndices[SamplerType::SamplerType_Count];
-		TextureIndices[SamplerType::SamplerType_Diffuse] = DiffuseTextureIndex;
-		TextureIndices[SamplerType::SamplerType_Specular] = SpecularTextureIndex;
-		return UpdateTextureDescriptor(TextureIndices, 2, DescriptorLayoutHandles::EntitySampler);
+		BMRUniform Buffer;
+		VkResult Result = vkCreateImage(LogicalDevice, ImageCreateInfo, nullptr, &Buffer.Image);
+		if (Result != VK_SUCCESS)
+		{
+			HandleLog(BMRLogType::LogType_Error, "CreateImage result is %d", Result);
+		}
+
+		VkMemoryRequirements MemoryRequirements;
+		vkGetImageMemoryRequirements(LogicalDevice, Buffer.Image, &MemoryRequirements);
+
+		const u32 MemoryTypeIndex = GetMemoryTypeIndex(Device.PhysicalDevice, MemoryRequirements.memoryTypeBits,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+		Buffer.Memory = AllocateMemory(MemoryRequirements.size, MemoryTypeIndex);
+		vkBindImageMemory(LogicalDevice, Buffer.Image, Buffer.Memory, 0);
+
+		return Buffer;
 	}
 
-	u32 LoadTerrainMaterial(u32 DiffuseTextureIndex)
+	void DestroyUniformImage(BMRUniform Image)
 	{
-		return UpdateTextureDescriptor(&DiffuseTextureIndex, 1, DescriptorLayoutHandles::TerrainSampler);
+		vkDestroyImage(LogicalDevice, Image.Image, nullptr);
+		vkFreeMemory(LogicalDevice, Image.Memory, nullptr);
 	}
 
-	u32 LoadSkyBoxMaterial(u32 CubeTextureIndex)
+	VkDescriptorSetLayout CreateUniformLayout(const VkDescriptorType* Types, const VkShaderStageFlags* Stages, u32 Count)
 	{
-		return UpdateTextureDescriptor(&CubeTextureIndex, 1, DescriptorLayoutHandles::TerrainSampler);
+		auto LayoutBindings = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorSetLayoutBinding>(Count);
+		for (u32 BindingIndex = 0; BindingIndex < Count; ++BindingIndex)
+		{
+			VkDescriptorSetLayoutBinding* LayoutBinding = LayoutBindings + BindingIndex;
+			*LayoutBinding = { };
+			LayoutBinding->binding = BindingIndex;
+			LayoutBinding->descriptorType = Types[BindingIndex];
+			LayoutBinding->descriptorCount = 1;
+			LayoutBinding->stageFlags = Stages[BindingIndex];
+			LayoutBinding->pImmutableSamplers = nullptr; // For Texture: Can make sampler data unchangeable (immutable) by specifying in layout	
+		}
+
+		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
+		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		LayoutCreateInfo.bindingCount = Count;
+		LayoutCreateInfo.pBindings = LayoutBindings;
+
+		VkDescriptorSetLayout Layout;
+		const VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo, nullptr, &Layout);
+		if (Result != VK_SUCCESS)
+		{
+			HandleLog(BMRLogType::LogType_Error, "vkCreateDescriptorSetLayout result is %d", Result);
+		}
+
+		return Layout;
+	}
+
+	void DestroyUniformBuffer(BMRUniform Buffer)
+	{
+		vkDeviceWaitIdle(LogicalDevice); // TODO!!!!!!!!!!!
+
+
+
+		vkDestroyBuffer(LogicalDevice, Buffer.Buffer, nullptr);
+		vkFreeMemory(LogicalDevice, Buffer.Memory, nullptr);
+	}
+
+	void CreateUniformSets(const VkDescriptorSetLayout* Layouts, u32 Count, VkDescriptorSet* OutSets)
+	{
+		HandleLog(BMRLogType::LogType_Info, "Allocating descriptor sets. Size count: %d", Count);
+
+		VkDescriptorSetAllocateInfo SetAllocInfo = { };
+		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		SetAllocInfo.descriptorPool = MainPool; // Pool to allocate Descriptor Set from
+		SetAllocInfo.descriptorSetCount = Count; // Number of sets to allocate
+		SetAllocInfo.pSetLayouts = Layouts; // Layouts to use to allocate sets (1:1 relationship)
+
+		const VkResult Result = vkAllocateDescriptorSets(LogicalDevice, &SetAllocInfo, (VkDescriptorSet*)OutSets);
+		if (Result != VK_SUCCESS)
+		{
+			HandleLog(BMRLogType::LogType_Error, "vkAllocateDescriptorSets result is %d", Result);
+		}
+	}
+
+	VkImageView CreateImageInterface(const BMRUniformImageInterfaceCreateInfo* InterfaceCreateInfo, VkImage Image)
+	{
+		VkImageViewCreateInfo ViewCreateInfo = { };
+		ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		ViewCreateInfo.image = Image;
+		ViewCreateInfo.viewType = InterfaceCreateInfo->ViewType;
+		ViewCreateInfo.format = InterfaceCreateInfo->Format;
+		ViewCreateInfo.components = InterfaceCreateInfo->Components;
+		ViewCreateInfo.subresourceRange = InterfaceCreateInfo->SubresourceRange;
+		ViewCreateInfo.pNext = InterfaceCreateInfo->pNext;
+
+		VkImageView ImageView;
+		const VkResult Result = vkCreateImageView(LogicalDevice, &ViewCreateInfo, nullptr, &ImageView);
+		if (Result != VK_SUCCESS)
+		{
+			HandleLog(BMRLogType::LogType_Error, "vkCreateImageView result is %d", Result);
+		}
+
+		return ImageView;
+	}
+
+	void DestroyUniformLayout(VkDescriptorSetLayout Layout)
+	{
+		vkDestroyDescriptorSetLayout(LogicalDevice, Layout, nullptr);
+	}
+
+	void DestroyImageInterface(VkImageView Interface)
+	{
+		vkDestroyImageView(LogicalDevice, Interface, nullptr);
+	}
+
+	void DestroySampler(VkSampler Sampler)
+	{
+		vkDestroySampler(LogicalDevice, Sampler, nullptr);
+	}
+
+	void AttachUniformsToSet(VkDescriptorSet Set, const BMRUniformSetAttachmentInfo* Infos, u32 BufferCount)
+	{
+		auto SetWrites = Memory::BmMemoryManagementSystem::FrameAlloc<VkWriteDescriptorSet>(BufferCount);
+		for (u32 BufferIndex = 0; BufferIndex < BufferCount; ++BufferIndex)
+		{
+			const BMRUniformSetAttachmentInfo* Info = Infos + BufferIndex;
+
+			VkWriteDescriptorSet* SetWrite = SetWrites + BufferIndex;
+			*SetWrite = { };
+			SetWrite->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			SetWrite->dstSet = Set;
+			SetWrite->dstBinding = BufferIndex;
+			SetWrite->dstArrayElement = 0;
+			SetWrite->descriptorType = Info->Type;
+			SetWrite->descriptorCount = 1;
+			SetWrite->pBufferInfo = &Info->BufferInfo;
+			SetWrite->pImageInfo = &Info->ImageInfo;
+		}
+
+		vkUpdateDescriptorSets(LogicalDevice, BufferCount, SetWrites, 0, nullptr);
 	}
 
 	u64 LoadVertices(const void* Vertices, u32 VertexSize, u64 VerticesCount)
@@ -1053,7 +931,7 @@ namespace BMR
 				const u32 TerrainDescriptorSetGroupCount = 2;
 				const VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = {
 					VpSet[MainRenderPass.ActiveVpSet],
-					MainRenderPass.SamplerDescriptors[DrawTerrainEntity->MaterialIndex]
+					DrawTerrainEntity->TextureSet
 				};
 
 				vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderPass.Pipelines[BMRPipelineHandles::Terrain].PipelineLayout,
@@ -1079,7 +957,7 @@ namespace BMR
 				const VkDescriptorSet DescriptorSetGroup[] =
 				{
 					VpSet[MainRenderPass.ActiveVpSet],
-					MainRenderPass.SamplerDescriptors[DrawEntity->MaterialIndex],
+					DrawEntity->TextureSet,
 					EntityLightSet[MainRenderPass.ActiveLightSet],
 					MaterialSet,
 					ShadowArraySet[ImageIndex],
@@ -1108,7 +986,7 @@ namespace BMR
 				const u32 SkyBoxDescriptorSetGroupCount = 2;
 				const VkDescriptorSet SkyBoxDescriptorSetGroup[SkyBoxDescriptorSetGroupCount] = {
 					VpSet[MainRenderPass.ActiveVpSet],
-					MainRenderPass.SamplerDescriptors[Scene.SkyBox.MaterialIndex],
+					Scene.SkyBox.TextureSet,
 				};
 
 				const VkPipelineLayout PipelineLayout = MainRenderPass.Pipelines[BMRPipelineHandles::SkyBox].PipelineLayout;

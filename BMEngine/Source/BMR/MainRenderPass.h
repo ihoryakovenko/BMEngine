@@ -7,15 +7,6 @@
 
 namespace BMR
 {
-	enum DescriptorLayoutHandles
-	{
-		TerrainSampler,
-		EntitySampler,
-		SkyBoxSampler, // TODO Same as TerrainSampler
-
-		Count
-	};
-
 	namespace PushConstantHandles
 	{
 		enum
@@ -60,28 +51,20 @@ namespace BMR
 
 	struct BMRMainRenderPass
 	{
-		void ClearResources(VkDevice LogicalDevice, u32 ImagesCount);
-
 		void SetupPushConstants();
-		void CreateDescriptorLayouts(VkDevice LogicalDevice);
-		void CreatePipelineLayouts(VkDevice LogicalDevice, BMRUniformLayout VpLayout,
-			BMRUniformLayout EntityLightLayout, BMRUniformLayout LightSpaceMatrixLayout, BMRUniformLayout Material,
-			BMRUniformLayout Deferred, BMRUniformLayout ShadowArray);
+		void CreatePipelineLayouts(VkDevice LogicalDevice, VkDescriptorSetLayout VpLayout,
+			VkDescriptorSetLayout EntityLightLayout, VkDescriptorSetLayout LightSpaceMatrixLayout, VkDescriptorSetLayout Material,
+			VkDescriptorSetLayout Deferred, VkDescriptorSetLayout ShadowArray, VkDescriptorSetLayout EntitySampler,
+			VkDescriptorSetLayout TerrainSkyBoxSampler);
 		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent,
 			BMRPipelineShaderInputDepr ShaderInputs[BMRShaderNames::ShaderNamesCount], VkRenderPass main, VkRenderPass depth);
 
 		BMRPipeline Pipelines[BMRPipelineHandles::PipelineHandlesCount];
 
 		VkPushConstantRange PushConstants[PushConstantHandles::Count];
-		VkDescriptorSetLayout DescriptorLayouts[DescriptorLayoutHandles::Count];
 
 		u32 ActiveLightSet = 0;
 		u32 ActiveVpSet = 0;
 		u32 ActiveLightSpaceMatrixSet = 0;
-
-		// TODO: Fix
-		static inline VkDescriptorSet SamplerDescriptors[MAX_IMAGES];
-
-		u32 TextureDescriptorCount = 0;
 	};
 }

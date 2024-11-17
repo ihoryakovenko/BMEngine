@@ -31,6 +31,8 @@ BMR::BMRUniformImageInterfaceCreateInfo ShadowMapElement1InterfaceCreateInfo;
 BMR::BMRUniformImageInterfaceCreateInfo ShadowMapElement2InterfaceCreateInfo;
 
 VkSamplerCreateInfo ShadowMapSamplerCreateInfo;
+VkSamplerCreateInfo DiffuseSamplerCreateInfo;
+VkSamplerCreateInfo SpecularSamplerCreateInfo;
 
 VkClearValue MainPassClearValues[3];
 VkClearValue DepthPassClearValues;
@@ -119,6 +121,25 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	ShadowMapSamplerCreateInfo.maxLod = 0.0f;									// Maximum Level of Detail to pick mip level
 	ShadowMapSamplerCreateInfo.anisotropyEnable = VK_TRUE;
 	ShadowMapSamplerCreateInfo.maxAnisotropy = 1; // Todo: support in config
+
+	DiffuseSamplerCreateInfo = { };
+	DiffuseSamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	DiffuseSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+	DiffuseSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+	DiffuseSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	DiffuseSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	DiffuseSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	DiffuseSamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	DiffuseSamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+	DiffuseSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	DiffuseSamplerCreateInfo.mipLodBias = 0.0f;
+	DiffuseSamplerCreateInfo.minLod = 0.0f;
+	DiffuseSamplerCreateInfo.maxLod = 0.0f;
+	DiffuseSamplerCreateInfo.anisotropyEnable = VK_TRUE;
+	DiffuseSamplerCreateInfo.maxAnisotropy = 16;
+
+	SpecularSamplerCreateInfo = DiffuseSamplerCreateInfo;
+	DiffuseSamplerCreateInfo.maxAnisotropy = 1;
 
 	// Images
 	DeferredInputDepthUniformCreateInfo = { };

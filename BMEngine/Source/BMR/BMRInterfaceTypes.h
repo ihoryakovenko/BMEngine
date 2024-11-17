@@ -103,7 +103,7 @@ namespace BMR
 		u64 VertexOffset = 0;
 		u64 IndexOffset = 0;
 		u32 IndicesCount = 0;
-		u32 MaterialIndex = -1;
+		VkDescriptorSet TextureSet = nullptr;
 		BMRModel Model;
 	};
 
@@ -112,7 +112,7 @@ namespace BMR
 		u64 VertexOffset = 0;
 		u64 IndexOffset = 0;
 		u32 IndicesCount = 0;
-		u32 MaterialIndex = -1;
+		VkDescriptorSet TextureSet = nullptr;
 	};
 
 	struct BMRDrawSkyBoxEntity
@@ -120,7 +120,7 @@ namespace BMR
 		u64 VertexOffset = 0;
 		u64 IndexOffset = 0;
 		u32 IndicesCount = 0;
-		u32 MaterialIndex = -1;
+		VkDescriptorSet TextureSet = nullptr;
 	};
 
 	struct BMRPointLight
@@ -253,10 +253,6 @@ namespace BMR
 		BMRFramebufferSet* FramebufferSets = nullptr;
 		u32 FramebufferSetCount = 0;
 	};
-
-	typedef VkDescriptorSet BMRUniformSet;
-	typedef VkDescriptorSetLayout BMRUniformLayout;
-	typedef VkImageView BMRUniformImageInterface;
 
 	struct BMRPipeline
 	{
