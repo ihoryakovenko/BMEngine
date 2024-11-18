@@ -398,14 +398,6 @@ namespace BMR
 		const VkResult Result = vkCreateGraphicsPipelines(Device.LogicalDevice, VK_NULL_HANDLE, PipelinesCount,
 			PipelineCreateInfos, nullptr, OutputPipelines);
 
-		for (u32 i = 0; i < PipelinesCount; ++i)
-		{
-			for (u32 j = 0; j < PipelineCreateInfos[i].stageCount; ++j)
-			{
-				vkDestroyShaderModule(Device.LogicalDevice, PipelineCreateInfos[i].pStages[j].module, nullptr);
-			}
-		}
-
 		if (Result != VK_SUCCESS)
 		{
 			HandleLog(BMRVkLogType_Error, "vkCreateGraphicsPipelines result is %d", Result);
@@ -532,6 +524,16 @@ namespace BMR
 		vkDestroyRenderPass(Device.LogicalDevice, Pass->Pass, nullptr);
 		Memory::BmMemoryManagementSystem::Deallocate(Pass->ClearValues);
 		Memory::BmMemoryManagementSystem::Deallocate(Pass->FramebufferSets);
+	}
+
+	void DestroyPipelineLayout(VkPipelineLayout Layout)
+	{
+		vkDestroyPipelineLayout(Device.LogicalDevice, Layout, nullptr);
+	}
+
+	void DestroyPipeline(VkPipeline Pipeline)
+	{
+		vkDestroyPipeline(Device.LogicalDevice, Pipeline, nullptr);
 	}
 
 	BMRUniform CreateUniformBuffer(const VkBufferCreateInfo* BufferInfo, VkMemoryPropertyFlags Properties)
@@ -776,6 +778,11 @@ namespace BMR
 	void DestroySampler(VkSampler Sampler)
 	{
 		vkDestroySampler(Device.LogicalDevice, Sampler, nullptr);
+	}
+
+	void DestroyShader(VkShaderModule Shader)
+	{
+		vkDestroyShaderModule(Device.LogicalDevice, Shader, nullptr);
 	}
 
 	void AttachUniformsToSet(VkDescriptorSet Set, const BMRUniformSetAttachmentInfo* Infos, u32 BufferCount)
@@ -1785,5 +1792,22 @@ namespace BMR
 
 		assert(false);
 		return 0;
+	}
+
+	bool CreateShader(const u32* Code, u32 CodeSize, VkShaderModule& VertexShaderModule)
+	{
+		VkShaderModuleCreateInfo ShaderModuleCreateInfo = { };
+		ShaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		ShaderModuleCreateInfo.codeSize = CodeSize;
+		ShaderModuleCreateInfo.pCode = Code;
+
+		VkResult Result = vkCreateShaderModule(Device.LogicalDevice, &ShaderModuleCreateInfo, nullptr, &VertexShaderModule);
+		if (Result != VK_SUCCESS)
+		{
+			HandleLog(BMRVkLogType_Error, "vkCreateShaderModule result is %d", Result);
+			return false;
+		}
+
+		return true;
 	}
 }

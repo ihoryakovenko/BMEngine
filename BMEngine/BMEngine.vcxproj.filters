@@ -16,9 +16,7 @@
     <ClCompile Include="..\External\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\External\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
-    <ClCompile Include="Source\BMR\MainRenderPass.cpp" />
     <ClCompile Include="Source\BMR\VulkanHelper.cpp" />
-    <ClCompile Include="Source\BMR\VulkanCoreTypes.cpp" />
     <ClCompile Include="Source\BMR\VulkanMemoryManagementSystem.cpp" />
     <ClCompile Include="Source\BMR\BMRInterface.cpp" />
     <ClCompile Include="Source\ImguiIntegration.cpp" />
@@ -39,9 +37,7 @@
     <ClInclude Include="..\External\imgui\imstb_textedit.h" />
     <ClInclude Include="..\External\imgui\imstb_truetype.h" />
     <ClInclude Include="Source\BMR\BMRInterfaceTypes.h" />
-    <ClInclude Include="Source\BMR\MainRenderPass.h" />
     <ClInclude Include="Source\ImguiIntegration.h" />
-    <ClInclude Include="Source\BMR\VulkanCoreTypes.h" />
     <ClInclude Include="Source\BMR\VulkanHelper.h" />
     <ClInclude Include="Source\BMR\VulkanMemoryManagementSystem.h" />
     <ClInclude Include="Source\BMR\BMRInterface.h" />

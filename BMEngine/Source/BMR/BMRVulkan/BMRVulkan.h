@@ -13,6 +13,7 @@ namespace BMR
 	static const u32 MAX_VERTEX_INPUTS_ATTRIBUTES = 16;
 	static const u32 MAX_VERTEX_INPUT_BINDINGS = 16;
 
+
 	enum BMRVkLogType
 	{
 		BMRVkLogType_Error,
@@ -177,6 +178,20 @@ namespace BMR
 		u32 FramebufferSetCount = 0;
 	};
 
+	struct BMRPipelineResourceInfo
+	{
+		VkRenderPass RenderPass = nullptr;
+		u32 SubpassIndex = -1;
+
+		VkPipelineLayout PipelineLayout = nullptr;
+	};
+
+	struct BMRSPipelineShaderInfo
+	{
+		const VkPipelineShaderStageCreateInfo* Infos = nullptr;
+		u32 InfosCounter = 0;
+	};
+
 	struct BMRPipeline
 	{
 		VkPipeline Pipeline = nullptr;
@@ -186,74 +201,51 @@ namespace BMR
 	void BMRVkInit(HWND WindowHandler, const BMRVkConfig& InConfig);
 	void BMRVkDeInit();
 
-	u32 GetImageCount();
+		u32 GetImageCount();
 	VkImageView* GetSwapchainImageViews();
 
 	void CreateRenderPass(const BMRRenderPassSettings* Settings, const BMRRenderTarget* Targets,
 		VkExtent2D TargetExtent, u32 TargetCount, u32 SwapchainImagesCount, BMRRenderPass* OutPass);
+	VkPipelineLayout CreatePipelineLayout(const VkDescriptorSetLayout* DescriptorLayouts,
+		u32 DescriptorLayoutsCount, const VkPushConstantRange* PushConstant, u32 PushConstantsCount);
+	void CreatePipelines(const BMRSPipelineShaderInfo* ShaderInputs, const BMRVertexInput* VertexInputs,
+		const BMRPipelineSettings* PipelinesSettings, const BMRPipelineResourceInfo* ResourceInfos,
+		u32 PipelinesCount, VkPipeline* OutputPipelines);
 	BMRUniform CreateUniformBuffer(const VkBufferCreateInfo* BufferInfo, VkMemoryPropertyFlags Properties);
 	BMRUniform CreateUniformImage(const VkImageCreateInfo* ImageCreateInfo);
 	VkDescriptorSetLayout CreateUniformLayout(const VkDescriptorType* Types, const VkShaderStageFlags* Stages, u32 Count);
 	void CreateUniformSets(const VkDescriptorSetLayout* Layouts, u32 Count, VkDescriptorSet* OutSets);
 	VkImageView CreateImageInterface(const BMRUniformImageInterfaceCreateInfo* InterfaceCreateInfo, VkImage Image);
 	VkSampler CreateSampler(const VkSamplerCreateInfo* CreateInfo);
+	bool CreateShader(const u32* Code, u32 CodeSize, VkShaderModule& VertexShaderModule);
 
 	void DestroyRenderPass(BMRRenderPass* Pass);
+	void DestroyPipelineLayout(VkPipelineLayout Layout);
+	void DestroyPipeline(VkPipeline Pipeline);
 	void DestroyUniformBuffer(BMRUniform Buffer);
 	void DestroyUniformImage(BMRUniform Image);
 	void DestroyUniformLayout(VkDescriptorSetLayout Layout);
 	void DestroyImageInterface(VkImageView Interface);
 	void DestroySampler(VkSampler Sampler);
+	void DestroyShader(VkShaderModule Shader);
 
 	void AttachUniformsToSet(VkDescriptorSet Set, const BMRUniformSetAttachmentInfo* Infos, u32 BufferCount);
 	void UpdateUniformBuffer(BMRUniform Buffer, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);
 	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, u32 LayersCount, void* Data);
 
-	VkPipelineLayout CreatePipelineLayout(const VkDescriptorSetLayout* DescriptorLayouts,
-		u32 DescriptorLayoutsCount, const VkPushConstantRange* PushConstant, u32 PushConstantsCount);
-
-	struct BMRPipelineShaderDescription
-	{
-		VkShaderStageFlagBits Stage = VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
-		const char* EntryPoint = nullptr;
-		u32* Code = nullptr;
-		u32 CodeSize = 0;
-	};
-
-	struct BMRPipelineResourceInfo
-	{
-		VkRenderPass RenderPass = nullptr;
-		u32 SubpassIndex = -1;
-
-		VkPipelineLayout PipelineLayout = nullptr;
-	};
-	enum BMRShaderStage
-	{
-		Vertex,
-		Fragment,
-
-		ShaderStagesCount,
-		BMRShaderStagesNone
-	};
-	struct BMRSPipelineShaderInfo
-	{
-		VkPipelineShaderStageCreateInfo Infos[BMRShaderStage::ShaderStagesCount];
-		u32 InfosCounter = 0;
-	};
-	void CreatePipelines(const BMRSPipelineShaderInfo* ShaderInputs, const BMRVertexInput* VertexInputs,
-		const BMRPipelineSettings* PipelinesSettings, const BMRPipelineResourceInfo* ResourceInfos,
-		u32 PipelinesCount, VkPipeline* OutputPipelines);
-
-
-
-
-
 	
+
+
+
+
+
+
+
 
 	struct BMRPhysicalDeviceIndices
 	{
-		int GraphicsFamily = -1;
-		int PresentationFamily = -1;
+		s32 GraphicsFamily = -1;
+		s32 PresentationFamily = -1;
 	};
 
 	struct BMRDevice
@@ -270,11 +262,4 @@ namespace BMR
 		VkImageView ImageViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkExtent2D SwapExtent = { };
 	};
-
-
-
-
-
-
-
 }

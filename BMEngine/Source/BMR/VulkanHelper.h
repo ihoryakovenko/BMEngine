@@ -11,8 +11,7 @@ namespace BMR
 
 	void HandleLog(BMRLogType LogType, const char* Format, ...);
 
-	bool CreateShader(VkDevice LogicalDevice, const u32* Code, u32 CodeSize,
-		VkShaderModule& VertexShaderModule);
+
 
 	
 

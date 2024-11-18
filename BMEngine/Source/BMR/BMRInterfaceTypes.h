@@ -34,39 +34,10 @@ namespace BMR
 		ShaderNamesCount
 	};
 
-
-
-	enum BMRPipelineHandles
-	{
-		Terrain = 0,
-		Entity,
-		Deferred,
-		SkyBox,
-		Depth,
-
-		PipelineHandlesCount,
-		PipelineHandlesNone
-	};
-
-	enum BMRTextureType
-	{
-		TextureType_2D,
-		TextureType_CUBE
-	};
-
-	struct BMRShaderCodeDescription
-	{
-		BMRPipelineHandles Handle = BMRPipelineHandles::PipelineHandlesNone;
-		BMRShaderStage Stage = BMRShaderStage::BMRShaderStagesNone;
-		u32* Code = nullptr;
-		u32 CodeSize = 0;
-	};
-
 	struct BMRConfig
 	{
 		BMRLogHandler LogHandler = nullptr;
 		bool EnableValidationLayers = false;
-		BMRShaderCodeDescription RenderShaders[BMRShaderNames::ShaderNamesCount];
 		u32 MaxTextures = 0;
 	};
 

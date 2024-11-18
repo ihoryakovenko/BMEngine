@@ -2,7 +2,6 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanCoreTypes.h"
 #include "Util/EngineTypes.h"
 
 namespace BMR::VulkanMemoryManagementSystem

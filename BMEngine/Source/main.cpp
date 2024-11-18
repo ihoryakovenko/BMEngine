@@ -63,15 +63,14 @@ TerrainVertex TerrainVerticesData[NumRows][NumCols];
 
 std::vector<BMR::BMRDrawEntity> DrawEntities;
 BMR::BMRConfig Config;
-std::vector<std::vector<char>> ShaderCodes(BMR::BMRShaderNames::ShaderNamesCount);
+
 BMR::BMRDrawSkyBoxEntity SkyBox;
 
 
-VkSampler ShadowMapSampler;
-VkSampler DiffuseSampler;
-VkSampler SpecularSampler;
 
-VkDescriptorSetLayout EntitySamplerLayout;
+
+
+
 
 std::vector<Texture> Textures;
 
@@ -611,42 +610,13 @@ void LoadDrawEntities()
 
 	SkyBoxCubeTextureIndex = LoadCubeTexture();
 
-
-
-	BMR::BMRUniformSetAttachmentInfo SetInfo[2];
-	SetInfo[0].ImageInfo.imageView = TestTextureIndex.ImageView;
-	SetInfo[0].ImageInfo.sampler = DiffuseSampler;
-	SetInfo[0].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	SetInfo[0].Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-
-	SetInfo[1].ImageInfo.imageView = TestTextureIndex.ImageView;
-	SetInfo[1].ImageInfo.sampler = SpecularSampler;
-	SetInfo[1].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	SetInfo[1].Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-
-	BMR::AttachUniformsToSet(TestMaterialIndex, SetInfo, 2);
-
-	SetInfo[0].ImageInfo.imageView = WhiteTextureIndex.ImageView;
-	SetInfo[1].ImageInfo.imageView = WhiteTextureIndex.ImageView;
-	BMR::AttachUniformsToSet(WhiteMaterialIndex, SetInfo, 2);
-
-	SetInfo[0].ImageInfo.imageView = ContainerTextureIndex.ImageView;
-	SetInfo[1].ImageInfo.imageView = ContainerSpecularTextureIndex.ImageView;
-	BMR::AttachUniformsToSet(ContainerMaterialIndex, SetInfo, 2);
-
-	SetInfo[0].ImageInfo.imageView = BlendWindowIndex.ImageView;
-	SetInfo[1].ImageInfo.imageView = BlendWindowIndex.ImageView;
-	BMR::AttachUniformsToSet(BlendWindowMaterial, SetInfo, 2);
-
-	SetInfo[0].ImageInfo.imageView = GrassTextureIndex.ImageView;
-	SetInfo[1].ImageInfo.imageView = GrassTextureIndex.ImageView;
-	BMR::AttachUniformsToSet(GrassMaterial, SetInfo, 2);
-
-	SetInfo[0].ImageInfo.imageView = SkyBoxCubeTextureIndex.ImageView;
-	BMR::AttachUniformsToSet(SkyBoxMaterial, SetInfo, 1);
-
-	SetInfo[0].ImageInfo.imageView = TestTextureIndex.ImageView;
-	BMR::AttachUniformsToSet(TerrainMaterial, SetInfo, 1);
+	BMR::TestAttachEntityTexture(TestTextureIndex.ImageView, TestTextureIndex.ImageView, &TestMaterialIndex);
+	BMR::TestAttachEntityTexture(WhiteTextureIndex.ImageView, WhiteTextureIndex.ImageView, &WhiteMaterialIndex);
+	BMR::TestAttachEntityTexture(ContainerTextureIndex.ImageView, ContainerSpecularTextureIndex.ImageView, &ContainerMaterialIndex);
+	BMR::TestAttachEntityTexture(BlendWindowIndex.ImageView, BlendWindowIndex.ImageView, &BlendWindowMaterial);
+	BMR::TestAttachEntityTexture(GrassTextureIndex.ImageView, GrassTextureIndex.ImageView, &GrassMaterial);
+	BMR::TestAttachSkyNoxTerrainTexture(SkyBoxCubeTextureIndex.ImageView, &SkyBoxMaterial);
+	BMR::TestAttachSkyNoxTerrainTexture(TestTextureIndex.ImageView, &TerrainMaterial);
 
 	tinyobj::attrib_t Attrib;
 	std::vector<tinyobj::shape_t> Shapes;
@@ -669,21 +639,7 @@ void LoadDrawEntities()
 			std::string FileName = "./Resources/Textures/" + Material.diffuse_texname.substr(Idx + 1);
 
 			const Texture NewTextureIndex = AddTexture(FileName.c_str());
-
-			BMR::CreateUniformSets(&EntitySamplerLayout, 1, &MaterialToTexture[i]);
-
-			BMR::BMRUniformSetAttachmentInfo SetInfo[2];
-			SetInfo[0].ImageInfo.imageView = NewTextureIndex.ImageView;
-			SetInfo[0].ImageInfo.sampler = DiffuseSampler;
-			SetInfo[0].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			SetInfo[0].Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-
-			SetInfo[1].ImageInfo.imageView = NewTextureIndex.ImageView;
-			SetInfo[1].ImageInfo.sampler = SpecularSampler;
-			SetInfo[1].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			SetInfo[1].Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-
-			BMR::AttachUniformsToSet(MaterialToTexture[i], SetInfo, 2);
+			BMR::TestAttachEntityTexture(NewTextureIndex.ImageView, NewTextureIndex.ImageView, &MaterialToTexture[i]);
 		}
 		else
 		{
@@ -842,62 +798,6 @@ void LoadDrawEntities()
 
 }
 
-void LoadShaders()
-{
-	std::vector<const char*> ShaderPaths;
-	std::vector<BMR::BMRPipelineHandles> HandleToPath;
-	std::vector<BMR::BMRShaderStage> StageToStages;
-
-	ShaderPaths.reserve(BMR::BMRShaderNames::ShaderNamesCount);
-	HandleToPath.reserve(BMR::BMRPipelineHandles::PipelineHandlesCount);
-	StageToStages.reserve(BMR::BMRShaderStage::ShaderStagesCount);
-
-	ShaderPaths.push_back("./Resources/Shaders/TerrainGenerator_vert.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::Terrain);
-	StageToStages.push_back(BMR::BMRShaderStage::Vertex);
-
-	ShaderPaths.push_back("./Resources/Shaders/TerrainGenerator_frag.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::Terrain);
-	StageToStages.push_back(BMR::BMRShaderStage::Fragment);
-
-	ShaderPaths.push_back("./Resources/Shaders/vert.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::Entity);
-	StageToStages.push_back(BMR::BMRShaderStage::Vertex);
-
-	ShaderPaths.push_back("./Resources/Shaders/frag.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::Entity);
-	StageToStages.push_back(BMR::BMRShaderStage::Fragment);
-
-	ShaderPaths.push_back("./Resources/Shaders/second_vert.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::Deferred);
-	StageToStages.push_back(BMR::BMRShaderStage::Vertex);
-
-	ShaderPaths.push_back("./Resources/Shaders/second_frag.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::Deferred);
-	StageToStages.push_back(BMR::BMRShaderStage::Fragment);
-
-	ShaderPaths.push_back("./Resources/Shaders/SkyBox_vert.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::SkyBox);
-	StageToStages.push_back(BMR::BMRShaderStage::Vertex);
-
-	ShaderPaths.push_back("./Resources/Shaders/SkyBox_frag.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::SkyBox);
-	StageToStages.push_back(BMR::BMRShaderStage::Fragment);
-
-	ShaderPaths.push_back("./Resources/Shaders/Depth_vert.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::Depth);
-	StageToStages.push_back(BMR::BMRShaderStage::Vertex);
-
-	for (u32 i = 0; i < BMR::BMRShaderNames::ShaderNamesCount; ++i)
-	{
-		Util::OpenAndReadFileFull(ShaderPaths[i], ShaderCodes[i], "rb");
-		Config.RenderShaders[i].Code = reinterpret_cast<u32*>(ShaderCodes[i].data());
-		Config.RenderShaders[i].CodeSize = ShaderCodes[i].size();
-		Config.RenderShaders[i].Handle = HandleToPath[i];
-		Config.RenderShaders[i].Stage = StageToStages[i];
-	}
-}
-
 void UpdateScene(BMR::BMRDrawScene& Scene, f32 DeltaTime)
 {
 	static f32 Angle = 0.0f;
@@ -950,7 +850,6 @@ int main()
 
 	std::vector<u32> TerrainIndices;
 	GenerateTerrain(TerrainIndices);
-	LoadShaders();
 
 	Config.MaxTextures = 90;
 	Config.LogHandler = BMRLog;
@@ -958,196 +857,6 @@ int main()
 
 	BMR::Init(glfwGetWin32Window(Window), Config);
 
-
-
-	ShadowMapSampler = BMR::CreateSampler(&ShadowMapSamplerCreateInfo);
-	DiffuseSampler = BMR::CreateSampler(&DiffuseSamplerCreateInfo);
-	SpecularSampler = BMR::CreateSampler(&SpecularSamplerCreateInfo);
-	
-	VkDescriptorSetLayout VpLayout = BMR::CreateUniformLayout(&VpDescriptorType, &VpStageFlags, 1);
-	VkDescriptorSetLayout EntityLightLayout = BMR::CreateUniformLayout(&EntityLightDescriptorType, &EntityLightStageFlags, 1);
-	VkDescriptorSetLayout LightSpaceMatrixLayout = BMR::CreateUniformLayout(&LightSpaceMatrixDescriptorType, &LightSpaceMatrixStageFlags, 1);
-	VkDescriptorSetLayout MaterialLayout = BMR::CreateUniformLayout(&MaterialDescriptorType, &MaterialStageFlags, 1);
-	VkDescriptorSetLayout DeferredInputLayout = BMR::CreateUniformLayout(DeferredInputDescriptorType, DeferredInputFlags, 2);
-	VkDescriptorSetLayout ShadowMapArrayLayout = BMR::CreateUniformLayout(&ShadowMapArrayDescriptorType, &ShadowMapArrayFlags, 1);
-	EntitySamplerLayout = BMR::CreateUniformLayout(EntitySamplerDescriptorType, EntitySamplerInputFlags, 2);
-	VkDescriptorSetLayout TerrainSkyBoxLayout = BMR::CreateUniformLayout(&TerrainSkyBoxSamplerDescriptorType, &TerrainSkyBoxArrayFlags, 1);
-
-	BMR::BMRUniform VpBuffer[3];
-	BMR::BMRUniform EntityLightBuffer[3];
-	BMR::BMRUniform LightSpaceMatrixBuffer[3];
-	BMR::BMRUniform MaterialBuffer;
-	BMR::BMRUniform DeferredInputDepthImage[3];
-	BMR::BMRUniform DeferredInputColorImage[3];
-	BMR::BMRUniform ShadowMapArray[3];
-
-	VkImageView DeferredInputDepthImageInterface[3];
-	VkImageView DeferredInputColorImageInterface[3];
-	VkImageView ShadowMapArrayImageInterface[3];
-	VkImageView ShadowMapElement1ImageInterface[3];
-	VkImageView ShadowMapElement2ImageInterface[3];
-
-	VkDescriptorSet VpSet[3];
-	VkDescriptorSet EntityLightSet[3];
-	VkDescriptorSet LightSpaceMatrixSet[3];
-	VkDescriptorSet MaterialSet;
-	VkDescriptorSet DeferredInputSet[3];
-	VkDescriptorSet ShadowMapArraySet[3];
-
-	for (u32 i = 0; i < BMR::GetImageCount(); i++)
-	{
-		//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
-		const VkDeviceSize VpBufferSize = sizeof(BMR::BMRUboViewProjection);
-		const VkDeviceSize LightBufferSize = sizeof(BMR::BMRLightBuffer);
-		const VkDeviceSize LightSpaceMatrixSize = sizeof(BMR::BMRLightSpaceMatrix);
-
-		VpBufferInfo.size = VpBufferSize;
-		VpBuffer[i] = BMR::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-		VpBufferInfo.size = LightBufferSize;
-		EntityLightBuffer[i] = BMR::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-		VpBufferInfo.size = LightSpaceMatrixSize;
-		LightSpaceMatrixBuffer[i] = BMR::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-		DeferredInputDepthImage[i] = BMR::CreateUniformImage(&DeferredInputDepthUniformCreateInfo);
-		DeferredInputColorImage[i] = BMR::CreateUniformImage(&DeferredInputColorUniformCreateInfo);
-		ShadowMapArray[i] = BMR::CreateUniformImage(&ShadowMapArrayCreateInfo);
-
-		DeferredInputDepthImageInterface[i] = BMR::CreateImageInterface(&DeferredInputDepthUniformInterfaceCreateInfo,
-			DeferredInputDepthImage[i].Image);
-		DeferredInputColorImageInterface[i] = BMR::CreateImageInterface(&DeferredInputUniformColorInterfaceCreateInfo,
-			DeferredInputColorImage[i].Image);
-		ShadowMapArrayImageInterface[i] = BMR::CreateImageInterface(&ShadowMapArrayInterfaceCreateInfo,
-			ShadowMapArray[i].Image);
-		ShadowMapElement1ImageInterface[i] = BMR::CreateImageInterface(&ShadowMapElement1InterfaceCreateInfo,
-			ShadowMapArray[i].Image);
-		ShadowMapElement2ImageInterface[i] = BMR::CreateImageInterface(&ShadowMapElement2InterfaceCreateInfo,
-			ShadowMapArray[i].Image);
-	
-		BMR::CreateUniformSets(&VpLayout, 1, VpSet + i);
-		BMR::CreateUniformSets(&EntityLightLayout, 1, EntityLightSet + i);
-		BMR::CreateUniformSets(&LightSpaceMatrixLayout, 1, LightSpaceMatrixSet + i);
-		BMR::CreateUniformSets(&DeferredInputLayout, 1, DeferredInputSet + i);
-		BMR::CreateUniformSets(&ShadowMapArrayLayout, 1, ShadowMapArraySet + i);
-
-		BMR::BMRUniformSetAttachmentInfo VpBufferAttachmentInfo;
-		VpBufferAttachmentInfo.BufferInfo.buffer = VpBuffer[i].Buffer;
-		VpBufferAttachmentInfo.BufferInfo.offset = 0;
-		VpBufferAttachmentInfo.BufferInfo.range = VpBufferSize;
-		VpBufferAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-
-		BMR::BMRUniformSetAttachmentInfo EntityLightAttachmentInfo;
-		EntityLightAttachmentInfo.BufferInfo.buffer = EntityLightBuffer[i].Buffer;
-		EntityLightAttachmentInfo.BufferInfo.offset = 0;
-		EntityLightAttachmentInfo.BufferInfo.range = LightBufferSize;
-		EntityLightAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-
-		BMR::BMRUniformSetAttachmentInfo LightSpaceMatrixAttachmentInfo;
-		LightSpaceMatrixAttachmentInfo.BufferInfo.buffer = LightSpaceMatrixBuffer[i].Buffer;
-		LightSpaceMatrixAttachmentInfo.BufferInfo.offset = 0;
-		LightSpaceMatrixAttachmentInfo.BufferInfo.range = LightSpaceMatrixSize;
-		LightSpaceMatrixAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-
-		BMR::BMRUniformSetAttachmentInfo DeferredInputAttachmentInfo[2];
-		DeferredInputAttachmentInfo[0].ImageInfo.imageView = DeferredInputColorImageInterface[i];
-		DeferredInputAttachmentInfo[0].ImageInfo.sampler = nullptr;
-		DeferredInputAttachmentInfo[0].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		DeferredInputAttachmentInfo[0].Type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-
-		DeferredInputAttachmentInfo[1].ImageInfo.imageView = DeferredInputDepthImageInterface[i];
-		DeferredInputAttachmentInfo[1].ImageInfo.sampler = nullptr;
-		DeferredInputAttachmentInfo[1].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		DeferredInputAttachmentInfo[1].Type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-
-		BMR::BMRUniformSetAttachmentInfo ShadowMapArrayAttachmentInfo;
-		ShadowMapArrayAttachmentInfo.ImageInfo.imageView = ShadowMapArrayImageInterface[i];
-		ShadowMapArrayAttachmentInfo.ImageInfo.sampler = ShadowMapSampler;
-		ShadowMapArrayAttachmentInfo.ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		ShadowMapArrayAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-
-		BMR::AttachUniformsToSet(VpSet[i], &VpBufferAttachmentInfo, 1);
-		BMR::AttachUniformsToSet(EntityLightSet[i], &EntityLightAttachmentInfo, 1);
-		BMR::AttachUniformsToSet(LightSpaceMatrixSet[i], &LightSpaceMatrixAttachmentInfo, 1);
-		BMR::AttachUniformsToSet(DeferredInputSet[i], DeferredInputAttachmentInfo, 2);
-		BMR::AttachUniformsToSet(ShadowMapArraySet[i], &ShadowMapArrayAttachmentInfo, 1);
-	}
-
-	const VkDeviceSize MaterialSize = sizeof(BMR::BMRMaterial);
-	VpBufferInfo.size = MaterialSize;
-	MaterialBuffer = BMR::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-	BMR::CreateUniformSets(&MaterialLayout, 1, &MaterialSet);
-
-	BMR::BMRUniformSetAttachmentInfo MaterialAttachmentInfo;
-	MaterialAttachmentInfo.BufferInfo.buffer = MaterialBuffer.Buffer;
-	MaterialAttachmentInfo.BufferInfo.offset = 0;
-	MaterialAttachmentInfo.BufferInfo.range = MaterialSize;
-	MaterialAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-
-	BMR::AttachUniformsToSet(MaterialSet, &MaterialAttachmentInfo, 1);
-
-	BMR::CreateUniformSets(&EntitySamplerLayout, 1, &TestMaterialIndex);
-	BMR::CreateUniformSets(&EntitySamplerLayout, 1, &WhiteMaterialIndex);
-	BMR::CreateUniformSets(&EntitySamplerLayout, 1, &ContainerMaterialIndex);
-	BMR::CreateUniformSets(&EntitySamplerLayout, 1, &BlendWindowMaterial);
-	BMR::CreateUniformSets(&EntitySamplerLayout, 1, &GrassMaterial);
-	BMR::CreateUniformSets(&TerrainSkyBoxLayout, 1, &SkyBoxMaterial);
-	BMR::CreateUniformSets(&TerrainSkyBoxLayout, 1, &TerrainMaterial);
-
-	std::vector<BMR::BMRRenderPass> RenderPasses(2);
-	{
-		BMR::BMRRenderTarget RenderTarget;
-		for (u32 ImageIndex = 0; ImageIndex < BMR::GetImageCount(); ImageIndex++)
-		{
-			BMR::BMRAttachmentView* AttachmentView = RenderTarget.AttachmentViews + ImageIndex;
-
-			AttachmentView->ImageViews = Memory::BmMemoryManagementSystem::FrameAlloc<VkImageView>(MainRenderPassSettings.AttachmentDescriptionsCount);
-			AttachmentView->ImageViews[0] = BMR::GetSwapchainImageViews()[ImageIndex];
-			AttachmentView->ImageViews[1] = DeferredInputColorImageInterface[ImageIndex];
-			AttachmentView->ImageViews[2] = DeferredInputDepthImageInterface[ImageIndex];
-		
-		}
-
-		BMR::CreateRenderPass(&MainRenderPassSettings, &RenderTarget, MainScreenExtent, 1, BMR::GetImageCount(), &RenderPasses[0]);
-	}
-	{
-		BMR::BMRRenderTarget RenderTargets[2];
-		for (u32 ImageIndex = 0; ImageIndex < BMR::GetImageCount(); ImageIndex++)
-		{
-			BMR::BMRAttachmentView* Target1AttachmentView = RenderTargets[0].AttachmentViews + ImageIndex;
-			BMR::BMRAttachmentView* Target2AttachmentView = RenderTargets[1].AttachmentViews + ImageIndex;
-
-			Target1AttachmentView->ImageViews = Memory::BmMemoryManagementSystem::FrameAlloc<VkImageView>(DepthRenderPassSettings.AttachmentDescriptionsCount);
-			Target2AttachmentView->ImageViews = Memory::BmMemoryManagementSystem::FrameAlloc<VkImageView>(DepthRenderPassSettings.AttachmentDescriptionsCount);
-
-			Target1AttachmentView->ImageViews[0] = ShadowMapElement1ImageInterface[ImageIndex];
-			Target2AttachmentView->ImageViews[0] = ShadowMapElement2ImageInterface[ImageIndex];
-		}
-
-		BMR::CreateRenderPass(&DepthRenderPassSettings, RenderTargets, DepthViewportExtent, 2, BMR::GetImageCount(), &RenderPasses[1]);
-	}
-
-	BMR::TestSetRendeRpasses(RenderPasses[0], RenderPasses[1],
-		VpBuffer, VpLayout, VpSet,
-		EntityLightBuffer, EntityLightLayout, EntityLightSet,
-		LightSpaceMatrixBuffer, LightSpaceMatrixLayout, LightSpaceMatrixSet,
-		MaterialBuffer, MaterialLayout, MaterialSet,
-		DeferredInputDepthImageInterface, DeferredInputColorImageInterface,
-		DeferredInputLayout, DeferredInputSet,
-		ShadowMapArray, ShadowMapArrayLayout, ShadowMapArraySet,
-		EntitySamplerLayout, TerrainSkyBoxLayout);
-
-
-
-
-
-
-
-
-
-
-
-	ShaderCodes.clear();
-	ShaderCodes.shrink_to_fit();
 
 	LoadDrawEntities();
 
@@ -1273,38 +982,18 @@ int main()
 
 	for (u32 i = 0; i < BMR::GetImageCount(); i++)
 	{
-		BMR::DestroyUniformBuffer(VpBuffer[i]);
-		BMR::DestroyUniformBuffer(EntityLightBuffer[i]);
-		BMR::DestroyUniformBuffer(LightSpaceMatrixBuffer[i]);
-		BMR::DestroyUniformImage(DeferredInputColorImage[i]);
-		BMR::DestroyUniformImage(DeferredInputDepthImage[i]);
-		BMR::DestroyUniformImage(ShadowMapArray[i]);
+		
+		
 
-		BMR::DestroyImageInterface(DeferredInputColorImageInterface[i]);
-		BMR::DestroyImageInterface(DeferredInputDepthImageInterface[i]);
-		BMR::DestroyImageInterface(ShadowMapArrayImageInterface[i]);
-		BMR::DestroyImageInterface(ShadowMapElement1ImageInterface[i]);
-		BMR::DestroyImageInterface(ShadowMapElement2ImageInterface[i]);
+
+		
+
 	}
 
-	BMR::DestroyUniformBuffer(MaterialBuffer);
 
-	BMR::DestroyUniformLayout(VpLayout);
-	BMR::DestroyUniformLayout(EntityLightLayout);
-	BMR::DestroyUniformLayout(LightSpaceMatrixLayout);
-	BMR::DestroyUniformLayout(MaterialLayout);
-	BMR::DestroyUniformLayout(DeferredInputLayout);
-	BMR::DestroyUniformLayout(ShadowMapArrayLayout);
-	BMR::DestroyUniformLayout(EntitySamplerLayout);
-	BMR::DestroyUniformLayout(TerrainSkyBoxLayout);
 
-	BMR::DestroySampler(ShadowMapSampler);
-	BMR::DestroySampler(DiffuseSampler);
+	
 
-	for (auto& Pass : RenderPasses)
-	{
-		BMR::DestroyRenderPass(&Pass);
-	}
 
 
 

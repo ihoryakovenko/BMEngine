@@ -10,17 +10,8 @@ namespace BMR
 	bool Init(HWND WindowHandler, const BMRConfig& InConfig);
 	void DeInit();
 
-	void TestSetRendeRpasses(BMRRenderPass Main, BMRRenderPass Depth,
-		BMRUniform* inVpBuffer, VkDescriptorSetLayout iVpLayout, VkDescriptorSet* iVpSet,
-		BMRUniform* inEntityLight, VkDescriptorSetLayout iEntityLightLayout, VkDescriptorSet* iEntityLightSet,
-		BMRUniform* iLightSpaceBuffer, VkDescriptorSetLayout iLightSpaceLayout, VkDescriptorSet* iLightSpaceSet,
-		BMRUniform iMaterial, VkDescriptorSetLayout iMaterialLayout, VkDescriptorSet iMaterialSet,
-		VkImageView* iDeferredInputDepthImage, VkImageView* iDeferredInputColorImage,
-		VkDescriptorSetLayout iDeferredInputLayout, VkDescriptorSet* iDeferredInputSet,
-		BMRUniform* iShadowArray, VkDescriptorSetLayout iShadowArrayLayout, VkDescriptorSet* iShadowArraySet,
-		VkDescriptorSetLayout iEntitySamplerLayout, VkDescriptorSetLayout iTerrainSkyBoxSamplerLayout);
-
-
+	void TestAttachEntityTexture(VkImageView DefuseImage, VkImageView SpecularImage, VkDescriptorSet* SetToAttach);
+	void TestAttachSkyNoxTerrainTexture(VkImageView DefuseImage, VkDescriptorSet* SetToAttach);
 	
 	
 	void UpdateMaterialBuffer(const BMRMaterial* Buffer);
