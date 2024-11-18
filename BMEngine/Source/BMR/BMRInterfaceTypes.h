@@ -6,12 +6,10 @@
 
 #include "Util/EngineTypes.h"
 
+#include "BMRVulkan/BMRVulkan.h"
+
 namespace BMR
 {
-	static const u32 MAX_SWAPCHAIN_IMAGES_COUNT = 3;
-	static const u32 MAX_VERTEX_INPUTS_ATTRIBUTES = 16;
-	static const u32 MAX_VERTEX_INPUT_BINDINGS = 16;
-
 	enum BMRLogType
 	{
 		LogType_Error,
@@ -36,14 +34,7 @@ namespace BMR
 		ShaderNamesCount
 	};
 
-	enum BMRShaderStage
-	{
-		Vertex,
-		Fragment,
 
-		ShaderStagesCount,
-		BMRShaderStagesNone
-	};
 
 	enum BMRPipelineHandles
 	{
@@ -171,94 +162,9 @@ namespace BMR
 		f32 Shininess;
 	};
 
-	struct BMRVertexInputAttribute
-	{
-		const char* VertexInputAttributeName = nullptr;
-		VkFormat Format = VK_FORMAT_UNDEFINED;
-		u32 AttributeOffset = 0;
-	};
 
-	struct BMRVertexInputBinding
-	{
-		const char* VertexInputBindingName = nullptr;
 
-		BMRVertexInputAttribute InputAttributes[MAX_VERTEX_INPUTS_ATTRIBUTES];
-		u32 InputAttributesCount = 0;
 
-		u32 Stride = 0;
-		VkVertexInputRate InputRate = VK_VERTEX_INPUT_RATE_MAX_ENUM;
-	};
-
-	struct BMRVertexInput
-	{
-		BMRVertexInputBinding VertexInputBinding[MAX_VERTEX_INPUT_BINDINGS];
-		u32 VertexInputBindingCount = 0;
-	};
-
-	struct BMRUniform
-	{
-		union
-		{
-			VkBuffer Buffer = nullptr;
-			VkImage Image;
-		};
-
-		VkDeviceMemory Memory = nullptr;
-	};
-
-	struct BMRUniformSetAttachmentInfo
-	{
-		union
-		{
-			VkDescriptorBufferInfo BufferInfo;
-			VkDescriptorImageInfo ImageInfo;
-		};
-
-		VkDescriptorType Type = VK_DESCRIPTOR_TYPE_MAX_ENUM;
-	};
-
-	struct BMRUniformImageInterfaceCreateInfo
-	{
-		const void* pNext = nullptr;
-		VkImageViewCreateFlags Flags = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
-		VkImageViewType ViewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
-		VkFormat Format = VK_FORMAT_UNDEFINED;
-		VkComponentMapping Components;
-		VkImageSubresourceRange SubresourceRange;
-	};
-
-	struct BMRAttachmentView
-	{
-		// Count should be equal to AttachmentDescriptionsCount
-		VkImageView* ImageViews = nullptr;
-	};
-
-	struct BMRRenderTarget
-	{
-		BMRAttachmentView AttachmentViews[MAX_SWAPCHAIN_IMAGES_COUNT];
-	};
-
-	struct BMRFramebufferSet
-	{
-		VkFramebuffer FrameBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
-	};
-
-	struct BMRRenderPass
-	{
-		VkRenderPass Pass = nullptr;
-
-		VkClearValue* ClearValues = nullptr;
-		u32 ClearValuesCount = 0;
-
-		BMRFramebufferSet* FramebufferSets = nullptr;
-		u32 FramebufferSetCount = 0;
-	};
-
-	struct BMRPipeline
-	{
-		VkPipeline Pipeline = nullptr;
-		VkPipelineLayout PipelineLayout = nullptr;
-	};
 
 	struct BMRDrawScene
 	{
@@ -277,70 +183,5 @@ namespace BMR
 		bool DrawSkyBox = false;
 
 		BMRLightBuffer* LightEntity = nullptr;
-	};
-
-	struct BMRPipelineSettings
-	{
-		const char* PipelineName = nullptr;
-
-		VkExtent2D Extent;
-
-		VkBool32 DepthClampEnable = VK_FALSE;
-		VkBool32 RasterizerDiscardEnable = VK_FALSE;
-		VkPolygonMode PolygonMode = VK_POLYGON_MODE_MAX_ENUM;
-		f32 LineWidth = 0.0f;
-		VkCullModeFlags CullMode = VK_CULL_MODE_NONE;
-		VkFrontFace FrontFace = VK_FRONT_FACE_MAX_ENUM;
-		VkBool32 DepthBiasEnable = VK_FALSE;
-
-		VkBool32 LogicOpEnable = VK_FALSE;
-		u32 AttachmentCount = 0;
-		u32 ColorWriteMask = 0;
-		VkBool32 BlendEnable = VK_FALSE;
-		VkBlendFactor SrcColorBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
-		VkBlendFactor DstColorBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
-		VkBlendOp ColorBlendOp = VK_BLEND_OP_MAX_ENUM;
-		VkBlendFactor SrcAlphaBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
-		VkBlendFactor DstAlphaBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
-		VkBlendOp AlphaBlendOp = VK_BLEND_OP_MAX_ENUM;
-
-		VkBool32 DepthTestEnable = VK_FALSE;
-		VkBool32 DepthWriteEnable = VK_FALSE;
-		VkCompareOp DepthCompareOp = VK_COMPARE_OP_MAX_ENUM;
-		VkBool32 DepthBoundsTestEnable = VK_FALSE;
-		VkBool32 StencilTestEnable = VK_FALSE;
-	};
-
-	struct BMRSubpassSettings
-	{
-		const char* SubpassName = nullptr;
-
-		const VkAttachmentReference* ColorAttachmentsReferences = nullptr;
-		u32 ColorAttachmentsReferencesCount = 0;
-
-		const VkAttachmentReference* DepthAttachmentReferences = nullptr;
-
-		// First subpass has to not contain InputAttachments
-		const VkAttachmentReference* InputAttachmentsReferences = nullptr;
-		u32 InputAttachmentsReferencesCount = 0;
-	};
-
-	struct BMRRenderPassSettings
-	{
-		const char* RenderPassName = nullptr;
-
-		// AttachmentDescriptions can be modified if contain undefined format
-		VkAttachmentDescription* AttachmentDescriptions = nullptr;
-		u32 AttachmentDescriptionsCount = 0;
-
-		const BMRSubpassSettings* SubpassesSettings = nullptr;
-		u32 SubpassSettingsCount = 0;
-
-		VkSubpassDependency* SubpassDependencies = nullptr;
-		// Has to be 1 more then SubpassSettingsCount
-		u32 SubpassDependenciesCount = 0;
-
-		const VkClearValue* ClearValues = nullptr;
-		u32 ClearValuesCount = 0;
 	};
 }

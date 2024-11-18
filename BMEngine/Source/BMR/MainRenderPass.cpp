@@ -2,7 +2,6 @@
 
 #include "VulkanHelper.h"
 #include "VulkanMemoryManagementSystem.h"
-#include "VulkanResourceManagementSystem.h"
 
 #include "Memory/MemoryManagmentSystem.h"
 
@@ -84,12 +83,12 @@ namespace BMR
 
 		for (u32 i = 0; i < BMRPipelineHandles::PipelineHandlesCount; ++i)
 		{
-			Pipelines[i].PipelineLayout = VulkanResourceManagementSystem::CreatePipelineLayout(SetLayouts[i],
+			Pipelines[i].PipelineLayout = CreatePipelineLayout(SetLayouts[i],
 				SetLayoutCountTable[i], &PushConstants[PushConstantHandles::Model], PushConstantRangeCountTable[i]);
 		}
 	}
 
-	void BMRMainRenderPass::CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent,
+	void BMRMainRenderPass::CreatePipelinesDepr(VkDevice LogicalDevice, VkExtent2D SwapExtent,
 		BMRPipelineShaderInputDepr ShaderInputs[BMRShaderNames::ShaderNamesCount], VkRenderPass main, VkRenderPass depth)
 	{
 		const VkShaderStageFlagBits NamesToStagesTable[] =
@@ -148,9 +147,9 @@ namespace BMR
 		PipelineResourceInfo[BMRPipelineHandles::Depth].RenderPass = depth;
 		PipelineResourceInfo[BMRPipelineHandles::Depth].SubpassIndex = TmpDepthSubpassIndex;
 
-
-		VkPipeline* NewPipelines = VulkanResourceManagementSystem::CreatePipelines(ShaderInfos, VertexInput, PipelineSettings,
-			PipelineResourceInfo, BMRPipelineHandles::PipelineHandlesCount);
+		VkPipeline NewPipelines[BMRPipelineHandles::PipelineHandlesCount];
+		CreatePipelines(ShaderInfos, VertexInput, PipelineSettings,
+			PipelineResourceInfo, BMRPipelineHandles::PipelineHandlesCount, NewPipelines);
 
 		for (u32 i = 0; i < BMRPipelineHandles::PipelineHandlesCount; ++i)
 		{

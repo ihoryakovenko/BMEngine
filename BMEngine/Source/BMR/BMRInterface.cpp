@@ -7,7 +7,6 @@
 
 #include "Memory/MemoryManagmentSystem.h"
 #include "VulkanMemoryManagementSystem.h"
-#include "VulkanResourceManagementSystem.h"
 
 #include "VulkanCoreTypes.h"
 #include "MainRenderPass.h"
@@ -15,85 +14,49 @@
 
 #include "Util/Settings.h"
 
+
+
+#include "BMRVulkan/BMRVulkan.h"
+
 namespace BMR
 {
-	static Memory::FrameArray<VkExtensionProperties> GetAvailableExtensionProperties();
-	static Memory::FrameArray<VkLayerProperties> GetAvailableInstanceLayerProperties();
-	static Memory::FrameArray<const char*> GetRequiredInstanceExtensions(const char** ValidationExtensions, u32 ValidationExtensionsCount);
-	static Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkSurfaceKHR Surface);
-
-	static VkExtent2D GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities, HWND WindowHandler);
-
-	static bool CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, u32 AvailableExtensionsCount,
-		const char** RequiredExtensions, u32 RequiredExtensionsCount);
-	static bool CheckValidationLayersSupport(VkLayerProperties* Properties, u32 PropertiesSize,
-		const char** ValidationLeyersToCheck, u32 ValidationLeyersToCheckSize);
-	static VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface);
-
-	static VkDevice CreateLogicalDevice(BMRPhysicalDeviceIndices Indices, const char* DeviceExtensions[],
-		u32 DeviceExtensionsSize);
-	static VkSampler CreateTextureSampler(f32 MaxAnisotropy, VkSamplerAddressMode AddressMode);
-
-	static bool SetupQueues();
-	static bool IsFormatSupported(VkFormat Format, VkImageTiling Tiling, VkFormatFeatureFlags FeatureFlags);
-
-	static void CreateSynchronisation();
-	static void DestroySynchronisation();
-
-	static void InitViewport(VkSurfaceKHR Surface, BMRViewportInstance* OutViewport,
-		BMRSwapchainInstance SwapInstance, VkImageView* ColorBuffers, VkImageView* DepthBuffers);
-	static void DeinitViewport(BMRViewportInstance* Viewport);
-
-	static void CreateCommandPool(VkDevice LogicalDevice, u32 FamilyIndex);
-
 	static void UpdateVpBuffer(const BMRUboViewProjection& ViewProjection);
 	static void UpdateLightBuffer(const BMRLightBuffer* Buffer);
 	static void UpdateLightSpaceBuffer(const BMRLightSpaceMatrix* LightSpaceMatrix);
 
-	static VkBuffer CreateBuffer(const VkBufferCreateInfo* BufferInfo);
 
-	VkDeviceMemory CreateDeviceMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex);
-
-	static VkDeviceMemory AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex);
-
-	static const u32 RequiredExtensionsCount = 2;
-	const char* RequiredInstanceExtensions[RequiredExtensionsCount] =
-	{
-		VK_KHR_SURFACE_EXTENSION_NAME,
-		VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-	};
 
 	static BMRConfig Config;
 
-	static BMRMainInstance Instance;
-	static VkDevice LogicalDevice = nullptr;
-	static BMRDeviceInstance Device;
 	static BMRMainRenderPass MainRenderPass;
 
-	static BMRViewportInstance MainViewport;
 
-	static VkQueue GraphicsQueue = nullptr;
-	static VkQueue PresentationQueue = nullptr;
 
 	static u32 CurrentFrame = 0;
 
-	static VkSemaphore ImagesAvailable[MAX_DRAW_FRAMES];
-	static VkSemaphore RenderFinished[MAX_DRAW_FRAMES];
-	static VkFence DrawFences[MAX_DRAW_FRAMES];
 
-	static VkCommandPool GraphicsCommandPool = nullptr;
+
+	
 
 	static BMRUniform VertexBuffer;
 	static u32 VertexBufferOffset = 0;
 	static BMRUniform IndexBuffer;
 	static u32 IndexBufferOffset = 0;
 
-	static VkDescriptorPool MainPool = nullptr;
-
-	static VkSurfaceFormatKHR SurfaceFormat;
+	
 
 
 
+	extern BMRDevice Device;
+	extern VkExtent2D SwapExtent;
+	extern VkSemaphore ImagesAvailable[MAX_DRAW_FRAMES];
+	extern VkSemaphore RenderFinished[MAX_DRAW_FRAMES];
+	extern VkFence DrawFences[MAX_DRAW_FRAMES];
+	extern VkQueue GraphicsQueue;
+	extern VkQueue PresentationQueue;
+	extern VkCommandPool GraphicsCommandPool;
+	extern BMRSwapchain SwapInstance;
+	extern VkCommandBuffer DrawCommandBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 
 	// TODO!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -120,10 +83,8 @@ namespace BMR
 	VkDescriptorSet* ShadowArraySet;
 	VkDescriptorSetLayout EntitySamplerLayout;
 
-	VkExtent2D Extent1;
 	BMRPipelineShaderInputDepr ShaderInputs[BMR::BMRShaderNames::ShaderNamesCount];
-	BMRSwapchainInstance SwapInstance1;
-	VkSurfaceKHR Surface;
+	
 
 
 
@@ -141,139 +102,12 @@ namespace BMR
 
 		SetLogHandler(Config.LogHandler);
 
-		const char* ValidationLayers[] = {
-			"VK_LAYER_KHRONOS_validation",
-			"VK_LAYER_LUNARG_monitor",
-		};
-		const u32 ValidationLayersSize = sizeof(ValidationLayers) / sizeof(ValidationLayers[0]);
+		BMRVkConfig BMRVkConfig;
+		BMRVkConfig.EnableValidationLayers = Config.EnableValidationLayers;
+		BMRVkConfig.LogHandler = (BMRVkLogHandler)Config.LogHandler;
+		BMRVkConfig.MaxTextures = Config.MaxTextures;
 
-		const char* ValidationExtensions[] = {
-			VK_EXT_DEBUG_UTILS_EXTENSION_NAME
-		};
-		const u32 ValidationExtensionsSize = Config.EnableValidationLayers ? sizeof(ValidationExtensions) / sizeof(ValidationExtensions[0]) : 0;
-
-		const char* DeviceExtensions[] = {
-			VK_KHR_SWAPCHAIN_EXTENSION_NAME
-		};
-		const u32 DeviceExtensionsSize = sizeof(DeviceExtensions) / sizeof(DeviceExtensions[0]);
-
-		Memory::FrameArray<VkExtensionProperties> AvailableExtensions = GetAvailableExtensionProperties();
-		Memory::FrameArray<const char*> RequiredExtensions = GetRequiredInstanceExtensions(ValidationExtensions, ValidationExtensionsSize);
-
-		if (!CheckRequiredInstanceExtensionsSupport(AvailableExtensions.Pointer.Data, AvailableExtensions.Count,
-			RequiredExtensions.Pointer.Data, RequiredExtensions.Count))
-		{
-			return false;
-		}
-
-		if (Config.EnableValidationLayers)
-		{
-			Memory::FrameArray<VkLayerProperties> LayerPropertiesData = GetAvailableInstanceLayerProperties();
-
-			if (!CheckValidationLayersSupport(LayerPropertiesData.Pointer.Data, LayerPropertiesData.Count,
-				ValidationLayers, ValidationLayersSize))
-			{
-				assert(false);
-			}
-		}
-
-		Instance = BMRMainInstance::CreateMainInstance(RequiredExtensions.Pointer.Data, RequiredExtensions.Count,
-			Config.EnableValidationLayers, ValidationLayers, ValidationLayersSize);
-
-		VkWin32SurfaceCreateInfoKHR surfaceCreateInfo = { };
-		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-		surfaceCreateInfo.hwnd = WindowHandler;
-		surfaceCreateInfo.hinstance = GetModuleHandle(nullptr);
-
-		Surface = nullptr;
-		VkResult Result = vkCreateWin32SurfaceKHR(Instance.VulkanInstance, &surfaceCreateInfo, nullptr, &Surface);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkCreateWin32SurfaceKHR result is %d", Result);
-		}
-
-		Device.Init(Instance.VulkanInstance, Surface, DeviceExtensions, DeviceExtensionsSize);
-
-		LogicalDevice = CreateLogicalDevice(Device.Indices, DeviceExtensions, DeviceExtensionsSize);
-
-		SurfaceFormat = GetBestSurfaceFormat(Surface);
-
-		const u32 FormatPrioritySize = 3;
-		VkFormat FormatPriority[FormatPrioritySize] = { VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT };
-
-		bool IsSupportedFormatFound = false;
-		for (u32 i = 0; i < FormatPrioritySize; ++i)
-		{
-			VkFormat FormatToCheck = FormatPriority[i];
-			if (IsFormatSupported(FormatToCheck, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT))
-			{
-				IsSupportedFormatFound = true;
-				break;
-			}
-
-			HandleLog(BMRLogType::LogType_Warning, "Format %d is not supported", Result);
-		}
-
-		assert(IsSupportedFormatFound);
-
-
-		VkSurfaceCapabilitiesKHR SurfaceCapabilities = { };
-
-		Result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Device.PhysicalDevice, Surface, &SurfaceCapabilities);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Warning, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR result is %d", Result);
-			return false;
-		}
-
-		Extent1 = GetBestSwapExtent(SurfaceCapabilities, WindowHandler);
-
-		CreateSynchronisation();
-		SetupQueues();
-		CreateCommandPool(LogicalDevice, Device.Indices.GraphicsFamily);
-
-		SwapInstance1 = BMRSwapchainInstance::CreateSwapchainInstance(Device.PhysicalDevice, Device.Indices,
-			LogicalDevice, Surface, SurfaceFormat, Extent1);
-
-		const u32 PoolSizeCount = 13;
-		auto TotalPassPoolSizes = Memory::FramePointer<VkDescriptorPoolSize>::Create(PoolSizeCount);
-		u32 TotalDescriptorLayouts = 21;
-		// Layout 1
-		TotalPassPoolSizes[0] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
-		// Layout 2
-		TotalPassPoolSizes[1] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
-
-		TotalPassPoolSizes[2] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
-
-		TotalPassPoolSizes[3] = { .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = SwapInstance1.ImagesCount };
-		// Layout 3
-		TotalPassPoolSizes[4] = { .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = SwapInstance1.ImagesCount };
-		TotalPassPoolSizes[5] = { .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = SwapInstance1.ImagesCount };
-		// Textures
-		TotalPassPoolSizes[6] = { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = Config.MaxTextures };
-
-
-		TotalPassPoolSizes[7] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
-		TotalPassPoolSizes[8] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
-
-		TotalPassPoolSizes[9] = { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = Config.MaxTextures };
-		TotalPassPoolSizes[10] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
-		TotalPassPoolSizes[11] = { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = Config.MaxTextures };
-		TotalPassPoolSizes[12] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
-
-		u32 TotalDescriptorCount = TotalDescriptorLayouts * SwapInstance1.ImagesCount;
-		TotalDescriptorCount += Config.MaxTextures;
-
-		VulkanResourceManagementSystem::Init(LogicalDevice, 16);
-
-		VulkanMemoryManagementSystem::BMRMemorySourceDevice MemoryDevice;
-		MemoryDevice.PhysicalDevice = Device.PhysicalDevice;
-		MemoryDevice.LogicalDevice = LogicalDevice;
-		MemoryDevice.TransferCommandPool = GraphicsCommandPool;
-		MemoryDevice.TransferQueue = GraphicsQueue;
-
-		VulkanMemoryManagementSystem::Init(MemoryDevice);
-		MainPool = VulkanMemoryManagementSystem::AllocateDescriptorPool(TotalPassPoolSizes.Data, PoolSizeCount, TotalDescriptorCount);
+		BMRVkInit(WindowHandler, BMRVkConfig);
 
 		VkBufferCreateInfo BufferInfo = {};
 		BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -301,25 +135,10 @@ namespace BMR
 
 	void DeInit()
 	{
-		vkDeviceWaitIdle(LogicalDevice);
-
-		DestroySynchronisation();
-
-		vkDestroyDescriptorPool(LogicalDevice, MainPool, nullptr);
-
+		vkDeviceWaitIdle(Device.LogicalDevice);
 		DestroyUniformBuffer(VertexBuffer);
 		DestroyUniformBuffer(IndexBuffer);
-		VulkanMemoryManagementSystem::Deinit();
-
-		VulkanResourceManagementSystem::DeInit();
-
-		vkDestroyCommandPool(LogicalDevice, GraphicsCommandPool, nullptr);
-
-		DeinitViewport(&MainViewport);
-
-		vkDestroyDevice(LogicalDevice, nullptr);
-
-		BMRMainInstance::DestroyMainInstance(Instance);
+		BMRVkDeInit();
 	}
 
 	void TestSetRendeRpasses(BMRRenderPass Main, BMRRenderPass Depth,
@@ -356,399 +175,9 @@ namespace BMR
 		EntitySamplerLayout = iEntitySamplerLayout;
 
 		MainRenderPass.SetupPushConstants();
-		MainRenderPass.CreatePipelineLayouts(LogicalDevice, VpLayout, EntityLightLayout, LightSpaceLayout, materialLayout,
+		MainRenderPass.CreatePipelineLayouts(Device.LogicalDevice, VpLayout, EntityLightLayout, LightSpaceLayout, materialLayout,
 			DeferredInputLayout, ShadowArrayLayout, EntitySamplerLayout, iTerrainSkyBoxSamplerLayout);
-		MainRenderPass.CreatePipelines(LogicalDevice, Extent1, ShaderInputs, MainPass.Pass, DepthPass.Pass);
-
-		InitViewport(Surface, &MainViewport, SwapInstance1, iDeferredInputColorImage, iDeferredInputDepthImage);
-	}
-
-	u32 GetImageCount()
-	{
-		return SwapInstance1.ImagesCount;
-	}
-
-	VkImageView* GetSwapchainImageViews()
-	{
-		return SwapInstance1.ImageViews;
-	}
-
-	void CreateRenderPass(const BMRRenderPassSettings* Settings, const BMRRenderTarget* Targets,
-		VkExtent2D TargetExtent, u32 TargetCount, u32 SwapchainImagesCount, BMRRenderPass* OutPass)
-	{
-		HandleLog(BMRLogType::LogType_Info, "Initializing RenderPass, Name: %s, Subpass count: %d, Attachments count: %d",
-			Settings->RenderPassName, Settings->SubpassSettingsCount, Settings->AttachmentDescriptionsCount);
-
-		// RenderPass create info
-		auto Subpasses = Memory::BmMemoryManagementSystem::FrameAlloc<VkSubpassDescription>(Settings->SubpassSettingsCount);
-		for (u32 SubpassIndex = 0; SubpassIndex < Settings->SubpassSettingsCount; ++SubpassIndex)
-		{
-			const BMRSubpassSettings* SubpassSettings = Settings->SubpassesSettings + SubpassIndex;
-			VkSubpassDescription* Subpass = Subpasses + SubpassIndex;
-
-			HandleLog(BMRLogType::LogType_Info, "Initializing Subpass, Name: %s, Color attachments count: %d, "
-				"Depth attachment state: %d, Input attachments count: %d",
-				SubpassSettings->SubpassName, SubpassSettings->ColorAttachmentsReferencesCount,
-				SubpassSettings->DepthAttachmentReferences ? 1 : 0, SubpassSettings->InputAttachmentsReferencesCount);
-
-			*Subpass = { };
-			Subpass->pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-			Subpass->pColorAttachments = SubpassSettings->ColorAttachmentsReferences;
-			Subpass->colorAttachmentCount = SubpassSettings->ColorAttachmentsReferencesCount;
-			Subpass->pDepthStencilAttachment = SubpassSettings->DepthAttachmentReferences;
-
-			if (SubpassIndex != 0)
-			{
-				Subpass->pInputAttachments = SubpassSettings->InputAttachmentsReferences;
-				Subpass->inputAttachmentCount = SubpassSettings->InputAttachmentsReferencesCount;
-			}
-			else if (SubpassSettings->InputAttachmentsReferences != nullptr || SubpassSettings->InputAttachmentsReferencesCount != 0)
-			{
-				HandleLog(BMRLogType::LogType_Warning, "Attempting to set Input attachment to first subpass");
-			}
-		}
-
-		for (u32 AttachmentDescriptionIndex = 0; AttachmentDescriptionIndex < Settings->AttachmentDescriptionsCount; ++AttachmentDescriptionIndex)
-		{
-			if (Settings->AttachmentDescriptions[AttachmentDescriptionIndex].format == VK_FORMAT_UNDEFINED)
-			{
-				HandleLog(BMRLogType::LogType_Info, "Setting new %d format for attachment description with index %d",
-					SurfaceFormat.format, AttachmentDescriptionIndex);
-				Settings->AttachmentDescriptions[AttachmentDescriptionIndex].format = SurfaceFormat.format;
-			}
-		}
-
-		VkRenderPassCreateInfo RenderPassCreateInfo = { };
-		RenderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		RenderPassCreateInfo.attachmentCount = Settings->AttachmentDescriptionsCount;
-		RenderPassCreateInfo.pAttachments = Settings->AttachmentDescriptions;
-		RenderPassCreateInfo.subpassCount = Settings->SubpassSettingsCount;
-		RenderPassCreateInfo.pSubpasses = Subpasses;
-		RenderPassCreateInfo.dependencyCount = Settings->SubpassDependenciesCount;
-		RenderPassCreateInfo.pDependencies = Settings->SubpassDependencies;
-
-		const VkResult Result = vkCreateRenderPass(LogicalDevice, &RenderPassCreateInfo, nullptr, &OutPass->Pass);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkCreateRenderPass result is %d", Result);
-		}
-
-		// Set clear values
-		OutPass->ClearValues = Memory::BmMemoryManagementSystem::Allocate<VkClearValue>(Settings->AttachmentDescriptionsCount);
-		OutPass->ClearValuesCount = Settings->AttachmentDescriptionsCount;
-		std::memcpy(OutPass->ClearValues, Settings->ClearValues, Settings->AttachmentDescriptionsCount * sizeof(VkClearValue));
-
-		// Creating framebuffers
-		OutPass->FramebufferSets = Memory::BmMemoryManagementSystem::Allocate<BMRFramebufferSet>(TargetCount);
-		for (u32 TargetIndex = 0; TargetIndex < TargetCount; ++TargetIndex)
-		{
-			BMRFramebufferSet* FramebufferSet = OutPass->FramebufferSets + TargetIndex;
-			const BMRRenderTarget* Target = Targets + TargetIndex;
-
-			for (u32 SwapchainImageIndex = 0; SwapchainImageIndex < SwapchainImagesCount; ++SwapchainImageIndex)
-			{
-				VkFramebuffer* Framebuffer = FramebufferSet->FrameBuffers + SwapchainImageIndex;
-				const BMRAttachmentView* AttachmentView = Target->AttachmentViews + SwapchainImageIndex;
-
-				VkFramebufferCreateInfo Info = { };
-				Info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-				Info.renderPass = OutPass->Pass;
-				Info.attachmentCount = Settings->AttachmentDescriptionsCount;
-				Info.pAttachments = AttachmentView->ImageViews; // List of attachments (1:1 with Render Pass)
-				Info.width = TargetExtent.width;
-				Info.height = TargetExtent.height;
-				Info.layers = 1;
-
-				const VkResult Result = vkCreateFramebuffer(LogicalDevice, &Info, nullptr, Framebuffer);
-				if (Result != VK_SUCCESS)
-				{
-					HandleLog(BMRLogType::LogType_Error, "vkCreateFramebuffer result is %d", Result);
-				}
-			}
-		}
-
-		OutPass->FramebufferSetCount = TargetCount;
-	}
-
-	void DestroyRenderPass(BMRRenderPass* Pass)
-	{
-		for (u32 TargetIndex = 0; TargetIndex < Pass->FramebufferSetCount; ++TargetIndex)
-		{
-			for (u32 SwapchainImageIndex = 0; SwapchainImageIndex < SwapInstance1.ImagesCount; ++SwapchainImageIndex)
-			{
-				vkDestroyFramebuffer(LogicalDevice, Pass->FramebufferSets[TargetIndex].FrameBuffers[SwapchainImageIndex], nullptr);
-			}
-		}
-
-		vkDestroyRenderPass(LogicalDevice, Pass->Pass, nullptr);
-		Memory::BmMemoryManagementSystem::Deallocate(Pass->ClearValues);
-		Memory::BmMemoryManagementSystem::Deallocate(Pass->FramebufferSets);
-	}
-
-	BMRUniform CreateUniformBuffer(const VkBufferCreateInfo* BufferInfo, VkMemoryPropertyFlags Properties)
-	{
-		BMRUniform UniformBuffer;
-		UniformBuffer.Buffer = CreateBuffer(BufferInfo);
-
-		VkMemoryRequirements MemoryRequirements;
-		vkGetBufferMemoryRequirements(LogicalDevice, UniformBuffer.Buffer, &MemoryRequirements);
-
-		const u32 MemoryTypeIndex = GetMemoryTypeIndex(Device.PhysicalDevice, MemoryRequirements.memoryTypeBits, Properties);
-
-		if (BufferInfo->size != MemoryRequirements.size)
-		{
-			HandleLog(BMRLogType::LogType_Warning, "Buffer memory requirement size is %d, allocating %d more then buffer size",
-				MemoryRequirements.size, MemoryRequirements.size - BufferInfo->size);
-		}
-
-		UniformBuffer.Memory = CreateDeviceMemory(MemoryRequirements.size, MemoryTypeIndex);
-		vkBindBufferMemory(LogicalDevice, UniformBuffer.Buffer, UniformBuffer.Memory, 0);
-
-		return UniformBuffer;
-	}
-
-	void UpdateUniformBuffer(BMRUniform Buffer, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data)
-	{
-		void* MappedMemory;
-		vkMapMemory(LogicalDevice, Buffer.Memory, Offset, DataSize, 0, &MappedMemory);
-		std::memcpy(MappedMemory, Data, DataSize);
-		vkUnmapMemory(LogicalDevice, Buffer.Memory);
-	}
-
-
-	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, u32 LayersCount, void* Data)
-	{
-		// FIRST TRANSITION
-		VkImageMemoryBarrier Barrier = { };
-		Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		Barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;									// Layout to transition from
-		Barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;									// Layout to transition to
-		Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition from
-		Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition to
-		Barrier.image = Image;											// Image being accessed and modified as part of barrier
-		Barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;	// Aspect of image being altered
-		Barrier.subresourceRange.baseMipLevel = 0;						// First mip level to start alterations on
-		Barrier.subresourceRange.levelCount = 1;							// Number of mip levels to alter starting from baseMipLevel
-		Barrier.subresourceRange.baseArrayLayer = 0;
-		Barrier.subresourceRange.layerCount = LayersCount;
-		Barrier.srcAccessMask = 0;								// Memory access stage transition must after...
-		Barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;		// Memory access stage transition must before...
-
-		// Todo: Create beginCommandBuffer function?
-		VkCommandBuffer CommandBuffer;
-
-		VkCommandBufferAllocateInfo AllocInfo = { };
-		AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		AllocInfo.commandPool = GraphicsCommandPool;
-		AllocInfo.commandBufferCount = 1;
-
-		VkCommandBufferBeginInfo BeginInfo = { };
-		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-		VkPipelineStageFlags SrcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-		VkPipelineStageFlags DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-
-		VkSubmitInfo SubmitInfo = { };
-		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.commandBufferCount = 1;
-		SubmitInfo.pCommandBuffers = &CommandBuffer;
-
-		vkAllocateCommandBuffers(LogicalDevice, &AllocInfo, &CommandBuffer);
-		vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
-
-		vkCmdPipelineBarrier(
-			CommandBuffer,
-			SrcStage, DstStage,		// Pipeline stages (match to src and dst AccessMasks)
-			0,						// Dependency flags
-			0, nullptr,				// Memory Barrier count + data
-			0, nullptr,				// Buffer Memory Barrier count + data
-			1, &Barrier	// Image Memory Barrier count + data
-		);
-
-		vkEndCommandBuffer(CommandBuffer);
-
-		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
-		vkQueueWaitIdle(GraphicsQueue);
-
-		// Copy data to image
-		VkMemoryRequirements MemoryRequirements;
-		vkGetImageMemoryRequirements(LogicalDevice, Image, &MemoryRequirements);
-
-		VulkanMemoryManagementSystem::CopyDataToImage(Image, Width, Height,
-			Format, MemoryRequirements.size / LayersCount, LayersCount, Data);
-
-		// SECOND TRANSITION
-		Barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL; // Layout to transition from
-		Barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		Barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		Barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-		SrcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-		DstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-
-		vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
-		vkCmdPipelineBarrier(CommandBuffer, SrcStage, DstStage, 0, 0, nullptr, 0, nullptr, 1, &Barrier);
-		vkEndCommandBuffer(CommandBuffer);
-
-		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
-		vkQueueWaitIdle(GraphicsQueue);
-
-		vkFreeCommandBuffers(LogicalDevice, GraphicsCommandPool, 1, &CommandBuffer);
-	}
-
-	VkSampler CreateSampler(const VkSamplerCreateInfo* CreateInfo)
-	{
-		VkSampler Sampler;
-		VkResult Result = vkCreateSampler(LogicalDevice, CreateInfo, nullptr, &Sampler);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkCreateSampler result is %d", Result);
-		}
-
-		return Sampler;
-	}
-
-	BMRUniform CreateUniformImage(const VkImageCreateInfo* ImageCreateInfo)
-	{
-		BMRUniform Buffer;
-		VkResult Result = vkCreateImage(LogicalDevice, ImageCreateInfo, nullptr, &Buffer.Image);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "CreateImage result is %d", Result);
-		}
-
-		VkMemoryRequirements MemoryRequirements;
-		vkGetImageMemoryRequirements(LogicalDevice, Buffer.Image, &MemoryRequirements);
-
-		const u32 MemoryTypeIndex = GetMemoryTypeIndex(Device.PhysicalDevice, MemoryRequirements.memoryTypeBits,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-		Buffer.Memory = AllocateMemory(MemoryRequirements.size, MemoryTypeIndex);
-		vkBindImageMemory(LogicalDevice, Buffer.Image, Buffer.Memory, 0);
-
-		return Buffer;
-	}
-
-	void DestroyUniformImage(BMRUniform Image)
-	{
-		vkDestroyImage(LogicalDevice, Image.Image, nullptr);
-		vkFreeMemory(LogicalDevice, Image.Memory, nullptr);
-	}
-
-	VkDescriptorSetLayout CreateUniformLayout(const VkDescriptorType* Types, const VkShaderStageFlags* Stages, u32 Count)
-	{
-		auto LayoutBindings = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorSetLayoutBinding>(Count);
-		for (u32 BindingIndex = 0; BindingIndex < Count; ++BindingIndex)
-		{
-			VkDescriptorSetLayoutBinding* LayoutBinding = LayoutBindings + BindingIndex;
-			*LayoutBinding = { };
-			LayoutBinding->binding = BindingIndex;
-			LayoutBinding->descriptorType = Types[BindingIndex];
-			LayoutBinding->descriptorCount = 1;
-			LayoutBinding->stageFlags = Stages[BindingIndex];
-			LayoutBinding->pImmutableSamplers = nullptr; // For Texture: Can make sampler data unchangeable (immutable) by specifying in layout	
-		}
-
-		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
-		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = Count;
-		LayoutCreateInfo.pBindings = LayoutBindings;
-
-		VkDescriptorSetLayout Layout;
-		const VkResult Result = vkCreateDescriptorSetLayout(LogicalDevice, &LayoutCreateInfo, nullptr, &Layout);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkCreateDescriptorSetLayout result is %d", Result);
-		}
-
-		return Layout;
-	}
-
-	void DestroyUniformBuffer(BMRUniform Buffer)
-	{
-		vkDeviceWaitIdle(LogicalDevice); // TODO!!!!!!!!!!!
-
-
-
-		vkDestroyBuffer(LogicalDevice, Buffer.Buffer, nullptr);
-		vkFreeMemory(LogicalDevice, Buffer.Memory, nullptr);
-	}
-
-	void CreateUniformSets(const VkDescriptorSetLayout* Layouts, u32 Count, VkDescriptorSet* OutSets)
-	{
-		HandleLog(BMRLogType::LogType_Info, "Allocating descriptor sets. Size count: %d", Count);
-
-		VkDescriptorSetAllocateInfo SetAllocInfo = { };
-		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		SetAllocInfo.descriptorPool = MainPool; // Pool to allocate Descriptor Set from
-		SetAllocInfo.descriptorSetCount = Count; // Number of sets to allocate
-		SetAllocInfo.pSetLayouts = Layouts; // Layouts to use to allocate sets (1:1 relationship)
-
-		const VkResult Result = vkAllocateDescriptorSets(LogicalDevice, &SetAllocInfo, (VkDescriptorSet*)OutSets);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkAllocateDescriptorSets result is %d", Result);
-		}
-	}
-
-	VkImageView CreateImageInterface(const BMRUniformImageInterfaceCreateInfo* InterfaceCreateInfo, VkImage Image)
-	{
-		VkImageViewCreateInfo ViewCreateInfo = { };
-		ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		ViewCreateInfo.image = Image;
-		ViewCreateInfo.viewType = InterfaceCreateInfo->ViewType;
-		ViewCreateInfo.format = InterfaceCreateInfo->Format;
-		ViewCreateInfo.components = InterfaceCreateInfo->Components;
-		ViewCreateInfo.subresourceRange = InterfaceCreateInfo->SubresourceRange;
-		ViewCreateInfo.pNext = InterfaceCreateInfo->pNext;
-
-		VkImageView ImageView;
-		const VkResult Result = vkCreateImageView(LogicalDevice, &ViewCreateInfo, nullptr, &ImageView);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkCreateImageView result is %d", Result);
-		}
-
-		return ImageView;
-	}
-
-	void DestroyUniformLayout(VkDescriptorSetLayout Layout)
-	{
-		vkDestroyDescriptorSetLayout(LogicalDevice, Layout, nullptr);
-	}
-
-	void DestroyImageInterface(VkImageView Interface)
-	{
-		vkDestroyImageView(LogicalDevice, Interface, nullptr);
-	}
-
-	void DestroySampler(VkSampler Sampler)
-	{
-		vkDestroySampler(LogicalDevice, Sampler, nullptr);
-	}
-
-	void AttachUniformsToSet(VkDescriptorSet Set, const BMRUniformSetAttachmentInfo* Infos, u32 BufferCount)
-	{
-		auto SetWrites = Memory::BmMemoryManagementSystem::FrameAlloc<VkWriteDescriptorSet>(BufferCount);
-		for (u32 BufferIndex = 0; BufferIndex < BufferCount; ++BufferIndex)
-		{
-			const BMRUniformSetAttachmentInfo* Info = Infos + BufferIndex;
-
-			VkWriteDescriptorSet* SetWrite = SetWrites + BufferIndex;
-			*SetWrite = { };
-			SetWrite->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			SetWrite->dstSet = Set;
-			SetWrite->dstBinding = BufferIndex;
-			SetWrite->dstArrayElement = 0;
-			SetWrite->descriptorType = Info->Type;
-			SetWrite->descriptorCount = 1;
-			SetWrite->pBufferInfo = &Info->BufferInfo;
-			SetWrite->pImageInfo = &Info->ImageInfo;
-		}
-
-		vkUpdateDescriptorSets(LogicalDevice, BufferCount, SetWrites, 0, nullptr);
+		MainRenderPass.CreatePipelinesDepr(Device.LogicalDevice, SwapExtent, ShaderInputs, MainPass.Pass, DepthPass.Pass);
 	}
 
 	u64 LoadVertices(const void* Vertices, u32 VertexSize, u64 VerticesCount)
@@ -785,7 +214,7 @@ namespace BMR
 	{
 		assert(Buffer);
 
-		const u32 UpdateIndex = (MainRenderPass.ActiveLightSet + 1) % MainViewport.ViewportSwapchain.ImagesCount;
+		const u32 UpdateIndex = (MainRenderPass.ActiveLightSet + 1) % SwapInstance.ImagesCount;
 
 		UpdateUniformBuffer(EntityLight[UpdateIndex], sizeof(BMRLightBuffer), 0,
 			Buffer);
@@ -802,7 +231,7 @@ namespace BMR
 
 	void UpdateLightSpaceBuffer(const BMRLightSpaceMatrix* LightSpaceMatrix)
 	{
-		const u32 UpdateIndex = (MainRenderPass.ActiveLightSpaceMatrixSet + 1) % MainViewport.ViewportSwapchain.ImagesCount;
+		const u32 UpdateIndex = (MainRenderPass.ActiveLightSpaceMatrixSet + 1) % SwapInstance.ImagesCount;
 
 		UpdateUniformBuffer(LightSpaceBuffer[UpdateIndex], sizeof(BMRLightSpaceMatrix), 0,
 			LightSpaceMatrix);
@@ -838,14 +267,14 @@ namespace BMR
 		VkFence Fence = DrawFences[CurrentFrame];
 		VkSemaphore ImageAvailable = ImagesAvailable[CurrentFrame];
 
-		vkWaitForFences(LogicalDevice, 1, &Fence, VK_TRUE, UINT64_MAX);
-		vkResetFences(LogicalDevice, 1, &Fence);
+		vkWaitForFences(Device.LogicalDevice, 1, &Fence, VK_TRUE, UINT64_MAX);
+		vkResetFences(Device.LogicalDevice, 1, &Fence);
 
 		u32 ImageIndex;
-		vkAcquireNextImageKHR(LogicalDevice, MainViewport.ViewportSwapchain.VulkanSwapchain, UINT64_MAX,
+		vkAcquireNextImageKHR(Device.LogicalDevice, SwapInstance.VulkanSwapchain, UINT64_MAX,
 			ImageAvailable, VK_NULL_HANDLE, &ImageIndex);
 
-		VkCommandBuffer CommandBuffer = MainViewport.CommandBuffers[ImageIndex];
+		VkCommandBuffer CommandBuffer = DrawCommandBuffers[ImageIndex];
 
 		VkResult Result = vkBeginCommandBuffer(CommandBuffer, &CommandBufferBeginInfo);
 		if (Result != VK_SUCCESS)
@@ -913,7 +342,7 @@ namespace BMR
 		MainRenderPassBeginInfo.renderArea.offset = { 0, 0 };
 		MainRenderPassBeginInfo.pClearValues = MainPassClearValues;
 		MainRenderPassBeginInfo.clearValueCount = MainPassClearValuesSize;
-		MainRenderPassBeginInfo.renderArea.extent = MainViewport.ViewportSwapchain.SwapExtent; // Size of region to run render pass on (starting at offset)
+		MainRenderPassBeginInfo.renderArea.extent = SwapInstance.SwapExtent; // Size of region to run render pass on (starting at offset)
 		MainRenderPassBeginInfo.framebuffer = MainPass.FramebufferSets[0].FrameBuffers[ImageIndex];
 
 		vkCmdBeginRenderPass(CommandBuffer, &MainRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -1040,7 +469,7 @@ namespace BMR
 		PresentInfo.waitSemaphoreCount = 1;
 		PresentInfo.swapchainCount = 1;
 		PresentInfo.pWaitSemaphores = &RenderFinished[CurrentFrame];
-		PresentInfo.pSwapchains = &MainViewport.ViewportSwapchain.VulkanSwapchain; // Swapchains to present images to
+		PresentInfo.pSwapchains = &SwapInstance.VulkanSwapchain; // Swapchains to present images to
 		PresentInfo.pImageIndices = &ImageIndex; // Index of images in swapchains to present
 		Result = vkQueuePresentKHR(PresentationQueue, &PresentInfo);
 		if (Result != VK_SUCCESS)
@@ -1051,415 +480,13 @@ namespace BMR
 		CurrentFrame = (CurrentFrame + 1) % MAX_DRAW_FRAMES;
 	}
 
-	bool CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, u32 AvailableExtensionsCount,
-		const char** RequiredExtensions, u32 RequiredExtensionsCount)
-	{
-		for (u32 i = 0; i < RequiredExtensionsCount; ++i)
-		{
-			bool IsExtensionSupported = false;
-			for (u32 j = 0; j < AvailableExtensionsCount; ++j)
-			{
-				if (std::strcmp(RequiredExtensions[i], AvailableExtensions[j].extensionName) == 0)
-				{
-					IsExtensionSupported = true;
-					break;
-				}
-			}
-
-			if (!IsExtensionSupported)
-			{
-				HandleLog(BMRLogType::LogType_Error, "Extension %s unsupported", RequiredExtensions[i]);
-				return false;
-			}
-		}
-
-		return true;
-	}
-
-	bool CheckValidationLayersSupport(VkLayerProperties* Properties, u32 PropertiesSize,
-		const char** ValidationLeyersToCheck, u32 ValidationLeyersToCheckSize)
-	{
-		for (u32 i = 0; i < ValidationLeyersToCheckSize; ++i)
-		{
-			bool IsLayerAvalible = false;
-			for (u32 j = 0; j < PropertiesSize; ++j)
-			{
-				if (std::strcmp(ValidationLeyersToCheck[i], Properties[j].layerName) == 0)
-				{
-					IsLayerAvalible = true;
-					break;
-				}
-			}
-
-			if (!IsLayerAvalible)
-			{
-				HandleLog(BMRLogType::LogType_Error, "Validation layer %s unsupported", ValidationLeyersToCheck[i]);
-				return false;
-			}
-		}
-
-		return true;
-	}
-
-	VkExtent2D GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities, HWND WindowHandler)
-	{
-		if (SurfaceCapabilities.currentExtent.width != UINT32_MAX)
-		{
-			return SurfaceCapabilities.currentExtent;
-		}
-		else
-		{
-			RECT Rect;
-			if (!GetClientRect(WindowHandler, &Rect))
-			{
-				assert(false);
-			}
-
-			u32 Width = Rect.right - Rect.left;
-			u32 Height = Rect.bottom - Rect.top;
-
-			
-			Width = glm::clamp(static_cast<u32>(Width), SurfaceCapabilities.minImageExtent.width, SurfaceCapabilities.maxImageExtent.width);
-			Height = glm::clamp(static_cast<u32>(Height), SurfaceCapabilities.minImageExtent.height, SurfaceCapabilities.maxImageExtent.height);
-
-			return { static_cast<u32>(Width), static_cast<u32>(Height) };
-		}
-	}
-
-	Memory::FrameArray<VkExtensionProperties> GetAvailableExtensionProperties()
-	{
-		u32 Count;
-		const VkResult Result = vkEnumerateInstanceExtensionProperties(nullptr, &Count, nullptr);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkEnumerateInstanceExtensionProperties result is %d", static_cast<int>(Result));
-		}
-
-		auto Data = Memory::FrameArray<VkExtensionProperties>::Create(Count);
-		vkEnumerateInstanceExtensionProperties(nullptr, &Count, Data.Pointer.Data);
-
-		return Data;
-	}
-
-	Memory::FrameArray<VkLayerProperties> GetAvailableInstanceLayerProperties()
-	{
-		u32 Count;
-		const VkResult Result = vkEnumerateInstanceLayerProperties(&Count, nullptr);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkEnumerateInstanceLayerProperties result is %d", Result);
-		}
-
-		auto Data = Memory::FrameArray<VkLayerProperties>::Create(Count);
-		vkEnumerateInstanceLayerProperties(&Count, Data.Pointer.Data);
-
-		return Data;
-	}
-
-	Memory::FrameArray<const char*> GetRequiredInstanceExtensions(const char** ValidationExtensions,
-		u32 ValidationExtensionsCount)
-	{
-		auto Data = Memory::FrameArray<const char*>::Create(RequiredExtensionsCount + ValidationExtensionsCount);
-
-		for (u32 i = 0; i < RequiredExtensionsCount; ++i)
-		{
-			Data[i] = RequiredInstanceExtensions[i];
-			HandleLog(BMRLogType::LogType_Info, "Requested %s extension", Data[i]);
-		}
-
-		for (u32 i = 0; i < ValidationExtensionsCount; ++i)
-		{
-			Data[i + RequiredExtensionsCount] = ValidationExtensions[i];
-			HandleLog(BMRLogType::LogType_Info, "Requested %s extension", Data[i]);
-		}
-
-		return Data;
-	}
-
-	Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkSurfaceKHR Surface)
-	{
-		u32 Count;
-		const VkResult Result = vkGetPhysicalDeviceSurfaceFormatsKHR(Device.PhysicalDevice, Surface, &Count, nullptr);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkGetPhysicalDeviceSurfaceFormatsKHR result is %d", Result);
-		}
-
-		auto Data = Memory::FrameArray<VkSurfaceFormatKHR>::Create(Count);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(Device.PhysicalDevice, Surface, &Count, Data.Pointer.Data);
-
-		return Data;
-	}
-
-	VkDevice CreateLogicalDevice(BMRPhysicalDeviceIndices Indices, const char* DeviceExtensions[],
-		u32 DeviceExtensionsSize)
-	{
-		const f32 Priority = 1.0f;
-
-		// One family can support graphics and presentation
-		// In that case create multiple VkDeviceQueueCreateInfo
-		VkDeviceQueueCreateInfo QueueCreateInfos[2] = { };
-		u32 FamilyIndicesSize = 1;
-
-		QueueCreateInfos[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		QueueCreateInfos[0].queueFamilyIndex = static_cast<u32>(Indices.GraphicsFamily);
-		QueueCreateInfos[0].queueCount = 1;
-		QueueCreateInfos[0].pQueuePriorities = &Priority;
-
-		if (Indices.GraphicsFamily != Indices.PresentationFamily)
-		{
-			QueueCreateInfos[1].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-			QueueCreateInfos[1].queueFamilyIndex = static_cast<u32>(Indices.PresentationFamily);
-			QueueCreateInfos[1].queueCount = 1;
-			QueueCreateInfos[1].pQueuePriorities = &Priority;
-
-			++FamilyIndicesSize;
-		}
-
-		VkPhysicalDeviceFeatures DeviceFeatures = { };
-		DeviceFeatures.fillModeNonSolid = VK_TRUE; // Todo: get from configs
-		DeviceFeatures.samplerAnisotropy = VK_TRUE; // Todo: get from configs
-		DeviceFeatures.multiViewport = VK_TRUE; // Todo: get from configs
-
-		VkDeviceCreateInfo DeviceCreateInfo = { };
-		DeviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-		DeviceCreateInfo.queueCreateInfoCount = FamilyIndicesSize;
-		DeviceCreateInfo.pQueueCreateInfos = QueueCreateInfos;
-		DeviceCreateInfo.enabledExtensionCount = DeviceExtensionsSize;
-		DeviceCreateInfo.ppEnabledExtensionNames = DeviceExtensions;
-		DeviceCreateInfo.pEnabledFeatures = &DeviceFeatures;
-
-		VkDevice LogicalDevice;
-		// Queues are created at the same time as the Device
-		VkResult Result = vkCreateDevice(Device.PhysicalDevice, &DeviceCreateInfo, nullptr, &LogicalDevice);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkCreateDevice result is %d", Result);
-			assert(false);
-		}
-
-		return LogicalDevice;
-	}
-
-	VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface)
-	{
-		Memory::FrameArray<VkSurfaceFormatKHR> FormatsData = GetSurfaceFormats(Surface);
-
-		VkSurfaceFormatKHR Format = { VK_FORMAT_UNDEFINED, static_cast<VkColorSpaceKHR>(0) };
-
-		// All formats available
-		if (FormatsData.Count == 1 && FormatsData[0].format == VK_FORMAT_UNDEFINED)
-		{
-			Format = { VK_FORMAT_R8G8B8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
-		}
-		else
-		{
-			for (u32 i = 0; i < FormatsData.Count; ++i)
-			{
-				VkSurfaceFormatKHR AvailableFormat = FormatsData[i];
-				if ((AvailableFormat.format == VK_FORMAT_R8G8B8_UNORM || AvailableFormat.format == VK_FORMAT_B8G8R8A8_UNORM)
-					&& AvailableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-				{
-					Format = AvailableFormat;
-					break;
-				}
-			}
-		}
-
-		if (Format.format == VK_FORMAT_UNDEFINED)
-		{
-			HandleLog(BMRLogType::LogType_Error, "SurfaceFormat is undefined");
-		}
-
-		return Format;
-	}
-
-	VkSampler CreateTextureSampler(f32 MaxAnisotropy, VkSamplerAddressMode AddressMode)
-	{
-		VkSamplerCreateInfo SamplerCreateInfo = { };
-		SamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		SamplerCreateInfo.magFilter = VK_FILTER_LINEAR;						// How to render when image is magnified on screen
-		SamplerCreateInfo.minFilter = VK_FILTER_LINEAR;						// How to render when image is minified on screen
-		SamplerCreateInfo.addressModeU = AddressMode;	// How to handle texture wrap in U (x) direction
-		SamplerCreateInfo.addressModeV = AddressMode;	// How to handle texture wrap in V (y) direction
-		SamplerCreateInfo.addressModeW = AddressMode;	// How to handle texture wrap in W (z) direction
-		SamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;	// Border beyond texture (only workds for border clamp)
-		SamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;				// Whether coords should be normalized (between 0 and 1)
-		SamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;		// Mipmap interpolation mode
-		SamplerCreateInfo.mipLodBias = 0.0f;								// Level of Details bias for mip level
-		SamplerCreateInfo.minLod = 0.0f;									// Minimum Level of Detail to pick mip level
-		SamplerCreateInfo.maxLod = 0.0f;									// Maximum Level of Detail to pick mip level
-		SamplerCreateInfo.anisotropyEnable = VK_TRUE;
-		SamplerCreateInfo.maxAnisotropy = MaxAnisotropy; // Todo: support in config
-
-		VkSampler Sampler;
-		VkResult Result = vkCreateSampler(LogicalDevice, &SamplerCreateInfo, nullptr, &Sampler);
-		if (Result != VK_SUCCESS)
-		{
-			assert(false);
-		}
-
-		return Sampler;
-	}
-
-	bool SetupQueues()
-	{
-		vkGetDeviceQueue(LogicalDevice, static_cast<u32>(Device.Indices.GraphicsFamily), 0, &GraphicsQueue);
-		vkGetDeviceQueue(LogicalDevice, static_cast<u32>(Device.Indices.PresentationFamily), 0, &PresentationQueue);
-
-		if (GraphicsQueue == nullptr && PresentationQueue == nullptr)
-		{
-			return false;
-		}
-	}
-
-	bool IsFormatSupported(VkFormat Format, VkImageTiling Tiling, VkFormatFeatureFlags FeatureFlags)
-	{
-		VkFormatProperties Properties;
-		vkGetPhysicalDeviceFormatProperties(Device.PhysicalDevice, Format, &Properties);
-
-		if (Tiling == VK_IMAGE_TILING_LINEAR && (Properties.linearTilingFeatures & FeatureFlags) == FeatureFlags)
-		{
-			return true;
-		}
-		else if (Tiling == VK_IMAGE_TILING_OPTIMAL && (Properties.optimalTilingFeatures & FeatureFlags) == FeatureFlags)
-		{
-			return true;
-		}
-	}
-
-	void CreateSynchronisation()
-	{
-		VkSemaphoreCreateInfo SemaphoreCreateInfo = { };
-		SemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-		VkFenceCreateInfo FenceCreateInfo = { };
-		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-		FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-		for (u64 i = 0; i < MAX_DRAW_FRAMES; i++)
-		{
-			if (vkCreateSemaphore(LogicalDevice, &SemaphoreCreateInfo, nullptr, &ImagesAvailable[i]) != VK_SUCCESS ||
-				vkCreateSemaphore(LogicalDevice, &SemaphoreCreateInfo, nullptr, &RenderFinished[i]) != VK_SUCCESS ||
-				vkCreateFence(LogicalDevice, &FenceCreateInfo, nullptr, &DrawFences[i]) != VK_SUCCESS)
-			{
-				HandleLog(BMRLogType::LogType_Error, "CreateSynchronisation error");
-				assert(false);
-			}
-		}
-	}
-
-	void DestroySynchronisation()
-	{
-		for (u64 i = 0; i < MAX_DRAW_FRAMES; i++)
-		{
-			vkDestroySemaphore(LogicalDevice, RenderFinished[i], nullptr);
-			vkDestroySemaphore(LogicalDevice, ImagesAvailable[i], nullptr);
-			vkDestroyFence(LogicalDevice, DrawFences[i], nullptr);
-		}
-	}
-
-	void DeinitViewport(BMRViewportInstance* Viewport)
-	{
-		BMRSwapchainInstance::DestroySwapchainInstance(LogicalDevice, Viewport->ViewportSwapchain);
-		vkDestroySurfaceKHR(Instance.VulkanInstance, Viewport->Surface, nullptr);
-	}
-
-	void InitViewport(VkSurfaceKHR Surface, BMRViewportInstance* OutViewport,
-		BMRSwapchainInstance SwapInstance, VkImageView* ColorBuffers, VkImageView* DepthBuffers)
-	{
-		OutViewport->Surface = Surface;
-		OutViewport->ViewportSwapchain = SwapInstance;
-
-		VkCommandBufferAllocateInfo CommandBufferAllocateInfo = { };
-		CommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		CommandBufferAllocateInfo.commandPool = GraphicsCommandPool;
-		CommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;	// VK_COMMAND_BUFFER_LEVEL_PRIMARY	: Buffer you submit directly to queue. Cant be called by other buffers.
-		// VK_COMMAND_BUFFER_LEVEL_SECONARY	: Buffer can't be called directly. Can be called from other buffers via "vkCmdExecuteCommands" when recording commands in primary buffer
-		CommandBufferAllocateInfo.commandBufferCount = static_cast<u32>(OutViewport->ViewportSwapchain.ImagesCount);
-
-		VkResult Result = vkAllocateCommandBuffers(LogicalDevice, &CommandBufferAllocateInfo, OutViewport->CommandBuffers);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkAllocateCommandBuffers result is %d", Result);
-		}
-	}
-
-	void CreateCommandPool(VkDevice LogicalDevice, u32 FamilyIndex)
-	{
-		VkCommandPoolCreateInfo PoolInfo = { };
-		PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-		PoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		PoolInfo.queueFamilyIndex = FamilyIndex;
-
-		VkResult Result = vkCreateCommandPool(LogicalDevice, &PoolInfo, nullptr, &GraphicsCommandPool);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkCreateCommandPool result is %d", Result);
-		}
-	}
-
 	void UpdateVpBuffer(const BMRUboViewProjection& ViewProjection)
 	{
-		const u32 UpdateIndex = (MainRenderPass.ActiveVpSet + 1) % MainViewport.ViewportSwapchain.ImagesCount;
+		const u32 UpdateIndex = (MainRenderPass.ActiveVpSet + 1) % SwapInstance.ImagesCount;
 
 		UpdateUniformBuffer(VpBuffer[UpdateIndex], sizeof(BMRUboViewProjection), 0,
 			&ViewProjection);
 
 		MainRenderPass.ActiveVpSet = UpdateIndex;
-	}
-
-	VkBuffer CreateBuffer(const VkBufferCreateInfo* BufferInfo)
-	{
-		HandleLog(BMRLogType::LogType_Info, "Creating VkBuffer. Requested size: %d", BufferInfo->size);
-
-		VkBuffer Buffer;
-		VkResult Result = vkCreateBuffer(LogicalDevice, BufferInfo, nullptr, &Buffer);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkCreateBuffer result is %d", Result);
-		}
-
-		return Buffer;
-	}
-
-	VkDeviceMemory CreateDeviceMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex)
-	{
-		HandleLog(BMRLogType::LogType_Info, "Allocating Device memory. Buffer type: Image, Size count: %d, Index: %d",
-			AllocationSize, MemoryTypeIndex);
-
-		VkMemoryAllocateInfo MemoryAllocInfo = { };
-		MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		MemoryAllocInfo.allocationSize = AllocationSize;
-		MemoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;
-
-		VkDeviceMemory Memory;
-		VkResult Result = vkAllocateMemory(LogicalDevice, &MemoryAllocInfo, nullptr, &Memory);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkAllocateMemory result is %d", Result);
-		}
-
-		return Memory;
-	}
-
-	VkDeviceMemory AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex)
-	{
-		HandleLog(BMRLogType::LogType_Info, "Allocating Device memory. Buffer type: Image, Size count: %d, Index: %d",
-			AllocationSize, MemoryTypeIndex);
-
-		VkMemoryAllocateInfo MemoryAllocInfo = { };
-		MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		MemoryAllocInfo.allocationSize = AllocationSize;
-		MemoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;
-
-		VkDeviceMemory Memory;
-		VkResult Result = vkAllocateMemory(LogicalDevice, &MemoryAllocInfo, nullptr, &Memory);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkAllocateMemory result is %d", Result);
-		}
-
-		return Memory;
 	}
 }

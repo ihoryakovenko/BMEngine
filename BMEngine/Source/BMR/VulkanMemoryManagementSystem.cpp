@@ -9,8 +9,6 @@
 
 namespace BMR::VulkanMemoryManagementSystem
 {
-	static VkDeviceMemory AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex);
-
 	static BMRMemorySourceDevice MemorySource;
 	static BMRUniform StagingBuffer;
 
@@ -80,59 +78,6 @@ namespace BMR::VulkanMemoryManagementSystem
 		return Pool;
 	}
 
-	void AllocateSets(VkDescriptorPool Pool, VkDescriptorSetLayout* Layouts,
-		u32 DescriptorSetCount, VkDescriptorSet* OutSets)
-	{
-		HandleLog(BMRLogType::LogType_Info, "Allocating descriptor sets. Size count: %d", DescriptorSetCount);
-
-		VkDescriptorSetAllocateInfo SetAllocInfo = { };
-		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		SetAllocInfo.descriptorPool = Pool; // Pool to allocate Descriptor Set from
-		SetAllocInfo.descriptorSetCount = DescriptorSetCount; // Number of sets to allocate
-		SetAllocInfo.pSetLayouts = Layouts; // Layouts to use to allocate sets (1:1 relationship)
-
-		VkResult Result = vkAllocateDescriptorSets(MemorySource.LogicalDevice, &SetAllocInfo, OutSets);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkAllocateDescriptorSets result is %d", Result);
-		}
-	}
-
-	BMRUniform CreateImageBuffer(VkImageCreateInfo* pCreateInfo)
-	{
-		BMRUniform Buffer;
-		VkResult Result = vkCreateImage(MemorySource.LogicalDevice, pCreateInfo, nullptr, &Buffer.Image);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "CreateImage result is %d", Result);
-		}
-
-		VkMemoryRequirements MemoryRequirements;
-		vkGetImageMemoryRequirements(MemorySource.LogicalDevice, Buffer.Image, &MemoryRequirements);
-
-		const u32 MemoryTypeIndex = GetMemoryTypeIndex(MemorySource.PhysicalDevice, MemoryRequirements.memoryTypeBits,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-		Buffer.Memory = AllocateMemory(MemoryRequirements.size, MemoryTypeIndex);
-		vkBindImageMemory(MemorySource.LogicalDevice, Buffer.Image, Buffer.Memory, 0);
-
-		return Buffer;
-	}
-
-	void DestroyImageBuffer(BMRUniform Image)
-	{
-		vkDestroyImage(MemorySource.LogicalDevice, Image.Image, nullptr);
-		vkFreeMemory(MemorySource.LogicalDevice, Image.Memory, nullptr);
-	}
-
-	void CopyDataToMemory(VkDeviceMemory Memory,
-		VkDeviceSize Offset, VkDeviceSize Size, const void* Data)
-	{
-		void* MappedMemory;
-		vkMapMemory(MemorySource.LogicalDevice, Memory, Offset, Size, 0, &MappedMemory);
-		std::memcpy(MappedMemory, Data, Size);
-		vkUnmapMemory(MemorySource.LogicalDevice, Memory);
-	}
 
 	void CopyDataToBuffer(VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Size, const void* Data)
 	{
@@ -246,25 +191,5 @@ namespace BMR::VulkanMemoryManagementSystem
 		vkQueueWaitIdle(MemorySource.TransferQueue);
 
 		vkFreeCommandBuffers(MemorySource.LogicalDevice, MemorySource.TransferCommandPool, 1, &TransferCommandBuffer);
-	}
-
-	VkDeviceMemory AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex)
-	{
-		HandleLog(BMRLogType::LogType_Info, "Allocating Device memory. Buffer type: Image, Size count: %d, Index: %d",
-			AllocationSize, MemoryTypeIndex);
-
-		VkMemoryAllocateInfo MemoryAllocInfo = { };
-		MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		MemoryAllocInfo.allocationSize = AllocationSize;
-		MemoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;
-
-		VkDeviceMemory Memory;
-		VkResult Result = vkAllocateMemory(MemorySource.LogicalDevice, &MemoryAllocInfo, nullptr, &Memory);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkAllocateMemory result is %d", Result);
-		}
-
-		return Memory;
 	}
 }

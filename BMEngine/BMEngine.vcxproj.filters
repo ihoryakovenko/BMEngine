@@ -22,8 +22,8 @@
     <ClCompile Include="Source\BMR\VulkanMemoryManagementSystem.cpp" />
     <ClCompile Include="Source\BMR\BMRInterface.cpp" />
     <ClCompile Include="Source\ImguiIntegration.cpp" />
-    <ClCompile Include="Source\BMR\VulkanResourceManagementSystem.cpp" />
     <ClCompile Include="Source\Util\Settings.cpp" />
+    <ClCompile Include="Source\BMR\BMRVulkan\BMRVulkan.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
@@ -45,8 +45,8 @@
     <ClInclude Include="Source\BMR\VulkanHelper.h" />
     <ClInclude Include="Source\BMR\VulkanMemoryManagementSystem.h" />
     <ClInclude Include="Source\BMR\BMRInterface.h" />
-    <ClInclude Include="Source\BMR\VulkanResourceManagementSystem.h" />
     <ClInclude Include="Source\Util\Settings.h" />
+    <ClInclude Include="Source\BMR\BMRVulkan\BMRVulkan.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />

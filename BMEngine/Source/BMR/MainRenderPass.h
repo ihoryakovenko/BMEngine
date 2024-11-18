@@ -56,7 +56,7 @@ namespace BMR
 			VkDescriptorSetLayout EntityLightLayout, VkDescriptorSetLayout LightSpaceMatrixLayout, VkDescriptorSetLayout Material,
 			VkDescriptorSetLayout Deferred, VkDescriptorSetLayout ShadowArray, VkDescriptorSetLayout EntitySampler,
 			VkDescriptorSetLayout TerrainSkyBoxSampler);
-		void CreatePipelines(VkDevice LogicalDevice, VkExtent2D SwapExtent,
+		void CreatePipelinesDepr(VkDevice LogicalDevice, VkExtent2D SwapExtent,
 			BMRPipelineShaderInputDepr ShaderInputs[BMRShaderNames::ShaderNamesCount], VkRenderPass main, VkRenderPass depth);
 
 		BMRPipeline Pipelines[BMRPipelineHandles::PipelineHandlesCount];
