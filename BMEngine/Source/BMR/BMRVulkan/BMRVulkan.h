@@ -174,8 +174,8 @@ namespace BMR
 		VkClearValue* ClearValues = nullptr;
 		u32 ClearValuesCount = 0;
 
-		BMRFramebufferSet* FramebufferSets = nullptr;
-		u32 FramebufferSetCount = 0;
+		BMRFramebufferSet* RenderTargets = nullptr;
+		u32 RenderTargetCount = 0;
 	};
 
 	struct BMRPipelineResourceInfo
@@ -201,8 +201,12 @@ namespace BMR
 	void BMRVkInit(HWND WindowHandler, const BMRVkConfig& InConfig);
 	void BMRVkDeInit();
 
-		u32 GetImageCount();
+	u32 GetImageCount();
 	VkImageView* GetSwapchainImageViews();
+	u32 AcquireNextImageIndex(); // Locks thread
+	VkCommandBuffer BeginDraw(u32 ImageIndex);
+	void EndDraw(u32 ImageIndex);
+	void BeginRenderPass(const BMRRenderPass* Pass, VkRect2D RenderArea, u32 RenderTargetIndex, u32 ImageIndex);
 
 	void CreateRenderPass(const BMRRenderPassSettings* Settings, const BMRRenderTarget* Targets,
 		VkExtent2D TargetExtent, u32 TargetCount, u32 SwapchainImagesCount, BMRRenderPass* OutPass);
@@ -233,33 +237,5 @@ namespace BMR
 	void UpdateUniformBuffer(BMRUniform Buffer, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);
 	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, u32 LayersCount, void* Data);
 
-	
-
-
-
-
-
-
-
-
-	struct BMRPhysicalDeviceIndices
-	{
-		s32 GraphicsFamily = -1;
-		s32 PresentationFamily = -1;
-	};
-
-	struct BMRDevice
-	{
-		VkPhysicalDevice PhysicalDevice = nullptr;
-		VkDevice LogicalDevice = nullptr;
-		BMRPhysicalDeviceIndices Indices;
-	};
-
-	struct BMRSwapchain
-	{
-		VkSwapchainKHR VulkanSwapchain = nullptr;
-		u32 ImagesCount = 0;
-		VkImageView ImageViews[MAX_SWAPCHAIN_IMAGES_COUNT];
-		VkExtent2D SwapExtent = { };
-	};
+	void WaitDevice();
 }

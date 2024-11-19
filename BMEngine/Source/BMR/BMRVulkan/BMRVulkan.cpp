@@ -19,6 +19,27 @@ namespace BMR
 		VkDebugUtilsMessengerEXT DebugMessenger = nullptr;
 	};
 
+	struct BMRPhysicalDeviceIndices
+	{
+		s32 GraphicsFamily = -1;
+		s32 PresentationFamily = -1;
+	};
+
+	struct BMRDevice
+	{
+		VkPhysicalDevice PhysicalDevice = nullptr;
+		VkDevice LogicalDevice = nullptr;
+		BMRPhysicalDeviceIndices Indices;
+	};
+
+	struct BMRSwapchain
+	{
+		VkSwapchainKHR VulkanSwapchain = nullptr;
+		u32 ImagesCount = 0;
+		VkImageView ImageViews[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkExtent2D SwapExtent = { };
+	};
+
 	// INTERNAL FUNCTIONS DECLARATIONS
 	static Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkSurfaceKHR Surface);
 	static void SetupBestSurfaceFormat(VkSurfaceKHR Surface);
@@ -98,19 +119,20 @@ namespace BMR
 
 	// Vulkan variables
 	static BMRMainInstance Instance;
-	BMRDevice Device;
+	static BMRDevice Device;
 	static VkSurfaceKHR Surface = nullptr;
-	VkSurfaceFormatKHR SurfaceFormat;
-	VkExtent2D SwapExtent;
-	VkSemaphore ImagesAvailable[MAX_DRAW_FRAMES];
-	VkSemaphore RenderFinished[MAX_DRAW_FRAMES];
-	VkFence DrawFences[MAX_DRAW_FRAMES];
-	VkQueue GraphicsQueue = nullptr;
-	VkQueue PresentationQueue = nullptr;
-	VkCommandPool GraphicsCommandPool = nullptr;
-	BMRSwapchain SwapInstance;
-	VkDescriptorPool MainPool = nullptr;
-	VkCommandBuffer DrawCommandBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VkSurfaceFormatKHR SurfaceFormat;
+	static VkExtent2D SwapExtent;
+	static VkSemaphore ImagesAvailable[MAX_DRAW_FRAMES];
+	static VkSemaphore RenderFinished[MAX_DRAW_FRAMES];
+	static VkFence DrawFences[MAX_DRAW_FRAMES];
+	static VkQueue GraphicsQueue = nullptr;
+	static VkQueue PresentationQueue = nullptr;
+	static VkCommandPool GraphicsCommandPool = nullptr;
+	static BMRSwapchain SwapInstance;
+	static VkDescriptorPool MainPool = nullptr;
+	static VkCommandBuffer DrawCommandBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+	static u32 CurrentFrame = 0;
 	
 
 	// FUNCTIONS IMPLEMENTATIONS
@@ -414,6 +436,94 @@ namespace BMR
 		return SwapInstance.ImageViews;
 	}
 
+	u32 AcquireNextImageIndex()
+	{
+		const VkFence* Fence = DrawFences + CurrentFrame;
+		const VkSemaphore ImageAvailable = ImagesAvailable[CurrentFrame];
+
+		vkWaitForFences(Device.LogicalDevice, 1, Fence, VK_TRUE, UINT64_MAX);
+		vkResetFences(Device.LogicalDevice, 1, Fence);
+
+		u32 ImageIndex;
+		vkAcquireNextImageKHR(Device.LogicalDevice, SwapInstance.VulkanSwapchain, UINT64_MAX,
+			ImageAvailable, VK_NULL_HANDLE, &ImageIndex);
+
+		return ImageIndex;
+	}
+
+	VkCommandBuffer BeginDraw(u32 ImageIndex)
+	{
+		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
+		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+		VkCommandBuffer CommandBuffer = DrawCommandBuffers[ImageIndex];
+		VkResult Result = vkBeginCommandBuffer(CommandBuffer, &CommandBufferBeginInfo);
+		if (Result != VK_SUCCESS)
+		{
+			HandleLog(BMRVkLogType_Error, "vkBeginCommandBuffer result is %d", Result);
+		}
+
+		return CommandBuffer;
+	}
+
+	void EndDraw(u32 ImageIndex)
+	{
+		VkResult Result = vkEndCommandBuffer(DrawCommandBuffers[ImageIndex]);
+		if (Result != VK_SUCCESS)
+		{
+			HandleLog(BMRVkLogType_Error, "vkBeginCommandBuffer result is %d", Result);
+		}
+
+		VkPipelineStageFlags WaitStages[] = {
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+		};
+
+		VkSubmitInfo SubmitInfo = { };
+		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		SubmitInfo.waitSemaphoreCount = 1;
+		SubmitInfo.pWaitDstStageMask = WaitStages;
+		SubmitInfo.commandBufferCount = 1;
+		SubmitInfo.signalSemaphoreCount = 1;
+		SubmitInfo.pWaitSemaphores = ImagesAvailable + CurrentFrame;
+		SubmitInfo.pCommandBuffers = DrawCommandBuffers + ImageIndex;
+		SubmitInfo.pSignalSemaphores = &RenderFinished[CurrentFrame];
+
+		Result = vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, DrawFences[CurrentFrame]);
+		if (Result != VK_SUCCESS)
+		{
+			HandleLog(BMRVkLogType_Error, "vkQueueSubmit result is %d", Result);
+			assert(false);
+		}
+
+		VkPresentInfoKHR PresentInfo = { };
+		PresentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+		PresentInfo.waitSemaphoreCount = 1;
+		PresentInfo.swapchainCount = 1;
+		PresentInfo.pWaitSemaphores = &RenderFinished[CurrentFrame];
+		PresentInfo.pSwapchains = &SwapInstance.VulkanSwapchain; // Swapchains to present images to
+		PresentInfo.pImageIndices = &ImageIndex; // Index of images in swapchains to present
+		Result = vkQueuePresentKHR(PresentationQueue, &PresentInfo);
+		if (Result != VK_SUCCESS)
+		{
+			HandleLog(BMRVkLogType_Error, "vkQueuePresentKHR result is %d", Result);
+		}
+
+		CurrentFrame = (CurrentFrame + 1) % MAX_DRAW_FRAMES;
+	}
+
+	void BeginRenderPass(const BMRRenderPass* Pass, VkRect2D RenderArea, u32 RenderTargetIndex, u32 ImageIndex)
+	{
+		VkRenderPassBeginInfo DepthRenderPassBeginInfo = { };
+		DepthRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		DepthRenderPassBeginInfo.renderPass = Pass->Pass;
+		DepthRenderPassBeginInfo.renderArea = RenderArea;
+		DepthRenderPassBeginInfo.pClearValues = Pass->ClearValues;
+		DepthRenderPassBeginInfo.clearValueCount = Pass->ClearValuesCount;
+		DepthRenderPassBeginInfo.framebuffer = Pass->RenderTargets[RenderTargetIndex].FrameBuffers[ImageIndex];
+
+		vkCmdBeginRenderPass(DrawCommandBuffers[ImageIndex], &DepthRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+	}
+
 	void CreateRenderPass(const BMRRenderPassSettings* Settings, const BMRRenderTarget* Targets,
 		VkExtent2D TargetExtent, u32 TargetCount, u32 SwapchainImagesCount, BMRRenderPass* OutPass)
 	{
@@ -480,10 +590,10 @@ namespace BMR
 		std::memcpy(OutPass->ClearValues, Settings->ClearValues, Settings->AttachmentDescriptionsCount * sizeof(VkClearValue));
 
 		// Creating framebuffers
-		OutPass->FramebufferSets = Memory::BmMemoryManagementSystem::Allocate<BMRFramebufferSet>(TargetCount);
+		OutPass->RenderTargets = Memory::BmMemoryManagementSystem::Allocate<BMRFramebufferSet>(TargetCount);
 		for (u32 TargetIndex = 0; TargetIndex < TargetCount; ++TargetIndex)
 		{
-			BMRFramebufferSet* FramebufferSet = OutPass->FramebufferSets + TargetIndex;
+			BMRFramebufferSet* FramebufferSet = OutPass->RenderTargets + TargetIndex;
 			const BMRRenderTarget* Target = Targets + TargetIndex;
 
 			for (u32 SwapchainImageIndex = 0; SwapchainImageIndex < SwapchainImagesCount; ++SwapchainImageIndex)
@@ -508,22 +618,22 @@ namespace BMR
 			}
 		}
 
-		OutPass->FramebufferSetCount = TargetCount;
+		OutPass->RenderTargetCount = TargetCount;
 	}
 
 	void DestroyRenderPass(BMRRenderPass* Pass)
 	{
-		for (u32 TargetIndex = 0; TargetIndex < Pass->FramebufferSetCount; ++TargetIndex)
+		for (u32 TargetIndex = 0; TargetIndex < Pass->RenderTargetCount; ++TargetIndex)
 		{
 			for (u32 SwapchainImageIndex = 0; SwapchainImageIndex < SwapInstance.ImagesCount; ++SwapchainImageIndex)
 			{
-				vkDestroyFramebuffer(Device.LogicalDevice, Pass->FramebufferSets[TargetIndex].FrameBuffers[SwapchainImageIndex], nullptr);
+				vkDestroyFramebuffer(Device.LogicalDevice, Pass->RenderTargets[TargetIndex].FrameBuffers[SwapchainImageIndex], nullptr);
 			}
 		}
 
 		vkDestroyRenderPass(Device.LogicalDevice, Pass->Pass, nullptr);
 		Memory::BmMemoryManagementSystem::Deallocate(Pass->ClearValues);
-		Memory::BmMemoryManagementSystem::Deallocate(Pass->FramebufferSets);
+		Memory::BmMemoryManagementSystem::Deallocate(Pass->RenderTargets);
 	}
 
 	void DestroyPipelineLayout(VkPipelineLayout Layout)
@@ -647,6 +757,11 @@ namespace BMR
 		vkQueueWaitIdle(GraphicsQueue);
 
 		vkFreeCommandBuffers(Device.LogicalDevice, GraphicsCommandPool, 1, &CommandBuffer);
+	}
+
+	void WaitDevice()
+	{
+		vkDeviceWaitIdle(Device.LogicalDevice);
 	}
 
 	VkSampler CreateSampler(const VkSamplerCreateInfo* CreateInfo)
