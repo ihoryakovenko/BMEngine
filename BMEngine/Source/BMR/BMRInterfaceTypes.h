@@ -1,8 +1,12 @@
 #pragma once
 
+#include <vulkan\vulkan.h>
+
 #include <glm/glm.hpp>
 
 #include "Util/EngineTypes.h"
+
+#include "BMRVulkan/BMRVulkan.h"
 
 namespace BMR
 {
@@ -30,46 +34,10 @@ namespace BMR
 		ShaderNamesCount
 	};
 
-	enum BMRShaderStages
-	{
-		Vertex,
-		Fragment,
-
-		ShaderStagesCount,
-		BMRShaderStagesNone
-	};
-
-	enum BMRPipelineHandles
-	{
-		Terrain = 0,
-		Entity,
-		Deferred,
-		SkyBox,
-		Depth,
-
-		PipelineHandlesCount,
-		PipelineHandlesNone
-	};
-
-	enum BMRTextureType
-	{
-		TextureType_2D,
-		TextureType_CUBE
-	};
-
-	struct BMRShaderCodeDescription
-	{
-		BMRPipelineHandles Handle = BMRPipelineHandles::PipelineHandlesNone;
-		BMRShaderStages Stage = BMRShaderStages::BMRShaderStagesNone;
-		u32* Code = nullptr;
-		u32 CodeSize = 0;
-	};
-
 	struct BMRConfig
 	{
 		BMRLogHandler LogHandler = nullptr;
 		bool EnableValidationLayers = false;
-		BMRShaderCodeDescription RenderShaders[BMRShaderNames::ShaderNamesCount];
 		u32 MaxTextures = 0;
 	};
 
@@ -97,7 +65,7 @@ namespace BMR
 		u64 VertexOffset = 0;
 		u64 IndexOffset = 0;
 		u32 IndicesCount = 0;
-		u32 MaterialIndex = -1;
+		VkDescriptorSet TextureSet = nullptr;
 		BMRModel Model;
 	};
 
@@ -106,7 +74,7 @@ namespace BMR
 		u64 VertexOffset = 0;
 		u64 IndexOffset = 0;
 		u32 IndicesCount = 0;
-		u32 MaterialIndex = -1;
+		VkDescriptorSet TextureSet = nullptr;
 	};
 
 	struct BMRDrawSkyBoxEntity
@@ -114,7 +82,7 @@ namespace BMR
 		u64 VertexOffset = 0;
 		u64 IndexOffset = 0;
 		u32 IndicesCount = 0;
-		u32 MaterialIndex = -1;
+		VkDescriptorSet TextureSet = nullptr;
 	};
 
 	struct BMRPointLight
@@ -160,6 +128,15 @@ namespace BMR
 		BMRSpotLight SpotLight;
 	};
 
+	struct BMRMaterial
+	{
+		f32 Shininess;
+	};
+
+
+
+
+
 	struct BMRDrawScene
 	{
 		BMRUboViewProjection ViewProjection;
@@ -177,28 +154,5 @@ namespace BMR
 		bool DrawSkyBox = false;
 
 		BMRLightBuffer* LightEntity = nullptr;
-	};
-
-	struct BMRMaterial
-	{
-		f32 Shininess;
-	};
-
-	struct BMREntityVertex
-	{
-		glm::vec3 Position;
-		glm::vec3 Color;
-		glm::vec2 TextureCoords;
-		glm::vec3 Normal;
-	};
-
-	struct BMRTerrainVertex
-	{
-		f32 Altitude;
-	};
-
-	struct BMRSkyBoxVertex
-	{
-		glm::vec3 Position;
 	};
 }

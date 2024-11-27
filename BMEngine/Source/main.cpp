@@ -32,32 +32,47 @@
 #include "ImguiIntegration.h"
 
 #include <thread>
+#include "Util/Settings.h"
+
+struct Texture
+{
+	BMR::BMRUniform UniformData;
+	VkImageView ImageView = nullptr;
+};
 
 const u32 NumRows = 600;
 const u32 NumCols = 600;
 
-u32 TestTextureIndex;
-u32 WhiteTextureIndex;
-u32 ContainerTextureIndex;
-u32 ContainerSpecularTextureIndex;
-u32 BlendWindowIndex;
-u32 GrassTextureIndex;
-u32 SkyBoxCubeTextureIndex;
+Texture TestTextureIndex;
+Texture WhiteTextureIndex;
+Texture ContainerTextureIndex;
+Texture ContainerSpecularTextureIndex;
+Texture BlendWindowIndex;
+Texture GrassTextureIndex;
+Texture SkyBoxCubeTextureIndex;
 
-u32 TestMaterialIndex;
-u32 WhiteMaterialIndex;
-u32 ContainerMaterialIndex;
-u32 BlendWindowMaterial;
-u32 GrassMaterial;
-u32 SkyBoxMaterial;
-u32 TerrainMaterial;
+VkDescriptorSet TestMaterialIndex;
+VkDescriptorSet WhiteMaterialIndex;
+VkDescriptorSet ContainerMaterialIndex;
+VkDescriptorSet BlendWindowMaterial;
+VkDescriptorSet GrassMaterial;
+VkDescriptorSet SkyBoxMaterial;
+VkDescriptorSet TerrainMaterial;
 
-BMR::BMRTerrainVertex TerrainVerticesData[NumRows][NumCols];
+TerrainVertex TerrainVerticesData[NumRows][NumCols];
 
 std::vector<BMR::BMRDrawEntity> DrawEntities;
 BMR::BMRConfig Config;
-std::vector<std::vector<char>> ShaderCodes(BMR::BMRShaderNames::ShaderNamesCount);
+
 BMR::BMRDrawSkyBoxEntity SkyBox;
+
+
+
+
+
+
+
+std::vector<Texture> Textures;
 
 void GenerateTerrain(std::vector<u32>& Indices)
 {
@@ -138,29 +153,29 @@ void GenerateTerrain(std::vector<u32>& Indices)
 	}
 }
 
-BMR::BMRTerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
+TerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
 u32 TerrainVerticesCount = NumRows * NumCols;
 
 struct TestMesh
 {
-	std::vector<BMR::BMREntityVertex> vertices;
+	std::vector<EntityVertex> vertices;
 	std::vector<u32> indices;
-	int MaterialIndex;
+	VkDescriptorSet MaterialIndex;
 	glm::mat4 Model = glm::mat4(1.0f);
 };
 
 struct SkyBoxMesh
 {
-	std::vector<BMR::BMRSkyBoxVertex> vertices;
+	std::vector<SkyBoxVertex> vertices;
 	std::vector<u32> indices;
-	int MaterialIndex;
+	VkDescriptorSet MaterialIndex;
 };
 
 namespace std
 {
-	template<> struct hash<BMR::BMREntityVertex>
+	template<> struct hash<EntityVertex>
 	{
-		size_t operator()(BMR::BMREntityVertex const& vertex) const
+		size_t operator()(EntityVertex const& vertex) const
 		{
 			size_t hashPosition = std::hash<glm::vec3>()(vertex.Position);
 			size_t hashColor = std::hash<glm::vec3>()(vertex.Color);
@@ -176,9 +191,9 @@ namespace std
 		}
 	};
 
-	template<> struct hash<BMR::BMRSkyBoxVertex>
+	template<> struct hash<SkyBoxVertex>
 	{
-		size_t operator()(BMR::BMRSkyBoxVertex const& vertex) const
+		size_t operator()(SkyBoxVertex const& vertex) const
 		{
 			size_t hashPosition = std::hash<glm::vec3>()(vertex.Position);
 			size_t combinedHash = hashPosition;
@@ -189,12 +204,12 @@ namespace std
 
 struct VertexEqual
 {
-	bool operator()(const BMR::BMREntityVertex& lhs, const BMR::BMREntityVertex& rhs) const
+	bool operator()(const EntityVertex& lhs, const EntityVertex& rhs) const
 	{
 		return lhs.Position == rhs.Position && lhs.Color == rhs.Color && lhs.TextureCoords == rhs.TextureCoords;
 	}
 
-	bool operator()(const BMR::BMRSkyBoxVertex& lhs, const BMR::BMRSkyBoxVertex& rhs) const
+	bool operator()(const SkyBoxVertex& lhs, const SkyBoxVertex& rhs) const
 	{
 		return lhs.Position == rhs.Position;
 	}
@@ -252,7 +267,7 @@ void BMRLog(BMR::BMRLogType LogType, const char* Format, va_list Args)
 	}
 }
 
-u32 AddTexture(const char* DiffuseTexturePath)
+Texture AddTexture(const char* DiffuseTexturePath)
 {
 	int Width;
 	int Height;
@@ -272,13 +287,50 @@ u32 AddTexture(const char* DiffuseTexturePath)
 	Info.LayersCount = 1;
 	Info.Data = &ImageData;
 
-	const u32 Handle = BMR::LoadTexture(Info, BMR::TextureType_2D);
+	VkImageCreateInfo ImageCreateInfo;
+	ImageCreateInfo = { };
+	ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	ImageCreateInfo.extent.width = Info.Width;
+	ImageCreateInfo.extent.height = Info.Height;
+	ImageCreateInfo.extent.depth = 1;
+	ImageCreateInfo.mipLevels = 1;
+	ImageCreateInfo.arrayLayers = Info.LayersCount;
+	ImageCreateInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+	ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	ImageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	BMR::BMRUniform TextureUniform = BMR::CreateUniformImage(&ImageCreateInfo);
+	BMR::CopyDataToImage(TextureUniform.Image, Info.Width, Info.Height, Info.Format, Info.LayersCount, Info.Data);
+
 	stbi_image_free(ImageData);
 
-	return Handle;
+	BMR::BMRUniformImageInterfaceCreateInfo InterfaceCreateInfo = { };
+	InterfaceCreateInfo.Flags = 0;
+	InterfaceCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D;
+	InterfaceCreateInfo.Format = VK_FORMAT_R8G8B8A8_SRGB;
+	InterfaceCreateInfo.Components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	InterfaceCreateInfo.Components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	InterfaceCreateInfo.Components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	InterfaceCreateInfo.Components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	InterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	InterfaceCreateInfo.SubresourceRange.baseMipLevel = 0;
+	InterfaceCreateInfo.SubresourceRange.levelCount = 1;
+	InterfaceCreateInfo.SubresourceRange.baseArrayLayer = 0;
+	InterfaceCreateInfo.SubresourceRange.layerCount = 1;
+
+	VkImageView TextureInterface = BMR::CreateImageInterface(&InterfaceCreateInfo, TextureUniform.Image);
+
+	Texture Tex;
+	Tex.UniformData = TextureUniform;
+	Tex.ImageView = TextureInterface;
+	return Tex;
 }
 
-u32 LoadCubeTexture()
+Texture LoadCubeTexture()
 {
 	const u32 texCount = 6;
 
@@ -315,14 +367,51 @@ u32 LoadCubeTexture()
 	Info.LayersCount = texCount;
 	Info.Data = CubeTexture;
 
-	const u32 Handle = BMR::LoadTexture(Info, BMR::TextureType_CUBE);
-	
+	VkImageCreateInfo ImageCreateInfo;
+	ImageCreateInfo = { };
+	ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	ImageCreateInfo.extent.width = Info.Width;
+	ImageCreateInfo.extent.height = Info.Height;
+	ImageCreateInfo.extent.depth = 1;
+	ImageCreateInfo.mipLevels = 1;
+	ImageCreateInfo.arrayLayers = Info.LayersCount;
+	ImageCreateInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+	ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	ImageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	ImageCreateInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+
+	BMR::BMRUniform TextureUniform = BMR::CreateUniformImage(&ImageCreateInfo);
+	BMR::CopyDataToImage(TextureUniform.Image, Info.Width, Info.Height, Info.Format, Info.LayersCount, Info.Data);
+
 	for (u32 i = 0; i < texCount; ++i)
 	{
 		stbi_image_free(CubeTexture[i]);
-	}
+	};
 
-	return Handle;
+	BMR::BMRUniformImageInterfaceCreateInfo InterfaceCreateInfo = { };
+	InterfaceCreateInfo.Flags = 0;
+	InterfaceCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_CUBE;
+	InterfaceCreateInfo.Format = VK_FORMAT_R8G8B8A8_SRGB;
+	InterfaceCreateInfo.Components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	InterfaceCreateInfo.Components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	InterfaceCreateInfo.Components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	InterfaceCreateInfo.Components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	InterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	InterfaceCreateInfo.SubresourceRange.baseMipLevel = 0;
+	InterfaceCreateInfo.SubresourceRange.levelCount = 1;
+	InterfaceCreateInfo.SubresourceRange.baseArrayLayer = 0;
+	InterfaceCreateInfo.SubresourceRange.layerCount = Info.LayersCount;
+
+	VkImageView TextureInterface = BMR::CreateImageInterface(&InterfaceCreateInfo, TextureUniform.Image);
+
+	Texture Tex;
+	Tex.UniformData = TextureUniform;
+	Tex.ImageView = TextureInterface;
+	return Tex;
 }
 
 void WindowCloseCallback(GLFWwindow* Window)
@@ -341,44 +430,20 @@ void MoveCamera(GLFWwindow* Window, f32 DeltaTime, Camera& MainCamera)
 {
 	const f32 RotationSpeed = 0.1f;
 	const f32 CameraSpeed = 10.0f;
-
-	f32 CameraDeltaSpeed = CameraSpeed * DeltaTime;
+	const f32 CameraDeltaSpeed = CameraSpeed * DeltaTime;
 
 	// Handle camera movement with keys
-	if (glfwGetKey(Window, GLFW_KEY_W) == GLFW_PRESS)
-	{
-		MainCamera.CameraPosition += CameraDeltaSpeed * MainCamera.CameraFront;
-	}
+	glm::vec3 movement = glm::vec3(0.0f);
+	if (glfwGetKey(Window, GLFW_KEY_W) == GLFW_PRESS) movement += MainCamera.CameraFront;
+	if (glfwGetKey(Window, GLFW_KEY_S) == GLFW_PRESS) movement -= MainCamera.CameraFront;
+	if (glfwGetKey(Window, GLFW_KEY_A) == GLFW_PRESS) movement -= glm::normalize(glm::cross(MainCamera.CameraFront, MainCamera.CameraUp));
+	if (glfwGetKey(Window, GLFW_KEY_D) == GLFW_PRESS) movement += glm::normalize(glm::cross(MainCamera.CameraFront, MainCamera.CameraUp));
+	if (glfwGetKey(Window, GLFW_KEY_SPACE) == GLFW_PRESS) movement += MainCamera.CameraUp;
+	if (glfwGetKey(Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) movement -= MainCamera.CameraUp;
 
-	if (glfwGetKey(Window, GLFW_KEY_S) == GLFW_PRESS)
-	{
-		MainCamera.CameraPosition -= CameraDeltaSpeed * MainCamera.CameraFront;
-	}
+	MainCamera.CameraPosition += movement * CameraDeltaSpeed;
 
-	if (glfwGetKey(Window, GLFW_KEY_A) == GLFW_PRESS)
-	{
-		MainCamera.CameraPosition -= glm::normalize(glm::cross(MainCamera.CameraFront, MainCamera.CameraUp)) * CameraDeltaSpeed;
-	}
-
-	if (glfwGetKey(Window, GLFW_KEY_D) == GLFW_PRESS)
-	{
-		MainCamera.CameraPosition += glm::normalize(glm::cross(MainCamera.CameraFront, MainCamera.CameraUp)) * CameraDeltaSpeed;
-	}
-
-	if (glfwGetKey(Window, GLFW_KEY_SPACE) == GLFW_PRESS)
-	{
-		MainCamera.CameraPosition += CameraDeltaSpeed * MainCamera.CameraUp;
-	}
-
-	if (glfwGetKey(Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
-	{
-		MainCamera.CameraPosition -= CameraDeltaSpeed * MainCamera.CameraUp;
-	}
-
-	if (glfwGetKey(Window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-	{
-		Close = true;
-	}
+	if (glfwGetKey(Window, GLFW_KEY_ESCAPE) == GLFW_PRESS) Close = true;
 
 	f64 MouseX, MouseY;
 	glfwGetCursorPos(Window, &MouseX, &MouseY);
@@ -395,14 +460,10 @@ void MoveCamera(GLFWwindow* Window, f32 DeltaTime, Camera& MainCamera)
 	LastX = MouseX;
 	LastY = MouseY;
 
-	OffsetX *= RotationSpeed;
-	OffsetY *= RotationSpeed;
+	Yaw += OffsetX * RotationSpeed;
+	Pitch += OffsetY * RotationSpeed;
 
-	Yaw += OffsetX;
-	Pitch += OffsetY;
-
-	if (Pitch > 89.0f) Pitch = 89.0f;
-	if (Pitch < -89.0f) Pitch = -89.0f;
+	Pitch = glm::clamp(Pitch, -89.0f, 89.0f);
 
 	glm::vec3 Front;
 	Front.x = cos(glm::radians(Yaw)) * cos(glm::radians(Pitch));
@@ -411,7 +472,7 @@ void MoveCamera(GLFWwindow* Window, f32 DeltaTime, Camera& MainCamera)
 	MainCamera.CameraFront = glm::normalize(Front);
 }
 
-TestMesh CreateCubeMesh(const char* Modelpath, int materialIndex)
+TestMesh CreateCubeMesh(const char* Modelpath, VkDescriptorSet materialIndex)
 {
 	TestMesh cube;
 
@@ -427,13 +488,13 @@ TestMesh CreateCubeMesh(const char* Modelpath, int materialIndex)
 		assert(false);
 	}
 
-	std::unordered_map<BMR::BMREntityVertex, u32, std::hash<BMR::BMREntityVertex>, VertexEqual> uniqueVertices{ };
+	std::unordered_map<EntityVertex, u32, std::hash<EntityVertex>, VertexEqual> uniqueVertices{ };
 
 	for (const auto& Shape : Shapes)
 	{
 		for (const auto& index : Shape.mesh.indices)
 		{
-			BMR::BMREntityVertex vertex{ };
+			EntityVertex vertex{ };
 
 			vertex.Position =
 			{
@@ -481,7 +542,7 @@ TestMesh CreateCubeMesh(const char* Modelpath, int materialIndex)
 	return cube;
 }
 
-SkyBoxMesh CreateSkyBoxMesh(const char* Modelpath, int materialIndex)
+SkyBoxMesh CreateSkyBoxMesh(const char* Modelpath, VkDescriptorSet materialIndex)
 {
 	SkyBoxMesh cube;
 
@@ -497,13 +558,13 @@ SkyBoxMesh CreateSkyBoxMesh(const char* Modelpath, int materialIndex)
 		assert(false);
 	}
 
-	std::unordered_map<BMR::BMRSkyBoxVertex, u32, std::hash<BMR::BMRSkyBoxVertex>, VertexEqual> uniqueVertices{ };
+	std::unordered_map<SkyBoxVertex, u32, std::hash<SkyBoxVertex>, VertexEqual> uniqueVertices{ };
 
 	for (const auto& Shape : Shapes)
 	{
 		for (const auto& index : Shape.mesh.indices)
 		{
-			BMR::BMRSkyBoxVertex vertex{ };
+			SkyBoxVertex vertex{ };
 
 			vertex.Position =
 			{
@@ -549,13 +610,13 @@ void LoadDrawEntities()
 
 	SkyBoxCubeTextureIndex = LoadCubeTexture();
 
-	TestMaterialIndex = BMR::LoadEntityMaterial(TestTextureIndex, ContainerSpecularTextureIndex);
-	WhiteMaterialIndex = BMR::LoadEntityMaterial(WhiteTextureIndex, WhiteTextureIndex);
-	ContainerMaterialIndex = BMR::LoadEntityMaterial(ContainerTextureIndex, ContainerSpecularTextureIndex);
-	BlendWindowMaterial = BMR::LoadEntityMaterial(BlendWindowIndex, BlendWindowIndex);
-	GrassMaterial = BMR::LoadEntityMaterial(GrassTextureIndex, GrassTextureIndex);
-	SkyBoxMaterial = BMR::LoadSkyBoxMaterial(SkyBoxCubeTextureIndex);
-	TerrainMaterial = BMR::LoadTerrainMaterial(TestTextureIndex);
+	BMR::TestAttachEntityTexture(TestTextureIndex.ImageView, TestTextureIndex.ImageView, &TestMaterialIndex);
+	BMR::TestAttachEntityTexture(WhiteTextureIndex.ImageView, WhiteTextureIndex.ImageView, &WhiteMaterialIndex);
+	BMR::TestAttachEntityTexture(ContainerTextureIndex.ImageView, ContainerSpecularTextureIndex.ImageView, &ContainerMaterialIndex);
+	BMR::TestAttachEntityTexture(BlendWindowIndex.ImageView, BlendWindowIndex.ImageView, &BlendWindowMaterial);
+	BMR::TestAttachEntityTexture(GrassTextureIndex.ImageView, GrassTextureIndex.ImageView, &GrassMaterial);
+	BMR::TestAttachSkyNoxTerrainTexture(SkyBoxCubeTextureIndex.ImageView, &SkyBoxMaterial);
+	BMR::TestAttachSkyNoxTerrainTexture(TestTextureIndex.ImageView, &TerrainMaterial);
 
 	tinyobj::attrib_t Attrib;
 	std::vector<tinyobj::shape_t> Shapes;
@@ -567,26 +628,29 @@ void LoadDrawEntities()
 		assert(false);
 	}
 
-	std::vector<int> MaterialToTexture(Materials.size());
+	std::vector<VkDescriptorSet> MaterialToTexture(Materials.size());
 
 	for (size_t i = 0; i < Materials.size(); i++)
 	{
-		MaterialToTexture[i] = BlendWindowMaterial;
 		const tinyobj::material_t& Material = Materials[i];
 		if (!Material.diffuse_texname.empty())
 		{
 			int Idx = Material.diffuse_texname.rfind("\\");
 			std::string FileName = "./Resources/Textures/" + Material.diffuse_texname.substr(Idx + 1);
 
-			const u32 NewTextureIndex = AddTexture(FileName.c_str());
-			MaterialToTexture[i] = BMR::LoadEntityMaterial(NewTextureIndex, NewTextureIndex);
+			const Texture NewTextureIndex = AddTexture(FileName.c_str());
+			BMR::TestAttachEntityTexture(NewTextureIndex.ImageView, NewTextureIndex.ImageView, &MaterialToTexture[i]);
+		}
+		else
+		{
+			MaterialToTexture[i] = BlendWindowMaterial;
 		}
 	}
 
 	std::vector<TestMesh> ModelMeshes;
 	ModelMeshes.reserve(Shapes.size());
 
-	std::unordered_map<BMR::BMREntityVertex, u32, std::hash<BMR::BMREntityVertex>, VertexEqual> uniqueVertices{ };
+	std::unordered_map<EntityVertex, u32, std::hash<EntityVertex>, VertexEqual> uniqueVertices{ };
 
 	for (const auto& Shape : Shapes)
 	{
@@ -594,7 +658,7 @@ void LoadDrawEntities()
 
 		for (const auto& index : Shape.mesh.indices)
 		{
-			BMR::BMREntityVertex vertex{ };
+			EntityVertex vertex{ };
 
 			vertex.Position =
 			{
@@ -675,24 +739,24 @@ void LoadDrawEntities()
 
 	for (int i = 0; i < ModelMeshes.size(); ++i)
 	{
-		DrawEntities[i].VertexOffset = LoadVertices(ModelMeshes[i].vertices.data(),
-			sizeof(BMR::BMREntityVertex), ModelMeshes[i].vertices.size());
+		DrawEntities[i].VertexOffset = BMR::LoadVertices(ModelMeshes[i].vertices.data(),
+			sizeof(EntityVertex), ModelMeshes[i].vertices.size());
 
 		DrawEntities[i].IndexOffset = BMR::LoadIndices(ModelMeshes[i].indices.data(),
 			ModelMeshes[i].indices.size());
 
 		DrawEntities[i].IndicesCount = ModelMeshes[i].indices.size();
 		DrawEntities[i].Model = ModelMeshes[i].Model;
-		DrawEntities[i].MaterialIndex = ModelMeshes[i].MaterialIndex;
+		DrawEntities[i].TextureSet = ModelMeshes[i].MaterialIndex;
 	}
 
 	auto SkyBoxMesh = CreateSkyBoxMesh(SkyBoxObj, SkyBoxMaterial);
 
-	SkyBox.VertexOffset = LoadVertices(SkyBoxMesh.vertices.data(),
-		sizeof(BMR::BMRSkyBoxVertex), SkyBoxMesh.vertices.size());
+	SkyBox.VertexOffset = BMR::LoadVertices(SkyBoxMesh.vertices.data(),
+		sizeof(SkyBoxVertex), SkyBoxMesh.vertices.size());
 	SkyBox.IndexOffset = BMR::LoadIndices(SkyBoxMesh.indices.data(), SkyBoxMesh.indices.size());
 	SkyBox.IndicesCount = SkyBoxMesh.indices.size();
-	SkyBox.MaterialIndex = SkyBoxMesh.MaterialIndex;
+	SkyBox.TextureSet = SkyBoxMesh.MaterialIndex;
 
 	{
 		glm::vec3 CubePos(0.0f, 0.0f, 8.0f);
@@ -734,86 +798,6 @@ void LoadDrawEntities()
 
 }
 
-void LoadShaders()
-{
-	std::vector<const char*> ShaderPaths;
-	std::vector<BMR::BMRPipelineHandles> HandleToPath;
-	std::vector<BMR::BMRShaderStages> StageToStages;
-
-	ShaderPaths.reserve(BMR::BMRShaderNames::ShaderNamesCount);
-	HandleToPath.reserve(BMR::BMRPipelineHandles::PipelineHandlesCount);
-	StageToStages.reserve(BMR::BMRShaderStages::ShaderStagesCount);
-
-	ShaderPaths.push_back("./Resources/Shaders/TerrainGenerator_vert.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::Terrain);
-	StageToStages.push_back(BMR::BMRShaderStages::Vertex);
-
-	ShaderPaths.push_back("./Resources/Shaders/TerrainGenerator_frag.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::Terrain);
-	StageToStages.push_back(BMR::BMRShaderStages::Fragment);
-
-	ShaderPaths.push_back("./Resources/Shaders/vert.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::Entity);
-	StageToStages.push_back(BMR::BMRShaderStages::Vertex);
-
-	ShaderPaths.push_back("./Resources/Shaders/frag.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::Entity);
-	StageToStages.push_back(BMR::BMRShaderStages::Fragment);
-
-	ShaderPaths.push_back("./Resources/Shaders/second_vert.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::Deferred);
-	StageToStages.push_back(BMR::BMRShaderStages::Vertex);
-
-	ShaderPaths.push_back("./Resources/Shaders/second_frag.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::Deferred);
-	StageToStages.push_back(BMR::BMRShaderStages::Fragment);
-
-	ShaderPaths.push_back("./Resources/Shaders/SkyBox_vert.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::SkyBox);
-	StageToStages.push_back(BMR::BMRShaderStages::Vertex);
-
-	ShaderPaths.push_back("./Resources/Shaders/SkyBox_frag.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::SkyBox);
-	StageToStages.push_back(BMR::BMRShaderStages::Fragment);
-
-	ShaderPaths.push_back("./Resources/Shaders/Depth_vert.spv");
-	HandleToPath.push_back(BMR::BMRPipelineHandles::Depth);
-	StageToStages.push_back(BMR::BMRShaderStages::Vertex);
-
-	for (u32 i = 0; i < BMR::BMRShaderNames::ShaderNamesCount; ++i)
-	{
-		Util::OpenAndReadFileFull(ShaderPaths[i], ShaderCodes[i], "rb");
-		Config.RenderShaders[i].Code = reinterpret_cast<u32*>(ShaderCodes[i].data());
-		Config.RenderShaders[i].CodeSize = ShaderCodes[i].size();
-		Config.RenderShaders[i].Handle = HandleToPath[i];
-		Config.RenderShaders[i].Stage = StageToStages[i];
-	}
-}
-
-void SortDrawObjects(BMR::BMRDrawScene& Scene)
-{
-	// TODO: Need to sort objects by distance to camera
-	int LastOpaqueIndex = Scene.DrawEntitiesCount - 1;
-	for (; LastOpaqueIndex >= 0; --LastOpaqueIndex)
-	{
-		if (Scene.DrawEntities[LastOpaqueIndex].MaterialIndex != GrassMaterial &&
-			Scene.DrawEntities[LastOpaqueIndex].MaterialIndex != BlendWindowMaterial)
-		{
-			break;
-		}
-	}
-
-	for (int i = 0; i < LastOpaqueIndex; ++i)
-	{
-		if (Scene.DrawEntities[i].MaterialIndex == GrassMaterial ||
-			Scene.DrawEntities[i].MaterialIndex == BlendWindowMaterial)
-		{
-			std::swap(Scene.DrawEntities[i], Scene.DrawEntities[LastOpaqueIndex]);
-			--LastOpaqueIndex;
-		}
-	}
-}
-
 void UpdateScene(BMR::BMRDrawScene& Scene, f32 DeltaTime)
 {
 	static f32 Angle = 0.0f;
@@ -846,7 +830,10 @@ int main()
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-	GLFWwindow* Window = glfwCreateWindow(1920, 1080, "BMEngine", nullptr, nullptr);
+	s32 WindowWidth = 1920;
+	s32 WindowHeight = 1080;
+
+	GLFWwindow* Window = glfwCreateWindow(WindowWidth, WindowHeight, "BMEngine", nullptr, nullptr);
 	if (Window == nullptr)
 	{
 		Util::Log::GlfwLogError();
@@ -854,11 +841,15 @@ int main()
 		return -1;
 	}
 
+	
+	glfwGetWindowSize(Window, &WindowWidth, &WindowHeight);
+
+	LoadSettings(WindowWidth, WindowHeight);
+
 	glfwSetInputMode(Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	std::vector<u32> TerrainIndices;
 	GenerateTerrain(TerrainIndices);
-	LoadShaders();
 
 	Config.MaxTextures = 90;
 	Config.LogHandler = BMRLog;
@@ -866,8 +857,6 @@ int main()
 
 	BMR::Init(glfwGetWin32Window(Window), Config);
 
-	ShaderCodes.clear();
-	ShaderCodes.shrink_to_fit();
 
 	LoadDrawEntities();
 
@@ -875,20 +864,22 @@ int main()
 	Scene.SkyBox = SkyBox;
 	Scene.DrawSkyBox = true;
 
-	const f32 Near = 1.0f;
+	const f32 Near = 0.1f;
 	const f32 Far = 100.0f;
 
+	const float Aspect = (float)MainScreenExtent.width / (float)MainScreenExtent.height;
+
 	Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
-		static_cast<f32>(1920) / static_cast<f32>(1080), Near, Far);
+		Aspect, Near, Far);
 	Scene.ViewProjection.Projection[1][1] *= -1;
 	Scene.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	BMR::BMRDrawTerrainEntity TestDrawTerrainEntity;
-	TestDrawTerrainEntity.VertexOffset = LoadVertices(&TerrainVerticesData[0][0],
-		sizeof(BMR::BMRTerrainVertex), NumRows * NumCols);
+	TestDrawTerrainEntity.VertexOffset = BMR::LoadVertices(&TerrainVerticesData[0][0],
+		sizeof(TerrainVertex), NumRows * NumCols);
 	TestDrawTerrainEntity.IndexOffset = BMR::LoadIndices(TerrainIndices.data(), TerrainIndices.size());
 	TestDrawTerrainEntity.IndicesCount = TerrainIndices.size();
-	TestDrawTerrainEntity.MaterialIndex = TerrainMaterial;
+	TestDrawTerrainEntity.TextureSet = TerrainMaterial;
 
 	TerrainIndices.clear();
 	TerrainIndices.shrink_to_fit();
@@ -977,7 +968,6 @@ int main()
 		TestData.SpotLight.LightSpaceMatrix = Scene.ViewProjection.Projection * Scene.ViewProjection.View;
 
 		Scene.LightEntity = &TestData;
-		SortDrawObjects(Scene);
 		Draw(Scene);
 
 		Memory::BmMemoryManagementSystem::FrameDealloc();
@@ -985,6 +975,28 @@ int main()
 
 	DrawImgui = false;
 	ImguiThread.join();
+
+
+
+
+
+	for (u32 i = 0; i < BMR::GetImageCount(); i++)
+	{
+		
+		
+
+
+		
+
+	}
+
+
+
+	
+
+
+
+
 	
 	BMR::DeInit();
 

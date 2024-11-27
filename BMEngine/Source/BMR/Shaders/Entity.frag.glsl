@@ -101,8 +101,8 @@ float LightDistanceAttenuation(vec3 FragmentPosition, vec3 LightPosition, float 
 
 float LinearizeDepth(float depth, vec2 Planes)
 {
-    float z = depth * 2.0 - 1.0;
-    return (2.0 * Planes.x * Planes.y) / (Planes.y + Planes.x - z * (Planes.y - Planes.x));
+	float z = depth * 2.0 - 1.0;
+	return (2.0 * Planes.x * Planes.y) / (Planes.y + Planes.x - z * (Planes.y - Planes.x));
 }
 
 float ApplyShadow(mat4 LightSpaceMatrix, float ShadowMapLayer, bool Linearize, vec2 Planes)

@@ -2,7 +2,6 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanCoreTypes.h"
 #include "Util/EngineTypes.h"
 
 namespace BMR::VulkanMemoryManagementSystem
@@ -22,17 +21,8 @@ namespace BMR::VulkanMemoryManagementSystem
 	VkDeviceSize CalculateImageAlignedSize(VkDeviceSize BufferSize);
 
 	VkDescriptorPool AllocateDescriptorPool(VkDescriptorPoolSize* PoolSizes, u32 PoolSizeCount, u32 MaxDescriptorCount);
-	void AllocateSets(VkDescriptorPool Pool, VkDescriptorSetLayout* Layouts,
-		u32 DescriptorSetCount, VkDescriptorSet* OutSets);
 
-	BMRImageBuffer CreateImageBuffer(VkImageCreateInfo* pCreateInfo);
-	void DestroyImageBuffer(BMRImageBuffer Image);
 
-	BMRGPUBuffer CreateBuffer(VkDeviceSize BufferSize, VkBufferUsageFlags Usage,
-		VkMemoryPropertyFlags Properties);
-	void DestroyBuffer(BMRGPUBuffer Buffer);
-
-	void CopyDataToMemory(VkDeviceMemory Memory, VkDeviceSize Offset, VkDeviceSize Size, const void* Data);
 	void CopyDataToBuffer(VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Size, const void* Data);
 	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, VkDeviceSize AlignedLayerSize,
 		u32 LayersCount, void* Data);

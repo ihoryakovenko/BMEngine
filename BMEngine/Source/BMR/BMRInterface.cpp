@@ -2,106 +2,105 @@
 
 #include <Windows.h>
 
-#include <vulkan/vulkan_win32.h>
+#include <vulkan/vulkan.h>
 
 #include "Memory/MemoryManagmentSystem.h"
 #include "VulkanMemoryManagementSystem.h"
 
-#include "VulkanCoreTypes.h"
-#include "MainRenderPass.h"
 #include "VulkanHelper.h"
+
+#include "Util/Settings.h"
+#include "Util/Util.h"
+
+#include "BMRVulkan/BMRVulkan.h"
 
 namespace BMR
 {
-	static u32 UpdateTextureDescriptor(u32* ImageViewIndices, u32 Count, DescriptorLayoutHandles LayoutHandle);
+	struct BMRPassSharedResources
+	{
+		BMRUniform VertexBuffer;
+		u32 VertexBufferOffset = 0;
 
-	static Memory::FrameArray<VkExtensionProperties> GetAvailableExtensionProperties();
-	static Memory::FrameArray<VkLayerProperties> GetAvailableInstanceLayerProperties();
-	static Memory::FrameArray<const char*> GetRequiredInstanceExtensions(const char** ValidationExtensions, u32 ValidationExtensionsCount);
-	static Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkSurfaceKHR Surface);
+		BMRUniform IndexBuffer;
+		u32 IndexBufferOffset = 0;
 
-	static VkExtent2D GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities, HWND WindowHandler);
+		BMR::BMRUniform ShadowMapArray[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkPushConstantRange PushConstants;
+	};
 
-	static bool CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, u32 AvailableExtensionsCount,
-		const char** RequiredExtensions, u32 RequiredExtensionsCount);
-	static bool CheckValidationLayersSupport(VkLayerProperties* Properties, u32 PropertiesSize,
-		const char** ValidationLeyersToCheck, u32 ValidationLeyersToCheckSize);
-	static VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface);
+	struct BMRDepthPass
+	{
+		VkDescriptorSetLayout LightSpaceMatrixLayout = nullptr;
 
-	static VkDevice CreateLogicalDevice(BMRPhysicalDeviceIndices Indices, const char* DeviceExtensions[],
-		u32 DeviceExtensionsSize);
-	static VkSampler CreateTextureSampler(f32 MaxAnisotropy, VkSamplerAddressMode AddressMode);
+		BMR::BMRUniform LightSpaceMatrixBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-	static bool SetupQueues();
-	static bool IsFormatSupported(VkFormat Format, VkImageTiling Tiling, VkFormatFeatureFlags FeatureFlags);
+		VkDescriptorSet LightSpaceMatrixSet[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-	static void CreateSynchronisation();
-	static void DestroySynchronisation();
+		VkImageView ShadowMapElement1ImageInterface[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkImageView ShadowMapElement2ImageInterface[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-	static void InitViewport(VkSurfaceKHR Surface, BMRViewportInstance* OutViewport,
-		BMRSwapchainInstance SwapInstance, VkImageView* ColorBuffers, VkImageView* DepthBuffers);
-	static void DeinitViewport(BMRViewportInstance* Viewport);
+		BMRPipeline Pipeline;
+		BMRRenderPass RenderPass;
+	};
 
-	static void CreateCommandPool(VkDevice LogicalDevice, u32 FamilyIndex);
+	struct BMRMainPass
+	{
+		VkSampler DiffuseSampler = nullptr;
+		VkSampler SpecularSampler = nullptr;
+		VkSampler ShadowMapArraySampler = nullptr;
+
+		VkDescriptorSetLayout VpLayout = nullptr;
+		VkDescriptorSetLayout EntityLightLayout = nullptr;
+		VkDescriptorSetLayout MaterialLayout = nullptr;
+		VkDescriptorSetLayout DeferredInputLayout = nullptr;
+		VkDescriptorSetLayout ShadowMapArrayLayout = nullptr;
+		VkDescriptorSetLayout EntitySamplerLayout = nullptr;
+		VkDescriptorSetLayout TerrainSkyBoxLayout = nullptr;
+
+		BMR::BMRUniform VpBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMR::BMRUniform EntityLightBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMR::BMRUniform MaterialBuffer;
+		BMR::BMRUniform DeferredInputDepthImage[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMR::BMRUniform DeferredInputColorImage[MAX_SWAPCHAIN_IMAGES_COUNT];
+
+		VkImageView DeferredInputDepthImageInterface[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkImageView DeferredInputColorImageInterface[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkImageView ShadowMapArrayImageInterface[MAX_SWAPCHAIN_IMAGES_COUNT];
+
+		VkDescriptorSet VpSet[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkDescriptorSet EntityLightSet[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkDescriptorSet DeferredInputSet[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkDescriptorSet MaterialSet;
+		VkDescriptorSet ShadowMapArraySet[MAX_SWAPCHAIN_IMAGES_COUNT];
+
+		BMRPipeline Pipelines[4];
+		BMRRenderPass RenderPass;
+	};
+
+	static void CreatePassSharedResources();
+	static void CreateDepthPass();
+	static void CreateMainPass();
+
+	static void DestroyPassSharedResources();
+	static void DestroyDepthPass();
+	static void DestroyMainPass();
 
 	static void UpdateVpBuffer(const BMRUboViewProjection& ViewProjection);
 	static void UpdateLightBuffer(const BMRLightBuffer* Buffer);
 	static void UpdateLightSpaceBuffer(const BMRLightSpaceMatrix* LightSpaceMatrix);
 
-	static const u32 RequiredExtensionsCount = 2;
-	const char* RequiredInstanceExtensions[RequiredExtensionsCount] =
-	{
-		VK_KHR_SURFACE_EXTENSION_NAME,
-		VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-	};
+	static void DepthPassDraw(const BMRDrawScene& Scene, VkCommandBuffer CommandBuffer, u32 ImageIndex);
+	static void MainPassDraw(const BMRDrawScene& Scene, VkCommandBuffer CommandBuffer, u32 ImageIndex);
 
 	static BMRConfig Config;
 
-	static BMRMainInstance Instance;
-	static VkDevice LogicalDevice = nullptr;
-	static BMRDeviceInstance Device;
-	static BMRMainRenderPass MainRenderPass;
+	static BMRPassSharedResources PassSharedResources;
+	static BMRDepthPass DepthPass;
+	static BMRMainPass MainPass;
 
-	static BMRViewportInstance MainViewport;
-
-	static VkQueue GraphicsQueue = nullptr;
-	static VkQueue PresentationQueue = nullptr;
-
-	static VkFormat ColorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Todo: check if VK_FORMAT_R8G8B8A8_UNORM supported
-	static VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
-
-	static u32 CurrentFrame = 0;
-
-	static VkSemaphore ImagesAvailable[MAX_DRAW_FRAMES];
-	static VkSemaphore RenderFinished[MAX_DRAW_FRAMES];
-	static VkFence DrawFences[MAX_DRAW_FRAMES];
-
-	static VkCommandPool GraphicsCommandPool = nullptr;
-
-	static BMRGPUBuffer VertexBuffer;
-	static u32 VertexBufferOffset = 0;
-	static BMRGPUBuffer IndexBuffer;
-	static u32 IndexBufferOffset = 0;
-
-	static VkDescriptorPool MainPool = nullptr;
-
-	static VkSampler Sampler[SamplerType::SamplerType_Count];
-
-	static BMRImageBuffer TextureBuffers[MAX_IMAGES];
-	static u32 ImageArraysCount = 0;
-	static VkImageView TextureImageViews[MAX_IMAGES];
-
-	static VkImageViewType ImageViewTypeTable[] =
-	{
-		VK_IMAGE_VIEW_TYPE_2D,
-		VK_IMAGE_VIEW_TYPE_CUBE
-	};
-
-	static VkImageCreateFlagBits ImageFlagsTable[] =
-	{
-		static_cast<VkImageCreateFlagBits>(0),
-		VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT
-	};
+	static u32 ActiveLightSet = 0;
+	static u32 ActiveVpSet = 0;
+	static u32 ActiveLightSpaceMatrixSet = 0;
 
 	bool Init(HWND WindowHandler, const BMRConfig& InConfig)
 	{
@@ -109,390 +108,71 @@ namespace BMR
 
 		SetLogHandler(Config.LogHandler);
 
-		const char* ValidationLayers[] = {
-			"VK_LAYER_KHRONOS_validation",
-			"VK_LAYER_LUNARG_monitor",
-		};
-		const u32 ValidationLayersSize = sizeof(ValidationLayers) / sizeof(ValidationLayers[0]);
+		BMRVkConfig BMRVkConfig;
+		BMRVkConfig.EnableValidationLayers = Config.EnableValidationLayers;
+		BMRVkConfig.LogHandler = (BMRVkLogHandler)Config.LogHandler;
+		BMRVkConfig.MaxTextures = Config.MaxTextures;
 
-		const char* ValidationExtensions[] = {
-			VK_EXT_DEBUG_UTILS_EXTENSION_NAME
-		};
-		const u32 ValidationExtensionsSize = Config.EnableValidationLayers ? sizeof(ValidationExtensions) / sizeof(ValidationExtensions[0]) : 0;
-
-		const char* DeviceExtensions[] = {
-			VK_KHR_SWAPCHAIN_EXTENSION_NAME
-		};
-		const u32 DeviceExtensionsSize = sizeof(DeviceExtensions) / sizeof(DeviceExtensions[0]);
-
-		Memory::FrameArray<VkExtensionProperties> AvailableExtensions = GetAvailableExtensionProperties();
-		Memory::FrameArray<const char*> RequiredExtensions = GetRequiredInstanceExtensions(ValidationExtensions, ValidationExtensionsSize);
-
-		if (!CheckRequiredInstanceExtensionsSupport(AvailableExtensions.Pointer.Data, AvailableExtensions.Count,
-			RequiredExtensions.Pointer.Data, RequiredExtensions.Count))
-		{
-			return false;
-		}
-
-		if (Config.EnableValidationLayers)
-		{
-			Memory::FrameArray<VkLayerProperties> LayerPropertiesData = GetAvailableInstanceLayerProperties();
-
-			if (!CheckValidationLayersSupport(LayerPropertiesData.Pointer.Data, LayerPropertiesData.Count,
-				ValidationLayers, ValidationLayersSize))
-			{
-				assert(false);
-			}
-		}
-
-		Instance = BMRMainInstance::CreateMainInstance(RequiredExtensions.Pointer.Data, RequiredExtensions.Count,
-			Config.EnableValidationLayers, ValidationLayers, ValidationLayersSize);
-
-		VkWin32SurfaceCreateInfoKHR surfaceCreateInfo = { };
-		surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-		surfaceCreateInfo.hwnd = WindowHandler;
-		surfaceCreateInfo.hinstance = GetModuleHandle(nullptr);
-
-		VkSurfaceKHR Surface = nullptr;
-		VkResult Result = vkCreateWin32SurfaceKHR(Instance.VulkanInstance, &surfaceCreateInfo, nullptr, &Surface);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkCreateWin32SurfaceKHR result is %d", Result);
-		}
-
-		Device.Init(Instance.VulkanInstance, Surface, DeviceExtensions, DeviceExtensionsSize);
-
-		LogicalDevice = CreateLogicalDevice(Device.Indices, DeviceExtensions, DeviceExtensionsSize);
-
-		VkSurfaceFormatKHR SurfaceFormat = GetBestSurfaceFormat(Surface);
-
-		const u32 FormatPrioritySize = 3;
-		VkFormat FormatPriority[FormatPrioritySize] = { VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT };
-
-		bool IsSupportedFormatFound = false;
-		for (u32 i = 0; i < FormatPrioritySize; ++i)
-		{
-			VkFormat FormatToCheck = FormatPriority[i];
-			if (IsFormatSupported(FormatToCheck, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT))
-			{
-				IsSupportedFormatFound = true;
-				break;
-			}
-
-			HandleLog(BMRLogType::LogType_Warning, "Format %d is not supported", Result);
-		}
-
-		assert(IsSupportedFormatFound);
-
-
-		VkSurfaceCapabilitiesKHR SurfaceCapabilities = { };
-
-		Result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Device.PhysicalDevice, Surface, &SurfaceCapabilities);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Warning, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR result is %d", Result);
-			return false;
-		}
-
-		VkExtent2D Extent1 = GetBestSwapExtent(SurfaceCapabilities, WindowHandler);
-
-		CreateSynchronisation();
-		SetupQueues();
-		CreateCommandPool(LogicalDevice, Device.Indices.GraphicsFamily);
-
-		BMRSwapchainInstance SwapInstance1 = BMRSwapchainInstance::CreateSwapchainInstance(Device.PhysicalDevice, Device.Indices,
-			LogicalDevice, Surface, SurfaceFormat, Extent1);
-
-		const u32 PoolSizeCount = 13;
-		auto TotalPassPoolSizes = Memory::FramePointer<VkDescriptorPoolSize>::Create(PoolSizeCount);
-		u32 TotalDescriptorLayouts = 21;
-		// Layout 1
-		TotalPassPoolSizes[0] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
-		// Layout 2
-		TotalPassPoolSizes[1] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
-
-		TotalPassPoolSizes[2] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
-
-		TotalPassPoolSizes[3] = { .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = SwapInstance1.ImagesCount };
-		// Layout 3
-		TotalPassPoolSizes[4] = { .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = SwapInstance1.ImagesCount };
-		TotalPassPoolSizes[5] = { .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, .descriptorCount = SwapInstance1.ImagesCount };
-		// Textures
-		TotalPassPoolSizes[6] = { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = Config.MaxTextures };
-
-
-		TotalPassPoolSizes[7] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
-		TotalPassPoolSizes[8] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
-
-		TotalPassPoolSizes[9] = { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = Config.MaxTextures };
-		TotalPassPoolSizes[10] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
-		TotalPassPoolSizes[11] = { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = Config.MaxTextures };
-		TotalPassPoolSizes[12] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = SwapInstance1.ImagesCount };
-
-		u32 TotalDescriptorCount = TotalDescriptorLayouts * SwapInstance1.ImagesCount;
-		TotalDescriptorCount += Config.MaxTextures;
-
-		VulkanMemoryManagementSystem::BMRMemorySourceDevice MemoryDevice;
-		MemoryDevice.PhysicalDevice = Device.PhysicalDevice;
-		MemoryDevice.LogicalDevice = LogicalDevice;
-		MemoryDevice.TransferCommandPool = GraphicsCommandPool;
-		MemoryDevice.TransferQueue = GraphicsQueue;
-
-		VulkanMemoryManagementSystem::Init(MemoryDevice);
-		MainPool = VulkanMemoryManagementSystem::AllocateDescriptorPool(TotalPassPoolSizes.Data, PoolSizeCount, TotalDescriptorCount);
-
-		VertexBuffer = VulkanMemoryManagementSystem::CreateBuffer(MB64,
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-		IndexBuffer = VulkanMemoryManagementSystem::CreateBuffer(MB64,
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-		BMRPipelineShaderInput ShaderInputs[BMR::BMRShaderNames::ShaderNamesCount];
-		for (u32 i = 0; i < BMR::BMRShaderNames::ShaderNamesCount; ++i)
-		{
-			ShaderInputs[i].Code = Config.RenderShaders[i].Code;
-			ShaderInputs[i].CodeSize = Config.RenderShaders[i].CodeSize;
-			ShaderInputs[i].EntryPoint = "main";
-			ShaderInputs[i].Handle = Config.RenderShaders[i].Handle;
-			ShaderInputs[i].Stage = Config.RenderShaders[i].Stage;
-		}
-
-		Sampler[SamplerType::SamplerType_Diffuse] = CreateTextureSampler(16, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
-		Sampler[SamplerType::SamplerType_Specular] = CreateTextureSampler(1, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
-		Sampler[SamplerType::SamplerType_ShadowMap] = CreateTextureSampler(1, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER);
-
-		MainRenderPass.CreateVulkanPass(LogicalDevice, ColorFormat, DepthFormat, SurfaceFormat);
-		MainRenderPass.SetupPushConstants();
-		MainRenderPass.CreateDescriptorLayouts(LogicalDevice);
-		MainRenderPass.CreatePipelineLayouts(LogicalDevice);
-		MainRenderPass.CreatePipelines(LogicalDevice, Extent1, ShaderInputs);
-		MainRenderPass.CreateImages(Device.PhysicalDevice, LogicalDevice, SwapInstance1.ImagesCount, Extent1, DepthFormat, ColorFormat);
-		MainRenderPass.CreateUniformBuffers(Device.PhysicalDevice, LogicalDevice, SwapInstance1.ImagesCount);
-		MainRenderPass.CreateSets(MainPool, LogicalDevice, SwapInstance1.ImagesCount, Sampler[SamplerType::SamplerType_ShadowMap]);
-		MainRenderPass.CreateFrameBuffer(LogicalDevice, Extent1, SwapInstance1.ImagesCount, SwapInstance1.ImageViews);
-
-		InitViewport(Surface, &MainViewport, SwapInstance1, MainRenderPass.ColorBufferViews, MainRenderPass.DepthBufferViews);
+		BMRVkInit(WindowHandler, BMRVkConfig);
+		CreatePassSharedResources();
+		CreateDepthPass();
+		CreateMainPass();
 
 		return true;
 	}
 
 	void DeInit()
 	{
-		vkDeviceWaitIdle(LogicalDevice);
+		BMR::WaitDevice();
+		DestroyDepthPass();
+		DestroyMainPass();
+		DestroyPassSharedResources();
 
-		DestroySynchronisation();
-
-		for (u32 i = 0; i < SamplerType::SamplerType_Count; ++i)
-		{
-			vkDestroySampler(LogicalDevice, Sampler[i], nullptr);
-		}
-
-		for (u32 i = 0; i < ImageArraysCount; ++i)
-		{
-			vkDestroyImageView(LogicalDevice, TextureImageViews[i], nullptr);
-		}
-
-		for (u32 i = 0; i < ImageArraysCount; ++i)
-		{
-			VulkanMemoryManagementSystem::DestroyImageBuffer(TextureBuffers[i]);
-		}
-
-		vkDestroyDescriptorPool(LogicalDevice, MainPool, nullptr);
-
-		VulkanMemoryManagementSystem::DestroyBuffer(VertexBuffer);
-		VulkanMemoryManagementSystem::DestroyBuffer(IndexBuffer);
-		VulkanMemoryManagementSystem::Deinit();
-
-		vkDestroyCommandPool(LogicalDevice, GraphicsCommandPool, nullptr);
-		MainRenderPass.ClearResources(LogicalDevice, MainViewport.ViewportSwapchain.ImagesCount);
-
-		DeinitViewport(&MainViewport);
-
-		vkDestroyDevice(LogicalDevice, nullptr);
-
-		BMRMainInstance::DestroyMainInstance(Instance);
+		BMRVkDeInit();
 	}
 
-	u32 LoadTexture(BMRTextureArrayInfo Info, BMRTextureType TextureType)
+	void TestAttachEntityTexture(VkImageView DefuseImage, VkImageView SpecularImage, VkDescriptorSet* SetToAttach)
 	{
-		const VkImageViewType TextureImageType = ImageViewTypeTable[TextureType];
+		BMR::CreateUniformSets(&MainPass.EntitySamplerLayout, 1, SetToAttach);
 
-		VkImageCreateInfo ImageCreateInfo;
-		ImageCreateInfo = { };
-		ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-		ImageCreateInfo.extent.width = Info.Width;
-		ImageCreateInfo.extent.height = Info.Height;
-		ImageCreateInfo.extent.depth = 1; // Depth of image (just 1, no 3D aspect)
-		ImageCreateInfo.mipLevels = 1;
-		ImageCreateInfo.arrayLayers = Info.LayersCount;
-		ImageCreateInfo.format = VK_FORMAT_R8G8B8A8_SRGB; // TODO: use VK_FORMAT_R8G8B8A8_UNORM for specular maps and normal maps
-		ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL; // How image data should be "tiled" (arranged for optimal reading)
-		ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Layout of image data on creation
-		ImageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT; // Bit flags defining what image will be used for
-		ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT; // Number of samples for multi-sampling
-		ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // Whether image can be shared between queues
-		ImageCreateInfo.flags = ImageFlagsTable[TextureType];
+		BMR::BMRUniformSetAttachmentInfo SetInfo[2];
+		SetInfo[0].ImageInfo.imageView = DefuseImage;
+		SetInfo[0].ImageInfo.sampler = MainPass.DiffuseSampler;
+		SetInfo[0].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		SetInfo[0].Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
-		BMRImageBuffer ImageBuffer = VulkanMemoryManagementSystem::CreateImageBuffer(&ImageCreateInfo);
+		SetInfo[1].ImageInfo.imageView = SpecularImage;
+		SetInfo[1].ImageInfo.sampler = MainPass.SpecularSampler;
+		SetInfo[1].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		SetInfo[1].Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
-		VkImageMemoryBarrier Barrier;
-		Barrier = { };
-		Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		Barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;									// Layout to transition from
-		Barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;									// Layout to transition to
-		Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition from
-		Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition to
-		Barrier.image = ImageBuffer.Image;											// Image being accessed and modified as part of barrier
-		Barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;	// Aspect of image being altered
-		Barrier.subresourceRange.baseMipLevel = 0;						// First mip level to start alterations on
-		Barrier.subresourceRange.levelCount = 1;							// Number of mip levels to alter starting from baseMipLevel
-		Barrier.subresourceRange.baseArrayLayer = 0;
-		Barrier.subresourceRange.layerCount = Info.LayersCount;
-
-		Barrier.srcAccessMask = 0;								// Memory access stage transition must after...
-		Barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;		// Memory access stage transition must before...
-
-		// Todo: Create beginCommandBuffer function?
-		VkCommandBuffer CommandBuffer;
-
-		VkCommandBufferAllocateInfo AllocInfo = { };
-		AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		AllocInfo.commandPool = GraphicsCommandPool;
-		AllocInfo.commandBufferCount = 1;
-
-		VkCommandBufferBeginInfo BeginInfo = { };
-		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-		VkPipelineStageFlags SrcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-		VkPipelineStageFlags DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-
-		VkSubmitInfo SubmitInfo = { };
-		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.commandBufferCount = 1;
-		SubmitInfo.pCommandBuffers = &CommandBuffer;
-
-		vkAllocateCommandBuffers(LogicalDevice, &AllocInfo, &CommandBuffer);
-		vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
-
-		vkCmdPipelineBarrier(
-			CommandBuffer,
-			SrcStage, DstStage,		// Pipeline stages (match to src and dst AccessMasks)
-			0,						// Dependency flags
-			0, nullptr,				// Memory Barrier count + data
-			0, nullptr,				// Buffer Memory Barrier count + data
-			1, &Barrier	// Image Memory Barrier count + data
-		);
-
-		vkEndCommandBuffer(CommandBuffer);
-
-		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
-		vkQueueWaitIdle(GraphicsQueue);
-
-		VkMemoryRequirements MemoryRequirements;
-		vkGetImageMemoryRequirements(LogicalDevice, ImageBuffer.Image, &MemoryRequirements);
-
-		VulkanMemoryManagementSystem::CopyDataToImage(ImageBuffer.Image, Info.Width, Info.Height,
-			Info.Format, MemoryRequirements.size / Info.LayersCount, Info.LayersCount, Info.Data);
-
-		Barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL; // Layout to transition from
-		Barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		Barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		Barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-		SrcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-		DstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-
-		vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
-		vkCmdPipelineBarrier(CommandBuffer, SrcStage, DstStage, 0, 0, nullptr, 0, nullptr, 1, &Barrier);
-		vkEndCommandBuffer(CommandBuffer);
-
-		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
-		vkQueueWaitIdle(GraphicsQueue);
-
-		vkFreeCommandBuffers(LogicalDevice, GraphicsCommandPool, 1, &CommandBuffer);
-
-		VkImageView View = CreateImageView(LogicalDevice, ImageBuffer.Image,
-			VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, TextureImageType,
-			Info.LayersCount);
-
-		TextureBuffers[ImageArraysCount] = ImageBuffer;
-		TextureImageViews[ImageArraysCount] = View;
-
-		const u32 CurrentIndex = ImageArraysCount;
-		++ImageArraysCount;
-
-		return CurrentIndex;
+		BMR::AttachUniformsToSet(*SetToAttach, SetInfo, 2);
 	}
 
-	// Shit but works for now
-	u32 UpdateTextureDescriptor(u32* ImageViewIndices, u32 Count, DescriptorLayoutHandles LayoutHandle)
+	void TestAttachSkyNoxTerrainTexture(VkImageView DefuseImage, VkDescriptorSet* SetToAttach)
 	{
-		VkWriteDescriptorSet TextureWriteData[SamplerType::SamplerType_Count];
-		VkDescriptorImageInfo TextureImageInfo[SamplerType::SamplerType_Count];
-		VkDescriptorSetLayout Layout = MainRenderPass.DescriptorLayouts[LayoutHandle];
-		VkDescriptorSet& Descriptor = MainRenderPass.SamplerDescriptors[MainRenderPass.TextureDescriptorCount];
+		BMR::CreateUniformSets(&MainPass.TerrainSkyBoxLayout, 1, SetToAttach);
 
-		VulkanMemoryManagementSystem::AllocateSets(MainPool, &Layout, 1, &Descriptor);
+		BMR::BMRUniformSetAttachmentInfo SetInfo[1];
+		SetInfo[0].ImageInfo.imageView = DefuseImage;
+		SetInfo[0].ImageInfo.sampler = MainPass.DiffuseSampler;
+		SetInfo[0].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		SetInfo[0].Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
-		for (u32 i = 0; i < Count; ++i)
-		{
-			TextureImageInfo[i] = { };
-			TextureImageInfo[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			TextureImageInfo[i].imageView = TextureImageViews[ImageViewIndices[i]];
-			TextureImageInfo[i].sampler = Sampler[i];
-
-			TextureWriteData[i] = { };
-			TextureWriteData[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			TextureWriteData[i].dstSet = Descriptor;
-			TextureWriteData[i].dstBinding = i;
-			TextureWriteData[i].dstArrayElement = 0;
-			TextureWriteData[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			TextureWriteData[i].descriptorCount = 1;
-			TextureWriteData[i].pImageInfo = TextureImageInfo + i;
-		}
-
-		vkUpdateDescriptorSets(LogicalDevice, Count, TextureWriteData, 0, nullptr);
-
-		const u32 CurrentIndex = MainRenderPass.TextureDescriptorCount;
-		++MainRenderPass.TextureDescriptorCount;
-
-		return CurrentIndex;
+		BMR::AttachUniformsToSet(*SetToAttach, SetInfo, 1);
 	}
 
-	u32 LoadEntityMaterial(u32 DiffuseTextureIndex, u32 SpecularTextureIndex)
-	{
-		u32 TextureIndices[SamplerType::SamplerType_Count];
-		TextureIndices[SamplerType::SamplerType_Diffuse] = DiffuseTextureIndex;
-		TextureIndices[SamplerType::SamplerType_Specular] = SpecularTextureIndex;
-		return UpdateTextureDescriptor(TextureIndices, 2, DescriptorLayoutHandles::EntitySampler);
-	}
-
-	u32 LoadTerrainMaterial(u32 DiffuseTextureIndex)
-	{
-		return UpdateTextureDescriptor(&DiffuseTextureIndex, 1, DescriptorLayoutHandles::TerrainSampler);
-	}
-
-	u32 LoadSkyBoxMaterial(u32 CubeTextureIndex)
-	{
-		return UpdateTextureDescriptor(&CubeTextureIndex, 1, DescriptorLayoutHandles::TerrainSampler);
-	}
-
-	u64 LoadVertices(const void* Vertices, u32 VertexSize, VkDeviceSize VerticesCount)
+	u64 LoadVertices(const void* Vertices, u32 VertexSize, u64 VerticesCount)
 	{
 		assert(Vertices);
 
 		const VkDeviceSize MeshVerticesSize = VertexSize * VerticesCount;
 		const VkDeviceSize AlignedSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(MeshVerticesSize);
 
-		VulkanMemoryManagementSystem::CopyDataToBuffer(VertexBuffer.Buffer, VertexBufferOffset, MeshVerticesSize, Vertices);
+		VulkanMemoryManagementSystem::CopyDataToBuffer(PassSharedResources.VertexBuffer.Buffer, PassSharedResources.VertexBufferOffset, MeshVerticesSize, Vertices);
 
-		const VkDeviceSize CurrentOffset = VertexBufferOffset;
-		VertexBufferOffset += AlignedSize;
+		const VkDeviceSize CurrentOffset = PassSharedResources.VertexBufferOffset;
+		PassSharedResources.VertexBufferOffset += AlignedSize;
 
 		return CurrentOffset;
 	}
@@ -504,10 +184,10 @@ namespace BMR
 		VkDeviceSize MeshIndicesSize = sizeof(u32) * IndicesCount;
 		const VkDeviceSize AlignedSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(MeshIndicesSize);
 
-		VulkanMemoryManagementSystem::CopyDataToBuffer(IndexBuffer.Buffer, IndexBufferOffset, MeshIndicesSize, Indices);
+		VulkanMemoryManagementSystem::CopyDataToBuffer(PassSharedResources.IndexBuffer.Buffer, PassSharedResources.IndexBufferOffset, MeshIndicesSize, Indices);
 
-		const VkDeviceSize CurrentOffset = IndexBufferOffset;
-		IndexBufferOffset += AlignedSize;
+		const VkDeviceSize CurrentOffset = PassSharedResources.IndexBufferOffset;
+		PassSharedResources.IndexBufferOffset += AlignedSize;
 
 		return CurrentOffset;
 	}
@@ -516,192 +196,460 @@ namespace BMR
 	{
 		assert(Buffer);
 
-		const u32 UpdateIndex = (MainRenderPass.ActiveLightSet + 1) % MainViewport.ViewportSwapchain.ImagesCount;
+		const u32 UpdateIndex = (ActiveLightSet + 1) % BMR::GetImageCount();
 
-		VulkanMemoryManagementSystem::CopyDataToMemory(MainRenderPass.LightBuffers[UpdateIndex].Memory, 0,
-			sizeof(BMRLightBuffer), Buffer);
+		UpdateUniformBuffer(MainPass.EntityLightBuffer[UpdateIndex], sizeof(BMRLightBuffer), 0,
+			Buffer);
 
-		MainRenderPass.ActiveLightSet = UpdateIndex;
+		ActiveLightSet = UpdateIndex;
 	}
 
 	void UpdateMaterialBuffer(const BMRMaterial* Buffer)
 	{
 		assert(Buffer);
-		VulkanMemoryManagementSystem::CopyDataToMemory(MainRenderPass.MaterialBuffer.Memory, 0,
-			sizeof(BMRMaterial), Buffer);
+		UpdateUniformBuffer(MainPass.MaterialBuffer, sizeof(BMRMaterial), 0,
+			Buffer);
 	}
 
 	void UpdateLightSpaceBuffer(const BMRLightSpaceMatrix* LightSpaceMatrix)
 	{
-		const u32 UpdateIndex = (MainRenderPass.ActiveLightSpaceMatrixSet + 1) % MainViewport.ViewportSwapchain.ImagesCount;
+		const u32 UpdateIndex = (ActiveLightSpaceMatrixSet + 1) % BMR::GetImageCount();
 
-		VulkanMemoryManagementSystem::CopyDataToMemory(MainRenderPass.DepthLightSpaceMatrixBuffers[UpdateIndex].Memory, 0,
-			sizeof(BMRLightSpaceMatrix), LightSpaceMatrix);
+		UpdateUniformBuffer(DepthPass.LightSpaceMatrixBuffer[UpdateIndex], sizeof(BMRLightSpaceMatrix), 0,
+			LightSpaceMatrix);
 
-		MainRenderPass.ActiveLightSpaceMatrixSet = UpdateIndex;
+		ActiveLightSpaceMatrixSet = UpdateIndex;
 	}
 
-	void Draw(const BMRDrawScene& Scene)
+	void CreatePassSharedResources()
 	{
-		// Todo Update only when changed
-		UpdateLightBuffer(Scene.LightEntity);
-		UpdateVpBuffer(Scene.ViewProjection);
+		VkBufferCreateInfo BufferInfo = { };
+		BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		BufferInfo.size = MB64;
+		BufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
-		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		PassSharedResources.VertexBuffer = CreateUniformBuffer(&BufferInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-		const u32 MainPassClearValuesSize = 3;
-		VkClearValue MainPassClearValues[MainPassClearValuesSize];
-		// Do not forget about position in array AttachmentDescriptions
-		MainPassClearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
-		MainPassClearValues[1].color = { 0.0f, 0.0f, 0.0f, 1.0f };
-		MainPassClearValues[2].depthStencil.depth = 1.0f;
+		BufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+		PassSharedResources.IndexBuffer = CreateUniformBuffer(&BufferInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	
+		for (u32 i = 0; i < BMR::GetImageCount(); i++)
+		{
+			PassSharedResources.ShadowMapArray[i] = BMR::CreateUniformImage(&ShadowMapArrayCreateInfo);
+		}
 
-		const u32 DepthPassClearValuesSize = 1;
-		VkClearValue DepthPassClearValues[DepthPassClearValuesSize];
-		// Do not forget about position in array AttachmentDescriptions
-		DepthPassClearValues[0].depthStencil.depth = 1.0f;
+		PassSharedResources.PushConstants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		PassSharedResources.PushConstants.offset = 0;
+		// Todo: check constant and model size?
+		PassSharedResources.PushConstants.size = sizeof(BMRModel);
+	}
 
-		VkPipelineStageFlags WaitStages[] = {
-			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+	void CreateDepthPass()
+	{
+		DepthPass.LightSpaceMatrixLayout = BMR::CreateUniformLayout(&LightSpaceMatrixDescriptorType, &LightSpaceMatrixStageFlags, 1);
+
+		for (u32 i = 0; i < GetImageCount(); i++)
+		{
+			const VkDeviceSize LightSpaceMatrixSize = sizeof(BMR::BMRLightSpaceMatrix);
+
+			VpBufferInfo.size = LightSpaceMatrixSize;
+			DepthPass.LightSpaceMatrixBuffer[i] = BMR::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+			BMR::CreateUniformSets(&DepthPass.LightSpaceMatrixLayout, 1, DepthPass.LightSpaceMatrixSet + i);
+
+			DepthPass.ShadowMapElement1ImageInterface[i] = BMR::CreateImageInterface(&ShadowMapElement1InterfaceCreateInfo,
+				PassSharedResources.ShadowMapArray[i].Image);
+			DepthPass.ShadowMapElement2ImageInterface[i] = BMR::CreateImageInterface(&ShadowMapElement2InterfaceCreateInfo,
+				PassSharedResources.ShadowMapArray[i].Image);
+
+			BMR::BMRUniformSetAttachmentInfo LightSpaceMatrixAttachmentInfo;
+			LightSpaceMatrixAttachmentInfo.BufferInfo.buffer = DepthPass.LightSpaceMatrixBuffer[i].Buffer;
+			LightSpaceMatrixAttachmentInfo.BufferInfo.offset = 0;
+			LightSpaceMatrixAttachmentInfo.BufferInfo.range = LightSpaceMatrixSize;
+			LightSpaceMatrixAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+			BMR::AttachUniformsToSet(DepthPass.LightSpaceMatrixSet[i], &LightSpaceMatrixAttachmentInfo, 1);
+		}
+
+		BMR::BMRRenderTarget RenderTargets[2];
+		for (u32 ImageIndex = 0; ImageIndex < BMR::GetImageCount(); ImageIndex++)
+		{
+			BMR::BMRAttachmentView* Target1AttachmentView = RenderTargets[0].AttachmentViews + ImageIndex;
+			BMR::BMRAttachmentView* Target2AttachmentView = RenderTargets[1].AttachmentViews + ImageIndex;
+
+			Target1AttachmentView->ImageViews = Memory::BmMemoryManagementSystem::FrameAlloc<VkImageView>(DepthRenderPassSettings.AttachmentDescriptionsCount);
+			Target2AttachmentView->ImageViews = Memory::BmMemoryManagementSystem::FrameAlloc<VkImageView>(DepthRenderPassSettings.AttachmentDescriptionsCount);
+
+			Target1AttachmentView->ImageViews[0] = DepthPass.ShadowMapElement1ImageInterface[ImageIndex];
+			Target2AttachmentView->ImageViews[0] = DepthPass.ShadowMapElement2ImageInterface[ImageIndex];
+		}
+
+		BMR::CreateRenderPass(&DepthRenderPassSettings, RenderTargets, DepthViewportExtent, 2, BMR::GetImageCount(), &DepthPass.RenderPass);
+	
+		DepthPass.Pipeline.PipelineLayout = CreatePipelineLayout(&DepthPass.LightSpaceMatrixLayout, 1,
+			&PassSharedResources.PushConstants, 1);
+
+		std::vector<char> ShaderCode;
+		Util::OpenAndReadFileFull("./Resources/Shaders/Depth_vert.spv", ShaderCode, "rb");
+
+		VkPipelineShaderStageCreateInfo Info = { };
+		Info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		Info.stage = VK_SHADER_STAGE_VERTEX_BIT;
+		Info.pName = "main";
+		CreateShader((u32*)ShaderCode.data(), ShaderCode.size(), Info.module);
+
+		BMRSPipelineShaderInfo ShaderInfo;
+		ShaderInfo.Infos = &Info;
+		ShaderInfo.InfosCounter = 1;
+
+		BMRPipelineResourceInfo ResourceInfo;
+		ResourceInfo.PipelineLayout = DepthPass.Pipeline.PipelineLayout;
+		ResourceInfo.RenderPass = DepthPass.RenderPass.Pass;
+		ResourceInfo.SubpassIndex = 0;
+
+		BMR::CreatePipelines(&ShaderInfo, &DepthVertexInput, &DepthPipelineSettings, &ResourceInfo, 1, &DepthPass.Pipeline.Pipeline);
+		BMR::DestroyShader(Info.module);
+	}
+
+	void CreateMainPass()
+	{
+		MainPass.DiffuseSampler = BMR::CreateSampler(&DiffuseSamplerCreateInfo);
+		MainPass.SpecularSampler = BMR::CreateSampler(&SpecularSamplerCreateInfo);
+		MainPass.ShadowMapArraySampler = BMR::CreateSampler(&ShadowMapSamplerCreateInfo);
+
+		MainPass.VpLayout = BMR::CreateUniformLayout(&VpDescriptorType, &VpStageFlags, 1);
+		MainPass.EntityLightLayout = BMR::CreateUniformLayout(&EntityLightDescriptorType, &EntityLightStageFlags, 1);
+		MainPass.MaterialLayout = BMR::CreateUniformLayout(&MaterialDescriptorType, &MaterialStageFlags, 1);
+		MainPass.DeferredInputLayout = BMR::CreateUniformLayout(DeferredInputDescriptorType, DeferredInputFlags, 2);
+		MainPass.ShadowMapArrayLayout = BMR::CreateUniformLayout(&ShadowMapArrayDescriptorType, &ShadowMapArrayFlags, 1);
+		MainPass.EntitySamplerLayout = BMR::CreateUniformLayout(EntitySamplerDescriptorType, EntitySamplerInputFlags, 2);
+		MainPass.TerrainSkyBoxLayout = BMR::CreateUniformLayout(&TerrainSkyBoxSamplerDescriptorType, &TerrainSkyBoxArrayFlags, 1);
+		
+		for (u32 i = 0; i < GetImageCount(); i++)
+		{
+			//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
+			const VkDeviceSize VpBufferSize = sizeof(BMR::BMRUboViewProjection);
+			const VkDeviceSize LightBufferSize = sizeof(BMR::BMRLightBuffer);
+
+			VpBufferInfo.size = VpBufferSize;
+			MainPass.VpBuffer[i] = BMR::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			VpBufferInfo.size = LightBufferSize;
+			MainPass.EntityLightBuffer[i] = BMR::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+			MainPass.DeferredInputDepthImage[i] = BMR::CreateUniformImage(&DeferredInputDepthUniformCreateInfo);
+			MainPass.DeferredInputColorImage[i] = BMR::CreateUniformImage(&DeferredInputColorUniformCreateInfo);
+
+			MainPass.DeferredInputDepthImageInterface[i] = BMR::CreateImageInterface(&DeferredInputDepthUniformInterfaceCreateInfo,
+				MainPass.DeferredInputDepthImage[i].Image);
+			MainPass.DeferredInputColorImageInterface[i] = BMR::CreateImageInterface(&DeferredInputUniformColorInterfaceCreateInfo,
+				MainPass.DeferredInputColorImage[i].Image);
+			MainPass.ShadowMapArrayImageInterface[i] = BMR::CreateImageInterface(&ShadowMapArrayInterfaceCreateInfo,
+				PassSharedResources.ShadowMapArray[i].Image);
+
+			BMR::CreateUniformSets(&MainPass.VpLayout, 1, MainPass.VpSet + i);
+			BMR::CreateUniformSets(&MainPass.EntityLightLayout, 1, MainPass.EntityLightSet + i);
+			BMR::CreateUniformSets(&MainPass.DeferredInputLayout, 1, MainPass.DeferredInputSet + i);
+			BMR::CreateUniformSets(&MainPass.ShadowMapArrayLayout, 1, MainPass.ShadowMapArraySet + i);
+
+			BMR::BMRUniformSetAttachmentInfo VpBufferAttachmentInfo;
+			VpBufferAttachmentInfo.BufferInfo.buffer = MainPass.VpBuffer[i].Buffer;
+			VpBufferAttachmentInfo.BufferInfo.offset = 0;
+			VpBufferAttachmentInfo.BufferInfo.range = VpBufferSize;
+			VpBufferAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+			BMR::BMRUniformSetAttachmentInfo EntityLightAttachmentInfo;
+			EntityLightAttachmentInfo.BufferInfo.buffer = MainPass.EntityLightBuffer[i].Buffer;
+			EntityLightAttachmentInfo.BufferInfo.offset = 0;
+			EntityLightAttachmentInfo.BufferInfo.range = LightBufferSize;
+			EntityLightAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+			BMR::BMRUniformSetAttachmentInfo DeferredInputAttachmentInfo[2];
+			DeferredInputAttachmentInfo[0].ImageInfo.imageView = MainPass.DeferredInputColorImageInterface[i];
+			DeferredInputAttachmentInfo[0].ImageInfo.sampler = nullptr;
+			DeferredInputAttachmentInfo[0].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			DeferredInputAttachmentInfo[0].Type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+
+			DeferredInputAttachmentInfo[1].ImageInfo.imageView = MainPass.DeferredInputDepthImageInterface[i];
+			DeferredInputAttachmentInfo[1].ImageInfo.sampler = nullptr;
+			DeferredInputAttachmentInfo[1].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			DeferredInputAttachmentInfo[1].Type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+
+			BMR::BMRUniformSetAttachmentInfo ShadowMapArrayAttachmentInfo;
+			ShadowMapArrayAttachmentInfo.ImageInfo.imageView = MainPass.ShadowMapArrayImageInterface[i];
+			ShadowMapArrayAttachmentInfo.ImageInfo.sampler = MainPass.ShadowMapArraySampler;
+			ShadowMapArrayAttachmentInfo.ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			ShadowMapArrayAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+			BMR::AttachUniformsToSet(MainPass.VpSet[i], &VpBufferAttachmentInfo, 1);
+			BMR::AttachUniformsToSet(MainPass.EntityLightSet[i], &EntityLightAttachmentInfo, 1);
+			BMR::AttachUniformsToSet(MainPass.DeferredInputSet[i], DeferredInputAttachmentInfo, 2);
+			BMR::AttachUniformsToSet(MainPass.ShadowMapArraySet[i], &ShadowMapArrayAttachmentInfo, 1);
+		}
+
+		const VkDeviceSize MaterialSize = sizeof(BMR::BMRMaterial);
+		VpBufferInfo.size = MaterialSize;
+		MainPass.MaterialBuffer = BMR::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+		BMR::CreateUniformSets(&MainPass.MaterialLayout, 1, &MainPass.MaterialSet);
+
+		BMR::BMRUniformSetAttachmentInfo MaterialAttachmentInfo;
+		MaterialAttachmentInfo.BufferInfo.buffer = MainPass.MaterialBuffer.Buffer;
+		MaterialAttachmentInfo.BufferInfo.offset = 0;
+		MaterialAttachmentInfo.BufferInfo.range = MaterialSize;
+		MaterialAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+		BMR::AttachUniformsToSet(MainPass.MaterialSet, &MaterialAttachmentInfo, 1);
+
+		BMR::BMRRenderTarget RenderTarget;
+		for (u32 ImageIndex = 0; ImageIndex < BMR::GetImageCount(); ImageIndex++)
+		{
+			BMR::BMRAttachmentView* AttachmentView = RenderTarget.AttachmentViews + ImageIndex;
+
+			AttachmentView->ImageViews = Memory::BmMemoryManagementSystem::FrameAlloc<VkImageView>(MainRenderPassSettings.AttachmentDescriptionsCount);
+			AttachmentView->ImageViews[0] = BMR::GetSwapchainImageViews()[ImageIndex];
+			AttachmentView->ImageViews[1] = MainPass.DeferredInputColorImageInterface[ImageIndex];
+			AttachmentView->ImageViews[2] = MainPass.DeferredInputDepthImageInterface[ImageIndex];
+
+		}
+
+		BMR::CreateRenderPass(&MainRenderPassSettings, &RenderTarget, MainScreenExtent, 1, BMR::GetImageCount(), &MainPass.RenderPass);
+	
+		const u32 TerrainDescriptorLayoutsCount = 2;
+		VkDescriptorSetLayout TerrainDescriptorLayouts[TerrainDescriptorLayoutsCount] =
+		{
+			MainPass.VpLayout,
+			MainPass.TerrainSkyBoxLayout
 		};
 
-		VkFence Fence = DrawFences[CurrentFrame];
-		VkSemaphore ImageAvailable = ImagesAvailable[CurrentFrame];
-
-		vkWaitForFences(LogicalDevice, 1, &Fence, VK_TRUE, UINT64_MAX);
-		vkResetFences(LogicalDevice, 1, &Fence);
-
-		u32 ImageIndex;
-		vkAcquireNextImageKHR(LogicalDevice, MainViewport.ViewportSwapchain.VulkanSwapchain, UINT64_MAX,
-			ImageAvailable, VK_NULL_HANDLE, &ImageIndex);
-
-		VkCommandBuffer CommandBuffer = MainViewport.CommandBuffers[ImageIndex];
-
-		VkResult Result = vkBeginCommandBuffer(CommandBuffer, &CommandBufferBeginInfo);
-		if (Result != VK_SUCCESS)
+		const u32 EntityDescriptorLayoutCount = 5;
+		VkDescriptorSetLayout EntityDescriptorLayouts[EntityDescriptorLayoutCount] =
 		{
-			HandleLog(BMRLogType::LogType_Error, "vkBeginCommandBuffer result is %d", Result);
+			MainPass.VpLayout,
+			MainPass.EntitySamplerLayout,
+			MainPass.EntityLightLayout,
+			MainPass.MaterialLayout,
+			MainPass.ShadowMapArrayLayout
+		};
+
+		const u32 SkyBoxDescriptorLayoutCount = 2;
+		VkDescriptorSetLayout SkyBoxDescriptorLayouts[SkyBoxDescriptorLayoutCount] =
+		{
+			MainPass.VpLayout,
+			MainPass.TerrainSkyBoxLayout,
+		};
+
+		const u32 TerrainIndex = 0;
+		const u32 EntityIndex = 1;
+		const u32 SkyBoxIndex = 2;
+		const u32 DeferredIndex = 3;
+
+		u32 SetLayoutCountTable[4];
+		SetLayoutCountTable[EntityIndex] = EntityDescriptorLayoutCount;
+		SetLayoutCountTable[TerrainIndex] = TerrainDescriptorLayoutsCount;
+		SetLayoutCountTable[DeferredIndex] = 1;
+		SetLayoutCountTable[SkyBoxIndex] = SkyBoxDescriptorLayoutCount;
+
+		const VkDescriptorSetLayout* SetLayouts[4];
+		SetLayouts[EntityIndex] = EntityDescriptorLayouts;
+		SetLayouts[TerrainIndex] = TerrainDescriptorLayouts;
+		SetLayouts[DeferredIndex] = &MainPass.DeferredInputLayout;
+		SetLayouts[SkyBoxIndex] = SkyBoxDescriptorLayouts;
+
+
+
+		u32 PushConstantRangeCountTable[4];
+		PushConstantRangeCountTable[EntityIndex] = 1;
+		PushConstantRangeCountTable[TerrainIndex] = 0;
+		PushConstantRangeCountTable[DeferredIndex] = 0;
+		PushConstantRangeCountTable[SkyBoxIndex] = 0;
+
+		for (u32 i = 0; i < 4; ++i)
+		{
+			MainPass.Pipelines[i].PipelineLayout = CreatePipelineLayout(SetLayouts[i],
+				SetLayoutCountTable[i], &PassSharedResources.PushConstants, PushConstantRangeCountTable[i]);
 		}
 
+		const char* Paths[4][2] = {
+			{ "./Resources/Shaders/TerrainGenerator_vert.spv", "./Resources/Shaders/TerrainGenerator_frag.spv" },
+			{"./Resources/Shaders/vert.spv", "./Resources/Shaders/frag.spv" },
+			{"./Resources/Shaders/SkyBox_vert.spv", "./Resources/Shaders/SkyBox_frag.spv" },
+			{"./Resources/Shaders/second_vert.spv", "./Resources/Shaders/second_frag.spv" },
+		};
+
+		VkShaderStageFlagBits Stages[2] = { VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };		
+
+		BMRSPipelineShaderInfo ShaderInfo[4];
+		VkPipelineShaderStageCreateInfo ShaderInfos[4][2];
+		for (u32 i = 0; i < 4; ++i)
 		{
-			const BMRLightSpaceMatrix* LightViews[] =
+			for (u32 j = 0; j < 2; ++j)
 			{
-				&Scene.LightEntity->DirectionLight.LightSpaceMatrix,
-				&Scene.LightEntity->SpotLight.LightSpaceMatrix,
-			};
+				std::vector<char> ShaderCode;
+				Util::OpenAndReadFileFull(Paths[i][j], ShaderCode, "rb");
 
-			const u32 FramebufferHandle[] =
-			{
-				FrameBuffersHandles::Tex1,
-				FrameBuffersHandles::Tex2
-			};
-
-			for (u32 LightCaster = 0; LightCaster < MAX_LIGHT_SOURCES; ++LightCaster)
-			{
-				UpdateLightSpaceBuffer(LightViews[LightCaster]);
-
-				VkRenderPassBeginInfo DepthRenderPassBeginInfo = { };
-				DepthRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-				DepthRenderPassBeginInfo.renderPass = MainRenderPass.RenderPasses[RenderPassHandles::Depth];
-				DepthRenderPassBeginInfo.renderArea.offset = { 0, 0 };
-				DepthRenderPassBeginInfo.pClearValues = DepthPassClearValues;
-				DepthRenderPassBeginInfo.clearValueCount = DepthPassClearValuesSize;
-				DepthRenderPassBeginInfo.renderArea.extent = DepthPassSwapExtent; // Size of region to run render pass on (starting at offset)
-				DepthRenderPassBeginInfo.framebuffer = MainRenderPass.Framebuffers[FramebufferHandle[LightCaster]][ImageIndex];
-
-				vkCmdBeginRenderPass(CommandBuffer, &DepthRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-		
-				vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderPass.Pipelines[BMRPipelineHandles::Depth]);
-
-				for (u32 i = 0; i < Scene.DrawEntitiesCount; ++i)
-				{
-					BMRDrawEntity* DrawEntity = Scene.DrawEntities + i;
-
-					const VkBuffer VertexBuffers[] = { VertexBuffer.Buffer };
-					const VkDeviceSize Offsets[] = { DrawEntity->VertexOffset };
-
-					const u32 DescriptorSetGroupCount = 1;
-					const VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] =
-					{
-						MainRenderPass.DescriptorsToImages[DescriptorHandles::DepthLightSpaceMatrix][MainRenderPass.ActiveLightSpaceMatrixSet],
-					};
-
-					const VkPipelineLayout PipelineLayout = MainRenderPass.PipelineLayouts[BMRPipelineHandles::Depth];
-
-					vkCmdPushConstants(CommandBuffer, PipelineLayout,
-						VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BMRModel), &DrawEntity->Model);
-
-					vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-						0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
-
-					vkCmdBindVertexBuffers(CommandBuffer, 0, 1, VertexBuffers, Offsets);
-					vkCmdBindIndexBuffer(CommandBuffer, IndexBuffer.Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
-					vkCmdDrawIndexed(CommandBuffer, DrawEntity->IndicesCount, 1, 0, 0, 0);
-				}
-
-				vkCmdEndRenderPass(CommandBuffer);
+				VkPipelineShaderStageCreateInfo* Info = &ShaderInfos[i][j];
+				*Info = { };
+				Info->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+				Info->stage = Stages[j];
+				Info->pName = "main";
+				CreateShader((u32*)ShaderCode.data(), ShaderCode.size(), Info->module);
 			}
+
+			ShaderInfo[i].Infos = ShaderInfos[i];
+			ShaderInfo[i].InfosCounter = 2;
 		}
 
-		VkRenderPassBeginInfo MainRenderPassBeginInfo = { };
-		MainRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		MainRenderPassBeginInfo.renderPass = MainRenderPass.RenderPasses[RenderPassHandles::Main];
-		MainRenderPassBeginInfo.renderArea.offset = { 0, 0 };
-		MainRenderPassBeginInfo.pClearValues = MainPassClearValues;
-		MainRenderPassBeginInfo.clearValueCount = MainPassClearValuesSize;
-		MainRenderPassBeginInfo.renderArea.extent = MainViewport.ViewportSwapchain.SwapExtent; // Size of region to run render pass on (starting at offset)
-		MainRenderPassBeginInfo.framebuffer = MainRenderPass.Framebuffers[FrameBuffersHandles::Main][ImageIndex];
 
-		vkCmdBeginRenderPass(CommandBuffer, &MainRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+		BMRVertexInput VertexInput[4];
+		VertexInput[EntityIndex] = EntityVertexInput;
+		VertexInput[TerrainIndex] = TerrainVertexInput;
+		VertexInput[DeferredIndex] = { };
+		VertexInput[SkyBoxIndex] = SkyBoxVertexInput;
 
+		BMRPipelineSettings PipelineSettings[4];
+		PipelineSettings[EntityIndex] = EntityPipelineSettings;
+		PipelineSettings[TerrainIndex] = TerrainPipelineSettings;
+		PipelineSettings[DeferredIndex] = DeferredPipelineSettings;
+		PipelineSettings[SkyBoxIndex] = SkyBoxPipelineSettings;
+
+
+		BMRPipelineResourceInfo PipelineResourceInfo[4];
+		PipelineResourceInfo[EntityIndex].PipelineLayout = MainPass.Pipelines[EntityIndex].PipelineLayout;
+		PipelineResourceInfo[EntityIndex].RenderPass = MainPass.RenderPass.Pass;
+		PipelineResourceInfo[EntityIndex].SubpassIndex = 0;
+
+		PipelineResourceInfo[TerrainIndex].PipelineLayout = MainPass.Pipelines[TerrainIndex].PipelineLayout;
+		PipelineResourceInfo[TerrainIndex].RenderPass = MainPass.RenderPass.Pass;
+		PipelineResourceInfo[TerrainIndex].SubpassIndex = 0;
+
+		PipelineResourceInfo[DeferredIndex].PipelineLayout = MainPass.Pipelines[DeferredIndex].PipelineLayout;
+		PipelineResourceInfo[DeferredIndex].RenderPass = MainPass.RenderPass.Pass;
+		PipelineResourceInfo[DeferredIndex].SubpassIndex = 1;
+
+		PipelineResourceInfo[SkyBoxIndex].PipelineLayout = MainPass.Pipelines[SkyBoxIndex].PipelineLayout;
+		PipelineResourceInfo[SkyBoxIndex].RenderPass = MainPass.RenderPass.Pass;
+		PipelineResourceInfo[SkyBoxIndex].SubpassIndex = 0;
+
+		VkPipeline NewPipelines[4];
+		CreatePipelines(ShaderInfo, VertexInput, PipelineSettings, PipelineResourceInfo, 4, NewPipelines);
+
+		for (u32 i = 0; i < 4; ++i)
 		{
-			vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderPass.Pipelines[BMRPipelineHandles::Terrain]);
+			MainPass.Pipelines[i].Pipeline = NewPipelines[i];
+		}
+	}
 
-			for (u32 i = 0; i < Scene.DrawTerrainEntitiesCount; ++i)
-			{
-				BMRDrawTerrainEntity* DrawTerrainEntity = Scene.DrawTerrainEntities + i;
+	void DestroyPassSharedResources()
+	{
+		DestroyUniformBuffer(PassSharedResources.VertexBuffer);
+		DestroyUniformBuffer(PassSharedResources.IndexBuffer);
 
-				const VkBuffer TerrainVertexBuffers[] = { VertexBuffer.Buffer };
-				const VkDeviceSize TerrainBuffersOffsets[] = { DrawTerrainEntity->VertexOffset };
+		for (u32 i = 0; i < BMR::GetImageCount(); i++)
+		{
+			BMR::DestroyUniformImage(PassSharedResources.ShadowMapArray[i]);
+		}
+	}
 
-				const u32 TerrainDescriptorSetGroupCount = 2;
-				const VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = {
-					MainRenderPass.DescriptorsToImages[DescriptorHandles::TerrainVp][MainRenderPass.ActiveVpSet],
-					MainRenderPass.SamplerDescriptors[DrawTerrainEntity->MaterialIndex]
-				};
+	void DestroyDepthPass()
+	{
+		for (u32 i = 0; i < GetImageCount(); i++)
+		{
+			BMR::DestroyUniformBuffer(DepthPass.LightSpaceMatrixBuffer[i]);
 
-				vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderPass.PipelineLayouts[BMRPipelineHandles::Terrain],
-					0, TerrainDescriptorSetGroupCount, TerrainDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
-
-				vkCmdBindVertexBuffers(CommandBuffer, 0, 1, TerrainVertexBuffers, TerrainBuffersOffsets);
-				vkCmdBindIndexBuffer(CommandBuffer, IndexBuffer.Buffer, DrawTerrainEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
-				vkCmdDrawIndexed(CommandBuffer, DrawTerrainEntity->IndicesCount, 1, 0, 0, 0);
-			}
+			BMR::DestroyImageInterface(DepthPass.ShadowMapElement1ImageInterface[i]);
+			BMR::DestroyImageInterface(DepthPass.ShadowMapElement2ImageInterface[i]);
 		}
 
-		{
-			vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderPass.Pipelines[BMRPipelineHandles::Entity]);
+		BMR::DestroyUniformLayout(DepthPass.LightSpaceMatrixLayout);
 
-			// TODO: Support rework to not create identical index buffers
+		BMR::DestroyPipelineLayout(DepthPass.Pipeline.PipelineLayout);
+		BMR::DestroyPipeline(DepthPass.Pipeline.Pipeline);
+
+		BMR::DestroyRenderPass(&DepthPass.RenderPass);
+	}
+
+	void DestroyMainPass()
+	{
+		for (u32 i = 0; i < BMR::GetImageCount(); i++)
+		{
+			BMR::DestroyUniformBuffer(MainPass.VpBuffer[i]);
+			BMR::DestroyUniformBuffer(MainPass.EntityLightBuffer[i]);
+			BMR::DestroyUniformImage(MainPass.DeferredInputColorImage[i]);
+			BMR::DestroyUniformImage(MainPass.DeferredInputDepthImage[i]);
+			
+
+			BMR::DestroyImageInterface(MainPass.DeferredInputColorImageInterface[i]);
+			BMR::DestroyImageInterface(MainPass.DeferredInputDepthImageInterface[i]);
+			BMR::DestroyImageInterface(MainPass.ShadowMapArrayImageInterface[i]);
+		}
+
+		BMR::DestroyUniformBuffer(MainPass.MaterialBuffer);
+
+		BMR::DestroyUniformLayout(MainPass.VpLayout);
+		BMR::DestroyUniformLayout(MainPass.EntityLightLayout);
+		BMR::DestroyUniformLayout(MainPass.MaterialLayout);
+		BMR::DestroyUniformLayout(MainPass.DeferredInputLayout);
+		BMR::DestroyUniformLayout(MainPass.ShadowMapArrayLayout);
+		BMR::DestroyUniformLayout(MainPass.EntitySamplerLayout);
+		BMR::DestroyUniformLayout(MainPass.TerrainSkyBoxLayout);
+
+		BMR::DestroySampler(MainPass.ShadowMapArraySampler);
+		BMR::DestroySampler(MainPass.DiffuseSampler);
+		BMR::DestroySampler(MainPass.SpecularSampler);
+
+		for (u32 i = 0; i < 4; ++i)
+		{
+			BMR::DestroyPipelineLayout(MainPass.Pipelines[i].PipelineLayout);
+			BMR::DestroyPipeline(MainPass.Pipelines[i].Pipeline);
+		}
+
+		BMR::DestroyRenderPass(&MainPass.RenderPass);
+	}
+
+	void UpdateVpBuffer(const BMRUboViewProjection& ViewProjection)
+	{
+		const u32 UpdateIndex = (ActiveVpSet + 1) % BMR::GetImageCount();
+
+		UpdateUniformBuffer(MainPass.VpBuffer[UpdateIndex], sizeof(BMRUboViewProjection), 0,
+			&ViewProjection);
+
+		ActiveVpSet = UpdateIndex;
+	}
+
+	void DepthPassDraw(const BMRDrawScene& Scene, VkCommandBuffer CommandBuffer, u32 ImageIndex)
+	{
+		const BMRLightSpaceMatrix* LightViews[] =
+		{
+			&Scene.LightEntity->DirectionLight.LightSpaceMatrix,
+			&Scene.LightEntity->SpotLight.LightSpaceMatrix,
+		};
+
+		for (u32 LightCaster = 0; LightCaster < MAX_LIGHT_SOURCES; ++LightCaster)
+		{
+			UpdateLightSpaceBuffer(LightViews[LightCaster]);
+
+			VkRect2D RenderArea;
+			RenderArea.extent = DepthViewportExtent;
+			RenderArea.offset = { 0, 0 };
+			BMR::BeginRenderPass(&DepthPass.RenderPass, RenderArea, LightCaster, ImageIndex);
+
+			vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, DepthPass.Pipeline.Pipeline);
+
 			for (u32 i = 0; i < Scene.DrawEntitiesCount; ++i)
 			{
 				BMRDrawEntity* DrawEntity = Scene.DrawEntities + i;
 
-				const VkBuffer VertexBuffers[] = { VertexBuffer.Buffer };
+				const VkBuffer VertexBuffers[] = { PassSharedResources.VertexBuffer.Buffer };
 				const VkDeviceSize Offsets[] = { DrawEntity->VertexOffset };
 
-				const VkDescriptorSet DescriptorSetGroup[] =
+				const u32 DescriptorSetGroupCount = 1;
+				const VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] =
 				{
-					MainRenderPass.DescriptorsToImages[DescriptorHandles::EntityVp][MainRenderPass.ActiveVpSet],
-					MainRenderPass.SamplerDescriptors[DrawEntity->MaterialIndex],
-					MainRenderPass.DescriptorsToImages[DescriptorHandles::EntityLigh][MainRenderPass.ActiveLightSet],
-					MainRenderPass.MaterialSet,
-					MainRenderPass.DescriptorsToImages[DescriptorHandles::ShadowMapSampler][ImageIndex],
+					DepthPass.LightSpaceMatrixSet[ActiveLightSpaceMatrixSet],
 				};
-				const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
-				const VkPipelineLayout PipelineLayout = MainRenderPass.PipelineLayouts[BMRPipelineHandles::Entity];
+				const VkPipelineLayout PipelineLayout = DepthPass.Pipeline.PipelineLayout;
 
 				vkCmdPushConstants(CommandBuffer, PipelineLayout,
 					VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BMRModel), &DrawEntity->Model);
@@ -710,439 +658,119 @@ namespace BMR
 					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
 
 				vkCmdBindVertexBuffers(CommandBuffer, 0, 1, VertexBuffers, Offsets);
-				vkCmdBindIndexBuffer(CommandBuffer, IndexBuffer.Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
+				vkCmdBindIndexBuffer(CommandBuffer, PassSharedResources.IndexBuffer.Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
 				vkCmdDrawIndexed(CommandBuffer, DrawEntity->IndicesCount, 1, 0, 0, 0);
 			}
+
+			vkCmdEndRenderPass(CommandBuffer);
 		}
-
-		{
-			if (Scene.DrawSkyBox)
-			{
-				vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderPass.Pipelines[BMRPipelineHandles::SkyBox]);
-
-				const u32 SkyBoxDescriptorSetGroupCount = 2;
-				const VkDescriptorSet SkyBoxDescriptorSetGroup[SkyBoxDescriptorSetGroupCount] = {
-					MainRenderPass.DescriptorsToImages[DescriptorHandles::SkyBoxVp][MainRenderPass.ActiveVpSet],
-					MainRenderPass.SamplerDescriptors[Scene.SkyBox.MaterialIndex],
-				};
-
-				const VkPipelineLayout PipelineLayout = MainRenderPass.PipelineLayouts[BMRPipelineHandles::SkyBox];
-
-				vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-					0, SkyBoxDescriptorSetGroupCount, SkyBoxDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
-
-				vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &VertexBuffer.Buffer, &Scene.SkyBox.VertexOffset);
-				vkCmdBindIndexBuffer(CommandBuffer, IndexBuffer.Buffer, Scene.SkyBox.IndexOffset, VK_INDEX_TYPE_UINT32);
-				vkCmdDrawIndexed(CommandBuffer, Scene.SkyBox.IndicesCount, 1, 0, 0, 0);
-			}
-		}
-
-		vkCmdNextSubpass(CommandBuffer, VK_SUBPASS_CONTENTS_INLINE);
-
-		{
-			vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderPass.Pipelines[BMRPipelineHandles::Deferred]);
-
-			vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainRenderPass.PipelineLayouts[BMRPipelineHandles::Deferred],
-				0, 1, &MainRenderPass.DescriptorsToImages[DescriptorHandles::DeferredInputAttachments][ImageIndex], 0, nullptr);
-
-			vkCmdDraw(CommandBuffer, 3, 1, 0, 0); // 3 hardcoded Indices for second "post processing" subpass
-		}
-
-		vkCmdEndRenderPass(CommandBuffer);
-
-		Result = vkEndCommandBuffer(CommandBuffer);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkBeginCommandBuffer result is %d", Result);
-		}
-
-		VkSubmitInfo SubmitInfo = { };
-		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.waitSemaphoreCount = 1;
-		SubmitInfo.pWaitDstStageMask = WaitStages;
-		SubmitInfo.commandBufferCount = 1;
-		SubmitInfo.signalSemaphoreCount = 1;
-		SubmitInfo.pWaitSemaphores = &ImageAvailable;
-		SubmitInfo.pCommandBuffers = &CommandBuffer; // Command buffer to submit
-		SubmitInfo.pSignalSemaphores = &RenderFinished[CurrentFrame]; // Semaphores to signal when command buffer finishes
-		Result = vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, Fence);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkQueueSubmit result is %d", Result);
-			assert(false);
-		}
-
-		VkPresentInfoKHR PresentInfo = { };
-		PresentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		PresentInfo.waitSemaphoreCount = 1;
-		PresentInfo.swapchainCount = 1;
-		PresentInfo.pWaitSemaphores = &RenderFinished[CurrentFrame];
-		PresentInfo.pSwapchains = &MainViewport.ViewportSwapchain.VulkanSwapchain; // Swapchains to present images to
-		PresentInfo.pImageIndices = &ImageIndex; // Index of images in swapchains to present
-		Result = vkQueuePresentKHR(PresentationQueue, &PresentInfo);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkQueuePresentKHR result is %d", Result);
-		}
-
-		CurrentFrame = (CurrentFrame + 1) % MAX_DRAW_FRAMES;
 	}
 
-	bool CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, u32 AvailableExtensionsCount,
-		const char** RequiredExtensions, u32 RequiredExtensionsCount)
+	void MainPassDraw(const BMRDrawScene& Scene, VkCommandBuffer CommandBuffer, u32 ImageIndex)
 	{
-		for (u32 i = 0; i < RequiredExtensionsCount; ++i)
-		{
-			bool IsExtensionSupported = false;
-			for (u32 j = 0; j < AvailableExtensionsCount; ++j)
-			{
-				if (std::strcmp(RequiredExtensions[i], AvailableExtensions[j].extensionName) == 0)
-				{
-					IsExtensionSupported = true;
-					break;
-				}
-			}
+		VkRect2D RenderArea;
+		RenderArea.extent = MainScreenExtent;
+		RenderArea.offset = { 0, 0 };
+		BMR::BeginRenderPass(&MainPass.RenderPass, RenderArea, 0, ImageIndex);
 
-			if (!IsExtensionSupported)
-			{
-				HandleLog(BMRLogType::LogType_Error, "Extension %s unsupported", RequiredExtensions[i]);
-				return false;
-			}
+		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[0].Pipeline);
+
+		for (u32 i = 0; i < Scene.DrawTerrainEntitiesCount; ++i)
+		{
+			BMRDrawTerrainEntity* DrawTerrainEntity = Scene.DrawTerrainEntities + i;
+
+			const VkBuffer TerrainVertexBuffers[] = { PassSharedResources.VertexBuffer.Buffer };
+			const VkDeviceSize TerrainBuffersOffsets[] = { DrawTerrainEntity->VertexOffset };
+
+			const u32 TerrainDescriptorSetGroupCount = 2;
+			const VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = {
+				MainPass.VpSet[ActiveVpSet],
+				DrawTerrainEntity->TextureSet
+			};
+
+			vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[0].PipelineLayout,
+				0, TerrainDescriptorSetGroupCount, TerrainDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+
+			vkCmdBindVertexBuffers(CommandBuffer, 0, 1, TerrainVertexBuffers, TerrainBuffersOffsets);
+			vkCmdBindIndexBuffer(CommandBuffer, PassSharedResources.IndexBuffer.Buffer, DrawTerrainEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(CommandBuffer, DrawTerrainEntity->IndicesCount, 1, 0, 0, 0);
 		}
-
-		return true;
-	}
-
-	bool CheckValidationLayersSupport(VkLayerProperties* Properties, u32 PropertiesSize,
-		const char** ValidationLeyersToCheck, u32 ValidationLeyersToCheckSize)
-	{
-		for (u32 i = 0; i < ValidationLeyersToCheckSize; ++i)
-		{
-			bool IsLayerAvalible = false;
-			for (u32 j = 0; j < PropertiesSize; ++j)
-			{
-				if (std::strcmp(ValidationLeyersToCheck[i], Properties[j].layerName) == 0)
-				{
-					IsLayerAvalible = true;
-					break;
-				}
-			}
-
-			if (!IsLayerAvalible)
-			{
-				HandleLog(BMRLogType::LogType_Error, "Validation layer %s unsupported", ValidationLeyersToCheck[i]);
-				return false;
-			}
-		}
-
-		return true;
-	}
-
-	VkExtent2D GetBestSwapExtent(const VkSurfaceCapabilitiesKHR& SurfaceCapabilities, HWND WindowHandler)
-	{
-		if (SurfaceCapabilities.currentExtent.width != UINT32_MAX)
-		{
-			return SurfaceCapabilities.currentExtent;
-		}
-		else
-		{
-			RECT Rect;
-			if (!GetClientRect(WindowHandler, &Rect))
-			{
-				assert(false);
-			}
-
-			u32 Width = Rect.right - Rect.left;
-			u32 Height = Rect.bottom - Rect.top;
-
 			
-			Width = glm::clamp(static_cast<u32>(Width), SurfaceCapabilities.minImageExtent.width, SurfaceCapabilities.maxImageExtent.width);
-			Height = glm::clamp(static_cast<u32>(Height), SurfaceCapabilities.minImageExtent.height, SurfaceCapabilities.maxImageExtent.height);
+		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[1].Pipeline);
 
-			return { static_cast<u32>(Width), static_cast<u32>(Height) };
-		}
-	}
-
-	Memory::FrameArray<VkExtensionProperties> GetAvailableExtensionProperties()
-	{
-		u32 Count;
-		const VkResult Result = vkEnumerateInstanceExtensionProperties(nullptr, &Count, nullptr);
-		if (Result != VK_SUCCESS)
+		// TODO: Support rework to not create identical index buffers
+		for (u32 i = 0; i < Scene.DrawEntitiesCount; ++i)
 		{
-			HandleLog(BMRLogType::LogType_Error, "vkEnumerateInstanceExtensionProperties result is %d", static_cast<int>(Result));
-		}
+			BMRDrawEntity* DrawEntity = Scene.DrawEntities + i;
 
-		auto Data = Memory::FrameArray<VkExtensionProperties>::Create(Count);
-		vkEnumerateInstanceExtensionProperties(nullptr, &Count, Data.Pointer.Data);
+			const VkBuffer VertexBuffers[] = { PassSharedResources.VertexBuffer.Buffer };
+			const VkDeviceSize Offsets[] = { DrawEntity->VertexOffset };
 
-		return Data;
-	}
-
-	Memory::FrameArray<VkLayerProperties> GetAvailableInstanceLayerProperties()
-	{
-		u32 Count;
-		const VkResult Result = vkEnumerateInstanceLayerProperties(&Count, nullptr);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkEnumerateInstanceLayerProperties result is %d", Result);
-		}
-
-		auto Data = Memory::FrameArray<VkLayerProperties>::Create(Count);
-		vkEnumerateInstanceLayerProperties(&Count, Data.Pointer.Data);
-
-		return Data;
-	}
-
-	Memory::FrameArray<const char*> GetRequiredInstanceExtensions(const char** ValidationExtensions,
-		u32 ValidationExtensionsCount)
-	{
-		auto Data = Memory::FrameArray<const char*>::Create(RequiredExtensionsCount + ValidationExtensionsCount);
-
-		for (u32 i = 0; i < RequiredExtensionsCount; ++i)
-		{
-			Data[i] = RequiredInstanceExtensions[i];
-			HandleLog(BMRLogType::LogType_Info, "Requested %s extension", Data[i]);
-		}
-
-		for (u32 i = 0; i < ValidationExtensionsCount; ++i)
-		{
-			Data[i + RequiredExtensionsCount] = ValidationExtensions[i];
-			HandleLog(BMRLogType::LogType_Info, "Requested %s extension", Data[i]);
-		}
-
-		return Data;
-	}
-
-	Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkSurfaceKHR Surface)
-	{
-		u32 Count;
-		const VkResult Result = vkGetPhysicalDeviceSurfaceFormatsKHR(Device.PhysicalDevice, Surface, &Count, nullptr);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkGetPhysicalDeviceSurfaceFormatsKHR result is %d", Result);
-		}
-
-		auto Data = Memory::FrameArray<VkSurfaceFormatKHR>::Create(Count);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(Device.PhysicalDevice, Surface, &Count, Data.Pointer.Data);
-
-		return Data;
-	}
-
-	VkDevice CreateLogicalDevice(BMRPhysicalDeviceIndices Indices, const char* DeviceExtensions[],
-		u32 DeviceExtensionsSize)
-	{
-		const f32 Priority = 1.0f;
-
-		// One family can support graphics and presentation
-		// In that case create multiple VkDeviceQueueCreateInfo
-		VkDeviceQueueCreateInfo QueueCreateInfos[2] = { };
-		u32 FamilyIndicesSize = 1;
-
-		QueueCreateInfos[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		QueueCreateInfos[0].queueFamilyIndex = static_cast<u32>(Indices.GraphicsFamily);
-		QueueCreateInfos[0].queueCount = 1;
-		QueueCreateInfos[0].pQueuePriorities = &Priority;
-
-		if (Indices.GraphicsFamily != Indices.PresentationFamily)
-		{
-			QueueCreateInfos[1].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-			QueueCreateInfos[1].queueFamilyIndex = static_cast<u32>(Indices.PresentationFamily);
-			QueueCreateInfos[1].queueCount = 1;
-			QueueCreateInfos[1].pQueuePriorities = &Priority;
-
-			++FamilyIndicesSize;
-		}
-
-		VkPhysicalDeviceFeatures DeviceFeatures = { };
-		DeviceFeatures.fillModeNonSolid = VK_TRUE; // Todo: get from configs
-		DeviceFeatures.samplerAnisotropy = VK_TRUE; // Todo: get from configs
-		DeviceFeatures.multiViewport = VK_TRUE; // Todo: get from configs
-
-		VkDeviceCreateInfo DeviceCreateInfo = { };
-		DeviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-		DeviceCreateInfo.queueCreateInfoCount = FamilyIndicesSize;
-		DeviceCreateInfo.pQueueCreateInfos = QueueCreateInfos;
-		DeviceCreateInfo.enabledExtensionCount = DeviceExtensionsSize;
-		DeviceCreateInfo.ppEnabledExtensionNames = DeviceExtensions;
-		DeviceCreateInfo.pEnabledFeatures = &DeviceFeatures;
-
-		VkDevice LogicalDevice;
-		// Queues are created at the same time as the Device
-		VkResult Result = vkCreateDevice(Device.PhysicalDevice, &DeviceCreateInfo, nullptr, &LogicalDevice);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkCreateDevice result is %d", Result);
-			assert(false);
-		}
-
-		return LogicalDevice;
-	}
-
-	VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface)
-	{
-		Memory::FrameArray<VkSurfaceFormatKHR> FormatsData = GetSurfaceFormats(Surface);
-
-		VkSurfaceFormatKHR Format = { VK_FORMAT_UNDEFINED, static_cast<VkColorSpaceKHR>(0) };
-
-		// All formats available
-		if (FormatsData.Count == 1 && FormatsData[0].format == VK_FORMAT_UNDEFINED)
-		{
-			Format = { VK_FORMAT_R8G8B8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
-		}
-		else
-		{
-			for (u32 i = 0; i < FormatsData.Count; ++i)
+			const VkDescriptorSet DescriptorSetGroup[] =
 			{
-				VkSurfaceFormatKHR AvailableFormat = FormatsData[i];
-				if ((AvailableFormat.format == VK_FORMAT_R8G8B8_UNORM || AvailableFormat.format == VK_FORMAT_B8G8R8A8_UNORM)
-					&& AvailableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-				{
-					Format = AvailableFormat;
-					break;
-				}
-			}
-		}
+				MainPass.VpSet[ActiveVpSet],
+				DrawEntity->TextureSet,
+				MainPass.EntityLightSet[ActiveLightSet],
+				MainPass.MaterialSet,
+				MainPass.ShadowMapArraySet[ImageIndex],
+			};
+			const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
-		if (Format.format == VK_FORMAT_UNDEFINED)
+			const VkPipelineLayout PipelineLayout = MainPass.Pipelines[1].PipelineLayout;
+
+			vkCmdPushConstants(CommandBuffer, PipelineLayout,
+				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BMRModel), &DrawEntity->Model);
+
+			vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
+				0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+
+			vkCmdBindVertexBuffers(CommandBuffer, 0, 1, VertexBuffers, Offsets);
+			vkCmdBindIndexBuffer(CommandBuffer, PassSharedResources.IndexBuffer.Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(CommandBuffer, DrawEntity->IndicesCount, 1, 0, 0, 0);
+		}
+		
+		if (Scene.DrawSkyBox)
 		{
-			HandleLog(BMRLogType::LogType_Error, "SurfaceFormat is undefined");
-		}
+			vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[2].Pipeline);
 
-		return Format;
+			const u32 SkyBoxDescriptorSetGroupCount = 2;
+			const VkDescriptorSet SkyBoxDescriptorSetGroup[SkyBoxDescriptorSetGroupCount] = {
+				MainPass.VpSet[ActiveVpSet],
+				Scene.SkyBox.TextureSet,
+			};
+
+			const VkPipelineLayout PipelineLayout = MainPass.Pipelines[2].PipelineLayout;
+
+			vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
+				0, SkyBoxDescriptorSetGroupCount, SkyBoxDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+
+			vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &PassSharedResources.VertexBuffer.Buffer, &Scene.SkyBox.VertexOffset);
+			vkCmdBindIndexBuffer(CommandBuffer, PassSharedResources.IndexBuffer.Buffer, Scene.SkyBox.IndexOffset, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(CommandBuffer, Scene.SkyBox.IndicesCount, 1, 0, 0, 0);
+		}
+		
+		vkCmdNextSubpass(CommandBuffer, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[MAX_SWAPCHAIN_IMAGES_COUNT].Pipeline);
+
+		vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[MAX_SWAPCHAIN_IMAGES_COUNT].PipelineLayout,
+			0, 1, &MainPass.DeferredInputSet[ImageIndex], 0, nullptr);
+		vkCmdDraw(CommandBuffer, 3, 1, 0, 0); // 3 hardcoded Indices for second "post processing" subpass
+		
+		vkCmdEndRenderPass(CommandBuffer);
 	}
 
-	VkSampler CreateTextureSampler(f32 MaxAnisotropy, VkSamplerAddressMode AddressMode)
+	void Draw(const BMRDrawScene& Scene)
 	{
-		VkSamplerCreateInfo SamplerCreateInfo = { };
-		SamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		SamplerCreateInfo.magFilter = VK_FILTER_LINEAR;						// How to render when image is magnified on screen
-		SamplerCreateInfo.minFilter = VK_FILTER_LINEAR;						// How to render when image is minified on screen
-		SamplerCreateInfo.addressModeU = AddressMode;	// How to handle texture wrap in U (x) direction
-		SamplerCreateInfo.addressModeV = AddressMode;	// How to handle texture wrap in V (y) direction
-		SamplerCreateInfo.addressModeW = AddressMode;	// How to handle texture wrap in W (z) direction
-		SamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;	// Border beyond texture (only workds for border clamp)
-		SamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;				// Whether coords should be normalized (between 0 and 1)
-		SamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;		// Mipmap interpolation mode
-		SamplerCreateInfo.mipLodBias = 0.0f;								// Level of Details bias for mip level
-		SamplerCreateInfo.minLod = 0.0f;									// Minimum Level of Detail to pick mip level
-		SamplerCreateInfo.maxLod = 0.0f;									// Maximum Level of Detail to pick mip level
-		SamplerCreateInfo.anisotropyEnable = VK_TRUE;
-		SamplerCreateInfo.maxAnisotropy = MaxAnisotropy; // Todo: support in config
+		// Todo Update only when changed
+		UpdateLightBuffer(Scene.LightEntity);
+		UpdateVpBuffer(Scene.ViewProjection);
 
-		VkSampler Sampler;
-		VkResult Result = vkCreateSampler(LogicalDevice, &SamplerCreateInfo, nullptr, &Sampler);
-		if (Result != VK_SUCCESS)
-		{
-			assert(false);
-		}
+		u32 ImageIndex = BMR::AcquireNextImageIndex();
+		VkCommandBuffer CommandBuffer = BMR::BeginDraw(ImageIndex);
 
-		return Sampler;
-	}
-
-	bool SetupQueues()
-	{
-		vkGetDeviceQueue(LogicalDevice, static_cast<u32>(Device.Indices.GraphicsFamily), 0, &GraphicsQueue);
-		vkGetDeviceQueue(LogicalDevice, static_cast<u32>(Device.Indices.PresentationFamily), 0, &PresentationQueue);
-
-		if (GraphicsQueue == nullptr && PresentationQueue == nullptr)
-		{
-			return false;
-		}
-	}
-
-	bool IsFormatSupported(VkFormat Format, VkImageTiling Tiling, VkFormatFeatureFlags FeatureFlags)
-	{
-		VkFormatProperties Properties;
-		vkGetPhysicalDeviceFormatProperties(Device.PhysicalDevice, Format, &Properties);
-
-		if (Tiling == VK_IMAGE_TILING_LINEAR && (Properties.linearTilingFeatures & FeatureFlags) == FeatureFlags)
-		{
-			return true;
-		}
-		else if (Tiling == VK_IMAGE_TILING_OPTIMAL && (Properties.optimalTilingFeatures & FeatureFlags) == FeatureFlags)
-		{
-			return true;
-		}
-	}
-
-	void CreateSynchronisation()
-	{
-		VkSemaphoreCreateInfo SemaphoreCreateInfo = { };
-		SemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-		VkFenceCreateInfo FenceCreateInfo = { };
-		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-		FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-		for (u64 i = 0; i < MAX_DRAW_FRAMES; i++)
-		{
-			if (vkCreateSemaphore(LogicalDevice, &SemaphoreCreateInfo, nullptr, &ImagesAvailable[i]) != VK_SUCCESS ||
-				vkCreateSemaphore(LogicalDevice, &SemaphoreCreateInfo, nullptr, &RenderFinished[i]) != VK_SUCCESS ||
-				vkCreateFence(LogicalDevice, &FenceCreateInfo, nullptr, &DrawFences[i]) != VK_SUCCESS)
-			{
-				HandleLog(BMRLogType::LogType_Error, "CreateSynchronisation error");
-				assert(false);
-			}
-		}
-	}
-
-	void DestroySynchronisation()
-	{
-		for (u64 i = 0; i < MAX_DRAW_FRAMES; i++)
-		{
-			vkDestroySemaphore(LogicalDevice, RenderFinished[i], nullptr);
-			vkDestroySemaphore(LogicalDevice, ImagesAvailable[i], nullptr);
-			vkDestroyFence(LogicalDevice, DrawFences[i], nullptr);
-		}
-	}
-
-	void DeinitViewport(BMRViewportInstance* Viewport)
-	{
-		BMRSwapchainInstance::DestroySwapchainInstance(LogicalDevice, Viewport->ViewportSwapchain);
-		vkDestroySurfaceKHR(Instance.VulkanInstance, Viewport->Surface, nullptr);
-	}
-
-	void InitViewport(VkSurfaceKHR Surface, BMRViewportInstance* OutViewport,
-		BMRSwapchainInstance SwapInstance, VkImageView* ColorBuffers, VkImageView* DepthBuffers)
-	{
-		OutViewport->Surface = Surface;
-		OutViewport->ViewportSwapchain = SwapInstance;
-
-		VkCommandBufferAllocateInfo CommandBufferAllocateInfo = { };
-		CommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		CommandBufferAllocateInfo.commandPool = GraphicsCommandPool;
-		CommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;	// VK_COMMAND_BUFFER_LEVEL_PRIMARY	: Buffer you submit directly to queue. Cant be called by other buffers.
-		// VK_COMMAND_BUFFER_LEVEL_SECONARY	: Buffer can't be called directly. Can be called from other buffers via "vkCmdExecuteCommands" when recording commands in primary buffer
-		CommandBufferAllocateInfo.commandBufferCount = static_cast<u32>(OutViewport->ViewportSwapchain.ImagesCount);
-
-		VkResult Result = vkAllocateCommandBuffers(LogicalDevice, &CommandBufferAllocateInfo, OutViewport->CommandBuffers);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkAllocateCommandBuffers result is %d", Result);
-		}
-	}
-
-	void CreateCommandPool(VkDevice LogicalDevice, u32 FamilyIndex)
-	{
-		VkCommandPoolCreateInfo PoolInfo = { };
-		PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-		PoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		PoolInfo.queueFamilyIndex = FamilyIndex;
-
-		VkResult Result = vkCreateCommandPool(LogicalDevice, &PoolInfo, nullptr, &GraphicsCommandPool);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRLogType::LogType_Error, "vkCreateCommandPool result is %d", Result);
-		}
-	}
-
-	void UpdateVpBuffer(const BMRUboViewProjection& ViewProjection)
-	{
-		const u32 UpdateIndex = (MainRenderPass.ActiveVpSet + 1) % MainViewport.ViewportSwapchain.ImagesCount;
-
-		VulkanMemoryManagementSystem::CopyDataToMemory(MainRenderPass.VpUniformBuffers[UpdateIndex].Memory, 0,
-			sizeof(BMRUboViewProjection), &ViewProjection);
-
-		MainRenderPass.ActiveVpSet = UpdateIndex;
+		DepthPassDraw(Scene, CommandBuffer, ImageIndex);
+		MainPassDraw(Scene, CommandBuffer, ImageIndex);
+		
+		BMR::EndDraw(ImageIndex);
 	}
 }
