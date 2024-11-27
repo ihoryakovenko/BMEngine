@@ -24,7 +24,7 @@ namespace BMR
 		BMRUniform IndexBuffer;
 		u32 IndexBufferOffset = 0;
 
-		BMR::BMRUniform ShadowMapArray[3];
+		BMR::BMRUniform ShadowMapArray[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkPushConstantRange PushConstants;
 	};
 
@@ -32,12 +32,12 @@ namespace BMR
 	{
 		VkDescriptorSetLayout LightSpaceMatrixLayout = nullptr;
 
-		BMR::BMRUniform LightSpaceMatrixBuffer[3];
+		BMR::BMRUniform LightSpaceMatrixBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		VkDescriptorSet LightSpaceMatrixSet[3];
+		VkDescriptorSet LightSpaceMatrixSet[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		VkImageView ShadowMapElement1ImageInterface[3];
-		VkImageView ShadowMapElement2ImageInterface[3];
+		VkImageView ShadowMapElement1ImageInterface[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkImageView ShadowMapElement2ImageInterface[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		BMRPipeline Pipeline;
 		BMRRenderPass RenderPass;
@@ -57,21 +57,21 @@ namespace BMR
 		VkDescriptorSetLayout EntitySamplerLayout = nullptr;
 		VkDescriptorSetLayout TerrainSkyBoxLayout = nullptr;
 
-		BMR::BMRUniform VpBuffer[3];
-		BMR::BMRUniform EntityLightBuffer[3];
+		BMR::BMRUniform VpBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMR::BMRUniform EntityLightBuffer[MAX_SWAPCHAIN_IMAGES_COUNT];
 		BMR::BMRUniform MaterialBuffer;
-		BMR::BMRUniform DeferredInputDepthImage[3];
-		BMR::BMRUniform DeferredInputColorImage[3];
+		BMR::BMRUniform DeferredInputDepthImage[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMR::BMRUniform DeferredInputColorImage[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		VkImageView DeferredInputDepthImageInterface[3];
-		VkImageView DeferredInputColorImageInterface[3];
-		VkImageView ShadowMapArrayImageInterface[3];
+		VkImageView DeferredInputDepthImageInterface[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkImageView DeferredInputColorImageInterface[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkImageView ShadowMapArrayImageInterface[MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		VkDescriptorSet VpSet[3];
-		VkDescriptorSet EntityLightSet[3];
-		VkDescriptorSet DeferredInputSet[3];
+		VkDescriptorSet VpSet[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkDescriptorSet EntityLightSet[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkDescriptorSet DeferredInputSet[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkDescriptorSet MaterialSet;
-		VkDescriptorSet ShadowMapArraySet[3];
+		VkDescriptorSet ShadowMapArraySet[MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		BMRPipeline Pipelines[4];
 		BMRRenderPass RenderPass;
@@ -750,9 +750,9 @@ namespace BMR
 		}
 		
 		vkCmdNextSubpass(CommandBuffer, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[3].Pipeline);
+		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[MAX_SWAPCHAIN_IMAGES_COUNT].Pipeline);
 
-		vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[3].PipelineLayout,
+		vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[MAX_SWAPCHAIN_IMAGES_COUNT].PipelineLayout,
 			0, 1, &MainPass.DeferredInputSet[ImageIndex], 0, nullptr);
 		vkCmdDraw(CommandBuffer, 3, 1, 0, 0); // 3 hardcoded Indices for second "post processing" subpass
 		
