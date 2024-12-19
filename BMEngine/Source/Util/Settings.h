@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BMR/BMRInterfaceTypes.h"
+#include "BMR/BMRInterface.h"
 
 void LoadSettings(u32 WindowWidth, u32 WindowHeight);
 
@@ -22,10 +22,10 @@ struct SkyBoxVertex
 	glm::vec3 Position;
 };
 
-extern BMR::BMRVertexInput EntityVertexInput;
-extern BMR::BMRVertexInput TerrainVertexInput;
-extern BMR::BMRVertexInput SkyBoxVertexInput;
-extern BMR::BMRVertexInput DepthVertexInput;
+extern BMRVulkan::BMRVertexInput EntityVertexInput;
+extern BMRVulkan::BMRVertexInput TerrainVertexInput;
+extern BMRVulkan::BMRVertexInput SkyBoxVertexInput;
+extern BMRVulkan::BMRVertexInput DepthVertexInput;
 
 extern VkExtent2D MainScreenExtent;
 extern VkExtent2D DepthViewportExtent;
@@ -33,14 +33,14 @@ extern VkExtent2D DepthViewportExtent;
 extern VkFormat ColorFormat;
 extern VkFormat DepthFormat;
 
-extern BMR::BMRPipelineSettings EntityPipelineSettings;
-extern BMR::BMRPipelineSettings TerrainPipelineSettings;
-extern BMR::BMRPipelineSettings DeferredPipelineSettings;
-extern BMR::BMRPipelineSettings SkyBoxPipelineSettings;
-extern BMR::BMRPipelineSettings DepthPipelineSettings;
+extern BMRVulkan::BMRPipelineSettings EntityPipelineSettings;
+extern BMRVulkan::BMRPipelineSettings TerrainPipelineSettings;
+extern BMRVulkan::BMRPipelineSettings DeferredPipelineSettings;
+extern BMRVulkan::BMRPipelineSettings SkyBoxPipelineSettings;
+extern BMRVulkan::BMRPipelineSettings DepthPipelineSettings;
 
-extern BMR::BMRRenderPassSettings MainRenderPassSettings;
-extern BMR::BMRRenderPassSettings DepthRenderPassSettings;
+extern BMRVulkan::BMRRenderPassSettings MainRenderPassSettings;
+extern BMRVulkan::BMRRenderPassSettings DepthRenderPassSettings;
 
 static VkDescriptorType VpDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 static VkDescriptorType EntityLightDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -67,11 +67,11 @@ extern VkImageCreateInfo DeferredInputDepthUniformCreateInfo;
 extern VkImageCreateInfo DeferredInputColorUniformCreateInfo;
 extern VkImageCreateInfo ShadowMapArrayCreateInfo;
 
-extern BMR::BMRUniformImageInterfaceCreateInfo DeferredInputDepthUniformInterfaceCreateInfo;
-extern BMR::BMRUniformImageInterfaceCreateInfo DeferredInputUniformColorInterfaceCreateInfo;
-extern BMR::BMRUniformImageInterfaceCreateInfo ShadowMapArrayInterfaceCreateInfo;
-extern BMR::BMRUniformImageInterfaceCreateInfo ShadowMapElement1InterfaceCreateInfo;
-extern BMR::BMRUniformImageInterfaceCreateInfo ShadowMapElement2InterfaceCreateInfo;
+extern BMRVulkan::BMRUniformImageInterfaceCreateInfo DeferredInputDepthUniformInterfaceCreateInfo;
+extern BMRVulkan::BMRUniformImageInterfaceCreateInfo DeferredInputUniformColorInterfaceCreateInfo;
+extern BMRVulkan::BMRUniformImageInterfaceCreateInfo ShadowMapArrayInterfaceCreateInfo;
+extern BMRVulkan::BMRUniformImageInterfaceCreateInfo ShadowMapElement1InterfaceCreateInfo;
+extern BMRVulkan::BMRUniformImageInterfaceCreateInfo ShadowMapElement2InterfaceCreateInfo;
 
 extern VkSamplerCreateInfo ShadowMapSamplerCreateInfo;
 extern VkSamplerCreateInfo DiffuseSamplerCreateInfo;

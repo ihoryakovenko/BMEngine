@@ -17,6 +17,17 @@ namespace Memory
 
 		static inline int AllocateCounter = 0;
 
+		// TODO: HANDLE CONSTRUCTORS AND DESTRUCTORS!!!!!!!!!!!!!!
+		// for (u64 i = 0; i < Count; ++i)
+		// {
+		//	new (memory + i) T(); // Placement new
+		// }
+		// 
+		//for (u64 i = 0; i < Count; ++i)
+		//{
+		//	memory[i].~T();
+		//}
+
 		template <typename T>
 		static T* Allocate(u64 Count = 1)
 		{
@@ -36,7 +47,7 @@ namespace Memory
 			return static_cast<T*>(std::calloc(Count, sizeof(T)));
 		}
 
-		static void Deallocate(void* Ptr)
+		static void Free(void* Ptr)
 		{
 #ifndef NDEBUG
 			if (Ptr != nullptr)
@@ -56,9 +67,10 @@ namespace Memory
 
 		static void DeInit()
 		{
-			Deallocate(MemoryPool);
+			Free(MemoryPool);
 		}
 
+		// TODO: HANDLE CONSTRUCTORS AND DESTRUCTORS!!!!!!!!!!!!!!
 		template<typename T>
 		static T* FrameAlloc(u32 Count = 1)
 		{
@@ -70,7 +82,7 @@ namespace Memory
 			return static_cast<T*>(ReturnPointer);
 		}
 
-		static void FrameDealloc()
+		static void FrameFree()
 		{
 			NextMemory = MemoryPool;
 		}

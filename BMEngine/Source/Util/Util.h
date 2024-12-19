@@ -50,7 +50,7 @@ namespace Util
 		template <typename... TArgs>
 		static void Print(std::string_view Type, std::string_view Message, TArgs&&... Args)
 		{
-			std::cout << std::format("{}: {}\n", Type, std::vformat(Message, std::make_format_args(Args...)));
+			//std::cout << std::format("{}: {}\n", Type, std::vformat(Message, std::make_format_args(Args...)));
 		}
 	};
 

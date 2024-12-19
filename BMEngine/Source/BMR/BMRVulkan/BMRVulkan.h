@@ -2,17 +2,14 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Windows.h>
-
 #include "Util/EngineTypes.h"
+#include "Platform/WinPlatform.h"
 
-namespace BMR
+namespace BMRVulkan
 {
-	static const u32 MAX_DRAW_FRAMES = 3;
 	static const u32 MAX_SWAPCHAIN_IMAGES_COUNT = 3;
 	static const u32 MAX_VERTEX_INPUTS_ATTRIBUTES = 16;
 	static const u32 MAX_VERTEX_INPUT_BINDINGS = 16;
-
 
 	enum BMRVkLogType
 	{
@@ -198,8 +195,8 @@ namespace BMR
 		VkPipelineLayout PipelineLayout = nullptr;
 	};
 
-	void BMRVkInit(HWND WindowHandler, const BMRVkConfig& InConfig);
-	void BMRVkDeInit();
+	void Init(Platform::BMRWindowHandler WindowHandler, const BMRVkConfig& InConfig);
+	void DeInit();
 
 	u32 GetImageCount();
 	VkImageView* GetSwapchainImageViews();
@@ -222,6 +219,10 @@ namespace BMR
 	VkImageView CreateImageInterface(const BMRUniformImageInterfaceCreateInfo* InterfaceCreateInfo, VkImage Image);
 	VkSampler CreateSampler(const VkSamplerCreateInfo* CreateInfo);
 	bool CreateShader(const u32* Code, u32 CodeSize, VkShaderModule& VertexShaderModule);
+
+	void CopyDataToBuffer(VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Size, const void* Data);
+	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, VkDeviceSize AlignedLayerSize,
+		u32 LayersCount, void* Data);
 
 	void DestroyRenderPass(BMRRenderPass* Pass);
 	void DestroyPipelineLayout(VkPipelineLayout Layout);

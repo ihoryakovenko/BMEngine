@@ -26,12 +26,12 @@
     <ClCompile Include="..\External\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\External\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="Source\BME\BMEInterface.cpp" />
     <ClCompile Include="Source\BMR\BMRVulkan\BMRVulkan.cpp" />
-    <ClCompile Include="Source\BMR\VulkanHelper.cpp" />
-    <ClCompile Include="Source\BMR\VulkanMemoryManagementSystem.cpp" />
     <ClCompile Include="Source\BMR\BMRInterface.cpp" />
     <ClCompile Include="Source\ImguiIntegration.cpp" />
     <ClCompile Include="Source\main.cpp" />
+    <ClCompile Include="Source\Platform\WinPlatform.cpp" />
     <ClCompile Include="Source\Util\Settings.cpp" />
     <ClCompile Include="Source\Util\Util.cpp" />
   </ItemGroup>
@@ -44,13 +44,12 @@
     <ClInclude Include="..\External\imgui\imstb_rectpack.h" />
     <ClInclude Include="..\External\imgui\imstb_textedit.h" />
     <ClInclude Include="..\External\imgui\imstb_truetype.h" />
-    <ClInclude Include="Source\BMR\BMRInterfaceTypes.h" />
+    <ClInclude Include="Source\BME\BMEInterface.h" />
     <ClInclude Include="Source\BMR\BMRVulkan\BMRVulkan.h" />
+    <ClInclude Include="Source\Platform\WinPlatform.h" />
     <ClInclude Include="Source\Util\Settings.h" />
     <ClInclude Include="Source\ImguiIntegration.h" />
     <ClInclude Include="Source\Memory\MemoryManagmentSystem.h" />
-    <ClInclude Include="Source\BMR\VulkanHelper.h" />
-    <ClInclude Include="Source\BMR\VulkanMemoryManagementSystem.h" />
     <ClInclude Include="Source\BMR\BMRInterface.h" />
     <ClInclude Include="Source\Util\EngineTypes.h" />
     <ClInclude Include="Source\Util\stb_image.h" />
@@ -86,6 +85,8 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
+    <EnableASAN>false</EnableASAN>
+    <EnableFuzzer>false</EnableFuzzer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -180,9 +181,10 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;GLM_FORCE_DEPTH_ZERO_TO_ONE;GLM_FORCE_RADIANS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_NONSTDC_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)External\GLFW\include;$(VULKAN_SDK)\Include;$(ProjectDir)Source;$(SolutionDir)External;$(SolutionDir)External\imgui;$(SolutionDir)External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWarningAsError>false</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -211,9 +213,10 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;GLM_FORCE_DEPTH_ZERO_TO_ONE;GLM_FORCE_RADIANS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_NONSTDC_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)External\GLFW\include;$(VULKAN_SDK)\Include;$(ProjectDir)Source;$(SolutionDir)External;$(SolutionDir)External\imgui;$(SolutionDir)External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWarningAsError>false</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

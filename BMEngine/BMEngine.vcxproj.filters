@@ -16,12 +16,12 @@
     <ClCompile Include="..\External\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\External\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
-    <ClCompile Include="Source\BMR\VulkanHelper.cpp" />
-    <ClCompile Include="Source\BMR\VulkanMemoryManagementSystem.cpp" />
     <ClCompile Include="Source\BMR\BMRInterface.cpp" />
     <ClCompile Include="Source\ImguiIntegration.cpp" />
     <ClCompile Include="Source\Util\Settings.cpp" />
     <ClCompile Include="Source\BMR\BMRVulkan\BMRVulkan.cpp" />
+    <ClCompile Include="Source\BME\BMEInterface.cpp" />
+    <ClCompile Include="Source\Platform\WinPlatform.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
@@ -36,13 +36,12 @@
     <ClInclude Include="..\External\imgui\imstb_rectpack.h" />
     <ClInclude Include="..\External\imgui\imstb_textedit.h" />
     <ClInclude Include="..\External\imgui\imstb_truetype.h" />
-    <ClInclude Include="Source\BMR\BMRInterfaceTypes.h" />
     <ClInclude Include="Source\ImguiIntegration.h" />
-    <ClInclude Include="Source\BMR\VulkanHelper.h" />
-    <ClInclude Include="Source\BMR\VulkanMemoryManagementSystem.h" />
     <ClInclude Include="Source\BMR\BMRInterface.h" />
     <ClInclude Include="Source\Util\Settings.h" />
     <ClInclude Include="Source\BMR\BMRVulkan\BMRVulkan.h" />
+    <ClInclude Include="Source\BME\BMEInterface.h" />
+    <ClInclude Include="Source\Platform\WinPlatform.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />

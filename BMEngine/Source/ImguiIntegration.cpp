@@ -487,7 +487,7 @@ void ImguiIntegration::DrawLoop(const bool& IsDrawing, GuiData Data)
 			ImGui::Begin("Options");
 
 			ImGui::DragFloat3("DirectionLightDirection", &(*Data.DirectionLightDirection)[0], 0.05, -1, 1);
-			ImGui::DragFloat3("eye", &(*Data.eye)[0], 0.05, -100, 100);
+			ImGui::DragFloat3("eye", &(*Data.Eye)[0], 0.05, -100, 100);
 
 			ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
 			ImGui::Checkbox("Another Window", &show_another_window);
