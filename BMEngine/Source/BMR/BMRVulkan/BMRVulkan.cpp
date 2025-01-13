@@ -198,7 +198,7 @@ namespace BMRVulkan
 
 		VkBufferCreateInfo bufferInfo = { };
 		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		bufferInfo.size = MB128;
+		bufferInfo.size = MB256;
 		bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		StagingBuffer = BMRVulkan::CreateUniformBuffer(&bufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -685,24 +685,44 @@ namespace BMRVulkan
 		vkUnmapMemory(Device.LogicalDevice, Buffer.Memory);
 	}
 
-
 	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, u32 LayersCount, void* Data)
 	{
-		// FIRST TRANSITION
-		VkImageMemoryBarrier Barrier = { };
-		Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		Barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;									// Layout to transition from
-		Barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;									// Layout to transition to
-		Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition from
-		Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition to
-		Barrier.image = Image;											// Image being accessed and modified as part of barrier
-		Barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;	// Aspect of image being altered
-		Barrier.subresourceRange.baseMipLevel = 0;						// First mip level to start alterations on
-		Barrier.subresourceRange.levelCount = 1;							// Number of mip levels to alter starting from baseMipLevel
-		Barrier.subresourceRange.baseArrayLayer = 0;
-		Barrier.subresourceRange.layerCount = LayersCount;
-		Barrier.srcAccessMask = 0;								// Memory access stage transition must after...
-		Barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;		// Memory access stage transition must before...
+		VkMemoryRequirements MemoryRequirements;
+		vkGetImageMemoryRequirements(Device.LogicalDevice, Image, &MemoryRequirements);
+
+		//CopyDataToImage(Image, Width, Height,
+		//	Format, MemoryRequirements.size / LayersCount, LayersCount, Data);
+
+		CopyDataToImage(Image, Width, Height,
+			Format, Width * Height * Format, LayersCount, Data);
+	}
+
+	void TransitImageLayout(VkImage Image, VkImageLayout OldLayout, VkImageLayout NewLayout,
+		VkAccessFlags SrcAccessMask, VkAccessFlags DstAccessMask,
+		VkPipelineStageFlags SrcStage, VkPipelineStageFlags DstStage,
+		BMRLayoutLayerTransitionData* LayerData, u32 LayerDataCount)
+	{
+		// TODO: Create system for commandBuffers and Barriers?
+		auto Barriers = Memory::BmMemoryManagementSystem::FrameAlloc<VkImageMemoryBarrier>(LayerDataCount);
+
+		for (u32 i = 0; i < LayerDataCount; ++i)
+		{
+			VkImageMemoryBarrier* Barrier = Barriers + i;
+			*Barrier = { };
+			Barrier->sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			Barrier->oldLayout = OldLayout;									// Layout to transition from
+			Barrier->newLayout = NewLayout;									// Layout to transition to
+			Barrier->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition from
+			Barrier->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition to
+			Barrier->image = Image;											// Image being accessed and modified as part of barrier
+			Barrier->subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;	// Aspect of image being altered
+			Barrier->subresourceRange.baseMipLevel = 0;						// First mip level to start alterations on
+			Barrier->subresourceRange.levelCount = 1;							// Number of mip levels to alter starting from baseMipLevel
+			Barrier->subresourceRange.baseArrayLayer = LayerData[i].BaseArrayLayer;
+			Barrier->subresourceRange.layerCount = LayerData[i].LayerCount;
+			Barrier->srcAccessMask = SrcAccessMask;								// Memory access stage transition must after...
+			Barrier->dstAccessMask = DstAccessMask;		// Memory access stage transition must before...
+		}
 
 		// Todo: Create beginCommandBuffer function?
 		VkCommandBuffer CommandBuffer;
@@ -716,9 +736,6 @@ namespace BMRVulkan
 		VkCommandBufferBeginInfo BeginInfo = { };
 		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 		BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-		VkPipelineStageFlags SrcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-		VkPipelineStageFlags DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 
 		VkSubmitInfo SubmitInfo = { };
 		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -734,38 +751,13 @@ namespace BMRVulkan
 			0,						// Dependency flags
 			0, nullptr,				// Memory Barrier count + data
 			0, nullptr,				// Buffer Memory Barrier count + data
-			1, &Barrier	// Image Memory Barrier count + data
+			LayerDataCount, Barriers	// Image Memory Barrier count + data
 		);
 
 		vkEndCommandBuffer(CommandBuffer);
 
 		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
 		vkQueueWaitIdle(GraphicsQueue);
-
-		// Copy data to image
-		VkMemoryRequirements MemoryRequirements;
-		vkGetImageMemoryRequirements(Device.LogicalDevice, Image, &MemoryRequirements);
-
-		CopyDataToImage(Image, Width, Height,
-			Format, MemoryRequirements.size / LayersCount, LayersCount, Data);
-
-		// SECOND TRANSITION
-		Barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL; // Layout to transition from
-		Barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		Barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		Barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-		SrcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-		DstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-
-		vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
-		vkCmdPipelineBarrier(CommandBuffer, SrcStage, DstStage, 0, 0, nullptr, 0, nullptr, 1, &Barrier);
-		vkEndCommandBuffer(CommandBuffer);
-
-		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
-		vkQueueWaitIdle(GraphicsQueue);
-
-		vkFreeCommandBuffers(Device.LogicalDevice, GraphicsCommandPool, 1, &CommandBuffer);
 	}
 
 	void WaitDevice()
@@ -978,7 +970,7 @@ namespace BMRVulkan
 		u32 LayersCount, void* Data)
 	{
 		const VkDeviceSize TotalAlignedSize = AlignedLayerSize * LayersCount;
-		assert(TotalAlignedSize <= MB128);
+		assert(TotalAlignedSize <= MB256);
 
 		const VkDeviceSize ActualLayerSize = Width * Height * Format; // Should be TotalAlignedSize in ideal (assert?)
 		if (ActualLayerSize != AlignedLayerSize)

@@ -164,11 +164,13 @@ namespace BMR
 	void DeInit();
 
 	BMRTexture CreateTexture(BMRTextureArrayInfo* Info);
+	BMRTexture CreateEmptyTexture(BMRTextureArrayInfo* Info);
+	void UpdateTexture(BMRTexture* Texture, BMRTextureArrayInfo* Info);
 	void DestroyTexture(BMRTexture* Texture);
 
 	void TestAttachEntityTexture(VkImageView DefuseImage, VkImageView SpecularImage, VkDescriptorSet* SetToAttach);
 	void TestAttachSkyNoxTerrainTexture(VkImageView DefuseImage, VkDescriptorSet* SetToAttach);
-	
+
 	void UpdateMaterialBuffer(const BMRMaterial* Buffer);
 	u64 LoadVertices(const void* Vertices, u32 VertexSize, u64 VerticesCount);
 	u64 LoadIndices(const u32* Indices, u32 IndicesCount);

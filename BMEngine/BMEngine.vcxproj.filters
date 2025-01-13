@@ -22,6 +22,9 @@
     <ClCompile Include="Source\BMR\BMRVulkan\BMRVulkan.cpp" />
     <ClCompile Include="Source\BME\BMEInterface.cpp" />
     <ClCompile Include="Source\Platform\WinPlatform.cpp" />
+    <ClCompile Include="Source\BME\Systems\DynamicMapSystem.cpp" />
+    <ClCompile Include="Source\BME\Systems\ResourceManager.cpp" />
+    <ClCompile Include="Source\BME\Scene.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
@@ -42,6 +45,10 @@
     <ClInclude Include="Source\BMR\BMRVulkan\BMRVulkan.h" />
     <ClInclude Include="Source\BME\BMEInterface.h" />
     <ClInclude Include="Source\Platform\WinPlatform.h" />
+    <ClInclude Include="Source\BME\Systems\DynamicMapSystem.h" />
+    <ClInclude Include="Source\BME\Systems\ResourceManager.h" />
+    <ClInclude Include="Source\BME\Scene.h" />
+    <ClInclude Include="Source\Util\Math.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />

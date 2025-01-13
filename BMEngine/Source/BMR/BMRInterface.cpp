@@ -164,10 +164,94 @@ namespace BMR
 
 		BMRTexture Texture;
 		Texture.UniformData = BMRVulkan::CreateUniformImage(&ImageCreateInfo);
-		BMRVulkan::CopyDataToImage(Texture.UniformData.Image, Info->Width, Info->Height, Info->Format, Info->LayersCount, Info->Data);
 		Texture.ImageView = BMRVulkan::CreateImageInterface(&InterfaceCreateInfo, Texture.UniformData.Image);
 
+		BMRVulkan::BMRLayoutLayerTransitionData TransitionData;
+		TransitionData.BaseArrayLayer = 0;
+		TransitionData.LayerCount = Info->LayersCount;
+
+		// FIRST TRANSITION
+		BMRVulkan::TransitImageLayout(Texture.UniformData.Image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			0, VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+			&TransitionData, 1);
+
+		BMRVulkan::CopyDataToImage(Texture.UniformData.Image, Info->Width, Info->Height, Info->Format, Info->LayersCount, Info->Data);
+
+		// SECOND TRANSITION
+		TransitImageLayout(Texture.UniformData.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, &TransitionData, 1);
+
 		return Texture;
+	}
+
+	BMRTexture CreateEmptyTexture(BMRTextureArrayInfo* Info)
+	{
+		VkImageCreateInfo ImageCreateInfo;
+		ImageCreateInfo = { };
+		ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+		ImageCreateInfo.extent.width = Info->Width;
+		ImageCreateInfo.extent.height = Info->Height;
+		ImageCreateInfo.extent.depth = 1;
+		ImageCreateInfo.mipLevels = 1;
+		ImageCreateInfo.arrayLayers = Info->LayersCount;
+		ImageCreateInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+		ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		ImageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		ImageCreateInfo.flags = Info->Flags;
+
+		BMRVulkan::BMRUniformImageInterfaceCreateInfo InterfaceCreateInfo = { };
+		InterfaceCreateInfo.Flags = 0;
+		InterfaceCreateInfo.ViewType = Info->ViewType;
+		InterfaceCreateInfo.Format = VK_FORMAT_R8G8B8A8_SRGB;
+		InterfaceCreateInfo.Components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		InterfaceCreateInfo.Components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		InterfaceCreateInfo.Components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		InterfaceCreateInfo.Components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		InterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		InterfaceCreateInfo.SubresourceRange.baseMipLevel = 0;
+		InterfaceCreateInfo.SubresourceRange.levelCount = 1;
+		InterfaceCreateInfo.SubresourceRange.baseArrayLayer = 0;
+		InterfaceCreateInfo.SubresourceRange.layerCount = Info->LayersCount;
+
+		BMRTexture Texture;
+		Texture.UniformData = BMRVulkan::CreateUniformImage(&ImageCreateInfo);
+		Texture.ImageView = BMRVulkan::CreateImageInterface(&InterfaceCreateInfo, Texture.UniformData.Image);
+
+		BMRVulkan::BMRLayoutLayerTransitionData TransitionData;
+		TransitionData.BaseArrayLayer = 0;
+		TransitionData.LayerCount = Info->LayersCount;
+		
+		// If texture is empty perform transit to shader optimal layout to allow draw
+		BMRVulkan::TransitImageLayout(Texture.UniformData.Image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			&TransitionData, 1);
+
+		return Texture;
+	}
+
+	void UpdateTexture(BMRTexture* Texture, BMRTextureArrayInfo* Info)
+	{
+		BMRVulkan::BMRLayoutLayerTransitionData TransitionData;
+		TransitionData.BaseArrayLayer = 0;
+		TransitionData.LayerCount = Info->LayersCount;
+
+		BMRVulkan::TransitImageLayout(Texture->UniformData.Image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			0, VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+			&TransitionData, 1);
+
+		BMRVulkan::CopyDataToImage(Texture->UniformData.Image, Info->Width, Info->Height, Info->Format, Info->LayersCount, Info->Data);
+	
+		TransitImageLayout(Texture->UniformData.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, &TransitionData, 1);
 	}
 
 	void DestroyTexture(BMRTexture* Texture)

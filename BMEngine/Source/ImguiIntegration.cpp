@@ -54,6 +54,7 @@ static double DeltaTime = 0.0f;
 static double LastTime = 0.0f;
 
 static int MapZoomLevel = 4;
+static int TileZoomLevel = 4;
 static int LatMin = 0;
 static int LatMax = 16;
 static int LonMin = 0;
@@ -504,8 +505,13 @@ void ImguiIntegration::DrawLoop(const bool& IsDrawing, GuiData Data)
 				ImGui::DragInt("LonMax", &LonMax, 0.05, 2, NewZoom))
 			{
 				assert(Data.OnZoomChanged);
-				NewZoom = 2 << MapZoomLevel - 1;
-				Data.OnZoomChanged(NewZoom, LatMin, LatMax, LonMin, LonMax);
+				Data.OnZoomChanged(MapZoomLevel, LatMin, LatMax, LonMin, LonMax);
+			}
+
+			if (ImGui::DragInt("TileZoom", &TileZoomLevel, 0.05, 4, 5))
+			{
+				assert(Data.OnTileZoomChanged);
+				Data.OnTileZoomChanged(TileZoomLevel);
 			}
 
 			//ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state

@@ -195,6 +195,12 @@ namespace BMRVulkan
 		VkPipelineLayout PipelineLayout = nullptr;
 	};
 
+	struct BMRLayoutLayerTransitionData
+	{
+		u32 BaseArrayLayer;
+		u32 LayerCount;
+	};
+
 	void Init(Platform::BMRWindowHandler WindowHandler, const BMRVkConfig& InConfig);
 	void DeInit();
 
@@ -237,6 +243,11 @@ namespace BMRVulkan
 	void AttachUniformsToSet(VkDescriptorSet Set, const BMRUniformSetAttachmentInfo* Infos, u32 BufferCount);
 	void UpdateUniformBuffer(BMRUniform Buffer, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);
 	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, u32 LayersCount, void* Data);
+
+	void TransitImageLayout(VkImage Image, VkImageLayout OldLayout, VkImageLayout NewLayout,
+		VkAccessFlags SrcAccessMask, VkAccessFlags DstAccessMask,
+		VkPipelineStageFlags SrcStage, VkPipelineStageFlags DstStage,
+		BMRLayoutLayerTransitionData* LayerData, u32 LayerDataCount);
 
 	void WaitDevice();
 }
