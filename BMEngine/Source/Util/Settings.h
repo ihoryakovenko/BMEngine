@@ -22,10 +22,17 @@ struct SkyBoxVertex
 	glm::vec3 Position;
 };
 
+struct QuadSphereVertex
+{
+	glm::vec3 Position;
+	glm::vec2 TextureCoords;
+};
+
 extern BMRVulkan::BMRVertexInput EntityVertexInput;
 extern BMRVulkan::BMRVertexInput TerrainVertexInput;
 extern BMRVulkan::BMRVertexInput SkyBoxVertexInput;
 extern BMRVulkan::BMRVertexInput DepthVertexInput;
+extern BMRVulkan::BMRVertexInput QuadSphereVertexInput;
 
 extern VkExtent2D MainScreenExtent;
 extern VkExtent2D DepthViewportExtent;
@@ -38,6 +45,9 @@ extern BMRVulkan::BMRPipelineSettings TerrainPipelineSettings;
 extern BMRVulkan::BMRPipelineSettings DeferredPipelineSettings;
 extern BMRVulkan::BMRPipelineSettings SkyBoxPipelineSettings;
 extern BMRVulkan::BMRPipelineSettings DepthPipelineSettings;
+extern BMRVulkan::BMRPipelineSettings MapPipelineSettings;
+
+static const u32 MainPathPipelinesCount = 5;
 
 extern BMRVulkan::BMRRenderPassSettings MainRenderPassSettings;
 extern BMRVulkan::BMRRenderPassSettings DepthRenderPassSettings;

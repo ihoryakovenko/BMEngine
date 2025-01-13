@@ -12,7 +12,7 @@ typedef float f32;
 typedef double f64;
 
 // TODO: move to globals?
-static const u32 MB64 = 1024 * 1024 * 64;
+static const u32 MB64 = 1024 * 1024 * 64 * 10;
 static const u32 MB128 = 1024 * 1024 * 128;
 static const u32 BUFFER_ALIGNMENT = 64;
 static const u32 IMAGE_ALIGNMENT = 4096;

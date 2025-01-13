@@ -33,6 +33,12 @@ namespace BMR
 		glm::mat4 Projection;
 	};
 
+	struct BMRTileSettings
+	{
+		int VertexTilesPerAxis;
+		int TextureTilesPerAxis;
+	};
+
 	typedef glm::mat4 BMRLightSpaceMatrix;
 
 	struct BMRTextureArrayInfo
@@ -58,6 +64,13 @@ namespace BMR
 	struct BMRDrawTerrainEntity
 	{
 		u64 VertexOffset = 0;
+		u64 IndexOffset = 0;
+		u32 IndicesCount = 0;
+		VkDescriptorSet TextureSet = nullptr;
+	};
+
+	struct BMRDrawMapEntity
+	{
 		u64 IndexOffset = 0;
 		u32 IndicesCount = 0;
 		VkDescriptorSet TextureSet = nullptr;
@@ -135,6 +148,9 @@ namespace BMR
 		BMRDrawSkyBoxEntity SkyBox;
 		bool DrawSkyBox = false;
 
+		BMRDrawMapEntity MapEntity;
+		BMRTileSettings MapTileSettings;
+
 		BMRLightBuffer* LightEntity = nullptr;
 	};
 
@@ -156,6 +172,8 @@ namespace BMR
 	void UpdateMaterialBuffer(const BMRMaterial* Buffer);
 	u64 LoadVertices(const void* Vertices, u32 VertexSize, u64 VerticesCount);
 	u64 LoadIndices(const u32* Indices, u32 IndicesCount);
+
+	void ClearIndices();
 
 	void Draw(const BMRDrawScene* Scene);
 }

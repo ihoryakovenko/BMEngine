@@ -49,12 +49,14 @@ namespace BMR
 		VkDescriptorSetLayout ShadowMapArrayLayout = nullptr;
 		VkDescriptorSetLayout EntitySamplerLayout = nullptr;
 		VkDescriptorSetLayout TerrainSkyBoxLayout = nullptr;
+		VkDescriptorSetLayout MapTileSettingsLayout = nullptr;
 
 		BMRVulkan::BMRUniform VpBuffer[BMRVulkan::MAX_SWAPCHAIN_IMAGES_COUNT];
 		BMRVulkan::BMRUniform EntityLightBuffer[BMRVulkan::MAX_SWAPCHAIN_IMAGES_COUNT];
 		BMRVulkan::BMRUniform MaterialBuffer;
 		BMRVulkan::BMRUniform DeferredInputDepthImage[BMRVulkan::MAX_SWAPCHAIN_IMAGES_COUNT];
 		BMRVulkan::BMRUniform DeferredInputColorImage[BMRVulkan::MAX_SWAPCHAIN_IMAGES_COUNT];
+		BMRVulkan::BMRUniform MapTileSettingsBuffer[BMRVulkan::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		VkImageView DeferredInputDepthImageInterface[BMRVulkan::MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView DeferredInputColorImageInterface[BMRVulkan::MAX_SWAPCHAIN_IMAGES_COUNT];
@@ -65,8 +67,9 @@ namespace BMR
 		VkDescriptorSet DeferredInputSet[BMRVulkan::MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkDescriptorSet MaterialSet;
 		VkDescriptorSet ShadowMapArraySet[BMRVulkan::MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkDescriptorSet MapTileSettingsSet[BMRVulkan::MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		BMRVulkan::BMRPipeline Pipelines[4];
+		BMRVulkan::BMRPipeline Pipelines[MainPathPipelinesCount];
 		BMRVulkan::BMRRenderPass RenderPass;
 	};
 
@@ -84,6 +87,7 @@ namespace BMR
 	static void UpdateVpBuffer(const BMRUboViewProjection& ViewProjection);
 	static void UpdateLightBuffer(const BMRLightBuffer* Buffer);
 	static void UpdateLightSpaceBuffer(const BMRLightSpaceMatrix* LightSpaceMatrix);
+	static void UpdateTileSettingsBuffer(const BMRTileSettings* TileSettings, u32 ImageIndex);
 
 	static void DepthPassDraw(const BMRDrawScene* Scene, VkCommandBuffer CommandBuffer, u32 ImageIndex);
 	static void MainPassDraw(const BMRDrawScene* Scene, VkCommandBuffer CommandBuffer, u32 ImageIndex);
@@ -234,6 +238,11 @@ namespace BMR
 		return CurrentOffset;
 	}
 
+	void ClearIndices()
+	{
+		PassSharedResources.IndexBufferOffset = 0;
+	}
+
 	void UpdateLightBuffer(const BMRLightBuffer* Buffer)
 	{
 		assert(Buffer);
@@ -261,6 +270,12 @@ namespace BMR
 			LightSpaceMatrix);
 
 		ActiveLightSpaceMatrixSet = UpdateIndex;
+	}
+
+	void UpdateTileSettingsBuffer(const BMRTileSettings* TileSettings, u32 ImageIndex)
+	{
+		UpdateUniformBuffer(MainPass.MapTileSettingsBuffer[ImageIndex], sizeof(BMRTileSettings), 0,
+			TileSettings);
 	}
 
 	void CreatePassSharedResources()
@@ -367,17 +382,21 @@ namespace BMR
 		MainPass.ShadowMapArrayLayout = BMRVulkan::CreateUniformLayout(&ShadowMapArrayDescriptorType, &ShadowMapArrayFlags, 1);
 		MainPass.EntitySamplerLayout = BMRVulkan::CreateUniformLayout(EntitySamplerDescriptorType, EntitySamplerInputFlags, 2);
 		MainPass.TerrainSkyBoxLayout = BMRVulkan::CreateUniformLayout(&TerrainSkyBoxSamplerDescriptorType, &TerrainSkyBoxArrayFlags, 1);
-		
+		MainPass.MapTileSettingsLayout = BMRVulkan::CreateUniformLayout(&VpDescriptorType, &VpStageFlags, 1);
+
 		for (u32 i = 0; i < BMRVulkan::GetImageCount(); i++)
 		{
 			//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
 			const VkDeviceSize VpBufferSize = sizeof(BMR::BMRUboViewProjection);
 			const VkDeviceSize LightBufferSize = sizeof(BMR::BMRLightBuffer);
+			const VkDeviceSize MapTileSettingsSize = sizeof(BMR::BMRTileSettings);
 
 			VpBufferInfo.size = VpBufferSize;
 			MainPass.VpBuffer[i] = BMRVulkan::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 			VpBufferInfo.size = LightBufferSize;
 			MainPass.EntityLightBuffer[i] = BMRVulkan::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			VpBufferInfo.size = MapTileSettingsSize;
+			MainPass.MapTileSettingsBuffer[i] = BMRVulkan::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 			MainPass.DeferredInputDepthImage[i] = BMRVulkan::CreateUniformImage(&DeferredInputDepthUniformCreateInfo);
 			MainPass.DeferredInputColorImage[i] = BMRVulkan::CreateUniformImage(&DeferredInputColorUniformCreateInfo);
@@ -393,6 +412,7 @@ namespace BMR
 			BMRVulkan::CreateUniformSets(&MainPass.EntityLightLayout, 1, MainPass.EntityLightSet + i);
 			BMRVulkan::CreateUniformSets(&MainPass.DeferredInputLayout, 1, MainPass.DeferredInputSet + i);
 			BMRVulkan::CreateUniformSets(&MainPass.ShadowMapArrayLayout, 1, MainPass.ShadowMapArraySet + i);
+			BMRVulkan::CreateUniformSets(&MainPass.MapTileSettingsLayout, 1, MainPass.MapTileSettingsSet + i);
 
 			BMRVulkan::BMRUniformSetAttachmentInfo VpBufferAttachmentInfo;
 			VpBufferAttachmentInfo.BufferInfo.buffer = MainPass.VpBuffer[i].Buffer;
@@ -423,10 +443,17 @@ namespace BMR
 			ShadowMapArrayAttachmentInfo.ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			ShadowMapArrayAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
+			BMRVulkan::BMRUniformSetAttachmentInfo MapTileSettingsAttachmentInfo;
+			MapTileSettingsAttachmentInfo.BufferInfo.buffer = MainPass.MapTileSettingsBuffer[i].Buffer;
+			MapTileSettingsAttachmentInfo.BufferInfo.offset = 0;
+			MapTileSettingsAttachmentInfo.BufferInfo.range = MapTileSettingsSize;
+			MapTileSettingsAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
 			BMRVulkan::AttachUniformsToSet(MainPass.VpSet[i], &VpBufferAttachmentInfo, 1);
 			BMRVulkan::AttachUniformsToSet(MainPass.EntityLightSet[i], &EntityLightAttachmentInfo, 1);
 			BMRVulkan::AttachUniformsToSet(MainPass.DeferredInputSet[i], DeferredInputAttachmentInfo, 2);
 			BMRVulkan::AttachUniformsToSet(MainPass.ShadowMapArraySet[i], &ShadowMapArrayAttachmentInfo, 1);
+			BMRVulkan::AttachUniformsToSet(MainPass.MapTileSettingsSet[i], &MapTileSettingsAttachmentInfo, 1);
 		}
 
 		const VkDeviceSize MaterialSize = sizeof(BMR::BMRMaterial);
@@ -481,39 +508,50 @@ namespace BMR
 			MainPass.TerrainSkyBoxLayout,
 		};
 
-		const u32 TerrainIndex = 0;
-		const u32 EntityIndex = 1;
-		const u32 SkyBoxIndex = 2;
-		const u32 DeferredIndex = 3;
+		VkDescriptorSetLayout MapDescriptorLayouts[] = 
+		{
+			MainPass.VpLayout,
+			MainPass.TerrainSkyBoxLayout,
+			MainPass.MapTileSettingsLayout,
+		};
+		const u32 MapDescriptorLayoutCount = sizeof(MapDescriptorLayouts) / sizeof(MapDescriptorLayouts[0]);
 
-		u32 SetLayoutCountTable[4];
+		const u32 TerrainIndex = 0;
+		const u32 EntityIndex = 2;
+		const u32 SkyBoxIndex = 3;
+		const u32 DeferredIndex = 4;
+		const u32 MapIndex = 1;
+
+		u32 SetLayoutCountTable[MainPathPipelinesCount];
 		SetLayoutCountTable[EntityIndex] = EntityDescriptorLayoutCount;
 		SetLayoutCountTable[TerrainIndex] = TerrainDescriptorLayoutsCount;
 		SetLayoutCountTable[DeferredIndex] = 1;
 		SetLayoutCountTable[SkyBoxIndex] = SkyBoxDescriptorLayoutCount;
+		SetLayoutCountTable[MapIndex] = MapDescriptorLayoutCount;
 
-		const VkDescriptorSetLayout* SetLayouts[4];
+		const VkDescriptorSetLayout* SetLayouts[MainPathPipelinesCount];
 		SetLayouts[EntityIndex] = EntityDescriptorLayouts;
 		SetLayouts[TerrainIndex] = TerrainDescriptorLayouts;
 		SetLayouts[DeferredIndex] = &MainPass.DeferredInputLayout;
 		SetLayouts[SkyBoxIndex] = SkyBoxDescriptorLayouts;
+		SetLayouts[MapIndex] = MapDescriptorLayouts;
 
-
-
-		u32 PushConstantRangeCountTable[4];
+		u32 PushConstantRangeCountTable[MainPathPipelinesCount];
 		PushConstantRangeCountTable[EntityIndex] = 1;
 		PushConstantRangeCountTable[TerrainIndex] = 0;
 		PushConstantRangeCountTable[DeferredIndex] = 0;
 		PushConstantRangeCountTable[SkyBoxIndex] = 0;
+		PushConstantRangeCountTable[MapIndex] = 0;
 
-		for (u32 i = 0; i < 4; ++i)
+		for (u32 i = 0; i < MainPathPipelinesCount; ++i)
 		{
 			MainPass.Pipelines[i].PipelineLayout = BMRVulkan::CreatePipelineLayout(SetLayouts[i],
 				SetLayoutCountTable[i], &PassSharedResources.PushConstants, PushConstantRangeCountTable[i]);
 		}
 
-		const char* Paths[4][2] = {
+		const char* Paths[MainPathPipelinesCount][2] = {
 			{ "./Resources/Shaders/TerrainGenerator_vert.spv", "./Resources/Shaders/TerrainGenerator_frag.spv" },
+			{ "./Resources/Shaders/QuadBasedSphere_vert.spv", "./Resources/Shaders/QuadBasedSphere_frag.spv" },
 			{"./Resources/Shaders/vert.spv", "./Resources/Shaders/frag.spv" },
 			{"./Resources/Shaders/SkyBox_vert.spv", "./Resources/Shaders/SkyBox_frag.spv" },
 			{"./Resources/Shaders/second_vert.spv", "./Resources/Shaders/second_frag.spv" },
@@ -521,9 +559,9 @@ namespace BMR
 
 		VkShaderStageFlagBits Stages[2] = { VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };		
 
-		BMRVulkan::BMRSPipelineShaderInfo ShaderInfo[4];
-		VkPipelineShaderStageCreateInfo ShaderInfos[4][2];
-		for (u32 i = 0; i < 4; ++i)
+		BMRVulkan::BMRSPipelineShaderInfo ShaderInfo[MainPathPipelinesCount];
+		VkPipelineShaderStageCreateInfo ShaderInfos[MainPathPipelinesCount][2];
+		for (u32 i = 0; i < MainPathPipelinesCount; ++i)
 		{
 			for (u32 j = 0; j < 2; ++j)
 			{
@@ -543,20 +581,21 @@ namespace BMR
 		}
 
 
-		BMRVulkan::BMRVertexInput VertexInput[4];
+		BMRVulkan::BMRVertexInput VertexInput[MainPathPipelinesCount];
 		VertexInput[EntityIndex] = EntityVertexInput;
 		VertexInput[TerrainIndex] = TerrainVertexInput;
 		VertexInput[DeferredIndex] = { };
 		VertexInput[SkyBoxIndex] = SkyBoxVertexInput;
+		VertexInput[MapIndex] = { };
 
-		BMRVulkan::BMRPipelineSettings PipelineSettings[4];
+		BMRVulkan::BMRPipelineSettings PipelineSettings[MainPathPipelinesCount];
 		PipelineSettings[EntityIndex] = EntityPipelineSettings;
 		PipelineSettings[TerrainIndex] = TerrainPipelineSettings;
 		PipelineSettings[DeferredIndex] = DeferredPipelineSettings;
 		PipelineSettings[SkyBoxIndex] = SkyBoxPipelineSettings;
+		PipelineSettings[MapIndex] = MapPipelineSettings;
 
-
-		BMRVulkan::BMRPipelineResourceInfo PipelineResourceInfo[4];
+		BMRVulkan::BMRPipelineResourceInfo PipelineResourceInfo[MainPathPipelinesCount];
 		PipelineResourceInfo[EntityIndex].PipelineLayout = MainPass.Pipelines[EntityIndex].PipelineLayout;
 		PipelineResourceInfo[EntityIndex].RenderPass = MainPass.RenderPass.Pass;
 		PipelineResourceInfo[EntityIndex].SubpassIndex = 0;
@@ -573,10 +612,14 @@ namespace BMR
 		PipelineResourceInfo[SkyBoxIndex].RenderPass = MainPass.RenderPass.Pass;
 		PipelineResourceInfo[SkyBoxIndex].SubpassIndex = 0;
 
-		VkPipeline NewPipelines[4];
-		CreatePipelines(ShaderInfo, VertexInput, PipelineSettings, PipelineResourceInfo, 4, NewPipelines);
+		PipelineResourceInfo[MapIndex].PipelineLayout = MainPass.Pipelines[MapIndex].PipelineLayout;
+		PipelineResourceInfo[MapIndex].RenderPass = MainPass.RenderPass.Pass;
+		PipelineResourceInfo[MapIndex].SubpassIndex = 0;
 
-		for (u32 i = 0; i < 4; ++i)
+		VkPipeline NewPipelines[MainPathPipelinesCount];
+		CreatePipelines(ShaderInfo, VertexInput, PipelineSettings, PipelineResourceInfo, MainPathPipelinesCount, NewPipelines);
+
+		for (u32 i = 0; i < MainPathPipelinesCount; ++i)
 		{
 			MainPass.Pipelines[i].Pipeline = NewPipelines[i];
 
@@ -622,6 +665,7 @@ namespace BMR
 		{
 			BMRVulkan::DestroyUniformBuffer(MainPass.VpBuffer[i]);
 			BMRVulkan::DestroyUniformBuffer(MainPass.EntityLightBuffer[i]);
+			BMRVulkan::DestroyUniformBuffer(MainPass.MapTileSettingsBuffer[i]);
 			BMRVulkan::DestroyUniformImage(MainPass.DeferredInputColorImage[i]);
 			BMRVulkan::DestroyUniformImage(MainPass.DeferredInputDepthImage[i]);
 			
@@ -640,12 +684,13 @@ namespace BMR
 		BMRVulkan::DestroyUniformLayout(MainPass.ShadowMapArrayLayout);
 		BMRVulkan::DestroyUniformLayout(MainPass.EntitySamplerLayout);
 		BMRVulkan::DestroyUniformLayout(MainPass.TerrainSkyBoxLayout);
+		BMRVulkan::DestroyUniformLayout(MainPass.MapTileSettingsLayout);
 
 		BMRVulkan::DestroySampler(MainPass.ShadowMapArraySampler);
 		BMRVulkan::DestroySampler(MainPass.DiffuseSampler);
 		BMRVulkan::DestroySampler(MainPass.SpecularSampler);
 
-		for (u32 i = 0; i < 4; ++i)
+		for (u32 i = 0; i < MainPathPipelinesCount; ++i)
 		{
 			BMRVulkan::DestroyPipelineLayout(MainPass.Pipelines[i].PipelineLayout);
 			BMRVulkan::DestroyPipeline(MainPass.Pipelines[i].Pipeline);
@@ -742,8 +787,23 @@ namespace BMR
 			vkCmdBindIndexBuffer(CommandBuffer, PassSharedResources.IndexBuffer.Buffer, DrawTerrainEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
 			vkCmdDrawIndexed(CommandBuffer, DrawTerrainEntity->IndicesCount, 1, 0, 0, 0);
 		}
-			
+
 		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[1].Pipeline);
+
+		const u32 TerrainDescriptorSetGroupCount = 3;
+		const VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = {
+			MainPass.VpSet[ActiveVpSet],
+			Scene->MapEntity.TextureSet,
+			MainPass.MapTileSettingsSet[ImageIndex]
+		};
+		
+		vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[1].PipelineLayout,
+			0, TerrainDescriptorSetGroupCount, TerrainDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+
+		vkCmdBindIndexBuffer(CommandBuffer, PassSharedResources.IndexBuffer.Buffer, Scene->MapEntity.IndexOffset, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(CommandBuffer, Scene->MapEntity.IndicesCount, 1, 0, 0, 0);
+			
+		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[2].Pipeline);
 
 		// TODO: Support rework to not create identical index buffers
 		for (u32 i = 0; i < Scene->DrawEntitiesCount; ++i)
@@ -763,7 +823,7 @@ namespace BMR
 			};
 			const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
-			const VkPipelineLayout PipelineLayout = MainPass.Pipelines[1].PipelineLayout;
+			const VkPipelineLayout PipelineLayout = MainPass.Pipelines[2].PipelineLayout;
 
 			vkCmdPushConstants(CommandBuffer, PipelineLayout,
 				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BMRModel), &DrawEntity->Model);
@@ -778,7 +838,7 @@ namespace BMR
 		
 		if (Scene->DrawSkyBox)
 		{
-			vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[2].Pipeline);
+			vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[3].Pipeline);
 
 			const u32 SkyBoxDescriptorSetGroupCount = 2;
 			const VkDescriptorSet SkyBoxDescriptorSetGroup[SkyBoxDescriptorSetGroupCount] = {
@@ -786,7 +846,7 @@ namespace BMR
 				Scene->SkyBox.TextureSet,
 			};
 
-			const VkPipelineLayout PipelineLayout = MainPass.Pipelines[2].PipelineLayout;
+			const VkPipelineLayout PipelineLayout = MainPass.Pipelines[3].PipelineLayout;
 
 			vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
 				0, SkyBoxDescriptorSetGroupCount, SkyBoxDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
@@ -797,9 +857,9 @@ namespace BMR
 		}
 		
 		vkCmdNextSubpass(CommandBuffer, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[BMRVulkan::MAX_SWAPCHAIN_IMAGES_COUNT].Pipeline);
+		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[4].Pipeline);
 
-		vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[BMRVulkan::MAX_SWAPCHAIN_IMAGES_COUNT].PipelineLayout,
+		vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[4].PipelineLayout,
 			0, 1, &MainPass.DeferredInputSet[ImageIndex], 0, nullptr);
 		vkCmdDraw(CommandBuffer, 3, 1, 0, 0); // 3 hardcoded Indices for second "post processing" subpass
 		
@@ -808,11 +868,13 @@ namespace BMR
 
 	void Draw(const BMRDrawScene* Scene)
 	{
-		// Todo Update only when changed
 		UpdateLightBuffer(Scene->LightEntity);
 		UpdateVpBuffer(Scene->ViewProjection);
+		
 
 		u32 ImageIndex = BMRVulkan::AcquireNextImageIndex();
+		UpdateTileSettingsBuffer(&Scene->MapTileSettings, ImageIndex);
+
 		VkCommandBuffer CommandBuffer = BMRVulkan::BeginDraw(ImageIndex);
 
 		DepthPassDraw(Scene, CommandBuffer, ImageIndex);

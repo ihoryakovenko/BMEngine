@@ -46,12 +46,18 @@ static bool                     g_SwapChainRebuild = false;
 
 static GLFWwindow* window = nullptr;
 
-static bool show_demo_window = true;
+static bool show_demo_window = false;
 static bool show_another_window = false;
 static ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
 static double DeltaTime = 0.0f;
 static double LastTime = 0.0f;
+
+static int MapZoomLevel = 4;
+static int LatMin = 0;
+static int LatMax = 16;
+static int LonMin = 0;
+static int LonMax = 16;
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -489,16 +495,29 @@ void ImguiIntegration::DrawLoop(const bool& IsDrawing, GuiData Data)
 			ImGui::DragFloat3("DirectionLightDirection", &(*Data.DirectionLightDirection)[0], 0.05, -1, 1);
 			ImGui::DragFloat3("eye", &(*Data.Eye)[0], 0.05, -100, 100);
 
-			ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-			ImGui::Checkbox("Another Window", &show_another_window);
+			int NewZoom = 2 << MapZoomLevel - 1;
 
-			ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-			ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+			if (ImGui::DragInt("Zoom", &MapZoomLevel, 0.05, 2, 16) ||
+				ImGui::DragInt("LatMin", &LatMin, 0.05, 0, NewZoom) ||
+				ImGui::DragInt("LatMax", &LatMax, 0.05, 2, NewZoom) ||
+				ImGui::DragInt("LonMin", &LonMin, 0.05, 0, NewZoom) ||
+				ImGui::DragInt("LonMax", &LonMax, 0.05, 2, NewZoom))
+			{
+				assert(Data.OnZoomChanged);
+				NewZoom = 2 << MapZoomLevel - 1;
+				Data.OnZoomChanged(NewZoom, LatMin, LatMax, LonMin, LonMax);
+			}
 
-			if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-				counter++;
-			ImGui::SameLine();
-			ImGui::Text("counter = %d", counter);
+			//ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
+			//ImGui::Checkbox("Another Window", &show_another_window);
+
+			//ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+			//ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+
+			//if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+			//	counter++;
+			//ImGui::SameLine();
+			//ImGui::Text("counter = %d", counter);
 
 			ImGuiIO& io = ImGui::GetIO();
 			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);

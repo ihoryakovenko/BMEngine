@@ -10,12 +10,14 @@ BMRVulkan::BMRVertexInput EntityVertexInput;
 BMRVulkan::BMRVertexInput TerrainVertexInput;
 BMRVulkan::BMRVertexInput SkyBoxVertexInput;
 BMRVulkan::BMRVertexInput DepthVertexInput;
+BMRVulkan::BMRVertexInput QuadSphereVertexInput;
 
 BMRVulkan::BMRPipelineSettings EntityPipelineSettings;
 BMRVulkan::BMRPipelineSettings TerrainPipelineSettings;
 BMRVulkan::BMRPipelineSettings DeferredPipelineSettings;
 BMRVulkan::BMRPipelineSettings SkyBoxPipelineSettings;
 BMRVulkan::BMRPipelineSettings DepthPipelineSettings;
+BMRVulkan::BMRPipelineSettings MapPipelineSettings;
 
 BMRVulkan::BMRRenderPassSettings MainRenderPassSettings;
 BMRVulkan::BMRRenderPassSettings DepthRenderPassSettings;
@@ -79,10 +81,12 @@ static const char TerrainPipelineName[] = "Terrain";
 static const char DeferredPipelineName[] = "Deferred";
 static const char SkyBoxPipelineName[] = "SkyBox";
 static const char DepthPipelineName[] = "Depth";
+static const char MapPipelineName[] = "Map";
 
 static const char EntityVertexInputName[] = "EntityVertex";
 static const char TerrainVertexInputName[] = "TerrainVertex";
 static const char SkyBoxVertexInputName[] = "SkyBoxVertex";
+static const char QuadSphereVertexInputName[] = "QuadSphereVertex";
 
 static const char PositionAttributeName[] = "Position";
 static const char ColorAttributeName[] = "Color";
@@ -407,6 +411,11 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	EntityPipelineSettings.DepthBoundsTestEnable = VK_FALSE;
 	EntityPipelineSettings.StencilTestEnable = VK_FALSE;
 
+	// MapPipeline
+	MapPipelineSettings = EntityPipelineSettings;
+	MapPipelineSettings.PipelineName = MapPipelineName;
+	//MapPipelineSettings.PolygonMode = VK_POLYGON_MODE_LINE;
+
 	// TerrainPipeline
 	TerrainPipelineSettings.PipelineName = TerrainPipelineName;
 	// Rasterizer
@@ -550,4 +559,12 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 
 	DepthVertexInput = EntityVertexInput;
 	DepthVertexInput.VertexInputBinding[0].InputAttributesCount = 1;
+
+	QuadSphereVertexInput.VertexInputBinding[0].InputAttributes[0] = { PositionAttributeName, VK_FORMAT_R32G32B32_SFLOAT, offsetof(QuadSphereVertex, Position) };
+	QuadSphereVertexInput.VertexInputBinding[0].InputAttributes[1] = { PositionAttributeName, VK_FORMAT_R32G32_SFLOAT, offsetof(QuadSphereVertex, TextureCoords) };
+	QuadSphereVertexInput.VertexInputBinding[0].InputAttributesCount = 2;
+	QuadSphereVertexInput.VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	QuadSphereVertexInput.VertexInputBinding[0].Stride = sizeof(QuadSphereVertex);
+	QuadSphereVertexInput.VertexInputBinding[0].VertexInputBindingName = QuadSphereVertexInputName;
+	QuadSphereVertexInput.VertexInputBindingCount = 1;
 }

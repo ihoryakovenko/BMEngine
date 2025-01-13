@@ -84,14 +84,18 @@ namespace BME
 
 	static void LoadDefaultResources();
 	static void LoadModel(const char* ModelPath, glm::mat4 Model, VkDescriptorSet CustomMaterial = nullptr);
-	static BMR::BMRTexture LoadTexture(const std::vector<std::string>& PathNames);
+	static BMR::BMRTexture LoadTexture(const std::vector<std::string>& PathNames,
+		VkImageViewType Type, VkImageCreateFlags Flags = 0);
+
 	static void LoadTerrain();
 	static void CreateSkyBoxMesh(VkDescriptorSet Material);
 
-	void SetUpScene();
+	static void SetUpScene();
 
 	static void RenderLog(BMR::BMRLogType LogType, const char* Format, va_list Args);
 	static void GenerateTerrain(std::vector<u32>& Indices);
+	static void CreateMap();
+	static void UpdateZoom(s32 Zoom, s32 InLatMin, s32 InLatMax, s32 InLonMin, s32 InLonMax);
 
 	static void MoveCamera(GLFWwindow* Window, f32 DeltaTime, Camera& MainCamera);
 
@@ -121,9 +125,18 @@ namespace BME
 	static TerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
 	static u32 TerrainVerticesCount = NumRows * NumCols;
 
+	static u32 MapTilesPerAxis = 16;
+	static u32 LatMin = 0;
+	static u32 LatMax = MapTilesPerAxis;
+	static u32 LonMin = 0;
+	static u32 LonMax = MapTilesPerAxis;
+
+	static bool UpdateMapIndices = true;
+
 	static std::vector<BMR::BMRDrawEntity> DrawEntities;
 	static BMR::BMRDrawSkyBoxEntity SkyBox;
 	static BMR::BMRDrawTerrainEntity TestDrawTerrainEntity;
+	static BMR::BMRDrawMapEntity TestDrawMapEntity;
 	static BMR::BMRLightBuffer LightData;
 
 	static ImguiIntegration::GuiData GuiData;
@@ -186,60 +199,62 @@ namespace BME
 
 		LoadDefaultResources();
 
-		CreateSkyBoxMesh(EngineMaterials["SkyBoxMaterial"]);
-		LoadModel("./Resources/Models/uh60.obj", glm::mat4(1.0f));
-		LoadTerrain();
+		//CreateSkyBoxMesh(EngineMaterials["SkyBoxMaterial"]);
+		//LoadModel("./Resources/Models/uh60.obj", glm::mat4(1.0f));
+		//LoadTerrain();
+
+		CreateMap();
 	
 
-		{
-			glm::vec3 CubePos(0.0f, -5.0f, 0.0f);
-			glm::mat4 Model = glm::mat4(1.0f);
-			Model = glm::translate(Model, CubePos);
-			Model = glm::scale(Model, glm::vec3(20.0f, 1.0f, 20.0f));
-			LoadModel("./Resources/Models/cube.obj", Model, EngineMaterials["WhiteMaterial"]);
-		}
+		//{
+		//	glm::vec3 CubePos(0.0f, -5.0f, 0.0f);
+		//	glm::mat4 Model = glm::mat4(1.0f);
+		//	Model = glm::translate(Model, CubePos);
+		//	Model = glm::scale(Model, glm::vec3(20.0f, 1.0f, 20.0f));
+		//	LoadModel("./Resources/Models/cube.obj", Model, EngineMaterials["WhiteMaterial"]);
+		//}
 
-		{
-			glm::vec3 CubePos(0.0f, 0.0f, 0.0f);
-			glm::mat4 Model = glm::mat4(1.0f);
-			Model = glm::translate(Model, CubePos);
-			Model = glm::scale(Model, glm::vec3(0.2f, 5.0f, 0.2f));
-			LoadModel("./Resources/Models/cube.obj", Model, EngineMaterials["TestMaterial"]);
-		}
+		//{
+		//	glm::vec3 CubePos(0.0f, 0.0f, 0.0f);
+		//	glm::mat4 Model = glm::mat4(1.0f);
+		//	Model = glm::translate(Model, CubePos);
+		//	Model = glm::scale(Model, glm::vec3(0.2f, 5.0f, 0.2f));
+		//	LoadModel("./Resources/Models/cube.obj", Model, EngineMaterials["TestMaterial"]);
+		//}
 
-		{
-			glm::vec3 CubePos(0.0f, 0.0f, 8.0f);
-			glm::mat4 Model = glm::mat4(1.0f);
-			Model = glm::translate(Model, CubePos);
-			Model = glm::rotate(Model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-			Model = glm::scale(Model, glm::vec3(0.5f));
-			LoadModel("./Resources/Models/cube.obj", Model, EngineMaterials["GrassMaterial"]);
-		}
+		//{
+		//	glm::vec3 CubePos(0.0f, 0.0f, 8.0f);
+		//	glm::mat4 Model = glm::mat4(1.0f);
+		//	Model = glm::translate(Model, CubePos);
+		//	Model = glm::rotate(Model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		//	Model = glm::scale(Model, glm::vec3(0.5f));
+		//	LoadModel("./Resources/Models/cube.obj", Model, EngineMaterials["GrassMaterial"]);
+		//}
 
-		{
-			glm::vec3 LightCubePos(0.0f, 0.0f, 10.0f);
-			glm::mat4 Model = glm::mat4(1.0f);
-			Model = glm::translate(Model, LightCubePos);
-			Model = glm::scale(Model, glm::vec3(0.2f));
-			LoadModel("./Resources/Models/cube.obj", Model, EngineMaterials["WhiteMaterial"]);
-		}
+		//{
+		//	glm::vec3 LightCubePos(0.0f, 0.0f, 10.0f);
+		//	glm::mat4 Model = glm::mat4(1.0f);
+		//	Model = glm::translate(Model, LightCubePos);
+		//	Model = glm::scale(Model, glm::vec3(0.2f));
+		//	LoadModel("./Resources/Models/cube.obj", Model, EngineMaterials["WhiteMaterial"]);
+		//}
 
-		{
-			glm::vec3 CubePos(0.0f, 0.0f, 15.0f);
-			glm::mat4 Model = glm::mat4(1.0f);
-			Model = glm::translate(Model, CubePos);
-			Model = glm::scale(Model, glm::vec3(1.0f));
-			LoadModel("./Resources/Models/cube.obj", Model, EngineMaterials["WhiteMaterial"]);
-		}
+		//{
+		//	glm::vec3 CubePos(0.0f, 0.0f, 15.0f);
+		//	glm::mat4 Model = glm::mat4(1.0f);
+		//	Model = glm::translate(Model, CubePos);
+		//	Model = glm::scale(Model, glm::vec3(1.0f));
+		//	LoadModel("./Resources/Models/cube.obj", Model, EngineMaterials["WhiteMaterial"]);
+		//}
 
-		{
-			glm::vec3 CubePos(5.0f, 0.0f, 10.0f);
-			glm::mat4 Model = glm::mat4(1.0f);
-			Model = glm::translate(Model, CubePos);
-			Model = glm::rotate(Model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-			Model = glm::scale(Model, glm::vec3(1.0f));
-			LoadModel("./Resources/Models/cube.obj", Model, EngineMaterials["ContainerMaterial"]);
-		}
+		//{
+		//	glm::vec3 CubePos(5.0f, 0.0f, 10.0f);
+		//	glm::mat4 Model = glm::mat4(1.0f);
+		//	Model = glm::translate(Model, CubePos);
+		//	Model = glm::rotate(Model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		//	Model = glm::scale(Model, glm::vec3(1.0f));
+		//	LoadModel("./Resources/Models/cube.obj", Model, EngineMaterials["ContainerMaterial"]);
+		//}
 
 		SetUpScene();
 		 
@@ -315,6 +330,15 @@ namespace BME
 		LightData.SpotLight.Planes = glm::vec2(Near, Far);
 		LightData.SpotLight.LightSpaceMatrix = Scene.ViewProjection.Projection * Scene.ViewProjection.View;
 
+		if (UpdateMapIndices)
+		{
+			CreateMap();
+		}
+
+		Scene.MapEntity = TestDrawMapEntity;
+		Scene.MapTileSettings.TextureTilesPerAxis = 16;
+		Scene.MapTileSettings.VertexTilesPerAxis = MapTilesPerAxis;
+
 		Scene.LightEntity = &LightData;
 
 		GuiData.DirectionLightDirection = &LightData.DirectionLight.Direction;
@@ -323,19 +347,19 @@ namespace BME
 
 	void LoadDefaultResources()
 	{
-		BMR::BMRTexture TestTexture = LoadTexture(std::vector<std::string> {"1giraffe.jpg"});
-		BMR::BMRTexture WhiteTexture = LoadTexture(std::vector<std::string> {"White.png"});
-		BMR::BMRTexture ContainerTexture = LoadTexture(std::vector<std::string> {"container2.png"});
-		BMR::BMRTexture ContainerSpecularTexture = LoadTexture(std::vector<std::string> {"container2_specular.png"});
-		BMR::BMRTexture BlendWindow = LoadTexture(std::vector<std::string> {"blending_transparent_window.png"});
-		BMR::BMRTexture GrassTexture = LoadTexture(std::vector<std::string> {"grass.png"});
+		BMR::BMRTexture TestTexture = LoadTexture(std::vector<std::string> {"1giraffe.jpg"}, VK_IMAGE_VIEW_TYPE_2D);
+		BMR::BMRTexture WhiteTexture = LoadTexture(std::vector<std::string> {"White.png"}, VK_IMAGE_VIEW_TYPE_2D);
+		BMR::BMRTexture ContainerTexture = LoadTexture(std::vector<std::string> {"container2.png"}, VK_IMAGE_VIEW_TYPE_2D);
+		BMR::BMRTexture ContainerSpecularTexture = LoadTexture(std::vector<std::string> {"container2_specular.png"}, VK_IMAGE_VIEW_TYPE_2D);
+		BMR::BMRTexture BlendWindow = LoadTexture(std::vector<std::string> {"blending_transparent_window.png"}, VK_IMAGE_VIEW_TYPE_2D);
+		BMR::BMRTexture GrassTexture = LoadTexture(std::vector<std::string> {"grass.png"}, VK_IMAGE_VIEW_TYPE_2D);
 		BMR::BMRTexture SkyBoxCubeTexture = LoadTexture(std::vector<std::string> {
 			"skybox/right.jpg",
 				"skybox/left.jpg",
 				"skybox/top.jpg",
 				"skybox/bottom.jpg",
 				"skybox/front.jpg",
-				"skybox/back.jpg", });
+				"skybox/back.jpg", }, VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
 
 		Textures["grass"] = GrassTexture;
 		Textures["blending_transparent_window"] = BlendWindow;
@@ -368,6 +392,24 @@ namespace BME
 		EngineMaterials["GrassMaterial"] = GrassMaterial;
 		EngineMaterials["SkyBoxMaterial"] = SkyBoxMaterial;
 		EngineMaterials["TerrainMaterial"] = TerrainMaterial;
+
+		std::vector<std::string> OsmTiles;
+
+		for (int i = 0; i < 16; ++i)
+		{
+			for (int j = 0; j < 16; ++j)
+			{
+				std::string FileName = "osm_tiles_zoom4/tile_4_";
+				FileName += std::to_string(j) + "_" + std::to_string(i) + ".png";
+				OsmTiles.emplace_back(std::move(FileName));
+			}
+		}
+
+		BMR::BMRTexture TextureArrayTiles = LoadTexture(OsmTiles, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
+		Textures["Tiles"] = TextureArrayTiles;
+		VkDescriptorSet TilesMaterial;
+		BMR::TestAttachSkyNoxTerrainTexture(TextureArrayTiles.ImageView, &TilesMaterial);
+		EngineMaterials["TilesMaterial"] = TilesMaterial;
 	}
 
 	void LoadModel(const char* ModelPath, glm::mat4 Model, VkDescriptorSet CustomMaterial)
@@ -394,7 +436,7 @@ namespace BME
 					int Idx = Material.diffuse_texname.rfind("\\");
 					const std::string FileName = Material.diffuse_texname.substr(Idx + 1);
 
-					const BMR::BMRTexture NewTexture = LoadTexture(std::vector<std::string>{FileName});
+					const BMR::BMRTexture NewTexture = LoadTexture(std::vector<std::string>{FileName}, VK_IMAGE_VIEW_TYPE_2D);
 					BMR::TestAttachEntityTexture(NewTexture.ImageView, NewTexture.ImageView, &MaterialToTexture[i]);
 
 					if (Textures.count(FileName))
@@ -481,7 +523,7 @@ namespace BME
 		}
 	}
 
-	BMR::BMRTexture LoadTexture(const std::vector<std::string>& PathNames)
+	BMR::BMRTexture LoadTexture(const std::vector<std::string>& PathNames, VkImageViewType Type, VkImageCreateFlags Flags)
 	{
 		assert(PathNames.size() > 0);
 		std::vector<stbi_uc*> ImageData(PathNames.size());
@@ -506,15 +548,8 @@ namespace BME
 		Info.Format = STBI_rgb_alpha;
 		Info.LayersCount = PathNames.size();
 		Info.Data = ImageData.data();
-		Info.ViewType = VK_IMAGE_VIEW_TYPE_2D;
-		Info.Flags = 0;
-
-		// TODO: TMP solution
-		if (Info.LayersCount > 1)
-		{
-			Info.ViewType = VK_IMAGE_VIEW_TYPE_CUBE;
-			Info.Flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-		}
+		Info.ViewType = Type;
+		Info.Flags = Flags;
 
 		BMR::BMRTexture Texture = BMR::CreateTexture(&Info);
 
@@ -543,7 +578,8 @@ namespace BME
 		const float Aspect = (float)MainScreenExtent.width / (float)MainScreenExtent.height;
 
 		Scene.SkyBox = SkyBox;
-		Scene.DrawSkyBox = true;
+		//Scene.DrawSkyBox = true;
+		Scene.DrawSkyBox = false;
 
 		Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
 			Aspect, Near, Far);
@@ -551,7 +587,7 @@ namespace BME
 		Scene.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 		Scene.DrawTerrainEntities = &TestDrawTerrainEntity;
-		Scene.DrawTerrainEntitiesCount = 1;
+		Scene.DrawTerrainEntitiesCount = 0;
 
 		Scene.DrawEntities = DrawEntities.data();
 		Scene.DrawEntitiesCount = DrawEntities.size();
@@ -585,6 +621,9 @@ namespace BME
 
 		GuiData.DirectionLightDirection = &LightData.DirectionLight.Direction;
 		GuiData.Eye = &Eye;
+		GuiData.OnZoomChanged = &UpdateZoom;
+
+		Scene.MapEntity = TestDrawMapEntity;
 	}
 
 	void RenderLog(BMR::BMRLogType LogType, const char* Format, va_list Args)
@@ -672,7 +711,8 @@ namespace BME
 			}
 		}
 
-		Indices.reserve(NumRows * NumCols);
+		Indices.reserve(NumRows * NumCols * 6);
+
 		for (int row = 0; row < NumRows - 1; ++row)
 		{
 			for (int col = 0; col < NumCols - 1; ++col)
@@ -693,6 +733,47 @@ namespace BME
 				Indices.push_back(topRight);
 			}
 		}
+	}
+
+	void CreateMap()
+	{
+		std::vector<u32> Indices;
+		Indices.reserve(MapTilesPerAxis * MapTilesPerAxis * 6);
+
+		for (s32 lat = LatMin; lat < LatMax; ++lat)
+		{
+			for (s32 lon = LonMin; lon < LonMax; ++lon)
+			{
+				s32 first = lat * (MapTilesPerAxis + 1) + lon;
+				s32 second = first + (MapTilesPerAxis + 1);
+
+				Indices.push_back(first);
+				Indices.push_back(second);
+				Indices.push_back(first + 1);
+
+				Indices.push_back(second);
+				Indices.push_back(second + 1);
+				Indices.push_back(first + 1);
+			}
+		}
+
+		BMR::ClearIndices();
+		TestDrawMapEntity.IndexOffset = BMR::LoadIndices(Indices.data(), Indices.size());
+		TestDrawMapEntity.IndicesCount = Indices.size();
+		TestDrawMapEntity.TextureSet = EngineMaterials["TilesMaterial"];
+
+		UpdateMapIndices = false;
+	}
+
+	void UpdateZoom(s32 Zoom, s32 InLatMin, s32 InLatMax, s32 InLonMin, s32 InLonMax)
+	{
+		MapTilesPerAxis = Zoom;
+		LatMin = InLatMin;
+		LatMax = InLatMax;
+		LonMin = InLonMin;
+		LonMax = InLonMax;
+
+		UpdateMapIndices = true;
 	}
 
 	void MoveCamera(GLFWwindow* Window, f32 DeltaTime, Camera& MainCamera)
