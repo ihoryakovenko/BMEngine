@@ -23,6 +23,7 @@
 #include "Systems/DynamicMapSystem.h"
 #include "Systems/ResourceManager.h"
 #include "Scene.h"
+#include "Util/Math.h"
 
 namespace std
 {
@@ -128,6 +129,8 @@ namespace BME
 
 	static glm::vec3 Eye = glm::vec3(0.0f, 10.0f, 0.0f);
 	static glm::vec3 Up = glm::vec3(0.0f, 0.0f, -1.0f);
+
+	static glm::vec3 CameraSphericalPosition = glm::vec3(0.0f, 0.0f, 2.0f);
 
 	int Main()
 	{
@@ -278,8 +281,18 @@ namespace BME
 
 	void Update(f32 DeltaTime)
 	{
-		MoveCamera(Window, DeltaTime, MainCamera);
-		DynamicMapSystem::Update();
+		//MoveCamera(Window, DeltaTime, MainCamera);
+
+		MainCamera.CameraPosition = Math::SphericalToCartesian(CameraSphericalPosition);
+		MainCamera.CameraFront = glm::normalize(-MainCamera.CameraPosition);
+
+		const glm::vec3 NorthPole(0.0f, 1.0f, 0.0f);
+		const glm::vec3 Right = glm::normalize(glm::cross(NorthPole, MainCamera.CameraFront));
+		MainCamera.CameraUp = glm::normalize(glm::cross(MainCamera.CameraFront, Right));
+
+
+		f32 AspectRatio = f32(MainScreenExtent.width) / f32(MainScreenExtent.height);
+		DynamicMapSystem::Update(CameraSphericalPosition, glm::radians(45.0f), AspectRatio);
 
 		static f32 Angle = 0.0f;
 
@@ -439,7 +452,7 @@ namespace BME
 		//Scene.DrawSkyBox = true;
 		Scene.DrawSkyBox = false;
 
-		Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.f),
+		Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.0f),
 			Aspect, Near, Far);
 		Scene.ViewProjection.Projection[1][1] *= -1;
 		Scene.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -481,6 +494,7 @@ namespace BME
 		GuiData.Eye = &Eye;
 		GuiData.OnZoomChanged = &DynamicMapSystem::SetVertexZoom;
 		GuiData.OnTileZoomChanged = &DynamicMapSystem::SetTileZoom;
+		GuiData.CameraMercatorPosition = &CameraSphericalPosition;
 	}
 
 	void RenderLog(BMR::BMRLogType LogType, const char* Format, va_list Args)

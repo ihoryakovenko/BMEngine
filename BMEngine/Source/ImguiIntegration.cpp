@@ -11,6 +11,9 @@
 
 #include <thread>
 
+#include <glm/glm.hpp>
+#include <glm/gtc/constants.hpp>
+
 // Volk headers
 #ifdef IMGUI_IMPL_VULKAN_USE_VOLK
 #define VOLK_IMPLEMENTATION
@@ -513,6 +516,10 @@ void ImguiIntegration::DrawLoop(const bool& IsDrawing, GuiData Data)
 				assert(Data.OnTileZoomChanged);
 				Data.OnTileZoomChanged(TileZoomLevel);
 			}
+
+			ImGui::DragFloat2("CameraPos", &(*Data.CameraMercatorPosition)[0], 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("CameraAlt", &(*Data.CameraMercatorPosition)[2], 0.05f, 0.0f, 10.0f);
+			
 
 			//ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
 			//ImGui::Checkbox("Another Window", &show_another_window);

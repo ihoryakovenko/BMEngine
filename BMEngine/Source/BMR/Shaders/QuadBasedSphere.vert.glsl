@@ -14,7 +14,7 @@ layout(set = 2, binding = 0) uniform UboTileSettings
 	int TextureTilesPerAxis;
 } TileSettings;
 
-const float radius = 10.0;
+const float radius = 1.0;
 
 void main()
 {

@@ -12,22 +12,24 @@ namespace DynamicMapSystem
 	static void UpdateVertexData(u32 VertexTilesPerAxis);
 	static void UpdateTilesData(u32 TextureTilesPerAxis);
 
-	static const std::string TilesTextureId = "TilesTexture";
-	static const std::string TilesMaterialId = "TilesMaterial";
+	static void ComputeVisibleTileRange(const glm::vec3& CameraSphericalPosition, f32 FovHorizontal, f32 AspectRatio, u32 VertexTilesPerAxis);
+
+	static const char TilesTextureId[] = "TilesTexture";
+	static const char TilesMaterialId[] = "TilesMaterial";
 
 	static const u32 MaxTileZoom = 5;
 
 	static u32 VertexZoom = 4;
 	static u32 TileZoom = 4;
-	static u32 LatMin = 0;
-	static u32 LatMax = 0;
-	static u32 LonMin = 0;
-	static u32 LonMax = 0;
+	static s32 LatMin = 0;
+	static s32 LatMax = 0;
+	static s32 LonMin = 0;
+	static s32 LonMax = 0;
 
 	static bool UpdateVertexDataFlag = false;
 	static bool UpdateTileDataFlag = false;
 
-	void DynamicMapSystem::Init()
+	void Init()
 	{
 		const u32 VertexTilesPerAxis = Math::GetTilesPerAxis(VertexZoom);
 		const u32 TextureTilesPerAxis = Math::GetTilesPerAxis(TileZoom);
@@ -41,8 +43,6 @@ namespace DynamicMapSystem
 		BMR::BMRTexture TextureArrayTiles = ResourceManager::EmptyTexture(TilesTextureId, 256, 256,
 			MaxTextureTilesPerAxis * MaxTextureTilesPerAxis, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
 
-		//BMR::BMRTexture TextureArrayTiles = ResourceManager::EmptyTexture(TilesTextureId, 256, 256,
-			//TextureTilesPerAxis * TextureTilesPerAxis, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
 
 		VkDescriptorSet TilesMaterial;
 		ResourceManager::CreateSkyBoxTerrainTexture(TilesMaterialId, TextureArrayTiles.ImageView, &TilesMaterial);
@@ -51,11 +51,12 @@ namespace DynamicMapSystem
 		UpdateTilesData(TextureTilesPerAxis);
 	}
 
-	void DynamicMapSystem::Update()
+	void Update(const glm::vec3& CameraPosition, f32 FovHorizontal, f32 AspectRatio)
 	{
-		if (UpdateVertexDataFlag)
+		const u32 VertexTilesPerAxis = Math::GetTilesPerAxis(VertexZoom);
+		ComputeVisibleTileRange(CameraPosition, FovHorizontal, AspectRatio, VertexTilesPerAxis);
+		//if (UpdateVertexDataFlag)
 		{
-			const u32 VertexTilesPerAxis = Math::GetTilesPerAxis(VertexZoom);
 			UpdateVertexData(VertexTilesPerAxis);
 		}
 
@@ -66,7 +67,7 @@ namespace DynamicMapSystem
 		}
 	}
 
-	void DynamicMapSystem::DeInit()
+	void DeInit()
 	{
 	}
 
@@ -77,9 +78,11 @@ namespace DynamicMapSystem
 
 		for (s32 lat = LatMin; lat < LatMax; ++lat)
 		{
-			for (s32 lon = LonMin; lon < LonMax; ++lon)
+			for (s32 j = LonMin; j < LonMax; ++j)
 			{
-				s32 first = lat * (VertexTilesPerAxis + 1) + lon;
+				const s32 Lon = j % VertexTilesPerAxis;
+
+				s32 first = lat * (VertexTilesPerAxis + 1) + Lon;
 				s32 second = first + (VertexTilesPerAxis + 1);
 
 				Indices.push_back(first);
@@ -122,6 +125,37 @@ namespace DynamicMapSystem
 		Scene.MapTileSettings.TextureTilesPerAxis = TextureTilesPerAxis;
 
 		UpdateTileDataFlag = false;
+	}
+
+	void ComputeVisibleTileRange(const glm::vec3& CameraSphericalPosition, f32 FovHorizontal, f32 AspectRatio, u32 VertexTilesPerAxis)
+	{
+		const f32 LatitudeNorm = (-CameraSphericalPosition.x + 1.0f) / 2.0f;
+		const f32 LongitudeNorm = (CameraSphericalPosition.y + 1.0f) / 2.0f;
+
+		const u32 CameraLat = LatitudeNorm * VertexTilesPerAxis;
+		const u32 CameraLon = LongitudeNorm * VertexTilesPerAxis;
+
+		f32 HalfFovHorizontal = FovHorizontal / 2.0f;
+
+		// Calculate how many tiles fit in the horizontal FOV (Longitude)
+		f32 VisibleLon = glm::tan(HalfFovHorizontal) * CameraSphericalPosition.z * 2.0f;
+		u32 LonRange = VisibleLon * VertexTilesPerAxis / glm::two_pi<f32>();
+
+		// Calculate how many tiles fit in the vertical FOV (Latitude)
+		f32 VisibleLat = glm::tan(HalfFovHorizontal / AspectRatio) * CameraSphericalPosition.z * 2.0f;
+		u32 LatRange = static_cast<u32>(VisibleLat * VertexTilesPerAxis / glm::pi<f32>());
+
+		// Adjust the LatMin, LatMax, LonMin, LonMax based on the visible range
+		LatMin = glm::max<u32>(0, static_cast<u32>(CameraLat) - LatRange);
+		LatMax = glm::min<u32>(static_cast<u32>(VertexTilesPerAxis), static_cast<u32>(CameraLat) + LatRange);
+
+		//LonMin = glm::max<u32>(0, static_cast<u32>(CameraLon) - LonRange);
+		//LonMax = glm::min<u32>(static_cast<u32>(VertexTilesPerAxis), static_cast<u32>(CameraLon) + LonRange);
+
+		LonMin = CameraLon - LonRange;
+		LonMax = CameraLon + LonRange;
+
+		int i = 0;
 	}
 
 	void SetVertexZoom(s32 Zoom, s32 InLatMin, s32 InLatMax, s32 InLonMin, s32 InLonMax)

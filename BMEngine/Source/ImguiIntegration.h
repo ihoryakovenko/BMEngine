@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <glm/gtc/epsilon.hpp>
 
 namespace ImguiIntegration
 {
@@ -11,8 +12,10 @@ namespace ImguiIntegration
 	{
 		glm::vec3* Eye = nullptr;
 		glm::vec3* DirectionLightDirection = nullptr;
+
 		ZoomChanged OnZoomChanged = nullptr;
 		TileZoomChanged OnTileZoomChanged = nullptr;
+		glm::vec3* CameraMercatorPosition = nullptr;
 	};
 
 	void DrawLoop(const bool& IsDrawing, GuiData Data);
