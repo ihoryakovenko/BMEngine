@@ -56,13 +56,6 @@ static ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 static double DeltaTime = 0.0f;
 static double LastTime = 0.0f;
 
-static int MapZoomLevel = 4;
-static int TileZoomLevel = 4;
-static int LatMin = 0;
-static int LatMax = 16;
-static int LonMin = 0;
-static int LonMax = 16;
-
 static void glfw_error_callback(int error, const char* description)
 {
 	fprintf(stderr, "GLFW Error %d: %s\n", error, description);
@@ -499,26 +492,8 @@ void ImguiIntegration::DrawLoop(const bool& IsDrawing, GuiData Data)
 			ImGui::DragFloat3("DirectionLightDirection", &(*Data.DirectionLightDirection)[0], 0.05, -1, 1);
 			ImGui::DragFloat3("eye", &(*Data.Eye)[0], 0.05, -100, 100);
 
-			int NewZoom = 2 << MapZoomLevel - 1;
-
-			if (ImGui::DragInt("Zoom", &MapZoomLevel, 0.05, 2, 16) ||
-				ImGui::DragInt("LatMin", &LatMin, 0.05, 0, NewZoom) ||
-				ImGui::DragInt("LatMax", &LatMax, 0.05, 2, NewZoom) ||
-				ImGui::DragInt("LonMin", &LonMin, 0.05, 0, NewZoom) ||
-				ImGui::DragInt("LonMax", &LonMax, 0.05, 2, NewZoom))
-			{
-				assert(Data.OnZoomChanged);
-				Data.OnZoomChanged(MapZoomLevel, LatMin, LatMax, LonMin, LonMax);
-			}
-
-			if (ImGui::DragInt("TileZoom", &TileZoomLevel, 0.05, 4, 5))
-			{
-				assert(Data.OnTileZoomChanged);
-				Data.OnTileZoomChanged(TileZoomLevel);
-			}
-
 			ImGui::DragFloat2("CameraPos", &(*Data.CameraMercatorPosition)[0], 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("CameraAlt", &(*Data.CameraMercatorPosition)[2], 0.05f, 0.0f, 10.0f);
+			ImGui::DragInt("Zoom", &(*Data.Zoom),0.05f, 3.0f, 20.0f);
 			
 
 			//ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state

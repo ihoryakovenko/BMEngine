@@ -71,13 +71,6 @@ namespace BME
 		}
 	};
 
-	struct Camera
-	{
-		glm::vec3 CameraPosition = glm::vec3(0.0f, 0.0f, 20.0f);
-		glm::vec3 CameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-		glm::vec3 CameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
-	};
-
 	static bool Init();
 	static bool InitSystems();
 	static void DeInit();
@@ -94,13 +87,13 @@ namespace BME
 	static void RenderLog(BMR::BMRLogType LogType, const char* Format, va_list Args);
 	static void GenerateTerrain(std::vector<u32>& Indices);
 
-	static void MoveCamera(GLFWwindow* Window, f32 DeltaTime, Camera& MainCamera);
+	static void MoveCamera(GLFWwindow* Window, f32 DeltaTime, DynamicMapSystem::MapCamera& MainCamera);
 
 	static const char ModelsBaseDir[] = "./Resources/Models/";
 
 	static Platform::BMRTMPWindowHandler* Window = nullptr;
 
-	static Camera MainCamera;
+	static DynamicMapSystem::MapCamera MainCamera;
 	static bool Close = false;
 	static bool FirstMouse = true;
 	static f32 LastX = 400, LastY = 300;
@@ -110,8 +103,8 @@ namespace BME
 	static f64 DeltaTime = 0.0f;
 	static f64 LastTime = 0.0f;
 
-	static const f32 Near = 0.1f;
-	static const f32 Far = 100.0f;
+	static const f32 Near = 0.001f;
+	static const f32 Far = 5.0f;
 
 	static const u32 NumRows = 600;
 	static const u32 NumCols = 600;
@@ -130,7 +123,8 @@ namespace BME
 	static glm::vec3 Eye = glm::vec3(0.0f, 10.0f, 0.0f);
 	static glm::vec3 Up = glm::vec3(0.0f, 0.0f, -1.0f);
 
-	static glm::vec3 CameraSphericalPosition = glm::vec3(0.0f, 0.0f, 2.0f);
+	static glm::vec3 CameraSphericalPosition = glm::vec3(0.0f, 0.0f, 6371.0f);
+	static s32 Zoom = 3;
 
 	int Main()
 	{
@@ -283,16 +277,22 @@ namespace BME
 	{
 		//MoveCamera(Window, DeltaTime, MainCamera);
 
-		MainCamera.CameraPosition = Math::SphericalToCartesian(CameraSphericalPosition);
-		MainCamera.CameraFront = glm::normalize(-MainCamera.CameraPosition);
+		CameraSphericalPosition.z = Math::CalculateCameraAltitude(Zoom);
+		CameraSphericalPosition.z += 1.0f;
+
+		MainCamera.altitude = CameraSphericalPosition.z;
+
+		MainCamera.position = Math::SphericalToCartesian(CameraSphericalPosition);
+		
+		MainCamera.front = glm::normalize(-MainCamera.position);
 
 		const glm::vec3 NorthPole(0.0f, 1.0f, 0.0f);
-		const glm::vec3 Right = glm::normalize(glm::cross(NorthPole, MainCamera.CameraFront));
-		MainCamera.CameraUp = glm::normalize(glm::cross(MainCamera.CameraFront, Right));
+		const glm::vec3 Right = glm::normalize(glm::cross(NorthPole, MainCamera.front));
+		MainCamera.up = glm::normalize(glm::cross(MainCamera.front, Right));
 
 
 		f32 AspectRatio = f32(MainScreenExtent.width) / f32(MainScreenExtent.height);
-		DynamicMapSystem::Update(CameraSphericalPosition, glm::radians(45.0f), AspectRatio);
+		DynamicMapSystem::Update(MainCamera, Zoom);
 
 		static f32 Angle = 0.0f;
 
@@ -307,7 +307,7 @@ namespace BME
 			glm::mat4 TestMat = glm::rotate(Scene.DrawEntities[i].Model, glm::radians(0.5f), glm::vec3(0.0f, 1.0f, 0.0f));
 		}
 
-		Scene.ViewProjection.View = glm::lookAt(MainCamera.CameraPosition, MainCamera.CameraPosition + MainCamera.CameraFront, MainCamera.CameraUp);
+		Scene.ViewProjection.View = glm::lookAt(MainCamera.position, MainCamera.position + MainCamera.front, MainCamera.up);
 
 		float NearPlane = 0.1f, FarPlane = 100.0f;
 		float HalfSize = 30.0f;
@@ -317,8 +317,8 @@ namespace BME
 		glm::mat4 LightView = glm::lookAt(Eye, Center, Up);
 
 		LightData.DirectionLight.LightSpaceMatrix = LightProjection * LightView;
-		LightData.SpotLight.Direction = MainCamera.CameraFront;
-		LightData.SpotLight.Position = MainCamera.CameraPosition;
+		LightData.SpotLight.Direction = MainCamera.front;
+		LightData.SpotLight.Position = MainCamera.position;
 		LightData.SpotLight.Planes = glm::vec2(Near, Far);
 		LightData.SpotLight.LightSpaceMatrix = Scene.ViewProjection.Projection * Scene.ViewProjection.View;
 
@@ -446,14 +446,15 @@ namespace BME
 
 	void SetUpScene()
 	{
-		const float Aspect = (float)MainScreenExtent.width / (float)MainScreenExtent.height;
+		MainCamera.fov = 45.0f;
+		MainCamera.aspectRatio = (float)MainScreenExtent.width / (float)MainScreenExtent.height;
 
 		Scene.SkyBox = SkyBox;
 		//Scene.DrawSkyBox = true;
 		Scene.DrawSkyBox = false;
 
-		Scene.ViewProjection.Projection = glm::perspective(glm::radians(45.0f),
-			Aspect, Near, Far);
+		Scene.ViewProjection.Projection = glm::perspective(glm::radians(MainCamera.fov),
+			MainCamera.aspectRatio, Near, Far);
 		Scene.ViewProjection.Projection[1][1] *= -1;
 		Scene.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -492,9 +493,8 @@ namespace BME
 
 		GuiData.DirectionLightDirection = &LightData.DirectionLight.Direction;
 		GuiData.Eye = &Eye;
-		GuiData.OnZoomChanged = &DynamicMapSystem::SetVertexZoom;
-		GuiData.OnTileZoomChanged = &DynamicMapSystem::SetTileZoom;
 		GuiData.CameraMercatorPosition = &CameraSphericalPosition;
+		GuiData.Zoom = &Zoom;
 	}
 
 	void RenderLog(BMR::BMRLogType LogType, const char* Format, va_list Args)
@@ -606,7 +606,7 @@ namespace BME
 		}
 	}
 
-	void MoveCamera(GLFWwindow* Window, f32 DeltaTime, Camera& MainCamera)
+	void MoveCamera(GLFWwindow* Window, f32 DeltaTime, DynamicMapSystem::MapCamera& MainCamera)
 	{
 		const f32 RotationSpeed = 0.1f;
 		const f32 CameraSpeed = 10.0f;
@@ -614,14 +614,14 @@ namespace BME
 
 		// Handle camera movement with keys
 		glm::vec3 movement = glm::vec3(0.0f);
-		if (glfwGetKey(Window, GLFW_KEY_W) == GLFW_PRESS) movement += MainCamera.CameraFront;
-		if (glfwGetKey(Window, GLFW_KEY_S) == GLFW_PRESS) movement -= MainCamera.CameraFront;
-		if (glfwGetKey(Window, GLFW_KEY_A) == GLFW_PRESS) movement -= glm::normalize(glm::cross(MainCamera.CameraFront, MainCamera.CameraUp));
-		if (glfwGetKey(Window, GLFW_KEY_D) == GLFW_PRESS) movement += glm::normalize(glm::cross(MainCamera.CameraFront, MainCamera.CameraUp));
-		if (glfwGetKey(Window, GLFW_KEY_SPACE) == GLFW_PRESS) movement += MainCamera.CameraUp;
-		if (glfwGetKey(Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) movement -= MainCamera.CameraUp;
+		if (glfwGetKey(Window, GLFW_KEY_W) == GLFW_PRESS) movement += MainCamera.front;
+		if (glfwGetKey(Window, GLFW_KEY_S) == GLFW_PRESS) movement -= MainCamera.front;
+		if (glfwGetKey(Window, GLFW_KEY_A) == GLFW_PRESS) movement -= glm::normalize(glm::cross(MainCamera.front, MainCamera.up));
+		if (glfwGetKey(Window, GLFW_KEY_D) == GLFW_PRESS) movement += glm::normalize(glm::cross(MainCamera.front, MainCamera.up));
+		if (glfwGetKey(Window, GLFW_KEY_SPACE) == GLFW_PRESS) movement += MainCamera.up;
+		if (glfwGetKey(Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) movement -= MainCamera.up;
 
-		MainCamera.CameraPosition += movement * CameraDeltaSpeed;
+		MainCamera.position += movement * CameraDeltaSpeed;
 
 		if (glfwGetKey(Window, GLFW_KEY_ESCAPE) == GLFW_PRESS) Close = true;
 
@@ -649,7 +649,7 @@ namespace BME
 		Front.x = cos(glm::radians(Yaw)) * cos(glm::radians(Pitch));
 		Front.y = sin(glm::radians(Pitch));
 		Front.z = sin(glm::radians(Yaw)) * cos(glm::radians(Pitch));
-		MainCamera.CameraFront = glm::normalize(Front);
+		MainCamera.front = glm::normalize(Front);
 	}
 
 	void CreateSkyBoxMesh(VkDescriptorSet Material)

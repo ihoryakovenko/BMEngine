@@ -16,6 +16,7 @@ namespace ImguiIntegration
 		ZoomChanged OnZoomChanged = nullptr;
 		TileZoomChanged OnTileZoomChanged = nullptr;
 		glm::vec3* CameraMercatorPosition = nullptr;
+		int* Zoom = nullptr;
 	};
 
 	void DrawLoop(const bool& IsDrawing, GuiData Data);

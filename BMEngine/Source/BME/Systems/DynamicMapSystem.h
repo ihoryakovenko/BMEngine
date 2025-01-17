@@ -8,10 +8,18 @@
 
 namespace DynamicMapSystem
 {
+	struct MapCamera
+	{
+		float altitude;       // Distance of the camera from the sphere's center
+		float fov;            // Vertical field of view in degrees
+		float aspectRatio;    // Width / Height of the viewport
+		glm::vec3 position;   // Camera position (assumes sphere center at (0, 0, 0))
+		glm::vec3 front;      // Camera front vector
+		glm::vec3 up;         // Camera up vector
+	};
+
 	void Init();
 	void DeInit();
 
-	void Update(const glm::vec3& CameraPosition, f32 FovHorizontal, f32 AspectRatio);
-	void SetVertexZoom(s32 Zoom, s32 InLatMin, s32 InLatMax, s32 InLonMin, s32 InLonMax);
-	void SetTileZoom(s32 Zoom);
+	void Update(const MapCamera& Camera, s32 Zoom);
 }

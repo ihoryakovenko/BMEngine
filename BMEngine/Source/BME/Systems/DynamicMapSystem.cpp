@@ -7,38 +7,36 @@
 #include "BME/Scene.h"
 #include "Util/Math.h"
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <iostream>
+#include <glm/gtx/string_cast.hpp>
+
 namespace DynamicMapSystem
 {
-	static void UpdateVertexData(u32 VertexTilesPerAxis);
-	static void UpdateTilesData(u32 TextureTilesPerAxis);
+	static void UpdateTilesData(s32 TextureTilesPerAxis);
 
-	static void ComputeVisibleTileRange(const glm::vec3& CameraSphericalPosition, f32 FovHorizontal, f32 AspectRatio, u32 VertexTilesPerAxis);
+	static s32 LonToTileX(f64 lon, s32 z);
+	static s32 LatToTileY(f64 lat, s32 z);
 
 	static const char TilesTextureId[] = "TilesTexture";
 	static const char TilesMaterialId[] = "TilesMaterial";
 
-	static const u32 MaxTileZoom = 5;
+	static const s32 MaxTileZoom = 5;
 
-	static u32 VertexZoom = 4;
-	static u32 TileZoom = 4;
-	static s32 LatMin = 0;
-	static s32 LatMax = 0;
-	static s32 LonMin = 0;
-	static s32 LonMax = 0;
+	static s32 VertexZoom = 1;
+	static s32 TileZoom = 4;
 
 	static bool UpdateVertexDataFlag = false;
 	static bool UpdateTileDataFlag = false;
 
+	static s32 CameraLat = 0;
+	static s32 CameraLon = 0;
+
 	void Init()
 	{
-		const u32 VertexTilesPerAxis = Math::GetTilesPerAxis(VertexZoom);
-		const u32 TextureTilesPerAxis = Math::GetTilesPerAxis(TileZoom);
-		const u32 MaxTextureTilesPerAxis = Math::GetTilesPerAxis(MaxTileZoom);
-
-		LatMax = VertexTilesPerAxis;
-		LonMax = VertexTilesPerAxis;
-
-		UpdateVertexData(VertexTilesPerAxis);
+		const s32 VertexTilesPerAxis = Math::GetTilesPerAxis(VertexZoom);
+		const s32 TextureTilesPerAxis = Math::GetTilesPerAxis(TileZoom);
+		const s32 MaxTextureTilesPerAxis = Math::GetTilesPerAxis(MaxTileZoom);
 
 		BMR::BMRTexture TextureArrayTiles = ResourceManager::EmptyTexture(TilesTextureId, 256, 256,
 			MaxTextureTilesPerAxis * MaxTextureTilesPerAxis, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
@@ -51,38 +49,115 @@ namespace DynamicMapSystem
 		UpdateTilesData(TextureTilesPerAxis);
 	}
 
-	void Update(const glm::vec3& CameraPosition, f32 FovHorizontal, f32 AspectRatio)
+	struct Tile
 	{
-		const u32 VertexTilesPerAxis = Math::GetTilesPerAxis(VertexZoom);
-		ComputeVisibleTileRange(CameraPosition, FovHorizontal, AspectRatio, VertexTilesPerAxis);
-		//if (UpdateVertexDataFlag)
-		{
-			UpdateVertexData(VertexTilesPerAxis);
-		}
+		int x;      // Tile X index
+		int y;      // Tile Y index
+		int Zoom;   // Zoom level
+	};
 
-		if (UpdateTileDataFlag)
-		{
-			const u32 TextureTilesPerAxis = Math::GetTilesPerAxis(TileZoom);
-			UpdateTilesData(TextureTilesPerAxis);
-		}
+	static s32 LonToTileX(f64 lon, s32 z)
+	{
+		return (s32)(floor((lon + 180.0) / 360.0 * (1 << z)));
 	}
 
-	void DeInit()
+	static s32 LatToTileY(f64 lat, s32 z)
 	{
+		f64 LatRad = lat * glm::pi<f64>() / 180.0;
+		return (s32)(floor((1.0 - asinh(tan(LatRad)) / glm::pi<f64>()) / 2.0 * (1 << z)));
 	}
 
-	void UpdateVertexData(u32 VertexTilesPerAxis)
+	void Update(const MapCamera& Camera, s32 Zoom)
 	{
-		std::vector<u32> Indices;
-		Indices.reserve(VertexTilesPerAxis * VertexTilesPerAxis * 6);
+		//const s32 NewVertexZoom = Zoom > 1.0f ? Zoom : 1.0f;
 
-		for (s32 lat = LatMin; lat < LatMax; ++lat)
+		//bool IsZoomChanged = false;
+		//if (VertexZoom != NewVertexZoom)
+		//{
+		//	VertexZoom = NewVertexZoom;
+		//	IsZoomChanged = true;
+		//}
+
+		VertexZoom = Zoom;
+
+		const s32 VertexTilesPerAxis = Math::GetTilesPerAxis(VertexZoom);
+
+		std::vector<Tile> visibleTiles;
+
+		f32 halfVSide = std::tan(glm::radians(Camera.fov / 2.0f)) * glm::length(Camera.position);
+		f32 halfHSide = halfVSide * Camera.aspectRatio;
+
+		glm::vec3 nearCenter = Camera.position + Camera.front * glm::length(Camera.position);
+		glm::vec3 right = glm::cross(Camera.front, Camera.up);
+
+		glm::vec3 frustumCorners[] = {
+			nearCenter + Camera.up * halfVSide - right * halfHSide, // Top-left
+			nearCenter + Camera.up * halfVSide + right * halfHSide, // Top-right
+			nearCenter - Camera.up * halfVSide - right * halfHSide, // Bottom-left
+			nearCenter - Camera.up * halfVSide + right * halfHSide  // Bottom-right
+		};
+
+		bool IsIntersected = false;
+		double minLat = 85.0, maxLat = -86.0, minLon = 180.0, maxLon = -180.0;
+
+		for (const auto& corner : frustumCorners)
 		{
-			for (s32 j = LonMin; j < LonMax; ++j)
+			glm::vec3 intersection;
+			if (Math::RaySphereIntersection(Camera.position, glm::normalize(corner - Camera.position), 1.0f, intersection))
 			{
-				const s32 Lon = j % VertexTilesPerAxis;
+				IsIntersected = true;
 
-				s32 first = lat * (VertexTilesPerAxis + 1) + Lon;
+				double lat = glm::degrees(asin(intersection.y));
+				double lon = glm::degrees(atan2(intersection.x, intersection.z));
+
+				minLat = std::min<>(minLat, lat);
+				maxLat = std::max<>(maxLat, lat);
+				minLon = std::min<>(minLon, lon);
+				maxLon = std::max<>(maxLon, lon);
+			}
+		}
+
+		//if (!IsIntersected)
+		//{
+		//	std::swap(minLon, maxLon);
+		//	std::swap(minLat, maxLat);
+		//}
+
+		int minTileX = LonToTileX(minLon, Zoom);
+		int maxTileX = LonToTileX(maxLon, Zoom);
+		int minTileY = LatToTileY(maxLat, Zoom);
+		int maxTileY = LatToTileY(minLat, Zoom);
+
+		//if (minTileY > maxTileY)
+		//{
+		//	std::swap(minTileY, maxTileY);
+		//}
+
+		//if (minTileX > maxTileX)
+		//{
+		//	std::swap(minTileX, maxTileX);
+		//}
+
+		if (IsIntersected)
+		{
+			maxTileX += (maxTileX > 0) ? 1 : -1;
+			maxTileY += (maxTileY > 0) ? 1 : -1;
+		}
+
+		std::vector<u32> Indices;
+		Indices.reserve(((minTileX + maxTileX) / 2) * ((minTileY + maxTileY) / 2) * 6);
+
+		for (int x = minTileX; x < maxTileX; ++x)
+		{
+			for (int y = minTileY; y < maxTileY; ++y)
+			{
+				// Clamp tile indices to valid ranges
+				int validX = (x + (1 << Zoom)) % (1 << Zoom); // Wrap X around at 2^Zoom
+				int validY = glm::clamp(y, 0, (1 << Zoom) - 1);
+
+				visibleTiles.push_back({ validX, validY, Zoom });
+
+				s32 first = validY * (VertexTilesPerAxis + 1) + validX;
 				s32 second = first + (VertexTilesPerAxis + 1);
 
 				Indices.push_back(first);
@@ -100,13 +175,21 @@ namespace DynamicMapSystem
 		Scene.MapEntity.IndicesCount = Indices.size();
 		Scene.MapTileSettings.VertexTilesPerAxis = VertexTilesPerAxis;
 
-		UpdateVertexDataFlag = false;
+		if (UpdateTileDataFlag)
+		{
+			const u32 TextureTilesPerAxis = Math::GetTilesPerAxis(TileZoom);
+			UpdateTilesData(TextureTilesPerAxis);
+		}
 	}
 
-	void UpdateTilesData(u32 TextureTilesPerAxis)
+	void DeInit()
+	{
+	}
+
+	void UpdateTilesData(s32 TextureTilesPerAxis)
 	{
 		std::vector<std::string> OsmTiles;
-		const std::string BasePath = "osm_tiles_zoom" + std::to_string(TileZoom) +
+		const std::string BasePath = "osm_tiles_Zoom" + std::to_string(TileZoom) +
 			"/tile_" + std::to_string(TileZoom) + '_';
 
 		for (int i = 0; i < TextureTilesPerAxis; ++i)
@@ -125,53 +208,5 @@ namespace DynamicMapSystem
 		Scene.MapTileSettings.TextureTilesPerAxis = TextureTilesPerAxis;
 
 		UpdateTileDataFlag = false;
-	}
-
-	void ComputeVisibleTileRange(const glm::vec3& CameraSphericalPosition, f32 FovHorizontal, f32 AspectRatio, u32 VertexTilesPerAxis)
-	{
-		const f32 LatitudeNorm = (-CameraSphericalPosition.x + 1.0f) / 2.0f;
-		const f32 LongitudeNorm = (CameraSphericalPosition.y + 1.0f) / 2.0f;
-
-		const u32 CameraLat = LatitudeNorm * VertexTilesPerAxis;
-		const u32 CameraLon = LongitudeNorm * VertexTilesPerAxis;
-
-		f32 HalfFovHorizontal = FovHorizontal / 2.0f;
-
-		// Calculate how many tiles fit in the horizontal FOV (Longitude)
-		f32 VisibleLon = glm::tan(HalfFovHorizontal) * CameraSphericalPosition.z * 2.0f;
-		u32 LonRange = VisibleLon * VertexTilesPerAxis / glm::two_pi<f32>();
-
-		// Calculate how many tiles fit in the vertical FOV (Latitude)
-		f32 VisibleLat = glm::tan(HalfFovHorizontal / AspectRatio) * CameraSphericalPosition.z * 2.0f;
-		u32 LatRange = static_cast<u32>(VisibleLat * VertexTilesPerAxis / glm::pi<f32>());
-
-		// Adjust the LatMin, LatMax, LonMin, LonMax based on the visible range
-		LatMin = glm::max<u32>(0, static_cast<u32>(CameraLat) - LatRange);
-		LatMax = glm::min<u32>(static_cast<u32>(VertexTilesPerAxis), static_cast<u32>(CameraLat) + LatRange);
-
-		//LonMin = glm::max<u32>(0, static_cast<u32>(CameraLon) - LonRange);
-		//LonMax = glm::min<u32>(static_cast<u32>(VertexTilesPerAxis), static_cast<u32>(CameraLon) + LonRange);
-
-		LonMin = CameraLon - LonRange;
-		LonMax = CameraLon + LonRange;
-
-		int i = 0;
-	}
-
-	void SetVertexZoom(s32 Zoom, s32 InLatMin, s32 InLatMax, s32 InLonMin, s32 InLonMax)
-	{
-		VertexZoom = Zoom;
-		LatMin = InLatMin;
-		LatMax = InLatMax;
-		LonMin = InLonMin;
-		LonMax = InLonMax;
-
-		UpdateVertexDataFlag = true;
-	}
-
-	void SetTileZoom(s32 Zoom)
-	{
-		TileZoom = Zoom;
-		UpdateTileDataFlag = true;
 	}
 }
