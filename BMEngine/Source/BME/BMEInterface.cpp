@@ -103,7 +103,7 @@ namespace BME
 	static f64 DeltaTime = 0.0f;
 	static f64 LastTime = 0.0f;
 
-	static const f32 Near = 0.001f;
+	static const f32 Near = 0.000001f;
 	static const f32 Far = 5.0f;
 
 	static const u32 NumRows = 600;
@@ -277,14 +277,14 @@ namespace BME
 	{
 		//MoveCamera(Window, DeltaTime, MainCamera);
 
-		CameraSphericalPosition.z = Math::CalculateCameraAltitude(Zoom);
+		CameraSphericalPosition.z = DynamicMapSystem::CalculateCameraAltitude(Zoom);
 		CameraSphericalPosition.z += 1.0f;
 
-		MainCamera.altitude = CameraSphericalPosition.z;
+		//MainCamera.altitude = CameraSphericalPosition.z;
 
-		MainCamera.position = Math::SphericalToMercator(CameraSphericalPosition);
+		MainCamera.Position = DynamicMapSystem::SphericalToMercator(CameraSphericalPosition);
 		
-		MainCamera.front = glm::normalize(-MainCamera.position);
+		MainCamera.front = glm::normalize(-MainCamera.Position);
 
 		const glm::vec3 NorthPole(0.0f, 1.0f, 0.0f);
 		const glm::vec3 Right = glm::normalize(glm::cross(NorthPole, MainCamera.front));
@@ -307,7 +307,7 @@ namespace BME
 			glm::mat4 TestMat = glm::rotate(Scene.DrawEntities[i].Model, glm::radians(0.5f), glm::vec3(0.0f, 1.0f, 0.0f));
 		}
 
-		Scene.ViewProjection.View = glm::lookAt(MainCamera.position, MainCamera.position + MainCamera.front, MainCamera.up);
+		Scene.ViewProjection.View = glm::lookAt(MainCamera.Position, MainCamera.Position + MainCamera.front, MainCamera.up);
 
 		float NearPlane = 0.1f, FarPlane = 100.0f;
 		float HalfSize = 30.0f;
@@ -318,7 +318,7 @@ namespace BME
 
 		LightData.DirectionLight.LightSpaceMatrix = LightProjection * LightView;
 		LightData.SpotLight.Direction = MainCamera.front;
-		LightData.SpotLight.Position = MainCamera.position;
+		LightData.SpotLight.Position = MainCamera.Position;
 		LightData.SpotLight.Planes = glm::vec2(Near, Far);
 		LightData.SpotLight.LightSpaceMatrix = Scene.ViewProjection.Projection * Scene.ViewProjection.View;
 
@@ -446,15 +446,15 @@ namespace BME
 
 	void SetUpScene()
 	{
-		MainCamera.fov = 45.0f;
-		MainCamera.aspectRatio = (float)MainScreenExtent.width / (float)MainScreenExtent.height;
+		MainCamera.Fov = 60.0f;
+		MainCamera.AspectRatio = (float)MainScreenExtent.width / (float)MainScreenExtent.height;
 
 		Scene.SkyBox = SkyBox;
 		//Scene.DrawSkyBox = true;
 		Scene.DrawSkyBox = false;
 
-		Scene.ViewProjection.Projection = glm::perspective(glm::radians(MainCamera.fov),
-			MainCamera.aspectRatio, Near, Far);
+		Scene.ViewProjection.Projection = glm::perspective(glm::radians(MainCamera.Fov),
+			MainCamera.AspectRatio, Near, Far);
 		Scene.ViewProjection.Projection[1][1] *= -1;
 		Scene.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -621,7 +621,7 @@ namespace BME
 		if (glfwGetKey(Window, GLFW_KEY_SPACE) == GLFW_PRESS) movement += MainCamera.up;
 		if (glfwGetKey(Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) movement -= MainCamera.up;
 
-		MainCamera.position += movement * CameraDeltaSpeed;
+		MainCamera.Position += movement * CameraDeltaSpeed;
 
 		if (glfwGetKey(Window, GLFW_KEY_ESCAPE) == GLFW_PRESS) Close = true;
 
