@@ -228,7 +228,7 @@ namespace BMRVulkan
 
 	void CopyDataToBuffer(VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Size, const void* Data);
 	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, VkDeviceSize AlignedLayerSize,
-		u32 LayersCount, void* Data);
+		u32 LayersCount, void* Data, u32 Baselayer = 0);
 
 	void DestroyRenderPass(BMRRenderPass* Pass);
 	void DestroyPipelineLayout(VkPipelineLayout Layout);
@@ -242,7 +242,7 @@ namespace BMRVulkan
 
 	void AttachUniformsToSet(VkDescriptorSet Set, const BMRUniformSetAttachmentInfo* Infos, u32 BufferCount);
 	void UpdateUniformBuffer(BMRUniform Buffer, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);
-	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, u32 LayersCount, void* Data);
+	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, u32 LayersCount, void* Data, u32 Baselayer = 0);
 
 	void TransitImageLayout(VkImage Image, VkImageLayout OldLayout, VkImageLayout NewLayout,
 		VkAccessFlags SrcAccessMask, VkAccessFlags DstAccessMask,

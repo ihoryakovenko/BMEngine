@@ -239,7 +239,7 @@ namespace BMR
 	void UpdateTexture(BMRTexture* Texture, BMRTextureArrayInfo* Info)
 	{
 		BMRVulkan::BMRLayoutLayerTransitionData TransitionData;
-		TransitionData.BaseArrayLayer = 0;
+		TransitionData.BaseArrayLayer = Info->BaseArrayLayer;
 		TransitionData.LayerCount = Info->LayersCount;
 
 		BMRVulkan::TransitImageLayout(Texture->UniformData.Image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -247,7 +247,8 @@ namespace BMR
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
 			&TransitionData, 1);
 
-		BMRVulkan::CopyDataToImage(Texture->UniformData.Image, Info->Width, Info->Height, Info->Format, Info->LayersCount, Info->Data);
+		BMRVulkan::CopyDataToImage(Texture->UniformData.Image, Info->Width, Info->Height,
+			Info->Format, Info->LayersCount, Info->Data, Info->BaseArrayLayer);
 	
 		TransitImageLayout(Texture->UniformData.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,

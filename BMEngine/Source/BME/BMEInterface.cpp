@@ -103,7 +103,7 @@ namespace BME
 	static f64 DeltaTime = 0.0f;
 	static f64 LastTime = 0.0f;
 
-	static const f32 Near = 0.000001f;
+	static const f32 Near = 0.00001f;
 	static const f32 Far = 5.0f;
 
 	static const u32 NumRows = 600;
@@ -495,6 +495,7 @@ namespace BME
 		GuiData.Eye = &Eye;
 		GuiData.CameraMercatorPosition = &CameraSphericalPosition;
 		GuiData.Zoom = &Zoom;
+		GuiData.OnTestSetDownload = DynamicMapSystem::TestSetDownload;
 	}
 
 	void RenderLog(BMR::BMRLogType LogType, const char* Format, va_list Args)

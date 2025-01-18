@@ -24,4 +24,6 @@ namespace DynamicMapSystem
 
 	glm::vec3 SphericalToMercator(const glm::vec3& Position);
 	f64 CalculateCameraAltitude(s32 ZoomLevel);
+
+	void TestSetDownload(bool Download);
 }

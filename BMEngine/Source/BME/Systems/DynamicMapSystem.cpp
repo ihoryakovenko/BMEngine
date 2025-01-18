@@ -4,23 +4,18 @@
 #include <string>
 #include <cassert>
 
+#include <httplib.h>
+
 #include "ResourceManager.h"
 #include "BME/Scene.h"
 #include "Util/Math.h"
 
+#include "stb_image.h"
+
 namespace DynamicMapSystem
 {
-	struct Tile
-	{
-		s32 x;
-		s32 y; 
-		s32 Zoom;
-	};
-
-	static void UpdateTilesData(s32 TextureTilesPerAxis);
-
-	static s32 LonToTileX(f64 lon, s32 z);
-	static s32 LatToTileY(f64 lat, s32 z);
+	static s32 LonToTileX(f64 Lon, s32 Zoom);
+	static s32 LatToTileY(f64 Lat, s32 Zoom);
 
 	static u32 GetTilesPerAxis(u32 Zoom);
 
@@ -32,16 +27,20 @@ namespace DynamicMapSystem
 
 	static const s32 MaxTileZoom = 5;
 	static const f64 SphereRadius = 1.0;
-	static const f64 TileAngularSize = 360.0 / (1 << 5);
+	static const f64 TileAngularSize = 360.0 / (1 << 6);
+
+	static u32 TextureTileSize = 256;
 
 	static s32 VertexZoom = 1;
 	static s32 TileZoom = 4;
 
-	static bool UpdateVertexDataFlag = false;
-	static bool UpdateTileDataFlag = false;
+	static s32 MinTileX = 0;
+	static s32 MaxTileX = 0;
 
-	static s32 CameraLat = 0;
-	static s32 CameraLon = 0;
+	static s32 MinTileY = 0;
+	static s32 MaxTileY = 0;
+
+	static bool TestDownload = false;
 
 	void Init()
 	{
@@ -49,33 +48,21 @@ namespace DynamicMapSystem
 		const s32 TextureTilesPerAxis = GetTilesPerAxis(TileZoom);
 		const s32 MaxTextureTilesPerAxis = GetTilesPerAxis(MaxTileZoom);
 
-		BMR::BMRTexture TextureArrayTiles = ResourceManager::EmptyTexture(TilesTextureId, 256, 256,
+		BMR::BMRTexture TextureArrayTiles = ResourceManager::EmptyTexture(TilesTextureId, TextureTileSize, TextureTileSize,
 			MaxTextureTilesPerAxis * MaxTextureTilesPerAxis, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
-
 
 		VkDescriptorSet TilesMaterial;
 		ResourceManager::CreateSkyBoxTerrainTexture(TilesMaterialId, TextureArrayTiles.ImageView, &TilesMaterial);
 		Scene.MapEntity.TextureSet = TilesMaterial;
-
-		UpdateTilesData(TextureTilesPerAxis);
 	}
 
 	void Update(const MapCamera& Camera, s32 Zoom)
 	{
-		//const s32 NewVertexZoom = Zoom > 1.0f ? Zoom : 1.0f;
-
-		//bool IsZoomChanged = false;
-		//if (VertexZoom != NewVertexZoom)
-		//{
-		//	VertexZoom = NewVertexZoom;
-		//	IsZoomChanged = true;
-		//}
-
 		VertexZoom = Zoom;
 
 		const s32 VertexTilesPerAxis = GetTilesPerAxis(VertexZoom);
 
-		auto CameraRelativeSpherePosition = glm::normalize(Camera.Position);
+		const glm::vec3 CameraRelativeSpherePosition = glm::normalize(Camera.Position);
 		const f64 CameraLat = glm::degrees(asin(CameraRelativeSpherePosition.y / SphereRadius));
 		const f64 CameraLon = glm::degrees(atan2(CameraRelativeSpherePosition.x, CameraRelativeSpherePosition.z));
 
@@ -102,19 +89,16 @@ namespace DynamicMapSystem
 			TilesCountY += (TilesCountY >= 0) ? 1 : -1;
 		}
 
-		s32 MinTileX = CameraTileX - TilesCountX / 2;
-		s32 MaxTileX = CameraTileX + TilesCountX / 2;
+		MinTileX = CameraTileX - TilesCountX / 2;
+		MaxTileX = CameraTileX + TilesCountX / 2;
 
-		s32 MinTileY = CameraTileY - TilesCountY / 2;
-		s32 MaxTileY = CameraTileY + TilesCountY / 2;
+		MinTileY = CameraTileY - TilesCountY / 2;
+		MaxTileY = CameraTileY + TilesCountY / 2;
 
 		MaxTileX += (MaxTileX >= 0) ? 1 : -1;
 		MaxTileY += (MaxTileY > 0) ? 1 : -1;
 
 		std::vector<u32> Indices;
-		//Indices.reserve(((minTileX + maxTileX) / 2) * ((minTileY + maxTileY) / 2) * 6);
-
-		std::vector<Tile> visibleTiles;
 
 		for (s32 x = MinTileX; x < MaxTileX; ++x)
 		{
@@ -123,8 +107,6 @@ namespace DynamicMapSystem
 			for (s32 y = MinTileY; y < MaxTileY; ++y)
 			{
 				const s32 ValidY = glm::clamp(y, 0, (1 << Zoom) - 1);
-
-				visibleTiles.push_back({ ValidX, ValidY, Zoom });
 
 				const s32 First = ValidY * (VertexTilesPerAxis + 1) + ValidX;
 				const s32 Second = First + (VertexTilesPerAxis + 1);
@@ -136,8 +118,39 @@ namespace DynamicMapSystem
 				Indices.push_back(Second);
 				Indices.push_back(Second + 1);
 				Indices.push_back(First + 1);
+
+				if (TestDownload)
+				{
+					static httplib::Client Client("http://tile.openstreetmap.org");
+					const std::string Path = "/" + std::to_string(VertexZoom) + "/" +
+						std::to_string(ValidX) + "/" + std::to_string(ValidY) + ".png";
+
+					const httplib::Result Res = Client.Get(Path);
+					if (Res && Res->status == 200)
+					{
+						BMR::BMRTexture* Texture = ResourceManager::FindTexture(TilesTextureId);
+
+						unsigned char* data = reinterpret_cast<unsigned char*>(const_cast<char*>(Res->body.data()));
+						int width, height, channels;
+						unsigned char* image = stbi_load_from_memory(data, Res->body.size(), &width, &height, &channels, 4);
+
+						BMR::BMRTextureArrayInfo Info;
+						Info.Width = TextureTileSize;
+						Info.Height = TextureTileSize;
+						Info.Format = 4;
+						Info.LayersCount = 1;
+						Info.BaseArrayLayer = ValidY * VertexTilesPerAxis + ValidX;
+						Info.Data = &image;
+
+						BMR::UpdateTexture(Texture, &Info);
+
+						Scene.MapTileSettings.TextureTilesPerAxis = VertexTilesPerAxis;
+					}
+				}
 			}
 		}
+
+		TestDownload = false;
 
 		if (Indices.empty())
 		{
@@ -148,40 +161,10 @@ namespace DynamicMapSystem
 		Scene.MapEntity.IndexOffset = BMR::LoadIndices(Indices.data(), Indices.size());
 		Scene.MapEntity.IndicesCount = Indices.size();
 		Scene.MapTileSettings.VertexTilesPerAxis = VertexTilesPerAxis;
-
-		if (UpdateTileDataFlag)
-		{
-			const u32 TextureTilesPerAxis = GetTilesPerAxis(TileZoom);
-			UpdateTilesData(TextureTilesPerAxis);
-		}
 	}
 
 	void DeInit()
 	{
-	}
-
-	void UpdateTilesData(s32 TextureTilesPerAxis)
-	{
-		std::vector<std::string> OsmTiles;
-		const std::string BasePath = "osm_tiles_Zoom" + std::to_string(TileZoom) +
-			"/tile_" + std::to_string(TileZoom) + '_';
-
-		for (s32 i = 0; i < TextureTilesPerAxis; ++i)
-		{
-			for (s32 j = 0; j < TextureTilesPerAxis; ++j)
-			{
-				std::string FileName = BasePath + std::to_string(j) + "_" + std::to_string(i) + ".png";
-				OsmTiles.emplace_back(std::move(FileName));
-			}
-		}
-
-		BMR::BMRTexture* Texture = ResourceManager::FindTexture(TilesTextureId);
-		assert(Texture);
-		ResourceManager::LoadToTexture(Texture, OsmTiles);
-
-		Scene.MapTileSettings.TextureTilesPerAxis = TextureTilesPerAxis;
-
-		UpdateTileDataFlag = false;
 	}
 
 	glm::vec3 SphericalToMercator(const glm::vec3& Position)
@@ -207,6 +190,11 @@ namespace DynamicMapSystem
 	f64 CalculateCameraAltitude(s32 ZoomLevel)
 	{
 		return Math::Circumference / glm::pow(2, ZoomLevel - 1);
+	}
+
+	void TestSetDownload(bool Download)
+	{
+		TestDownload = Download;
 	}
 
 	u32 GetTilesPerAxis(u32 Zoom)

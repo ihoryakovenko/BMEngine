@@ -494,6 +494,11 @@ void ImguiIntegration::DrawLoop(const bool& IsDrawing, GuiData Data)
 
 			ImGui::DragFloat2("CameraPos", &(*Data.CameraMercatorPosition)[0], 0.01f, -1.0f, 1.0f);
 			ImGui::DragInt("Zoom", &(*Data.Zoom),0.05f, 1.0f, 20.0f);
+
+			if (ImGui::Button("Download tiles"))
+			{
+				Data.OnTestSetDownload(true);
+			}
 			
 
 			//ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state

@@ -50,6 +50,7 @@ namespace BMR
 		u8** Data = nullptr;
 		VkImageViewType ViewType;
 		VkImageCreateFlags Flags;
+		u32 BaseArrayLayer = 0;
 	};
 
 	struct BMRDrawEntity

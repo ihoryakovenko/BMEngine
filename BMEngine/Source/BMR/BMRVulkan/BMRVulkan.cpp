@@ -685,7 +685,7 @@ namespace BMRVulkan
 		vkUnmapMemory(Device.LogicalDevice, Buffer.Memory);
 	}
 
-	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, u32 LayersCount, void* Data)
+	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, u32 LayersCount, void* Data, u32 Baselayer)
 	{
 		VkMemoryRequirements MemoryRequirements;
 		vkGetImageMemoryRequirements(Device.LogicalDevice, Image, &MemoryRequirements);
@@ -694,7 +694,7 @@ namespace BMRVulkan
 		//	Format, MemoryRequirements.size / LayersCount, LayersCount, Data);
 
 		CopyDataToImage(Image, Width, Height,
-			Format, Width * Height * Format, LayersCount, Data);
+			Format, Width * Height * Format, LayersCount, Data, Baselayer);
 	}
 
 	void TransitImageLayout(VkImage Image, VkImageLayout OldLayout, VkImageLayout NewLayout,
@@ -967,7 +967,7 @@ namespace BMRVulkan
 	}
 
 	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, VkDeviceSize AlignedLayerSize,
-		u32 LayersCount, void* Data)
+		u32 LayersCount, void* Data, u32 Baselayer)
 	{
 		const VkDeviceSize TotalAlignedSize = AlignedLayerSize * LayersCount;
 		assert(TotalAlignedSize <= MB256);
@@ -1014,7 +1014,7 @@ namespace BMRVulkan
 		ImageRegion.bufferImageHeight = 0;
 		ImageRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		ImageRegion.imageSubresource.mipLevel = 0;
-		ImageRegion.imageSubresource.baseArrayLayer = 0; // Starting array layer (if array)
+		ImageRegion.imageSubresource.baseArrayLayer = Baselayer;
 		ImageRegion.imageSubresource.layerCount = LayersCount;
 		ImageRegion.imageOffset = { 0, 0, 0 };
 		ImageRegion.imageExtent = { Width, Height, 1 };

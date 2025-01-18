@@ -414,7 +414,7 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	// MapPipeline
 	MapPipelineSettings = EntityPipelineSettings;
 	MapPipelineSettings.PipelineName = MapPipelineName;
-	MapPipelineSettings.PolygonMode = VK_POLYGON_MODE_LINE;
+	//MapPipelineSettings.PolygonMode = VK_POLYGON_MODE_LINE;
 
 	// TerrainPipeline
 	TerrainPipelineSettings.PipelineName = TerrainPipelineName;
