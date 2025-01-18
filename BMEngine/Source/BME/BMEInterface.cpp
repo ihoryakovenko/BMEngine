@@ -282,7 +282,7 @@ namespace BME
 
 		MainCamera.altitude = CameraSphericalPosition.z;
 
-		MainCamera.position = Math::SphericalToCartesian(CameraSphericalPosition);
+		MainCamera.position = Math::SphericalToMercator(CameraSphericalPosition);
 		
 		MainCamera.front = glm::normalize(-MainCamera.position);
 

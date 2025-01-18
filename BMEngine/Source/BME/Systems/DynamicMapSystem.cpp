@@ -7,10 +7,6 @@
 #include "BME/Scene.h"
 #include "Util/Math.h"
 
-#define GLM_ENABLE_EXPERIMENTAL
-#include <iostream>
-#include <glm/gtx/string_cast.hpp>
-
 namespace DynamicMapSystem
 {
 	static void UpdateTilesData(s32 TextureTilesPerAxis);
@@ -22,6 +18,8 @@ namespace DynamicMapSystem
 	static const char TilesMaterialId[] = "TilesMaterial";
 
 	static const s32 MaxTileZoom = 5;
+
+	static const f32 SphereRadius = 1.0f;
 
 	static s32 VertexZoom = 1;
 	static s32 TileZoom = 4;
@@ -51,9 +49,9 @@ namespace DynamicMapSystem
 
 	struct Tile
 	{
-		int x;      // Tile X index
-		int y;      // Tile Y index
-		int Zoom;   // Zoom level
+		s32 x;      // Tile X index
+		s32 y;      // Tile Y index
+		s32 Zoom;   // Zoom level
 	};
 
 	static s32 LonToTileX(f64 lon, s32 z)
@@ -82,92 +80,135 @@ namespace DynamicMapSystem
 
 		const s32 VertexTilesPerAxis = Math::GetTilesPerAxis(VertexZoom);
 
-		std::vector<Tile> visibleTiles;
+		const f32 HalfVSide = std::tan(glm::radians(Camera.fov / 2.0f)) * glm::length(Camera.position);
+		const f32 HalfHSide = HalfVSide * Camera.aspectRatio;
 
-		f32 halfVSide = std::tan(glm::radians(Camera.fov / 2.0f)) * glm::length(Camera.position);
-		f32 halfHSide = halfVSide * Camera.aspectRatio;
+		const glm::vec3 NearCenter = Camera.position + Camera.front * glm::length(Camera.position);
+		const glm::vec3 Right = glm::cross(Camera.front, Camera.up);
 
-		glm::vec3 nearCenter = Camera.position + Camera.front * glm::length(Camera.position);
-		glm::vec3 right = glm::cross(Camera.front, Camera.up);
+		//f32 minLat = -90.0;
+		//f32 maxLat = 90.0;
+		//f32 minLon = -180.0;
+		//f32 maxLon = 180.0;
 
-		glm::vec3 frustumCorners[] = {
-			nearCenter + Camera.up * halfVSide - right * halfHSide, // Top-left
-			nearCenter + Camera.up * halfVSide + right * halfHSide, // Top-right
-			nearCenter - Camera.up * halfVSide - right * halfHSide, // Bottom-left
-			nearCenter - Camera.up * halfVSide + right * halfHSide  // Bottom-right
+		f32 minLat = 90.0;
+		f32 maxLat = -90.0;
+		f32 minLon = 180.0;
+		f32 maxLon = -180.0;
+
+		const glm::vec3 FrustumCorners[] = {
+			NearCenter + Camera.up * HalfVSide - Right * HalfHSide,  // Top-left
+			NearCenter + Camera.up * HalfVSide + Right * HalfHSide,  // Top-right
+			NearCenter - Camera.up * HalfVSide - Right * HalfHSide,  // Bottom-left
+			NearCenter - Camera.up * HalfVSide + Right * HalfHSide,   // Bottom-right
+			NearCenter + Camera.up * HalfVSide,		// Up
+			NearCenter - Camera.up * HalfVSide,		// Down
 		};
 
-		bool IsIntersected = false;
-		double minLat = 85.0, maxLat = -86.0, minLon = 180.0, maxLon = -180.0;
-
-		for (const auto& corner : frustumCorners)
+		s32 IntersectionCounter = 0;
+		glm::vec3 Intersection;
+		for (const glm::vec3& Corner : FrustumCorners)
 		{
-			glm::vec3 intersection;
-			if (Math::RaySphereIntersection(Camera.position, glm::normalize(corner - Camera.position), 1.0f, intersection))
+			if (Math::RaySphereIntersection(Camera.position, glm::normalize(Corner - Camera.position), SphereRadius, Intersection))
 			{
-				IsIntersected = true;
+				const f32 Lat = glm::degrees(asin(Intersection.y / SphereRadius));
+				const f32 Lon = glm::degrees(atan2(Intersection.x, Intersection.z));
 
-				double lat = glm::degrees(asin(intersection.y));
-				double lon = glm::degrees(atan2(intersection.x, intersection.z));
+				minLat = std::min<>(minLat, Lat);
+				maxLat = std::max<>(maxLat, Lat);
+				minLon = std::min<>(minLon, Lon);
+				maxLon = std::max<>(maxLon, Lon);
 
-				minLat = std::min<>(minLat, lat);
-				maxLat = std::max<>(maxLat, lat);
-				minLon = std::min<>(minLon, lon);
-				maxLon = std::max<>(maxLon, lon);
+				++IntersectionCounter;
 			}
 		}
 
-		//if (!IsIntersected)
-		//{
-		//	std::swap(minLon, maxLon);
-		//	std::swap(minLat, maxLat);
-		//}
+		auto norm = glm::normalize(Camera.position);
+		//auto norm = glm::normalize(Camera.position + Camera.up * HalfVSide);
+		const f32 Lat = glm::degrees(asin(norm.y / SphereRadius));
+		const f32 Lon = glm::degrees(atan2(norm.x, norm.z));
 
-		int minTileX = LonToTileX(minLon, Zoom);
-		int maxTileX = LonToTileX(maxLon, Zoom);
-		int minTileY = LatToTileY(maxLat, Zoom);
-		int maxTileY = LatToTileY(minLat, Zoom);
+		s32 centerTileX = LonToTileX(Lon, Zoom);
+		s32 centerTileY = LatToTileY(Lat, Zoom);
 
-		//if (minTileY > maxTileY)
-		//{
-		//	std::swap(minTileY, maxTileY);
-		//}
+		float hfov = Camera.fov * Camera.aspectRatio; // Horizontal FOV in degrees
 
-		//if (minTileX > maxTileX)
-		//{
-		//	std::swap(minTileX, maxTileX);
-		//}
+		float verticalAngle = glm::degrees(2.0f * atan(tan(glm::radians(Camera.fov * 0.5f)) * (SphereRadius / (SphereRadius + Camera.altitude))));
+		float horizontalAngle = glm::degrees(2.0f * atan(tan(glm::radians(hfov * 0.5f)) * (SphereRadius / (SphereRadius + Camera.altitude))));
 
-		if (IsIntersected)
+		float tileAngularSize = 360.0f / (1 << Zoom);
+		tileAngularSize = tileAngularSize * cos(glm::radians(Lat));
+
+		s32 tilesX = ceil(horizontalAngle / tileAngularSize);
+		s32 tilesY = ceil(verticalAngle / tileAngularSize);
+
+		s32 minTileX = centerTileX - tilesX / 2;
+		s32 maxTileX = centerTileX + tilesX / 2;
+
+		s32 minTileY = centerTileY - tilesY / 2;
+		s32 maxTileY = centerTileY + tilesY / 2;
+
+		//s32 minTileX = LonToTileX(minLon, Zoom);
+		//s32 maxTileX = LonToTileX(maxLon, Zoom);
+		//s32 minTileY = LatToTileY(maxLat, Zoom);
+		//s32 maxTileY = LatToTileY(minLat, Zoom);
+
+		if (IntersectionCounter > 5)
 		{
-			maxTileX += (maxTileX > 0) ? 1 : -1;
+			if (maxLon - minLon > 180.0f)
+			{
+				maxTileX = LonToTileX(maxLon - 360.0f, Zoom);
+				if (maxTileX < minTileX)
+				{
+					std::swap(minTileX, maxTileX);
+					//minTileX = LonToTileX(minLon + 360.0f, Zoom);
+					//maxTileX = -minTileX;
+				}
+				//minTileX -= 2;
+			}
+
+			maxTileX += (maxTileX >= 0) ? 1 : -1;
 			maxTileY += (maxTileY > 0) ? 1 : -1;
+		}
+		else
+		{
+			minTileX = 0;
+			maxTileX = VertexTilesPerAxis;
+			minTileY = 0;
+			maxTileY = VertexTilesPerAxis;
 		}
 
 		std::vector<u32> Indices;
-		Indices.reserve(((minTileX + maxTileX) / 2) * ((minTileY + maxTileY) / 2) * 6);
+		//Indices.reserve(((minTileX + maxTileX) / 2) * ((minTileY + maxTileY) / 2) * 6);
 
-		for (int x = minTileX; x < maxTileX; ++x)
+		std::vector<Tile> visibleTiles;
+
+		for (s32 x = minTileX; x < maxTileX; ++x)
 		{
-			for (int y = minTileY; y < maxTileY; ++y)
+			const s32 ValidX = (x + (1 << Zoom)) % (1 << Zoom);
+
+			for (s32 y = minTileY; y < maxTileY; ++y)
 			{
-				// Clamp tile indices to valid ranges
-				int validX = (x + (1 << Zoom)) % (1 << Zoom); // Wrap X around at 2^Zoom
-				int validY = glm::clamp(y, 0, (1 << Zoom) - 1);
+				const s32 ValidY = glm::clamp(y, 0, (1 << Zoom) - 1);
 
-				visibleTiles.push_back({ validX, validY, Zoom });
+				visibleTiles.push_back({ ValidX, ValidY, Zoom });
 
-				s32 first = validY * (VertexTilesPerAxis + 1) + validX;
-				s32 second = first + (VertexTilesPerAxis + 1);
+				const s32 First = ValidY * (VertexTilesPerAxis + 1) + ValidX;
+				const s32 Second = First + (VertexTilesPerAxis + 1);
 
-				Indices.push_back(first);
-				Indices.push_back(second);
-				Indices.push_back(first + 1);
+				Indices.push_back(First);
+				Indices.push_back(Second);
+				Indices.push_back(First + 1);
 
-				Indices.push_back(second);
-				Indices.push_back(second + 1);
-				Indices.push_back(first + 1);
+				Indices.push_back(Second);
+				Indices.push_back(Second + 1);
+				Indices.push_back(First + 1);
 			}
+		}
+
+		if (Indices.empty())
+		{
+			return;
 		}
 
 		BMR::ClearIndices();
@@ -192,9 +233,9 @@ namespace DynamicMapSystem
 		const std::string BasePath = "osm_tiles_Zoom" + std::to_string(TileZoom) +
 			"/tile_" + std::to_string(TileZoom) + '_';
 
-		for (int i = 0; i < TextureTilesPerAxis; ++i)
+		for (s32 i = 0; i < TextureTilesPerAxis; ++i)
 		{
-			for (int j = 0; j < TextureTilesPerAxis; ++j)
+			for (s32 j = 0; j < TextureTilesPerAxis; ++j)
 			{
 				std::string FileName = BasePath + std::to_string(j) + "_" + std::to_string(i) + ".png";
 				OsmTiles.emplace_back(std::move(FileName));

@@ -19,11 +19,11 @@ namespace Math
 		return 2 << glm::clamp(Zoom - 1u, MinZoom, MaxZoom);
 	}
 
-	static glm::vec3 SphericalToCartesian(const glm::vec3& Position)
+	static glm::vec3 SphericalToMercator(const glm::vec3& Position)
 	{
 		//const f32 Latitude = glm::half_pi<f32>() * Position.x; // Map [-1, 1] -> [-p/2, p/2]
 
-		// Map[-1, 1] -> Mercator latitude in radians
+		// Map[-1, 1] -> Mercator latitude in radians [-p/2, p/2]
 		const f32 Latitude = glm::atan(glm::sinh(glm::pi<f32>() * Position.x)); 
 		const f32 Longitude = glm::pi<f32>() * Position.y; // Map [-1, 1] -> [-p, p]
 		const f32 Altitude = Position.z;
