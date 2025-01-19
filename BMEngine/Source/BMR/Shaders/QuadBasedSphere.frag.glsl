@@ -10,6 +10,9 @@ layout(set = 2, binding = 0) uniform UboTileSettings
 {
 	int VertexTilesPerAxis;
 	int TextureTilesPerAxis;
+	int MinTileX;
+	int MinTileY;
+	int TilesCountY;
 } TileSettings;
 
 void main()
@@ -19,7 +22,10 @@ void main()
 	int tileX = int(fragUV.x / tileSize);
 	int tileY = int(fragUV.y / tileSize);
 
-	int layer = tileY * TileSettings.TextureTilesPerAxis + tileX;
+	int OffsetX = (tileX - TileSettings.MinTileX + TileSettings.VertexTilesPerAxis) % TileSettings.VertexTilesPerAxis;
+	int OffsetY = (tileY - TileSettings.MinTileY + TileSettings.VertexTilesPerAxis) % TileSettings.VertexTilesPerAxis;
+	int layer = OffsetX * (TileSettings.TilesCountY + 1) + OffsetY;
+	
 	vec2 tileUV = mod(fragUV, tileSize) / tileSize;
 
 	outColor = texture(TextureSampler, vec3(tileUV, float(layer)));

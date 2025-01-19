@@ -10,8 +10,8 @@ namespace DynamicMapSystem
 {
 	struct MapCamera
 	{
-		float Fov;            // Vertical field of view in degrees
-		float AspectRatio;    // Width / Height of the viewport
+		f32 Fov;            // Vertical field of view in degrees
+		f32 AspectRatio;    // Width / Height of the viewport
 		glm::vec3 Position;   // Camera position (assumes sphere center at (0, 0, 0))
 		glm::vec3 front;      // Camera front vector
 		glm::vec3 up;         // Camera up vector

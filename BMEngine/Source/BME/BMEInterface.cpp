@@ -124,7 +124,7 @@ namespace BME
 	static glm::vec3 Up = glm::vec3(0.0f, 0.0f, -1.0f);
 
 	static glm::vec3 CameraSphericalPosition = glm::vec3(0.0f, 0.0f, 6371.0f);
-	static s32 Zoom = 3;
+	static s32 Zoom = 6;
 
 	int Main()
 	{
@@ -244,7 +244,12 @@ namespace BME
 		BMR::BMRConfig RenderConfig;
 		RenderConfig.MaxTextures = 90;
 		RenderConfig.LogHandler = RenderLog;
+
+		RenderConfig.EnableValidationLayers = false;
+
+#ifdef _DEBUG
 		RenderConfig.EnableValidationLayers = true;
+#endif
 
 		BMR::Init(glfwGetWin32Window(Window), &RenderConfig);
 		ResourceManager::Init();

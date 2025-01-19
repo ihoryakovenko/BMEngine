@@ -12,6 +12,8 @@ layout(set = 2, binding = 0) uniform UboTileSettings
 {
 	int VertexTilesPerAxis;
 	int TextureTilesPerAxis;
+	int MinTileX;
+	int MinTileY;
 } TileSettings;
 
 const float radius = 1.0;
@@ -37,34 +39,3 @@ void main()
 	fragUV = vec2(u, v);
 	gl_Position = ViewProjection.Projection * ViewProjection.View * vec4(spherePos, 1.0);
 }
-
-
-
-
-
-
-
-
-
-//    const int longitudeSegments = 16;
-//    const int latitudeSegments = 16;
-//    const float radius = 10.0;
-//
-//    int vertexIndex = int(gl_VertexIndex);
-//
-//    int i = vertexIndex % (longitudeSegments + 1);
-//    int j = vertexIndex / (longitudeSegments + 1);
-//
-//    float u = float(i) / float(longitudeSegments);
-//    float v = float(j) / float(latitudeSegments);
-//
-//    float theta = u * 2.0 * 3.14159265359 - 3.14159265359;
-//	float phi = v * 3.14159265359 - 3.14159265359 / 2.0;
-//
-//	vec3 spherePos;
-//	spherePos.x = radius * cos(phi) * sin(theta);
-//	spherePos.y = radius * sin(phi);
-//	spherePos.z = -radius * cos(phi) * cos(theta);
-//
-//    fragUV = vec2(1 - u, 1 - v);
-//    gl_Position = ViewProjection.Projection * ViewProjection.View * vec4(spherePos, 1.0);

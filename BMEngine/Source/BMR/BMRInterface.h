@@ -35,8 +35,11 @@ namespace BMR
 
 	struct BMRTileSettings
 	{
-		int VertexTilesPerAxis;
-		int TextureTilesPerAxis;
+		u32 VertexTilesPerAxis;
+		u32 TextureTilesPerAxis;
+		u32 MinTileX;
+		u32 MinTileY;
+		u32 TilesCountY;
 	};
 
 	typedef glm::mat4 BMRLightSpaceMatrix;
