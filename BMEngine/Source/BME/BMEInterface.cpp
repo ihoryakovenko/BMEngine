@@ -75,7 +75,7 @@ namespace BME
 	static bool InitSystems();
 	static void DeInit();
 
-	static void Update(f32 DeltaTime);
+	static void Update(f64 DeltaTime);
 
 	static void LoadModel(const char* ModelPath, glm::mat4 Model, VkDescriptorSet CustomMaterial = nullptr);
 
@@ -124,7 +124,7 @@ namespace BME
 	static glm::vec3 Up = glm::vec3(0.0f, 0.0f, -1.0f);
 
 	static glm::vec3 CameraSphericalPosition = glm::vec3(0.0f, 0.0f, 6371.0f);
-	static s32 Zoom = 6;
+	static s32 Zoom = 4;
 
 	int Main()
 	{
@@ -278,7 +278,7 @@ namespace BME
 		}
 	}
 
-	void Update(f32 DeltaTime)
+	void Update(f64 DeltaTime)
 	{
 		//MoveCamera(Window, DeltaTime, MainCamera);
 
@@ -297,7 +297,7 @@ namespace BME
 
 
 		f32 AspectRatio = f32(MainScreenExtent.width) / f32(MainScreenExtent.height);
-		DynamicMapSystem::Update(MainCamera, Zoom);
+		DynamicMapSystem::Update(DeltaTime, MainCamera, Zoom);
 
 		static f32 Angle = 0.0f;
 

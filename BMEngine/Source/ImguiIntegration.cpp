@@ -56,6 +56,9 @@ static ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 static double DeltaTime = 0.0f;
 static double LastTime = 0.0f;
 
+static float CameraLat = 50.45032261691907;
+static float CameraLon = 30.52466412479834;
+
 static void glfw_error_callback(int error, const char* description)
 {
 	fprintf(stderr, "GLFW Error %d: %s\n", error, description);
@@ -492,8 +495,17 @@ void ImguiIntegration::DrawLoop(const bool& IsDrawing, GuiData Data)
 			ImGui::DragFloat3("DirectionLightDirection", &(*Data.DirectionLightDirection)[0], 0.05, -1, 1);
 			ImGui::DragFloat3("eye", &(*Data.Eye)[0], 0.05, -100, 100);
 
-			ImGui::DragFloat2("CameraPos", &(*Data.CameraMercatorPosition)[0], 0.01f, -1.0f, 1.0f);
+			//ImGui::DragFloat2("CameraPos", &(*Data.CameraMercatorPosition)[0], 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Camera latitude", &CameraLat, 0.01f, -90.0f, 90.0f);
+			ImGui::DragFloat("Camera longitude", &CameraLon, 0.01f, -180.0f, 180.0f);
 			ImGui::DragInt("Zoom", &(*Data.Zoom),0.05f, 1.0f, 20.0f);
+
+			float LatRadians = glm::radians(CameraLat);
+			float MercatorLat = std::log(std::tan(glm::pi<float>() / 4.0f + LatRadians / 2.0f));
+			float NormalizedMercatorLat = MercatorLat / glm::pi<float>();
+
+			Data.CameraMercatorPosition->x = NormalizedMercatorLat;
+			Data.CameraMercatorPosition->y = CameraLon / 180.0f;
 
 			if (ImGui::Button("Download tiles"))
 			{

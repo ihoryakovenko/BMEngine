@@ -22,11 +22,12 @@ void main()
 	int tileX = int(fragUV.x / tileSize);
 	int tileY = int(fragUV.y / tileSize);
 
-	int OffsetX = (tileX - TileSettings.MinTileX + TileSettings.VertexTilesPerAxis) % TileSettings.VertexTilesPerAxis;
-	int OffsetY = (tileY - TileSettings.MinTileY + TileSettings.VertexTilesPerAxis) % TileSettings.VertexTilesPerAxis;
+	int OffsetX = (tileX - TileSettings.MinTileX + TileSettings.TextureTilesPerAxis) % TileSettings.TextureTilesPerAxis;
+	int OffsetY = (tileY - TileSettings.MinTileY + TileSettings.TextureTilesPerAxis) % TileSettings.TextureTilesPerAxis;
 	int layer = OffsetX * (TileSettings.TilesCountY + 1) + OffsetY;
 	
 	vec2 tileUV = mod(fragUV, tileSize) / tileSize;
 
 	outColor = texture(TextureSampler, vec3(tileUV, float(layer)));
+	//outColor = vec4(1.0, 0.0, 0.0, 1.0);
 }

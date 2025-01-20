@@ -5,6 +5,7 @@
 #include <thread>
 #include <queue>
 #include <cassert>
+#include <cfloat>
 
 #include <httplib.h>
 
@@ -31,6 +32,8 @@ namespace DynamicMapSystem
 	static s32 GetTilesPerAxis(s32 Zoom);
 
 	static void DownloadTiles(const std::vector<Tile>& Tiles);
+	static void GetCameraVisibleRange(f64 CameraLat, f64 CameraLon, f64 HorizontalAngle, f64 VerticalAngle, s32 VertexTilesPerAxis,
+		s32& MinTileX, s32& MaxTileX, s32& MinTileY, s32& MaxTileY, s32& TilesCountY);
 
 	static const char TilesTextureId[] = "TilesTexture";
 	static const char TilesMaterialId[] = "TilesMaterial";
@@ -49,11 +52,10 @@ namespace DynamicMapSystem
 	static s32 VertexZoom = 0;
 	static s32 TileZoom = 0;
 
-	//static s32 MinTileX = 0;
-	//static s32 MaxTileX = 0;
-
-	//static s32 MinTileY = 0;
-	//static s32 MaxTileY = 0;
+	static f64 CashedCameraLat = DBL_MIN;
+	static f64 CashedCameraLon = DBL_MIN;
+	static const f64 TileUpdateTimeSeconds = 1.5;
+	static f64 TileUpdateCounter = 0.0;
 
 	static std::mutex QueueMutex;
 	static std::queue<Tile> DownloadQueue;
@@ -62,7 +64,7 @@ namespace DynamicMapSystem
 
 	static httplib::Client* Client = nullptr;
 
-	static bool TestDownload = false;
+	static bool TestDownload = true;
 
 	void Init()
 	{
@@ -77,7 +79,7 @@ namespace DynamicMapSystem
 		Client = &ClientInstance;
 	}
 
-	void Update(const MapCamera& Camera, s32 Zoom)
+	void Update(f64 DeltaTime, const MapCamera& Camera, s32 Zoom)
 	{
 		VertexZoom = Zoom > MinVertexZoom ? Zoom : MinVertexZoom;
 
@@ -103,32 +105,10 @@ namespace DynamicMapSystem
 			s32 MinTileY;
 			s32 MaxTileY;
 
-			const f64 RelativeTileAngularSize = 360.0 / VertexTilesPerAxis * cos(glm::radians(CameraLat));
+			s32 TilesCountY;
 
-			const s32 CameraTileX = LonToTileX(CameraLon, VertexTilesPerAxis);
-			const s32 CameraTileY = LatToTileY(CameraLat, VertexTilesPerAxis);
-
-			s32 VertexCountX = ceil(HorizontalAngle / RelativeTileAngularSize);
-			s32 VertexCountY = ceil(VerticalAngle / RelativeTileAngularSize);
-
-			//TilesCountY += (TilesCountY >= 0) ? 1 : -1;
-
-			if (VertexCountY % 2 != 0)
-			{
-				VertexCountY += (VertexCountY >= 0) ? 1 : -1;
-			}
-
-			MinTileX = CameraTileX - VertexCountX / 2;
-			MaxTileX = CameraTileX + VertexCountX / 2;
-
-			MinTileY = CameraTileY - VertexCountY / 2;
-			MaxTileY = CameraTileY + VertexCountY / 2;
-
-			//MaxVertexTileX += (MaxVertexTileX >= 0) ? 1 : -1;
-			//MaxVertexTileY += (MaxVertexTileY > 0) ? 1 : -1;
-
-			//MinVertexTileX -= (MinVertexTileX >= 0) ? 1 : -1;
-			//MinVertexTileY -= (MinVertexTileY > 0) ? 1 : -1;
+			GetCameraVisibleRange(CameraLat, CameraLon, HorizontalAngle, VerticalAngle, VertexTilesPerAxis,
+				MinTileX, MaxTileX, MinTileY, MaxTileY, TilesCountY);
 
 			std::vector<u32> Indices;
 			for (s32 x = MinTileX; x < MaxTileX; ++x)
@@ -163,8 +143,31 @@ namespace DynamicMapSystem
 			Scene.MapTileSettings.VertexTilesPerAxis = VertexTilesPerAxis;
 		}
 
+		bool UpdateTiles = false;
+
+		//if (TileZoom != Zoom)
+		//{
+		//	UpdateTiles = true;
+		//}
+
+		if (CashedCameraLat != CameraLat || CashedCameraLon != CameraLon || TileZoom != Zoom)
+		{
+			if (TileUpdateCounter > TileUpdateTimeSeconds)
+			{
+				UpdateTiles = true;
+			}
+			else
+			{
+				TileUpdateCounter += DeltaTime;
+			}
+		}
+
+		if (UpdateTiles)
 		{
 			TileZoom = Zoom;
+			CashedCameraLat = CameraLat;
+			CashedCameraLon = CameraLon;
+			TileUpdateCounter = 0.0;
 			
 			s32 MinTileX;
 			s32 MaxTileX;
@@ -172,25 +175,12 @@ namespace DynamicMapSystem
 			s32 MinTileY;
 			s32 MaxTileY;
 
+			s32 TilesCountY;
+
 			const s32 TilesPerAxis = GetTilesPerAxis(TileZoom);
-			const f64 RelativeTileAngularSize = 360.0 / TilesPerAxis * cos(glm::radians(CameraLat));
 
-			const s32 CameraTileX = LonToTileX(CameraLon, TilesPerAxis);
-			const s32 CameraTileY = LatToTileY(CameraLat, TilesPerAxis);
-
-			s32 TilesCountX = ceil(HorizontalAngle / RelativeTileAngularSize);
-			s32 TilesCountY = ceil(VerticalAngle / RelativeTileAngularSize);
-
-			if (TilesCountY % 2 != 0)
-			{
-				TilesCountY += (TilesCountY >= 0) ? 1 : -1;
-			}
-
-			MinTileX = CameraTileX - TilesCountX / 2;
-			MaxTileX = CameraTileX + TilesCountX / 2;
-
-			MinTileY = CameraTileY - TilesCountY / 2;
-			MaxTileY = CameraTileY + TilesCountY / 2;
+			GetCameraVisibleRange(CameraLat, CameraLon, HorizontalAngle, VerticalAngle, TilesPerAxis,
+				MinTileX, MaxTileX, MinTileY, MaxTileY, TilesCountY);
 
 			s32 ClampedMinTileX;
 			s32 ClampedMinTileY;
@@ -219,7 +209,7 @@ namespace DynamicMapSystem
 					if (TestDownload)
 					{
 						Tile T;
-						T.Zoom = VertexZoom;
+						T.Zoom = TileZoom;
 						T.X = ValidX;
 						T.Y = ValidY;
 
@@ -238,7 +228,7 @@ namespace DynamicMapSystem
 				Thread.detach();
 			}
 
-			TestDownload = false;
+			//TestDownload = false;
 		}
 		
 		BMR::BMRTexture* Texture = ResourceManager::FindTexture(TilesTextureId);
@@ -323,10 +313,16 @@ namespace DynamicMapSystem
 
 			Tile TileToDownload = Tiles[i];
 
-			const std::string Path = "/" + std::to_string(VertexZoom) + "/" +
+			const std::string Path = "/" + std::to_string(TileToDownload.Zoom) + "/" +
 				std::to_string(TileToDownload.X) + "/" + std::to_string(TileToDownload.Y) + ".png";
 
+			auto start = std::chrono::high_resolution_clock::now();
+
 			httplib::Result Res = Client->Get(Path);
+
+			auto end = std::chrono::high_resolution_clock::now();
+			std::chrono::duration<double> duration = end - start;
+			std::cout << "Request took " << duration.count() << " seconds" << std::endl;
 
 			if (Res && Res->status == httplib::StatusCode::OK_200)
 			{
@@ -336,6 +332,40 @@ namespace DynamicMapSystem
 				DownloadQueue.emplace(std::move(TileToDownload));
 			}
 		}
+	}
+
+	void GetCameraVisibleRange(f64 CameraLat, f64 CameraLon, f64 HorizontalAngle, f64 VerticalAngle, s32 TilesPerAxis,
+		s32& MinTileX, s32& MaxTileX, s32& MinTileY, s32& MaxTileY, s32& TilesCountY)
+	{
+		const f64 RelativeTileAngularSize = 360.0 / TilesPerAxis * cos(glm::radians(CameraLat));
+
+		const s32 CameraTileX = LonToTileX(CameraLon, TilesPerAxis);
+		const s32 CameraTileY = LatToTileY(CameraLat, TilesPerAxis);
+
+		s32 TilesCountX = ceil(HorizontalAngle / RelativeTileAngularSize);
+		TilesCountY = ceil(VerticalAngle / RelativeTileAngularSize);
+
+		TilesCountY += (TilesCountY >= 0) ? 1 : -1;
+
+		if (TilesCountY % 2 != 0)
+		{
+			TilesCountY += (TilesCountY >= 0) ? 1 : -1;
+		}
+
+		TilesCountX += TilesCountX / 2;
+		TilesCountY += TilesCountY / 2;
+
+		MinTileX = CameraTileX - TilesCountX / 2;
+		MaxTileX = CameraTileX + TilesCountX / 2;
+
+		MinTileY = CameraTileY - TilesCountY / 2;
+		MaxTileY = CameraTileY + TilesCountY / 2;
+
+		//MaxVertexTileX += (MaxVertexTileX >= 0) ? 1 : -1;
+		//MaxVertexTileY += (MaxVertexTileY > 0) ? 1 : -1;
+
+		//MinVertexTileX -= (MinVertexTileX >= 0) ? 1 : -1;
+		//MinVertexTileY -= (MinVertexTileY > 0) ? 1 : -1;
 	}
 
 	s32 LonToTileX(f64 Lon, s32 TilePerAxis)
