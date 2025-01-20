@@ -21,7 +21,8 @@ void main()
 	float Gamma = 2.2;
 
 	int xHalf = 1600;
-	if (gl_FragCoord.x > xHalf)
+	//if (gl_FragCoord.x > xHalf)
+	if (false)
 	{
 		float lowerBound = 0.99;
 		float upperBound = 1;

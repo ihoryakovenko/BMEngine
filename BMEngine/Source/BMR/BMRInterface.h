@@ -33,6 +33,15 @@ namespace BMR
 		glm::mat4 Projection;
 	};
 
+	struct BMRTileSettings
+	{
+		u32 VertexTilesPerAxis;
+		u32 TextureTilesPerAxis;
+		u32 MinTileX;
+		u32 MinTileY;
+		u32 TilesCountY;
+	};
+
 	typedef glm::mat4 BMRLightSpaceMatrix;
 
 	struct BMRTextureArrayInfo
@@ -44,6 +53,7 @@ namespace BMR
 		u8** Data = nullptr;
 		VkImageViewType ViewType;
 		VkImageCreateFlags Flags;
+		u32 BaseArrayLayer = 0;
 	};
 
 	struct BMRDrawEntity
@@ -58,6 +68,13 @@ namespace BMR
 	struct BMRDrawTerrainEntity
 	{
 		u64 VertexOffset = 0;
+		u64 IndexOffset = 0;
+		u32 IndicesCount = 0;
+		VkDescriptorSet TextureSet = nullptr;
+	};
+
+	struct BMRDrawMapEntity
+	{
 		u64 IndexOffset = 0;
 		u32 IndicesCount = 0;
 		VkDescriptorSet TextureSet = nullptr;
@@ -135,6 +152,9 @@ namespace BMR
 		BMRDrawSkyBoxEntity SkyBox;
 		bool DrawSkyBox = false;
 
+		BMRDrawMapEntity MapEntity;
+		BMRTileSettings MapTileSettings;
+
 		BMRLightBuffer* LightEntity = nullptr;
 	};
 
@@ -148,14 +168,18 @@ namespace BMR
 	void DeInit();
 
 	BMRTexture CreateTexture(BMRTextureArrayInfo* Info);
+	BMRTexture CreateEmptyTexture(BMRTextureArrayInfo* Info);
+	void UpdateTexture(BMRTexture* Texture, BMRTextureArrayInfo* Info);
 	void DestroyTexture(BMRTexture* Texture);
 
 	void TestAttachEntityTexture(VkImageView DefuseImage, VkImageView SpecularImage, VkDescriptorSet* SetToAttach);
 	void TestAttachSkyNoxTerrainTexture(VkImageView DefuseImage, VkDescriptorSet* SetToAttach);
-	
+
 	void UpdateMaterialBuffer(const BMRMaterial* Buffer);
 	u64 LoadVertices(const void* Vertices, u32 VertexSize, u64 VerticesCount);
 	u64 LoadIndices(const u32* Indices, u32 IndicesCount);
+
+	void ClearIndices();
 
 	void Draw(const BMRDrawScene* Scene);
 }

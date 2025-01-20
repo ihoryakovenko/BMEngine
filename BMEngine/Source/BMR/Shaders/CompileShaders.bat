@@ -39,5 +39,8 @@ if not exist "%SHADER_OUTPUT%" (
 %VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_OUTPUT%SkyBox_vert.spv -V %SHADER_PATH%SkyBox.vert.glsl
 %VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_OUTPUT%SkyBox_frag.spv -V %SHADER_PATH%SkyBox.frag.glsl
 
+%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_OUTPUT%QuadBasedSphere_vert.spv -V %SHADER_PATH%QuadBasedSphere.vert.glsl
+%VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_OUTPUT%QuadBasedSphere_frag.spv -V %SHADER_PATH%QuadBasedSphere.frag.glsl
+
 %VULKAN_SDK%/Bin/glslangValidator.exe -o %SHADER_OUTPUT%Depth_vert.spv -V %SHADER_PATH%Depth.vert.glsl
 pause

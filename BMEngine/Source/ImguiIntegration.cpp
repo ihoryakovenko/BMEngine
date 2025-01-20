@@ -11,6 +11,9 @@
 
 #include <thread>
 
+#include <glm/glm.hpp>
+#include <glm/gtc/constants.hpp>
+
 // Volk headers
 #ifdef IMGUI_IMPL_VULKAN_USE_VOLK
 #define VOLK_IMPLEMENTATION
@@ -46,12 +49,15 @@ static bool                     g_SwapChainRebuild = false;
 
 static GLFWwindow* window = nullptr;
 
-static bool show_demo_window = true;
+static bool show_demo_window = false;
 static bool show_another_window = false;
 static ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
 static double DeltaTime = 0.0f;
 static double LastTime = 0.0f;
+
+static float CameraLat = 50.45032261691907;
+static float CameraLon = 30.52466412479834;
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -489,16 +495,34 @@ void ImguiIntegration::DrawLoop(const bool& IsDrawing, GuiData Data)
 			ImGui::DragFloat3("DirectionLightDirection", &(*Data.DirectionLightDirection)[0], 0.05, -1, 1);
 			ImGui::DragFloat3("eye", &(*Data.Eye)[0], 0.05, -100, 100);
 
-			ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-			ImGui::Checkbox("Another Window", &show_another_window);
+			//ImGui::DragFloat2("CameraPos", &(*Data.CameraMercatorPosition)[0], 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Camera latitude", &CameraLat, 0.01f, -90.0f, 90.0f);
+			ImGui::DragFloat("Camera longitude", &CameraLon, 0.01f, -180.0f, 180.0f);
+			ImGui::DragInt("Zoom", &(*Data.Zoom),0.05f, 1.0f, 20.0f);
 
-			ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-			ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+			float LatRadians = glm::radians(CameraLat);
+			float MercatorLat = std::log(std::tan(glm::pi<float>() / 4.0f + LatRadians / 2.0f));
+			float NormalizedMercatorLat = MercatorLat / glm::pi<float>();
 
-			if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-				counter++;
-			ImGui::SameLine();
-			ImGui::Text("counter = %d", counter);
+			Data.CameraMercatorPosition->x = NormalizedMercatorLat;
+			Data.CameraMercatorPosition->y = CameraLon / 180.0f;
+
+			if (ImGui::Button("Download tiles"))
+			{
+				Data.OnTestSetDownload(true);
+			}
+			
+
+			//ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
+			//ImGui::Checkbox("Another Window", &show_another_window);
+
+			//ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+			//ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+
+			//if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+			//	counter++;
+			//ImGui::SameLine();
+			//ImGui::Text("counter = %d", counter);
 
 			ImGuiIO& io = ImGui::GetIO();
 			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);

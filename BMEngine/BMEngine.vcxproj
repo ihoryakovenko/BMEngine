@@ -27,6 +27,9 @@
     <ClCompile Include="..\External\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Source\BME\BMEInterface.cpp" />
+    <ClCompile Include="Source\BME\Scene.cpp" />
+    <ClCompile Include="Source\BME\Systems\DynamicMapSystem.cpp" />
+    <ClCompile Include="Source\BME\Systems\ResourceManager.cpp" />
     <ClCompile Include="Source\BMR\BMRVulkan\BMRVulkan.cpp" />
     <ClCompile Include="Source\BMR\BMRInterface.cpp" />
     <ClCompile Include="Source\ImguiIntegration.cpp" />
@@ -45,8 +48,12 @@
     <ClInclude Include="..\External\imgui\imstb_textedit.h" />
     <ClInclude Include="..\External\imgui\imstb_truetype.h" />
     <ClInclude Include="Source\BME\BMEInterface.h" />
+    <ClInclude Include="Source\BME\Scene.h" />
+    <ClInclude Include="Source\BME\Systems\DynamicMapSystem.h" />
+    <ClInclude Include="Source\BME\Systems\ResourceManager.h" />
     <ClInclude Include="Source\BMR\BMRVulkan\BMRVulkan.h" />
     <ClInclude Include="Source\Platform\WinPlatform.h" />
+    <ClInclude Include="Source\Util\Math.h" />
     <ClInclude Include="Source\Util\Settings.h" />
     <ClInclude Include="Source\ImguiIntegration.h" />
     <ClInclude Include="Source\Memory\MemoryManagmentSystem.h" />
