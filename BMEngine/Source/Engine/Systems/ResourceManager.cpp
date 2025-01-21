@@ -9,19 +9,19 @@ namespace ResourceManager
 {
 	static const std::string TexturesPath = "./Resources/Textures/";
 
-	static std::map<std::string, BMR::BMRTexture> Textures;
+	static std::map<std::string, Render::RenderTexture> Textures;
 	static std::map<std::string, VkDescriptorSet> EngineMaterials;
 
 	void Init()
 	{
 		// Default resources
-		BMR::BMRTexture TestTexture = LoadTexture("1giraffe", std::vector<std::string> {"1giraffe.jpg"}, VK_IMAGE_VIEW_TYPE_2D);
-		BMR::BMRTexture WhiteTexture = LoadTexture("White", std::vector<std::string> {"White.png"}, VK_IMAGE_VIEW_TYPE_2D);
-		BMR::BMRTexture ContainerTexture = LoadTexture("container2", std::vector<std::string> {"container2.png"}, VK_IMAGE_VIEW_TYPE_2D);
-		BMR::BMRTexture ContainerSpecularTexture = LoadTexture("container2_specular", std::vector<std::string> {"container2_specular.png"}, VK_IMAGE_VIEW_TYPE_2D);
-		BMR::BMRTexture BlendWindow = LoadTexture("blending_transparent_window", std::vector<std::string> {"blending_transparent_window.png"}, VK_IMAGE_VIEW_TYPE_2D);
-		BMR::BMRTexture GrassTexture = LoadTexture("grass", std::vector<std::string> {"grass.png"}, VK_IMAGE_VIEW_TYPE_2D);
-		BMR::BMRTexture SkyBoxCubeTexture = LoadTexture("skybox", std::vector<std::string> {
+		Render::RenderTexture TestTexture = LoadTexture("1giraffe", std::vector<std::string> {"1giraffe.jpg"}, VK_IMAGE_VIEW_TYPE_2D);
+		Render::RenderTexture WhiteTexture = LoadTexture("White", std::vector<std::string> {"White.png"}, VK_IMAGE_VIEW_TYPE_2D);
+		Render::RenderTexture ContainerTexture = LoadTexture("container2", std::vector<std::string> {"container2.png"}, VK_IMAGE_VIEW_TYPE_2D);
+		Render::RenderTexture ContainerSpecularTexture = LoadTexture("container2_specular", std::vector<std::string> {"container2_specular.png"}, VK_IMAGE_VIEW_TYPE_2D);
+		Render::RenderTexture BlendWindow = LoadTexture("blending_transparent_window", std::vector<std::string> {"blending_transparent_window.png"}, VK_IMAGE_VIEW_TYPE_2D);
+		Render::RenderTexture GrassTexture = LoadTexture("grass", std::vector<std::string> {"grass.png"}, VK_IMAGE_VIEW_TYPE_2D);
+		Render::RenderTexture SkyBoxCubeTexture = LoadTexture("skybox", std::vector<std::string> {
 			"skybox/right.jpg",
 				"skybox/left.jpg",
 				"skybox/top.jpg",
@@ -50,11 +50,11 @@ namespace ResourceManager
 	{
 		for (auto& Texture : Textures)
 		{
-			BMR::DestroyTexture(&Texture.second);
+			Render::DestroyTexture(&Texture.second);
 		}
 	}
 
-	BMR::BMRTexture LoadTexture(const std::string& Id, const std::vector<std::string>& PathNames,
+	Render::RenderTexture LoadTexture(const std::string& Id, const std::vector<std::string>& PathNames,
 		VkImageViewType Type, VkImageCreateFlags Flags)
 	{
 		assert(PathNames.size() > 0);
@@ -74,7 +74,7 @@ namespace ResourceManager
 			}
 		}
 
-		BMR::BMRTextureArrayInfo Info;
+		Render::TextureArrayInfo Info;
 		Info.Width = Width;
 		Info.Height = Height;
 		Info.Format = STBI_rgb_alpha;
@@ -83,7 +83,7 @@ namespace ResourceManager
 		Info.ViewType = Type;
 		Info.Flags = Flags;
 
-		BMR::BMRTexture Texture = BMR::CreateTexture(&Info);
+		Render::RenderTexture Texture = Render::CreateTexture(&Info);
 
 		for (u32 i = 0; i < PathNames.size(); ++i)
 		{
@@ -94,10 +94,10 @@ namespace ResourceManager
 		return Texture;
 	}
 
-	BMR::BMRTexture EmptyTexture(const std::string& Id, u32 Width, u32 Height, u32 Layers,
+	Render::RenderTexture EmptyTexture(const std::string& Id, u32 Width, u32 Height, u32 Layers,
 		VkImageViewType Type, VkImageCreateFlags Flags)
 	{
-		BMR::BMRTextureArrayInfo Info;
+		Render::TextureArrayInfo Info;
 		Info.Width = Width;
 		Info.Height = Height;
 		Info.Format = STBI_rgb_alpha;
@@ -105,13 +105,13 @@ namespace ResourceManager
 		Info.ViewType = Type;
 		Info.Flags = Flags;
 
-		BMR::BMRTexture Texture = BMR::CreateEmptyTexture(&Info);
+		Render::RenderTexture Texture = Render::CreateEmptyTexture(&Info);
 
 		Textures[Id] = Texture;
 		return Texture;
 	}
 
-	void LoadToTexture(BMR::BMRTexture* Texture, const std::vector<std::string>& PathNames)
+	void LoadToTexture(Render::RenderTexture* Texture, const std::vector<std::string>& PathNames)
 	{
 		assert(PathNames.size() > 0);
 		std::vector<stbi_uc*> ImageData(PathNames.size());
@@ -130,14 +130,14 @@ namespace ResourceManager
 			}
 		}
 
-		BMR::BMRTextureArrayInfo Info;
+		Render::TextureArrayInfo Info;
 		Info.Width = Width;
 		Info.Height = Height;
 		Info.Format = STBI_rgb_alpha;
 		Info.LayersCount = PathNames.size();
 		Info.Data = ImageData.data();
 
-		BMR::UpdateTexture(Texture, &Info);
+		Render::UpdateTexture(Texture, &Info);
 
 		for (u32 i = 0; i < PathNames.size(); ++i)
 		{
@@ -156,7 +156,7 @@ namespace ResourceManager
 		return nullptr;
 	}
 
-	BMR::BMRTexture* FindTexture(const std::string& Id)
+	Render::RenderTexture* FindTexture(const std::string& Id)
 	{
 		auto it = Textures.find(Id);
 		if (it != Textures.end())
@@ -169,13 +169,13 @@ namespace ResourceManager
 
 	void CreateEntityMaterial(const std::string& Id, VkImageView DefuseImage, VkImageView SpecularImage, VkDescriptorSet* SetToAttach)
 	{
-		BMR::TestAttachEntityTexture(DefuseImage, SpecularImage, SetToAttach);
+		Render::TestAttachEntityTexture(DefuseImage, SpecularImage, SetToAttach);
 		EngineMaterials[Id] = *SetToAttach;
 	}
 
 	void CreateSkyBoxTerrainTexture(const std::string& Id, VkImageView DefuseImage, VkDescriptorSet* SetToAttach)
 	{
-		BMR::TestAttachSkyNoxTerrainTexture(DefuseImage, SetToAttach);
+		Render::TestAttachSkyNoxTerrainTexture(DefuseImage, SetToAttach);
 		EngineMaterials[Id] = *SetToAttach;
 	}
 }

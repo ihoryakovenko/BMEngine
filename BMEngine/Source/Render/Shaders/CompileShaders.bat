@@ -15,7 +15,7 @@ if "%PROJECT_DIR%" == "" (
     exit /b 2
 )
 
-set SHADER_PATH=%PROJECT_DIR%Source/BMR/Shaders/
+set SHADER_PATH=%PROJECT_DIR%Source/Render/Shaders/
 set SHADER_OUTPUT=%PROJECT_DIR%/Resources/Shaders/
 
 if not exist "%SHADER_OUTPUT%" (

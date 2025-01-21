@@ -5,29 +5,29 @@
 #include "Util/EngineTypes.h"
 #include "Platform/WinPlatform.h"
 
-namespace BMRVulkan
+namespace VulkanInterface
 {
 	static const u32 MAX_SWAPCHAIN_IMAGES_COUNT = 3;
 	static const u32 MAX_VERTEX_INPUTS_ATTRIBUTES = 16;
 	static const u32 MAX_VERTEX_INPUT_BINDINGS = 16;
 
-	enum BMRVkLogType
+	enum LogType
 	{
 		BMRVkLogType_Error,
 		BMRVkLogType_Warning,
 		BMRVkLogType_Info
 	};
 
-	typedef void (*BMRVkLogHandler)(BMRVkLogType, const char*, va_list);
+	typedef void (*BMRVkLogHandler)(LogType, const char*, va_list);
 
-	struct BMRVkConfig
+	struct VulkanInterfaceConfig
 	{
 		BMRVkLogHandler LogHandler = nullptr;
 		bool EnableValidationLayers = false;
 		u32 MaxTextures = 0;
 	};
 
-	struct BMRVertexInputAttribute
+	struct VertexInputAttribute
 	{
 		const char* VertexInputAttributeName = nullptr;
 		VkFormat Format = VK_FORMAT_UNDEFINED;
@@ -38,20 +38,20 @@ namespace BMRVulkan
 	{
 		const char* VertexInputBindingName = nullptr;
 
-		BMRVertexInputAttribute InputAttributes[MAX_VERTEX_INPUTS_ATTRIBUTES];
+		VertexInputAttribute InputAttributes[MAX_VERTEX_INPUTS_ATTRIBUTES];
 		u32 InputAttributesCount = 0;
 
 		u32 Stride = 0;
 		VkVertexInputRate InputRate = VK_VERTEX_INPUT_RATE_MAX_ENUM;
 	};
 
-	struct BMRVertexInput
+	struct VertexInput
 	{
 		BMRVertexInputBinding VertexInputBinding[MAX_VERTEX_INPUT_BINDINGS];
 		u32 VertexInputBindingCount = 0;
 	};
 
-	struct BMRPipelineSettings
+	struct PipelineSettings
 	{
 		const char* PipelineName = nullptr;
 
@@ -83,7 +83,7 @@ namespace BMRVulkan
 		VkBool32 StencilTestEnable = VK_FALSE;
 	};
 
-	struct BMRSubpassSettings
+	struct SubpassSettings
 	{
 		const char* SubpassName = nullptr;
 
@@ -97,7 +97,7 @@ namespace BMRVulkan
 		u32 InputAttachmentsReferencesCount = 0;
 	};
 
-	struct BMRRenderPassSettings
+	struct RenderPassSettings
 	{
 		const char* RenderPassName = nullptr;
 
@@ -105,7 +105,7 @@ namespace BMRVulkan
 		VkAttachmentDescription* AttachmentDescriptions = nullptr;
 		u32 AttachmentDescriptionsCount = 0;
 
-		const BMRSubpassSettings* SubpassesSettings = nullptr;
+		const SubpassSettings* SubpassesSettings = nullptr;
 		u32 SubpassSettingsCount = 0;
 
 		VkSubpassDependency* SubpassDependencies = nullptr;
@@ -116,7 +116,7 @@ namespace BMRVulkan
 		u32 ClearValuesCount = 0;
 	};
 
-	struct BMRUniform
+	struct UniformValue
 	{
 		union
 		{
@@ -127,7 +127,7 @@ namespace BMRVulkan
 		VkDeviceMemory Memory = nullptr;
 	};
 
-	struct BMRUniformSetAttachmentInfo
+	struct UniformSetAttachmentInfo
 	{
 		union
 		{
@@ -138,7 +138,7 @@ namespace BMRVulkan
 		VkDescriptorType Type = VK_DESCRIPTOR_TYPE_MAX_ENUM;
 	};
 
-	struct BMRUniformImageInterfaceCreateInfo
+	struct UniformImageInterfaceCreateInfo
 	{
 		const void* pNext = nullptr;
 		VkImageViewCreateFlags Flags = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
@@ -148,34 +148,34 @@ namespace BMRVulkan
 		VkImageSubresourceRange SubresourceRange;
 	};
 
-	struct BMRAttachmentView
+	struct AttachmentView
 	{
 		// Count should be equal to AttachmentDescriptionsCount
 		VkImageView* ImageViews = nullptr;
 	};
 
-	struct BMRRenderTarget
+	struct RenderTarget
 	{
-		BMRAttachmentView AttachmentViews[MAX_SWAPCHAIN_IMAGES_COUNT];
+		AttachmentView AttachmentViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 	};
 
-	struct BMRFramebufferSet
+	struct FramebufferSet
 	{
 		VkFramebuffer FrameBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 	};
 
-	struct BMRRenderPass
+	struct RenderPass
 	{
 		VkRenderPass Pass = nullptr;
 
 		VkClearValue* ClearValues = nullptr;
 		u32 ClearValuesCount = 0;
 
-		BMRFramebufferSet* RenderTargets = nullptr;
+		FramebufferSet* RenderTargets = nullptr;
 		u32 RenderTargetCount = 0;
 	};
 
-	struct BMRPipelineResourceInfo
+	struct PipelineResourceInfo
 	{
 		VkRenderPass RenderPass = nullptr;
 		u32 SubpassIndex = -1;
@@ -183,25 +183,25 @@ namespace BMRVulkan
 		VkPipelineLayout PipelineLayout = nullptr;
 	};
 
-	struct BMRSPipelineShaderInfo
+	struct PipelineShaderInfo
 	{
 		const VkPipelineShaderStageCreateInfo* Infos = nullptr;
 		u32 InfosCounter = 0;
 	};
 
-	struct BMRPipeline
+	struct RenderPipeline
 	{
 		VkPipeline Pipeline = nullptr;
 		VkPipelineLayout PipelineLayout = nullptr;
 	};
 
-	struct BMRLayoutLayerTransitionData
+	struct LayoutLayerTransitionData
 	{
 		u32 BaseArrayLayer;
 		u32 LayerCount;
 	};
 
-	void Init(Platform::BMRWindowHandler WindowHandler, const BMRVkConfig& InConfig);
+	void Init(Platform::BMRWindowHandler WindowHandler, const VulkanInterfaceConfig& InConfig);
 	void DeInit();
 
 	u32 GetImageCount();
@@ -209,20 +209,20 @@ namespace BMRVulkan
 	u32 AcquireNextImageIndex(); // Locks thread
 	VkCommandBuffer BeginDraw(u32 ImageIndex);
 	void EndDraw(u32 ImageIndex);
-	void BeginRenderPass(const BMRRenderPass* Pass, VkRect2D RenderArea, u32 RenderTargetIndex, u32 ImageIndex);
+	void BeginRenderPass(const RenderPass* Pass, VkRect2D RenderArea, u32 RenderTargetIndex, u32 ImageIndex);
 
-	void CreateRenderPass(const BMRRenderPassSettings* Settings, const BMRRenderTarget* Targets,
-		VkExtent2D TargetExtent, u32 TargetCount, u32 SwapchainImagesCount, BMRRenderPass* OutPass);
+	void CreateRenderPass(const RenderPassSettings* Settings, const RenderTarget* Targets,
+		VkExtent2D TargetExtent, u32 TargetCount, u32 SwapchainImagesCount, RenderPass* OutPass);
 	VkPipelineLayout CreatePipelineLayout(const VkDescriptorSetLayout* DescriptorLayouts,
 		u32 DescriptorLayoutsCount, const VkPushConstantRange* PushConstant, u32 PushConstantsCount);
-	void CreatePipelines(const BMRSPipelineShaderInfo* ShaderInputs, const BMRVertexInput* VertexInputs,
-		const BMRPipelineSettings* PipelinesSettings, const BMRPipelineResourceInfo* ResourceInfos,
+	void CreatePipelines(const PipelineShaderInfo* ShaderInputs, const VertexInput* VertexInputs,
+		const PipelineSettings* PipelinesSettings, const PipelineResourceInfo* ResourceInfos,
 		u32 PipelinesCount, VkPipeline* OutputPipelines);
-	BMRUniform CreateUniformBuffer(const VkBufferCreateInfo* BufferInfo, VkMemoryPropertyFlags Properties);
-	BMRUniform CreateUniformImage(const VkImageCreateInfo* ImageCreateInfo);
+	UniformValue CreateUniformBuffer(const VkBufferCreateInfo* BufferInfo, VkMemoryPropertyFlags Properties);
+	UniformValue CreateUniformImage(const VkImageCreateInfo* ImageCreateInfo);
 	VkDescriptorSetLayout CreateUniformLayout(const VkDescriptorType* Types, const VkShaderStageFlags* Stages, u32 Count);
 	void CreateUniformSets(const VkDescriptorSetLayout* Layouts, u32 Count, VkDescriptorSet* OutSets);
-	VkImageView CreateImageInterface(const BMRUniformImageInterfaceCreateInfo* InterfaceCreateInfo, VkImage Image);
+	VkImageView CreateImageInterface(const UniformImageInterfaceCreateInfo* InterfaceCreateInfo, VkImage Image);
 	VkSampler CreateSampler(const VkSamplerCreateInfo* CreateInfo);
 	bool CreateShader(const u32* Code, u32 CodeSize, VkShaderModule& VertexShaderModule);
 
@@ -230,24 +230,24 @@ namespace BMRVulkan
 	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, VkDeviceSize AlignedLayerSize,
 		u32 LayersCount, void* Data, u32 Baselayer = 0);
 
-	void DestroyRenderPass(BMRRenderPass* Pass);
+	void DestroyRenderPass(RenderPass* Pass);
 	void DestroyPipelineLayout(VkPipelineLayout Layout);
 	void DestroyPipeline(VkPipeline Pipeline);
-	void DestroyUniformBuffer(BMRUniform Buffer);
-	void DestroyUniformImage(BMRUniform Image);
+	void DestroyUniformBuffer(UniformValue Buffer);
+	void DestroyUniformImage(UniformValue Image);
 	void DestroyUniformLayout(VkDescriptorSetLayout Layout);
 	void DestroyImageInterface(VkImageView Interface);
 	void DestroySampler(VkSampler Sampler);
 	void DestroyShader(VkShaderModule Shader);
 
-	void AttachUniformsToSet(VkDescriptorSet Set, const BMRUniformSetAttachmentInfo* Infos, u32 BufferCount);
-	void UpdateUniformBuffer(BMRUniform Buffer, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);
+	void AttachUniformsToSet(VkDescriptorSet Set, const UniformSetAttachmentInfo* Infos, u32 BufferCount);
+	void UpdateUniformBuffer(UniformValue Buffer, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);
 	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, u32 LayersCount, void* Data, u32 Baselayer = 0);
 
 	void TransitImageLayout(VkImage Image, VkImageLayout OldLayout, VkImageLayout NewLayout,
 		VkAccessFlags SrcAccessMask, VkAccessFlags DstAccessMask,
 		VkPipelineStageFlags SrcStage, VkPipelineStageFlags DstStage,
-		BMRLayoutLayerTransitionData* LayerData, u32 LayerDataCount);
+		LayoutLayerTransitionData* LayerData, u32 LayerDataCount);
 
 	void WaitDevice();
 }

@@ -4,17 +4,17 @@
 #include <glm/gtc/constants.hpp>
 
 #include "Util/EngineTypes.h"
-#include "BMR/BMRInterface.h"
+#include "Render/Render.h"
 
 namespace DynamicMapSystem
 {
 	struct MapCamera
 	{
-		f32 Fov;            // Vertical field of view in degrees
-		f32 AspectRatio;    // Width / Height of the viewport
-		glm::vec3 Position;   // Camera position (assumes sphere center at (0, 0, 0))
-		glm::vec3 front;      // Camera front vector
-		glm::vec3 up;         // Camera up vector
+		f32 Fov;
+		f32 AspectRatio;
+		glm::vec3 Position;
+		glm::vec3 Front;
+		glm::vec3 Up;
 	};
 
 	void Init();

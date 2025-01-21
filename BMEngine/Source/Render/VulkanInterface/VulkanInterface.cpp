@@ -1,4 +1,4 @@
-#include "BMRVulkan.h"
+#include "VulkanInterface.h"
 
 #include <cassert>
 #include <cstring>
@@ -9,7 +9,7 @@
 
 #include "Memory/MemoryManagmentSystem.h"
 
-namespace BMRVulkan
+namespace VulkanInterface
 {
 	// TYPES DECLARATION
 	struct BMRMainInstance
@@ -103,11 +103,11 @@ namespace BMRVulkan
 		VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
 		void* UserData);
 
-	static void HandleLog(BMRVkLogType LogType, const char* Format, ...);
+	static void HandleLog(LogType LogType, const char* Format, ...);
 
 	// INTERNAL VARIABLES
 	static BMRVkLogHandler LogHandler = nullptr;
-	static BMRVkConfig Config;
+	static VulkanInterfaceConfig Config;
 
 	static const u32 RequiredExtensionsCount = 2;
 	const char* RequiredInstanceExtensions[RequiredExtensionsCount] =
@@ -136,11 +136,11 @@ namespace BMRVulkan
 	static u32 CurrentFrame = 0;
 
 	// TODO: move StagingBuffer to external system
-	static BMRVulkan::BMRUniform StagingBuffer;
+	static VulkanInterface::UniformValue StagingBuffer;
 	
 
 	// FUNCTIONS IMPLEMENTATIONS
-	void Init(Platform::BMRWindowHandler WindowHandler, const BMRVkConfig& InConfig)
+	void Init(Platform::BMRWindowHandler WindowHandler, const VulkanInterfaceConfig& InConfig)
 	{
 		Config = InConfig;
 		LogHandler = Config.LogHandler;
@@ -201,7 +201,7 @@ namespace BMRVulkan
 		bufferInfo.size = MB256;
 		bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		StagingBuffer = BMRVulkan::CreateUniformBuffer(&bufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		StagingBuffer = VulkanInterface::CreateUniformBuffer(&bufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	}
 
 	void DeInit()
@@ -235,8 +235,8 @@ namespace BMRVulkan
 		return PipelineLayout;
 	}
 
-	void CreatePipelines(const BMRSPipelineShaderInfo* ShaderInputs, const BMRVertexInput* VertexInputs,
-		const BMRPipelineSettings* PipelinesSettings, const BMRPipelineResourceInfo* ResourceInfos,
+	void CreatePipelines(const PipelineShaderInfo* ShaderInputs, const VertexInput* VertexInputs,
+		const PipelineSettings* PipelinesSettings, const PipelineResourceInfo* ResourceInfos,
 		u32 PipelinesCount, VkPipeline* OutputPipelines)
 	{
 		auto PipelineCreateInfos = Memory::BmMemoryManagementSystem::FrameAlloc<VkGraphicsPipelineCreateInfo>(PipelinesCount);
@@ -263,8 +263,8 @@ namespace BMRVulkan
 
 		for (u32 PipelineIndex = 0; PipelineIndex < PipelinesCount; ++PipelineIndex)
 		{
-			const BMRVertexInput* VertexInput = VertexInputs + PipelineIndex;
-			const BMRPipelineSettings* Settings = PipelinesSettings + PipelineIndex;
+			const VertexInput* VertexInput = VertexInputs + PipelineIndex;
+			const PipelineSettings* Settings = PipelinesSettings + PipelineIndex;
 			VkViewport* Viewport = Viewports + PipelineIndex;
 			VkRect2D* Scissor = Scissors + PipelineIndex;
 
@@ -316,7 +316,7 @@ namespace BMRVulkan
 
 				for (u32 CurrentAttributeIndex = 0; CurrentAttributeIndex < BMRBinding->InputAttributesCount; ++CurrentAttributeIndex)
 				{
-					const BMRVertexInputAttribute* BMRAttribute = BMRBinding->InputAttributes + CurrentAttributeIndex;
+					const VertexInputAttribute* BMRAttribute = BMRBinding->InputAttributes + CurrentAttributeIndex;
 					VkVertexInputAttributeDescription* VertexInputAttribute = VertexInputAttributes + VertexInputAttributesIndex;
 
 					VertexInputAttribute->binding = BindingIndex;
@@ -403,7 +403,7 @@ namespace BMRVulkan
 			DepthStencilInfo[PipelineIndex].stencilTestEnable = Settings->StencilTestEnable;
 
 			// CREATE INFO
-			const BMRPipelineResourceInfo* ResourceInfo = ResourceInfos + PipelineIndex;
+			const PipelineResourceInfo* ResourceInfo = ResourceInfos + PipelineIndex;
 
 			VkGraphicsPipelineCreateInfo* PipelineCreateInfo = PipelineCreateInfos + PipelineIndex;
 			PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -520,7 +520,7 @@ namespace BMRVulkan
 		CurrentFrame = (CurrentFrame + 1) % MAX_DRAW_FRAMES;
 	}
 
-	void BeginRenderPass(const BMRRenderPass* Pass, VkRect2D RenderArea, u32 RenderTargetIndex, u32 ImageIndex)
+	void BeginRenderPass(const RenderPass* Pass, VkRect2D RenderArea, u32 RenderTargetIndex, u32 ImageIndex)
 	{
 		VkRenderPassBeginInfo DepthRenderPassBeginInfo = { };
 		DepthRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -533,8 +533,8 @@ namespace BMRVulkan
 		vkCmdBeginRenderPass(DrawCommandBuffers[ImageIndex], &DepthRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 	}
 
-	void CreateRenderPass(const BMRRenderPassSettings* Settings, const BMRRenderTarget* Targets,
-		VkExtent2D TargetExtent, u32 TargetCount, u32 SwapchainImagesCount, BMRRenderPass* OutPass)
+	void CreateRenderPass(const RenderPassSettings* Settings, const RenderTarget* Targets,
+		VkExtent2D TargetExtent, u32 TargetCount, u32 SwapchainImagesCount, RenderPass* OutPass)
 	{
 		HandleLog(BMRVkLogType_Info, "Initializing RenderPass, Name: %s, Subpass count: %d, Attachments count: %d",
 			Settings->RenderPassName, Settings->SubpassSettingsCount, Settings->AttachmentDescriptionsCount);
@@ -543,7 +543,7 @@ namespace BMRVulkan
 		auto Subpasses = Memory::BmMemoryManagementSystem::FrameAlloc<VkSubpassDescription>(Settings->SubpassSettingsCount);
 		for (u32 SubpassIndex = 0; SubpassIndex < Settings->SubpassSettingsCount; ++SubpassIndex)
 		{
-			const BMRSubpassSettings* SubpassSettings = Settings->SubpassesSettings + SubpassIndex;
+			const SubpassSettings* SubpassSettings = Settings->SubpassesSettings + SubpassIndex;
 			VkSubpassDescription* Subpass = Subpasses + SubpassIndex;
 
 			HandleLog(BMRVkLogType_Info, "Initializing Subpass, Name: %s, Color attachments count: %d, "
@@ -599,16 +599,16 @@ namespace BMRVulkan
 		std::memcpy(OutPass->ClearValues, Settings->ClearValues, Settings->AttachmentDescriptionsCount * sizeof(VkClearValue));
 
 		// Creating framebuffers
-		OutPass->RenderTargets = Memory::BmMemoryManagementSystem::Allocate<BMRFramebufferSet>(TargetCount);
+		OutPass->RenderTargets = Memory::BmMemoryManagementSystem::Allocate<FramebufferSet>(TargetCount);
 		for (u32 TargetIndex = 0; TargetIndex < TargetCount; ++TargetIndex)
 		{
-			BMRFramebufferSet* FramebufferSet = OutPass->RenderTargets + TargetIndex;
-			const BMRRenderTarget* Target = Targets + TargetIndex;
+			FramebufferSet* FramebufferSet = OutPass->RenderTargets + TargetIndex;
+			const RenderTarget* Target = Targets + TargetIndex;
 
 			for (u32 SwapchainImageIndex = 0; SwapchainImageIndex < SwapchainImagesCount; ++SwapchainImageIndex)
 			{
 				VkFramebuffer* Framebuffer = FramebufferSet->FrameBuffers + SwapchainImageIndex;
-				const BMRAttachmentView* AttachmentView = Target->AttachmentViews + SwapchainImageIndex;
+				const AttachmentView* AttachmentView = Target->AttachmentViews + SwapchainImageIndex;
 
 				VkFramebufferCreateInfo Info = { };
 				Info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -630,7 +630,7 @@ namespace BMRVulkan
 		OutPass->RenderTargetCount = TargetCount;
 	}
 
-	void DestroyRenderPass(BMRRenderPass* Pass)
+	void DestroyRenderPass(RenderPass* Pass)
 	{
 		for (u32 TargetIndex = 0; TargetIndex < Pass->RenderTargetCount; ++TargetIndex)
 		{
@@ -655,9 +655,9 @@ namespace BMRVulkan
 		vkDestroyPipeline(Device.LogicalDevice, Pipeline, nullptr);
 	}
 
-	BMRUniform CreateUniformBuffer(const VkBufferCreateInfo* BufferInfo, VkMemoryPropertyFlags Properties)
+	UniformValue CreateUniformBuffer(const VkBufferCreateInfo* BufferInfo, VkMemoryPropertyFlags Properties)
 	{
-		BMRUniform UniformBuffer;
+		UniformValue UniformBuffer;
 		UniformBuffer.Buffer = CreateBuffer(BufferInfo);
 
 		VkMemoryRequirements MemoryRequirements;
@@ -677,7 +677,7 @@ namespace BMRVulkan
 		return UniformBuffer;
 	}
 
-	void UpdateUniformBuffer(BMRUniform Buffer, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data)
+	void UpdateUniformBuffer(UniformValue Buffer, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data)
 	{
 		void* MappedMemory;
 		vkMapMemory(Device.LogicalDevice, Buffer.Memory, Offset, DataSize, 0, &MappedMemory);
@@ -700,7 +700,7 @@ namespace BMRVulkan
 	void TransitImageLayout(VkImage Image, VkImageLayout OldLayout, VkImageLayout NewLayout,
 		VkAccessFlags SrcAccessMask, VkAccessFlags DstAccessMask,
 		VkPipelineStageFlags SrcStage, VkPipelineStageFlags DstStage,
-		BMRLayoutLayerTransitionData* LayerData, u32 LayerDataCount)
+		LayoutLayerTransitionData* LayerData, u32 LayerDataCount)
 	{
 		// TODO: Create system for commandBuffers and Barriers?
 		auto Barriers = Memory::BmMemoryManagementSystem::FrameAlloc<VkImageMemoryBarrier>(LayerDataCount);
@@ -777,9 +777,9 @@ namespace BMRVulkan
 		return Sampler;
 	}
 
-	BMRUniform CreateUniformImage(const VkImageCreateInfo* ImageCreateInfo)
+	UniformValue CreateUniformImage(const VkImageCreateInfo* ImageCreateInfo)
 	{
-		BMRUniform Buffer;
+		UniformValue Buffer;
 		VkResult Result = vkCreateImage(Device.LogicalDevice, ImageCreateInfo, nullptr, &Buffer.Image);
 		if (Result != VK_SUCCESS)
 		{
@@ -798,7 +798,7 @@ namespace BMRVulkan
 		return Buffer;
 	}
 
-	void DestroyUniformImage(BMRUniform Image)
+	void DestroyUniformImage(UniformValue Image)
 	{
 		vkDestroyImage(Device.LogicalDevice, Image.Image, nullptr);
 		vkFreeMemory(Device.LogicalDevice, Image.Memory, nullptr);
@@ -833,7 +833,7 @@ namespace BMRVulkan
 		return Layout;
 	}
 
-	void DestroyUniformBuffer(BMRUniform Buffer)
+	void DestroyUniformBuffer(UniformValue Buffer)
 	{
 		vkDeviceWaitIdle(Device.LogicalDevice); // TODO FIX
 
@@ -858,7 +858,7 @@ namespace BMRVulkan
 		}
 	}
 
-	VkImageView CreateImageInterface(const BMRUniformImageInterfaceCreateInfo* InterfaceCreateInfo, VkImage Image)
+	VkImageView CreateImageInterface(const UniformImageInterfaceCreateInfo* InterfaceCreateInfo, VkImage Image)
 	{
 		VkImageViewCreateInfo ViewCreateInfo = { };
 		ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -899,12 +899,12 @@ namespace BMRVulkan
 		vkDestroyShaderModule(Device.LogicalDevice, Shader, nullptr);
 	}
 
-	void AttachUniformsToSet(VkDescriptorSet Set, const BMRUniformSetAttachmentInfo* Infos, u32 BufferCount)
+	void AttachUniformsToSet(VkDescriptorSet Set, const UniformSetAttachmentInfo* Infos, u32 BufferCount)
 	{
 		auto SetWrites = Memory::BmMemoryManagementSystem::FrameAlloc<VkWriteDescriptorSet>(BufferCount);
 		for (u32 BufferIndex = 0; BufferIndex < BufferCount; ++BufferIndex)
 		{
-			const BMRUniformSetAttachmentInfo* Info = Infos + BufferIndex;
+			const UniformSetAttachmentInfo* Info = Infos + BufferIndex;
 
 			VkWriteDescriptorSet* SetWrite = SetWrites + BufferIndex;
 			*SetWrite = { };
@@ -1036,7 +1036,7 @@ namespace BMRVulkan
 	}
 
 	// INTERNAL FUNCTIONS
-	void HandleLog(BMRVkLogType LogType, const char* Format, ...)
+	void HandleLog(LogType LogType, const char* Format, ...)
 	{
 		if (LogHandler != nullptr)
 		{

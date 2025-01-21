@@ -1,6 +1,6 @@
 #pragma once
 
-namespace BME
+namespace Engine
 {
 	int Main();
 }

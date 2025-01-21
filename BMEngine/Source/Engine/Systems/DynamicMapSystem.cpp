@@ -10,7 +10,7 @@
 #include <httplib.h>
 
 #include "ResourceManager.h"
-#include "BME/Scene.h"
+#include "Engine/Scene.h"
 #include "Util/Math.h"
 
 #include "stb_image.h"
@@ -68,7 +68,7 @@ namespace DynamicMapSystem
 
 	void Init()
 	{
-		BMR::BMRTexture TextureArrayTiles = ResourceManager::EmptyTexture(TilesTextureId, TextureTileSize, TextureTileSize,
+		Render::RenderTexture TextureArrayTiles = ResourceManager::EmptyTexture(TilesTextureId, TextureTileSize, TextureTileSize,
 			MaxTextureTilesPerAxis, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
 
 		VkDescriptorSet TilesMaterial;
@@ -137,8 +137,8 @@ namespace DynamicMapSystem
 				return;
 			}
 
-			BMR::ClearIndices();
-			Scene.MapEntity.IndexOffset = BMR::LoadIndices(Indices.data(), Indices.size());
+			Render::ClearIndices();
+			Scene.MapEntity.IndexOffset = Render::LoadIndices(Indices.data(), Indices.size());
 			Scene.MapEntity.IndicesCount = Indices.size();
 			Scene.MapTileSettings.VertexTilesPerAxis = VertexTilesPerAxis;
 		}
@@ -231,7 +231,7 @@ namespace DynamicMapSystem
 			//TestDownload = false;
 		}
 		
-		BMR::BMRTexture* Texture = ResourceManager::FindTexture(TilesTextureId);
+		Render::RenderTexture* Texture = ResourceManager::FindTexture(TilesTextureId);
 
 		{
 			std::unique_lock Lock(QueueMutex);
@@ -243,7 +243,7 @@ namespace DynamicMapSystem
 				int width, height, channels;
 				unsigned char* image = stbi_load_from_memory(data, TileDataCompressed.Data.size(), &width, &height, &channels, 4);
 
-				BMR::BMRTextureArrayInfo Info;
+				Render::TextureArrayInfo Info;
 				Info.Width = TextureTileSize;
 				Info.Height = TextureTileSize;
 				Info.Format = 4;
@@ -251,7 +251,7 @@ namespace DynamicMapSystem
 				Info.BaseArrayLayer = TileDataCompressed.ArrayLayer;
 				Info.Data = &image;
 
-				BMR::UpdateTexture(Texture, &Info);
+				Render::UpdateTexture(Texture, &Info);
 
 				DownloadQueue.pop();
 			}

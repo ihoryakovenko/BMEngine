@@ -1,6 +1,6 @@
-#include "BME/BMEInterface.h"
+#include "Engine/Engine.h"
 
 int main()
 {
-	BME::Main();	
+	Engine::Main();	
 }

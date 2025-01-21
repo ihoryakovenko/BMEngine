@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BMR/BMRInterface.h"
+#include "Render/Render.h"
 
 void LoadSettings(u32 WindowWidth, u32 WindowHeight);
 
@@ -28,11 +28,11 @@ struct QuadSphereVertex
 	glm::vec2 TextureCoords;
 };
 
-extern BMRVulkan::BMRVertexInput EntityVertexInput;
-extern BMRVulkan::BMRVertexInput TerrainVertexInput;
-extern BMRVulkan::BMRVertexInput SkyBoxVertexInput;
-extern BMRVulkan::BMRVertexInput DepthVertexInput;
-extern BMRVulkan::BMRVertexInput QuadSphereVertexInput;
+extern VulkanInterface::VertexInput EntityVertexInput;
+extern VulkanInterface::VertexInput TerrainVertexInput;
+extern VulkanInterface::VertexInput SkyBoxVertexInput;
+extern VulkanInterface::VertexInput DepthVertexInput;
+extern VulkanInterface::VertexInput QuadSphereVertexInput;
 
 extern VkExtent2D MainScreenExtent;
 extern VkExtent2D DepthViewportExtent;
@@ -40,17 +40,17 @@ extern VkExtent2D DepthViewportExtent;
 extern VkFormat ColorFormat;
 extern VkFormat DepthFormat;
 
-extern BMRVulkan::BMRPipelineSettings EntityPipelineSettings;
-extern BMRVulkan::BMRPipelineSettings TerrainPipelineSettings;
-extern BMRVulkan::BMRPipelineSettings DeferredPipelineSettings;
-extern BMRVulkan::BMRPipelineSettings SkyBoxPipelineSettings;
-extern BMRVulkan::BMRPipelineSettings DepthPipelineSettings;
-extern BMRVulkan::BMRPipelineSettings MapPipelineSettings;
+extern VulkanInterface::PipelineSettings EntityPipelineSettings;
+extern VulkanInterface::PipelineSettings TerrainPipelineSettings;
+extern VulkanInterface::PipelineSettings DeferredPipelineSettings;
+extern VulkanInterface::PipelineSettings SkyBoxPipelineSettings;
+extern VulkanInterface::PipelineSettings DepthPipelineSettings;
+extern VulkanInterface::PipelineSettings MapPipelineSettings;
 
 static const u32 MainPathPipelinesCount = 5;
 
-extern BMRVulkan::BMRRenderPassSettings MainRenderPassSettings;
-extern BMRVulkan::BMRRenderPassSettings DepthRenderPassSettings;
+extern VulkanInterface::RenderPassSettings MainRenderPassSettings;
+extern VulkanInterface::RenderPassSettings DepthRenderPassSettings;
 
 static VkDescriptorType VpDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 static VkDescriptorType EntityLightDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -77,11 +77,11 @@ extern VkImageCreateInfo DeferredInputDepthUniformCreateInfo;
 extern VkImageCreateInfo DeferredInputColorUniformCreateInfo;
 extern VkImageCreateInfo ShadowMapArrayCreateInfo;
 
-extern BMRVulkan::BMRUniformImageInterfaceCreateInfo DeferredInputDepthUniformInterfaceCreateInfo;
-extern BMRVulkan::BMRUniformImageInterfaceCreateInfo DeferredInputUniformColorInterfaceCreateInfo;
-extern BMRVulkan::BMRUniformImageInterfaceCreateInfo ShadowMapArrayInterfaceCreateInfo;
-extern BMRVulkan::BMRUniformImageInterfaceCreateInfo ShadowMapElement1InterfaceCreateInfo;
-extern BMRVulkan::BMRUniformImageInterfaceCreateInfo ShadowMapElement2InterfaceCreateInfo;
+extern VulkanInterface::UniformImageInterfaceCreateInfo DeferredInputDepthUniformInterfaceCreateInfo;
+extern VulkanInterface::UniformImageInterfaceCreateInfo DeferredInputUniformColorInterfaceCreateInfo;
+extern VulkanInterface::UniformImageInterfaceCreateInfo ShadowMapArrayInterfaceCreateInfo;
+extern VulkanInterface::UniformImageInterfaceCreateInfo ShadowMapElement1InterfaceCreateInfo;
+extern VulkanInterface::UniformImageInterfaceCreateInfo ShadowMapElement2InterfaceCreateInfo;
 
 extern VkSamplerCreateInfo ShadowMapSamplerCreateInfo;
 extern VkSamplerCreateInfo DiffuseSamplerCreateInfo;

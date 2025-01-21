@@ -1,4 +1,4 @@
-#include "BMEInterface.h"
+#include "Engine.h"
 
 #include <iostream>
 #include <vector>
@@ -17,7 +17,7 @@
 #include "Memory/MemoryManagmentSystem.h"
 #include "Platform/WinPlatform.h"
 #include "Util/Settings.h"
-#include "BMR/BMRInterface.h"
+#include "Render/Render.h"
 #include "Util/Util.h"
 #include "ImguiIntegration.h"
 #include "Systems/DynamicMapSystem.h"
@@ -56,7 +56,7 @@ namespace std
 	};
 }
 
-namespace BME
+namespace Engine
 {
 	struct VertexEqual
 	{
@@ -84,7 +84,7 @@ namespace BME
 
 	static void SetUpScene();
 
-	static void RenderLog(BMR::BMRLogType LogType, const char* Format, va_list Args);
+	static void RenderLog(Render::BMRLogType LogType, const char* Format, va_list Args);
 	static void GenerateTerrain(std::vector<u32>& Indices);
 
 	static void MoveCamera(GLFWwindow* Window, f32 DeltaTime, DynamicMapSystem::MapCamera& MainCamera);
@@ -113,10 +113,10 @@ namespace BME
 	static u32 TerrainVerticesCount = NumRows * NumCols;
 
 
-	static BMR::BMRDrawTerrainEntity TestDrawTerrainEntity;
-	static std::vector<BMR::BMRDrawEntity> DrawEntities;
-	static BMR::BMRDrawSkyBoxEntity SkyBox;
-	static BMR::BMRLightBuffer LightData;
+	static Render::DrawTerrainEntity TestDrawTerrainEntity;
+	static std::vector<Render::DrawEntity> DrawEntities;
+	static Render::DrawSkyBoxEntity SkyBox;
+	static Render::LightBuffer LightData;
 
 	static ImguiIntegration::GuiData GuiData;
 
@@ -241,7 +241,7 @@ namespace BME
 		const u32 FrameAllocSize = 1024 * 1024;
 		Memory::BmMemoryManagementSystem::Init(FrameAllocSize);
 
-		BMR::BMRConfig RenderConfig;
+		Render::RenderConfig RenderConfig;
 		RenderConfig.MaxTextures = 90;
 		RenderConfig.LogHandler = RenderLog;
 
@@ -251,7 +251,7 @@ namespace BME
 		RenderConfig.EnableValidationLayers = true;
 #endif
 
-		BMR::Init(glfwGetWin32Window(Window), &RenderConfig);
+		Render::Init(glfwGetWin32Window(Window), &RenderConfig);
 		ResourceManager::Init();
 		DynamicMapSystem::Init();
 
@@ -263,7 +263,7 @@ namespace BME
 		DynamicMapSystem::DeInit();
 
 		ResourceManager::DeInit();
-		BMR::DeInit();
+		Render::DeInit();
 
 		glfwDestroyWindow(Window);
 
@@ -289,11 +289,11 @@ namespace BME
 
 		MainCamera.Position = DynamicMapSystem::SphericalToMercator(CameraSphericalPosition);
 		
-		MainCamera.front = glm::normalize(-MainCamera.Position);
+		MainCamera.Front = glm::normalize(-MainCamera.Position);
 
 		const glm::vec3 NorthPole(0.0f, 1.0f, 0.0f);
-		const glm::vec3 Right = glm::normalize(glm::cross(NorthPole, MainCamera.front));
-		MainCamera.up = glm::normalize(glm::cross(MainCamera.front, Right));
+		const glm::vec3 Right = glm::normalize(glm::cross(NorthPole, MainCamera.Front));
+		MainCamera.Up = glm::normalize(glm::cross(MainCamera.Front, Right));
 
 
 		f32 AspectRatio = f32(MainScreenExtent.width) / f32(MainScreenExtent.height);
@@ -312,7 +312,7 @@ namespace BME
 			glm::mat4 TestMat = glm::rotate(Scene.DrawEntities[i].Model, glm::radians(0.5f), glm::vec3(0.0f, 1.0f, 0.0f));
 		}
 
-		Scene.ViewProjection.View = glm::lookAt(MainCamera.Position, MainCamera.Position + MainCamera.front, MainCamera.up);
+		Scene.ViewProjection.View = glm::lookAt(MainCamera.Position, MainCamera.Position + MainCamera.Front, MainCamera.Up);
 
 		float NearPlane = 0.1f, FarPlane = 100.0f;
 		float HalfSize = 30.0f;
@@ -322,7 +322,7 @@ namespace BME
 		glm::mat4 LightView = glm::lookAt(Eye, Center, Up);
 
 		LightData.DirectionLight.LightSpaceMatrix = LightProjection * LightView;
-		LightData.SpotLight.Direction = MainCamera.front;
+		LightData.SpotLight.Direction = MainCamera.Front;
 		LightData.SpotLight.Position = MainCamera.Position;
 		LightData.SpotLight.Planes = glm::vec2(Near, Far);
 		LightData.SpotLight.LightSpaceMatrix = Scene.ViewProjection.Projection * Scene.ViewProjection.View;
@@ -359,7 +359,7 @@ namespace BME
 
 					if (ResourceManager::FindTexture(FileName) == nullptr)
 					{
-						BMR::BMRTexture NewTexture = ResourceManager::LoadTexture(FileName, std::vector<std::string>{FileName}, VK_IMAGE_VIEW_TYPE_2D);
+						Render::RenderTexture NewTexture = ResourceManager::LoadTexture(FileName, std::vector<std::string>{FileName}, VK_IMAGE_VIEW_TYPE_2D);
 						ResourceManager::CreateEntityMaterial(FileName, NewTexture.ImageView, NewTexture.ImageView, &MaterialToTexture[i]);
 					}
 				}
@@ -421,9 +421,9 @@ namespace BME
 				indices.push_back(uniqueVertices[vertex]);
 			}
 
-			BMR::BMRDrawEntity DrawEntity;
-			DrawEntity.VertexOffset = BMR::LoadVertices(vertices.data(), sizeof(EntityVertex), vertices.size());
-			DrawEntity.IndexOffset = BMR::LoadIndices(indices.data(), indices.size());
+			Render::DrawEntity DrawEntity;
+			DrawEntity.VertexOffset = Render::LoadVertices(vertices.data(), sizeof(EntityVertex), vertices.size());
+			DrawEntity.IndexOffset = Render::LoadIndices(indices.data(), indices.size());
 			DrawEntity.IndicesCount = indices.size();
 			DrawEntity.Model = Model;
 			DrawEntity.TextureSet = CustomMaterial;
@@ -442,9 +442,9 @@ namespace BME
 		std::vector<u32> TerrainIndices;
 		GenerateTerrain(TerrainIndices);
 
-		TestDrawTerrainEntity.VertexOffset = BMR::LoadVertices(&TerrainVerticesData[0][0],
+		TestDrawTerrainEntity.VertexOffset = Render::LoadVertices(&TerrainVerticesData[0][0],
 			sizeof(TerrainVertex), NumRows * NumCols);
-		TestDrawTerrainEntity.IndexOffset = BMR::LoadIndices(TerrainIndices.data(), TerrainIndices.size());
+		TestDrawTerrainEntity.IndexOffset = Render::LoadIndices(TerrainIndices.data(), TerrainIndices.size());
 		TestDrawTerrainEntity.IndicesCount = TerrainIndices.size();
 		TestDrawTerrainEntity.TextureSet = ResourceManager::FindMaterial("TerrainMaterial"); // TODO load here
 	}
@@ -492,9 +492,9 @@ namespace BME
 		LightData.SpotLight.CutOff = glm::cos(glm::radians(12.5f));
 		LightData.SpotLight.OuterCutOff = glm::cos(glm::radians(17.5f));
 
-		BMR::BMRMaterial Mat;
+		Render::Material Mat;
 		Mat.Shininess = 32.f;
-		BMR::UpdateMaterialBuffer(&Mat);
+		Render::UpdateMaterialBuffer(&Mat);
 
 		GuiData.DirectionLightDirection = &LightData.DirectionLight.Direction;
 		GuiData.Eye = &Eye;
@@ -503,11 +503,11 @@ namespace BME
 		GuiData.OnTestSetDownload = DynamicMapSystem::TestSetDownload;
 	}
 
-	void RenderLog(BMR::BMRLogType LogType, const char* Format, va_list Args)
+	void RenderLog(Render::BMRLogType LogType, const char* Format, va_list Args)
 	{
 		switch (LogType)
 		{
-			case BMR::LogType_Error:
+			case Render::LogType_Error:
 			{
 				std::cout << "\033[31;5mError: "; // Set red color
 				vprintf(Format, Args);
@@ -515,14 +515,14 @@ namespace BME
 				assert(false);
 				break;
 			}
-			case BMR::LogType_Warning:
+			case Render::LogType_Warning:
 			{
 				std::cout << "\033[33;5mWarning: "; // Set red color
 				vprintf(Format, Args);
 				std::cout << "\n\033[m"; // Reset red color
 				break;
 			}
-			case BMR::LogType_Info:
+			case Render::LogType_Info:
 			{
 				std::cout << "Info: ";
 				vprintf(Format, Args);
@@ -620,12 +620,12 @@ namespace BME
 
 		// Handle camera movement with keys
 		glm::vec3 movement = glm::vec3(0.0f);
-		if (glfwGetKey(Window, GLFW_KEY_W) == GLFW_PRESS) movement += MainCamera.front;
-		if (glfwGetKey(Window, GLFW_KEY_S) == GLFW_PRESS) movement -= MainCamera.front;
-		if (glfwGetKey(Window, GLFW_KEY_A) == GLFW_PRESS) movement -= glm::normalize(glm::cross(MainCamera.front, MainCamera.up));
-		if (glfwGetKey(Window, GLFW_KEY_D) == GLFW_PRESS) movement += glm::normalize(glm::cross(MainCamera.front, MainCamera.up));
-		if (glfwGetKey(Window, GLFW_KEY_SPACE) == GLFW_PRESS) movement += MainCamera.up;
-		if (glfwGetKey(Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) movement -= MainCamera.up;
+		if (glfwGetKey(Window, GLFW_KEY_W) == GLFW_PRESS) movement += MainCamera.Front;
+		if (glfwGetKey(Window, GLFW_KEY_S) == GLFW_PRESS) movement -= MainCamera.Front;
+		if (glfwGetKey(Window, GLFW_KEY_A) == GLFW_PRESS) movement -= glm::normalize(glm::cross(MainCamera.Front, MainCamera.Up));
+		if (glfwGetKey(Window, GLFW_KEY_D) == GLFW_PRESS) movement += glm::normalize(glm::cross(MainCamera.Front, MainCamera.Up));
+		if (glfwGetKey(Window, GLFW_KEY_SPACE) == GLFW_PRESS) movement += MainCamera.Up;
+		if (glfwGetKey(Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) movement -= MainCamera.Up;
 
 		MainCamera.Position += movement * CameraDeltaSpeed;
 
@@ -655,7 +655,7 @@ namespace BME
 		Front.x = cos(glm::radians(Yaw)) * cos(glm::radians(Pitch));
 		Front.y = sin(glm::radians(Pitch));
 		Front.z = sin(glm::radians(Yaw)) * cos(glm::radians(Pitch));
-		MainCamera.front = glm::normalize(Front);
+		MainCamera.Front = glm::normalize(Front);
 	}
 
 	void CreateSkyBoxMesh(VkDescriptorSet Material)
@@ -697,8 +697,8 @@ namespace BME
 			indices.push_back(uniqueVertices[vertex]);
 		}
 
-		SkyBox.VertexOffset = BMR::LoadVertices(vertices.data(), sizeof(EntityVertex), vertices.size());
-		SkyBox.IndexOffset = BMR::LoadIndices(indices.data(), indices.size());
+		SkyBox.VertexOffset = Render::LoadVertices(vertices.data(), sizeof(EntityVertex), vertices.size());
+		SkyBox.IndexOffset = Render::LoadIndices(indices.data(), indices.size());
 		SkyBox.IndicesCount = indices.size();
 		SkyBox.TextureSet = Material;
 	}

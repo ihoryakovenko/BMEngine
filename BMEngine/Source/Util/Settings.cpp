@@ -6,31 +6,31 @@ VkExtent2D DepthViewportExtent = { 1024, 1024 };
 VkFormat ColorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Todo: check if VK_FORMAT_R8G8B8A8_UNORM supported
 VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
 
-BMRVulkan::BMRVertexInput EntityVertexInput;
-BMRVulkan::BMRVertexInput TerrainVertexInput;
-BMRVulkan::BMRVertexInput SkyBoxVertexInput;
-BMRVulkan::BMRVertexInput DepthVertexInput;
-BMRVulkan::BMRVertexInput QuadSphereVertexInput;
+VulkanInterface::VertexInput EntityVertexInput;
+VulkanInterface::VertexInput TerrainVertexInput;
+VulkanInterface::VertexInput SkyBoxVertexInput;
+VulkanInterface::VertexInput DepthVertexInput;
+VulkanInterface::VertexInput QuadSphereVertexInput;
 
-BMRVulkan::BMRPipelineSettings EntityPipelineSettings;
-BMRVulkan::BMRPipelineSettings TerrainPipelineSettings;
-BMRVulkan::BMRPipelineSettings DeferredPipelineSettings;
-BMRVulkan::BMRPipelineSettings SkyBoxPipelineSettings;
-BMRVulkan::BMRPipelineSettings DepthPipelineSettings;
-BMRVulkan::BMRPipelineSettings MapPipelineSettings;
+VulkanInterface::PipelineSettings EntityPipelineSettings;
+VulkanInterface::PipelineSettings TerrainPipelineSettings;
+VulkanInterface::PipelineSettings DeferredPipelineSettings;
+VulkanInterface::PipelineSettings SkyBoxPipelineSettings;
+VulkanInterface::PipelineSettings DepthPipelineSettings;
+VulkanInterface::PipelineSettings MapPipelineSettings;
 
-BMRVulkan::BMRRenderPassSettings MainRenderPassSettings;
-BMRVulkan::BMRRenderPassSettings DepthRenderPassSettings;
+VulkanInterface::RenderPassSettings MainRenderPassSettings;
+VulkanInterface::RenderPassSettings DepthRenderPassSettings;
 
 VkImageCreateInfo DeferredInputDepthUniformCreateInfo;
 VkImageCreateInfo DeferredInputColorUniformCreateInfo;
 VkImageCreateInfo ShadowMapArrayCreateInfo;
 
-BMRVulkan::BMRUniformImageInterfaceCreateInfo DeferredInputDepthUniformInterfaceCreateInfo;
-BMRVulkan::BMRUniformImageInterfaceCreateInfo DeferredInputUniformColorInterfaceCreateInfo;
-BMRVulkan::BMRUniformImageInterfaceCreateInfo ShadowMapArrayInterfaceCreateInfo;
-BMRVulkan::BMRUniformImageInterfaceCreateInfo ShadowMapElement1InterfaceCreateInfo;
-BMRVulkan::BMRUniformImageInterfaceCreateInfo ShadowMapElement2InterfaceCreateInfo;
+VulkanInterface::UniformImageInterfaceCreateInfo DeferredInputDepthUniformInterfaceCreateInfo;
+VulkanInterface::UniformImageInterfaceCreateInfo DeferredInputUniformColorInterfaceCreateInfo;
+VulkanInterface::UniformImageInterfaceCreateInfo ShadowMapArrayInterfaceCreateInfo;
+VulkanInterface::UniformImageInterfaceCreateInfo ShadowMapElement1InterfaceCreateInfo;
+VulkanInterface::UniformImageInterfaceCreateInfo ShadowMapElement2InterfaceCreateInfo;
 
 VkSamplerCreateInfo ShadowMapSamplerCreateInfo;
 VkSamplerCreateInfo DiffuseSamplerCreateInfo;
@@ -66,12 +66,12 @@ static VkAttachmentReference DeferredSubpassInputReferences[InputReferencesCount
 static const u32 ExitDependenciesIndex = SubpassIndex::Count;
 static const u32 MainPassSubpassDependenciesCount = SubpassIndex::Count + 1;
 static VkSubpassDependency MainPassSubpassDependencies[MainPassSubpassDependenciesCount];
-static BMRVulkan::BMRSubpassSettings MainRenderPassSubpasses[Count];
+static VulkanInterface::SubpassSettings MainRenderPassSubpasses[Count];
 
 static const u32 DepthPassAttachmentDescriptionsCount = 1;
 static VkAttachmentDescription DepthPassAttachmentDescriptions[DepthPassAttachmentDescriptionsCount];
 static VkAttachmentReference DepthSubpassDepthAttachmentReference = { };
-static BMRVulkan::BMRSubpassSettings DepthSubpasses[Subpasses_Count];
+static VulkanInterface::SubpassSettings DepthSubpasses[Subpasses_Count];
 static const u32 DepthPassExitDependenciesIndex = Subpasses::Subpasses_Count;
 static const u32 DepthPassSubpassDependenciesCount = Subpasses::Subpasses_Count + 1;
 static VkSubpassDependency DepthPassSubpassDependencies[DepthPassSubpassDependenciesCount];

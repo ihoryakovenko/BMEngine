@@ -3,11 +3,11 @@
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 
-#include "BMRVulkan/BMRVulkan.h"
+#include "VulkanInterface/VulkanInterface.h"
 
 #include "Util/EngineTypes.h"
 
-namespace BMR
+namespace Render
 {
 	enum BMRLogType
 	{
@@ -18,7 +18,7 @@ namespace BMR
 
 	typedef void (*BMRLogHandler)(BMRLogType, const char*, va_list);
 
-	struct BMRConfig
+	struct RenderConfig
 	{
 		BMRLogHandler LogHandler = nullptr;
 		bool EnableValidationLayers = false;
@@ -27,13 +27,13 @@ namespace BMR
 
 	typedef glm::mat4 BMRModel;
 
-	struct BMRUboViewProjection
+	struct ViewProjectionBuffer
 	{
 		glm::mat4 View;
 		glm::mat4 Projection;
 	};
 
-	struct BMRTileSettings
+	struct TileSettingsBuffer
 	{
 		u32 VertexTilesPerAxis;
 		u32 TextureTilesPerAxis;
@@ -44,7 +44,7 @@ namespace BMR
 
 	typedef glm::mat4 BMRLightSpaceMatrix;
 
-	struct BMRTextureArrayInfo
+	struct TextureArrayInfo
 	{
 		u32 Width = 0;
 		u32 Height = 0;
@@ -56,7 +56,7 @@ namespace BMR
 		u32 BaseArrayLayer = 0;
 	};
 
-	struct BMRDrawEntity
+	struct DrawEntity
 	{
 		u64 VertexOffset = 0;
 		u64 IndexOffset = 0;
@@ -65,7 +65,7 @@ namespace BMR
 		BMRModel Model;
 	};
 
-	struct BMRDrawTerrainEntity
+	struct DrawTerrainEntity
 	{
 		u64 VertexOffset = 0;
 		u64 IndexOffset = 0;
@@ -73,14 +73,14 @@ namespace BMR
 		VkDescriptorSet TextureSet = nullptr;
 	};
 
-	struct BMRDrawMapEntity
+	struct DrawMapEntity
 	{
 		u64 IndexOffset = 0;
 		u32 IndicesCount = 0;
 		VkDescriptorSet TextureSet = nullptr;
 	};
 
-	struct BMRDrawSkyBoxEntity
+	struct DrawSkyBoxEntity
 	{
 		u64 VertexOffset = 0;
 		u64 IndexOffset = 0;
@@ -88,7 +88,7 @@ namespace BMR
 		VkDescriptorSet TextureSet = nullptr;
 	};
 
-	struct BMRPointLight
+	struct PointLight
 	{
 		glm::vec4 Position;
 		glm::vec3 Ambient;
@@ -99,7 +99,7 @@ namespace BMR
 		f32 Quadratic;
 	};
 
-	struct BMRDirectionLight
+	struct DirectionLight
 	{
 		BMRLightSpaceMatrix LightSpaceMatrix;
 		alignas(16) glm::vec3 Direction;
@@ -108,7 +108,7 @@ namespace BMR
 		alignas(16) glm::vec3 Specular;
 	};
 
-	struct BMRSpotLight
+	struct SpotLight
 	{
 		BMRLightSpaceMatrix LightSpaceMatrix;
 		glm::vec3 Position;
@@ -124,62 +124,62 @@ namespace BMR
 		alignas(16) glm::vec2 Planes;
 	};
 
-	struct BMRLightBuffer
+	struct LightBuffer
 	{
-		BMRPointLight PointLight;
-		BMRDirectionLight DirectionLight;
-		BMRSpotLight SpotLight;
+		PointLight PointLight;
+		DirectionLight DirectionLight;
+		SpotLight SpotLight;
 	};
 
-	struct BMRMaterial
+	struct Material
 	{
 		f32 Shininess;
 	};
 
-	struct BMRDrawScene
+	struct DrawScene
 	{
-		BMRUboViewProjection ViewProjection;
+		ViewProjectionBuffer ViewProjection;
 
-		BMRDrawEntity* DrawEntities = nullptr;
+		DrawEntity* DrawEntities = nullptr;
 		u32 DrawEntitiesCount = 0;
 
-		BMRDrawEntity* DrawTransparentEntities = nullptr;
+		DrawEntity* DrawTransparentEntities = nullptr;
 		u32 DrawTransparentEntitiesCount = 0;
 
-		BMRDrawTerrainEntity* DrawTerrainEntities = nullptr;
+		DrawTerrainEntity* DrawTerrainEntities = nullptr;
 		u32 DrawTerrainEntitiesCount = 0;
 
-		BMRDrawSkyBoxEntity SkyBox;
+		DrawSkyBoxEntity SkyBox;
 		bool DrawSkyBox = false;
 
-		BMRDrawMapEntity MapEntity;
-		BMRTileSettings MapTileSettings;
+		DrawMapEntity MapEntity;
+		TileSettingsBuffer MapTileSettings;
 
-		BMRLightBuffer* LightEntity = nullptr;
+		LightBuffer* LightEntity = nullptr;
 	};
 
-	struct BMRTexture
+	struct RenderTexture
 	{
-		BMRVulkan::BMRUniform UniformData;
+		VulkanInterface::UniformValue UniformData;
 		VkImageView ImageView = nullptr;
 	};
 
-	bool Init(HWND WindowHandler, const BMRConfig* InConfig);
+	bool Init(HWND WindowHandler, const RenderConfig* InConfig);
 	void DeInit();
 
-	BMRTexture CreateTexture(BMRTextureArrayInfo* Info);
-	BMRTexture CreateEmptyTexture(BMRTextureArrayInfo* Info);
-	void UpdateTexture(BMRTexture* Texture, BMRTextureArrayInfo* Info);
-	void DestroyTexture(BMRTexture* Texture);
+	RenderTexture CreateTexture(TextureArrayInfo* Info);
+	RenderTexture CreateEmptyTexture(TextureArrayInfo* Info);
+	void UpdateTexture(RenderTexture* Texture, TextureArrayInfo* Info);
+	void DestroyTexture(RenderTexture* Texture);
 
 	void TestAttachEntityTexture(VkImageView DefuseImage, VkImageView SpecularImage, VkDescriptorSet* SetToAttach);
 	void TestAttachSkyNoxTerrainTexture(VkImageView DefuseImage, VkDescriptorSet* SetToAttach);
 
-	void UpdateMaterialBuffer(const BMRMaterial* Buffer);
+	void UpdateMaterialBuffer(const Material* Buffer);
 	u64 LoadVertices(const void* Vertices, u32 VertexSize, u64 VerticesCount);
 	u64 LoadIndices(const u32* Indices, u32 IndicesCount);
 
 	void ClearIndices();
 
-	void Draw(const BMRDrawScene* Scene);
+	void Draw(const DrawScene* Scene);
 }
