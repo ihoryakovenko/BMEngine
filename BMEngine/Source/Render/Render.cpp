@@ -7,17 +7,20 @@
 #include "Util/Settings.h"
 #include "Util/Util.h"
 
+#include "Engine/Systems/DynamicMapSystem.h"
+#include "FrameManager.h"
+
 namespace Render
 {
 	struct BMRPassSharedResources
 	{
-		VulkanInterface::UniformValue VertexBuffer;
+		VulkanInterface::UniformBuffer VertexBuffer;
 		u32 VertexBufferOffset = 0;
 
-		VulkanInterface::UniformValue IndexBuffer;
+		VulkanInterface::UniformBuffer IndexBuffer;
 		u32 IndexBufferOffset = 0;
 
-		VulkanInterface::UniformValue ShadowMapArray[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+		VulkanInterface::UniformImage ShadowMapArray[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkPushConstantRange PushConstants;
 	};
 
@@ -25,7 +28,7 @@ namespace Render
 	{
 		VkDescriptorSetLayout LightSpaceMatrixLayout = nullptr;
 
-		VulkanInterface::UniformValue LightSpaceMatrixBuffer[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+		VulkanInterface::UniformBuffer LightSpaceMatrixBuffer[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		VkDescriptorSet LightSpaceMatrixSet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
 
@@ -42,32 +45,27 @@ namespace Render
 		VkSampler SpecularSampler = nullptr;
 		VkSampler ShadowMapArraySampler = nullptr;
 
-		VkDescriptorSetLayout VpLayout = nullptr;
 		VkDescriptorSetLayout EntityLightLayout = nullptr;
 		VkDescriptorSetLayout MaterialLayout = nullptr;
 		VkDescriptorSetLayout DeferredInputLayout = nullptr;
 		VkDescriptorSetLayout ShadowMapArrayLayout = nullptr;
 		VkDescriptorSetLayout EntitySamplerLayout = nullptr;
 		VkDescriptorSetLayout TerrainSkyBoxLayout = nullptr;
-		VkDescriptorSetLayout MapTileSettingsLayout = nullptr;
+		
 
-		VulkanInterface::UniformValue VpBuffer[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
-		VulkanInterface::UniformValue EntityLightBuffer[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
-		VulkanInterface::UniformValue MaterialBuffer;
-		VulkanInterface::UniformValue DeferredInputDepthImage[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
-		VulkanInterface::UniformValue DeferredInputColorImage[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
-		VulkanInterface::UniformValue MapTileSettingsBuffer[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+		VulkanInterface::UniformBuffer EntityLightBuffer[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+		VulkanInterface::UniformBuffer MaterialBuffer;
+		VulkanInterface::UniformImage DeferredInputDepthImage[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+		VulkanInterface::UniformImage DeferredInputColorImage[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		VkImageView DeferredInputDepthImageInterface[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView DeferredInputColorImageInterface[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImageView ShadowMapArrayImageInterface[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
 
-		VkDescriptorSet VpSet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkDescriptorSet EntityLightSet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkDescriptorSet DeferredInputSet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkDescriptorSet MaterialSet;
 		VkDescriptorSet ShadowMapArraySet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
-		VkDescriptorSet MapTileSettingsSet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		VulkanInterface::RenderPipeline Pipelines[MainPathPipelinesCount];
 		VulkanInterface::RenderPass RenderPass;
@@ -84,34 +82,21 @@ namespace Render
 	static void DestroyDepthPass();
 	static void DestroyMainPass();
 
-	static void UpdateVpBuffer(const ViewProjectionBuffer& ViewProjection);
-	static void UpdateLightBuffer(const LightBuffer* Buffer);
-	static void UpdateLightSpaceBuffer(const BMRLightSpaceMatrix* LightSpaceMatrix);
-	static void UpdateTileSettingsBuffer(const TileSettingsBuffer* TileSettings, u32 ImageIndex);
-
 	static void DepthPassDraw(const DrawScene* Scene, VkCommandBuffer CommandBuffer, u32 ImageIndex);
 	static void MainPassDraw(const DrawScene* Scene, VkCommandBuffer CommandBuffer, u32 ImageIndex);
-
-	static RenderConfig Config;
 
 	static BMRPassSharedResources PassSharedResources;
 	static BMRDepthPass DepthPass;
 	static BMRMainPass MainPass;
 
-	static u32 ActiveLightSet = 0;
-	static u32 ActiveVpSet = 0;
-	static u32 ActiveLightSpaceMatrixSet = 0;
+	static VkCommandBuffer TestCurrentFrameCommandBuffer = nullptr;
 
-	bool Init(HWND WindowHandler, const RenderConfig* InConfig)
+	void PreRenderInit()
 	{
-		Config = *InConfig;
+	}
 
-		VulkanInterface::VulkanInterfaceConfig BMRVkConfig;
-		BMRVkConfig.EnableValidationLayers = Config.EnableValidationLayers;
-		BMRVkConfig.LogHandler = (VulkanInterface::BMRVkLogHandler)Config.LogHandler;
-		BMRVkConfig.MaxTextures = Config.MaxTextures;
-
-		Init(WindowHandler, BMRVkConfig);
+	bool Init()
+	{
 		CreatePassSharedResources();
 		CreateDepthPass();
 		CreateMainPass();
@@ -125,8 +110,44 @@ namespace Render
 		DestroyDepthPass();
 		DestroyMainPass();
 		DestroyPassSharedResources();
+	}
 
-		VulkanInterface::DeInit();
+	VkDescriptorSetLayout TestGetTerrainSkyBoxLayout()
+	{
+		return MainPass.TerrainSkyBoxLayout;
+	}
+
+	VkRenderPass TestGetRenderPass()
+	{
+		return MainPass.RenderPass.Pass;
+	}
+
+	void TestUpdateUniforBuffer(VulkanInterface::UniformBuffer* Buffer, u64 DataSize, u64 Offset, const void* Data)
+	{
+		VulkanInterface::UpdateUniformBuffer(Buffer[VulkanInterface::TestGetImageIndex()], DataSize, Offset,
+			Data);
+	}
+
+	void BindPipeline(VkPipeline RenderPipeline)
+	{
+		vkCmdBindPipeline(TestCurrentFrameCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, RenderPipeline);
+	}
+
+	void BindDescriptorSet(const VkDescriptorSet* DescriptorSetGroup, u32 DescriptorSetGroupCount,
+		VkPipelineLayout PipelineLayout)
+	{
+		vkCmdBindDescriptorSets(TestCurrentFrameCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
+			0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+	}
+
+	void BindIndexBuffer(VulkanInterface::IndexBuffer IndexBuffer, u32 Offset)
+	{
+		vkCmdBindIndexBuffer(TestCurrentFrameCommandBuffer, IndexBuffer.Buffer, Offset, VK_INDEX_TYPE_UINT32);
+	}
+
+	void DrawIndexed(u32 IndexCount)
+	{
+		vkCmdDrawIndexed(TestCurrentFrameCommandBuffer, IndexCount, 1, 0, 0, 0);
 	}
 
 	RenderTexture CreateTexture(TextureArrayInfo* Info)
@@ -323,21 +344,19 @@ namespace Render
 		return CurrentOffset;
 	}
 
+	void LoadIndices(VulkanInterface::IndexBuffer IndexBuffer, const u32* Indices, u32 IndicesCount, u64 Offset)
+	{
+		assert(Indices);
+
+		VkDeviceSize MeshIndicesSize = sizeof(u32) * IndicesCount;
+		const VkDeviceSize AlignedSize = CalculateBufferAlignedSize(MeshIndicesSize);
+
+		VulkanInterface::CopyDataToBuffer(IndexBuffer.Buffer, Offset, MeshIndicesSize, Indices);
+	}
+
 	void ClearIndices()
 	{
 		PassSharedResources.IndexBufferOffset = 0;
-	}
-
-	void UpdateLightBuffer(const LightBuffer* Buffer)
-	{
-		assert(Buffer);
-
-		const u32 UpdateIndex = (ActiveLightSet + 1) % VulkanInterface::GetImageCount();
-
-		UpdateUniformBuffer(MainPass.EntityLightBuffer[UpdateIndex], sizeof(LightBuffer), 0,
-			Buffer);
-
-		ActiveLightSet = UpdateIndex;
 	}
 
 	void UpdateMaterialBuffer(const Material* Buffer)
@@ -345,22 +364,6 @@ namespace Render
 		assert(Buffer);
 		UpdateUniformBuffer(MainPass.MaterialBuffer, sizeof(Material), 0,
 			Buffer);
-	}
-
-	void UpdateLightSpaceBuffer(const BMRLightSpaceMatrix* LightSpaceMatrix)
-	{
-		const u32 UpdateIndex = (ActiveLightSpaceMatrixSet + 1) % VulkanInterface::GetImageCount();
-
-		UpdateUniformBuffer(DepthPass.LightSpaceMatrixBuffer[UpdateIndex], sizeof(BMRLightSpaceMatrix), 0,
-			LightSpaceMatrix);
-
-		ActiveLightSpaceMatrixSet = UpdateIndex;
-	}
-
-	void UpdateTileSettingsBuffer(const TileSettingsBuffer* TileSettings, u32 ImageIndex)
-	{
-		UpdateUniformBuffer(MainPass.MapTileSettingsBuffer[ImageIndex], sizeof(TileSettingsBuffer), 0,
-			TileSettings);
 	}
 
 	void CreatePassSharedResources()
@@ -371,10 +374,10 @@ namespace Render
 		BufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-		PassSharedResources.VertexBuffer = VulkanInterface::CreateUniformBuffer(&BufferInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		PassSharedResources.VertexBuffer = VulkanInterface::CreateUniformBufferInternal(&BufferInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 		BufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-		PassSharedResources.IndexBuffer = VulkanInterface::CreateUniformBuffer(&BufferInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		PassSharedResources.IndexBuffer = VulkanInterface::CreateUniformBufferInternal(&BufferInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 	
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
@@ -396,7 +399,7 @@ namespace Render
 			const VkDeviceSize LightSpaceMatrixSize = sizeof(Render::BMRLightSpaceMatrix);
 
 			VpBufferInfo.size = LightSpaceMatrixSize;
-			DepthPass.LightSpaceMatrixBuffer[i] = VulkanInterface::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			DepthPass.LightSpaceMatrixBuffer[i] = VulkanInterface::CreateUniformBufferInternal(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 			VulkanInterface::CreateUniformSets(&DepthPass.LightSpaceMatrixLayout, 1, DepthPass.LightSpaceMatrixSet + i);
 
@@ -460,28 +463,21 @@ namespace Render
 		MainPass.SpecularSampler = VulkanInterface::CreateSampler(&SpecularSamplerCreateInfo);
 		MainPass.ShadowMapArraySampler = VulkanInterface::CreateSampler(&ShadowMapSamplerCreateInfo);
 
-		MainPass.VpLayout = VulkanInterface::CreateUniformLayout(&VpDescriptorType, &VpStageFlags, 1);
 		MainPass.EntityLightLayout = VulkanInterface::CreateUniformLayout(&EntityLightDescriptorType, &EntityLightStageFlags, 1);
 		MainPass.MaterialLayout = VulkanInterface::CreateUniformLayout(&MaterialDescriptorType, &MaterialStageFlags, 1);
 		MainPass.DeferredInputLayout = VulkanInterface::CreateUniformLayout(DeferredInputDescriptorType, DeferredInputFlags, 2);
 		MainPass.ShadowMapArrayLayout = VulkanInterface::CreateUniformLayout(&ShadowMapArrayDescriptorType, &ShadowMapArrayFlags, 1);
 		MainPass.EntitySamplerLayout = VulkanInterface::CreateUniformLayout(EntitySamplerDescriptorType, EntitySamplerInputFlags, 2);
 		MainPass.TerrainSkyBoxLayout = VulkanInterface::CreateUniformLayout(&TerrainSkyBoxSamplerDescriptorType, &TerrainSkyBoxArrayFlags, 1);
-		MainPass.MapTileSettingsLayout = VulkanInterface::CreateUniformLayout(&VpDescriptorType, &VpStageFlags, 1);
 
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
 			//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
-			const VkDeviceSize VpBufferSize = sizeof(Render::ViewProjectionBuffer);
+			
 			const VkDeviceSize LightBufferSize = sizeof(Render::LightBuffer);
-			const VkDeviceSize MapTileSettingsSize = sizeof(Render::TileSettingsBuffer);
-
-			VpBufferInfo.size = VpBufferSize;
-			MainPass.VpBuffer[i] = VulkanInterface::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			
 			VpBufferInfo.size = LightBufferSize;
-			MainPass.EntityLightBuffer[i] = VulkanInterface::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-			VpBufferInfo.size = MapTileSettingsSize;
-			MainPass.MapTileSettingsBuffer[i] = VulkanInterface::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			MainPass.EntityLightBuffer[i] = VulkanInterface::CreateUniformBufferInternal(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 			MainPass.DeferredInputDepthImage[i] = VulkanInterface::CreateUniformImage(&DeferredInputDepthUniformCreateInfo);
 			MainPass.DeferredInputColorImage[i] = VulkanInterface::CreateUniformImage(&DeferredInputColorUniformCreateInfo);
@@ -493,17 +489,9 @@ namespace Render
 			MainPass.ShadowMapArrayImageInterface[i] = VulkanInterface::CreateImageInterface(&ShadowMapArrayInterfaceCreateInfo,
 				PassSharedResources.ShadowMapArray[i].Image);
 
-			VulkanInterface::CreateUniformSets(&MainPass.VpLayout, 1, MainPass.VpSet + i);
 			VulkanInterface::CreateUniformSets(&MainPass.EntityLightLayout, 1, MainPass.EntityLightSet + i);
 			VulkanInterface::CreateUniformSets(&MainPass.DeferredInputLayout, 1, MainPass.DeferredInputSet + i);
 			VulkanInterface::CreateUniformSets(&MainPass.ShadowMapArrayLayout, 1, MainPass.ShadowMapArraySet + i);
-			VulkanInterface::CreateUniformSets(&MainPass.MapTileSettingsLayout, 1, MainPass.MapTileSettingsSet + i);
-
-			VulkanInterface::UniformSetAttachmentInfo VpBufferAttachmentInfo;
-			VpBufferAttachmentInfo.BufferInfo.buffer = MainPass.VpBuffer[i].Buffer;
-			VpBufferAttachmentInfo.BufferInfo.offset = 0;
-			VpBufferAttachmentInfo.BufferInfo.range = VpBufferSize;
-			VpBufferAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 
 			VulkanInterface::UniformSetAttachmentInfo EntityLightAttachmentInfo;
 			EntityLightAttachmentInfo.BufferInfo.buffer = MainPass.EntityLightBuffer[i].Buffer;
@@ -528,22 +516,14 @@ namespace Render
 			ShadowMapArrayAttachmentInfo.ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			ShadowMapArrayAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
-			VulkanInterface::UniformSetAttachmentInfo MapTileSettingsAttachmentInfo;
-			MapTileSettingsAttachmentInfo.BufferInfo.buffer = MainPass.MapTileSettingsBuffer[i].Buffer;
-			MapTileSettingsAttachmentInfo.BufferInfo.offset = 0;
-			MapTileSettingsAttachmentInfo.BufferInfo.range = MapTileSettingsSize;
-			MapTileSettingsAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-
-			VulkanInterface::AttachUniformsToSet(MainPass.VpSet[i], &VpBufferAttachmentInfo, 1);
 			VulkanInterface::AttachUniformsToSet(MainPass.EntityLightSet[i], &EntityLightAttachmentInfo, 1);
 			VulkanInterface::AttachUniformsToSet(MainPass.DeferredInputSet[i], DeferredInputAttachmentInfo, 2);
 			VulkanInterface::AttachUniformsToSet(MainPass.ShadowMapArraySet[i], &ShadowMapArrayAttachmentInfo, 1);
-			VulkanInterface::AttachUniformsToSet(MainPass.MapTileSettingsSet[i], &MapTileSettingsAttachmentInfo, 1);
 		}
 
 		const VkDeviceSize MaterialSize = sizeof(Render::Material);
 		VpBufferInfo.size = MaterialSize;
-		MainPass.MaterialBuffer = VulkanInterface::CreateUniformBuffer(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		MainPass.MaterialBuffer = VulkanInterface::CreateUniformBufferInternal(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 		VulkanInterface::CreateUniformSets(&MainPass.MaterialLayout, 1, &MainPass.MaterialSet);
 
@@ -569,17 +549,19 @@ namespace Render
 
 		VulkanInterface::CreateRenderPass(&MainRenderPassSettings, &RenderTarget, MainScreenExtent, 1, VulkanInterface::GetImageCount(), &MainPass.RenderPass);
 	
+		const VkDescriptorSetLayout VpLayout = FrameManager::GetViewProjectionLayout();
+
 		const u32 TerrainDescriptorLayoutsCount = 2;
 		VkDescriptorSetLayout TerrainDescriptorLayouts[TerrainDescriptorLayoutsCount] =
 		{
-			MainPass.VpLayout,
+			VpLayout,
 			MainPass.TerrainSkyBoxLayout
 		};
 
 		const u32 EntityDescriptorLayoutCount = 5;
 		VkDescriptorSetLayout EntityDescriptorLayouts[EntityDescriptorLayoutCount] =
 		{
-			MainPass.VpLayout,
+			VpLayout,
 			MainPass.EntitySamplerLayout,
 			MainPass.EntityLightLayout,
 			MainPass.MaterialLayout,
@@ -589,44 +571,32 @@ namespace Render
 		const u32 SkyBoxDescriptorLayoutCount = 2;
 		VkDescriptorSetLayout SkyBoxDescriptorLayouts[SkyBoxDescriptorLayoutCount] =
 		{
-			MainPass.VpLayout,
+			VpLayout,
 			MainPass.TerrainSkyBoxLayout,
 		};
-
-		VkDescriptorSetLayout MapDescriptorLayouts[] = 
-		{
-			MainPass.VpLayout,
-			MainPass.TerrainSkyBoxLayout,
-			MainPass.MapTileSettingsLayout,
-		};
-		const u32 MapDescriptorLayoutCount = sizeof(MapDescriptorLayouts) / sizeof(MapDescriptorLayouts[0]);
 
 		const u32 TerrainIndex = 0;
-		const u32 EntityIndex = 2;
-		const u32 SkyBoxIndex = 3;
-		const u32 DeferredIndex = 4;
-		const u32 MapIndex = 1;
+		const u32 EntityIndex = 1;
+		const u32 SkyBoxIndex = 2;
+		const u32 DeferredIndex = 3;
 
 		u32 SetLayoutCountTable[MainPathPipelinesCount];
 		SetLayoutCountTable[EntityIndex] = EntityDescriptorLayoutCount;
 		SetLayoutCountTable[TerrainIndex] = TerrainDescriptorLayoutsCount;
 		SetLayoutCountTable[DeferredIndex] = 1;
 		SetLayoutCountTable[SkyBoxIndex] = SkyBoxDescriptorLayoutCount;
-		SetLayoutCountTable[MapIndex] = MapDescriptorLayoutCount;
 
 		const VkDescriptorSetLayout* SetLayouts[MainPathPipelinesCount];
 		SetLayouts[EntityIndex] = EntityDescriptorLayouts;
 		SetLayouts[TerrainIndex] = TerrainDescriptorLayouts;
 		SetLayouts[DeferredIndex] = &MainPass.DeferredInputLayout;
 		SetLayouts[SkyBoxIndex] = SkyBoxDescriptorLayouts;
-		SetLayouts[MapIndex] = MapDescriptorLayouts;
 
 		u32 PushConstantRangeCountTable[MainPathPipelinesCount];
 		PushConstantRangeCountTable[EntityIndex] = 1;
 		PushConstantRangeCountTable[TerrainIndex] = 0;
 		PushConstantRangeCountTable[DeferredIndex] = 0;
 		PushConstantRangeCountTable[SkyBoxIndex] = 0;
-		PushConstantRangeCountTable[MapIndex] = 0;
 
 		for (u32 i = 0; i < MainPathPipelinesCount; ++i)
 		{
@@ -636,7 +606,6 @@ namespace Render
 
 		const char* Paths[MainPathPipelinesCount][2] = {
 			{ "./Resources/Shaders/TerrainGenerator_vert.spv", "./Resources/Shaders/TerrainGenerator_frag.spv" },
-			{ "./Resources/Shaders/QuadBasedSphere_vert.spv", "./Resources/Shaders/QuadBasedSphere_frag.spv" },
 			{"./Resources/Shaders/vert.spv", "./Resources/Shaders/frag.spv" },
 			{"./Resources/Shaders/SkyBox_vert.spv", "./Resources/Shaders/SkyBox_frag.spv" },
 			{"./Resources/Shaders/second_vert.spv", "./Resources/Shaders/second_frag.spv" },
@@ -671,14 +640,12 @@ namespace Render
 		VertexInput[TerrainIndex] = TerrainVertexInput;
 		VertexInput[DeferredIndex] = { };
 		VertexInput[SkyBoxIndex] = SkyBoxVertexInput;
-		VertexInput[MapIndex] = { };
 
 		VulkanInterface::PipelineSettings PipelineSettings[MainPathPipelinesCount];
 		PipelineSettings[EntityIndex] = EntityPipelineSettings;
 		PipelineSettings[TerrainIndex] = TerrainPipelineSettings;
 		PipelineSettings[DeferredIndex] = DeferredPipelineSettings;
 		PipelineSettings[SkyBoxIndex] = SkyBoxPipelineSettings;
-		PipelineSettings[MapIndex] = MapPipelineSettings;
 
 		VulkanInterface::PipelineResourceInfo PipelineResourceInfo[MainPathPipelinesCount];
 		PipelineResourceInfo[EntityIndex].PipelineLayout = MainPass.Pipelines[EntityIndex].PipelineLayout;
@@ -696,10 +663,6 @@ namespace Render
 		PipelineResourceInfo[SkyBoxIndex].PipelineLayout = MainPass.Pipelines[SkyBoxIndex].PipelineLayout;
 		PipelineResourceInfo[SkyBoxIndex].RenderPass = MainPass.RenderPass.Pass;
 		PipelineResourceInfo[SkyBoxIndex].SubpassIndex = 0;
-
-		PipelineResourceInfo[MapIndex].PipelineLayout = MainPass.Pipelines[MapIndex].PipelineLayout;
-		PipelineResourceInfo[MapIndex].RenderPass = MainPass.RenderPass.Pass;
-		PipelineResourceInfo[MapIndex].SubpassIndex = 0;
 
 		VkPipeline NewPipelines[MainPathPipelinesCount];
 		CreatePipelines(ShaderInfo, VertexInput, PipelineSettings, PipelineResourceInfo, MainPathPipelinesCount, NewPipelines);
@@ -748,9 +711,7 @@ namespace Render
 	{
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
-			VulkanInterface::DestroyUniformBuffer(MainPass.VpBuffer[i]);
 			VulkanInterface::DestroyUniformBuffer(MainPass.EntityLightBuffer[i]);
-			VulkanInterface::DestroyUniformBuffer(MainPass.MapTileSettingsBuffer[i]);
 			VulkanInterface::DestroyUniformImage(MainPass.DeferredInputColorImage[i]);
 			VulkanInterface::DestroyUniformImage(MainPass.DeferredInputDepthImage[i]);
 			
@@ -762,14 +723,12 @@ namespace Render
 
 		VulkanInterface::DestroyUniformBuffer(MainPass.MaterialBuffer);
 
-		VulkanInterface::DestroyUniformLayout(MainPass.VpLayout);
 		VulkanInterface::DestroyUniformLayout(MainPass.EntityLightLayout);
 		VulkanInterface::DestroyUniformLayout(MainPass.MaterialLayout);
 		VulkanInterface::DestroyUniformLayout(MainPass.DeferredInputLayout);
 		VulkanInterface::DestroyUniformLayout(MainPass.ShadowMapArrayLayout);
 		VulkanInterface::DestroyUniformLayout(MainPass.EntitySamplerLayout);
 		VulkanInterface::DestroyUniformLayout(MainPass.TerrainSkyBoxLayout);
-		VulkanInterface::DestroyUniformLayout(MainPass.MapTileSettingsLayout);
 
 		VulkanInterface::DestroySampler(MainPass.ShadowMapArraySampler);
 		VulkanInterface::DestroySampler(MainPass.DiffuseSampler);
@@ -784,16 +743,6 @@ namespace Render
 		VulkanInterface::DestroyRenderPass(&MainPass.RenderPass);
 	}
 
-	void UpdateVpBuffer(const ViewProjectionBuffer& ViewProjection)
-	{
-		const u32 UpdateIndex = (ActiveVpSet + 1) % VulkanInterface::GetImageCount();
-
-		UpdateUniformBuffer(MainPass.VpBuffer[UpdateIndex], sizeof(ViewProjectionBuffer), 0,
-			&ViewProjection);
-
-		ActiveVpSet = UpdateIndex;
-	}
-
 	void DepthPassDraw(const DrawScene* Scene, VkCommandBuffer CommandBuffer, u32 ImageIndex)
 	{
 		const BMRLightSpaceMatrix* LightViews[] =
@@ -804,7 +753,8 @@ namespace Render
 
 		for (u32 LightCaster = 0; LightCaster < MAX_LIGHT_SOURCES; ++LightCaster)
 		{
-			UpdateLightSpaceBuffer(LightViews[LightCaster]);
+			VulkanInterface::UpdateUniformBuffer(DepthPass.LightSpaceMatrixBuffer[LightCaster], sizeof(BMRLightSpaceMatrix), 0,
+				LightViews[LightCaster]);
 
 			VkRect2D RenderArea;
 			RenderArea.extent = DepthViewportExtent;
@@ -823,7 +773,7 @@ namespace Render
 				const u32 DescriptorSetGroupCount = 1;
 				const VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] =
 				{
-					DepthPass.LightSpaceMatrixSet[ActiveLightSpaceMatrixSet],
+					DepthPass.LightSpaceMatrixSet[LightCaster],
 				};
 
 				const VkPipelineLayout PipelineLayout = DepthPass.Pipeline.PipelineLayout;
@@ -845,6 +795,8 @@ namespace Render
 
 	void MainPassDraw(const DrawScene* Scene, VkCommandBuffer CommandBuffer, u32 ImageIndex)
 	{
+		const VkDescriptorSet VpSet = FrameManager::GetViewProjectionSet()[ImageIndex];
+
 		VkRect2D RenderArea;
 		RenderArea.extent = MainScreenExtent;
 		RenderArea.offset = { 0, 0 };
@@ -861,7 +813,7 @@ namespace Render
 
 			const u32 TerrainDescriptorSetGroupCount = 2;
 			const VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = {
-				MainPass.VpSet[ActiveVpSet],
+				VpSet,
 				DrawTerrainEntity->TextureSet
 			};
 
@@ -873,24 +825,10 @@ namespace Render
 			vkCmdDrawIndexed(CommandBuffer, DrawTerrainEntity->IndicesCount, 1, 0, 0, 0);
 		}
 
+		DynamicMapSystem::OnDraw();
+
 		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[1].Pipeline);
 
-		const u32 TerrainDescriptorSetGroupCount = 3;
-		const VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = {
-			MainPass.VpSet[ActiveVpSet],
-			Scene->MapEntity.TextureSet,
-			MainPass.MapTileSettingsSet[ImageIndex]
-		};
-		
-		vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[1].PipelineLayout,
-			0, TerrainDescriptorSetGroupCount, TerrainDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
-
-		vkCmdBindIndexBuffer(CommandBuffer, PassSharedResources.IndexBuffer.Buffer, Scene->MapEntity.IndexOffset, VK_INDEX_TYPE_UINT32);
-		vkCmdDrawIndexed(CommandBuffer, Scene->MapEntity.IndicesCount, 1, 0, 0, 0);
-			
-		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[2].Pipeline);
-
-		// TODO: Support rework to not create identical index buffers
 		for (u32 i = 0; i < Scene->DrawEntitiesCount; ++i)
 		{
 			DrawEntity* DrawEntity = Scene->DrawEntities + i;
@@ -900,15 +838,15 @@ namespace Render
 
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
-				MainPass.VpSet[ActiveVpSet],
+				VpSet,
 				DrawEntity->TextureSet,
-				MainPass.EntityLightSet[ActiveLightSet],
+				MainPass.EntityLightSet[ImageIndex],
 				MainPass.MaterialSet,
 				MainPass.ShadowMapArraySet[ImageIndex],
 			};
 			const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
-			const VkPipelineLayout PipelineLayout = MainPass.Pipelines[2].PipelineLayout;
+			const VkPipelineLayout PipelineLayout = MainPass.Pipelines[1].PipelineLayout;
 
 			vkCmdPushConstants(CommandBuffer, PipelineLayout,
 				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BMRModel), &DrawEntity->Model);
@@ -923,15 +861,15 @@ namespace Render
 		
 		if (Scene->DrawSkyBox)
 		{
-			vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[3].Pipeline);
+			vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[2].Pipeline);
 
 			const u32 SkyBoxDescriptorSetGroupCount = 2;
 			const VkDescriptorSet SkyBoxDescriptorSetGroup[SkyBoxDescriptorSetGroupCount] = {
-				MainPass.VpSet[ActiveVpSet],
+				VpSet,
 				Scene->SkyBox.TextureSet,
 			};
 
-			const VkPipelineLayout PipelineLayout = MainPass.Pipelines[3].PipelineLayout;
+			const VkPipelineLayout PipelineLayout = MainPass.Pipelines[2].PipelineLayout;
 
 			vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
 				0, SkyBoxDescriptorSetGroupCount, SkyBoxDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
@@ -942,9 +880,9 @@ namespace Render
 		}
 		
 		vkCmdNextSubpass(CommandBuffer, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[4].Pipeline);
+		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[3].Pipeline);
 
-		vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[4].PipelineLayout,
+		vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[3].PipelineLayout,
 			0, 1, &MainPass.DeferredInputSet[ImageIndex], 0, nullptr);
 		vkCmdDraw(CommandBuffer, 3, 1, 0, 0); // 3 hardcoded Indices for second "post processing" subpass
 		
@@ -953,17 +891,15 @@ namespace Render
 
 	void Draw(const DrawScene* Scene)
 	{
-		UpdateLightBuffer(Scene->LightEntity);
-		UpdateVpBuffer(Scene->ViewProjection);
-		
-
 		u32 ImageIndex = VulkanInterface::AcquireNextImageIndex();
-		UpdateTileSettingsBuffer(&Scene->MapTileSettings, ImageIndex);
 
-		VkCommandBuffer CommandBuffer = VulkanInterface::BeginDraw(ImageIndex);
+		VulkanInterface::UpdateUniformBuffer(MainPass.EntityLightBuffer[ImageIndex], sizeof(LightBuffer), 0,
+			Scene->LightEntity);
 
-		DepthPassDraw(Scene, CommandBuffer, ImageIndex);
-		MainPassDraw(Scene, CommandBuffer, ImageIndex);
+		TestCurrentFrameCommandBuffer = VulkanInterface::BeginDraw(ImageIndex);
+
+		DepthPassDraw(Scene, TestCurrentFrameCommandBuffer, ImageIndex);
+		MainPassDraw(Scene, TestCurrentFrameCommandBuffer, ImageIndex);
 		
 		VulkanInterface::EndDraw(ImageIndex);
 	}

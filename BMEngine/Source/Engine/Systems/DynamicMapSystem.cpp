@@ -12,6 +12,10 @@
 #include "ResourceManager.h"
 #include "Engine/Scene.h"
 #include "Util/Math.h"
+#include "Util/Util.h"
+#include "Util/Settings.h"
+#include "Memory/MemoryManagmentSystem.h"
+#include "Render/FrameManager.h"
 
 #include "stb_image.h"
 
@@ -24,6 +28,15 @@ namespace DynamicMapSystem
 		s32 Y;
 		s32 ArrayLayer;
 		std::string Data;
+	};
+
+	struct TileSettingsBuffer
+	{
+		u32 VertexTilesPerAxis;
+		u32 TextureTilesPerAxis;
+		u32 MinTileX;
+		u32 MinTileY;
+		u32 TilesCountY;
 	};
 
 	static s32 LonToTileX(f64 Lon, s32 Zoom);
@@ -64,10 +77,77 @@ namespace DynamicMapSystem
 
 	static httplib::Client* Client = nullptr;
 
+	static TileSettingsBuffer MapTileSettings;
+
+	static VulkanInterface::IndexBuffer IndexBuffer;
+	static VkDescriptorSetLayout MapTileSettingsLayout = nullptr;
+	static VulkanInterface::IndexBuffer MapTileSettingsBuffer[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VkDescriptorSet MapTileSettingsSet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VulkanInterface::RenderPipeline Pipeline;
+
 	static bool TestDownload = true;
+	static int TestIndicesCount = 0;
 
 	void Init()
 	{
+		const u32 ShaderCount = 2;
+		VulkanInterface::Shader Shaders[ShaderCount];
+
+		std::vector<char> VertexShaderCode;
+		Util::OpenAndReadFileFull("./Resources/Shaders/QuadBasedSphere_vert.spv", VertexShaderCode, "rb");
+		std::vector<char> FragmentShaderCode;
+		Util::OpenAndReadFileFull("./Resources/Shaders/QuadBasedSphere_frag.spv", FragmentShaderCode, "rb");
+
+		Shaders[0].Stage = VK_SHADER_STAGE_VERTEX_BIT;
+		Shaders[0].Code = VertexShaderCode.data();
+		Shaders[0].CodeSize = VertexShaderCode.size();
+
+		Shaders[1].Stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+		Shaders[1].Code = FragmentShaderCode.data();
+		Shaders[1].CodeSize = FragmentShaderCode.size();
+
+		const VkDescriptorType Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		const VkShaderStageFlags Flags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		MapTileSettingsLayout = VulkanInterface::CreateUniformLayout(&Type, &Flags, 1);
+
+		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
+		{
+			const VkDeviceSize MapTileSettingsSize = sizeof(TileSettingsBuffer);
+			MapTileSettingsBuffer[i] = VulkanInterface::CreateUniformBuffer(MapTileSettingsSize);
+		
+			VulkanInterface::CreateUniformSets(&MapTileSettingsLayout, 1, MapTileSettingsSet + i);
+
+			VulkanInterface::UniformSetAttachmentInfo MapTileSettingsAttachmentInfo;
+			MapTileSettingsAttachmentInfo.BufferInfo.buffer = MapTileSettingsBuffer[i].Buffer;
+			MapTileSettingsAttachmentInfo.BufferInfo.offset = 0;
+			MapTileSettingsAttachmentInfo.BufferInfo.range = MapTileSettingsSize;
+			MapTileSettingsAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+			VulkanInterface::AttachUniformsToSet(MapTileSettingsSet[i], &MapTileSettingsAttachmentInfo, 1);
+		}
+
+		VkDescriptorSetLayout MapDescriptorLayouts[] =
+		{
+			FrameManager::GetViewProjectionLayout(),
+			Render::TestGetTerrainSkyBoxLayout(),
+			MapTileSettingsLayout,
+		};
+		const u32 MapDescriptorLayoutCount = sizeof(MapDescriptorLayouts) / sizeof(MapDescriptorLayouts[0]);
+
+		Pipeline.PipelineLayout = VulkanInterface::CreatePipelineLayout(MapDescriptorLayouts, MapDescriptorLayoutCount, nullptr, 0);
+
+		VulkanInterface::PipelineResourceInfo ResourceInfo;
+		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
+		ResourceInfo.RenderPass = Render::TestGetRenderPass();
+		ResourceInfo.SubpassIndex = 0;
+
+		VulkanInterface::BMRVertexInputBinding VertexInput;
+		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, &VertexInput, 0,
+			&MapPipelineSettings, &ResourceInfo);
+
+
+		IndexBuffer = VulkanInterface::CreateIndexBuffer(MB64);
+
 		Render::RenderTexture TextureArrayTiles = ResourceManager::EmptyTexture(TilesTextureId, TextureTileSize, TextureTileSize,
 			MaxTextureTilesPerAxis, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
 
@@ -137,10 +217,9 @@ namespace DynamicMapSystem
 				return;
 			}
 
-			Render::ClearIndices();
-			Scene.MapEntity.IndexOffset = Render::LoadIndices(Indices.data(), Indices.size());
-			Scene.MapEntity.IndicesCount = Indices.size();
-			Scene.MapTileSettings.VertexTilesPerAxis = VertexTilesPerAxis;
+			TestIndicesCount = Indices.size();
+			Render::LoadIndices(IndexBuffer, Indices.data(), Indices.size(), 0);
+			MapTileSettings.VertexTilesPerAxis = VertexTilesPerAxis;
 		}
 
 		bool UpdateTiles = false;
@@ -190,10 +269,10 @@ namespace DynamicMapSystem
 				ClampedMinTileX = (MinTileX + TilesPerAxis) % TilesPerAxis;
 				ClampedMinTileY = glm::clamp(MinTileY, 0, TilesPerAxis - 1);
 
-				Scene.MapTileSettings.TextureTilesPerAxis = TilesPerAxis;
-				Scene.MapTileSettings.MinTileX = ClampedMinTileX;
-				Scene.MapTileSettings.MinTileY = ClampedMinTileY;
-				Scene.MapTileSettings.TilesCountY = TilesCountY;
+				MapTileSettings.TextureTilesPerAxis = TilesPerAxis;
+				MapTileSettings.MinTileX = ClampedMinTileX;
+				MapTileSettings.MinTileY = ClampedMinTileY;
+				MapTileSettings.TilesCountY = TilesCountY;
 			}
 
 			std::vector<Tile> TilesToDownload;
@@ -258,9 +337,37 @@ namespace DynamicMapSystem
 		}
 	}
 
+	void OnDraw()
+	{
+		Render::TestUpdateUniforBuffer(MapTileSettingsBuffer, sizeof(TileSettingsBuffer), 0, &MapTileSettings);
+
+		Render::BindPipeline(Pipeline.Pipeline);
+
+		const VkDescriptorSet DescriptorSetGroup[] = {
+			FrameManager::GetViewProjectionSet()[VulkanInterface::TestGetImageIndex()],
+			Scene.MapEntity.TextureSet,
+			MapTileSettingsSet[VulkanInterface::TestGetImageIndex()]
+		};
+
+		Render::BindDescriptorSet(DescriptorSetGroup, 3, Pipeline.PipelineLayout);
+		Render::BindIndexBuffer(IndexBuffer, 0);
+		Render::DrawIndexed(TestIndicesCount);
+	}
+
 	void DeInit()
 	{
 		StopDownload = true;
+
+		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
+		{
+			VulkanInterface::DestroyUniformBuffer(MapTileSettingsBuffer[i]);
+		}
+
+		VulkanInterface::DestroyUniformBuffer(IndexBuffer);
+		VulkanInterface::DestroyUniformLayout(MapTileSettingsLayout);
+		VulkanInterface::DestroyPipeline(Pipeline.Pipeline);
+		VulkanInterface::DestroyPipelineLayout(Pipeline.PipelineLayout);
+		
 		std::unique_lock DeInitLock(DeInitMutex);
 	}
 

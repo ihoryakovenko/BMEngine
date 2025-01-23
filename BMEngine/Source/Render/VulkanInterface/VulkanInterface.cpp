@@ -134,9 +134,10 @@ namespace VulkanInterface
 	static VkDescriptorPool MainPool = nullptr;
 	static VkCommandBuffer DrawCommandBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 	static u32 CurrentFrame = 0;
+	static u32 CurrentImageIndex = 0;
 
 	// TODO: move StagingBuffer to external system
-	static VulkanInterface::UniformValue StagingBuffer;
+	static VulkanInterface::UniformBuffer StagingBuffer;
 	
 
 	// FUNCTIONS IMPLEMENTATIONS
@@ -201,7 +202,7 @@ namespace VulkanInterface
 		bufferInfo.size = MB256;
 		bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		StagingBuffer = VulkanInterface::CreateUniformBuffer(&bufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		StagingBuffer = VulkanInterface::CreateUniformBufferInternal(&bufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	}
 
 	void DeInit()
@@ -435,6 +436,217 @@ namespace VulkanInterface
 		}
 	}
 
+	VkPipeline BatchPipelineCreation(const Shader* Shaders, u32 ShadersCount,
+		const BMRVertexInputBinding* VertexInputBinding, u32 VertexInputBindingCount,
+		const PipelineSettings* Settings, const PipelineResourceInfo* ResourceInfo)
+	{
+		HandleLog(BMRVkLogType_Info,
+			"CREATING PIPELINE %s\n"
+			"Extent - Width: %d, Height: %d\n"
+			"DepthClampEnable: %d, RasterizerDiscardEnable: %d\n"
+			"PolygonMode: %d, LineWidth: %f, CullMode: %d, FrontFace: %d, DepthBiasEnable: %d\n"
+			"LogicOpEnable: %d, AttachmentCount: %d, ColorWriteMask: %d\n"
+			"BlendEnable: %d, SrcColorBlendFactor: %d, DstColorBlendFactor: %d, ColorBlendOp: %d\n"
+			"SrcAlphaBlendFactor: %d, DstAlphaBlendFactor: %d, AlphaBlendOp: %d\n"
+			"DepthTestEnable: %d, DepthWriteEnable: %d, DepthCompareOp: %d\n"
+			"DepthBoundsTestEnable: %d, StencilTestEnable: %d",
+			Settings->PipelineName,
+			Settings->Extent.width, Settings->Extent.height,
+			Settings->DepthClampEnable, Settings->RasterizerDiscardEnable,
+			Settings->PolygonMode, Settings->LineWidth, Settings->CullMode,
+			Settings->FrontFace, Settings->DepthBiasEnable,
+			Settings->LogicOpEnable, Settings->AttachmentCount, Settings->ColorWriteMask,
+			Settings->BlendEnable, Settings->SrcColorBlendFactor,
+			Settings->DstColorBlendFactor, Settings->ColorBlendOp,
+			Settings->SrcAlphaBlendFactor, Settings->DstAlphaBlendFactor,
+			Settings->AlphaBlendOp,
+			Settings->DepthTestEnable, Settings->DepthWriteEnable,
+			Settings->DepthCompareOp, Settings->DepthBoundsTestEnable,
+			Settings->StencilTestEnable
+		);
+
+		HandleLog(BMRVkLogType_Info, "Creating VkPipelineShaderStageCreateInfo, ShadersCount: %d", ShadersCount);
+
+		auto ShaderStageCreateInfos = Memory::BmMemoryManagementSystem::FrameAlloc<VkPipelineShaderStageCreateInfo>(ShadersCount);
+		for (u32 i = 0; i < ShadersCount; ++i)
+		{
+			HandleLog(BMRVkLogType_Info, "Shader #%d, Stage: %d", i, Shaders[i].Stage);
+
+			VkPipelineShaderStageCreateInfo* ShaderStageCreateInfo = ShaderStageCreateInfos + i;
+			*ShaderStageCreateInfo = { };
+			ShaderStageCreateInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			ShaderStageCreateInfo->stage = Shaders[i].Stage;
+			ShaderStageCreateInfo->pName = "main";
+			VulkanInterface::CreateShader((const u32*)Shaders[i].Code, Shaders[i].CodeSize, ShaderStageCreateInfo->module);
+		}
+
+		// INPUTASSEMBLY
+		VkPipelineInputAssemblyStateCreateInfo InputAssemblyStateCreateInfo = { };
+		InputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+		InputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		InputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;
+
+		// MULTISAMPLING
+		VkPipelineMultisampleStateCreateInfo MultisampleStateCreateInfo = { };
+		MultisampleStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+		MultisampleStateCreateInfo.sampleShadingEnable = VK_FALSE;					// Enable multisample shading or not
+		MultisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;	// Number of samples to use per fragment
+
+		// VERTEX INPUT
+		auto VertexInputBindings = Memory::BmMemoryManagementSystem::FrameAlloc<VkVertexInputBindingDescription>(VertexInputBindingCount);
+		auto VertexInputAttributes = Memory::BmMemoryManagementSystem::FrameAlloc<VkVertexInputAttributeDescription>(VertexInputBindingCount * MAX_VERTEX_INPUTS_ATTRIBUTES);
+		u32 VertexInputAttributesIndex = 0;
+
+		HandleLog(BMRVkLogType_Info, "Creating vertex input, VertexInputBindingCount: %d", VertexInputBindingCount);
+
+		for (u32 BindingIndex = 0; BindingIndex < VertexInputBindingCount; ++BindingIndex)
+		{
+			const BMRVertexInputBinding* BMRBinding = VertexInputBinding + BindingIndex;
+			VkVertexInputBindingDescription* VertexInputBinding = VertexInputBindings + BindingIndex;
+
+			VertexInputBinding->binding = BindingIndex;
+			VertexInputBinding->inputRate = BMRBinding->InputRate;
+			VertexInputBinding->stride = BMRBinding->Stride;
+
+			HandleLog(BMRVkLogType_Info, "Initialized VkVertexInputBindingDescription, BindingName: %s, "
+				"BindingIndex: %d, VkInputRate: %d, Stride: %d, InputAttributesCount: %d",
+				BMRBinding->VertexInputBindingName, VertexInputBinding->binding, VertexInputBinding->inputRate,
+				VertexInputBinding->stride, BMRBinding->InputAttributesCount);
+
+			for (u32 CurrentAttributeIndex = 0; CurrentAttributeIndex < BMRBinding->InputAttributesCount; ++CurrentAttributeIndex)
+			{
+				const VertexInputAttribute* BMRAttribute = BMRBinding->InputAttributes + CurrentAttributeIndex;
+				VkVertexInputAttributeDescription* VertexInputAttribute = VertexInputAttributes + VertexInputAttributesIndex;
+
+				VertexInputAttribute->binding = BindingIndex;
+				VertexInputAttribute->location = CurrentAttributeIndex;
+				VertexInputAttribute->format = BMRAttribute->Format;
+				VertexInputAttribute->offset = BMRAttribute->AttributeOffset;
+
+				HandleLog(BMRVkLogType_Info, "Initialized VkVertexInputAttributeDescription, "
+					"AttributeName: %s, BindingIndex: %d, Location: %d, VkFormat: %d, Offset: %d, Index in creation array: %d",
+					BMRAttribute->VertexInputAttributeName, BindingIndex, CurrentAttributeIndex,
+					VertexInputAttribute->format, VertexInputAttribute->offset, VertexInputAttributesIndex);
+
+				++VertexInputAttributesIndex;
+			}
+		}
+		auto VertexInputInfo = Memory::BmMemoryManagementSystem::FrameAlloc<VkPipelineVertexInputStateCreateInfo>();
+		*VertexInputInfo = { };
+		VertexInputInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		VertexInputInfo->vertexBindingDescriptionCount = VertexInputBindingCount;
+		VertexInputInfo->pVertexBindingDescriptions = VertexInputBindings;
+		VertexInputInfo->vertexAttributeDescriptionCount = VertexInputAttributesIndex;
+		VertexInputInfo->pVertexAttributeDescriptions = VertexInputAttributes;
+
+		// VIEWPORT
+		auto Viewport = Memory::BmMemoryManagementSystem::FrameAlloc<VkViewport>();
+		Viewport->width = Settings->Extent.width;
+		Viewport->height = Settings->Extent.height;
+		Viewport->minDepth = 0.0f;
+		Viewport->maxDepth = 1.0f;
+		Viewport->x = 0.0f;
+		Viewport->y = 0.0f;
+
+		auto Scissor = Memory::BmMemoryManagementSystem::FrameAlloc<VkRect2D>();
+		Scissor->extent.width = Settings->Extent.width;
+		Scissor->extent.height = Settings->Extent.height;
+		Scissor->offset = { };
+
+		auto ViewportStateCreateInfo = Memory::BmMemoryManagementSystem::FrameAlloc<VkPipelineViewportStateCreateInfo>();
+		*ViewportStateCreateInfo = { };
+		ViewportStateCreateInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+		ViewportStateCreateInfo->viewportCount = 1;
+		ViewportStateCreateInfo->pViewports = Viewport;
+		ViewportStateCreateInfo->scissorCount = 1;
+		ViewportStateCreateInfo->pScissors = Scissor;
+
+		// RASTERIZATION
+		auto RasterizationStateCreateInfo = Memory::BmMemoryManagementSystem::FrameAlloc<VkPipelineRasterizationStateCreateInfo>();
+		*RasterizationStateCreateInfo = { };
+		RasterizationStateCreateInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+		RasterizationStateCreateInfo->depthClampEnable = Settings->DepthClampEnable;
+		// Whether to discard data and skip rasterizer. Never creates fragments, only suitable for pipeline without framebuffer output
+		RasterizationStateCreateInfo->rasterizerDiscardEnable = Settings->RasterizerDiscardEnable;
+		RasterizationStateCreateInfo->polygonMode = Settings->PolygonMode;
+		RasterizationStateCreateInfo->lineWidth = Settings->LineWidth;
+		RasterizationStateCreateInfo->cullMode = Settings->CullMode;
+		RasterizationStateCreateInfo->frontFace = Settings->FrontFace;
+		// Whether to add depth bias to fragments (good for stopping "shadow acne" in shadow mapping)
+		RasterizationStateCreateInfo->depthBiasEnable = Settings->DepthBiasEnable;
+
+		// COLOR BLENDING
+		// Colors to apply blending to
+		auto ColorBlendAttachmentState = Memory::BmMemoryManagementSystem::FrameAlloc<VkPipelineColorBlendAttachmentState>();
+		ColorBlendAttachmentState->colorWriteMask = Settings->ColorWriteMask;
+		ColorBlendAttachmentState->blendEnable = Settings->BlendEnable;
+		// Blending uses equation: (srcColorBlendFactor * new color) colorBlendOp (dstColorBlendFactor * old color)// Enable blending
+		ColorBlendAttachmentState->srcColorBlendFactor = Settings->SrcColorBlendFactor;
+		ColorBlendAttachmentState->dstColorBlendFactor = Settings->DstColorBlendFactor;
+		ColorBlendAttachmentState->colorBlendOp = Settings->ColorBlendOp;
+		ColorBlendAttachmentState->srcAlphaBlendFactor = Settings->SrcAlphaBlendFactor;
+		// Summarised: (VK_BLEND_FACTOR_SRC_ALPHA * new color) + (VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA * old color)
+//			   (new color alpha * new color) + ((1 - new color alpha) * old color)
+		ColorBlendAttachmentState->dstAlphaBlendFactor = Settings->DstAlphaBlendFactor;
+		ColorBlendAttachmentState->alphaBlendOp = Settings->AlphaBlendOp;
+		// Summarised: (1 * new alpha) + (0 * old alpha) = new alpharesult != VK_SUCCESS
+
+		auto ColorBlendInfo = Memory::BmMemoryManagementSystem::FrameAlloc<VkPipelineColorBlendStateCreateInfo>();
+		*ColorBlendInfo = { };
+		ColorBlendInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		ColorBlendInfo->logicOpEnable = Settings->LogicOpEnable; // Alternative to calculations is to use logical operations
+		ColorBlendInfo->attachmentCount = Settings->AttachmentCount;
+		ColorBlendInfo->pAttachments = Settings->AttachmentCount > 0 ? ColorBlendAttachmentState : nullptr;
+
+		// DEPTH STENCIL
+		auto DepthStencilInfo = Memory::BmMemoryManagementSystem::FrameAlloc<VkPipelineDepthStencilStateCreateInfo>();
+		*DepthStencilInfo = { };
+		DepthStencilInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		DepthStencilInfo->depthTestEnable = Settings->DepthTestEnable;
+		DepthStencilInfo->depthWriteEnable = Settings->DepthWriteEnable;
+		DepthStencilInfo->depthCompareOp = Settings->DepthCompareOp;
+		DepthStencilInfo->depthBoundsTestEnable = Settings->DepthBoundsTestEnable;
+		DepthStencilInfo->stencilTestEnable = Settings->StencilTestEnable;
+
+		// CREATE INFO
+
+		auto PipelineCreateInfo = Memory::BmMemoryManagementSystem::FrameAlloc<VkGraphicsPipelineCreateInfo>();
+		PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		PipelineCreateInfo->stageCount = ShadersCount;
+		PipelineCreateInfo->pStages = ShaderStageCreateInfos;
+		PipelineCreateInfo->pVertexInputState = VertexInputInfo;
+		PipelineCreateInfo->pInputAssemblyState = &InputAssemblyStateCreateInfo;
+		PipelineCreateInfo->pViewportState = ViewportStateCreateInfo;
+		PipelineCreateInfo->pDynamicState = nullptr;
+		PipelineCreateInfo->pRasterizationState = RasterizationStateCreateInfo;
+		PipelineCreateInfo->pMultisampleState = &MultisampleStateCreateInfo;
+		PipelineCreateInfo->pColorBlendState = ColorBlendInfo;
+		PipelineCreateInfo->pDepthStencilState = DepthStencilInfo;
+		PipelineCreateInfo->layout = ResourceInfo->PipelineLayout;
+		PipelineCreateInfo->renderPass = ResourceInfo->RenderPass;
+		PipelineCreateInfo->subpass = ResourceInfo->SubpassIndex;
+
+		// Pipeline Derivatives : Can create multiple pipelines that derive from one another for optimisation
+		PipelineCreateInfo->basePipelineHandle = VK_NULL_HANDLE;
+		PipelineCreateInfo->basePipelineIndex = -1;
+
+		VkPipeline Pipeline;
+		const VkResult Result = vkCreateGraphicsPipelines(Device.LogicalDevice, VK_NULL_HANDLE, 1,
+			PipelineCreateInfo, nullptr, &Pipeline);
+
+		if (Result != VK_SUCCESS)
+		{
+			HandleLog(BMRVkLogType_Error, "vkCreateGraphicsPipelines result is %d", Result);
+		}
+
+		for (u32 j = 0; j < ShadersCount; ++j)
+		{
+			VulkanInterface::DestroyShader(ShaderStageCreateInfos[j].module);
+		}
+
+		return Pipeline;
+	}
+
 	u32 GetImageCount()
 	{
 		return SwapInstance.ImagesCount;
@@ -453,11 +665,15 @@ namespace VulkanInterface
 		vkWaitForFences(Device.LogicalDevice, 1, Fence, VK_TRUE, UINT64_MAX);
 		vkResetFences(Device.LogicalDevice, 1, Fence);
 
-		u32 ImageIndex;
 		vkAcquireNextImageKHR(Device.LogicalDevice, SwapInstance.VulkanSwapchain, UINT64_MAX,
-			ImageAvailable, VK_NULL_HANDLE, &ImageIndex);
+			ImageAvailable, VK_NULL_HANDLE, &CurrentImageIndex);
 
-		return ImageIndex;
+		return CurrentImageIndex;
+	}
+
+	u32 TestGetImageIndex()
+	{
+		return CurrentImageIndex;
 	}
 
 	VkCommandBuffer BeginDraw(u32 ImageIndex)
@@ -655,9 +871,9 @@ namespace VulkanInterface
 		vkDestroyPipeline(Device.LogicalDevice, Pipeline, nullptr);
 	}
 
-	UniformValue CreateUniformBuffer(const VkBufferCreateInfo* BufferInfo, VkMemoryPropertyFlags Properties)
+	UniformBuffer CreateUniformBufferInternal(const VkBufferCreateInfo* BufferInfo, VkMemoryPropertyFlags Properties)
 	{
-		UniformValue UniformBuffer;
+		UniformBuffer UniformBuffer;
 		UniformBuffer.Buffer = CreateBuffer(BufferInfo);
 
 		VkMemoryRequirements MemoryRequirements;
@@ -674,10 +890,11 @@ namespace VulkanInterface
 		UniformBuffer.Memory = CreateDeviceMemory(MemoryRequirements.size, MemoryTypeIndex);
 		vkBindBufferMemory(Device.LogicalDevice, UniformBuffer.Buffer, UniformBuffer.Memory, 0);
 
+		UniformBuffer.Size = MemoryRequirements.size;
 		return UniformBuffer;
 	}
 
-	void UpdateUniformBuffer(UniformValue Buffer, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data)
+	void UpdateUniformBuffer(UniformBuffer Buffer, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data)
 	{
 		void* MappedMemory;
 		vkMapMemory(Device.LogicalDevice, Buffer.Memory, Offset, DataSize, 0, &MappedMemory);
@@ -777,28 +994,29 @@ namespace VulkanInterface
 		return Sampler;
 	}
 
-	UniformValue CreateUniformImage(const VkImageCreateInfo* ImageCreateInfo)
+	UniformImage CreateUniformImage(const VkImageCreateInfo* ImageCreateInfo)
 	{
-		UniformValue Buffer;
-		VkResult Result = vkCreateImage(Device.LogicalDevice, ImageCreateInfo, nullptr, &Buffer.Image);
+		UniformImage Image;
+		VkResult Result = vkCreateImage(Device.LogicalDevice, ImageCreateInfo, nullptr, &Image.Image);
 		if (Result != VK_SUCCESS)
 		{
 			HandleLog(BMRVkLogType_Error, "CreateImage result is %d", Result);
 		}
 
 		VkMemoryRequirements MemoryRequirements;
-		vkGetImageMemoryRequirements(Device.LogicalDevice, Buffer.Image, &MemoryRequirements);
+		vkGetImageMemoryRequirements(Device.LogicalDevice, Image.Image, &MemoryRequirements);
 
 		const u32 MemoryTypeIndex = GetMemoryTypeIndex(Device.PhysicalDevice, MemoryRequirements.memoryTypeBits,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-		Buffer.Memory = AllocateMemory(MemoryRequirements.size, MemoryTypeIndex);
-		vkBindImageMemory(Device.LogicalDevice, Buffer.Image, Buffer.Memory, 0);
+		Image.Memory = AllocateMemory(MemoryRequirements.size, MemoryTypeIndex);
+		vkBindImageMemory(Device.LogicalDevice, Image.Image, Image.Memory, 0);
 
-		return Buffer;
+		Image.Size = MemoryRequirements.size;
+		return Image;
 	}
 
-	void DestroyUniformImage(UniformValue Image)
+	void DestroyUniformImage(UniformImage Image)
 	{
 		vkDestroyImage(Device.LogicalDevice, Image.Image, nullptr);
 		vkFreeMemory(Device.LogicalDevice, Image.Memory, nullptr);
@@ -833,7 +1051,7 @@ namespace VulkanInterface
 		return Layout;
 	}
 
-	void DestroyUniformBuffer(UniformValue Buffer)
+	void DestroyUniformBuffer(UniformBuffer Buffer)
 	{
 		vkDeviceWaitIdle(Device.LogicalDevice); // TODO FIX
 
@@ -2041,5 +2259,39 @@ namespace VulkanInterface
 		}
 
 		return Pool;
+	}
+
+	UniformBuffer CreateUniformBuffer(u64 Size)
+	{
+		VkBufferCreateInfo BufferInfo = { };
+		BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		BufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		BufferInfo.size = Size;
+
+		return VulkanInterface::CreateUniformBufferInternal(&BufferInfo,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	}
+
+	IndexBuffer CreateVertexBuffer(u64 Size)
+	{
+		VkBufferCreateInfo BufferInfo = { };
+		BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		BufferInfo.size = Size;
+		BufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		return VulkanInterface::CreateUniformBufferInternal(&BufferInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	}
+
+	IndexBuffer CreateIndexBuffer(u64 Size)
+	{
+		VkBufferCreateInfo BufferInfo = { };
+		BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		BufferInfo.size = Size;
+		BufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		return VulkanInterface::CreateUniformBufferInternal(&BufferInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 	}
 }

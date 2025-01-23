@@ -25,6 +25,7 @@
     <ClCompile Include="Source\Engine\Systems\DynamicMapSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\ResourceManager.cpp" />
     <ClCompile Include="Source\Engine\Scene.cpp" />
+    <ClCompile Include="Source\Render\FrameManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
@@ -49,6 +50,7 @@
     <ClInclude Include="Source\Engine\Systems\ResourceManager.h" />
     <ClInclude Include="Source\Engine\Scene.h" />
     <ClInclude Include="Source\Util\Math.h" />
+    <ClInclude Include="Source\Render\FrameManager.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />
