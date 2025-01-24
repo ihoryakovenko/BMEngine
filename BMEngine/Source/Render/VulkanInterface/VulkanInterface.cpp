@@ -64,7 +64,7 @@ namespace VulkanInterface
 	static bool CheckFormats();
 	static bool CheckDeviceSuitability(const char* DeviceExtensions[], u32 DeviceExtensionsSize,
 		VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount, BMRPhysicalDeviceIndices Indices,
-		VkPhysicalDeviceFeatures AvailableFeatures);
+		VkPhysicalDevice Device);
 	static bool CheckDeviceExtensionsSupport(VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount,
 		const char** ExtensionsToCheck, u32 ExtensionsToCheckSize);
 	static bool IsFormatSupported(VkFormat Format, VkImageTiling Tiling, VkFormatFeatureFlags FeatureFlags);
@@ -1630,8 +1630,204 @@ namespace VulkanInterface
 
 	bool CheckDeviceSuitability(const char* DeviceExtensions[], u32 DeviceExtensionsSize,
 		VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount, BMRPhysicalDeviceIndices Indices,
-		VkPhysicalDeviceFeatures AvailableFeatures)
+		VkPhysicalDevice Device)
 	{
+		VkPhysicalDeviceFeatures AvailableFeatures;
+		vkGetPhysicalDeviceFeatures(Device, &AvailableFeatures);
+
+		VkPhysicalDeviceProperties DeviceProperties;
+		vkGetPhysicalDeviceProperties(Device, &DeviceProperties);
+
+		HandleLog(BMRVkLogType_Info,
+			"VkPhysicalDeviceProperties:\n"
+			"  apiVersion: %u\n  driverVersion: %u\n  vendorID: %u\n  deviceID: %u\n"
+			"  deviceType: %u\n  deviceName: %s\n"
+			"  pipelineCacheUUID: %02X%02X%02X%02X-%02X%02X%02X%02X-%02X%02X%02X%02X-%02X%02X%02X%02X\n"
+			"  sparseProperties:\n    residencyStandard2DBlockShape: %u\n"
+			"    residencyStandard2DMultisampleBlockShape: %u\n    residencyStandard3DBlockShape: %u\n"
+			"    residencyAlignedMipSize: %u\n    residencyNonResidentStrict: %u",
+			DeviceProperties.apiVersion,DeviceProperties.driverVersion,
+			DeviceProperties.vendorID,DeviceProperties.deviceID,
+			DeviceProperties.deviceType,DeviceProperties.deviceName,
+			DeviceProperties.pipelineCacheUUID[0], DeviceProperties.pipelineCacheUUID[1], DeviceProperties.pipelineCacheUUID[2], DeviceProperties.pipelineCacheUUID[3],
+			DeviceProperties.pipelineCacheUUID[4], DeviceProperties.pipelineCacheUUID[5], DeviceProperties.pipelineCacheUUID[6], DeviceProperties.pipelineCacheUUID[7],
+			DeviceProperties.pipelineCacheUUID[8], DeviceProperties.pipelineCacheUUID[9], DeviceProperties.pipelineCacheUUID[10], DeviceProperties.pipelineCacheUUID[11],
+			DeviceProperties.pipelineCacheUUID[12], DeviceProperties.pipelineCacheUUID[13], DeviceProperties.pipelineCacheUUID[14], DeviceProperties.pipelineCacheUUID[15],
+			DeviceProperties.sparseProperties.residencyStandard2DBlockShape,
+			DeviceProperties.sparseProperties.residencyStandard2DMultisampleBlockShape,
+			DeviceProperties.sparseProperties.residencyStandard3DBlockShape,
+			DeviceProperties.sparseProperties.residencyAlignedMipSize,
+			DeviceProperties.sparseProperties.residencyNonResidentStrict
+		);
+
+		HandleLog(BMRVkLogType_Info,
+			"VkPhysicalDeviceFeatures:\n  robustBufferAccess: %d\n  fullDrawIndexUint32: %d\n"
+			"  imageCubeArray: %d\n  independentBlend: %d\n  geometryShader: %d\n"
+			"  tessellationShader: %d\n  sampleRateShading: %d\n  dualSrcBlend: %d\n"
+			"  logicOp: %d\n  multiDrawIndirect: %d\n  drawIndirectFirstInstance: %d\n"
+			"  depthClamp: %d\n  depthBiasClamp: %d\n  fillModeNonSolid: %d\n"
+			"  depthBounds: %d\n  wideLines: %d\n  largePoints: %d\n  alphaToOne: %d\n"
+			"  multiViewport: %d\n  samplerAnisotropy: %d\n  textureCompressionETC2: %d\n"
+			"  textureCompressionASTC_LDR: %d\n  textureCompressionBC: %d\n"
+			"  occlusionQueryPrecise: %d\n  pipelineStatisticsQuery: %d\n"
+			"  vertexPipelineStoresAndAtomics: %d\n  fragmentStoresAndAtomics: %d\n"
+			"  shaderTessellationAndGeometryPointSize: %d\n  shaderImageGatherExtended: %d\n"
+			"  shaderStorageImageExtendedFormats: %d\n  shaderStorageImageMultisample: %d\n"
+			"  shaderStorageImageReadWithoutFormat: %d\n  shaderStorageImageWriteWithoutFormat: %d\n"
+			"  shaderUniformBufferArrayDynamicIndexing: %d\n  shaderSampledImageArrayDynamicIndexing: %d\n"
+			"  shaderStorageBufferArrayDynamicIndexing: %d\n  shaderStorageImageArrayDynamicIndexing: %d\n"
+			"  shaderClipDistance: %d\n  shaderCullDistance: %d\n  shaderFloat64: %d\n"
+			"  shaderInt64: %d\n  shaderInt16: %d\n  shaderResourceResidency: %d\n"
+			"  shaderResourceMinLod: %d\n  sparseBinding: %d\n  sparseResidencyBuffer: %d\n"
+			"  sparseResidencyImage2D: %d\n  sparseResidencyImage3D: %d\n  sparseResidency2Samples: %d\n"
+			"  sparseResidency4Samples: %d\n  sparseResidency8Samples: %d\n  sparseResidency16Samples: %d\n"
+			"  sparseResidencyAliased: %d\n  variableMultisampleRate: %d\n  inheritedQueries: %d",
+			AvailableFeatures.robustBufferAccess,AvailableFeatures.fullDrawIndexUint32,AvailableFeatures.imageCubeArray,
+			AvailableFeatures.independentBlend,AvailableFeatures.geometryShader,AvailableFeatures.tessellationShader,
+			AvailableFeatures.sampleRateShading,AvailableFeatures.dualSrcBlend,AvailableFeatures.logicOp,
+			AvailableFeatures.multiDrawIndirect,AvailableFeatures.drawIndirectFirstInstance,AvailableFeatures.depthClamp,
+			AvailableFeatures.depthBiasClamp,AvailableFeatures.fillModeNonSolid,AvailableFeatures.depthBounds,
+			AvailableFeatures.wideLines,AvailableFeatures.largePoints,AvailableFeatures.alphaToOne,
+			AvailableFeatures.multiViewport,AvailableFeatures.samplerAnisotropy,AvailableFeatures.textureCompressionETC2,
+			AvailableFeatures.textureCompressionASTC_LDR,AvailableFeatures.textureCompressionBC,
+			AvailableFeatures.occlusionQueryPrecise,AvailableFeatures.pipelineStatisticsQuery,
+			AvailableFeatures.vertexPipelineStoresAndAtomics,AvailableFeatures.fragmentStoresAndAtomics,
+			AvailableFeatures.shaderTessellationAndGeometryPointSize,AvailableFeatures.shaderImageGatherExtended,
+			AvailableFeatures.shaderStorageImageExtendedFormats,AvailableFeatures.shaderStorageImageMultisample,
+			AvailableFeatures.shaderStorageImageReadWithoutFormat,AvailableFeatures.shaderStorageImageWriteWithoutFormat,
+			AvailableFeatures.shaderUniformBufferArrayDynamicIndexing,AvailableFeatures.shaderSampledImageArrayDynamicIndexing,
+			AvailableFeatures.shaderStorageBufferArrayDynamicIndexing,AvailableFeatures.shaderStorageImageArrayDynamicIndexing,
+			AvailableFeatures.shaderClipDistance,AvailableFeatures.shaderCullDistance,
+			AvailableFeatures.shaderFloat64,AvailableFeatures.shaderInt64,AvailableFeatures.shaderInt16,
+			AvailableFeatures.shaderResourceResidency,AvailableFeatures.shaderResourceMinLod,
+			AvailableFeatures.sparseBinding,AvailableFeatures.sparseResidencyBuffer,
+			AvailableFeatures.sparseResidencyImage2D,AvailableFeatures.sparseResidencyImage3D,
+			AvailableFeatures.sparseResidency2Samples,AvailableFeatures.sparseResidency4Samples,
+			AvailableFeatures.sparseResidency8Samples,AvailableFeatures.sparseResidency16Samples,
+			AvailableFeatures.sparseResidencyAliased,AvailableFeatures.variableMultisampleRate,
+			AvailableFeatures.inheritedQueries
+		);
+
+		HandleLog(BMRVkLogType_Info,
+			"VkPhysicalDeviceLimits:\n  maxImageDimension1D: %u\n  maxImageDimension2D: %u\n"
+			"  maxImageDimension3D: %u\n  maxImageDimensionCube: %u\n"
+			"  maxImageArrayLayers: %u\n  maxTexelBufferElements: %u\n"
+			"  maxUniformBufferRange: %u\n  maxStorageBufferRange: %u\n"
+			"  maxPushConstantsSize: %u\n  maxMemoryAllocationCount: %u\n"
+			"  maxSamplerAllocationCount: %u\n  bufferImageGranularity: %llu\n"
+			"  sparseAddressSpaceSize: %llu\n  maxBoundDescriptorSets: %u\n"
+			"  maxPerStageDescriptorSamplers: %u\n  maxPerStageDescriptorUniformBuffers: %u\n"
+			"  maxPerStageDescriptorStorageBuffers: %u\n  maxPerStageDescriptorSampledImages: %u\n"
+			"  maxPerStageDescriptorStorageImages: %u\n  maxPerStageDescriptorInputAttachments: %u\n"
+			"  maxPerStageResources: %u\n  maxDescriptorSetSamplers: %u\n"
+			"  maxDescriptorSetUniformBuffers: %u\n  maxDescriptorSetUniformBuffersDynamic: %u\n"
+			"  maxDescriptorSetStorageBuffers: %u\n  maxDescriptorSetStorageBuffersDynamic: %u\n"
+			"  maxDescriptorSetSampledImages: %u\n  maxDescriptorSetStorageImages: %u\n"
+			"  maxDescriptorSetInputAttachments: %u\n  maxVertexInputAttributes: %u\n"
+			"  maxVertexInputBindings: %u\n  maxVertexInputAttributeOffset: %u\n"
+			"  maxVertexInputBindingStride: %u\n  maxVertexOutputComponents: %u\n"
+			"  maxTessellationGenerationLevel: %u\n  maxTessellationPatchSize: %u\n"
+			"  maxTessellationControlPerVertexInputComponents: %u\n  maxTessellationControlPerVertexOutputComponents: %u\n"
+			"  maxTessellationControlPerPatchOutputComponents: %u\n  maxTessellationControlTotalOutputComponents: %u\n"
+			"  maxTessellationEvaluationInputComponents: %u\n  maxTessellationEvaluationOutputComponents: %u\n"
+			"  maxGeometryShaderInvocations: %u\n  maxGeometryInputComponents: %u\n"
+			"  maxGeometryOutputComponents: %u\n  maxGeometryOutputVertices: %u\n"
+			"  maxGeometryTotalOutputComponents: %u\n  maxFragmentInputComponents: %u\n"
+			"  maxFragmentOutputAttachments: %u\n  maxFragmentDualSrcAttachments: %u\n"
+			"  maxFragmentCombinedOutputResources: %u\n  maxComputeSharedMemorySize: %u\n"
+			"  maxComputeWorkGroupCount[0]: %u\n  maxComputeWorkGroupCount[1]: %u\n"
+			"  maxComputeWorkGroupCount[2]: %u\n  maxComputeWorkGroupInvocations: %u\n"
+			"  maxComputeWorkGroupSize[0]: %u\n  maxComputeWorkGroupSize[1]: %u\n"
+			"  maxComputeWorkGroupSize[2]: %u\n  subPixelPrecisionBits: %u\n"
+			"  subTexelPrecisionBits: %u\n  mipmapPrecisionBits: %u\n"
+			"  maxDrawIndexedIndexValue: %u\n  maxDrawIndirectCount: %u\n"
+			"  maxSamplerLodBias: %f\n  maxSamplerAnisotropy: %f\n"
+			"  maxViewports: %u\n  maxViewportDimensions[0]: %u\n"
+			"  maxViewportDimensions[1]: %u\n  viewportBoundsRange[0]: %f\n"
+			"  viewportBoundsRange[1]: %f\n  viewportSubPixelBits: %u\n"
+			"  minMemoryMapAlignment: %zu\n  minTexelBufferOffsetAlignment: %llu\n"
+			"  minUniformBufferOffsetAlignment: %llu\n  minStorageBufferOffsetAlignment: %llu\n"
+			"  minTexelOffset: %d\n  maxTexelOffset: %u\n"
+			"  minTexelGatherOffset: %d\n  maxTexelGatherOffset: %u\n"
+			"  minInterpolationOffset: %f\n  maxInterpolationOffset: %f\n"
+			"  subPixelInterpolationOffsetBits: %u\n  maxFramebufferWidth: %u\n"
+			"  maxFramebufferHeight: %u\n  maxFramebufferLayers: %u\n"
+			"  framebufferColorSampleCounts: %u\n  framebufferDepthSampleCounts: %u\n"
+			"  framebufferStencilSampleCounts: %u\n  framebufferNoAttachmentsSampleCounts: %u\n"
+			"  maxColorAttachments: %u\n  sampledImageColorSampleCounts: %u\n"
+			"  sampledImageIntegerSampleCounts: %u\n  sampledImageDepthSampleCounts: %u\n"
+			"  sampledImageStencilSampleCounts: %u\n  storageImageSampleCounts: %u\n"
+			"  maxSampleMaskWords: %u\n  timestampComputeAndGraphics: %d\n"
+			"  timestampPeriod: %f\n  maxClipDistances: %u\n"
+			"  maxCullDistances: %u\n  maxCombinedClipAndCullDistances: %u\n"
+			"  discreteQueuePriorities: %u\n  pointSizeRange[0]: %f\n"
+			"  pointSizeRange[1]: %f\n  lineWidthRange[0]: %f\n"
+			"  lineWidthRange[1]: %f\n  pointSizeGranularity: %f\n"
+			"  lineWidthGranularity: %f\n  strictLines: %d\n"
+			"  standardSampleLocations: %d\n  optimalBufferCopyOffsetAlignment: %llu\n"
+			"  optimalBufferCopyRowPitchAlignment: %llu\n  nonCoherentAtomSize: %llu",
+			DeviceProperties.limits.maxImageDimension1D,DeviceProperties.limits.maxImageDimension2D,
+			DeviceProperties.limits.maxImageDimension3D,DeviceProperties.limits.maxImageDimensionCube,
+			DeviceProperties.limits.maxImageArrayLayers,DeviceProperties.limits.maxTexelBufferElements,
+			DeviceProperties.limits.maxUniformBufferRange,DeviceProperties.limits.maxStorageBufferRange,
+			DeviceProperties.limits.maxPushConstantsSize,DeviceProperties.limits.maxMemoryAllocationCount,
+			DeviceProperties.limits.maxSamplerAllocationCount,DeviceProperties.limits.bufferImageGranularity,
+			DeviceProperties.limits.sparseAddressSpaceSize,DeviceProperties.limits.maxBoundDescriptorSets,
+			DeviceProperties.limits.maxPerStageDescriptorSamplers,DeviceProperties.limits.maxPerStageDescriptorUniformBuffers,
+			DeviceProperties.limits.maxPerStageDescriptorStorageBuffers,DeviceProperties.limits.maxPerStageDescriptorSampledImages,
+			DeviceProperties.limits.maxPerStageDescriptorStorageImages,DeviceProperties.limits.maxPerStageDescriptorInputAttachments,
+			DeviceProperties.limits.maxPerStageResources,DeviceProperties.limits.maxDescriptorSetSamplers,
+			DeviceProperties.limits.maxDescriptorSetUniformBuffers,DeviceProperties.limits.maxDescriptorSetUniformBuffersDynamic,
+			DeviceProperties.limits.maxDescriptorSetStorageBuffers,DeviceProperties.limits.maxDescriptorSetStorageBuffersDynamic,
+			DeviceProperties.limits.maxDescriptorSetSampledImages,DeviceProperties.limits.maxDescriptorSetStorageImages,
+			DeviceProperties.limits.maxDescriptorSetInputAttachments,DeviceProperties.limits.maxVertexInputAttributes,
+			DeviceProperties.limits.maxVertexInputBindings,DeviceProperties.limits.maxVertexInputAttributeOffset,
+			DeviceProperties.limits.maxVertexInputBindingStride,DeviceProperties.limits.maxVertexOutputComponents,
+			DeviceProperties.limits.maxTessellationGenerationLevel,DeviceProperties.limits.maxTessellationPatchSize,
+			DeviceProperties.limits.maxTessellationControlPerVertexInputComponents,
+			DeviceProperties.limits.maxTessellationControlPerVertexOutputComponents,
+			DeviceProperties.limits.maxTessellationControlPerPatchOutputComponents,
+			DeviceProperties.limits.maxTessellationControlTotalOutputComponents,
+			DeviceProperties.limits.maxTessellationEvaluationInputComponents,
+			DeviceProperties.limits.maxTessellationEvaluationOutputComponents,
+			DeviceProperties.limits.maxGeometryShaderInvocations,DeviceProperties.limits.maxGeometryInputComponents,
+			DeviceProperties.limits.maxGeometryOutputComponents,DeviceProperties.limits.maxGeometryOutputVertices,
+			DeviceProperties.limits.maxGeometryTotalOutputComponents,DeviceProperties.limits.maxFragmentInputComponents,
+			DeviceProperties.limits.maxFragmentOutputAttachments,DeviceProperties.limits.maxFragmentDualSrcAttachments,
+			DeviceProperties.limits.maxFragmentCombinedOutputResources,DeviceProperties.limits.maxComputeSharedMemorySize,
+			DeviceProperties.limits.maxComputeWorkGroupCount[0],DeviceProperties.limits.maxComputeWorkGroupCount[1],
+			DeviceProperties.limits.maxComputeWorkGroupCount[2],DeviceProperties.limits.maxComputeWorkGroupInvocations,
+			DeviceProperties.limits.maxComputeWorkGroupSize[0],DeviceProperties.limits.maxComputeWorkGroupSize[1],
+			DeviceProperties.limits.maxComputeWorkGroupSize[2],DeviceProperties.limits.subPixelPrecisionBits,
+			DeviceProperties.limits.subTexelPrecisionBits,DeviceProperties.limits.mipmapPrecisionBits,
+			DeviceProperties.limits.maxDrawIndexedIndexValue,DeviceProperties.limits.maxDrawIndirectCount,
+			DeviceProperties.limits.maxSamplerLodBias,DeviceProperties.limits.maxSamplerAnisotropy,
+			DeviceProperties.limits.maxViewports,DeviceProperties.limits.maxViewportDimensions[0],
+			DeviceProperties.limits.maxViewportDimensions[1],DeviceProperties.limits.viewportBoundsRange[0],
+			DeviceProperties.limits.viewportBoundsRange[1],DeviceProperties.limits.viewportSubPixelBits,
+			DeviceProperties.limits.minMemoryMapAlignment,DeviceProperties.limits.minTexelBufferOffsetAlignment,
+			DeviceProperties.limits.minUniformBufferOffsetAlignment,DeviceProperties.limits.minStorageBufferOffsetAlignment,
+			DeviceProperties.limits.minTexelOffset,DeviceProperties.limits.maxTexelOffset,
+			DeviceProperties.limits.minTexelGatherOffset,DeviceProperties.limits.maxTexelGatherOffset,
+			DeviceProperties.limits.minInterpolationOffset,DeviceProperties.limits.maxInterpolationOffset,
+			DeviceProperties.limits.subPixelInterpolationOffsetBits,DeviceProperties.limits.maxFramebufferWidth,
+			DeviceProperties.limits.maxFramebufferHeight,DeviceProperties.limits.maxFramebufferLayers,
+			DeviceProperties.limits.framebufferColorSampleCounts,DeviceProperties.limits.framebufferDepthSampleCounts,
+			DeviceProperties.limits.framebufferStencilSampleCounts,DeviceProperties.limits.framebufferNoAttachmentsSampleCounts,
+			DeviceProperties.limits.maxColorAttachments,DeviceProperties.limits.sampledImageColorSampleCounts,
+			DeviceProperties.limits.sampledImageIntegerSampleCounts,DeviceProperties.limits.sampledImageDepthSampleCounts,
+			DeviceProperties.limits.sampledImageStencilSampleCounts,DeviceProperties.limits.storageImageSampleCounts,
+			DeviceProperties.limits.maxSampleMaskWords,DeviceProperties.limits.timestampComputeAndGraphics,
+			DeviceProperties.limits.timestampPeriod,DeviceProperties.limits.maxClipDistances,
+			DeviceProperties.limits.maxCullDistances,DeviceProperties.limits.maxCombinedClipAndCullDistances,
+			DeviceProperties.limits.discreteQueuePriorities,DeviceProperties.limits.pointSizeRange[0],
+			DeviceProperties.limits.pointSizeRange[1],DeviceProperties.limits.lineWidthRange[0],
+			DeviceProperties.limits.lineWidthRange[1],DeviceProperties.limits.pointSizeGranularity,
+			DeviceProperties.limits.lineWidthGranularity,DeviceProperties.limits.strictLines,
+			DeviceProperties.limits.standardSampleLocations,DeviceProperties.limits.optimalBufferCopyOffsetAlignment,
+			DeviceProperties.limits.optimalBufferCopyRowPitchAlignment,DeviceProperties.limits.nonCoherentAtomSize
+		);
+
 		if (!CheckDeviceExtensionsSupport(ExtensionProperties, ExtensionPropertiesCount, DeviceExtensions, DeviceExtensionsSize))
 		{
 			HandleLog(BMRVkLogType_Warning, "PhysicalDeviceIndices are not initialized");
@@ -1647,6 +1843,12 @@ namespace VulkanInterface
 		if (!AvailableFeatures.samplerAnisotropy)
 		{
 			HandleLog(BMRVkLogType_Warning, "Feature samplerAnisotropy is not supported");
+			return false;
+		}
+
+		if (!AvailableFeatures.multiViewport)
+		{
+			HandleLog(BMRVkLogType_Warning, "Feature multiViewport is not supported");
 			return false;
 		}
 
@@ -1705,11 +1907,8 @@ namespace VulkanInterface
 
 			Device.Indices = GetPhysicalDeviceIndices(FamilyPropertiesData.Pointer.Data, FamilyPropertiesData.Count, Device.PhysicalDevice, Surface);
 
-			VkPhysicalDeviceFeatures AvailableFeatures;
-			vkGetPhysicalDeviceFeatures(Device.PhysicalDevice, &AvailableFeatures);
-
 			IsDeviceFound = CheckDeviceSuitability(DeviceExtensions, DeviceExtensionsSize,
-				DeviceExtensionsData.Pointer.Data, DeviceExtensionsData.Count, Device.Indices, AvailableFeatures);
+				DeviceExtensionsData.Pointer.Data, DeviceExtensionsData.Count, Device.Indices, Device.PhysicalDevice);
 
 			if (IsDeviceFound)
 			{

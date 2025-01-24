@@ -229,7 +229,8 @@ namespace DynamicMapSystem
 		//	UpdateTiles = true;
 		//}
 
-		if (CashedCameraLat != CameraLat || CashedCameraLon != CameraLon || TileZoom != Zoom)
+		//if (CashedCameraLat != CameraLat || CashedCameraLon != CameraLon || TileZoom != Zoom)
+		if (TileZoom != Zoom)
 		{
 			if (TileUpdateCounter > TileUpdateTimeSeconds)
 			{
@@ -343,13 +344,20 @@ namespace DynamicMapSystem
 
 		Render::BindPipeline(Pipeline.Pipeline);
 
+		auto test = FrameManager::GetViewProjectionSet();
+
+		const u32 DynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(FrameManager::ViewProjectionBuffer);
+		Render::BindDescriptorSet(&test, 1, Pipeline.PipelineLayout, 0, &DynamicOffset, 1);
+
 		const VkDescriptorSet DescriptorSetGroup[] = {
-			FrameManager::GetViewProjectionSet()[VulkanInterface::TestGetImageIndex()],
+			//FrameManager::GetViewProjectionSet()[VulkanInterface::TestGetImageIndex()],
 			Scene.MapEntity.TextureSet,
 			MapTileSettingsSet[VulkanInterface::TestGetImageIndex()]
 		};
 
-		Render::BindDescriptorSet(DescriptorSetGroup, 3, Pipeline.PipelineLayout);
+		const u32 Count = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
+
+		Render::BindDescriptorSet(DescriptorSetGroup, Count, Pipeline.PipelineLayout, 1, nullptr, 0);
 		Render::BindIndexBuffer(IndexBuffer, 0);
 		Render::DrawIndexed(TestIndicesCount);
 	}

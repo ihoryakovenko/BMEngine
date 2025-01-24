@@ -133,11 +133,11 @@ namespace Render
 		vkCmdBindPipeline(TestCurrentFrameCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, RenderPipeline);
 	}
 
-	void BindDescriptorSet(const VkDescriptorSet* DescriptorSetGroup, u32 DescriptorSetGroupCount,
-		VkPipelineLayout PipelineLayout)
+	void BindDescriptorSet(const VkDescriptorSet* Sets, u32 DescriptorsCount,
+		VkPipelineLayout PipelineLayout, u32 FirstSet, const u32* DynamicOffset, u32 DynamicOffsetsCount)
 	{
 		vkCmdBindDescriptorSets(TestCurrentFrameCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-			0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+			FirstSet, DescriptorsCount, Sets, DynamicOffsetsCount, DynamicOffset);
 	}
 
 	void BindIndexBuffer(VulkanInterface::IndexBuffer IndexBuffer, u32 Offset)
@@ -795,89 +795,89 @@ namespace Render
 
 	void MainPassDraw(const DrawScene* Scene, VkCommandBuffer CommandBuffer, u32 ImageIndex)
 	{
-		const VkDescriptorSet VpSet = FrameManager::GetViewProjectionSet()[ImageIndex];
+		//const VkDescriptorSet VpSet = FrameManager::GetViewProjectionSet()[ImageIndex];
 
 		VkRect2D RenderArea;
 		RenderArea.extent = MainScreenExtent;
 		RenderArea.offset = { 0, 0 };
 		VulkanInterface::BeginRenderPass(&MainPass.RenderPass, RenderArea, 0, ImageIndex);
 
-		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[0].Pipeline);
+		//vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[0].Pipeline);
 
-		for (u32 i = 0; i < Scene->DrawTerrainEntitiesCount; ++i)
-		{
-			DrawTerrainEntity* DrawTerrainEntity = Scene->DrawTerrainEntities + i;
+		//for (u32 i = 0; i < Scene->DrawTerrainEntitiesCount; ++i)
+		//{
+		//	DrawTerrainEntity* DrawTerrainEntity = Scene->DrawTerrainEntities + i;
 
-			const VkBuffer TerrainVertexBuffers[] = { PassSharedResources.VertexBuffer.Buffer };
-			const VkDeviceSize TerrainBuffersOffsets[] = { DrawTerrainEntity->VertexOffset };
+		//	const VkBuffer TerrainVertexBuffers[] = { PassSharedResources.VertexBuffer.Buffer };
+		//	const VkDeviceSize TerrainBuffersOffsets[] = { DrawTerrainEntity->VertexOffset };
 
-			const u32 TerrainDescriptorSetGroupCount = 2;
-			const VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = {
-				VpSet,
-				DrawTerrainEntity->TextureSet
-			};
+		//	const u32 TerrainDescriptorSetGroupCount = 2;
+		//	const VkDescriptorSet TerrainDescriptorSetGroup[TerrainDescriptorSetGroupCount] = {
+		//		VpSet,
+		//		DrawTerrainEntity->TextureSet
+		//	};
 
-			vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[0].PipelineLayout,
-				0, TerrainDescriptorSetGroupCount, TerrainDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+		//	vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[0].PipelineLayout,
+		//		0, TerrainDescriptorSetGroupCount, TerrainDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
 
-			vkCmdBindVertexBuffers(CommandBuffer, 0, 1, TerrainVertexBuffers, TerrainBuffersOffsets);
-			vkCmdBindIndexBuffer(CommandBuffer, PassSharedResources.IndexBuffer.Buffer, DrawTerrainEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(CommandBuffer, DrawTerrainEntity->IndicesCount, 1, 0, 0, 0);
-		}
+		//	vkCmdBindVertexBuffers(CommandBuffer, 0, 1, TerrainVertexBuffers, TerrainBuffersOffsets);
+		//	vkCmdBindIndexBuffer(CommandBuffer, PassSharedResources.IndexBuffer.Buffer, DrawTerrainEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
+		//	vkCmdDrawIndexed(CommandBuffer, DrawTerrainEntity->IndicesCount, 1, 0, 0, 0);
+		//}
 
 		DynamicMapSystem::OnDraw();
 
-		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[1].Pipeline);
+		//vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[1].Pipeline);
 
-		for (u32 i = 0; i < Scene->DrawEntitiesCount; ++i)
-		{
-			DrawEntity* DrawEntity = Scene->DrawEntities + i;
+		//for (u32 i = 0; i < Scene->DrawEntitiesCount; ++i)
+		//{
+		//	DrawEntity* DrawEntity = Scene->DrawEntities + i;
 
-			const VkBuffer VertexBuffers[] = { PassSharedResources.VertexBuffer.Buffer };
-			const VkDeviceSize Offsets[] = { DrawEntity->VertexOffset };
+		//	const VkBuffer VertexBuffers[] = { PassSharedResources.VertexBuffer.Buffer };
+		//	const VkDeviceSize Offsets[] = { DrawEntity->VertexOffset };
 
-			const VkDescriptorSet DescriptorSetGroup[] =
-			{
-				VpSet,
-				DrawEntity->TextureSet,
-				MainPass.EntityLightSet[ImageIndex],
-				MainPass.MaterialSet,
-				MainPass.ShadowMapArraySet[ImageIndex],
-			};
-			const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
+		//	const VkDescriptorSet DescriptorSetGroup[] =
+		//	{
+		//		VpSet,
+		//		DrawEntity->TextureSet,
+		//		MainPass.EntityLightSet[ImageIndex],
+		//		MainPass.MaterialSet,
+		//		MainPass.ShadowMapArraySet[ImageIndex],
+		//	};
+		//	const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
-			const VkPipelineLayout PipelineLayout = MainPass.Pipelines[1].PipelineLayout;
+		//	const VkPipelineLayout PipelineLayout = MainPass.Pipelines[1].PipelineLayout;
 
-			vkCmdPushConstants(CommandBuffer, PipelineLayout,
-				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BMRModel), &DrawEntity->Model);
+		//	vkCmdPushConstants(CommandBuffer, PipelineLayout,
+		//		VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BMRModel), &DrawEntity->Model);
 
-			vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-				0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+		//	vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
+		//		0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
 
-			vkCmdBindVertexBuffers(CommandBuffer, 0, 1, VertexBuffers, Offsets);
-			vkCmdBindIndexBuffer(CommandBuffer, PassSharedResources.IndexBuffer.Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(CommandBuffer, DrawEntity->IndicesCount, 1, 0, 0, 0);
-		}
-		
-		if (Scene->DrawSkyBox)
-		{
-			vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[2].Pipeline);
+		//	vkCmdBindVertexBuffers(CommandBuffer, 0, 1, VertexBuffers, Offsets);
+		//	vkCmdBindIndexBuffer(CommandBuffer, PassSharedResources.IndexBuffer.Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
+		//	vkCmdDrawIndexed(CommandBuffer, DrawEntity->IndicesCount, 1, 0, 0, 0);
+		//}
+		//
+		//if (Scene->DrawSkyBox)
+		//{
+		//	vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[2].Pipeline);
 
-			const u32 SkyBoxDescriptorSetGroupCount = 2;
-			const VkDescriptorSet SkyBoxDescriptorSetGroup[SkyBoxDescriptorSetGroupCount] = {
-				VpSet,
-				Scene->SkyBox.TextureSet,
-			};
+		//	const u32 SkyBoxDescriptorSetGroupCount = 2;
+		//	const VkDescriptorSet SkyBoxDescriptorSetGroup[SkyBoxDescriptorSetGroupCount] = {
+		//		VpSet,
+		//		Scene->SkyBox.TextureSet,
+		//	};
 
-			const VkPipelineLayout PipelineLayout = MainPass.Pipelines[2].PipelineLayout;
+		//	const VkPipelineLayout PipelineLayout = MainPass.Pipelines[2].PipelineLayout;
 
-			vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-				0, SkyBoxDescriptorSetGroupCount, SkyBoxDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+		//	vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
+		//		0, SkyBoxDescriptorSetGroupCount, SkyBoxDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
 
-			vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &PassSharedResources.VertexBuffer.Buffer, &Scene->SkyBox.VertexOffset);
-			vkCmdBindIndexBuffer(CommandBuffer, PassSharedResources.IndexBuffer.Buffer, Scene->SkyBox.IndexOffset, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(CommandBuffer, Scene->SkyBox.IndicesCount, 1, 0, 0, 0);
-		}
+		//	vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &PassSharedResources.VertexBuffer.Buffer, &Scene->SkyBox.VertexOffset);
+		//	vkCmdBindIndexBuffer(CommandBuffer, PassSharedResources.IndexBuffer.Buffer, Scene->SkyBox.IndexOffset, VK_INDEX_TYPE_UINT32);
+		//	vkCmdDrawIndexed(CommandBuffer, Scene->SkyBox.IndicesCount, 1, 0, 0, 0);
+		//}
 		
 		vkCmdNextSubpass(CommandBuffer, VK_SUBPASS_CONTENTS_INLINE);
 		vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[3].Pipeline);

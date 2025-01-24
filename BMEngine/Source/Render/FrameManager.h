@@ -19,9 +19,13 @@ namespace FrameManager
 	};
 
 	void Init();
-	void Update(const ViewProjectionBuffer* Data);
 	void DeInit();
 
+	void UpdateViewProjection(const ViewProjectionBuffer* Data);
+
+	u64 ReserveUniformMemory(u64 Size);
+	void UpdateUniformMemory(u64 Offset, const void* Data, u64 Size);
+
 	VkDescriptorSetLayout GetViewProjectionLayout();
-	VkDescriptorSet* GetViewProjectionSet();
+	VkDescriptorSet GetViewProjectionSet();
 }

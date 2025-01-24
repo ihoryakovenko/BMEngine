@@ -305,7 +305,7 @@ namespace Engine
 		const glm::vec3 Right = glm::normalize(glm::cross(NorthPole, MainCamera.Front));
 		MainCamera.Up = glm::normalize(glm::cross(MainCamera.Front, Right));
 
-		FrameManager::Update(&ViewProjection);
+		FrameManager::UpdateViewProjection(&ViewProjection);
 
 		f32 AspectRatio = f32(MainScreenExtent.width) / f32(MainScreenExtent.height);
 		DynamicMapSystem::Update(DeltaTime, MainCamera, Zoom);

@@ -138,8 +138,8 @@ namespace Render
 	VkRenderPass TestGetRenderPass();
 	void TestUpdateUniforBuffer(VulkanInterface::UniformBuffer* Buffer, u64 DataSize, u64 Offset, const void* Data);
 	void BindPipeline(VkPipeline RenderPipeline);
-	void BindDescriptorSet(const VkDescriptorSet* DescriptorSetGroup, u32 DescriptorSetGroupCount,
-		VkPipelineLayout PipelineLayout);
+	void BindDescriptorSet(const VkDescriptorSet* Sets, u32 DescriptorsCount,
+		VkPipelineLayout PipelineLayout, u32 FirstSet, const u32* DynamicOffset, u32 DynamicOffsetsCount);
 	void BindIndexBuffer(VulkanInterface::IndexBuffer IndexBuffer, u32 Offset);
 	void DrawIndexed(u32 IndexCount);
 
