@@ -14,6 +14,7 @@ layout(set = 2, binding = 0) uniform UboTileSettings
 	int TextureTilesPerAxis;
 	int MinTileX;
 	int MinTileY;
+	int TilesCountY;
 } TileSettings;
 
 const float radius = 1.0;

@@ -24,6 +24,7 @@
 #include "Systems/ResourceManager.h"
 #include "Scene.h"
 #include "Util/Math.h"
+#include "Render/FrameManager.h"
 
 namespace std
 {
@@ -84,7 +85,7 @@ namespace Engine
 
 	static void SetUpScene();
 
-	static void RenderLog(Render::BMRLogType LogType, const char* Format, va_list Args);
+	static void RenderLog(VulkanInterface::LogType LogType, const char* Format, va_list Args);
 	static void GenerateTerrain(std::vector<u32>& Indices);
 
 	static void MoveCamera(GLFWwindow* Window, f32 DeltaTime, DynamicMapSystem::MapCamera& MainCamera);
@@ -125,6 +126,8 @@ namespace Engine
 
 	static glm::vec3 CameraSphericalPosition = glm::vec3(0.0f, 0.0f, 6371.0f);
 	static s32 Zoom = 4;
+
+	static FrameManager::ViewProjectionBuffer ViewProjection;
 
 	int Main()
 	{
@@ -241,7 +244,7 @@ namespace Engine
 		const u32 FrameAllocSize = 1024 * 1024;
 		Memory::BmMemoryManagementSystem::Init(FrameAllocSize);
 
-		Render::RenderConfig RenderConfig;
+		VulkanInterface::VulkanInterfaceConfig RenderConfig;
 		RenderConfig.MaxTextures = 90;
 		RenderConfig.LogHandler = RenderLog;
 
@@ -251,7 +254,12 @@ namespace Engine
 		RenderConfig.EnableValidationLayers = true;
 #endif
 
-		Render::Init(glfwGetWin32Window(Window), &RenderConfig);
+		 
+
+		VulkanInterface::Init(glfwGetWin32Window(Window), RenderConfig);
+
+		FrameManager::Init();
+		Render::Init();
 		ResourceManager::Init();
 		DynamicMapSystem::Init();
 
@@ -264,6 +272,8 @@ namespace Engine
 
 		ResourceManager::DeInit();
 		Render::DeInit();
+		FrameManager::DeInit();
+		VulkanInterface::DeInit();
 
 		glfwDestroyWindow(Window);
 
@@ -295,6 +305,7 @@ namespace Engine
 		const glm::vec3 Right = glm::normalize(glm::cross(NorthPole, MainCamera.Front));
 		MainCamera.Up = glm::normalize(glm::cross(MainCamera.Front, Right));
 
+		FrameManager::UpdateViewProjection(&ViewProjection);
 
 		f32 AspectRatio = f32(MainScreenExtent.width) / f32(MainScreenExtent.height);
 		DynamicMapSystem::Update(DeltaTime, MainCamera, Zoom);
@@ -312,7 +323,7 @@ namespace Engine
 			glm::mat4 TestMat = glm::rotate(Scene.DrawEntities[i].Model, glm::radians(0.5f), glm::vec3(0.0f, 1.0f, 0.0f));
 		}
 
-		Scene.ViewProjection.View = glm::lookAt(MainCamera.Position, MainCamera.Position + MainCamera.Front, MainCamera.Up);
+		ViewProjection.View = glm::lookAt(MainCamera.Position, MainCamera.Position + MainCamera.Front, MainCamera.Up);
 
 		float NearPlane = 0.1f, FarPlane = 100.0f;
 		float HalfSize = 30.0f;
@@ -325,7 +336,7 @@ namespace Engine
 		LightData.SpotLight.Direction = MainCamera.Front;
 		LightData.SpotLight.Position = MainCamera.Position;
 		LightData.SpotLight.Planes = glm::vec2(Near, Far);
-		LightData.SpotLight.LightSpaceMatrix = Scene.ViewProjection.Projection * Scene.ViewProjection.View;
+		LightData.SpotLight.LightSpaceMatrix = ViewProjection.Projection * ViewProjection.View;
 
 		Scene.LightEntity = &LightData;
 
@@ -458,10 +469,10 @@ namespace Engine
 		//Scene.DrawSkyBox = true;
 		Scene.DrawSkyBox = false;
 
-		Scene.ViewProjection.Projection = glm::perspective(glm::radians(MainCamera.Fov),
+		ViewProjection.Projection = glm::perspective(glm::radians(MainCamera.Fov),
 			MainCamera.AspectRatio, Near, Far);
-		Scene.ViewProjection.Projection[1][1] *= -1;
-		Scene.ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		ViewProjection.Projection[1][1] *= -1;
+		ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 		Scene.DrawTerrainEntities = &TestDrawTerrainEntity;
 		Scene.DrawTerrainEntitiesCount = 0;
@@ -503,11 +514,11 @@ namespace Engine
 		GuiData.OnTestSetDownload = DynamicMapSystem::TestSetDownload;
 	}
 
-	void RenderLog(Render::BMRLogType LogType, const char* Format, va_list Args)
+	void RenderLog(VulkanInterface::LogType LogType, const char* Format, va_list Args)
 	{
 		switch (LogType)
 		{
-			case Render::LogType_Error:
+			case VulkanInterface::LogType::BMRVkLogType_Error:
 			{
 				std::cout << "\033[31;5mError: "; // Set red color
 				vprintf(Format, Args);
@@ -515,14 +526,14 @@ namespace Engine
 				assert(false);
 				break;
 			}
-			case Render::LogType_Warning:
+			case VulkanInterface::LogType::BMRVkLogType_Warning:
 			{
 				std::cout << "\033[33;5mWarning: "; // Set red color
 				vprintf(Format, Args);
 				std::cout << "\n\033[m"; // Reset red color
 				break;
 			}
-			case Render::LogType_Info:
+			case VulkanInterface::LogType::BMRVkLogType_Info:
 			{
 				std::cout << "Info: ";
 				vprintf(Format, Args);

@@ -9,38 +9,7 @@
 
 namespace Render
 {
-	enum BMRLogType
-	{
-		LogType_Error,
-		LogType_Warning,
-		LogType_Info
-	};
-
-	typedef void (*BMRLogHandler)(BMRLogType, const char*, va_list);
-
-	struct RenderConfig
-	{
-		BMRLogHandler LogHandler = nullptr;
-		bool EnableValidationLayers = false;
-		u32 MaxTextures = 0;
-	};
-
 	typedef glm::mat4 BMRModel;
-
-	struct ViewProjectionBuffer
-	{
-		glm::mat4 View;
-		glm::mat4 Projection;
-	};
-
-	struct TileSettingsBuffer
-	{
-		u32 VertexTilesPerAxis;
-		u32 TextureTilesPerAxis;
-		u32 MinTileX;
-		u32 MinTileY;
-		u32 TilesCountY;
-	};
 
 	typedef glm::mat4 BMRLightSpaceMatrix;
 
@@ -138,8 +107,6 @@ namespace Render
 
 	struct DrawScene
 	{
-		ViewProjectionBuffer ViewProjection;
-
 		DrawEntity* DrawEntities = nullptr;
 		u32 DrawEntitiesCount = 0;
 
@@ -153,19 +120,28 @@ namespace Render
 		bool DrawSkyBox = false;
 
 		DrawMapEntity MapEntity;
-		TileSettingsBuffer MapTileSettings;
 
 		LightBuffer* LightEntity = nullptr;
 	};
 
 	struct RenderTexture
 	{
-		VulkanInterface::UniformValue UniformData;
+		VulkanInterface::UniformImage UniformData;
 		VkImageView ImageView = nullptr;
 	};
 
-	bool Init(HWND WindowHandler, const RenderConfig* InConfig);
+	void PreRenderInit();
+	bool Init();
 	void DeInit();
+
+	VkDescriptorSetLayout TestGetTerrainSkyBoxLayout();
+	VkRenderPass TestGetRenderPass();
+	void TestUpdateUniforBuffer(VulkanInterface::UniformBuffer* Buffer, u64 DataSize, u64 Offset, const void* Data);
+	void BindPipeline(VkPipeline RenderPipeline);
+	void BindDescriptorSet(const VkDescriptorSet* Sets, u32 DescriptorsCount,
+		VkPipelineLayout PipelineLayout, u32 FirstSet, const u32* DynamicOffset, u32 DynamicOffsetsCount);
+	void BindIndexBuffer(VulkanInterface::IndexBuffer IndexBuffer, u32 Offset);
+	void DrawIndexed(u32 IndexCount);
 
 	RenderTexture CreateTexture(TextureArrayInfo* Info);
 	RenderTexture CreateEmptyTexture(TextureArrayInfo* Info);
@@ -178,6 +154,7 @@ namespace Render
 	void UpdateMaterialBuffer(const Material* Buffer);
 	u64 LoadVertices(const void* Vertices, u32 VertexSize, u64 VerticesCount);
 	u64 LoadIndices(const u32* Indices, u32 IndicesCount);
+	void LoadIndices(VulkanInterface::IndexBuffer IndexBuffer, const u32* Indices, u32 IndicesCount, u64 Offset);
 
 	void ClearIndices();
 
