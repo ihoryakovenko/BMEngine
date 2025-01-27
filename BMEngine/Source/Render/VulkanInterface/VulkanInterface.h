@@ -276,4 +276,6 @@ namespace VulkanInterface
 	UniformBuffer CreateUniformBuffer(u64 Size);
 	VertexBuffer CreateVertexBuffer(u64 Size);
 	IndexBuffer CreateIndexBuffer(u64 Size);
+
+	VkPhysicalDeviceProperties* GetDeviceProperties();
 }

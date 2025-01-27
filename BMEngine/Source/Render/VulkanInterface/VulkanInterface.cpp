@@ -121,6 +121,7 @@ namespace VulkanInterface
 	// Vulkan variables
 	static BMRMainInstance Instance;
 	static BMRDevice Device;
+	static VkPhysicalDeviceProperties DeviceProperties;
 	static VkSurfaceKHR Surface = nullptr;
 	static VkSurfaceFormatKHR SurfaceFormat;
 	static VkExtent2D SwapExtent;
@@ -1635,7 +1636,7 @@ namespace VulkanInterface
 		VkPhysicalDeviceFeatures AvailableFeatures;
 		vkGetPhysicalDeviceFeatures(Device, &AvailableFeatures);
 
-		VkPhysicalDeviceProperties DeviceProperties;
+		// TODO: Request vkGetPhysicalDeviceProperties in the caller
 		vkGetPhysicalDeviceProperties(Device, &DeviceProperties);
 
 		HandleLog(BMRVkLogType_Info,
@@ -2492,5 +2493,10 @@ namespace VulkanInterface
 		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 		return VulkanInterface::CreateUniformBufferInternal(&BufferInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	}
+
+	VkPhysicalDeviceProperties* GetDeviceProperties()
+	{
+		return &DeviceProperties;
 	}
 }

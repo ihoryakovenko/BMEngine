@@ -1,10 +1,8 @@
 #pragma once
 
 #include <glm/glm.hpp>
-#include <glm/gtc/constants.hpp>
 
 #include "Util/EngineTypes.h"
-#include "Render/Render.h"
 
 namespace DynamicMapSystem
 {

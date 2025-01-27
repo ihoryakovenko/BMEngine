@@ -12,11 +12,6 @@ struct EntityVertex
 	glm::vec3 Normal;
 };
 
-struct TerrainVertex
-{
-	f32 Altitude;
-};
-
 struct SkyBoxVertex
 {
 	glm::vec3 Position;
@@ -29,7 +24,6 @@ struct QuadSphereVertex
 };
 
 extern VulkanInterface::VertexInput EntityVertexInput;
-extern VulkanInterface::VertexInput TerrainVertexInput;
 extern VulkanInterface::VertexInput SkyBoxVertexInput;
 extern VulkanInterface::VertexInput DepthVertexInput;
 extern VulkanInterface::VertexInput QuadSphereVertexInput;
@@ -41,13 +35,11 @@ extern VkFormat ColorFormat;
 extern VkFormat DepthFormat;
 
 extern VulkanInterface::PipelineSettings EntityPipelineSettings;
-extern VulkanInterface::PipelineSettings TerrainPipelineSettings;
 extern VulkanInterface::PipelineSettings DeferredPipelineSettings;
 extern VulkanInterface::PipelineSettings SkyBoxPipelineSettings;
 extern VulkanInterface::PipelineSettings DepthPipelineSettings;
-extern VulkanInterface::PipelineSettings MapPipelineSettings;
 
-static const u32 MainPathPipelinesCount = 4;
+static const u32 MainPathPipelinesCount = 3;
 
 extern VulkanInterface::RenderPassSettings MainRenderPassSettings;
 extern VulkanInterface::RenderPassSettings DepthRenderPassSettings;
@@ -58,7 +50,6 @@ static VkDescriptorType MaterialDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFF
 static VkDescriptorType DeferredInputDescriptorType[2] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT };
 static VkDescriptorType ShadowMapArrayDescriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 static VkDescriptorType EntitySamplerDescriptorType[2] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
-static VkDescriptorType TerrainSkyBoxSamplerDescriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
 static VkShaderStageFlags EntityLightStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 static VkShaderStageFlags LightSpaceMatrixStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -66,7 +57,6 @@ static VkShaderStageFlags MaterialStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 static VkShaderStageFlags DeferredInputFlags[2] = { VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
 static VkShaderStageFlags ShadowMapArrayFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 static VkShaderStageFlags EntitySamplerInputFlags[2] = { VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
-static VkShaderStageFlags TerrainSkyBoxArrayFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
 extern VkClearValue MainPassClearValues[3];
 extern VkClearValue DepthPassClearValues;

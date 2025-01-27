@@ -34,14 +34,6 @@ namespace Render
 		BMRModel Model;
 	};
 
-	struct DrawTerrainEntity
-	{
-		u64 VertexOffset = 0;
-		u64 IndexOffset = 0;
-		u32 IndicesCount = 0;
-		VkDescriptorSet TextureSet = nullptr;
-	};
-
 	struct DrawMapEntity
 	{
 		u64 IndexOffset = 0;
@@ -113,9 +105,6 @@ namespace Render
 		DrawEntity* DrawTransparentEntities = nullptr;
 		u32 DrawTransparentEntitiesCount = 0;
 
-		DrawTerrainEntity* DrawTerrainEntities = nullptr;
-		u32 DrawTerrainEntitiesCount = 0;
-
 		DrawSkyBoxEntity SkyBox;
 		bool DrawSkyBox = false;
 
@@ -130,18 +119,27 @@ namespace Render
 		VkImageView ImageView = nullptr;
 	};
 
+	typedef void (*OnDrawDelegate)(void);
+
 	void PreRenderInit();
 	bool Init();
 	void DeInit();
 
+	// Move to engine
+	void AddDrawFunction(OnDrawDelegate Delegate);
+
 	VkDescriptorSetLayout TestGetTerrainSkyBoxLayout();
 	VkRenderPass TestGetRenderPass();
 	void TestUpdateUniforBuffer(VulkanInterface::UniformBuffer* Buffer, u64 DataSize, u64 Offset, const void* Data);
+	void BindNextSubpass();
 	void BindPipeline(VkPipeline RenderPipeline);
 	void BindDescriptorSet(const VkDescriptorSet* Sets, u32 DescriptorsCount,
 		VkPipelineLayout PipelineLayout, u32 FirstSet, const u32* DynamicOffset, u32 DynamicOffsetsCount);
-	void BindIndexBuffer(VulkanInterface::IndexBuffer IndexBuffer, u32 Offset);
+	void BindVertexBuffer(VulkanInterface::VertexBuffer VertexBuffer, u64 Offset); // Pass multiple buffers?
+	void BindIndexBuffer(VulkanInterface::IndexBuffer IndexBuffer, u64 Offset);
 	void DrawIndexed(u32 IndexCount);
+	void Draw(u32 VertexCount, u32 InstanceCount);
+	void EndRenderPass();
 
 	RenderTexture CreateTexture(TextureArrayInfo* Info);
 	RenderTexture CreateEmptyTexture(TextureArrayInfo* Info);
@@ -154,7 +152,9 @@ namespace Render
 	void UpdateMaterialBuffer(const Material* Buffer);
 	u64 LoadVertices(const void* Vertices, u32 VertexSize, u64 VerticesCount);
 	u64 LoadIndices(const u32* Indices, u32 IndicesCount);
+
 	void LoadIndices(VulkanInterface::IndexBuffer IndexBuffer, const u32* Indices, u32 IndicesCount, u64 Offset);
+	void LoadVertices(VulkanInterface::VertexBuffer VertexBuffer, const void* Vertices, u32 VertexSize, u64 VerticesCount, u64 Offset);
 
 	void ClearIndices();
 

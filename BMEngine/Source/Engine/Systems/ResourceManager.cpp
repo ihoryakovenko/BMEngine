@@ -42,8 +42,6 @@ namespace ResourceManager
 		CreateEntityMaterial("ContainerMaterial", ContainerTexture.ImageView, ContainerSpecularTexture.ImageView, &ContainerMaterial);
 		CreateEntityMaterial("BlendWindowMaterial", BlendWindow.ImageView, BlendWindow.ImageView, &BlendWindowMaterial);
 		CreateEntityMaterial("GrassMaterial", GrassTexture.ImageView, GrassTexture.ImageView, &GrassMaterial);
-		CreateSkyBoxTerrainTexture("SkyBoxMaterial", SkyBoxCubeTexture.ImageView, &SkyBoxMaterial);
-		CreateSkyBoxTerrainTexture("TerrainMaterial", TestTexture.ImageView, &TerrainMaterial);
 	}
 
 	void DeInit()

@@ -7,6 +7,8 @@
 #include <cassert>
 #include <cfloat>
 
+#include <glm/gtc/constants.hpp>
+
 #include <httplib.h>
 
 #include "ResourceManager.h"
@@ -16,6 +18,7 @@
 #include "Util/Settings.h"
 #include "Memory/MemoryManagmentSystem.h"
 #include "Render/FrameManager.h"
+#include "Render/Render.h"
 
 #include "stb_image.h"
 
@@ -30,7 +33,8 @@ namespace DynamicMapSystem
 		std::string Data;
 	};
 
-	struct TileSettingsBuffer
+	// TODO: alignas(64) is TMP solution, solve using Properties->limits.minUniformBufferOffsetAlignment
+	struct alignas(64) TileSettingsBuffer
 	{
 		u32 VertexTilesPerAxis;
 		u32 TextureTilesPerAxis;
@@ -75,14 +79,14 @@ namespace DynamicMapSystem
 	static std::atomic<bool> StopDownload = false;
 	static std::mutex DeInitMutex;
 
-	static httplib::Client* Client = nullptr;
+	static httplib::Client* Client;
 
 	static TileSettingsBuffer MapTileSettings;
 
 	static VulkanInterface::IndexBuffer IndexBuffer;
-	static VkDescriptorSetLayout MapTileSettingsLayout = nullptr;
-	static VulkanInterface::IndexBuffer MapTileSettingsBuffer[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
-	static VkDescriptorSet MapTileSettingsSet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VkDescriptorSetLayout MapTileSettingsLayout;
+	static FrameManager::UniformMemoryHnadle SettingsBufferHandle;
+	static VkDescriptorSet MapTileSettingsSet;
 	static VulkanInterface::RenderPipeline Pipeline;
 
 	static bool TestDownload = true;
@@ -90,6 +94,8 @@ namespace DynamicMapSystem
 
 	void Init()
 	{
+		Render::AddDrawFunction(OnDraw);
+
 		const u32 ShaderCount = 2;
 		VulkanInterface::Shader Shaders[ShaderCount];
 
@@ -106,25 +112,11 @@ namespace DynamicMapSystem
 		Shaders[1].Code = FragmentShaderCode.data();
 		Shaders[1].CodeSize = FragmentShaderCode.size();
 
-		const VkDescriptorType Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		const VkShaderStageFlags Flags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-		MapTileSettingsLayout = VulkanInterface::CreateUniformLayout(&Type, &Flags, 1);
+		const VkDeviceSize MapTileSettingsSize = sizeof(TileSettingsBuffer);
 
-		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
-		{
-			const VkDeviceSize MapTileSettingsSize = sizeof(TileSettingsBuffer);
-			MapTileSettingsBuffer[i] = VulkanInterface::CreateUniformBuffer(MapTileSettingsSize);
-		
-			VulkanInterface::CreateUniformSets(&MapTileSettingsLayout, 1, MapTileSettingsSet + i);
-
-			VulkanInterface::UniformSetAttachmentInfo MapTileSettingsAttachmentInfo;
-			MapTileSettingsAttachmentInfo.BufferInfo.buffer = MapTileSettingsBuffer[i].Buffer;
-			MapTileSettingsAttachmentInfo.BufferInfo.offset = 0;
-			MapTileSettingsAttachmentInfo.BufferInfo.range = MapTileSettingsSize;
-			MapTileSettingsAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-
-			VulkanInterface::AttachUniformsToSet(MapTileSettingsSet[i], &MapTileSettingsAttachmentInfo, 1);
-		}
+		MapTileSettingsLayout = FrameManager::CreateCompatibleLayout(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+		SettingsBufferHandle = FrameManager::ReserveUniformMemory(MapTileSettingsSize);
+		MapTileSettingsSet = FrameManager::CreateAndBindSet(SettingsBufferHandle, MapTileSettingsSize, MapTileSettingsLayout);
 
 		VkDescriptorSetLayout MapDescriptorLayouts[] =
 		{
@@ -141,10 +133,14 @@ namespace DynamicMapSystem
 		ResourceInfo.RenderPass = Render::TestGetRenderPass();
 		ResourceInfo.SubpassIndex = 0;
 
+		VulkanInterface::PipelineSettings MapPipelineSettings = EntityPipelineSettings;
+		MapPipelineSettings.PipelineName = "Map";
+		//MapPipelineSettings.PolygonMode = VK_POLYGON_MODE_LINE;
+
 		VulkanInterface::BMRVertexInputBinding VertexInput;
+		
 		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, &VertexInput, 0,
 			&MapPipelineSettings, &ResourceInfo);
-
 
 		IndexBuffer = VulkanInterface::CreateIndexBuffer(MB64);
 
@@ -340,24 +336,24 @@ namespace DynamicMapSystem
 
 	void OnDraw()
 	{
-		Render::TestUpdateUniforBuffer(MapTileSettingsBuffer, sizeof(TileSettingsBuffer), 0, &MapTileSettings);
-
-		Render::BindPipeline(Pipeline.Pipeline);
-
-		auto test = FrameManager::GetViewProjectionSet();
-
-		const u32 DynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(FrameManager::ViewProjectionBuffer);
-		Render::BindDescriptorSet(&test, 1, Pipeline.PipelineLayout, 0, &DynamicOffset, 1);
+		FrameManager::UpdateUniformMemory(SettingsBufferHandle, &MapTileSettings, sizeof(TileSettingsBuffer));
 
 		const VkDescriptorSet DescriptorSetGroup[] = {
-			//FrameManager::GetViewProjectionSet()[VulkanInterface::TestGetImageIndex()],
+			FrameManager::GetViewProjectionSet(),
 			Scene.MapEntity.TextureSet,
-			MapTileSettingsSet[VulkanInterface::TestGetImageIndex()]
+			MapTileSettingsSet
 		};
 
-		const u32 Count = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
+		const u32 DynamicOffsets[] = {
+			{ VulkanInterface::TestGetImageIndex() * sizeof(FrameManager::ViewProjectionBuffer) },
+			{ VulkanInterface::TestGetImageIndex() * sizeof(TileSettingsBuffer) },
+		};
 
-		Render::BindDescriptorSet(DescriptorSetGroup, Count, Pipeline.PipelineLayout, 1, nullptr, 0);
+		const u32 DescriptorCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
+		const u32 DynamicOffsetCount = sizeof(DynamicOffsets) / sizeof(DynamicOffsets[0]);
+
+		Render::BindPipeline(Pipeline.Pipeline);
+		Render::BindDescriptorSet(DescriptorSetGroup, DescriptorCount, Pipeline.PipelineLayout, 0, DynamicOffsets, DynamicOffsetCount);
 		Render::BindIndexBuffer(IndexBuffer, 0);
 		Render::DrawIndexed(TestIndicesCount);
 	}
@@ -365,11 +361,6 @@ namespace DynamicMapSystem
 	void DeInit()
 	{
 		StopDownload = true;
-
-		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
-		{
-			VulkanInterface::DestroyUniformBuffer(MapTileSettingsBuffer[i]);
-		}
 
 		VulkanInterface::DestroyUniformBuffer(IndexBuffer);
 		VulkanInterface::DestroyUniformLayout(MapTileSettingsLayout);

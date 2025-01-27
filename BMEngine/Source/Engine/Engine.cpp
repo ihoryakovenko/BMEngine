@@ -25,6 +25,7 @@
 #include "Scene.h"
 #include "Util/Math.h"
 #include "Render/FrameManager.h"
+#include "Systems/TerrainSystem.h"
 
 namespace std
 {
@@ -80,13 +81,11 @@ namespace Engine
 
 	static void LoadModel(const char* ModelPath, glm::mat4 Model, VkDescriptorSet CustomMaterial = nullptr);
 
-	static void LoadTerrain();
 	static void CreateSkyBoxMesh(VkDescriptorSet Material);
 
 	static void SetUpScene();
 
 	static void RenderLog(VulkanInterface::LogType LogType, const char* Format, va_list Args);
-	static void GenerateTerrain(std::vector<u32>& Indices);
 
 	static void MoveCamera(GLFWwindow* Window, f32 DeltaTime, DynamicMapSystem::MapCamera& MainCamera);
 
@@ -104,17 +103,9 @@ namespace Engine
 	static f64 DeltaTime = 0.0f;
 	static f64 LastTime = 0.0f;
 
-	static const f32 Near = 0.00001f;
-	static const f32 Far = 5.0f;
+	static const f32 Near = 0.1f;
+	static const f32 Far = 5000.0f;
 
-	static const u32 NumRows = 600;
-	static const u32 NumCols = 600;
-	static TerrainVertex TerrainVerticesData[NumRows][NumCols];
-	static TerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
-	static u32 TerrainVerticesCount = NumRows * NumCols;
-
-
-	static Render::DrawTerrainEntity TestDrawTerrainEntity;
 	static std::vector<Render::DrawEntity> DrawEntities;
 	static Render::DrawSkyBoxEntity SkyBox;
 	static Render::LightBuffer LightData;
@@ -179,60 +170,60 @@ namespace Engine
 
 		InitSystems();
 
-		//CreateSkyBoxMesh(EngineMaterials["SkyBoxMaterial"]);
-		//LoadModel("./Resources/Models/uh60.obj", glm::mat4(1.0f));
-		//LoadTerrain();
+		
+		CreateSkyBoxMesh(ResourceManager::FindMaterial("SkyBoxMaterial"));
+		LoadModel("./Resources/Models/uh60.obj", glm::mat4(1.0f));
 	
 
-		//{
-		//	glm::vec3 CubePos(0.0f, -5.0f, 0.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::scale(Model, glm::vec3(20.0f, 1.0f, 20.0f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, EngineMaterials["WhiteMaterial"]);
-		//}
+		{
+			glm::vec3 CubePos(0.0f, -5.0f, 0.0f);
+			glm::mat4 Model = glm::mat4(1.0f);
+			Model = glm::translate(Model, CubePos);
+			Model = glm::scale(Model, glm::vec3(20.0f, 1.0f, 20.0f));
+			LoadModel("./Resources/Models/cube.obj", Model, ResourceManager::FindMaterial("WhiteMaterial"));
+		}
 
-		//{
-		//	glm::vec3 CubePos(0.0f, 0.0f, 0.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::scale(Model, glm::vec3(0.2f, 5.0f, 0.2f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, EngineMaterials["TestMaterial"]);
-		//}
+		{
+			glm::vec3 CubePos(0.0f, 0.0f, 0.0f);
+			glm::mat4 Model = glm::mat4(1.0f);
+			Model = glm::translate(Model, CubePos);
+			Model = glm::scale(Model, glm::vec3(0.2f, 5.0f, 0.2f));
+			LoadModel("./Resources/Models/cube.obj", Model, ResourceManager::FindMaterial("TestMaterial"));
+		}
 
-		//{
-		//	glm::vec3 CubePos(0.0f, 0.0f, 8.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::rotate(Model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		//	Model = glm::scale(Model, glm::vec3(0.5f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, EngineMaterials["GrassMaterial"]);
-		//}
+		{
+			glm::vec3 CubePos(0.0f, 0.0f, 8.0f);
+			glm::mat4 Model = glm::mat4(1.0f);
+			Model = glm::translate(Model, CubePos);
+			Model = glm::rotate(Model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+			Model = glm::scale(Model, glm::vec3(0.5f));
+			LoadModel("./Resources/Models/cube.obj", Model, ResourceManager::FindMaterial("GrassMaterial"));
+		}
 
-		//{
-		//	glm::vec3 LightCubePos(0.0f, 0.0f, 10.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, LightCubePos);
-		//	Model = glm::scale(Model, glm::vec3(0.2f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, EngineMaterials["WhiteMaterial"]);
-		//}
+		{
+			glm::vec3 LightCubePos(0.0f, 0.0f, 10.0f);
+			glm::mat4 Model = glm::mat4(1.0f);
+			Model = glm::translate(Model, LightCubePos);
+			Model = glm::scale(Model, glm::vec3(0.2f));
+			LoadModel("./Resources/Models/cube.obj", Model, ResourceManager::FindMaterial("WhiteMaterial"));
+		}
 
-		//{
-		//	glm::vec3 CubePos(0.0f, 0.0f, 15.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::scale(Model, glm::vec3(1.0f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, EngineMaterials["WhiteMaterial"]);
-		//}
+		{
+			glm::vec3 CubePos(0.0f, 0.0f, 15.0f);
+			glm::mat4 Model = glm::mat4(1.0f);
+			Model = glm::translate(Model, CubePos);
+			Model = glm::scale(Model, glm::vec3(1.0f));
+			LoadModel("./Resources/Models/cube.obj", Model, ResourceManager::FindMaterial("WhiteMaterial"));
+		}
 
-		//{
-		//	glm::vec3 CubePos(5.0f, 0.0f, 10.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::rotate(Model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		//	Model = glm::scale(Model, glm::vec3(1.0f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, EngineMaterials["ContainerMaterial"]);
-		//}
+		{
+			glm::vec3 CubePos(5.0f, 0.0f, 10.0f);
+			glm::mat4 Model = glm::mat4(1.0f);
+			Model = glm::translate(Model, CubePos);
+			Model = glm::rotate(Model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+			Model = glm::scale(Model, glm::vec3(1.0f));
+			LoadModel("./Resources/Models/cube.obj", Model, ResourceManager::FindMaterial("ContainerMaterial"));
+		}
 
 		SetUpScene();
 		 
@@ -261,6 +252,7 @@ namespace Engine
 		FrameManager::Init();
 		Render::Init();
 		ResourceManager::Init();
+		TerrainSystem::Init();
 		DynamicMapSystem::Init();
 
 		return true;
@@ -269,6 +261,7 @@ namespace Engine
 	void DeInit()
 	{
 		DynamicMapSystem::DeInit();
+		TerrainSystem::DeInit();
 
 		ResourceManager::DeInit();
 		Render::DeInit();
@@ -448,18 +441,6 @@ namespace Engine
 		}
 	}
 
-	void LoadTerrain()
-	{
-		std::vector<u32> TerrainIndices;
-		GenerateTerrain(TerrainIndices);
-
-		TestDrawTerrainEntity.VertexOffset = Render::LoadVertices(&TerrainVerticesData[0][0],
-			sizeof(TerrainVertex), NumRows * NumCols);
-		TestDrawTerrainEntity.IndexOffset = Render::LoadIndices(TerrainIndices.data(), TerrainIndices.size());
-		TestDrawTerrainEntity.IndicesCount = TerrainIndices.size();
-		TestDrawTerrainEntity.TextureSet = ResourceManager::FindMaterial("TerrainMaterial"); // TODO load here
-	}
-
 	void SetUpScene()
 	{
 		MainCamera.Fov = 60.0f;
@@ -473,9 +454,6 @@ namespace Engine
 			MainCamera.AspectRatio, Near, Far);
 		ViewProjection.Projection[1][1] *= -1;
 		ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
-		Scene.DrawTerrainEntities = &TestDrawTerrainEntity;
-		Scene.DrawTerrainEntitiesCount = 0;
 
 		Scene.DrawEntities = DrawEntities.data();
 		Scene.DrawEntitiesCount = DrawEntities.size();
@@ -539,86 +517,6 @@ namespace Engine
 				vprintf(Format, Args);
 				std::cout << '\n';
 				break;
-			}
-		}
-	}
-
-	void GenerateTerrain(std::vector<u32>& Indices)
-	{
-		const f32 MaxAltitude = 0.0f;
-		const f32 MinAltitude = -10.0f;
-		const f32 SmoothMin = 7.0f;
-		const f32 SmoothMax = 3.0f;
-		const f32 SmoothFactor = 0.5f;
-		const f32 ScaleFactor = 0.2f;
-
-		std::mt19937 Gen(1);
-		std::uniform_real_distribution<f32> Dist(MinAltitude, MaxAltitude);
-
-		bool UpFactor = false;
-		bool DownFactor = false;
-
-		for (int i = 0; i < NumRows; ++i)
-		{
-			for (int j = 0; j < NumCols; ++j)
-			{
-				const f32 RandomAltitude = Dist(Gen);
-				const f32 Probability = (RandomAltitude - MinAltitude) / (MaxAltitude - MinAltitude);
-
-				const f32 PreviousCornerAltitude = i > 0 && j > 0 ? TerrainVerticesData[i - 1][j - 1].Altitude : 5.0f;
-				const f32 PreviousIAltitude = i > 0 ? TerrainVerticesData[i - 1][j].Altitude : 5.0f;
-				const f32 PreviousJAltitude = j > 0 ? TerrainVerticesData[i][j - 1].Altitude : 5.0f;
-
-				const f32 PreviousAverageAltitude = (PreviousCornerAltitude + PreviousIAltitude + PreviousJAltitude) / 3.0f;
-
-				f32 NormalizedAltitude = (PreviousAverageAltitude - MinAltitude) / (MaxAltitude - MinAltitude);
-
-				const f32 Smooth = (PreviousAverageAltitude <= SmoothMin || PreviousAverageAltitude >= SmoothMax) ? SmoothFactor : 1.0f;
-
-				if (UpFactor)
-				{
-					NormalizedAltitude *= ScaleFactor;
-				}
-				else if (DownFactor)
-				{
-					NormalizedAltitude /= ScaleFactor;
-				}
-
-				if (NormalizedAltitude > Probability)
-				{
-					TerrainVerticesData[i][j].Altitude = PreviousAverageAltitude - Probability * Smooth;
-					UpFactor = false;
-					DownFactor = true;
-				}
-				else
-				{
-					TerrainVerticesData[i][j].Altitude = PreviousAverageAltitude + Probability * Smooth;
-					UpFactor = true;
-					DownFactor = false;
-				}
-			}
-		}
-
-		Indices.reserve(NumRows * NumCols * 6);
-
-		for (int row = 0; row < NumRows - 1; ++row)
-		{
-			for (int col = 0; col < NumCols - 1; ++col)
-			{
-				u32 topLeft = row * NumCols + col;
-				u32 topRight = topLeft + 1;
-				u32 bottomLeft = (row + 1) * NumCols + col;
-				u32 bottomRight = bottomLeft + 1;
-
-				// First triangle (Top-left, Bottom-left, Bottom-right)
-				Indices.push_back(topLeft);
-				Indices.push_back(bottomLeft);
-				Indices.push_back(bottomRight);
-
-				// Second triangle (Top-left, Bottom-right, Top-right)
-				Indices.push_back(topLeft);
-				Indices.push_back(bottomRight);
-				Indices.push_back(topRight);
 			}
 		}
 	}

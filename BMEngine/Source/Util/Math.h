@@ -3,6 +3,7 @@
 #include <cassert>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/constants.hpp>
 
 #include "EngineTypes.h"
 

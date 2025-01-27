@@ -7,17 +7,14 @@ VkFormat ColorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Todo: check if VK_FORMAT_R8G
 VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
 
 VulkanInterface::VertexInput EntityVertexInput;
-VulkanInterface::VertexInput TerrainVertexInput;
 VulkanInterface::VertexInput SkyBoxVertexInput;
 VulkanInterface::VertexInput DepthVertexInput;
 VulkanInterface::VertexInput QuadSphereVertexInput;
 
 VulkanInterface::PipelineSettings EntityPipelineSettings;
-VulkanInterface::PipelineSettings TerrainPipelineSettings;
 VulkanInterface::PipelineSettings DeferredPipelineSettings;
 VulkanInterface::PipelineSettings SkyBoxPipelineSettings;
 VulkanInterface::PipelineSettings DepthPipelineSettings;
-VulkanInterface::PipelineSettings MapPipelineSettings;
 
 VulkanInterface::RenderPassSettings MainRenderPassSettings;
 VulkanInterface::RenderPassSettings DepthRenderPassSettings;
@@ -77,14 +74,11 @@ static const u32 DepthPassSubpassDependenciesCount = Subpasses::Subpasses_Count 
 static VkSubpassDependency DepthPassSubpassDependencies[DepthPassSubpassDependenciesCount];
 
 static const char EntityPipelineName[] = "Entity";
-static const char TerrainPipelineName[] = "Terrain";
 static const char DeferredPipelineName[] = "Deferred";
 static const char SkyBoxPipelineName[] = "SkyBox";
 static const char DepthPipelineName[] = "Depth";
-static const char MapPipelineName[] = "Map";
 
 static const char EntityVertexInputName[] = "EntityVertex";
-static const char TerrainVertexInputName[] = "TerrainVertex";
 static const char SkyBoxVertexInputName[] = "SkyBoxVertex";
 static const char QuadSphereVertexInputName[] = "QuadSphereVertex";
 
@@ -92,7 +86,6 @@ static const char PositionAttributeName[] = "Position";
 static const char ColorAttributeName[] = "Color";
 static const char TextureCoordsAttributeName[] = "TextureCoords";
 static const char NormalAttributeName[] = "Normal";
-static const char AltitudeAttributeName[] = "Altitude";
 
 static const char MainRenderPassName[] = "MainRenderPass";
 static const char MainSubpassName[] = "MainSubpass";
@@ -411,39 +404,7 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	EntityPipelineSettings.DepthBoundsTestEnable = VK_FALSE;
 	EntityPipelineSettings.StencilTestEnable = VK_FALSE;
 
-	// MapPipeline
-	MapPipelineSettings = EntityPipelineSettings;
-	MapPipelineSettings.PipelineName = MapPipelineName;
-	//MapPipelineSettings.PolygonMode = VK_POLYGON_MODE_LINE;
-
 	// TerrainPipeline
-	TerrainPipelineSettings.PipelineName = TerrainPipelineName;
-	// Rasterizer
-	TerrainPipelineSettings.Extent = MainScreenExtent;
-	TerrainPipelineSettings.DepthClampEnable = VK_FALSE;
-	TerrainPipelineSettings.RasterizerDiscardEnable = VK_FALSE;
-	TerrainPipelineSettings.PolygonMode = VK_POLYGON_MODE_FILL;
-	TerrainPipelineSettings.LineWidth = 1.0f;
-	TerrainPipelineSettings.CullMode = VK_CULL_MODE_BACK_BIT;
-	TerrainPipelineSettings.FrontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	TerrainPipelineSettings.DepthBiasEnable = VK_FALSE;
-	// Multisampling
-	TerrainPipelineSettings.BlendEnable = VK_TRUE;
-	TerrainPipelineSettings.LogicOpEnable = VK_FALSE;
-	TerrainPipelineSettings.AttachmentCount = 1;
-	TerrainPipelineSettings.ColorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	TerrainPipelineSettings.SrcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	TerrainPipelineSettings.DstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	TerrainPipelineSettings.ColorBlendOp = VK_BLEND_OP_ADD;
-	TerrainPipelineSettings.SrcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-	TerrainPipelineSettings.DstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	TerrainPipelineSettings.AlphaBlendOp = VK_BLEND_OP_ADD;
-	// Depth testing
-	TerrainPipelineSettings.DepthTestEnable = VK_TRUE;
-	TerrainPipelineSettings.DepthWriteEnable = VK_TRUE;
-	TerrainPipelineSettings.DepthCompareOp = VK_COMPARE_OP_LESS;
-	TerrainPipelineSettings.DepthBoundsTestEnable = VK_FALSE;
-	TerrainPipelineSettings.StencilTestEnable = VK_FALSE;
 
 	// DeferredPipelineSettings
 	DeferredPipelineSettings.PipelineName = DeferredPipelineName;
@@ -542,13 +503,6 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	EntityVertexInput.VertexInputBinding[0].Stride = sizeof(EntityVertex);
 	EntityVertexInput.VertexInputBinding[0].VertexInputBindingName = EntityVertexInputName;
 	EntityVertexInput.VertexInputBindingCount = 1;
-
-	TerrainVertexInput.VertexInputBinding[0].InputAttributes[0] = { AltitudeAttributeName, VK_FORMAT_R32_SFLOAT, offsetof(TerrainVertex, Altitude) };
-	TerrainVertexInput.VertexInputBinding[0].InputAttributesCount = 1;
-	TerrainVertexInput.VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-	TerrainVertexInput.VertexInputBinding[0].Stride = sizeof(TerrainVertex);
-	TerrainVertexInput.VertexInputBinding[0].VertexInputBindingName = TerrainVertexInputName;
-	TerrainVertexInput.VertexInputBindingCount = 1;
 
 	SkyBoxVertexInput.VertexInputBinding[0].InputAttributes[0] = { PositionAttributeName, VK_FORMAT_R32G32B32_SFLOAT, offsetof(SkyBoxVertex, Position) };
 	SkyBoxVertexInput.VertexInputBinding[0].InputAttributesCount = 1;
