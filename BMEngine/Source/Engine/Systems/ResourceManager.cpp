@@ -5,6 +5,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#include "TerrainSystem.h"
+#include "StaticMeshSystem.h"
+
 namespace ResourceManager
 {
 	static const std::string TexturesPath = "./Resources/Textures/";
@@ -28,20 +31,6 @@ namespace ResourceManager
 				"skybox/bottom.jpg",
 				"skybox/front.jpg",
 				"skybox/back.jpg", }, VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
-
-		VkDescriptorSet TestMaterial;
-		VkDescriptorSet WhiteMaterial;
-		VkDescriptorSet ContainerMaterial;
-		VkDescriptorSet BlendWindowMaterial;
-		VkDescriptorSet GrassMaterial;
-		VkDescriptorSet SkyBoxMaterial;
-		VkDescriptorSet TerrainMaterial;
-
-		CreateEntityMaterial("TestMaterial", TestTexture.ImageView, TestTexture.ImageView, &TestMaterial);
-		CreateEntityMaterial("WhiteMaterial", WhiteTexture.ImageView, WhiteTexture.ImageView, &WhiteMaterial);
-		CreateEntityMaterial("ContainerMaterial", ContainerTexture.ImageView, ContainerSpecularTexture.ImageView, &ContainerMaterial);
-		CreateEntityMaterial("BlendWindowMaterial", BlendWindow.ImageView, BlendWindow.ImageView, &BlendWindowMaterial);
-		CreateEntityMaterial("GrassMaterial", GrassTexture.ImageView, GrassTexture.ImageView, &GrassMaterial);
 	}
 
 	void DeInit()
@@ -165,15 +154,9 @@ namespace ResourceManager
 		return nullptr;
 	}
 
-	void CreateEntityMaterial(const std::string& Id, VkImageView DefuseImage, VkImageView SpecularImage, VkDescriptorSet* SetToAttach)
-	{
-		Render::TestAttachEntityTexture(DefuseImage, SpecularImage, SetToAttach);
-		EngineMaterials[Id] = *SetToAttach;
-	}
-
 	void CreateSkyBoxTerrainTexture(const std::string& Id, VkImageView DefuseImage, VkDescriptorSet* SetToAttach)
 	{
-		Render::TestAttachSkyNoxTerrainTexture(DefuseImage, SetToAttach);
+		TerrainSystem::TestAttachSkyNoxTerrainTexture(DefuseImage, SetToAttach);
 		EngineMaterials[Id] = *SetToAttach;
 	}
 }

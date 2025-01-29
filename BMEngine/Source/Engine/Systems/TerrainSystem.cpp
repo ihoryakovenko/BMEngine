@@ -23,11 +23,11 @@ namespace TerrainSystem
 	static TerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
 	static u32 IndicesCount;
 
+	static u64 VertexOffset;
+	static u64 IndexOffset;
 	static VulkanInterface::RenderPipeline Pipeline;
 	static VkDescriptorSet TextureSet;
 	static VkDescriptorSetLayout SamplerLayout;
-	static VulkanInterface::IndexBuffer IndexBuffer;
-	static VulkanInterface::VertexBuffer VertexBuffer;
 	static VkSampler Sampler;
 
 	void Init()
@@ -60,6 +60,21 @@ namespace TerrainSystem
 			SamplerLayout
 		};
 
+		VkSamplerCreateInfo DiffuseSamplerCreateInfo = { };
+		DiffuseSamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		DiffuseSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+		DiffuseSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+		DiffuseSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		DiffuseSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		DiffuseSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		DiffuseSamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+		DiffuseSamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+		DiffuseSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		DiffuseSamplerCreateInfo.mipLodBias = 0.0f;
+		DiffuseSamplerCreateInfo.minLod = 0.0f;
+		DiffuseSamplerCreateInfo.maxLod = 0.0f;
+		DiffuseSamplerCreateInfo.anisotropyEnable = VK_TRUE;
+		DiffuseSamplerCreateInfo.maxAnisotropy = 16;
 		Sampler = VulkanInterface::CreateSampler(&DiffuseSamplerCreateInfo);
 
 		VulkanInterface::CreateUniformSets(&SamplerLayout, 1, &TextureSet);
@@ -128,8 +143,6 @@ namespace TerrainSystem
 	{
 		VulkanInterface::DestroySampler(Sampler);
 		VulkanInterface::DestroyUniformLayout(SamplerLayout);
-		VulkanInterface::DestroyUniformBuffer(VertexBuffer);
-		VulkanInterface::DestroyUniformBuffer(IndexBuffer);
 		VulkanInterface::DestroyPipelineLayout(Pipeline.PipelineLayout);
 		VulkanInterface::DestroyPipeline(Pipeline.Pipeline);
 	}
@@ -146,8 +159,8 @@ namespace TerrainSystem
 
 		Render::BindPipeline(Pipeline.Pipeline);
 		Render::BindDescriptorSet(Sets, TerrainDescriptorSetGroupCount, Pipeline.PipelineLayout, 0, &DynamicOffset, 1);
-		Render::BindVertexBuffer(VertexBuffer, 0);
-		Render::BindIndexBuffer(IndexBuffer, 0);
+		Render::BindVertexBuffer(VertexOffset);
+		Render::BindIndexBuffer(IndexOffset);
 		Render::DrawIndexed(IndicesCount);
 	}
 
@@ -158,11 +171,8 @@ namespace TerrainSystem
 
 		IndicesCount = TerrainIndices.size();
 
-		IndexBuffer = VulkanInterface::CreateIndexBuffer(IndicesCount * sizeof(TerrainIndices[0]));
-		VertexBuffer = VulkanInterface::CreateVertexBuffer(sizeof(TerrainVertex) * NumRows * NumCols);
-
-		Render::LoadIndices(IndexBuffer, TerrainIndices.data(), IndicesCount, 0);
-		Render::LoadVertices(VertexBuffer, &TerrainVerticesData[0][0], sizeof(TerrainVertex), NumRows * NumCols, 0);
+		VertexOffset = Render::LoadVertices(&TerrainVerticesData[0][0], sizeof(TerrainVertex), NumRows * NumCols);
+		IndexOffset = Render::LoadIndices(TerrainIndices.data(), IndicesCount);
 	}
 
 	void GenerateTerrain(std::vector<u32>& Indices)
@@ -243,5 +253,21 @@ namespace TerrainSystem
 				Indices.push_back(topRight);
 			}
 		}
+	}
+
+
+
+
+	void TestAttachSkyNoxTerrainTexture(VkImageView DefuseImage, VkDescriptorSet* SetToAttach)
+	{
+		VulkanInterface::CreateUniformSets(&SamplerLayout, 1, SetToAttach);
+
+		VulkanInterface::UniformSetAttachmentInfo SetInfo[1];
+		SetInfo[0].ImageInfo.imageView = DefuseImage;
+		SetInfo[0].ImageInfo.sampler = Sampler;
+		SetInfo[0].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		SetInfo[0].Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+		VulkanInterface::AttachUniformsToSet(*SetToAttach, SetInfo, 1);
 	}
 }

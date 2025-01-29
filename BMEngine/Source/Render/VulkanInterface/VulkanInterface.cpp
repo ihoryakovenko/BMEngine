@@ -610,7 +610,6 @@ namespace VulkanInterface
 		DepthStencilInfo->stencilTestEnable = Settings->StencilTestEnable;
 
 		// CREATE INFO
-
 		auto PipelineCreateInfo = Memory::BmMemoryManagementSystem::FrameAlloc<VkGraphicsPipelineCreateInfo>();
 		PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 		PipelineCreateInfo->stageCount = ShadersCount;

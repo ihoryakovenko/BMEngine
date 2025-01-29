@@ -18,6 +18,8 @@ namespace FrameManager
 	static UniformMemoryHnadle VpHandle;
 	static VkDescriptorSet VpSet;
 
+	static VkPushConstantRange PushConstants;
+
 	void Init()
 	{
 		BufferMultiFrameSize = BufferSingleFrameSize * VulkanInterface::GetImageCount();

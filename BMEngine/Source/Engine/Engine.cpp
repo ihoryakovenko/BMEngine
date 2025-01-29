@@ -7,9 +7,6 @@
 #include <unordered_map>
 #include <thread>
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
-
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtx/hash.hpp>
@@ -26,27 +23,10 @@
 #include "Util/Math.h"
 #include "Render/FrameManager.h"
 #include "Systems/TerrainSystem.h"
+#include "Systems/StaticMeshSystem.h"
 
 namespace std
 {
-	template<> struct hash<EntityVertex>
-	{
-		size_t operator()(EntityVertex const& vertex) const
-		{
-			size_t hashPosition = std::hash<glm::vec3>()(vertex.Position);
-			size_t hashColor = std::hash<glm::vec3>()(vertex.Color);
-			size_t hashTextureCoords = std::hash<glm::vec2>()(vertex.TextureCoords);
-			size_t hashNormal = std::hash<glm::vec3>()(vertex.Normal);
-
-			size_t combinedHash = hashPosition;
-			combinedHash ^= (hashColor << 1);
-			combinedHash ^= (hashTextureCoords << 1);
-			combinedHash ^= (hashNormal << 1);
-
-			return combinedHash;
-		}
-	};
-
 	template<> struct hash<SkyBoxVertex>
 	{
 		size_t operator()(SkyBoxVertex const& vertex) const
@@ -62,11 +42,6 @@ namespace Engine
 {
 	struct VertexEqual
 	{
-		bool operator()(const EntityVertex& lhs, const EntityVertex& rhs) const
-		{
-			return lhs.Position == rhs.Position && lhs.Color == rhs.Color && lhs.TextureCoords == rhs.TextureCoords;
-		}
-
 		bool operator()(const SkyBoxVertex& lhs, const SkyBoxVertex& rhs) const
 		{
 			return lhs.Position == rhs.Position;
@@ -79,8 +54,6 @@ namespace Engine
 
 	static void Update(f64 DeltaTime);
 
-	static void LoadModel(const char* ModelPath, glm::mat4 Model, VkDescriptorSet CustomMaterial = nullptr);
-
 	static void CreateSkyBoxMesh(VkDescriptorSet Material);
 
 	static void SetUpScene();
@@ -88,8 +61,6 @@ namespace Engine
 	static void RenderLog(VulkanInterface::LogType LogType, const char* Format, va_list Args);
 
 	static void MoveCamera(GLFWwindow* Window, f32 DeltaTime, DynamicMapSystem::MapCamera& MainCamera);
-
-	static const char ModelsBaseDir[] = "./Resources/Models/";
 
 	static Platform::BMRTMPWindowHandler* Window = nullptr;
 
@@ -106,7 +77,6 @@ namespace Engine
 	static const f32 Near = 0.1f;
 	static const f32 Far = 5000.0f;
 
-	static std::vector<Render::DrawEntity> DrawEntities;
 	static Render::DrawSkyBoxEntity SkyBox;
 	static Render::LightBuffer LightData;
 
@@ -172,58 +142,6 @@ namespace Engine
 
 		
 		CreateSkyBoxMesh(ResourceManager::FindMaterial("SkyBoxMaterial"));
-		LoadModel("./Resources/Models/uh60.obj", glm::mat4(1.0f));
-	
-
-		{
-			glm::vec3 CubePos(0.0f, -5.0f, 0.0f);
-			glm::mat4 Model = glm::mat4(1.0f);
-			Model = glm::translate(Model, CubePos);
-			Model = glm::scale(Model, glm::vec3(20.0f, 1.0f, 20.0f));
-			LoadModel("./Resources/Models/cube.obj", Model, ResourceManager::FindMaterial("WhiteMaterial"));
-		}
-
-		{
-			glm::vec3 CubePos(0.0f, 0.0f, 0.0f);
-			glm::mat4 Model = glm::mat4(1.0f);
-			Model = glm::translate(Model, CubePos);
-			Model = glm::scale(Model, glm::vec3(0.2f, 5.0f, 0.2f));
-			LoadModel("./Resources/Models/cube.obj", Model, ResourceManager::FindMaterial("TestMaterial"));
-		}
-
-		{
-			glm::vec3 CubePos(0.0f, 0.0f, 8.0f);
-			glm::mat4 Model = glm::mat4(1.0f);
-			Model = glm::translate(Model, CubePos);
-			Model = glm::rotate(Model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-			Model = glm::scale(Model, glm::vec3(0.5f));
-			LoadModel("./Resources/Models/cube.obj", Model, ResourceManager::FindMaterial("GrassMaterial"));
-		}
-
-		{
-			glm::vec3 LightCubePos(0.0f, 0.0f, 10.0f);
-			glm::mat4 Model = glm::mat4(1.0f);
-			Model = glm::translate(Model, LightCubePos);
-			Model = glm::scale(Model, glm::vec3(0.2f));
-			LoadModel("./Resources/Models/cube.obj", Model, ResourceManager::FindMaterial("WhiteMaterial"));
-		}
-
-		{
-			glm::vec3 CubePos(0.0f, 0.0f, 15.0f);
-			glm::mat4 Model = glm::mat4(1.0f);
-			Model = glm::translate(Model, CubePos);
-			Model = glm::scale(Model, glm::vec3(1.0f));
-			LoadModel("./Resources/Models/cube.obj", Model, ResourceManager::FindMaterial("WhiteMaterial"));
-		}
-
-		{
-			glm::vec3 CubePos(5.0f, 0.0f, 10.0f);
-			glm::mat4 Model = glm::mat4(1.0f);
-			Model = glm::translate(Model, CubePos);
-			Model = glm::rotate(Model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-			Model = glm::scale(Model, glm::vec3(1.0f));
-			LoadModel("./Resources/Models/cube.obj", Model, ResourceManager::FindMaterial("ContainerMaterial"));
-		}
 
 		SetUpScene();
 		 
@@ -254,6 +172,7 @@ namespace Engine
 		ResourceManager::Init();
 		TerrainSystem::Init();
 		DynamicMapSystem::Init();
+		StaticMeshSystem::Init();
 
 		return true;
 	}
@@ -262,6 +181,7 @@ namespace Engine
 	{
 		DynamicMapSystem::DeInit();
 		TerrainSystem::DeInit();
+		StaticMeshSystem::DeInit();
 
 		ResourceManager::DeInit();
 		Render::DeInit();
@@ -283,12 +203,10 @@ namespace Engine
 
 	void Update(f64 DeltaTime)
 	{
-		//MoveCamera(Window, DeltaTime, MainCamera);
+		MoveCamera(Window, DeltaTime, MainCamera);
 
 		CameraSphericalPosition.z = DynamicMapSystem::CalculateCameraAltitude(Zoom);
 		CameraSphericalPosition.z += 1.0f;
-
-		//MainCamera.altitude = CameraSphericalPosition.z;
 
 		MainCamera.Position = DynamicMapSystem::SphericalToMercator(CameraSphericalPosition);
 		
@@ -337,114 +255,14 @@ namespace Engine
 		GuiData.Eye = &Eye;
 	}
 
-	void LoadModel(const char* ModelPath, glm::mat4 Model, VkDescriptorSet CustomMaterial)
-	{
-		tinyobj::attrib_t Attrib;
-		std::vector<tinyobj::shape_t> Shapes;
-		std::vector<tinyobj::material_t> Materials;
-		std::string Warn, Err;
-
-		if (!tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &Warn, &Err, ModelPath, ModelsBaseDir))
-		{
-			assert(false);
-		}
-
-		std::vector<VkDescriptorSet> MaterialToTexture(Materials.size());
-
-		if (CustomMaterial == nullptr)
-		{
-			for (size_t i = 0; i < Materials.size(); i++)
-			{
-				const tinyobj::material_t& Material = Materials[i];
-				if (!Material.diffuse_texname.empty())
-				{
-					int Idx = Material.diffuse_texname.rfind("\\");
-					const std::string FileName = Material.diffuse_texname.substr(Idx + 1);
-
-					if (ResourceManager::FindTexture(FileName) == nullptr)
-					{
-						Render::RenderTexture NewTexture = ResourceManager::LoadTexture(FileName, std::vector<std::string>{FileName}, VK_IMAGE_VIEW_TYPE_2D);
-						ResourceManager::CreateEntityMaterial(FileName, NewTexture.ImageView, NewTexture.ImageView, &MaterialToTexture[i]);
-					}
-				}
-				else
-				{
-					MaterialToTexture[i] = ResourceManager::FindMaterial("BlendWindowMaterial");
-				}
-			}
-		}
-
-		std::unordered_map<EntityVertex, u32, std::hash<EntityVertex>, VertexEqual> uniqueVertices{ };
-
-		for (const auto& Shape : Shapes)
-		{
-			std::vector<EntityVertex> vertices;
-			std::vector<u32> indices;
-
-			for (const auto& index : Shape.mesh.indices)
-			{
-				EntityVertex vertex{ };
-
-				vertex.Position =
-				{
-					Attrib.vertices[3 * index.vertex_index + 0],
-					Attrib.vertices[3 * index.vertex_index + 1],
-					Attrib.vertices[3 * index.vertex_index + 2]
-				};
-
-				vertex.TextureCoords =
-				{
-					Attrib.texcoords[2 * index.texcoord_index + 0],
-					Attrib.texcoords[2 * index.texcoord_index + 1]
-				};
-
-				vertex.Color = { 1.0f, 1.0f, 1.0f };
-
-				if (index.normal_index >= 0)
-				{
-					vertex.Normal =
-					{
-						Attrib.normals[3 * index.normal_index + 0],
-						Attrib.normals[3 * index.normal_index + 1],
-						Attrib.normals[3 * index.normal_index + 2]
-					};
-				}
-				else
-				{
-					assert(false);
-					// Fallback if normal is not available (optional)
-					vertex.Normal = { 0.0f, 1.0f, 0.0f }; // Default to up-direction, or compute it later
-				}
-
-				if (!uniqueVertices.count(vertex))
-				{
-					uniqueVertices[vertex] = static_cast<u32>(vertices.size());
-					vertices.push_back(vertex);
-				}
-
-				indices.push_back(uniqueVertices[vertex]);
-			}
-
-			Render::DrawEntity DrawEntity;
-			DrawEntity.VertexOffset = Render::LoadVertices(vertices.data(), sizeof(EntityVertex), vertices.size());
-			DrawEntity.IndexOffset = Render::LoadIndices(indices.data(), indices.size());
-			DrawEntity.IndicesCount = indices.size();
-			DrawEntity.Model = Model;
-			DrawEntity.TextureSet = CustomMaterial;
-
-			if (CustomMaterial == nullptr)
-			{
-				DrawEntity.TextureSet = MaterialToTexture[Shape.mesh.material_ids[0]];
-			}
-
-			DrawEntities.push_back(DrawEntity);
-		}
-	}
-
 	void SetUpScene()
 	{
 		MainCamera.Fov = 60.0f;
 		MainCamera.AspectRatio = (float)MainScreenExtent.width / (float)MainScreenExtent.height;
+
+		MainCamera.Position = glm::vec3(0.0f, 0.0f, 20.0f);
+		MainCamera.Front = glm::vec3(0.0f, 0.0f, -1.0f);
+		MainCamera.Up = glm::vec3(0.0f, 1.0f, 0.0f);
 
 		Scene.SkyBox = SkyBox;
 		//Scene.DrawSkyBox = true;
@@ -481,9 +299,9 @@ namespace Engine
 		LightData.SpotLight.CutOff = glm::cos(glm::radians(12.5f));
 		LightData.SpotLight.OuterCutOff = glm::cos(glm::radians(17.5f));
 
-		Render::Material Mat;
+		StaticMeshSystem::Material Mat;
 		Mat.Shininess = 32.f;
-		Render::UpdateMaterialBuffer(&Mat);
+		StaticMeshSystem::UpdateMaterialBuffer(&Mat);
 
 		GuiData.DirectionLightDirection = &LightData.DirectionLight.Direction;
 		GuiData.Eye = &Eye;
@@ -569,7 +387,7 @@ namespace Engine
 
 	void CreateSkyBoxMesh(VkDescriptorSet Material)
 	{
-		const char* SkyBoxObj = "./Resources/Models/SkyBox.obj";
+		/*const char* SkyBoxObj = "./Resources/Models/SkyBox.obj";
 
 		tinyobj::attrib_t Attrib;
 		std::vector<tinyobj::shape_t> Shapes;
@@ -606,9 +424,9 @@ namespace Engine
 			indices.push_back(uniqueVertices[vertex]);
 		}
 
-		SkyBox.VertexOffset = Render::LoadVertices(vertices.data(), sizeof(EntityVertex), vertices.size());
+		SkyBox.VertexOffset = Render::LoadVertices(vertices.data(), sizeof(StaticMeshVertex), vertices.size());
 		SkyBox.IndexOffset = Render::LoadIndices(indices.data(), indices.size());
 		SkyBox.IndicesCount = indices.size();
-		SkyBox.TextureSet = Material;
+		SkyBox.TextureSet = Material;*/
 	}
 }

@@ -19,7 +19,6 @@ namespace DynamicMapSystem
 	void DeInit();
 
 	void Update(f64 DeltaTime, const MapCamera& Camera, s32 Zoom);
-	void OnDraw();
 
 	glm::vec3 SphericalToMercator(const glm::vec3& Position);
 	f64 CalculateCameraAltitude(s32 ZoomLevel);

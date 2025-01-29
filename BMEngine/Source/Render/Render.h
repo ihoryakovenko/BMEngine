@@ -92,11 +92,6 @@ namespace Render
 		SpotLight SpotLight;
 	};
 
-	struct Material
-	{
-		f32 Shininess;
-	};
-
 	struct DrawScene
 	{
 		DrawEntity* DrawEntities = nullptr;
@@ -137,6 +132,10 @@ namespace Render
 		VkPipelineLayout PipelineLayout, u32 FirstSet, const u32* DynamicOffset, u32 DynamicOffsetsCount);
 	void BindVertexBuffer(VulkanInterface::VertexBuffer VertexBuffer, u64 Offset); // Pass multiple buffers?
 	void BindIndexBuffer(VulkanInterface::IndexBuffer IndexBuffer, u64 Offset);
+	void BindVertexBuffer(u64 Offset);
+	void BindIndexBuffer(u64 Offset);
+	void BindPushConstants(VkPipelineLayout PipelineLayout, VkShaderStageFlags StageFlags,
+		u32 Size, const void* Data);
 	void DrawIndexed(u32 IndexCount);
 	void Draw(u32 VertexCount, u32 InstanceCount);
 	void EndRenderPass();
@@ -146,10 +145,6 @@ namespace Render
 	void UpdateTexture(RenderTexture* Texture, TextureArrayInfo* Info);
 	void DestroyTexture(RenderTexture* Texture);
 
-	void TestAttachEntityTexture(VkImageView DefuseImage, VkImageView SpecularImage, VkDescriptorSet* SetToAttach);
-	void TestAttachSkyNoxTerrainTexture(VkImageView DefuseImage, VkDescriptorSet* SetToAttach);
-
-	void UpdateMaterialBuffer(const Material* Buffer);
 	u64 LoadVertices(const void* Vertices, u32 VertexSize, u64 VerticesCount);
 	u64 LoadIndices(const u32* Indices, u32 IndicesCount);
 
@@ -159,4 +154,6 @@ namespace Render
 	void ClearIndices();
 
 	void Draw(const DrawScene* Scene);
+
+	VkImage TmpGetShadowMapArray(int i);
 }

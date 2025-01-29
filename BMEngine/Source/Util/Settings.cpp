@@ -1,4 +1,5 @@
 #include "Settings.h"
+#include "Engine/Systems/StaticMeshSystem.h"
 
 VkExtent2D MainScreenExtent;
 VkExtent2D DepthViewportExtent = { 1024, 1024 };
@@ -6,12 +7,9 @@ VkExtent2D DepthViewportExtent = { 1024, 1024 };
 VkFormat ColorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Todo: check if VK_FORMAT_R8G8B8A8_UNORM supported
 VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
 
-VulkanInterface::VertexInput EntityVertexInput;
 VulkanInterface::VertexInput SkyBoxVertexInput;
 VulkanInterface::VertexInput DepthVertexInput;
-VulkanInterface::VertexInput QuadSphereVertexInput;
 
-VulkanInterface::PipelineSettings EntityPipelineSettings;
 VulkanInterface::PipelineSettings DeferredPipelineSettings;
 VulkanInterface::PipelineSettings SkyBoxPipelineSettings;
 VulkanInterface::PipelineSettings DepthPipelineSettings;
@@ -25,13 +23,8 @@ VkImageCreateInfo ShadowMapArrayCreateInfo;
 
 VulkanInterface::UniformImageInterfaceCreateInfo DeferredInputDepthUniformInterfaceCreateInfo;
 VulkanInterface::UniformImageInterfaceCreateInfo DeferredInputUniformColorInterfaceCreateInfo;
-VulkanInterface::UniformImageInterfaceCreateInfo ShadowMapArrayInterfaceCreateInfo;
 VulkanInterface::UniformImageInterfaceCreateInfo ShadowMapElement1InterfaceCreateInfo;
 VulkanInterface::UniformImageInterfaceCreateInfo ShadowMapElement2InterfaceCreateInfo;
-
-VkSamplerCreateInfo ShadowMapSamplerCreateInfo;
-VkSamplerCreateInfo DiffuseSamplerCreateInfo;
-VkSamplerCreateInfo SpecularSamplerCreateInfo;
 
 VkClearValue MainPassClearValues[3];
 VkClearValue DepthPassClearValues;
@@ -73,19 +66,12 @@ static const u32 DepthPassExitDependenciesIndex = Subpasses::Subpasses_Count;
 static const u32 DepthPassSubpassDependenciesCount = Subpasses::Subpasses_Count + 1;
 static VkSubpassDependency DepthPassSubpassDependencies[DepthPassSubpassDependenciesCount];
 
-static const char EntityPipelineName[] = "Entity";
 static const char DeferredPipelineName[] = "Deferred";
 static const char SkyBoxPipelineName[] = "SkyBox";
 static const char DepthPipelineName[] = "Depth";
 
-static const char EntityVertexInputName[] = "EntityVertex";
 static const char SkyBoxVertexInputName[] = "SkyBoxVertex";
 static const char QuadSphereVertexInputName[] = "QuadSphereVertex";
-
-static const char PositionAttributeName[] = "Position";
-static const char ColorAttributeName[] = "Color";
-static const char TextureCoordsAttributeName[] = "TextureCoords";
-static const char NormalAttributeName[] = "Normal";
 
 static const char MainRenderPassName[] = "MainRenderPass";
 static const char MainSubpassName[] = "MainSubpass";
@@ -101,42 +87,6 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	VpBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	VpBufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 	VpBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-	// Samplers
-	ShadowMapSamplerCreateInfo = { };
-	ShadowMapSamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	ShadowMapSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;						// How to render when image is magnified on screen
-	ShadowMapSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;						// How to render when image is minified on screen
-	ShadowMapSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;	// How to handle texture wrap in U (x) direction
-	ShadowMapSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;	// How to handle texture wrap in V (y) direction
-	ShadowMapSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;	// How to handle texture wrap in W (z) direction
-	ShadowMapSamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;	// Border beyond texture (only workds for border clamp)
-	ShadowMapSamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;				// Whether coords should be normalized (between 0 and 1)
-	ShadowMapSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;		// Mipmap interpolation mode
-	ShadowMapSamplerCreateInfo.mipLodBias = 0.0f;								// Level of Details bias for mip level
-	ShadowMapSamplerCreateInfo.minLod = 0.0f;									// Minimum Level of Detail to pick mip level
-	ShadowMapSamplerCreateInfo.maxLod = 0.0f;									// Maximum Level of Detail to pick mip level
-	ShadowMapSamplerCreateInfo.anisotropyEnable = VK_TRUE;
-	ShadowMapSamplerCreateInfo.maxAnisotropy = 1; // Todo: support in config
-
-	DiffuseSamplerCreateInfo = { };
-	DiffuseSamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	DiffuseSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
-	DiffuseSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
-	DiffuseSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	DiffuseSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	DiffuseSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	DiffuseSamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-	DiffuseSamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
-	DiffuseSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	DiffuseSamplerCreateInfo.mipLodBias = 0.0f;
-	DiffuseSamplerCreateInfo.minLod = 0.0f;
-	DiffuseSamplerCreateInfo.maxLod = 0.0f;
-	DiffuseSamplerCreateInfo.anisotropyEnable = VK_TRUE;
-	DiffuseSamplerCreateInfo.maxAnisotropy = 16;
-
-	SpecularSamplerCreateInfo = DiffuseSamplerCreateInfo;
-	DiffuseSamplerCreateInfo.maxAnisotropy = 1;
 
 	// Images
 	DeferredInputDepthUniformCreateInfo = { };
@@ -196,10 +146,6 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	DeferredInputUniformColorInterfaceCreateInfo = DeferredInputDepthUniformInterfaceCreateInfo;
 	DeferredInputUniformColorInterfaceCreateInfo.Format = ColorFormat;
 	DeferredInputUniformColorInterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-
-	ShadowMapArrayInterfaceCreateInfo = DeferredInputDepthUniformInterfaceCreateInfo;
-	ShadowMapArrayInterfaceCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-	ShadowMapArrayInterfaceCreateInfo.SubresourceRange.layerCount = 2;
 
 	ShadowMapElement1InterfaceCreateInfo = DeferredInputDepthUniformInterfaceCreateInfo;
 	ShadowMapElement1InterfaceCreateInfo.SubresourceRange.baseArrayLayer = 0;
@@ -375,34 +321,8 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 //DynamicStateCreateInfo.dynamicStateCount = static_cast<u32>(2);
 //DynamicStateCreateInfo.pDynamicStates = DynamicStates;
 
-	// MainPipeline
-	EntityPipelineSettings.PipelineName = EntityPipelineName;
-	// Rasterizer
-	EntityPipelineSettings.Extent = MainScreenExtent;
-	EntityPipelineSettings.DepthClampEnable = VK_FALSE;
-	EntityPipelineSettings.RasterizerDiscardEnable = VK_FALSE;
-	EntityPipelineSettings.PolygonMode = VK_POLYGON_MODE_FILL;
-	EntityPipelineSettings.LineWidth = 1.0f;
-	EntityPipelineSettings.CullMode = VK_CULL_MODE_BACK_BIT;
-	EntityPipelineSettings.FrontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	EntityPipelineSettings.DepthBiasEnable = VK_FALSE;
-	// Multisampling
-	EntityPipelineSettings.BlendEnable = VK_TRUE;
-	EntityPipelineSettings.LogicOpEnable = VK_FALSE;
-	EntityPipelineSettings.AttachmentCount = 1;
-	EntityPipelineSettings.ColorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	EntityPipelineSettings.SrcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	EntityPipelineSettings.DstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	EntityPipelineSettings.ColorBlendOp = VK_BLEND_OP_ADD;
-	EntityPipelineSettings.SrcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-	EntityPipelineSettings.DstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	EntityPipelineSettings.AlphaBlendOp = VK_BLEND_OP_ADD;
-	// Depth testing
-	EntityPipelineSettings.DepthTestEnable = VK_TRUE;
-	EntityPipelineSettings.DepthWriteEnable = VK_TRUE;
-	EntityPipelineSettings.DepthCompareOp = VK_COMPARE_OP_LESS;
-	EntityPipelineSettings.DepthBoundsTestEnable = VK_FALSE;
-	EntityPipelineSettings.StencilTestEnable = VK_FALSE;
+
+
 
 	// TerrainPipeline
 
@@ -494,31 +414,18 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	DepthPipelineSettings.StencilTestEnable = VK_FALSE;
 
 	// Vertices
-	EntityVertexInput.VertexInputBinding[0].InputAttributes[0] = { PositionAttributeName, VK_FORMAT_R32G32B32_SFLOAT, offsetof(EntityVertex, Position) };
-	EntityVertexInput.VertexInputBinding[0].InputAttributes[1] = { ColorAttributeName, VK_FORMAT_R32G32B32_SFLOAT, offsetof(EntityVertex, Color) };
-	EntityVertexInput.VertexInputBinding[0].InputAttributes[2] = { TextureCoordsAttributeName, VK_FORMAT_R32G32_SFLOAT, offsetof(EntityVertex, TextureCoords) };
-	EntityVertexInput.VertexInputBinding[0].InputAttributes[3] = { NormalAttributeName, VK_FORMAT_R32G32B32_SFLOAT, offsetof(EntityVertex, Normal) };
-	EntityVertexInput.VertexInputBinding[0].InputAttributesCount = 4;
-	EntityVertexInput.VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-	EntityVertexInput.VertexInputBinding[0].Stride = sizeof(EntityVertex);
-	EntityVertexInput.VertexInputBinding[0].VertexInputBindingName = EntityVertexInputName;
-	EntityVertexInput.VertexInputBindingCount = 1;
-
-	SkyBoxVertexInput.VertexInputBinding[0].InputAttributes[0] = { PositionAttributeName, VK_FORMAT_R32G32B32_SFLOAT, offsetof(SkyBoxVertex, Position) };
+	SkyBoxVertexInput.VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(SkyBoxVertex, Position) };
 	SkyBoxVertexInput.VertexInputBinding[0].InputAttributesCount = 1;
 	SkyBoxVertexInput.VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 	SkyBoxVertexInput.VertexInputBinding[0].Stride = sizeof(SkyBoxVertex);
 	SkyBoxVertexInput.VertexInputBinding[0].VertexInputBindingName = SkyBoxVertexInputName;
 	SkyBoxVertexInput.VertexInputBindingCount = 1;
 
-	DepthVertexInput = EntityVertexInput;
+	DepthVertexInput.VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshSystem::StaticMeshVertex, Position) };
 	DepthVertexInput.VertexInputBinding[0].InputAttributesCount = 1;
-
-	QuadSphereVertexInput.VertexInputBinding[0].InputAttributes[0] = { PositionAttributeName, VK_FORMAT_R32G32B32_SFLOAT, offsetof(QuadSphereVertex, Position) };
-	QuadSphereVertexInput.VertexInputBinding[0].InputAttributes[1] = { PositionAttributeName, VK_FORMAT_R32G32_SFLOAT, offsetof(QuadSphereVertex, TextureCoords) };
-	QuadSphereVertexInput.VertexInputBinding[0].InputAttributesCount = 2;
-	QuadSphereVertexInput.VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-	QuadSphereVertexInput.VertexInputBinding[0].Stride = sizeof(QuadSphereVertex);
-	QuadSphereVertexInput.VertexInputBinding[0].VertexInputBindingName = QuadSphereVertexInputName;
-	QuadSphereVertexInput.VertexInputBindingCount = 1;
+	DepthVertexInput.VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	DepthVertexInput.VertexInputBinding[0].Stride = sizeof(StaticMeshSystem::StaticMeshVertex);
+	DepthVertexInput.VertexInputBinding[0].VertexInputBindingName = "EntityVertex";
+	DepthVertexInput.VertexInputBinding[0].InputAttributesCount = 1;
+	DepthVertexInput.VertexInputBindingCount = 1;
 }

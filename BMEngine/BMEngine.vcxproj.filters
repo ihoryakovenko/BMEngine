@@ -26,6 +26,9 @@
     <ClCompile Include="Source\Engine\Systems\ResourceManager.cpp" />
     <ClCompile Include="Source\Engine\Scene.cpp" />
     <ClCompile Include="Source\Render\FrameManager.cpp" />
+    <ClCompile Include="Source\Engine\Systems\TerrainSystem.cpp" />
+    <ClCompile Include="Source\Render\MainRenderPass.cpp" />
+    <ClCompile Include="Source\Engine\Systems\StaticMeshSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
@@ -51,6 +54,9 @@
     <ClInclude Include="Source\Engine\Scene.h" />
     <ClInclude Include="Source\Util\Math.h" />
     <ClInclude Include="Source\Render\FrameManager.h" />
+    <ClInclude Include="Source\Engine\Systems\TerrainSystem.h" />
+    <ClInclude Include="Source\Render\MainRenderPass.h" />
+    <ClInclude Include="Source\Engine\Systems\StaticMeshSystem.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />

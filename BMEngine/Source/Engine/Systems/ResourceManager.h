@@ -23,6 +23,5 @@ namespace ResourceManager
 	Render::RenderTexture* FindTexture(const std::string& Id);
 
 	// Test
-	void CreateEntityMaterial(const std::string& Id, VkImageView DefuseImage, VkImageView SpecularImage, VkDescriptorSet* SetToAttach);
 	void CreateSkyBoxTerrainTexture(const std::string& Id, VkImageView DefuseImage, VkDescriptorSet* SetToAttach);
 }

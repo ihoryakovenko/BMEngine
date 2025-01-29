@@ -496,8 +496,8 @@ void ImguiIntegration::DrawLoop(const bool& IsDrawing, GuiData Data)
 			ImGui::DragFloat3("eye", &(*Data.Eye)[0], 0.05, -100, 100);
 
 			//ImGui::DragFloat2("CameraPos", &(*Data.CameraMercatorPosition)[0], 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Camera latitude", &CameraLat, 0.01f, -90.0f, 90.0f);
-			ImGui::DragFloat("Camera longitude", &CameraLon, 0.01f, -180.0f, 180.0f);
+			ImGui::DragFloat("Camera latitude", &CameraLat, 1.01f, -90.0f, 90.0f);
+			ImGui::DragFloat("Camera longitude", &CameraLon, 1.01f, -180.0f, 180.0f);
 			ImGui::DragInt("Zoom", &(*Data.Zoom),0.05f, 1.0f, 20.0f);
 
 			float LatRadians = glm::radians(CameraLat);
