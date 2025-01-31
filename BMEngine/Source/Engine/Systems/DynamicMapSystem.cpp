@@ -135,39 +135,14 @@ namespace DynamicMapSystem
 		ResourceInfo.RenderPass = Render::TestGetRenderPass();
 		ResourceInfo.SubpassIndex = 0;
 
-		VulkanInterface::PipelineSettings MapPipelineSettings;
-		MapPipelineSettings.PipelineName = "Map";
-		// Rasterizer
-		MapPipelineSettings.Extent = MainScreenExtent;
-		MapPipelineSettings.DepthClampEnable = VK_FALSE;
-		MapPipelineSettings.RasterizerDiscardEnable = VK_FALSE;
-		MapPipelineSettings.PolygonMode = VK_POLYGON_MODE_FILL;
-		MapPipelineSettings.LineWidth = 1.0f;
-		MapPipelineSettings.CullMode = VK_CULL_MODE_BACK_BIT;
-		MapPipelineSettings.FrontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-		MapPipelineSettings.DepthBiasEnable = VK_FALSE;
-		// Multisampling
-		MapPipelineSettings.BlendEnable = VK_TRUE;
-		MapPipelineSettings.LogicOpEnable = VK_FALSE;
-		MapPipelineSettings.AttachmentCount = 1;
-		MapPipelineSettings.ColorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-		MapPipelineSettings.SrcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-		MapPipelineSettings.DstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		MapPipelineSettings.ColorBlendOp = VK_BLEND_OP_ADD;
-		MapPipelineSettings.SrcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		MapPipelineSettings.DstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-		MapPipelineSettings.AlphaBlendOp = VK_BLEND_OP_ADD;
-		// Depth testing
-		MapPipelineSettings.DepthTestEnable = VK_TRUE;
-		MapPipelineSettings.DepthWriteEnable = VK_TRUE;
-		MapPipelineSettings.DepthCompareOp = VK_COMPARE_OP_LESS;
-		MapPipelineSettings.DepthBoundsTestEnable = VK_FALSE;
-		MapPipelineSettings.StencilTestEnable = VK_FALSE;
+		VulkanInterface::PipelineSettings PipelineSettings;
+		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/DynamicMapSystem.ini");
+		PipelineSettings.Extent = MainScreenExtent;
 
 		VulkanInterface::BMRVertexInputBinding VertexInput;
 		
 		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, &VertexInput, 0,
-			&MapPipelineSettings, &ResourceInfo);
+			&PipelineSettings, &ResourceInfo);
 
 		IndexBuffer = VulkanInterface::CreateIndexBuffer(MB64);
 

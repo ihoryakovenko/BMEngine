@@ -55,8 +55,6 @@ namespace FrameManager
 
 	void UpdateUniformMemory(UniformMemoryHnadle Handle, const void* Data, u64 Size)
 	{
-
-
 		VulkanInterface::UpdateUniformBuffer(Buffer, Size,
 			Handle + (Size * VulkanInterface::TestGetImageIndex()), Data);
 	}

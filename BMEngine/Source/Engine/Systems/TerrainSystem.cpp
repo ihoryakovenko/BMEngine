@@ -104,37 +104,12 @@ namespace TerrainSystem
 		VertexInputBinding[0].Stride = sizeof(TerrainVertex);
 		VertexInputBinding[0].VertexInputBindingName = "TerrainVertex";
 
-		VulkanInterface::PipelineSettings TerrainPipelineSettings;
-		TerrainPipelineSettings.PipelineName = "Terrain";
-		// Rasterizer
-		TerrainPipelineSettings.Extent = MainScreenExtent;
-		TerrainPipelineSettings.DepthClampEnable = VK_FALSE;
-		TerrainPipelineSettings.RasterizerDiscardEnable = VK_FALSE;
-		TerrainPipelineSettings.PolygonMode = VK_POLYGON_MODE_FILL;
-		TerrainPipelineSettings.LineWidth = 1.0f;
-		TerrainPipelineSettings.CullMode = VK_CULL_MODE_BACK_BIT;
-		TerrainPipelineSettings.FrontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-		TerrainPipelineSettings.DepthBiasEnable = VK_FALSE;
-		// Multisampling
-		TerrainPipelineSettings.BlendEnable = VK_TRUE;
-		TerrainPipelineSettings.LogicOpEnable = VK_FALSE;
-		TerrainPipelineSettings.AttachmentCount = 1;
-		TerrainPipelineSettings.ColorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-		TerrainPipelineSettings.SrcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-		TerrainPipelineSettings.DstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		TerrainPipelineSettings.ColorBlendOp = VK_BLEND_OP_ADD;
-		TerrainPipelineSettings.SrcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		TerrainPipelineSettings.DstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-		TerrainPipelineSettings.AlphaBlendOp = VK_BLEND_OP_ADD;
-		// Depth testing
-		TerrainPipelineSettings.DepthTestEnable = VK_TRUE;
-		TerrainPipelineSettings.DepthWriteEnable = VK_TRUE;
-		TerrainPipelineSettings.DepthCompareOp = VK_COMPARE_OP_LESS;
-		TerrainPipelineSettings.DepthBoundsTestEnable = VK_FALSE;
-		TerrainPipelineSettings.StencilTestEnable = VK_FALSE;
+		VulkanInterface::PipelineSettings PipelineSettings;
+		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMeshSystem.ini");
+		PipelineSettings.Extent = MainScreenExtent;
 
 		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, VertexInputBinding, VertexInputCount,
-			&TerrainPipelineSettings, &ResourceInfo);
+			&PipelineSettings, &ResourceInfo);
 
 		LoadTerrain();
 	}

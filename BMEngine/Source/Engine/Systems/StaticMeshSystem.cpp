@@ -7,34 +7,12 @@
 #include "Util/Settings.h"
 #include "Util/Util.h"
 
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/hash.hpp>
-
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
-
 #include "ResourceManager.h"
 #include "Engine/Scene.h"
+#include "Engine/Assets.h"
 
-std::vector<Render::DrawEntity> DrawEntities;
-
-template<> struct std::hash<StaticMeshSystem::StaticMeshVertex>
-{
-	size_t operator()(StaticMeshSystem::StaticMeshVertex const& vertex) const
-	{
-		size_t hashPosition = std::hash<glm::vec3>()(vertex.Position);
-		size_t hashColor = std::hash<glm::vec3>()(vertex.Color);
-		size_t hashTextureCoords = std::hash<glm::vec2>()(vertex.TextureCoords);
-		size_t hashNormal = std::hash<glm::vec3>()(vertex.Normal);
-
-		size_t combinedHash = hashPosition;
-		combinedHash ^= (hashColor << 1);
-		combinedHash ^= (hashTextureCoords << 1);
-		combinedHash ^= (hashNormal << 1);
-
-		return combinedHash;
-	}
-};
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
 
 VkDescriptorSet TestMaterial;
 VkDescriptorSet WhiteMaterial;
@@ -44,16 +22,10 @@ VkDescriptorSet GrassMaterial;
 VkDescriptorSet SkyBoxMaterial;
 VkDescriptorSet TerrainMaterial;
 
+std::vector<Render::DrawEntity> DrawEntities;
+
 namespace StaticMeshSystem
 {
-	struct VertexEqual
-	{
-		bool operator()(const StaticMeshVertex& lhs, const StaticMeshVertex& rhs) const
-		{
-			return lhs.Position == rhs.Position && lhs.Color == rhs.Color && lhs.TextureCoords == rhs.TextureCoords;
-		}
-	};
-
 	static void OnDraw();
 
 	static void LoadModel(const char* ModelPath, glm::mat4 Model, VkDescriptorSet CustomMaterial = nullptr);
@@ -72,13 +44,13 @@ namespace StaticMeshSystem
 	static VkDescriptorSetLayout ShadowMapArrayLayout;
 
 	static VulkanInterface::UniformBuffer MaterialBuffer;
-	static VulkanInterface::UniformBuffer EntityLightBufferHandle[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static FrameManager::UniformMemoryHnadle EntityLightBufferHandle;
 	
 	static VkImageView ShadowMapArrayImageInterface[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 	static VkPushConstantRange PushConstants;
 
-	static VkDescriptorSet StaticMeshLightSet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VkDescriptorSet StaticMeshLightSet;
 	static VkDescriptorSet MaterialSet;
 	static VkDescriptorSet ShadowMapArraySet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
 
@@ -125,10 +97,12 @@ namespace StaticMeshSystem
 		SpecularSampler = VulkanInterface::CreateSampler(&SpecularSamplerCreateInfo);
 		ShadowMapArraySampler = VulkanInterface::CreateSampler(&ShadowMapSamplerCreateInfo);
 
-		const VkDescriptorType EntityLightDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		const VkShaderStageFlags EntityLightStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-		StaticMeshLightLayout = VulkanInterface::CreateUniformLayout(&EntityLightDescriptorType, &EntityLightStageFlags, 1);
-	
+
+		const VkDeviceSize LightBufferSize = sizeof(Render::LightBuffer);
+		StaticMeshLightLayout = FrameManager::CreateCompatibleLayout(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+		EntityLightBufferHandle = FrameManager::ReserveUniformMemory(LightBufferSize);
+		StaticMeshLightSet = FrameManager::CreateAndBindSet(EntityLightBufferHandle, LightBufferSize, StaticMeshLightLayout);
+
 		const VkShaderStageFlags EntitySamplerInputFlags[2] = { VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
 		const VkDescriptorType EntitySamplerDescriptorType[2] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
 		StaticMeshSamplerLayout = VulkanInterface::CreateUniformLayout(EntitySamplerDescriptorType, EntitySamplerInputFlags, 2);
@@ -173,33 +147,14 @@ namespace StaticMeshSystem
 
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
-			const VkDeviceSize LightBufferSize = sizeof(Render::LightBuffer);
-
-			VkBufferCreateInfo LightBufferInfo = { };
-			LightBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-			LightBufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-			LightBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-			LightBufferInfo.size = LightBufferSize;
-
-			EntityLightBufferHandle[i] = VulkanInterface::CreateUniformBufferInternal(&LightBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
 			ShadowMapArrayImageInterface[i] = VulkanInterface::CreateImageInterface(&ShadowMapArrayInterfaceCreateInfo,
 				Render::TmpGetShadowMapArray(i));
-
-			VulkanInterface::UniformSetAttachmentInfo EntityLightAttachmentInfo;
-			EntityLightAttachmentInfo.BufferInfo.buffer = EntityLightBufferHandle[i].Buffer;
-			EntityLightAttachmentInfo.BufferInfo.offset = 0;
-			EntityLightAttachmentInfo.BufferInfo.range = LightBufferSize;
-			EntityLightAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 
 			VulkanInterface::UniformSetAttachmentInfo ShadowMapArrayAttachmentInfo;
 			ShadowMapArrayAttachmentInfo.ImageInfo.imageView = ShadowMapArrayImageInterface[i];
 			ShadowMapArrayAttachmentInfo.ImageInfo.sampler = ShadowMapArraySampler;
 			ShadowMapArrayAttachmentInfo.ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			ShadowMapArrayAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-
-			VulkanInterface::CreateUniformSets(&StaticMeshLightLayout, 1, StaticMeshLightSet + i);
-			VulkanInterface::AttachUniformsToSet(StaticMeshLightSet[i], &EntityLightAttachmentInfo, 1);
 
 			VulkanInterface::CreateUniformSets(&ShadowMapArrayLayout, 1, ShadowMapArraySet + i);
 			VulkanInterface::AttachUniformsToSet(ShadowMapArraySet[i], &ShadowMapArrayAttachmentInfo, 1);
@@ -208,8 +163,8 @@ namespace StaticMeshSystem
 		VkDescriptorSetLayout StaticMeshDescriptorLayouts[] =
 		{
 			FrameManager::GetViewProjectionLayout(),
-			StaticMeshSamplerLayout,
 			StaticMeshLightLayout,
+			StaticMeshSamplerLayout,
 			StaticMeshMaterialLayout,
 			ShadowMapArrayLayout
 		};
@@ -241,42 +196,16 @@ namespace StaticMeshSystem
 
 		VulkanInterface::BMRVertexInputBinding VertexInputBinding[1];
 		VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshVertex, Position) };
-		VertexInputBinding[0].InputAttributes[1] = { "Color", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshVertex, Color) };
-		VertexInputBinding[0].InputAttributes[2] = { "TextureCoords", VK_FORMAT_R32G32_SFLOAT, offsetof(StaticMeshVertex, TextureCoords) };
-		VertexInputBinding[0].InputAttributes[3] = { "Normal", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshVertex, Normal) };
-		VertexInputBinding[0].InputAttributesCount = 4;
+		VertexInputBinding[0].InputAttributes[1] = { "TextureCoords", VK_FORMAT_R32G32_SFLOAT, offsetof(StaticMeshVertex, TextureCoords) };
+		VertexInputBinding[0].InputAttributes[2] = { "Normal", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshVertex, Normal) };
+		VertexInputBinding[0].InputAttributesCount = 3;
 		VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 		VertexInputBinding[0].Stride = sizeof(StaticMeshVertex);
 		VertexInputBinding[0].VertexInputBindingName = "EntityVertex";
 
-		VulkanInterface::PipelineSettings EntityPipelineSettings;
-		EntityPipelineSettings.PipelineName = "Entity";
-		// Rasterizer
-		EntityPipelineSettings.Extent = MainScreenExtent;
-		EntityPipelineSettings.DepthClampEnable = VK_FALSE;
-		EntityPipelineSettings.RasterizerDiscardEnable = VK_FALSE;
-		EntityPipelineSettings.PolygonMode = VK_POLYGON_MODE_FILL;
-		EntityPipelineSettings.LineWidth = 1.0f;
-		EntityPipelineSettings.CullMode = VK_CULL_MODE_BACK_BIT;
-		EntityPipelineSettings.FrontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-		EntityPipelineSettings.DepthBiasEnable = VK_FALSE;
-		// Multisampling
-		EntityPipelineSettings.BlendEnable = VK_TRUE;
-		EntityPipelineSettings.LogicOpEnable = VK_FALSE;
-		EntityPipelineSettings.AttachmentCount = 1;
-		EntityPipelineSettings.ColorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-		EntityPipelineSettings.SrcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-		EntityPipelineSettings.DstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		EntityPipelineSettings.ColorBlendOp = VK_BLEND_OP_ADD;
-		EntityPipelineSettings.SrcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		EntityPipelineSettings.DstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-		EntityPipelineSettings.AlphaBlendOp = VK_BLEND_OP_ADD;
-		// Depth testing
-		EntityPipelineSettings.DepthTestEnable = VK_TRUE;
-		EntityPipelineSettings.DepthWriteEnable = VK_TRUE;
-		EntityPipelineSettings.DepthCompareOp = VK_COMPARE_OP_LESS;
-		EntityPipelineSettings.DepthBoundsTestEnable = VK_FALSE;
-		EntityPipelineSettings.StencilTestEnable = VK_FALSE;
+		VulkanInterface::PipelineSettings PipelineSettings;
+		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMeshSystem.ini");
+		PipelineSettings.Extent = MainScreenExtent;
 
 		VulkanInterface::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
@@ -284,7 +213,7 @@ namespace StaticMeshSystem
 		ResourceInfo.SubpassIndex = 0;
 
 		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, VertexInputBinding, 1,
-			&EntityPipelineSettings, &ResourceInfo);
+			&PipelineSettings, &ResourceInfo);
 
 		
 
@@ -312,6 +241,26 @@ namespace StaticMeshSystem
 
 		LoadModel("./Resources/Models/uh60.obj", glm::mat4(1.0f));
 
+		Assets::Model3D Uh60Model = Assets::LoadModel3D(".\\Resources\\Assets\\Models\\uh60.model");
+
+		Render::LoadVertices(Uh60Model.VertexData, sizeof(StaticMeshVertex), Uh60Model.Header.VerticesCount);
+		Render::LoadIndices(Uh60Model.IndexData, Uh60Model.Header.IndicesCount);
+
+		for (u32 i = 0; i < Uh60Model.Header.MeshCount; i++)
+		{
+			Render::DrawEntity En;
+			En.VertexOffset = Uh60Model.VertexOffsets[i];
+			En.IndexOffset = Uh60Model.IndexOffsets[i];
+			// This reads the last index offset + 1, need handle after the loop
+			En.IndicesCount = Uh60Model.IndicesCounts[i];
+			En.TextureSet = TestMaterial;
+			En.Model = glm::mat4(1.0f);
+
+			DrawEntities.push_back(En);
+		}
+
+
+		Assets::DestroyModel3D(&Uh60Model);
 
 		{
 			glm::vec3 CubePos(0.0f, -5.0f, 0.0f);
@@ -369,7 +318,6 @@ namespace StaticMeshSystem
 	{
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
-			VulkanInterface::DestroyUniformBuffer(EntityLightBufferHandle[i]);
 			VulkanInterface::DestroyImageInterface(ShadowMapArrayImageInterface[i]);
 		}
 
@@ -387,8 +335,7 @@ namespace StaticMeshSystem
 
 	void OnDraw()
 	{
-		VulkanInterface::UpdateUniformBuffer(EntityLightBufferHandle[VulkanInterface::TestGetImageIndex()], sizeof(Render::LightBuffer), 0,
-			Scene.LightEntity);
+		FrameManager::UpdateUniformMemory(EntityLightBufferHandle, Scene.LightEntity, sizeof(Render::LightBuffer));
 
 		Render::BindPipeline(Pipeline.Pipeline);
 
@@ -397,21 +344,23 @@ namespace StaticMeshSystem
 		const u32 DynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(FrameManager::ViewProjectionBuffer);
 		Render::BindDescriptorSet(&VpSet, 1, Pipeline.PipelineLayout, 0, &DynamicOffset, 1);
 
+		const u32 LightDynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(Render::LightBuffer);
+
 		for (u32 i = 0; i < Scene.DrawEntitiesCount; ++i)
 		{
 			Render::DrawEntity* DrawEntity = Scene.DrawEntities + i;
 
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
+				StaticMeshLightSet,
 				DrawEntity->TextureSet,
-				StaticMeshLightSet[VulkanInterface::TestGetImageIndex()],
 				MaterialSet,
 				ShadowMapArraySet[VulkanInterface::TestGetImageIndex()],
 			};
 			const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
 			Render::BindPushConstants(Pipeline.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(Render::BMRModel), &DrawEntity->Model);
-			Render::BindDescriptorSet(DescriptorSetGroup, DescriptorSetGroupCount, Pipeline.PipelineLayout, 1, nullptr, 0);
+			Render::BindDescriptorSet(DescriptorSetGroup, DescriptorSetGroupCount, Pipeline.PipelineLayout, 1, &LightDynamicOffset, 1);
 			Render::BindVertexBuffer(DrawEntity->VertexOffset);
 			Render::BindIndexBuffer(DrawEntity->IndexOffset);
 			Render::DrawIndexed(DrawEntity->IndicesCount);
@@ -452,110 +401,7 @@ namespace StaticMeshSystem
 
 	void LoadModel(const char* ModelPath, glm::mat4 Model, VkDescriptorSet CustomMaterial)
 	{
-		tinyobj::attrib_t Attrib;
-		std::vector<tinyobj::shape_t> Shapes;
-		std::vector<tinyobj::material_t> Materials;
-		std::string Warn, Err;
+		
 
-		if (!tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &Warn, &Err, ModelPath, ModelsBaseDir))
-		{
-			assert(false);
-		}
-
-		std::vector<VkDescriptorSet> MaterialToTexture(Materials.size());
-
-		if (CustomMaterial == nullptr)
-		{
-			for (size_t i = 0; i < Materials.size(); i++)
-			{
-				const tinyobj::material_t& Material = Materials[i];
-				if (!Material.diffuse_texname.empty())
-				{
-					int Idx = Material.diffuse_texname.rfind("\\");
-					const std::string FileName = Material.diffuse_texname.substr(Idx + 1);
-
-					if (ResourceManager::FindTexture(FileName) == nullptr)
-					{
-						Render::RenderTexture NewTexture = ResourceManager::LoadTexture(FileName, std::vector<std::string>{FileName}, VK_IMAGE_VIEW_TYPE_2D);
-						AttachTextureToStaticMesh(NewTexture.ImageView, NewTexture.ImageView, &MaterialToTexture[i]);
-						CustomMaterial = MaterialToTexture[i];
-					}
-				}
-				else
-				{
-					//MaterialToTexture[i] = ResourceManager::FindMaterial("BlendWindowMaterial");
-					//MaterialToTexture[i] = BlendWindowMaterial;
-					CustomMaterial = BlendWindowMaterial;
-				}
-			}
-		}
-
-		std::unordered_map<StaticMeshVertex, u32, std::hash<StaticMeshVertex>, VertexEqual> uniqueVertices{ };
-
-		for (const auto& Shape : Shapes)
-		{
-			std::vector<StaticMeshVertex> vertices;
-			std::vector<u32> indices;
-
-			for (const auto& index : Shape.mesh.indices)
-			{
-				StaticMeshVertex vertex{ };
-
-				vertex.Position =
-				{
-					Attrib.vertices[3 * index.vertex_index + 0],
-					Attrib.vertices[3 * index.vertex_index + 1],
-					Attrib.vertices[3 * index.vertex_index + 2]
-				};
-
-				vertex.TextureCoords =
-				{
-					Attrib.texcoords[2 * index.texcoord_index + 0],
-					Attrib.texcoords[2 * index.texcoord_index + 1]
-				};
-
-				vertex.Color = { 1.0f, 1.0f, 1.0f };
-
-				if (index.normal_index >= 0)
-				{
-					vertex.Normal =
-					{
-						Attrib.normals[3 * index.normal_index + 0],
-						Attrib.normals[3 * index.normal_index + 1],
-						Attrib.normals[3 * index.normal_index + 2]
-					};
-				}
-				else
-				{
-					assert(false);
-					// Fallback if normal is not available (optional)
-					vertex.Normal = { 0.0f, 1.0f, 0.0f }; // Default to up-direction, or compute it later
-				}
-
-				if (!uniqueVertices.count(vertex))
-				{
-					uniqueVertices[vertex] = static_cast<u32>(vertices.size());
-					vertices.push_back(vertex);
-				}
-
-				indices.push_back(uniqueVertices[vertex]);
-			}
-
-			Render::DrawEntity DrawEntity;
-			DrawEntity.VertexOffset = Render::LoadVertices(vertices.data(), sizeof(StaticMeshVertex), vertices.size());
-			DrawEntity.IndexOffset = Render::LoadIndices(indices.data(), indices.size());
-			DrawEntity.IndicesCount = indices.size();
-			DrawEntity.Model = Model;
-			DrawEntity.TextureSet = CustomMaterial;
-
-			if (CustomMaterial == nullptr)
-			{
-				DrawEntity.TextureSet = MaterialToTexture[Shape.mesh.material_ids[0]];
-			}
-
-			assert(DrawEntity.TextureSet);
-
-			DrawEntities.push_back(DrawEntity);
-		}
 	}
 }

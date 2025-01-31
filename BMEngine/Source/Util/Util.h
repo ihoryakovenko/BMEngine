@@ -9,6 +9,8 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include "Render/VulkanInterface/VulkanInterface.h"
+
 namespace Util
 {
 	bool ReadFileFull(FILE* File, std::vector<char>& OutFileData);
@@ -53,6 +55,8 @@ namespace Util
 			//std::cout << std::format("{}: {}\n", Type, std::vformat(Message, std::make_format_args(Args...)));
 		}
 	};
+
+	void LoadPipelineSettings(VulkanInterface::PipelineSettings& settings, const char* filePath);
 
 #ifdef NDEBUG
 	static bool EnableValidationLayers = false;

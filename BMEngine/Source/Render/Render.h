@@ -90,6 +90,9 @@ namespace Render
 		PointLight PointLight;
 		DirectionLight DirectionLight;
 		SpotLight SpotLight;
+
+		glm::vec4 tmp;
+		glm::vec4 tmp2;
 	};
 
 	struct DrawScene

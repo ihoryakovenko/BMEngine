@@ -40,10 +40,9 @@ struct SpotLight
 #define DIRECTIONAL_LIGHT_SHADOW_TEXTURE_INDEX 0
 #define SPOT_LIGHT_SHADOW_TEXTURE_INDEX 1
 
-layout(location = 0) in vec3 FragmentColor;
-layout(location = 1) in vec2 FragmentTexture;
-layout(location = 2) in vec3 FragmentNormal;
-layout(location = 3) in vec4 WorldFragPos;
+layout(location = 0) in vec2 FragmentTexture;
+layout(location = 1) in vec3 FragmentNormal;
+layout(location = 2) in vec4 WorldFragPos;
 
 layout(set = 0, binding = 0) uniform UboViewProjection
 {
@@ -51,11 +50,11 @@ layout(set = 0, binding = 0) uniform UboViewProjection
 	mat4 Projection;
 } ViewProjection;
 
-layout(set = 1, binding = 0) uniform sampler2D DiffuseTexture;
-layout(set = 1, binding = 1) uniform sampler2D SpecularTexture;
+layout(set = 2, binding = 0) uniform sampler2D DiffuseTexture;
+layout(set = 2, binding = 1) uniform sampler2D SpecularTexture;
 
 
-layout(set = 2, binding = 0) uniform LightCasters
+layout(set = 1, binding = 0) uniform LightCasters
 {
 	PointLight pointlight;
 	DirectionLight directionLight;
