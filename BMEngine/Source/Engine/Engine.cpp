@@ -154,7 +154,8 @@ namespace Engine
 		Memory::BmMemoryManagementSystem::Init(FrameAllocSize);
 
 		VulkanInterface::VulkanInterfaceConfig RenderConfig;
-		RenderConfig.MaxTextures = 90;
+		//RenderConfig.MaxTextures = 90;
+		RenderConfig.MaxTextures = 500; // TODO: FIX!!!!
 		RenderConfig.LogHandler = RenderLog;
 
 		RenderConfig.EnableValidationLayers = false;

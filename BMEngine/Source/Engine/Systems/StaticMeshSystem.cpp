@@ -224,7 +224,7 @@ namespace StaticMeshSystem
 
 
 
-		auto test = *ResourceManager::FindTexture("1giraffe");
+		auto test = *ResourceManager::FindTexture("1giraffe.jpg");
 
 		//ResourceManager::CreateEntityMaterial("TestMaterial", TestTexture.ImageView, TestTexture.ImageView, &TestMaterial);
 		//ResourceManager::CreateEntityMaterial("WhiteMaterial", WhiteTexture.ImageView, WhiteTexture.ImageView, &WhiteMaterial);
@@ -238,8 +238,6 @@ namespace StaticMeshSystem
 		AttachTextureToStaticMesh(test.ImageView, test.ImageView, &BlendWindowMaterial);
 		AttachTextureToStaticMesh(test.ImageView, test.ImageView, &GrassMaterial);
 
-		LoadModel("./Resources/Models/uh60.obj", glm::mat4(1.0f));
-
 		Util::Model3DData ModelData = Util::LoadModel3DData(".\\Resources\\Models\\uh60.model");
 		Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
 
@@ -250,11 +248,17 @@ namespace StaticMeshSystem
 			const u64 VerticesCount = Uh60Model.VerticesCounts[i];
 			const u32 IndicesCount = Uh60Model.IndicesCounts[i];
 
+			const Render::RenderTexture* Texture = ResourceManager::FindTexture(Uh60Model.DiffuseTexturesHashes[i]);
+			
+			// TODO DELETE!
+			VkDescriptorSet Set;
+			AttachTextureToStaticMesh(Texture->ImageView, Texture->ImageView, &Set);
+
 			Render::DrawEntity En;
 			En.VertexOffset = Render::LoadVertices(Uh60Model.VertexData + ModelVertexByteOffset, sizeof(StaticMeshVertex), VerticesCount);
 			En.IndexOffset = Render::LoadIndices(Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount);
 			En.IndicesCount = Uh60Model.IndicesCounts[i];
-			En.TextureSet = TestMaterial;
+			En.TextureSet = Set;
 			En.Model = glm::mat4(1.0f);
 
 			DrawEntities.push_back(En);

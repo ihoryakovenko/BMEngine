@@ -4,10 +4,15 @@
 #include <vector>
 
 #include "Util/EngineTypes.h"
+
 #include "Render/Render.h"
 
 namespace ResourceManager
 {
+	extern u64 DefaultTextureHash;
+	extern const u8 DefaultTextureData[];
+	extern u64 DefaultTextureDataCount;
+
 	void Init();
 	void DeInit();
 
@@ -21,6 +26,7 @@ namespace ResourceManager
 
 	VkDescriptorSet FindMaterial(const std::string& Id);
 	Render::RenderTexture* FindTexture(const std::string& Id);
+	Render::RenderTexture* FindTexture(u64 Hash);
 
 	// Test
 	void CreateSkyBoxTerrainTexture(const std::string& Id, VkImageView DefuseImage, VkDescriptorSet* SetToAttach);

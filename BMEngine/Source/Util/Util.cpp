@@ -206,7 +206,8 @@ namespace Util
 				Indices.push_back(uniqueVertices[vertex]);
 			}
 
-			TextureHashes[i] = Hasher(Materials[Shape->mesh.material_ids[0]].diffuse_texname);
+			const std::string* Texture = &Materials[Shape->mesh.material_ids[0]].diffuse_texname;
+			TextureHashes[i] = Hasher(*Texture);
 			VerticesCounts[i] = Vertices.size();
 			IndicesCounts[i] = Indices.size();
 
