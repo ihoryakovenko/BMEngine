@@ -9,7 +9,6 @@
 
 #include "ResourceManager.h"
 #include "Engine/Scene.h"
-#include "Engine/Assets.h"
 
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -241,26 +240,31 @@ namespace StaticMeshSystem
 
 		LoadModel("./Resources/Models/uh60.obj", glm::mat4(1.0f));
 
-		Assets::Model3D Uh60Model = Assets::LoadModel3D(".\\Resources\\Assets\\Models\\uh60.model");
+		Util::Model3DData ModelData = Util::LoadModel3DData(".\\Resources\\Models\\uh60.model");
+		Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
 
-		Render::LoadVertices(Uh60Model.VertexData, sizeof(StaticMeshVertex), Uh60Model.Header.VerticesCount);
-		Render::LoadIndices(Uh60Model.IndexData, Uh60Model.Header.IndicesCount);
-
-		for (u32 i = 0; i < Uh60Model.Header.MeshCount; i++)
+		u64 ModelVertexByteOffset = 0;
+		u32 ModelIndexCountOffset = 0;
+		for (u32 i = 0; i < Uh60Model.MeshCount; i++)
 		{
+			const u64 VerticesCount = Uh60Model.VerticesCounts[i];
+			const u32 IndicesCount = Uh60Model.IndicesCounts[i];
+
 			Render::DrawEntity En;
-			En.VertexOffset = Uh60Model.VertexOffsets[i];
-			En.IndexOffset = Uh60Model.IndexOffsets[i];
-			// This reads the last index offset + 1, need handle after the loop
+			En.VertexOffset = Render::LoadVertices(Uh60Model.VertexData + ModelVertexByteOffset, sizeof(StaticMeshVertex), VerticesCount);
+			En.IndexOffset = Render::LoadIndices(Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount);
 			En.IndicesCount = Uh60Model.IndicesCounts[i];
 			En.TextureSet = TestMaterial;
 			En.Model = glm::mat4(1.0f);
 
 			DrawEntities.push_back(En);
+
+			ModelVertexByteOffset += VerticesCount * sizeof(StaticMeshVertex);
+			ModelIndexCountOffset += IndicesCount;
 		}
 
 
-		Assets::DestroyModel3D(&Uh60Model);
+		Util::ClearModel3DData(ModelData);
 
 		{
 			glm::vec3 CubePos(0.0f, -5.0f, 0.0f);

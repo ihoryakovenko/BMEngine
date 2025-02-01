@@ -63,4 +63,31 @@ namespace Util
 #else
 	static bool EnableValidationLayers = true;
 #endif
+
+	typedef u8* Model3DData;
+
+	struct Model3DFileHeader
+	{
+		u64 VerticesCount;
+		u32 MeshCount;
+		u32 IndicesCount;
+	};
+
+	struct Model3D
+	{
+		u8* VertexData;
+		u64* VerticesCounts;
+		u32* IndexData;
+		u32* IndicesCounts;
+		u64* DiffuseTexturesHashes;
+		u32 MeshCount;
+	};
+
+	void ObjToModel3D(const char* FilePath, const char* OutputPath);
+
+	Model3DData LoadModel3DData(const char* FilePath);
+	void ClearModel3DData(Model3DData Data);
+
+	Model3D ParseModel3D(Model3DData Data);
+
 }

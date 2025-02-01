@@ -2,6 +2,45 @@
 
 #include "EngineTypes.h"
 
+#include "Memory/MemoryManagmentSystem.h"
+
+#include "Engine/Systems/StaticMeshSystem.h"
+
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
+
+#include <unordered_map>
+
+#include <Windows.h>
+#include <shlwapi.h>
+
+struct VertexEqual
+{
+	bool operator()(const StaticMeshSystem::StaticMeshVertex& lhs, const StaticMeshSystem::StaticMeshVertex& rhs) const
+	{
+		return lhs.Position == rhs.Position && lhs.TextureCoords == rhs.TextureCoords;
+	}
+};
+
+template<> struct std::hash<StaticMeshSystem::StaticMeshVertex>
+{
+	size_t operator()(StaticMeshSystem::StaticMeshVertex const& vertex) const
+	{
+		size_t hashPosition = std::hash<glm::vec3>()(vertex.Position);
+		size_t hashTextureCoords = std::hash<glm::vec2>()(vertex.TextureCoords);
+		size_t hashNormal = std::hash<glm::vec3>()(vertex.Normal);
+
+		size_t combinedHash = hashPosition;
+		combinedHash ^= (hashTextureCoords << 1);
+		combinedHash ^= (hashNormal << 1);
+
+		return combinedHash;
+	}
+};
+
 namespace Util
 {
 	bool ReadFileFull(FILE* File, std::vector<char>& OutFileData)
@@ -83,5 +122,181 @@ namespace Util
 		Settings.DepthCompareOp = (VkCompareOp)GetPrivateProfileIntA("Pipeline", "DepthCompareOp", VK_COMPARE_OP_LESS, FilePath);
 		Settings.DepthBoundsTestEnable = GetPrivateProfileIntA("Pipeline", "DepthBoundsTestEnable", 0, FilePath);
 		Settings.StencilTestEnable = GetPrivateProfileIntA("Pipeline", "StencilTestEnable", 0, FilePath);
+	}
+
+	void ObjToModel3D(const char* FilePath, const char* OutputPath)
+	{
+		char BaseDir[MAX_PATH];
+		strcpy(BaseDir, FilePath);
+		PathRemoveFileSpecA(BaseDir);
+
+		char NewAssetPath[MAX_PATH];
+		strcpy(NewAssetPath, OutputPath);
+		strcat(NewAssetPath, PathFindFileNameA(FilePath));
+		PathRemoveExtensionA(NewAssetPath);
+		strcat(NewAssetPath, ".model");
+
+		tinyobj::attrib_t Attrib;
+		std::vector<tinyobj::shape_t> Shapes;
+		std::vector<tinyobj::material_t> Materials;
+		std::string Warn, Err;
+
+		if (!tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &Warn, &Err, FilePath, BaseDir))
+		{
+			assert(false);
+		}
+
+		u64* VerticesCounts = Memory::BmMemoryManagementSystem::Allocate<u64>(Shapes.size());
+		u32* IndicesCounts = Memory::BmMemoryManagementSystem::Allocate<u32>(Shapes.size());
+
+		std::unordered_map<StaticMeshSystem::StaticMeshVertex, u32,
+			std::hash<StaticMeshSystem::StaticMeshVertex>, VertexEqual> uniqueVertices{ };
+
+		std::hash<std::string> Hasher;
+
+		std::vector<u64> TextureHashes(Shapes.size());
+		std::vector<StaticMeshSystem::StaticMeshVertex> AllVertices;
+		std::vector<u32> AllIndices;
+
+		std::vector<StaticMeshSystem::StaticMeshVertex> Vertices;
+		std::vector<u32> Indices;
+
+		for (u32 i = 0; i < Shapes.size(); i++)
+		{
+			Vertices.clear();
+			Indices.clear();
+
+			const tinyobj::shape_t* Shape = Shapes.data() + i;
+
+			for (u32 j = 0; j < Shape->mesh.indices.size(); j++)
+			{
+				tinyobj::index_t Index = Shape->mesh.indices[j];
+
+				StaticMeshSystem::StaticMeshVertex vertex = { };
+
+				vertex.Position =
+				{
+					Attrib.vertices[3 * Index.vertex_index + 0],
+					Attrib.vertices[3 * Index.vertex_index + 1],
+					Attrib.vertices[3 * Index.vertex_index + 2]
+				};
+
+				vertex.TextureCoords =
+				{
+					Attrib.texcoords[2 * Index.texcoord_index + 0],
+					Attrib.texcoords[2 * Index.texcoord_index + 1]
+				};
+
+				if (Index.normal_index >= 0)
+				{
+					vertex.Normal =
+					{
+						Attrib.normals[3 * Index.normal_index + 0],
+						Attrib.normals[3 * Index.normal_index + 1],
+						Attrib.normals[3 * Index.normal_index + 2]
+					};
+				}
+
+				if (!uniqueVertices.count(vertex))
+				{
+					uniqueVertices[vertex] = static_cast<u32>(Vertices.size());
+					Vertices.push_back(vertex);
+				}
+
+				Indices.push_back(uniqueVertices[vertex]);
+			}
+
+			TextureHashes[i] = Hasher(Materials[Shape->mesh.material_ids[0]].diffuse_texname);
+			VerticesCounts[i] = Vertices.size();
+			IndicesCounts[i] = Indices.size();
+
+			AllVertices.insert(AllVertices.end(), Vertices.begin(), Vertices.end());
+			AllIndices.insert(AllIndices.end(), Indices.begin(), Indices.end());
+		}
+
+		HANDLE hFile = CreateFileA(NewAssetPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+		if (hFile == INVALID_HANDLE_VALUE)
+		{
+			assert(false);
+			return;
+		}
+
+		DWORD BytesWritten;
+		BOOL Result = 1;
+
+		Model3DFileHeader Header;
+		Header.MeshCount = Shapes.size();
+		Header.VerticesCount = AllVertices.size();
+		Header.IndicesCount = AllIndices.size();
+
+		Result &= WriteFile(hFile, &Header, sizeof(Header), &BytesWritten, NULL);
+		Result &= WriteFile(hFile, AllVertices.data(), Header.VerticesCount * sizeof(AllVertices[0]), &BytesWritten, NULL);
+		Result &= WriteFile(hFile, VerticesCounts, Header.MeshCount * sizeof(VerticesCounts[0]), &BytesWritten, NULL);
+		Result &= WriteFile(hFile, AllIndices.data(), Header.IndicesCount * sizeof(AllIndices[0]), &BytesWritten, NULL);
+		Result &= WriteFile(hFile, IndicesCounts, Header.MeshCount * sizeof(IndicesCounts[0]), &BytesWritten, NULL);
+		Result &= WriteFile(hFile, TextureHashes.data(), Header.MeshCount * sizeof(TextureHashes[0]), &BytesWritten, NULL);
+
+		CloseHandle(hFile);
+
+		Memory::BmMemoryManagementSystem::Free(VerticesCounts);
+		Memory::BmMemoryManagementSystem::Free(IndicesCounts);
+
+		assert(Result);
+	}
+
+	Model3DData LoadModel3DData(const char* FilePath)
+	{
+		HANDLE hFile = CreateFileA(FilePath, GENERIC_READ, FILE_SHARE_READ, NULL,
+			OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+		if (hFile == INVALID_HANDLE_VALUE)
+		{
+			assert(false);
+		}
+
+		LARGE_INTEGER FileSize;
+		if (!GetFileSizeEx(hFile, &FileSize))
+		{
+			assert(false);
+		}
+
+		Model3DData Data = Memory::BmMemoryManagementSystem::Allocate<u8>(FileSize.QuadPart);
+
+		DWORD BytesRead;
+		BOOL Result = ReadFile(hFile, Data, FileSize.QuadPart, &BytesRead, NULL);
+		assert(Result);
+
+		return Data;
+	}
+
+	void ClearModel3DData(Model3DData Data)
+	{
+		Memory::BmMemoryManagementSystem::Free(Data);
+	}
+
+	Model3D ParseModel3D(Model3DData Data)
+	{
+		Model3DFileHeader* Header = (Model3DFileHeader*)Data;
+		Data += sizeof(Model3DFileHeader);
+
+		Model3D Model;
+		Model.MeshCount = Header->MeshCount;
+
+		Model.VertexData = Data;
+		Data += Header->VerticesCount * sizeof(StaticMeshSystem::StaticMeshVertex);
+
+		Model.VerticesCounts = (u64*)Data;
+		Data += Header->MeshCount * sizeof(u64);
+
+		Model.IndexData = (u32*)Data;
+		Data += Header->IndicesCount * sizeof(u32);
+
+		Model.IndicesCounts = (u32*)Data;
+		Data += Header->MeshCount * sizeof(u32);
+
+		Model.DiffuseTexturesHashes = (u64*)Data;
+
+		return Model;
 	}
 }
