@@ -23,8 +23,8 @@ namespace TerrainSystem
 	static TerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
 	static u32 IndicesCount;
 
-	static u64 VertexOffset;
-	static u64 IndexOffset;
+	static VulkanInterface::IndexBuffer IndexBuffer;
+	static VulkanInterface::VertexBuffer VertexBuffer;
 	static VulkanInterface::RenderPipeline Pipeline;
 	static VkDescriptorSet TextureSet;
 	static VkDescriptorSetLayout SamplerLayout;
@@ -111,11 +111,17 @@ namespace TerrainSystem
 		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, VertexInputBinding, VertexInputCount,
 			&PipelineSettings, &ResourceInfo);
 
+		// TODO: Load data on creation
+		IndexBuffer = VulkanInterface::CreateIndexBuffer(MB64);
+		VertexBuffer = VulkanInterface::CreateVertexBuffer(MB64);
+
 		LoadTerrain();
 	}
 
 	void DeInit()
 	{
+		VulkanInterface::DestroyUniformBuffer(VertexBuffer);
+		VulkanInterface::DestroyUniformBuffer(IndexBuffer);
 		VulkanInterface::DestroySampler(Sampler);
 		VulkanInterface::DestroyUniformLayout(SamplerLayout);
 		VulkanInterface::DestroyPipelineLayout(Pipeline.PipelineLayout);
@@ -129,14 +135,19 @@ namespace TerrainSystem
 			TextureSet
 		};
 
+		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+
 		const u32 TerrainDescriptorSetGroupCount = sizeof(Sets) / sizeof(Sets[0]);
 		const u32 DynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(FrameManager::ViewProjectionBuffer);
 
-		Render::BindPipeline(Pipeline.Pipeline);
-		Render::BindDescriptorSet(Sets, TerrainDescriptorSetGroupCount, Pipeline.PipelineLayout, 0, &DynamicOffset, 1);
-		Render::BindVertexBuffer(VertexOffset);
-		Render::BindIndexBuffer(IndexOffset);
-		Render::DrawIndexed(IndicesCount);
+		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
+		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
+			0, TerrainDescriptorSetGroupCount, Sets, 1, &DynamicOffset);
+
+		const u64 VertexOffset = 0;
+		vkCmdBindVertexBuffers(CmdBuffer, 0, 1, &VertexBuffer.Buffer, &VertexOffset);
+		vkCmdBindIndexBuffer(CmdBuffer, IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(CmdBuffer, IndicesCount, 1, 0, 0, 0);
 	}
 
 	void LoadTerrain()
@@ -146,8 +157,8 @@ namespace TerrainSystem
 
 		IndicesCount = TerrainIndices.size();
 
-		VertexOffset = Render::LoadVertices(&TerrainVerticesData[0][0], sizeof(TerrainVertex), NumRows * NumCols);
-		IndexOffset = Render::LoadIndices(TerrainIndices.data(), IndicesCount);
+		Render::LoadVertices(&VertexBuffer, &TerrainVerticesData[0][0], sizeof(TerrainVertex), NumRows * NumCols, 0);
+		Render::LoadIndices(&IndexBuffer, TerrainIndices.data(), IndicesCount, 0);
 	}
 
 	void GenerateTerrain(std::vector<u32>& Indices)

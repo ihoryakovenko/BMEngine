@@ -121,6 +121,7 @@ namespace VulkanInterface
 		VkBuffer Buffer;
 		VkDeviceMemory Memory;
 		u64 Size; // Size could be aligned
+		u64 Offset;
 	};
 
 	struct UniformImage
@@ -278,4 +279,18 @@ namespace VulkanInterface
 	IndexBuffer CreateIndexBuffer(u64 Size);
 
 	VkPhysicalDeviceProperties* GetDeviceProperties();
+
+
+
+
+
+
+
+
+
+
+
+
+
+	VkCommandBuffer GetCommandBuffer();
 }

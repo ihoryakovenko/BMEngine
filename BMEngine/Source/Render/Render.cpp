@@ -122,64 +122,6 @@ namespace Render
 			Data);
 	}
 
-	void BindNextSubpass()
-	{
-		vkCmdNextSubpass(TestCurrentFrameCommandBuffer, VK_SUBPASS_CONTENTS_INLINE);
-	}
-
-	void BindPipeline(VkPipeline RenderPipeline)
-	{
-		vkCmdBindPipeline(TestCurrentFrameCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, RenderPipeline);
-	}
-
-	void BindDescriptorSet(const VkDescriptorSet* Sets, u32 DescriptorsCount,
-		VkPipelineLayout PipelineLayout, u32 FirstSet, const u32* DynamicOffset, u32 DynamicOffsetsCount)
-	{
-		vkCmdBindDescriptorSets(TestCurrentFrameCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-			FirstSet, DescriptorsCount, Sets, DynamicOffsetsCount, DynamicOffset);
-	}
-
-	void BindVertexBuffer(VulkanInterface::VertexBuffer VertexBuffer, u64 Offset)
-	{
-		vkCmdBindVertexBuffers(TestCurrentFrameCommandBuffer, 0, 1, &(VertexBuffer.Buffer), &Offset);
-	}
-
-	void BindIndexBuffer(VulkanInterface::IndexBuffer IndexBuffer, u64 Offset)
-	{
-		vkCmdBindIndexBuffer(TestCurrentFrameCommandBuffer, IndexBuffer.Buffer, Offset, VK_INDEX_TYPE_UINT32);
-	}
-
-	void BindVertexBuffer(u64 Offset)
-	{
-		Render::BindVertexBuffer(PassSharedResources.VertexBuffer, Offset);
-	}
-
-	void BindIndexBuffer(u64 Offset)
-	{
-		Render::BindIndexBuffer(PassSharedResources.IndexBuffer, Offset);
-	}
-
-	void BindPushConstants(VkPipelineLayout PipelineLayout, VkShaderStageFlags StageFlags,
-		u32 Size, const void* Data)
-	{
-		vkCmdPushConstants(TestCurrentFrameCommandBuffer, PipelineLayout, StageFlags, 0, Size, Data);
-	}
-
-	void DrawIndexed(u32 IndexCount)
-	{
-		vkCmdDrawIndexed(TestCurrentFrameCommandBuffer, IndexCount, 1, 0, 0, 0);
-	}
-
-	void Draw(u32 VertexCount, u32 InstanceCount)
-	{
-		vkCmdDraw(TestCurrentFrameCommandBuffer, 3, 1, 0, 0);
-	}
-
-	void EndRenderPass()
-	{
-		vkCmdEndRenderPass(TestCurrentFrameCommandBuffer);
-	}
-
 	RenderTexture CreateTexture(TextureArrayInfo* Info)
 	{
 		VkImageCreateInfo ImageCreateInfo;
@@ -313,57 +255,28 @@ namespace Render
 		VulkanInterface::DestroyUniformImage(Texture->UniformData);
 	}
 
-	u64 LoadVertices(const void* Vertices, u32 VertexSize, u64 VerticesCount)
+	void LoadIndices(VulkanInterface::IndexBuffer* IndexBuffer, const u32* Indices, u32 IndicesCount, u64 Offset)
 	{
+		assert(Indices);
+		assert(IndexBuffer);
+
+		VkDeviceSize MeshIndicesSize = sizeof(u32) * IndicesCount;
+		const VkDeviceSize AlignedSize = CalculateBufferAlignedSize(MeshIndicesSize);
+
+		VulkanInterface::CopyDataToBuffer(IndexBuffer->Buffer, Offset, MeshIndicesSize, Indices);
+		IndexBuffer->Offset += AlignedSize;
+	}
+
+	void LoadVertices(VulkanInterface::VertexBuffer* VertexBuffer, const void* Vertices, u32 VertexSize, u64 VerticesCount, u64 Offset)
+	{
+		assert(VertexBuffer);
 		assert(Vertices);
 
 		const VkDeviceSize MeshVerticesSize = VertexSize * VerticesCount;
 		const VkDeviceSize AlignedSize = CalculateBufferAlignedSize(MeshVerticesSize);
 
-		VulkanInterface::CopyDataToBuffer(PassSharedResources.VertexBuffer.Buffer, PassSharedResources.VertexBufferOffset, MeshVerticesSize, Vertices);
-
-		const VkDeviceSize CurrentOffset = PassSharedResources.VertexBufferOffset;
-		PassSharedResources.VertexBufferOffset += AlignedSize;
-
-		return CurrentOffset;
-	}
-
-	u64 LoadIndices(const u32* Indices, u32 IndicesCount)
-	{
-		assert(Indices);
-
-		VkDeviceSize MeshIndicesSize = sizeof(u32) * IndicesCount;
-		const VkDeviceSize AlignedSize = CalculateBufferAlignedSize(MeshIndicesSize);
-
-		VulkanInterface::CopyDataToBuffer(PassSharedResources.IndexBuffer.Buffer, PassSharedResources.IndexBufferOffset, MeshIndicesSize, Indices);
-
-		const VkDeviceSize CurrentOffset = PassSharedResources.IndexBufferOffset;
-		PassSharedResources.IndexBufferOffset += AlignedSize;
-
-		return CurrentOffset;
-	}
-
-	void LoadIndices(VulkanInterface::IndexBuffer IndexBuffer, const u32* Indices, u32 IndicesCount, u64 Offset)
-	{
-		assert(Indices);
-
-		VkDeviceSize MeshIndicesSize = sizeof(u32) * IndicesCount;
-		const VkDeviceSize AlignedSize = CalculateBufferAlignedSize(MeshIndicesSize);
-
-		VulkanInterface::CopyDataToBuffer(IndexBuffer.Buffer, Offset, MeshIndicesSize, Indices);
-	}
-
-	void LoadVertices(VulkanInterface::VertexBuffer VertexBuffer, const void* Vertices, u32 VertexSize, u64 VerticesCount, u64 Offset)
-	{
-		const VkDeviceSize MeshVerticesSize = VertexSize * VerticesCount;
-		const VkDeviceSize AlignedSize = CalculateBufferAlignedSize(MeshVerticesSize);
-
-		VulkanInterface::CopyDataToBuffer(VertexBuffer.Buffer, Offset, MeshVerticesSize, Vertices);
-	}
-
-	void ClearIndices()
-	{
-		PassSharedResources.IndexBufferOffset = 0;
+		VulkanInterface::CopyDataToBuffer(VertexBuffer->Buffer, Offset, MeshVerticesSize, Vertices);
+		VertexBuffer->Offset += AlignedSize;
 	}
 
 	void CreatePassSharedResources()
@@ -749,11 +662,17 @@ namespace Render
 		//}
 		
 		//MainRenderPass::OnDraw();
-		Render::BindNextSubpass();
-		Render::BindPipeline(MainPass.Pipelines[1].Pipeline);
-		Render::BindDescriptorSet(&MainPass.DeferredInputSet[ImageIndex], 1, MainPass.Pipelines[1].PipelineLayout, 0, nullptr, 0);
-		Render::Draw(3, 1); // 3 hardcoded vertices for second "post processing" subpass
-		Render::EndRenderPass();
+
+		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+		vkCmdNextSubpass(CmdBuffer, VK_SUBPASS_CONTENTS_INLINE);
+		
+		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[1].Pipeline);
+
+		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MainPass.Pipelines[1].PipelineLayout,
+			0, 1, &MainPass.DeferredInputSet[ImageIndex], 0, nullptr);
+
+		vkCmdDraw(CmdBuffer, 3, 1, 0, 0); // 3 hardcoded vertices for second "post processing" subpass
+		vkCmdEndRenderPass(CmdBuffer);
 	}
 
 	void Draw(const DrawScene* Scene)

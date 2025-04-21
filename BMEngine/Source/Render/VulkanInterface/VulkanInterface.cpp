@@ -891,6 +891,7 @@ namespace VulkanInterface
 		vkBindBufferMemory(Device.LogicalDevice, UniformBuffer.Buffer, UniformBuffer.Memory, 0);
 
 		UniformBuffer.Size = MemoryRequirements.size;
+		UniformBuffer.Offset = 0;
 		return UniformBuffer;
 	}
 
@@ -2497,5 +2498,10 @@ namespace VulkanInterface
 	VkPhysicalDeviceProperties* GetDeviceProperties()
 	{
 		return &DeviceProperties;
+	}
+
+	VkCommandBuffer GetCommandBuffer()
+	{
+		return DrawCommandBuffers[CurrentImageIndex];
 	}
 }

@@ -53,6 +53,9 @@ namespace StaticMeshSystem
 	static VkDescriptorSet MaterialSet;
 	static VkDescriptorSet ShadowMapArraySet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
 
+	static VulkanInterface::IndexBuffer IndexBuffer;
+	static VulkanInterface::VertexBuffer VertexBuffer;
+
 	void Init()
 	{
 		Render::AddDrawFunction(OnDraw);
@@ -214,7 +217,8 @@ namespace StaticMeshSystem
 		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, VertexInputBinding, 1,
 			&PipelineSettings, &ResourceInfo);
 
-		
+		IndexBuffer = VulkanInterface::CreateIndexBuffer(MB64);
+		VertexBuffer = VulkanInterface::CreateVertexBuffer(MB64);
 
 
 
@@ -252,11 +256,15 @@ namespace StaticMeshSystem
 			
 			// TODO DELETE!
 			VkDescriptorSet Set;
-			AttachTextureToStaticMesh(Texture->ImageView, Texture->ImageView, &Set);
+			AttachTextureToStaticMesh(Texture->ImageView, Texture->ImageView, &Set);			
 
 			Render::DrawEntity En;
-			En.VertexOffset = Render::LoadVertices(Uh60Model.VertexData + ModelVertexByteOffset, sizeof(StaticMeshVertex), VerticesCount);
-			En.IndexOffset = Render::LoadIndices(Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount);
+			En.VertexOffset = VertexBuffer.Offset;
+			Render::LoadVertices(&VertexBuffer, Uh60Model.VertexData + ModelVertexByteOffset, sizeof(StaticMeshVertex), VerticesCount, VertexBuffer.Offset);
+
+			En.IndexOffset = IndexBuffer.Offset;
+			Render::LoadIndices(&IndexBuffer, Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, IndexBuffer.Offset);
+
 			En.IndicesCount = Uh60Model.IndicesCounts[i];
 			En.TextureSet = Set;
 			En.Model = glm::mat4(1.0f);
@@ -339,18 +347,24 @@ namespace StaticMeshSystem
 		VulkanInterface::DestroySampler(ShadowMapArraySampler);
 		VulkanInterface::DestroySampler(DiffuseSampler);
 		VulkanInterface::DestroySampler(SpecularSampler);
+
+		VulkanInterface::DestroyUniformBuffer(VertexBuffer);
+		VulkanInterface::DestroyUniformBuffer(IndexBuffer);
 	}
 
 	void OnDraw()
 	{
 		FrameManager::UpdateUniformMemory(EntityLightBufferHandle, Scene.LightEntity, sizeof(Render::LightBuffer));
 
-		Render::BindPipeline(Pipeline.Pipeline);
+		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
+		
 
 		const VkDescriptorSet VpSet = FrameManager::GetViewProjectionSet();
 
 		const u32 DynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(FrameManager::ViewProjectionBuffer);
-		Render::BindDescriptorSet(&VpSet, 1, Pipeline.PipelineLayout, 0, &DynamicOffset, 1);
+		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
+			0, 1, &VpSet, 1, &DynamicOffset);
 
 		const u32 LightDynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(Render::LightBuffer);
 
@@ -367,11 +381,15 @@ namespace StaticMeshSystem
 			};
 			const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
-			Render::BindPushConstants(Pipeline.PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(Render::BMRModel), &DrawEntity->Model);
-			Render::BindDescriptorSet(DescriptorSetGroup, DescriptorSetGroupCount, Pipeline.PipelineLayout, 1, &LightDynamicOffset, 1);
-			Render::BindVertexBuffer(DrawEntity->VertexOffset);
-			Render::BindIndexBuffer(DrawEntity->IndexOffset);
-			Render::DrawIndexed(DrawEntity->IndicesCount);
+			const VkShaderStageFlags Flags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			vkCmdPushConstants(CmdBuffer, Pipeline.PipelineLayout, Flags, 0, sizeof(Render::BMRModel), &DrawEntity->Model);
+
+			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
+				1, DescriptorSetGroupCount, DescriptorSetGroup, 1, &LightDynamicOffset);
+
+			vkCmdBindVertexBuffers(CmdBuffer, 0, 1, &VertexBuffer.Buffer, &DrawEntity->VertexOffset);
+			vkCmdBindIndexBuffer(CmdBuffer, IndexBuffer.Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(CmdBuffer, DrawEntity->IndicesCount, 1, 0, 0, 0);
 		}
 	}
 

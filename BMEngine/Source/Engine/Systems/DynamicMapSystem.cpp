@@ -216,7 +216,7 @@ namespace DynamicMapSystem
 			}
 
 			TestIndicesCount = Indices.size();
-			Render::LoadIndices(IndexBuffer, Indices.data(), Indices.size(), 0);
+			Render::LoadIndices(&IndexBuffer, Indices.data(), Indices.size(), 0);
 			MapTileSettings.VertexTilesPerAxis = VertexTilesPerAxis;
 		}
 
@@ -354,10 +354,13 @@ namespace DynamicMapSystem
 		const u32 DescriptorCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 		const u32 DynamicOffsetCount = sizeof(DynamicOffsets) / sizeof(DynamicOffsets[0]);
 
-		Render::BindPipeline(Pipeline.Pipeline);
-		Render::BindDescriptorSet(DescriptorSetGroup, DescriptorCount, Pipeline.PipelineLayout, 0, DynamicOffsets, DynamicOffsetCount);
-		Render::BindIndexBuffer(IndexBuffer, 0);
-		Render::DrawIndexed(TestIndicesCount);
+		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
+		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout, 0, DescriptorCount,
+			DescriptorSetGroup, DynamicOffsetCount, DynamicOffsets);
+
+		vkCmdBindIndexBuffer(CmdBuffer, IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(CmdBuffer, TestIndicesCount, 1, 0, 0, 0);
 	}
 
 	void DeInit()
