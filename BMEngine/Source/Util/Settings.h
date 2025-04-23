@@ -32,7 +32,6 @@ extern VulkanInterface::PipelineSettings DepthPipelineSettings;
 static const u32 MainPathPipelinesCount = 2;
 
 extern VulkanInterface::RenderPassSettings MainRenderPassSettings;
-extern VulkanInterface::RenderPassSettings DepthRenderPassSettings;
 
 static VkDescriptorType LightSpaceMatrixDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 static VkDescriptorType DeferredInputDescriptorType[2] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT };
@@ -41,7 +40,6 @@ static VkShaderStageFlags LightSpaceMatrixStageFlags = VK_SHADER_STAGE_VERTEX_BI
 static VkShaderStageFlags DeferredInputFlags[2] = { VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
 
 extern VkClearValue MainPassClearValues[3];
-extern VkClearValue DepthPassClearValues;
 
 extern VkImageCreateInfo DeferredInputDepthUniformCreateInfo;
 extern VkImageCreateInfo DeferredInputColorUniformCreateInfo;

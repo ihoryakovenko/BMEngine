@@ -181,6 +181,11 @@ namespace VulkanInterface
 
 	struct PipelineResourceInfo
 	{
+		u32 ColorAttachmentCount;
+		VkFormat* ColorAttachmentFormats;
+		VkFormat DepthAttachmentFormat;
+		VkFormat StencilAttachmentFormat;
+
 		VkRenderPass RenderPass = nullptr;
 		u32 SubpassIndex = -1;
 

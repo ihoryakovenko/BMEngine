@@ -407,6 +407,14 @@ namespace VulkanInterface
 			// CREATE INFO
 			const PipelineResourceInfo* ResourceInfo = ResourceInfos + PipelineIndex;
 
+			VkPipelineRenderingCreateInfo RenderingInfo = { };
+			RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+			RenderingInfo.pNext = nullptr;
+			RenderingInfo.colorAttachmentCount = ResourceInfo->ColorAttachmentCount;
+			RenderingInfo.pColorAttachmentFormats = ResourceInfo->ColorAttachmentFormats;
+			RenderingInfo.depthAttachmentFormat = ResourceInfo->DepthAttachmentFormat;
+			RenderingInfo.stencilAttachmentFormat = ResourceInfo->DepthAttachmentFormat;
+
 			VkGraphicsPipelineCreateInfo* PipelineCreateInfo = PipelineCreateInfos + PipelineIndex;
 			PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 			PipelineCreateInfo->stageCount = ShaderInputs[PipelineIndex].InfosCounter;
@@ -422,6 +430,11 @@ namespace VulkanInterface
 			PipelineCreateInfo->layout = ResourceInfo->PipelineLayout;
 			PipelineCreateInfo->renderPass = ResourceInfo->RenderPass;
 			PipelineCreateInfo->subpass = ResourceInfo->SubpassIndex;
+
+			if (PipelineCreateInfo->renderPass == nullptr)
+			{
+				PipelineCreateInfo->pNext = &RenderingInfo;
+			}
 
 			// Pipeline Derivatives : Can create multiple pipelines that derive from one another for optimisation
 			PipelineCreateInfo->basePipelineHandle = VK_NULL_HANDLE;
@@ -609,6 +622,14 @@ namespace VulkanInterface
 		DepthStencilInfo->depthBoundsTestEnable = Settings->DepthBoundsTestEnable;
 		DepthStencilInfo->stencilTestEnable = Settings->StencilTestEnable;
 
+		VkPipelineRenderingCreateInfo RenderingInfo = { };
+		RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+		RenderingInfo.pNext = nullptr;
+		RenderingInfo.colorAttachmentCount = ResourceInfo->ColorAttachmentCount;
+		RenderingInfo.pColorAttachmentFormats = ResourceInfo->ColorAttachmentFormats;
+		RenderingInfo.depthAttachmentFormat = ResourceInfo->DepthAttachmentFormat;
+		RenderingInfo.stencilAttachmentFormat = ResourceInfo->DepthAttachmentFormat;
+
 		// CREATE INFO
 		auto PipelineCreateInfo = Memory::BmMemoryManagementSystem::FrameAlloc<VkGraphicsPipelineCreateInfo>();
 		PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -625,6 +646,11 @@ namespace VulkanInterface
 		PipelineCreateInfo->layout = ResourceInfo->PipelineLayout;
 		PipelineCreateInfo->renderPass = ResourceInfo->RenderPass;
 		PipelineCreateInfo->subpass = ResourceInfo->SubpassIndex;
+
+		if (PipelineCreateInfo->renderPass == nullptr)
+		{
+			PipelineCreateInfo->pNext = &RenderingInfo;
+		}
 
 		// Pipeline Derivatives : Can create multiple pipelines that derive from one another for optimisation
 		PipelineCreateInfo->basePipelineHandle = VK_NULL_HANDLE;
@@ -1891,7 +1917,8 @@ namespace VulkanInterface
 	{
 		const char* DeviceExtensions[] =
 		{
-			VK_KHR_SWAPCHAIN_EXTENSION_NAME
+			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+			VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME
 		};
 
 		const u32 DeviceExtensionsSize = sizeof(DeviceExtensions) / sizeof(DeviceExtensions[0]);
@@ -1963,6 +1990,18 @@ namespace VulkanInterface
 		DeviceFeatures.samplerAnisotropy = VK_TRUE; // Todo: get from configs
 		DeviceFeatures.multiViewport = VK_TRUE; // Todo: get from configs
 
+		// TODO: Check if supported
+		VkPhysicalDeviceDynamicRenderingFeatures DynamicRenderingFeatures = { };
+		DynamicRenderingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+		DynamicRenderingFeatures.dynamicRendering = VK_TRUE;
+
+		// TODO: Check if supported
+		VkPhysicalDeviceSynchronization2Features Sync2Features = { };
+		Sync2Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
+		Sync2Features.synchronization2 = VK_TRUE;
+
+		DynamicRenderingFeatures.pNext = &Sync2Features;
+
 		VkDeviceCreateInfo DeviceCreateInfo = { };
 		DeviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		DeviceCreateInfo.queueCreateInfoCount = FamilyIndicesSize;
@@ -1970,6 +2009,7 @@ namespace VulkanInterface
 		DeviceCreateInfo.enabledExtensionCount = DeviceExtensionsSize;
 		DeviceCreateInfo.ppEnabledExtensionNames = DeviceExtensions;
 		DeviceCreateInfo.pEnabledFeatures = &DeviceFeatures;
+		DeviceCreateInfo.pNext = &DynamicRenderingFeatures;
 
 		VkDevice LogicalDevice;
 		// Queues are created at the same time as the Device

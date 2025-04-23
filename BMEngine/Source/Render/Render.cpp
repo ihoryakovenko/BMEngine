@@ -329,21 +329,6 @@ namespace Render
 
 			VulkanInterface::AttachUniformsToSet(DepthPass.LightSpaceMatrixSet[i], &LightSpaceMatrixAttachmentInfo, 1);
 		}
-
-		VulkanInterface::RenderTarget RenderTargets[2];
-		for (u32 ImageIndex = 0; ImageIndex < VulkanInterface::GetImageCount(); ImageIndex++)
-		{
-			VulkanInterface::AttachmentView* Target1AttachmentView = RenderTargets[0].AttachmentViews + ImageIndex;
-			VulkanInterface::AttachmentView* Target2AttachmentView = RenderTargets[1].AttachmentViews + ImageIndex;
-
-			Target1AttachmentView->ImageViews = Memory::BmMemoryManagementSystem::FrameAlloc<VkImageView>(DepthRenderPassSettings.AttachmentDescriptionsCount);
-			Target2AttachmentView->ImageViews = Memory::BmMemoryManagementSystem::FrameAlloc<VkImageView>(DepthRenderPassSettings.AttachmentDescriptionsCount);
-
-			Target1AttachmentView->ImageViews[0] = DepthPass.ShadowMapElement1ImageInterface[ImageIndex];
-			Target2AttachmentView->ImageViews[0] = DepthPass.ShadowMapElement2ImageInterface[ImageIndex];
-		}
-
-		VulkanInterface::CreateRenderPass(&DepthRenderPassSettings, RenderTargets, DepthViewportExtent, 2, VulkanInterface::GetImageCount(), &DepthPass.RenderPass);
 	
 		DepthPass.Pipeline.PipelineLayout = VulkanInterface::CreatePipelineLayout(&DepthPass.LightSpaceMatrixLayout, 1,
 			&PassSharedResources.PushConstants, 1);
@@ -363,8 +348,13 @@ namespace Render
 
 		VulkanInterface::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = DepthPass.Pipeline.PipelineLayout;
-		ResourceInfo.RenderPass = DepthPass.RenderPass.Pass;
+		ResourceInfo.RenderPass = nullptr;
 		ResourceInfo.SubpassIndex = 0;
+
+		ResourceInfo.ColorAttachmentCount = 0;
+		ResourceInfo.ColorAttachmentFormats = nullptr;
+		ResourceInfo.DepthAttachmentFormat = DepthFormat;
+		ResourceInfo.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
 		VulkanInterface::CreatePipelines(&ShaderInfo, &DepthVertexInput, &DepthPipelineSettings, &ResourceInfo, 1, &DepthPass.Pipeline.Pipeline);
 		VulkanInterface::DestroyShader(Info.module);
@@ -592,7 +582,48 @@ namespace Render
 			VkRect2D RenderArea;
 			RenderArea.extent = DepthViewportExtent;
 			RenderArea.offset = { 0, 0 };
-			VulkanInterface::BeginRenderPass(&DepthPass.RenderPass, RenderArea, LightCaster, ImageIndex);
+
+			VkRenderingAttachmentInfo DepthAttachment{ };
+			DepthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+			DepthAttachment.imageView = DepthPass.ShadowMapElement1ImageInterface[VulkanInterface::TestGetImageIndex()];
+			DepthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+			DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			DepthAttachment.clearValue.depthStencil.depth = 1.0f;
+
+			VkRenderingInfo RenderingInfo{ };
+			RenderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+			RenderingInfo.renderArea = RenderArea;
+			RenderingInfo.layerCount = 1;
+			RenderingInfo.colorAttachmentCount = 0;
+			RenderingInfo.pColorAttachments = nullptr;
+			RenderingInfo.pDepthAttachment = &DepthAttachment;
+
+			VkImageMemoryBarrier2 DepthAttachmentTransitionBefore = { };
+			DepthAttachmentTransitionBefore.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+			DepthAttachmentTransitionBefore.srcStageMask = VK_PIPELINE_STAGE_2_NONE; // because we're coming from UNDEFINED
+			DepthAttachmentTransitionBefore.srcAccessMask = 0;
+			DepthAttachmentTransitionBefore.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+			DepthAttachmentTransitionBefore.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			DepthAttachmentTransitionBefore.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			DepthAttachmentTransitionBefore.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			DepthAttachmentTransitionBefore.image = PassSharedResources.ShadowMapArray[VulkanInterface::TestGetImageIndex()].Image;
+			DepthAttachmentTransitionBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+			DepthAttachmentTransitionBefore.subresourceRange.baseMipLevel = 0;
+			DepthAttachmentTransitionBefore.subresourceRange.levelCount = 1;
+			DepthAttachmentTransitionBefore.subresourceRange.baseArrayLayer = LightCaster;
+			DepthAttachmentTransitionBefore.subresourceRange.layerCount = 1;		
+
+			VkDependencyInfo DependencyInfoBefore = { };
+			DependencyInfoBefore.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+			DependencyInfoBefore.imageMemoryBarrierCount = 1;
+			DependencyInfoBefore.pImageMemoryBarriers = &DepthAttachmentTransitionBefore,
+
+			vkCmdPipelineBarrier2(CommandBuffer, &DependencyInfoBefore);
+
+			vkCmdBeginRendering(CommandBuffer, &RenderingInfo);
+
+			//VulkanInterface::BeginRenderPass(&DepthPass.RenderPass, RenderArea, LightCaster, ImageIndex);
 
 			vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, DepthPass.Pipeline.Pipeline);
 
@@ -622,7 +653,31 @@ namespace Render
 				vkCmdDrawIndexed(CommandBuffer, DrawEntity->IndicesCount, 1, 0, 0, 0);
 			}
 
-			vkCmdEndRenderPass(CommandBuffer);
+			//vkCmdEndRenderPass(CommandBuffer);
+			vkCmdEndRendering(CommandBuffer);
+
+			// TODO: move to Main pass?
+			VkImageMemoryBarrier2 DepthAttachmentTransitionAfter = { };
+			DepthAttachmentTransitionAfter.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+			DepthAttachmentTransitionAfter.srcStageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+			DepthAttachmentTransitionAfter.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			DepthAttachmentTransitionAfter.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+			DepthAttachmentTransitionAfter.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+			DepthAttachmentTransitionAfter.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			DepthAttachmentTransitionAfter.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			DepthAttachmentTransitionAfter.image = PassSharedResources.ShadowMapArray[VulkanInterface::TestGetImageIndex()].Image;
+			DepthAttachmentTransitionAfter.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+			DepthAttachmentTransitionAfter.subresourceRange.baseMipLevel = 0;
+			DepthAttachmentTransitionAfter.subresourceRange.levelCount = 1;
+			DepthAttachmentTransitionAfter.subresourceRange.baseArrayLayer = LightCaster;
+			DepthAttachmentTransitionAfter.subresourceRange.layerCount = 1;
+
+			VkDependencyInfo DependencyInfoAfter = { };
+			DependencyInfoAfter.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+			DependencyInfoAfter.imageMemoryBarrierCount = 1;
+			DependencyInfoAfter.pImageMemoryBarriers = &DepthAttachmentTransitionAfter;
+
+			vkCmdPipelineBarrier2(CommandBuffer, &DependencyInfoAfter);
 		}
 	}
 

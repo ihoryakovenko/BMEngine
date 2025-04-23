@@ -15,7 +15,6 @@ VulkanInterface::PipelineSettings SkyBoxPipelineSettings;
 VulkanInterface::PipelineSettings DepthPipelineSettings;
 
 VulkanInterface::RenderPassSettings MainRenderPassSettings;
-VulkanInterface::RenderPassSettings DepthRenderPassSettings;
 
 VkImageCreateInfo DeferredInputDepthUniformCreateInfo;
 VkImageCreateInfo DeferredInputColorUniformCreateInfo;
@@ -57,14 +56,6 @@ static const u32 ExitDependenciesIndex = SubpassIndex::Count;
 static const u32 MainPassSubpassDependenciesCount = SubpassIndex::Count + 1;
 static VkSubpassDependency MainPassSubpassDependencies[MainPassSubpassDependenciesCount];
 static VulkanInterface::SubpassSettings MainRenderPassSubpasses[Count];
-
-static const u32 DepthPassAttachmentDescriptionsCount = 1;
-static VkAttachmentDescription DepthPassAttachmentDescriptions[DepthPassAttachmentDescriptionsCount];
-static VkAttachmentReference DepthSubpassDepthAttachmentReference = { };
-static VulkanInterface::SubpassSettings DepthSubpasses[Subpasses_Count];
-static const u32 DepthPassExitDependenciesIndex = Subpasses::Subpasses_Count;
-static const u32 DepthPassSubpassDependenciesCount = Subpasses::Subpasses_Count + 1;
-static VkSubpassDependency DepthPassSubpassDependencies[DepthPassSubpassDependenciesCount];
 
 static const char DeferredPipelineName[] = "Deferred";
 static const char SkyBoxPipelineName[] = "SkyBox";
@@ -259,58 +250,6 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	MainRenderPassSettings.ClearValues = MainPassClearValues;
 	MainRenderPassSettings.ClearValuesCount = 3;
 
-	// DEPTH RENDERPASS
-	DepthPassClearValues.depthStencil.depth = 1.0f;
-
-	const u32 DepthSubpassAttachmentIndex = 0;
-
-	DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex] = { };
-	DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex].format = DepthFormat;
-	DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
-	DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	DepthPassAttachmentDescriptions[DepthSubpassAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-	DepthSubpassDepthAttachmentReference.attachment = DepthSubpassAttachmentIndex;
-	DepthSubpassDepthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-	// Subpass dependencies
-	// Transition must happen after...
-	DepthPassSubpassDependencies[Subpasses::Depth].srcSubpass = VK_SUBPASS_EXTERNAL;
-	DepthPassSubpassDependencies[Subpasses::Depth].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-	DepthPassSubpassDependencies[Subpasses::Depth].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-	// But must happen before...
-	DepthPassSubpassDependencies[Subpasses::Depth].dstSubpass = Subpasses::Depth;
-	DepthPassSubpassDependencies[Subpasses::Depth].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	DepthPassSubpassDependencies[Subpasses::Depth].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-	DepthPassSubpassDependencies[Subpasses::Depth].dependencyFlags = 0;
-
-	// Conversion from VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-	// Transition must happen after...
-	DepthPassSubpassDependencies[DepthPassExitDependenciesIndex].srcSubpass = Subpasses::Depth;
-	DepthPassSubpassDependencies[DepthPassExitDependenciesIndex].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	DepthPassSubpassDependencies[DepthPassExitDependenciesIndex].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	// But must happen before...
-	DepthPassSubpassDependencies[DepthPassExitDependenciesIndex].dstSubpass = VK_SUBPASS_EXTERNAL;
-	DepthPassSubpassDependencies[DepthPassExitDependenciesIndex].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-	DepthPassSubpassDependencies[DepthPassExitDependenciesIndex].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-	DepthPassSubpassDependencies[DepthPassExitDependenciesIndex].dependencyFlags = 0;
-
-	DepthSubpasses[Depth].DepthAttachmentReferences = &DepthSubpassDepthAttachmentReference;
-	DepthSubpasses[Depth].SubpassName = DepthSubpassName;
-
-	DepthRenderPassSettings.AttachmentDescriptions = DepthPassAttachmentDescriptions;
-	DepthRenderPassSettings.AttachmentDescriptionsCount = DepthPassAttachmentDescriptionsCount;
-	DepthRenderPassSettings.SubpassesSettings = DepthSubpasses;
-	DepthRenderPassSettings.SubpassSettingsCount = Subpasses_Count;
-	DepthRenderPassSettings.RenderPassName = DepthRenderPassName;
-	DepthRenderPassSettings.SubpassDependencies = DepthPassSubpassDependencies;
-	DepthRenderPassSettings.SubpassDependenciesCount = DepthPassSubpassDependenciesCount;
-	DepthRenderPassSettings.ClearValues = &DepthPassClearValues;
-	DepthRenderPassSettings.ClearValuesCount = 1;
 
 	// Dynamic states TODO
 // Use vkCmdSetViewport(Commandbuffer, 0, 1, &Viewport) and vkCmdSetScissor(Commandbuffer, 0, 1, &Scissor)
