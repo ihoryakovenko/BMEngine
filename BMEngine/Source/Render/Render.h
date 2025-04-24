@@ -6,6 +6,7 @@
 #include "VulkanInterface/VulkanInterface.h"
 
 #include "Util/EngineTypes.h"
+#include "Engine/Systems/Render/RenderResourceManger.h"
 
 namespace Render
 {
@@ -23,30 +24,6 @@ namespace Render
 		VkImageViewType ViewType;
 		VkImageCreateFlags Flags;
 		u32 BaseArrayLayer = 0;
-	};
-
-	struct DrawEntity
-	{
-		u64 VertexOffset = 0;
-		u64 IndexOffset = 0;
-		u32 IndicesCount = 0;
-		VkDescriptorSet TextureSet = nullptr;
-		BMRModel Model;
-	};
-
-	struct DrawMapEntity
-	{
-		u64 IndexOffset = 0;
-		u32 IndicesCount = 0;
-		VkDescriptorSet TextureSet = nullptr;
-	};
-
-	struct DrawSkyBoxEntity
-	{
-		u64 VertexOffset = 0;
-		u64 IndexOffset = 0;
-		u32 IndicesCount = 0;
-		VkDescriptorSet TextureSet = nullptr;
 	};
 
 	struct PointLight
@@ -97,16 +74,16 @@ namespace Render
 
 	struct DrawScene
 	{
-		DrawEntity* DrawEntities = nullptr;
+		RenderResourceManager::DrawEntity* DrawEntities = nullptr;
 		u32 DrawEntitiesCount = 0;
 
-		DrawEntity* DrawTransparentEntities = nullptr;
+		RenderResourceManager::DrawEntity* DrawTransparentEntities = nullptr;
 		u32 DrawTransparentEntitiesCount = 0;
 
-		DrawSkyBoxEntity SkyBox;
+		RenderResourceManager::DrawEntity SkyBox;
 		bool DrawSkyBox = false;
 
-		DrawMapEntity MapEntity;
+		RenderResourceManager::DrawEntity MapEntity;
 
 		LightBuffer* LightEntity = nullptr;
 	};
@@ -141,4 +118,9 @@ namespace Render
 	void Draw(const DrawScene* Scene);
 
 	VkImage TmpGetShadowMapArray(int i);
+
+
+
+	VkDeviceSize CalculateBufferAlignedSize(VkDeviceSize BufferSize);
+	VkDeviceSize CalculateImageAlignedSize(VkDeviceSize BufferSize);
 }

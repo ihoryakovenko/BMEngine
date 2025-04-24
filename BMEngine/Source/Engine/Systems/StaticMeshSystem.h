@@ -8,7 +8,6 @@
 
 #include <vector>
 #include "Render/Render.h"
-extern std::vector<Render::DrawEntity> DrawEntities;
 
 namespace StaticMeshSystem
 {

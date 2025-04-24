@@ -24,6 +24,7 @@
 #include "Render/FrameManager.h"
 #include "Systems/TerrainSystem.h"
 #include "Systems/StaticMeshSystem.h"
+#include "Engine/Systems/Render/RenderResourceManger.h"
 
 namespace std
 {
@@ -77,7 +78,7 @@ namespace Engine
 	static const f32 Near = 0.1f;
 	static const f32 Far = 5000.0f;
 
-	static Render::DrawSkyBoxEntity SkyBox;
+	static RenderResourceManager::DrawEntity SkyBox;
 	static Render::LightBuffer LightData;
 
 	static ImguiIntegration::GuiData GuiData;
@@ -167,7 +168,8 @@ namespace Engine
 		 
 
 		VulkanInterface::Init(glfwGetWin32Window(Window), RenderConfig);
-
+		RenderResourceManager::AllocateIndexBuffer(MB64);
+		RenderResourceManager::AllocateVertexBuffer(MB64);
 		FrameManager::Init();
 		Render::Init();
 		ResourceManager::Init();
@@ -184,6 +186,7 @@ namespace Engine
 		TerrainSystem::DeInit();
 		StaticMeshSystem::DeInit();
 
+		RenderResourceManager::DeInit();
 		ResourceManager::DeInit();
 		Render::DeInit();
 		FrameManager::DeInit();
@@ -274,8 +277,8 @@ namespace Engine
 		ViewProjection.Projection[1][1] *= -1;
 		ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
-		Scene.DrawEntities = DrawEntities.data();
-		Scene.DrawEntitiesCount = DrawEntities.size();
+		Scene.DrawEntities = RenderResourceManager::GetEntities();
+		Scene.DrawEntitiesCount = RenderResourceManager::GetEntitiesCount();
 
 		LightData.PointLight.Position = glm::vec4(0.0f, 0.0f, 10.0f, 1.0f);
 		LightData.PointLight.Ambient = glm::vec3(0.01f, 0.01f, 0.01f);

@@ -29,6 +29,9 @@
     <ClCompile Include="Source\Engine\Systems\TerrainSystem.cpp" />
     <ClCompile Include="Source\Render\MainRenderPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\StaticMeshSystem.cpp" />
+    <ClCompile Include="Source\Engine\Systems\RenderChain.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\RenderResourceManger.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\LightningSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
@@ -57,6 +60,9 @@
     <ClInclude Include="Source\Engine\Systems\TerrainSystem.h" />
     <ClInclude Include="Source\Render\MainRenderPass.h" />
     <ClInclude Include="Source\Engine\Systems\StaticMeshSystem.h" />
+    <ClInclude Include="Source\Engine\Systems\RenderChain.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\RenderResourceManger.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\LightningSystem.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />

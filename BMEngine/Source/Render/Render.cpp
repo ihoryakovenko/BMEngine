@@ -58,8 +58,6 @@ namespace Render
 		VulkanInterface::RenderPass RenderPass;
 	};
 
-	static VkDeviceSize CalculateBufferAlignedSize(VkDeviceSize BufferSize);
-	static VkDeviceSize CalculateImageAlignedSize(VkDeviceSize BufferSize);
 
 	static void CreatePassSharedResources();
 	static void CreateDepthPass();
@@ -623,13 +621,11 @@ namespace Render
 
 			vkCmdBeginRendering(CommandBuffer, &RenderingInfo);
 
-			//VulkanInterface::BeginRenderPass(&DepthPass.RenderPass, RenderArea, LightCaster, ImageIndex);
-
 			vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, DepthPass.Pipeline.Pipeline);
 
 			for (u32 i = 0; i < Scene->DrawEntitiesCount; ++i)
 			{
-				DrawEntity* DrawEntity = Scene->DrawEntities + i;
+				RenderResourceManager::DrawEntity* DrawEntity = Scene->DrawEntities + i;
 
 				const VkBuffer VertexBuffers[] = { PassSharedResources.VertexBuffer.Buffer };
 				const VkDeviceSize Offsets[] = { DrawEntity->VertexOffset };

@@ -3,6 +3,7 @@
 #include "Render/VulkanInterface/VulkanInterface.h"
 #include "Render/Render.h"
 #include "Render/FrameManager.h"
+#include "Render/RenderResourceManger.h"
 
 #include "Util/Settings.h"
 #include "Util/Util.h"
@@ -20,8 +21,6 @@ VkDescriptorSet BlendWindowMaterial;
 VkDescriptorSet GrassMaterial;
 VkDescriptorSet SkyBoxMaterial;
 VkDescriptorSet TerrainMaterial;
-
-std::vector<Render::DrawEntity> DrawEntities;
 
 namespace StaticMeshSystem
 {
@@ -52,9 +51,6 @@ namespace StaticMeshSystem
 	static VkDescriptorSet StaticMeshLightSet;
 	static VkDescriptorSet MaterialSet;
 	static VkDescriptorSet ShadowMapArraySet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
-
-	static VulkanInterface::IndexBuffer IndexBuffer;
-	static VulkanInterface::VertexBuffer VertexBuffer;
 
 	void Init()
 	{
@@ -217,8 +213,6 @@ namespace StaticMeshSystem
 		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, VertexInputBinding, 1,
 			&PipelineSettings, &ResourceInfo);
 
-		IndexBuffer = VulkanInterface::CreateIndexBuffer(MB64);
-		VertexBuffer = VulkanInterface::CreateVertexBuffer(MB64);
 
 
 
@@ -256,20 +250,10 @@ namespace StaticMeshSystem
 			
 			// TODO DELETE!
 			VkDescriptorSet Set;
-			AttachTextureToStaticMesh(Texture->ImageView, Texture->ImageView, &Set);			
+			AttachTextureToStaticMesh(Texture->ImageView, Texture->ImageView, &Set);
 
-			Render::DrawEntity En;
-			En.VertexOffset = VertexBuffer.Offset;
-			Render::LoadVertices(&VertexBuffer, Uh60Model.VertexData + ModelVertexByteOffset, sizeof(StaticMeshVertex), VerticesCount, VertexBuffer.Offset);
-
-			En.IndexOffset = IndexBuffer.Offset;
-			Render::LoadIndices(&IndexBuffer, Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, IndexBuffer.Offset);
-
-			En.IndicesCount = Uh60Model.IndicesCounts[i];
-			En.TextureSet = Set;
-			En.Model = glm::mat4(1.0f);
-
-			DrawEntities.push_back(En);
+			RenderResourceManager::CreateEntity(Uh60Model.VertexData + ModelVertexByteOffset, sizeof(StaticMeshVertex), VerticesCount,
+				Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, Set);
 
 			ModelVertexByteOffset += VerticesCount * sizeof(StaticMeshVertex);
 			ModelIndexCountOffset += IndicesCount;
@@ -347,9 +331,6 @@ namespace StaticMeshSystem
 		VulkanInterface::DestroySampler(ShadowMapArraySampler);
 		VulkanInterface::DestroySampler(DiffuseSampler);
 		VulkanInterface::DestroySampler(SpecularSampler);
-
-		VulkanInterface::DestroyUniformBuffer(VertexBuffer);
-		VulkanInterface::DestroyUniformBuffer(IndexBuffer);
 	}
 
 	void OnDraw()
@@ -359,7 +340,6 @@ namespace StaticMeshSystem
 		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
 		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
 		
-
 		const VkDescriptorSet VpSet = FrameManager::GetViewProjectionSet();
 
 		const u32 DynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(FrameManager::ViewProjectionBuffer);
@@ -368,9 +348,12 @@ namespace StaticMeshSystem
 
 		const u32 LightDynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(Render::LightBuffer);
 
+		VulkanInterface::VertexBuffer VertexBuffer = RenderResourceManager::GetVertexBuffer();
+		VulkanInterface::IndexBuffer IndexBuffer = RenderResourceManager::GetIndexBuffer();
+
 		for (u32 i = 0; i < Scene.DrawEntitiesCount; ++i)
 		{
-			Render::DrawEntity* DrawEntity = Scene.DrawEntities + i;
+			RenderResourceManager::DrawEntity* DrawEntity = Scene.DrawEntities + i;
 
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
