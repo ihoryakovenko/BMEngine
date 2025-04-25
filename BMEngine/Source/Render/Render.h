@@ -10,10 +10,6 @@
 
 namespace Render
 {
-	typedef glm::mat4 BMRModel;
-
-	typedef glm::mat4 BMRLightSpaceMatrix;
-
 	struct TextureArrayInfo
 	{
 		u32 Width = 0;
@@ -39,7 +35,7 @@ namespace Render
 
 	struct DirectionLight
 	{
-		BMRLightSpaceMatrix LightSpaceMatrix;
+		glm::mat4 LightSpaceMatrix;
 		alignas(16) glm::vec3 Direction;
 		alignas(16) glm::vec3 Ambient;
 		alignas(16) glm::vec3 Diffuse;
@@ -48,7 +44,7 @@ namespace Render
 
 	struct SpotLight
 	{
-		BMRLightSpaceMatrix LightSpaceMatrix;
+		glm::mat4 LightSpaceMatrix;
 		glm::vec3 Position;
 		f32 CutOff;
 		glm::vec3 Direction;
@@ -96,15 +92,9 @@ namespace Render
 
 	typedef void (*OnDrawDelegate)(void);
 
-	void PreRenderInit();
 	bool Init();
 	void DeInit();
 
-	// Move to engine
-	void AddDrawFunction(OnDrawDelegate Delegate);
-
-	VkDescriptorSetLayout TestGetTerrainSkyBoxLayout();
-	VkRenderPass TestGetRenderPass();
 	void TestUpdateUniforBuffer(VulkanInterface::UniformBuffer* Buffer, u64 DataSize, u64 Offset, const void* Data);
 
 	RenderTexture CreateTexture(TextureArrayInfo* Info);
@@ -116,8 +106,6 @@ namespace Render
 	void LoadVertices(VulkanInterface::VertexBuffer* VertexBuffer, const void* Vertices, u32 VertexSize, u64 VerticesCount, u64 Offset);
 
 	void Draw(const DrawScene* Scene);
-
-	VkImage TmpGetShadowMapArray(int i);
 
 
 

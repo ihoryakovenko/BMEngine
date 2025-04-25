@@ -25,6 +25,8 @@
 #include "Systems/TerrainSystem.h"
 #include "Systems/StaticMeshSystem.h"
 #include "Engine/Systems/Render/RenderResourceManger.h"
+#include "Systems/Render/LightningPass.h"
+#include "Systems/Render/MainPass.h"
 
 namespace std
 {
@@ -172,9 +174,11 @@ namespace Engine
 		RenderResourceManager::AllocateVertexBuffer(MB64);
 		FrameManager::Init();
 		Render::Init();
+		MainPass::Init();
 		ResourceManager::Init();
+		LightningPass::Init();
 		TerrainSystem::Init();
-		DynamicMapSystem::Init();
+		//DynamicMapSystem::Init();
 		StaticMeshSystem::Init();
 
 		return true;
@@ -182,13 +186,15 @@ namespace Engine
 
 	void DeInit()
 	{
-		DynamicMapSystem::DeInit();
+		//DynamicMapSystem::DeInit();
 		TerrainSystem::DeInit();
 		StaticMeshSystem::DeInit();
+		TerrainSystem::DeInit();
 
 		RenderResourceManager::DeInit();
 		ResourceManager::DeInit();
 		Render::DeInit();
+		MainPass::DeInit();
 		FrameManager::DeInit();
 		VulkanInterface::DeInit();
 
@@ -223,7 +229,7 @@ namespace Engine
 		FrameManager::UpdateViewProjection(&ViewProjection);
 
 		f32 AspectRatio = f32(MainScreenExtent.width) / f32(MainScreenExtent.height);
-		DynamicMapSystem::Update(DeltaTime, MainCamera, Zoom);
+		//DynamicMapSystem::Update(DeltaTime, MainCamera, Zoom);
 
 		static f32 Angle = 0.0f;
 

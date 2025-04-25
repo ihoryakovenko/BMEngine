@@ -21,6 +21,8 @@ namespace StaticMeshSystem
 	void Init();
 	void DeInit();
 
+	void Draw();
+
 	struct Material
 	{
 		f32 Shininess;

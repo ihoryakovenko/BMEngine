@@ -762,19 +762,6 @@ namespace VulkanInterface
 		CurrentFrame = (CurrentFrame + 1) % MAX_DRAW_FRAMES;
 	}
 
-	void BeginRenderPass(const RenderPass* Pass, VkRect2D RenderArea, u32 RenderTargetIndex, u32 ImageIndex)
-	{
-		VkRenderPassBeginInfo DepthRenderPassBeginInfo = { };
-		DepthRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		DepthRenderPassBeginInfo.renderPass = Pass->Pass;
-		DepthRenderPassBeginInfo.renderArea = RenderArea;
-		DepthRenderPassBeginInfo.pClearValues = Pass->ClearValues;
-		DepthRenderPassBeginInfo.clearValueCount = Pass->ClearValuesCount;
-		DepthRenderPassBeginInfo.framebuffer = Pass->RenderTargets[RenderTargetIndex].FrameBuffers[ImageIndex];
-
-		vkCmdBeginRenderPass(DrawCommandBuffers[ImageIndex], &DepthRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-	}
-
 	void CreateRenderPass(const RenderPassSettings* Settings, const RenderTarget* Targets,
 		VkExtent2D TargetExtent, u32 TargetCount, u32 SwapchainImagesCount, RenderPass* OutPass)
 	{

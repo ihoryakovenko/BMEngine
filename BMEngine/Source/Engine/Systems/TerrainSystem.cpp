@@ -2,6 +2,7 @@
 
 #include "Render/Render.h"
 #include "Render/FrameManager.h"
+#include "Render/MainPass.h"
 #include "ResourceManager.h"
 #include "Util/Util.h"
 #include "Util/Settings.h"
@@ -13,7 +14,6 @@ namespace TerrainSystem
 		f32 Altitude;
 	};
 
-	static void OnDraw();
 	static void LoadTerrain();
 	static void GenerateTerrain(std::vector<u32>& Indices);
 
@@ -32,8 +32,6 @@ namespace TerrainSystem
 
 	void Init()
 	{
-		Render::AddDrawFunction(OnDraw);
-
 		const u32 ShaderCount = 2;
 		VulkanInterface::Shader Shaders[ShaderCount];
 
@@ -93,7 +91,7 @@ namespace TerrainSystem
 
 		VulkanInterface::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
-		ResourceInfo.RenderPass = Render::TestGetRenderPass();
+		ResourceInfo.RenderPass = MainPass::TestGetRenderPass();
 		ResourceInfo.SubpassIndex = 0;
 
 		const u32 VertexInputCount = 1;
@@ -128,7 +126,7 @@ namespace TerrainSystem
 		VulkanInterface::DestroyPipeline(Pipeline.Pipeline);
 	}
 
-	void OnDraw()
+	void Draw()
 	{
 		const VkDescriptorSet Sets[] = {
 			FrameManager::GetViewProjectionSet(),

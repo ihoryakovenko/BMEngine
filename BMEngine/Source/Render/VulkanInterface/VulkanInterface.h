@@ -220,7 +220,6 @@ namespace VulkanInterface
 	u32 TestGetImageIndex();
 	VkCommandBuffer BeginDraw(u32 ImageIndex);
 	void EndDraw(u32 ImageIndex);
-	void BeginRenderPass(const RenderPass* Pass, VkRect2D RenderArea, u32 RenderTargetIndex, u32 ImageIndex);
 
 	void CreateRenderPass(const RenderPassSettings* Settings, const RenderTarget* Targets,
 		VkExtent2D TargetExtent, u32 TargetCount, u32 SwapchainImagesCount, RenderPass* OutPass);

@@ -27,11 +27,10 @@
     <ClCompile Include="Source\Engine\Scene.cpp" />
     <ClCompile Include="Source\Render\FrameManager.cpp" />
     <ClCompile Include="Source\Engine\Systems\TerrainSystem.cpp" />
-    <ClCompile Include="Source\Render\MainRenderPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\StaticMeshSystem.cpp" />
-    <ClCompile Include="Source\Engine\Systems\RenderChain.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderResourceManger.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\LightningSystem.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\LightningPass.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\MainPass.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
@@ -58,11 +57,10 @@
     <ClInclude Include="Source\Util\Math.h" />
     <ClInclude Include="Source\Render\FrameManager.h" />
     <ClInclude Include="Source\Engine\Systems\TerrainSystem.h" />
-    <ClInclude Include="Source\Render\MainRenderPass.h" />
     <ClInclude Include="Source\Engine\Systems\StaticMeshSystem.h" />
-    <ClInclude Include="Source\Engine\Systems\RenderChain.h" />
     <ClInclude Include="Source\Engine\Systems\Render\RenderResourceManger.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\LightningSystem.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\LightningPass.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\MainPass.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />

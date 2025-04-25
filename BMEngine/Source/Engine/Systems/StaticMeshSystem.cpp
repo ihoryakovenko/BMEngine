@@ -4,6 +4,8 @@
 #include "Render/Render.h"
 #include "Render/FrameManager.h"
 #include "Render/RenderResourceManger.h"
+#include "Render/LightningPass.h"
+#include "Render/MainPass.h"
 
 #include "Util/Settings.h"
 #include "Util/Util.h"
@@ -54,8 +56,6 @@ namespace StaticMeshSystem
 
 	void Init()
 	{
-		Render::AddDrawFunction(OnDraw);
-
 		VkSamplerCreateInfo DiffuseSamplerCreateInfo = { };
 		DiffuseSamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 		DiffuseSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
@@ -146,7 +146,7 @@ namespace StaticMeshSystem
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
 			ShadowMapArrayImageInterface[i] = VulkanInterface::CreateImageInterface(&ShadowMapArrayInterfaceCreateInfo,
-				Render::TmpGetShadowMapArray(i));
+				LightningPass::GetShadowMapArray()[i].Image);
 
 			VulkanInterface::UniformSetAttachmentInfo ShadowMapArrayAttachmentInfo;
 			ShadowMapArrayAttachmentInfo.ImageInfo.imageView = ShadowMapArrayImageInterface[i];
@@ -172,7 +172,7 @@ namespace StaticMeshSystem
 		PushConstants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 		PushConstants.offset = 0;
 		// Todo: check constant and model size?
-		PushConstants.size = sizeof(Render::BMRModel);
+		PushConstants.size = sizeof(glm::mat4);
 
 		Pipeline.PipelineLayout = VulkanInterface::CreatePipelineLayout(StaticMeshDescriptorLayouts, StaticMeshDescriptorLayoutCount, &PushConstants, 1);
 
@@ -207,7 +207,7 @@ namespace StaticMeshSystem
 
 		VulkanInterface::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
-		ResourceInfo.RenderPass = Render::TestGetRenderPass();
+		ResourceInfo.RenderPass = MainPass::TestGetRenderPass();
 		ResourceInfo.SubpassIndex = 0;
 
 		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, VertexInputBinding, 1,
@@ -333,7 +333,7 @@ namespace StaticMeshSystem
 		VulkanInterface::DestroySampler(SpecularSampler);
 	}
 
-	void OnDraw()
+	void Draw()
 	{
 		FrameManager::UpdateUniformMemory(EntityLightBufferHandle, Scene.LightEntity, sizeof(Render::LightBuffer));
 
@@ -365,7 +365,7 @@ namespace StaticMeshSystem
 			const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
 			const VkShaderStageFlags Flags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-			vkCmdPushConstants(CmdBuffer, Pipeline.PipelineLayout, Flags, 0, sizeof(Render::BMRModel), &DrawEntity->Model);
+			vkCmdPushConstants(CmdBuffer, Pipeline.PipelineLayout, Flags, 0, sizeof(glm::mat4), &DrawEntity->Model);
 
 			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
 				1, DescriptorSetGroupCount, DescriptorSetGroup, 1, &LightDynamicOffset);

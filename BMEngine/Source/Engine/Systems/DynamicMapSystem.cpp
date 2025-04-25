@@ -96,8 +96,6 @@ namespace DynamicMapSystem
 
 	void Init()
 	{
-		Render::AddDrawFunction(OnDraw);
-
 		const u32 ShaderCount = 2;
 		VulkanInterface::Shader Shaders[ShaderCount];
 
@@ -123,7 +121,7 @@ namespace DynamicMapSystem
 		VkDescriptorSetLayout MapDescriptorLayouts[] =
 		{
 			FrameManager::GetViewProjectionLayout(),
-			Render::TestGetTerrainSkyBoxLayout(),
+			//Render::TestGetTerrainSkyBoxLayout(),
 			MapTileSettingsLayout,
 		};
 		const u32 MapDescriptorLayoutCount = sizeof(MapDescriptorLayouts) / sizeof(MapDescriptorLayouts[0]);
@@ -132,7 +130,7 @@ namespace DynamicMapSystem
 
 		VulkanInterface::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
-		ResourceInfo.RenderPass = Render::TestGetRenderPass();
+		//ResourceInfo.RenderPass = Render::TestGetRenderPass();
 		ResourceInfo.SubpassIndex = 0;
 
 		VulkanInterface::PipelineSettings PipelineSettings;
