@@ -5,8 +5,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-#include "TerrainSystem.h"
-#include "StaticMeshSystem.h"
+#include "TerrainRender.h"
+#include "Engine/Systems/Render/StaticMeshRender.h"
 
 namespace ResourceManager
 {
@@ -178,7 +178,7 @@ namespace ResourceManager
 
 	void CreateSkyBoxTerrainTexture(const std::string& Id, VkImageView DefuseImage, VkDescriptorSet* SetToAttach)
 	{
-		TerrainSystem::TestAttachSkyNoxTerrainTexture(DefuseImage, SetToAttach);
+		TerrainRender::TestAttachSkyNoxTerrainTexture(DefuseImage, SetToAttach);
 		EngineMaterials[Id] = *SetToAttach;
 	}
 

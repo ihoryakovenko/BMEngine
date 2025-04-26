@@ -4,7 +4,7 @@
 
 #include <vulkan/vulkan.h>
 
-namespace TerrainSystem
+namespace TerrainRender
 {
 	void Init();
 	void DeInit();

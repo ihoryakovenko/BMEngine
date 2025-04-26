@@ -1,5 +1,5 @@
 #include "Settings.h"
-#include "Engine/Systems/StaticMeshSystem.h"
+#include "Engine/Systems/StaticMeshRender.h"
 
 VkExtent2D MainScreenExtent;
 VkExtent2D DepthViewportExtent = { 1024, 1024 };
@@ -16,8 +16,6 @@ VulkanInterface::PipelineSettings DepthPipelineSettings;
 
 VulkanInterface::RenderPassSettings MainRenderPassSettings;
 
-VkImageCreateInfo DeferredInputDepthUniformCreateInfo;
-VkImageCreateInfo DeferredInputColorUniformCreateInfo;
 VkImageCreateInfo ShadowMapArrayCreateInfo;
 
 VulkanInterface::UniformImageInterfaceCreateInfo DeferredInputDepthUniformInterfaceCreateInfo;
@@ -33,7 +31,6 @@ VkBufferCreateInfo VpBufferInfo;
 enum SubpassIndex
 {
 	MainSubpass = 0,
-	DeferredSubpass,
 
 	Count
 };
@@ -80,26 +77,6 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	VpBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 	// Images
-	DeferredInputDepthUniformCreateInfo = { };
-	DeferredInputDepthUniformCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	DeferredInputDepthUniformCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-	DeferredInputDepthUniformCreateInfo.extent.depth = 1;
-	DeferredInputDepthUniformCreateInfo.mipLevels = 1;
-	DeferredInputDepthUniformCreateInfo.arrayLayers = 1;
-	DeferredInputDepthUniformCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-	DeferredInputDepthUniformCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	DeferredInputDepthUniformCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-	DeferredInputDepthUniformCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	DeferredInputDepthUniformCreateInfo.flags = 0;
-	DeferredInputDepthUniformCreateInfo.extent.width = MainScreenExtent.width;
-	DeferredInputDepthUniformCreateInfo.extent.height = MainScreenExtent.height;
-	DeferredInputDepthUniformCreateInfo.format = DepthFormat;
-	DeferredInputDepthUniformCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
-
-	DeferredInputColorUniformCreateInfo = DeferredInputDepthUniformCreateInfo;
-	DeferredInputColorUniformCreateInfo.format = ColorFormat;
-	DeferredInputColorUniformCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
-
 	ShadowMapArrayCreateInfo = { };
 	ShadowMapArrayCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	ShadowMapArrayCreateInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -112,7 +89,6 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	ShadowMapArrayCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	ShadowMapArrayCreateInfo.flags = 0;
 	ShadowMapArrayCreateInfo.format = ColorFormat;
-	ShadowMapArrayCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
 	ShadowMapArrayCreateInfo.extent.width = DepthViewportExtent.width;
 	ShadowMapArrayCreateInfo.extent.height = DepthViewportExtent.height;
 	ShadowMapArrayCreateInfo.format = DepthFormat;
@@ -197,48 +173,26 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	DeferredSubpassInputReferences[1].attachment = 2;
 	DeferredSubpassInputReferences[1].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-	// Subpass dependencies
-	// Transition must happen after...
-	MainPassSubpassDependencies[SubpassIndex::MainSubpass].srcSubpass = VK_SUBPASS_EXTERNAL;
-	MainPassSubpassDependencies[SubpassIndex::MainSubpass].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-	MainPassSubpassDependencies[SubpassIndex::MainSubpass].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-	// But must happen before...
-	MainPassSubpassDependencies[SubpassIndex::MainSubpass].dstSubpass = SubpassIndex::DeferredSubpass;
-	MainPassSubpassDependencies[SubpassIndex::MainSubpass].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	MainPassSubpassDependencies[SubpassIndex::MainSubpass].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	MainPassSubpassDependencies[SubpassIndex::MainSubpass].dependencyFlags = 0;
+	MainPassSubpassDependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+	MainPassSubpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	MainPassSubpassDependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+	MainPassSubpassDependencies[0].dstSubpass = SubpassIndex::MainSubpass;
+	MainPassSubpassDependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	MainPassSubpassDependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	MainPassSubpassDependencies[0].dependencyFlags = 0;
 
-	// Transition must happen after...
-	MainPassSubpassDependencies[SubpassIndex::DeferredSubpass].srcSubpass = SubpassIndex::MainSubpass;
-	MainPassSubpassDependencies[SubpassIndex::DeferredSubpass].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	MainPassSubpassDependencies[SubpassIndex::DeferredSubpass].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	// But must happen before...
-	MainPassSubpassDependencies[SubpassIndex::DeferredSubpass].dstSubpass = SubpassIndex::DeferredSubpass;
-	MainPassSubpassDependencies[SubpassIndex::DeferredSubpass].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	MainPassSubpassDependencies[SubpassIndex::DeferredSubpass].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-	MainPassSubpassDependencies[SubpassIndex::DeferredSubpass].dependencyFlags = 0;
-
-	// Conversion from VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-	// Transition must happen after...
-	MainPassSubpassDependencies[ExitDependenciesIndex].srcSubpass = SubpassIndex::DeferredSubpass;
-	MainPassSubpassDependencies[ExitDependenciesIndex].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	MainPassSubpassDependencies[ExitDependenciesIndex].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	// But must happen before...
-	MainPassSubpassDependencies[ExitDependenciesIndex].dstSubpass = VK_SUBPASS_EXTERNAL;
-	MainPassSubpassDependencies[ExitDependenciesIndex].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-	MainPassSubpassDependencies[ExitDependenciesIndex].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-	MainPassSubpassDependencies[ExitDependenciesIndex].dependencyFlags = 0;
+	MainPassSubpassDependencies[1].srcSubpass = SubpassIndex::MainSubpass;
+	MainPassSubpassDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	MainPassSubpassDependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	MainPassSubpassDependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+	MainPassSubpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	MainPassSubpassDependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+	MainPassSubpassDependencies[1].dependencyFlags = 0;
 
 	MainRenderPassSubpasses[MainSubpass].ColorAttachmentsReferences = &EntitySubpassColourAttachmentReference;
 	MainRenderPassSubpasses[MainSubpass].ColorAttachmentsReferencesCount = 1;
 	MainRenderPassSubpasses[MainSubpass].DepthAttachmentReferences = &EntitySubpassDepthAttachmentReference;
 	MainRenderPassSubpasses[MainSubpass].SubpassName = MainSubpassName;
-
-	MainRenderPassSubpasses[DeferredSubpass].ColorAttachmentsReferences = &SwapchainColorAttachmentReference;
-	MainRenderPassSubpasses[DeferredSubpass].ColorAttachmentsReferencesCount = 1;
-	MainRenderPassSubpasses[DeferredSubpass].InputAttachmentsReferences = DeferredSubpassInputReferences;
-	MainRenderPassSubpasses[DeferredSubpass].InputAttachmentsReferencesCount = InputReferencesCount;
-	MainRenderPassSubpasses[DeferredSubpass].SubpassName = DeferredSubpassName;
 
 	MainRenderPassSettings.AttachmentDescriptions = MainPathAttachmentDescriptions;
 	MainRenderPassSettings.AttachmentDescriptionsCount = MainPathAttachmentDescriptionsCount;
@@ -360,10 +314,10 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	SkyBoxVertexInput.VertexInputBinding[0].VertexInputBindingName = SkyBoxVertexInputName;
 	SkyBoxVertexInput.VertexInputBindingCount = 1;
 
-	DepthVertexInput.VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshSystem::StaticMeshVertex, Position) };
+	DepthVertexInput.VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshRender::StaticMeshVertex, Position) };
 	DepthVertexInput.VertexInputBinding[0].InputAttributesCount = 1;
 	DepthVertexInput.VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-	DepthVertexInput.VertexInputBinding[0].Stride = sizeof(StaticMeshSystem::StaticMeshVertex);
+	DepthVertexInput.VertexInputBinding[0].Stride = sizeof(StaticMeshRender::StaticMeshVertex);
 	DepthVertexInput.VertexInputBinding[0].VertexInputBindingName = "EntityVertex";
 	DepthVertexInput.VertexInputBinding[0].InputAttributesCount = 1;
 	DepthVertexInput.VertexInputBindingCount = 1;

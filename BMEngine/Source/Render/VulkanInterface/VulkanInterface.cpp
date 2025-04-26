@@ -36,6 +36,7 @@ namespace VulkanInterface
 		VkSwapchainKHR VulkanSwapchain = nullptr;
 		u32 ImagesCount = 0;
 		VkImageView ImageViews[MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkImage Images[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkExtent2D SwapExtent = { };
 	};
 
@@ -681,6 +682,11 @@ namespace VulkanInterface
 	VkImageView* GetSwapchainImageViews()
 	{
 		return SwapInstance.ImageViews;
+	}
+
+	VkImage* GetSwapchainImages()
+	{
+		return SwapInstance.Images;
 	}
 
 	u32 AcquireNextImageIndex()
@@ -2180,6 +2186,8 @@ namespace VulkanInterface
 
 		for (u32 i = 0; i < SwapInstance.ImagesCount; ++i)
 		{
+			SwapInstance.Images[i] = Images[i];
+
 			VkImageView ImageView = CreateImageView(Images[i],
 				SurfaceFormat.format, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_2D, 1);
 			if (ImageView == nullptr)
@@ -2530,5 +2538,10 @@ namespace VulkanInterface
 	VkCommandBuffer GetCommandBuffer()
 	{
 		return DrawCommandBuffers[CurrentImageIndex];
+	}
+
+	VkFormat GetSurfaceFormat()
+	{
+		return SurfaceFormat.format;
 	}
 }

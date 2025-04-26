@@ -22,11 +22,12 @@
 #include "Scene.h"
 #include "Util/Math.h"
 #include "Render/FrameManager.h"
-#include "Systems/TerrainSystem.h"
-#include "Systems/StaticMeshSystem.h"
+#include "Systems/TerrainRender.h"
+#include "Engine/Systems/Render/StaticMeshRender.h"
 #include "Engine/Systems/Render/RenderResourceManger.h"
 #include "Systems/Render/LightningPass.h"
 #include "Systems/Render/MainPass.h"
+#include "Systems/Render/DeferredPass.h"
 
 namespace std
 {
@@ -174,12 +175,13 @@ namespace Engine
 		RenderResourceManager::AllocateVertexBuffer(MB64);
 		FrameManager::Init();
 		Render::Init();
+		DeferredPass::Init();
 		MainPass::Init();
 		ResourceManager::Init();
 		LightningPass::Init();
-		TerrainSystem::Init();
+		TerrainRender::Init();
 		//DynamicMapSystem::Init();
-		StaticMeshSystem::Init();
+		StaticMeshRender::Init();
 
 		return true;
 	}
@@ -187,14 +189,14 @@ namespace Engine
 	void DeInit()
 	{
 		//DynamicMapSystem::DeInit();
-		TerrainSystem::DeInit();
-		StaticMeshSystem::DeInit();
-		TerrainSystem::DeInit();
+		TerrainRender::DeInit();
+		StaticMeshRender::DeInit();
 
 		RenderResourceManager::DeInit();
 		ResourceManager::DeInit();
 		Render::DeInit();
 		MainPass::DeInit();
+		DeferredPass::DeInit();
 		FrameManager::DeInit();
 		VulkanInterface::DeInit();
 
@@ -309,9 +311,9 @@ namespace Engine
 		LightData.SpotLight.CutOff = glm::cos(glm::radians(12.5f));
 		LightData.SpotLight.OuterCutOff = glm::cos(glm::radians(17.5f));
 
-		StaticMeshSystem::Material Mat;
+		StaticMeshRender::Material Mat;
 		Mat.Shininess = 32.f;
-		StaticMeshSystem::UpdateMaterialBuffer(&Mat);
+		StaticMeshRender::UpdateMaterialBuffer(&Mat);
 
 		GuiData.DirectionLightDirection = &LightData.DirectionLight.Direction;
 		GuiData.Eye = &Eye;

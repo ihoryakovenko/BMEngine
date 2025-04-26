@@ -9,7 +9,7 @@
 #include <vector>
 #include "Render/Render.h"
 
-namespace StaticMeshSystem
+namespace StaticMeshRender
 {
 	struct StaticMeshVertex
 	{

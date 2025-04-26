@@ -4,7 +4,7 @@
 
 #include "Memory/MemoryManagmentSystem.h"
 
-#include "Engine/Systems/StaticMeshSystem.h"
+#include "Engine/Systems/Render/StaticMeshRender.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -19,15 +19,15 @@
 
 struct VertexEqual
 {
-	bool operator()(const StaticMeshSystem::StaticMeshVertex& lhs, const StaticMeshSystem::StaticMeshVertex& rhs) const
+	bool operator()(const StaticMeshRender::StaticMeshVertex& lhs, const StaticMeshRender::StaticMeshVertex& rhs) const
 	{
 		return lhs.Position == rhs.Position && lhs.TextureCoords == rhs.TextureCoords;
 	}
 };
 
-template<> struct std::hash<StaticMeshSystem::StaticMeshVertex>
+template<> struct std::hash<StaticMeshRender::StaticMeshVertex>
 {
-	size_t operator()(StaticMeshSystem::StaticMeshVertex const& vertex) const
+	size_t operator()(StaticMeshRender::StaticMeshVertex const& vertex) const
 	{
 		size_t hashPosition = std::hash<glm::vec3>()(vertex.Position);
 		size_t hashTextureCoords = std::hash<glm::vec2>()(vertex.TextureCoords);
@@ -149,16 +149,16 @@ namespace Util
 		u64* VerticesCounts = Memory::BmMemoryManagementSystem::Allocate<u64>(Shapes.size());
 		u32* IndicesCounts = Memory::BmMemoryManagementSystem::Allocate<u32>(Shapes.size());
 
-		std::unordered_map<StaticMeshSystem::StaticMeshVertex, u32,
-			std::hash<StaticMeshSystem::StaticMeshVertex>, VertexEqual> uniqueVertices{ };
+		std::unordered_map<StaticMeshRender::StaticMeshVertex, u32,
+			std::hash<StaticMeshRender::StaticMeshVertex>, VertexEqual> uniqueVertices{ };
 
 		std::hash<std::string> Hasher;
 
 		std::vector<u64> TextureHashes(Shapes.size());
-		std::vector<StaticMeshSystem::StaticMeshVertex> AllVertices;
+		std::vector<StaticMeshRender::StaticMeshVertex> AllVertices;
 		std::vector<u32> AllIndices;
 
-		std::vector<StaticMeshSystem::StaticMeshVertex> Vertices;
+		std::vector<StaticMeshRender::StaticMeshVertex> Vertices;
 		std::vector<u32> Indices;
 
 		for (u32 i = 0; i < Shapes.size(); i++)
@@ -172,7 +172,7 @@ namespace Util
 			{
 				tinyobj::index_t Index = Shape->mesh.indices[j];
 
-				StaticMeshSystem::StaticMeshVertex vertex = { };
+				StaticMeshRender::StaticMeshVertex vertex = { };
 
 				vertex.Position =
 				{
@@ -285,7 +285,7 @@ namespace Util
 		Model.MeshCount = Header->MeshCount;
 
 		Model.VertexData = Data;
-		Data += Header->VerticesCount * sizeof(StaticMeshSystem::StaticMeshVertex);
+		Data += Header->VerticesCount * sizeof(StaticMeshRender::StaticMeshVertex);
 
 		Model.VerticesCounts = (u64*)Data;
 		Data += Header->MeshCount * sizeof(u64);

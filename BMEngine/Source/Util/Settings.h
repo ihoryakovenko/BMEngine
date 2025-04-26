@@ -29,17 +29,12 @@ extern VulkanInterface::PipelineSettings DeferredPipelineSettings;
 extern VulkanInterface::PipelineSettings SkyBoxPipelineSettings;
 extern VulkanInterface::PipelineSettings DepthPipelineSettings;
 
-static const u32 MainPathPipelinesCount = 2;
+static const u32 MainPathPipelinesCount = 1;
 
 extern VulkanInterface::RenderPassSettings MainRenderPassSettings;
 
-static VkDescriptorType DeferredInputDescriptorType[2] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT };
-static VkShaderStageFlags DeferredInputFlags[2] = { VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
-
 extern VkClearValue MainPassClearValues[3];
 
-extern VkImageCreateInfo DeferredInputDepthUniformCreateInfo;
-extern VkImageCreateInfo DeferredInputColorUniformCreateInfo;
 extern VkImageCreateInfo ShadowMapArrayCreateInfo;
 
 extern VulkanInterface::UniformImageInterfaceCreateInfo DeferredInputDepthUniformInterfaceCreateInfo;

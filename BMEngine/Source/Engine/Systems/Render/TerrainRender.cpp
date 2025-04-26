@@ -1,13 +1,13 @@
-#include "TerrainSystem.h"
+#include "TerrainRender.h"
 
 #include "Render/Render.h"
 #include "Render/FrameManager.h"
-#include "Render/MainPass.h"
-#include "ResourceManager.h"
+#include "MainPass.h"
+#include "Engine/Systems/ResourceManager.h"
 #include "Util/Util.h"
 #include "Util/Settings.h"
 
-namespace TerrainSystem
+namespace TerrainRender
 {
 	struct TerrainVertex
 	{
@@ -103,7 +103,7 @@ namespace TerrainSystem
 		VertexInputBinding[0].VertexInputBindingName = "TerrainVertex";
 
 		VulkanInterface::PipelineSettings PipelineSettings;
-		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMeshSystem.ini");
+		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMeshRender.ini");
 		PipelineSettings.Extent = MainScreenExtent;
 
 		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, VertexInputBinding, VertexInputCount,

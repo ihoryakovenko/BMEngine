@@ -1,16 +1,16 @@
-#include "StaticMeshSystem.h"
+#include "StaticMeshRender.h"
 
 #include "Render/VulkanInterface/VulkanInterface.h"
 #include "Render/Render.h"
 #include "Render/FrameManager.h"
-#include "Render/RenderResourceManger.h"
-#include "Render/LightningPass.h"
-#include "Render/MainPass.h"
+#include "Engine/Systems/Render/RenderResourceManger.h"
+#include "Engine/Systems/Render/LightningPass.h"
+#include "Engine/Systems/Render/MainPass.h"
 
 #include "Util/Settings.h"
 #include "Util/Util.h"
 
-#include "ResourceManager.h"
+#include "Engine/Systems/ResourceManager.h"
 #include "Engine/Scene.h"
 
 #include "glm/glm.hpp"
@@ -24,10 +24,8 @@ VkDescriptorSet GrassMaterial;
 VkDescriptorSet SkyBoxMaterial;
 VkDescriptorSet TerrainMaterial;
 
-namespace StaticMeshSystem
+namespace StaticMeshRender
 {
-	static void OnDraw();
-
 	static void LoadModel(const char* ModelPath, glm::mat4 Model, VkDescriptorSet CustomMaterial = nullptr);
 
 	static const char ModelsBaseDir[] = "./Resources/Models/";
@@ -202,7 +200,7 @@ namespace StaticMeshSystem
 		VertexInputBinding[0].VertexInputBindingName = "EntityVertex";
 
 		VulkanInterface::PipelineSettings PipelineSettings;
-		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMeshSystem.ini");
+		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMeshRender.ini");
 		PipelineSettings.Extent = MainScreenExtent;
 
 		VulkanInterface::PipelineResourceInfo ResourceInfo;

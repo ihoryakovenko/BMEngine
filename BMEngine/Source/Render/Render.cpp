@@ -8,10 +8,11 @@
 #include "Util/Util.h"
 
 #include "FrameManager.h"
-#include "Engine/Systems/TerrainSystem.h"
-#include "Engine/Systems/StaticMeshSystem.h"
+#include "Engine/Systems/Render/StaticMeshRender.h"
 #include "Engine/Systems/Render/LightningPass.h"
 #include "Engine/Systems/Render/MainPass.h"
+#include "Engine/Systems/Render/DeferredPass.h"
+#include "Engine/Systems/Render/TerrainRender.h"
 
 namespace Render
 {
@@ -198,10 +199,11 @@ namespace Render
 
 		MainPass::BeginPass();
 
-		TerrainSystem::Draw();
-		StaticMeshSystem::Draw();
+		TerrainRender::Draw();
+		StaticMeshRender::Draw();
 
 		MainPass::EndPass();
+		DeferredPass::Draw();
 		
 		VulkanInterface::EndDraw(ImageIndex);
 	}

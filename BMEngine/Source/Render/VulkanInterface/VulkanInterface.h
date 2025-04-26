@@ -216,6 +216,7 @@ namespace VulkanInterface
 	// TO refactor
 	u32 GetImageCount();
 	VkImageView* GetSwapchainImageViews();
+	VkImage* GetSwapchainImages();
 	u32 AcquireNextImageIndex(); // Locks thread
 	u32 TestGetImageIndex();
 	VkCommandBuffer BeginDraw(u32 ImageIndex);
@@ -297,4 +298,5 @@ namespace VulkanInterface
 
 
 	VkCommandBuffer GetCommandBuffer();
+	VkFormat GetSurfaceFormat();
 }

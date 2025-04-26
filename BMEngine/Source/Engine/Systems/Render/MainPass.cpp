@@ -10,70 +10,25 @@
 
 #include <glm/glm.hpp>
 
+#include "DeferredPass.h"
+
 namespace MainPass
 {
-	static VkDescriptorSetLayout DeferredInputLayout;
 	static VkDescriptorSetLayout SkyBoxLayout;
-
-
-	static VulkanInterface::UniformImage DeferredInputDepthImage[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
-	static VulkanInterface::UniformImage DeferredInputColorImage[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
-
-	static VkImageView DeferredInputDepthImageInterface[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
-	static VkImageView DeferredInputColorImageInterface[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
-
-	static VkDescriptorSet DeferredInputSet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 	static VulkanInterface::RenderPipeline Pipelines[MainPathPipelinesCount];
 	static VulkanInterface::RenderPass RenderPass;
 
-	static VkPushConstantRange PushConstants;
-
 	void Init()
 	{
-		PushConstants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-		PushConstants.offset = 0;
-		// Todo: check constant and model size?
-		PushConstants.size = sizeof(glm::mat4);
-
-		DeferredInputLayout = VulkanInterface::CreateUniformLayout(DeferredInputDescriptorType, DeferredInputFlags, 2);
+		
 
 
 		const VkDescriptorType Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		const VkShaderStageFlags Flags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		SkyBoxLayout = VulkanInterface::CreateUniformLayout(&Type, &Flags, 1);
 
-		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
-		{
-			//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
 
-
-
-
-			DeferredInputDepthImage[i] = VulkanInterface::CreateUniformImage(&DeferredInputDepthUniformCreateInfo);
-			DeferredInputColorImage[i] = VulkanInterface::CreateUniformImage(&DeferredInputColorUniformCreateInfo);
-
-			DeferredInputDepthImageInterface[i] = VulkanInterface::CreateImageInterface(&DeferredInputDepthUniformInterfaceCreateInfo,
-				DeferredInputDepthImage[i].Image);
-			DeferredInputColorImageInterface[i] = VulkanInterface::CreateImageInterface(&DeferredInputUniformColorInterfaceCreateInfo,
-				DeferredInputColorImage[i].Image);
-
-			VulkanInterface::CreateUniformSets(&DeferredInputLayout, 1, DeferredInputSet + i);
-
-
-			VulkanInterface::UniformSetAttachmentInfo DeferredInputAttachmentInfo[2];
-			DeferredInputAttachmentInfo[0].ImageInfo.imageView = DeferredInputColorImageInterface[i];
-			DeferredInputAttachmentInfo[0].ImageInfo.sampler = nullptr;
-			DeferredInputAttachmentInfo[0].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			DeferredInputAttachmentInfo[0].Type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-
-			DeferredInputAttachmentInfo[1].ImageInfo.imageView = DeferredInputDepthImageInterface[i];
-			DeferredInputAttachmentInfo[1].ImageInfo.sampler = nullptr;
-			DeferredInputAttachmentInfo[1].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			DeferredInputAttachmentInfo[1].Type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-
-			VulkanInterface::AttachUniformsToSet(DeferredInputSet[i], DeferredInputAttachmentInfo, 2);
-		}
 
 
 
@@ -84,8 +39,8 @@ namespace MainPass
 
 			AttachmentView->ImageViews = Memory::BmMemoryManagementSystem::FrameAlloc<VkImageView>(MainRenderPassSettings.AttachmentDescriptionsCount);
 			AttachmentView->ImageViews[0] = VulkanInterface::GetSwapchainImageViews()[ImageIndex];
-			AttachmentView->ImageViews[1] = DeferredInputColorImageInterface[ImageIndex];
-			AttachmentView->ImageViews[2] = DeferredInputDepthImageInterface[ImageIndex];
+			AttachmentView->ImageViews[1] = DeferredPass::TestDeferredInputColorImageInterface()[ImageIndex];
+			AttachmentView->ImageViews[2] = DeferredPass::TestDeferredInputDepthImageInterface()[ImageIndex];
 
 		}
 
@@ -101,29 +56,24 @@ namespace MainPass
 		};
 
 		const u32 SkyBoxIndex = 0;
-		const u32 DeferredIndex = 1;
 
 		u32 SetLayoutCountTable[MainPathPipelinesCount];
-		SetLayoutCountTable[DeferredIndex] = 1;
 		SetLayoutCountTable[SkyBoxIndex] = SkyBoxDescriptorLayoutCount;
 
 		const VkDescriptorSetLayout* SetLayouts[MainPathPipelinesCount];
-		SetLayouts[DeferredIndex] = &DeferredInputLayout;
 		SetLayouts[SkyBoxIndex] = SkyBoxDescriptorLayouts;
 
 		u32 PushConstantRangeCountTable[MainPathPipelinesCount];
-		PushConstantRangeCountTable[DeferredIndex] = 0;
 		PushConstantRangeCountTable[SkyBoxIndex] = 0;
 
 		for (u32 i = 0; i < MainPathPipelinesCount; ++i)
 		{
 			Pipelines[i].PipelineLayout = VulkanInterface::CreatePipelineLayout(SetLayouts[i],
-				SetLayoutCountTable[i], &PushConstants, PushConstantRangeCountTable[i]);
+				SetLayoutCountTable[i], nullptr, PushConstantRangeCountTable[i]);
 		}
 
 		const char* Paths[MainPathPipelinesCount][2] = {
 			{ "./Resources/Shaders/SkyBox_vert.spv", "./Resources/Shaders/SkyBox_frag.spv" },
-			{ "./Resources/Shaders/second_vert.spv", "./Resources/Shaders/second_frag.spv" },
 		};
 
 		VkShaderStageFlagBits Stages[2] = { VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
@@ -151,19 +101,12 @@ namespace MainPass
 
 
 		VulkanInterface::VertexInput VertexInput[MainPathPipelinesCount];
-		VertexInput[DeferredIndex] = { };
 		VertexInput[SkyBoxIndex] = SkyBoxVertexInput;
 
 		VulkanInterface::PipelineSettings PipelineSettings[MainPathPipelinesCount];
-		PipelineSettings[DeferredIndex] = DeferredPipelineSettings;
 		PipelineSettings[SkyBoxIndex] = SkyBoxPipelineSettings;
 
 		VulkanInterface::PipelineResourceInfo PipelineResourceInfo[MainPathPipelinesCount];
-
-		PipelineResourceInfo[DeferredIndex].PipelineLayout = Pipelines[DeferredIndex].PipelineLayout;
-		PipelineResourceInfo[DeferredIndex].RenderPass = RenderPass.Pass;
-		PipelineResourceInfo[DeferredIndex].SubpassIndex = 1;
-
 		PipelineResourceInfo[SkyBoxIndex].PipelineLayout = Pipelines[SkyBoxIndex].PipelineLayout;
 		PipelineResourceInfo[SkyBoxIndex].RenderPass = RenderPass.Pass;
 		PipelineResourceInfo[SkyBoxIndex].SubpassIndex = 0;
@@ -232,15 +175,6 @@ namespace MainPass
 		//MainRenderPass::OnDraw();
 
 		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
-		vkCmdNextSubpass(CmdBuffer, VK_SUBPASS_CONTENTS_INLINE);
-
-		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipelines[1].Pipeline);
-
-		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipelines[1].PipelineLayout,
-			0, 1, &DeferredInputSet[VulkanInterface::TestGetImageIndex()], 0, nullptr);
-
-		vkCmdDraw(CmdBuffer, 3, 1, 0, 0); // 3 hardcoded vertices for second "post processing" subpass
-
 		vkCmdEndRenderPass(CmdBuffer);
 	}
 
