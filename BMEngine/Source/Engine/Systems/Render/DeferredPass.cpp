@@ -47,9 +47,6 @@ namespace DeferredPass
 		DepthSamplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
 		DepthSamplerInfo.anisotropyEnable = VK_FALSE;
 
-		ColorSampler = VulkanInterface::CreateSampler(&ColorSamplerCreateInfo);
-		DepthSampler = VulkanInterface::CreateSampler(&DepthSamplerInfo);
-
 		VkDescriptorType DeferredInputDescriptorType[2] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
 		VkShaderStageFlags DeferredInputFlags[2] = { VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
 		DeferredInputLayout = VulkanInterface::CreateUniformLayout(DeferredInputDescriptorType, DeferredInputFlags, 2);
@@ -74,6 +71,28 @@ namespace DeferredPass
 		DeferredInputColorUniformCreateInfo.format = ColorFormat;
 		DeferredInputColorUniformCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
+		VulkanInterface::UniformImageInterfaceCreateInfo InputDepthUniformInterfaceCreateInfo = { };
+		InputDepthUniformInterfaceCreateInfo = { };
+		InputDepthUniformInterfaceCreateInfo.Flags = 0; // No flags
+		InputDepthUniformInterfaceCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D;
+		InputDepthUniformInterfaceCreateInfo.Format = DepthFormat;
+		InputDepthUniformInterfaceCreateInfo.Components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		InputDepthUniformInterfaceCreateInfo.Components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		InputDepthUniformInterfaceCreateInfo.Components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		InputDepthUniformInterfaceCreateInfo.Components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		InputDepthUniformInterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		InputDepthUniformInterfaceCreateInfo.SubresourceRange.baseMipLevel = 0;
+		InputDepthUniformInterfaceCreateInfo.SubresourceRange.levelCount = 1;
+		InputDepthUniformInterfaceCreateInfo.SubresourceRange.baseArrayLayer = 0;
+		InputDepthUniformInterfaceCreateInfo.SubresourceRange.layerCount = 1;
+
+		VulkanInterface::UniformImageInterfaceCreateInfo InputUniformColorInterfaceCreateInfo = InputDepthUniformInterfaceCreateInfo;
+		InputUniformColorInterfaceCreateInfo.Format = ColorFormat;
+		InputUniformColorInterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+		ColorSampler = VulkanInterface::CreateSampler(&ColorSamplerCreateInfo);
+		DepthSampler = VulkanInterface::CreateSampler(&DepthSamplerInfo);
+
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
 			//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
@@ -81,9 +100,9 @@ namespace DeferredPass
 			DeferredInputDepthImage[i] = VulkanInterface::CreateUniformImage(&DeferredInputDepthUniformCreateInfo);
 			DeferredInputColorImage[i] = VulkanInterface::CreateUniformImage(&DeferredInputColorUniformCreateInfo);
 
-			DeferredInputDepthImageInterface[i] = VulkanInterface::CreateImageInterface(&DeferredInputDepthUniformInterfaceCreateInfo,
+			DeferredInputDepthImageInterface[i] = VulkanInterface::CreateImageInterface(&InputDepthUniformInterfaceCreateInfo,
 				DeferredInputDepthImage[i].Image);
-			DeferredInputColorImageInterface[i] = VulkanInterface::CreateImageInterface(&DeferredInputUniformColorInterfaceCreateInfo,
+			DeferredInputColorImageInterface[i] = VulkanInterface::CreateImageInterface(&InputUniformColorInterfaceCreateInfo,
 				DeferredInputColorImage[i].Image);
 
 			VulkanInterface::CreateUniformSets(&DeferredInputLayout, 1, DeferredInputSet + i);

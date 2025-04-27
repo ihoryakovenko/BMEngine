@@ -131,7 +131,7 @@ namespace DynamicMapSystem
 		VulkanInterface::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
 		//ResourceInfo.RenderPass = Render::TestGetRenderPass();
-		ResourceInfo.SubpassIndex = 0;
+		//ResourceInfo.SubpassIndex = 0;
 
 		VulkanInterface::PipelineSettings PipelineSettings;
 		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/DynamicMapSystem.ini");

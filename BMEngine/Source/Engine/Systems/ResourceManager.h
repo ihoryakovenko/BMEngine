@@ -30,4 +30,78 @@ namespace ResourceManager
 
 	// Test
 	void CreateSkyBoxTerrainTexture(const std::string& Id, VkImageView DefuseImage, VkDescriptorSet* SetToAttach);
+
+	template<typename T>
+	struct ResourceInitializer
+	{
+		static inline std::unordered_map<std::string_view, T*> RegisteredResources;
+		static inline std::unordered_map<std::string_view, std::vector<void(*)(T*)>> Delegates;
+
+		static void Register(const std::string_view& Name, T* Resource)
+		{
+			auto RegisteredResourceIterator = RegisteredResources.find(Name);
+			assert(RegisteredResourceIterator == RegisteredResources.end() && "Resource already set");
+			RegisteredResources[Name] = Resource;
+
+			if (auto DelegateIterator = Delegates.find(Name); DelegateIterator != Delegates.end())
+			{
+				for (auto& Function : DelegateIterator->second)
+					Function(Resource);
+				Delegates.erase(DelegateIterator);
+			}
+		}
+
+		static void Request(const std::string_view& Name, void(*DelegateFunction)(T*))
+		{
+			if (auto it = RegisteredResources.find(Name); it != RegisteredResources.end())
+			{
+				DelegateFunction(it->second);
+			}
+			else
+			{
+				Delegates[Name].push_back(DelegateFunction);
+			}
+		}
+	};
+
+	template<typename T>
+	struct ResourceInitializer2
+	{
+		enum Resources
+		{
+			DrawEntities = 0,
+
+			Count
+		};
+
+		static inline T* RegisteredResources[Resources::Count] = { };
+		static inline std::vector<void(*)(T*)> Delegates[Resources::Count];
+
+
+		static void Register(Resources ResourceId, T* Resource)
+		{
+			assert(RegisteredResources[ResourceId] == nullptr && "Resource already set");
+			RegisteredResources[ResourceId] = Resource;
+
+			for (auto Delegate : Delegates[ResourceId])
+			{
+				Delegate(Resource);
+			}
+
+			Delegates[ResourceId].clear();
+		}
+
+		static void Request(Resources ResourceId, void(*DelegateFunction)(T*))
+		{
+			if (RegisteredResources[ResourceId] != nullptr)
+			{
+				DelegateFunction(RegisteredResources[ResourceId]);
+			}
+			else
+			{
+				Delegates[ResourceId].push_back(DelegateFunction);
+			}
+		}
+	};
+
 }

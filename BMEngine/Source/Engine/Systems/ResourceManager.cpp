@@ -5,7 +5,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-#include "TerrainRender.h"
+#include "Engine/Systems/Render/TerrainRender.h"
 #include "Engine/Systems/Render/StaticMeshRender.h"
 
 namespace ResourceManager

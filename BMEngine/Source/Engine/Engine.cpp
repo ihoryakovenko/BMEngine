@@ -22,7 +22,7 @@
 #include "Scene.h"
 #include "Util/Math.h"
 #include "Render/FrameManager.h"
-#include "Systems/TerrainRender.h"
+#include "Systems/Render/TerrainRender.h"
 #include "Engine/Systems/Render/StaticMeshRender.h"
 #include "Engine/Systems/Render/RenderResourceManger.h"
 #include "Systems/Render/LightningPass.h"

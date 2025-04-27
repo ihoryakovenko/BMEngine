@@ -8,6 +8,8 @@
 #include "Util/Settings.h"
 #include "Util/Util.h"
 
+#include "StaticMeshRender.h"
+
 // todo: delete
 #include "Engine/Scene.h"
 
@@ -34,14 +36,54 @@ namespace LightningPass
 		VkShaderStageFlags LightSpaceMatrixStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 		LightSpaceMatrixLayout = VulkanInterface::CreateUniformLayout(&LightSpaceMatrixDescriptorType, &LightSpaceMatrixStageFlags, 1);
 
+		VulkanInterface::UniformImageInterfaceCreateInfo ShadowMapElement1InterfaceCreateInfo = { };
+		ShadowMapElement1InterfaceCreateInfo.Flags = 0; // No flags
+		ShadowMapElement1InterfaceCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D;
+		ShadowMapElement1InterfaceCreateInfo.Format = DepthFormat;
+		ShadowMapElement1InterfaceCreateInfo.Components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		ShadowMapElement1InterfaceCreateInfo.Components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		ShadowMapElement1InterfaceCreateInfo.Components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		ShadowMapElement1InterfaceCreateInfo.Components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		ShadowMapElement1InterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		ShadowMapElement1InterfaceCreateInfo.SubresourceRange.baseMipLevel = 0;
+		ShadowMapElement1InterfaceCreateInfo.SubresourceRange.levelCount = 1;
+		ShadowMapElement1InterfaceCreateInfo.SubresourceRange.baseArrayLayer = 0;
+		ShadowMapElement1InterfaceCreateInfo.SubresourceRange.layerCount = 1;
+
+		VulkanInterface::UniformImageInterfaceCreateInfo ShadowMapElement2InterfaceCreateInfo = ShadowMapElement1InterfaceCreateInfo;
+		ShadowMapElement2InterfaceCreateInfo.SubresourceRange.baseArrayLayer = 1;
+
+		VkImageCreateInfo ShadowMapArrayCreateInfo = { };
+		ShadowMapArrayCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		ShadowMapArrayCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+		ShadowMapArrayCreateInfo.extent.depth = 1;
+		ShadowMapArrayCreateInfo.mipLevels = 1;
+		ShadowMapArrayCreateInfo.arrayLayers = 1;
+		ShadowMapArrayCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		ShadowMapArrayCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		ShadowMapArrayCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		ShadowMapArrayCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		ShadowMapArrayCreateInfo.flags = 0;
+		ShadowMapArrayCreateInfo.format = ColorFormat;
+		ShadowMapArrayCreateInfo.extent.width = DepthViewportExtent.width;
+		ShadowMapArrayCreateInfo.extent.height = DepthViewportExtent.height;
+		ShadowMapArrayCreateInfo.format = DepthFormat;
+		ShadowMapArrayCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		ShadowMapArrayCreateInfo.arrayLayers = 2;
+
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
 			ShadowMapArray[i] = VulkanInterface::CreateUniformImage(&ShadowMapArrayCreateInfo);
 
 			const VkDeviceSize LightSpaceMatrixSize = sizeof(glm::mat4);
 
-			VpBufferInfo.size = LightSpaceMatrixSize;
-			LightSpaceMatrixBuffer[i] = VulkanInterface::CreateUniformBufferInternal(&VpBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			VkBufferCreateInfo BufferInfo = { };
+			BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+			BufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+			BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			BufferInfo.size = LightSpaceMatrixSize;
+
+			LightSpaceMatrixBuffer[i] = VulkanInterface::CreateUniformBufferInternal(&BufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 			VulkanInterface::CreateUniformSets(&LightSpaceMatrixLayout, 1, LightSpaceMatrixSet + i);
 
@@ -62,21 +104,17 @@ namespace LightningPass
 		// Todo: check constant and model size?
 		PushConstants.size = sizeof(glm::mat4);
 
-		Pipeline.PipelineLayout = VulkanInterface::CreatePipelineLayout(&LightSpaceMatrixLayout, 1,
-			&PushConstants, 1);
+		Pipeline.PipelineLayout = VulkanInterface::CreatePipelineLayout(&LightSpaceMatrixLayout, 1, &PushConstants, 1);
 
 		std::vector<char> ShaderCode;
 		Util::OpenAndReadFileFull("./Resources/Shaders/Depth_vert.spv", ShaderCode, "rb");
 
-		VkPipelineShaderStageCreateInfo Info = { };
-		Info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		Info.stage = VK_SHADER_STAGE_VERTEX_BIT;
-		Info.pName = "main";
-		VulkanInterface::CreateShader((u32*)ShaderCode.data(), ShaderCode.size(), Info.module);
+		const u32 ShaderCount = 1;
+		VulkanInterface::Shader Shaders[ShaderCount];
 
-		VulkanInterface::PipelineShaderInfo ShaderInfo;
-		ShaderInfo.Infos = &Info;
-		ShaderInfo.InfosCounter = 1;
+		Shaders[0].Stage = VK_SHADER_STAGE_VERTEX_BIT;
+		Shaders[0].Code = ShaderCode.data();
+		Shaders[0].CodeSize = ShaderCode.size();
 
 		VulkanInterface::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
@@ -88,8 +126,15 @@ namespace LightningPass
 		ResourceInfo.DepthAttachmentFormat = DepthFormat;
 		ResourceInfo.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
-		VulkanInterface::CreatePipelines(&ShaderInfo, &DepthVertexInput, &DepthPipelineSettings, &ResourceInfo, 1, &Pipeline.Pipeline);
-		VulkanInterface::DestroyShader(Info.module);
+		const u32 VertexInputCount = 1;
+		VulkanInterface::BMRVertexInputBinding VertexInputBinding[VertexInputCount];
+		VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshRender::StaticMeshVertex, Position) };
+		VertexInputBinding[0].InputAttributesCount = 1;
+		VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		VertexInputBinding[0].Stride = sizeof(StaticMeshRender::StaticMeshVertex);
+		VertexInputBinding[0].VertexInputBindingName = "MeshVertex";
+
+		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, VertexInputBinding, VertexInputCount, &DepthPipelineSettings, &ResourceInfo);
 	}
 
 	void DeInit()

@@ -16,12 +16,17 @@ namespace MainPass
 {
 	static VkDescriptorSetLayout SkyBoxLayout;
 
-	static VulkanInterface::RenderPipeline Pipelines[MainPathPipelinesCount];
+	static VulkanInterface::RenderPipeline SkyBoxPipeline;
 	static VulkanInterface::RenderPass RenderPass;
+
+	static VulkanInterface::AttachmentData AttachmentData;
 
 	void Init()
 	{
-		
+		AttachmentData.ColorAttachmentCount = 2;
+		AttachmentData.ColorAttachmentFormats[0] = ColorFormat;
+		AttachmentData.ColorAttachmentFormats[1] = DepthFormat;
+		AttachmentData.DepthAttachmentFormat = DepthFormat;
 
 
 		const VkDescriptorType Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -55,74 +60,38 @@ namespace MainPass
 			SkyBoxLayout,
 		};
 
-		const u32 SkyBoxIndex = 0;
 
-		u32 SetLayoutCountTable[MainPathPipelinesCount];
-		SetLayoutCountTable[SkyBoxIndex] = SkyBoxDescriptorLayoutCount;
+		SkyBoxPipeline.PipelineLayout = VulkanInterface::CreatePipelineLayout(SkyBoxDescriptorLayouts, SkyBoxDescriptorLayoutCount, nullptr, 0);
 
-		const VkDescriptorSetLayout* SetLayouts[MainPathPipelinesCount];
-		SetLayouts[SkyBoxIndex] = SkyBoxDescriptorLayouts;
+		const u32 ShaderCount = 2;
+		VulkanInterface::Shader Shaders[ShaderCount];
 
-		u32 PushConstantRangeCountTable[MainPathPipelinesCount];
-		PushConstantRangeCountTable[SkyBoxIndex] = 0;
+		std::vector<char> VertexShaderCode;
+		Util::OpenAndReadFileFull("./Resources/Shaders/SkyBox_vert.spv", VertexShaderCode, "rb");
+		std::vector<char> FragmentShaderCode;
+		Util::OpenAndReadFileFull("./Resources/Shaders/SkyBox_frag.spv", FragmentShaderCode, "rb");
 
-		for (u32 i = 0; i < MainPathPipelinesCount; ++i)
-		{
-			Pipelines[i].PipelineLayout = VulkanInterface::CreatePipelineLayout(SetLayouts[i],
-				SetLayoutCountTable[i], nullptr, PushConstantRangeCountTable[i]);
-		}
+		Shaders[0].Stage = VK_SHADER_STAGE_VERTEX_BIT;
+		Shaders[0].Code = VertexShaderCode.data();
+		Shaders[0].CodeSize = VertexShaderCode.size();
 
-		const char* Paths[MainPathPipelinesCount][2] = {
-			{ "./Resources/Shaders/SkyBox_vert.spv", "./Resources/Shaders/SkyBox_frag.spv" },
-		};
+		Shaders[1].Stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+		Shaders[1].Code = FragmentShaderCode.data();
+		Shaders[1].CodeSize = FragmentShaderCode.size();
 
-		VkShaderStageFlagBits Stages[2] = { VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
+		VulkanInterface::BMRVertexInputBinding VertexInputBinding[1];
+		VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(SkyBoxVertex, Position) };
+		VertexInputBinding[0].InputAttributesCount = 1;
+		VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		VertexInputBinding[0].Stride = sizeof(SkyBoxVertex);
+		VertexInputBinding[0].VertexInputBindingName = "EntityVertex";
 
-		VulkanInterface::PipelineShaderInfo ShaderInfo[MainPathPipelinesCount];
-		VkPipelineShaderStageCreateInfo ShaderInfos[MainPathPipelinesCount][2];
-		for (u32 i = 0; i < MainPathPipelinesCount; ++i)
-		{
-			for (u32 j = 0; j < 2; ++j)
-			{
-				std::vector<char> ShaderCode;
-				Util::OpenAndReadFileFull(Paths[i][j], ShaderCode, "rb");
+		VulkanInterface::PipelineResourceInfo ResourceInfo;
+		ResourceInfo.PipelineLayout = SkyBoxPipeline.PipelineLayout;
+		ResourceInfo.RenderPass = MainPass::TestGetRenderPass();
+		ResourceInfo.SubpassIndex = 0;
 
-				VkPipelineShaderStageCreateInfo* Info = &ShaderInfos[i][j];
-				*Info = { };
-				Info->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-				Info->stage = Stages[j];
-				Info->pName = "main";
-				VulkanInterface::CreateShader((u32*)ShaderCode.data(), ShaderCode.size(), Info->module);
-			}
-
-			ShaderInfo[i].Infos = ShaderInfos[i];
-			ShaderInfo[i].InfosCounter = 2;
-		}
-
-
-		VulkanInterface::VertexInput VertexInput[MainPathPipelinesCount];
-		VertexInput[SkyBoxIndex] = SkyBoxVertexInput;
-
-		VulkanInterface::PipelineSettings PipelineSettings[MainPathPipelinesCount];
-		PipelineSettings[SkyBoxIndex] = SkyBoxPipelineSettings;
-
-		VulkanInterface::PipelineResourceInfo PipelineResourceInfo[MainPathPipelinesCount];
-		PipelineResourceInfo[SkyBoxIndex].PipelineLayout = Pipelines[SkyBoxIndex].PipelineLayout;
-		PipelineResourceInfo[SkyBoxIndex].RenderPass = RenderPass.Pass;
-		PipelineResourceInfo[SkyBoxIndex].SubpassIndex = 0;
-
-		VkPipeline NewPipelines[MainPathPipelinesCount];
-		CreatePipelines(ShaderInfo, VertexInput, PipelineSettings, PipelineResourceInfo, MainPathPipelinesCount, NewPipelines);
-
-		for (u32 i = 0; i < MainPathPipelinesCount; ++i)
-		{
-			Pipelines[i].Pipeline = NewPipelines[i];
-
-			for (u32 j = 0; j < 2; ++j)
-			{
-				VulkanInterface::DestroyShader(ShaderInfo[i].Infos[j].module);
-			}
-		}
+		SkyBoxPipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, VertexInputBinding, 1, &SkyBoxPipelineSettings, &ResourceInfo);
 	}
 
 	void DeInit()
@@ -146,7 +115,7 @@ namespace MainPass
 		DepthRenderPassBeginInfo.clearValueCount = RenderPass.ClearValuesCount;
 		DepthRenderPassBeginInfo.framebuffer = RenderPass.RenderTargets[0].FrameBuffers[VulkanInterface::TestGetImageIndex()];
 
-		vkCmdBeginRenderPass(CmdBuffer, &DepthRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);		
+		vkCmdBeginRenderPass(CmdBuffer, &DepthRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 	}
 
 	void EndPass()
@@ -178,11 +147,13 @@ namespace MainPass
 		vkCmdEndRenderPass(CmdBuffer);
 	}
 
-
-
-
 	VkRenderPass TestGetRenderPass()
 	{
 		return RenderPass.Pass;
+	}
+
+	VulkanInterface::AttachmentData* GetAttachmentData()
+	{
+		return &AttachmentData;
 	}
 }

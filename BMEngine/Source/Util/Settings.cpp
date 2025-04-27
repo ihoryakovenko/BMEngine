@@ -1,5 +1,5 @@
 #include "Settings.h"
-#include "Engine/Systems/StaticMeshRender.h"
+#include "Engine/Systems/Render/StaticMeshRender.h"
 
 VkExtent2D MainScreenExtent;
 VkExtent2D DepthViewportExtent = { 1024, 1024 };
@@ -7,26 +7,14 @@ VkExtent2D DepthViewportExtent = { 1024, 1024 };
 VkFormat ColorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Todo: check if VK_FORMAT_R8G8B8A8_UNORM supported
 VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
 
-VulkanInterface::VertexInput SkyBoxVertexInput;
-VulkanInterface::VertexInput DepthVertexInput;
-
 VulkanInterface::PipelineSettings DeferredPipelineSettings;
 VulkanInterface::PipelineSettings SkyBoxPipelineSettings;
 VulkanInterface::PipelineSettings DepthPipelineSettings;
 
 VulkanInterface::RenderPassSettings MainRenderPassSettings;
 
-VkImageCreateInfo ShadowMapArrayCreateInfo;
-
-VulkanInterface::UniformImageInterfaceCreateInfo DeferredInputDepthUniformInterfaceCreateInfo;
-VulkanInterface::UniformImageInterfaceCreateInfo DeferredInputUniformColorInterfaceCreateInfo;
-VulkanInterface::UniformImageInterfaceCreateInfo ShadowMapElement1InterfaceCreateInfo;
-VulkanInterface::UniformImageInterfaceCreateInfo ShadowMapElement2InterfaceCreateInfo;
-
 VkClearValue MainPassClearValues[3];
 VkClearValue DepthPassClearValues;
-
-VkBufferCreateInfo VpBufferInfo;
 
 enum SubpassIndex
 {
@@ -71,54 +59,6 @@ static const char DepthSubpassName[] = "DepthSubpass";
 void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 {
 	MainScreenExtent = { WindowWidth, WindowHeight };
-
-	VpBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	VpBufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-	VpBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-	// Images
-	ShadowMapArrayCreateInfo = { };
-	ShadowMapArrayCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	ShadowMapArrayCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-	ShadowMapArrayCreateInfo.extent.depth = 1;
-	ShadowMapArrayCreateInfo.mipLevels = 1;
-	ShadowMapArrayCreateInfo.arrayLayers = 1;
-	ShadowMapArrayCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-	ShadowMapArrayCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	ShadowMapArrayCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-	ShadowMapArrayCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	ShadowMapArrayCreateInfo.flags = 0;
-	ShadowMapArrayCreateInfo.format = ColorFormat;
-	ShadowMapArrayCreateInfo.extent.width = DepthViewportExtent.width;
-	ShadowMapArrayCreateInfo.extent.height = DepthViewportExtent.height;
-	ShadowMapArrayCreateInfo.format = DepthFormat;
-	ShadowMapArrayCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-	ShadowMapArrayCreateInfo.arrayLayers = 2;
-
-	// Image views
-	DeferredInputDepthUniformInterfaceCreateInfo = { };
-	DeferredInputDepthUniformInterfaceCreateInfo.Flags = 0; // No flags
-	DeferredInputDepthUniformInterfaceCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D;
-	DeferredInputDepthUniformInterfaceCreateInfo.Format = DepthFormat;
-	DeferredInputDepthUniformInterfaceCreateInfo.Components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-	DeferredInputDepthUniformInterfaceCreateInfo.Components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-	DeferredInputDepthUniformInterfaceCreateInfo.Components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-	DeferredInputDepthUniformInterfaceCreateInfo.Components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-	DeferredInputDepthUniformInterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-	DeferredInputDepthUniformInterfaceCreateInfo.SubresourceRange.baseMipLevel = 0;
-	DeferredInputDepthUniformInterfaceCreateInfo.SubresourceRange.levelCount = 1;
-	DeferredInputDepthUniformInterfaceCreateInfo.SubresourceRange.baseArrayLayer = 0;
-	DeferredInputDepthUniformInterfaceCreateInfo.SubresourceRange.layerCount = 1;
-
-	DeferredInputUniformColorInterfaceCreateInfo = DeferredInputDepthUniformInterfaceCreateInfo;
-	DeferredInputUniformColorInterfaceCreateInfo.Format = ColorFormat;
-	DeferredInputUniformColorInterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-
-	ShadowMapElement1InterfaceCreateInfo = DeferredInputDepthUniformInterfaceCreateInfo;
-	ShadowMapElement1InterfaceCreateInfo.SubresourceRange.baseArrayLayer = 0;
-
-	ShadowMapElement2InterfaceCreateInfo = ShadowMapElement1InterfaceCreateInfo;
-	ShadowMapElement2InterfaceCreateInfo.SubresourceRange.baseArrayLayer = 1;
 
 	// MAIN RENDERPASS
 	MainPassClearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -305,20 +245,4 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	DepthPipelineSettings.DepthCompareOp = VK_COMPARE_OP_LESS;
 	DepthPipelineSettings.DepthBoundsTestEnable = VK_FALSE;
 	DepthPipelineSettings.StencilTestEnable = VK_FALSE;
-
-	// Vertices
-	SkyBoxVertexInput.VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(SkyBoxVertex, Position) };
-	SkyBoxVertexInput.VertexInputBinding[0].InputAttributesCount = 1;
-	SkyBoxVertexInput.VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-	SkyBoxVertexInput.VertexInputBinding[0].Stride = sizeof(SkyBoxVertex);
-	SkyBoxVertexInput.VertexInputBinding[0].VertexInputBindingName = SkyBoxVertexInputName;
-	SkyBoxVertexInput.VertexInputBindingCount = 1;
-
-	DepthVertexInput.VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshRender::StaticMeshVertex, Position) };
-	DepthVertexInput.VertexInputBinding[0].InputAttributesCount = 1;
-	DepthVertexInput.VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-	DepthVertexInput.VertexInputBinding[0].Stride = sizeof(StaticMeshRender::StaticMeshVertex);
-	DepthVertexInput.VertexInputBinding[0].VertexInputBindingName = "EntityVertex";
-	DepthVertexInput.VertexInputBinding[0].InputAttributesCount = 1;
-	DepthVertexInput.VertexInputBindingCount = 1;
 }

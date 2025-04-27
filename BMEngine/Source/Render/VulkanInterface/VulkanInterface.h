@@ -45,12 +45,6 @@ namespace VulkanInterface
 		VkVertexInputRate InputRate = VK_VERTEX_INPUT_RATE_MAX_ENUM;
 	};
 
-	struct VertexInput
-	{
-		BMRVertexInputBinding VertexInputBinding[MAX_VERTEX_INPUT_BINDINGS];
-		u32 VertexInputBindingCount = 0;
-	};
-
 	struct PipelineSettings
 	{
 		const char* PipelineName = nullptr;
@@ -152,6 +146,14 @@ namespace VulkanInterface
 		VkImageSubresourceRange SubresourceRange;
 	};
 
+	struct AttachmentData
+	{
+		u32 ColorAttachmentCount;
+		VkFormat ColorAttachmentFormats[16]; // get max attachments from device
+		VkFormat DepthAttachmentFormat;
+		VkFormat StencilAttachmentFormat;
+	};
+
 	struct AttachmentView
 	{
 		// Count should be equal to AttachmentDescriptionsCount
@@ -192,12 +194,6 @@ namespace VulkanInterface
 		VkPipelineLayout PipelineLayout = nullptr;
 	};
 
-	struct PipelineShaderInfo
-	{
-		const VkPipelineShaderStageCreateInfo* Infos = nullptr;
-		u32 InfosCounter = 0;
-	};
-
 	struct RenderPipeline
 	{
 		VkPipeline Pipeline = nullptr;
@@ -226,9 +222,6 @@ namespace VulkanInterface
 		VkExtent2D TargetExtent, u32 TargetCount, u32 SwapchainImagesCount, RenderPass* OutPass);
 	VkPipelineLayout CreatePipelineLayout(const VkDescriptorSetLayout* DescriptorLayouts,
 		u32 DescriptorLayoutsCount, const VkPushConstantRange* PushConstant, u32 PushConstantsCount);
-	void CreatePipelines(const PipelineShaderInfo* ShaderInputs, const VertexInput* VertexInputs,
-		const PipelineSettings* PipelinesSettings, const PipelineResourceInfo* ResourceInfos,
-		u32 PipelinesCount, VkPipeline* OutputPipelines);
 	UniformBuffer CreateUniformBufferInternal(const VkBufferCreateInfo* BufferInfo, VkMemoryPropertyFlags Properties);
 	UniformImage CreateUniformImage(const VkImageCreateInfo* ImageCreateInfo);
 	VkDescriptorSetLayout CreateUniformLayout(const VkDescriptorType* Types, const VkShaderStageFlags* Stages, u32 Count);
