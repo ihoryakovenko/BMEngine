@@ -77,39 +77,6 @@ namespace VulkanInterface
 		VkBool32 StencilTestEnable = VK_FALSE;
 	};
 
-	struct SubpassSettings
-	{
-		const char* SubpassName = nullptr;
-
-		const VkAttachmentReference* ColorAttachmentsReferences = nullptr;
-		u32 ColorAttachmentsReferencesCount = 0;
-
-		const VkAttachmentReference* DepthAttachmentReferences = nullptr;
-
-		// First subpass has to not contain InputAttachments
-		const VkAttachmentReference* InputAttachmentsReferences = nullptr;
-		u32 InputAttachmentsReferencesCount = 0;
-	};
-
-	struct RenderPassSettings
-	{
-		const char* RenderPassName = nullptr;
-
-		// AttachmentDescriptions can be modified if contain undefined format
-		VkAttachmentDescription* AttachmentDescriptions = nullptr;
-		u32 AttachmentDescriptionsCount = 0;
-
-		const SubpassSettings* SubpassesSettings = nullptr;
-		u32 SubpassSettingsCount = 0;
-
-		VkSubpassDependency* SubpassDependencies = nullptr;
-		// Has to be 1 more then SubpassSettingsCount
-		u32 SubpassDependenciesCount = 0;
-
-		const VkClearValue* ClearValues = nullptr;
-		u32 ClearValuesCount = 0;
-	};
-
 	struct UniformBuffer
 	{
 		VkBuffer Buffer;
@@ -154,43 +121,9 @@ namespace VulkanInterface
 		VkFormat StencilAttachmentFormat;
 	};
 
-	struct AttachmentView
-	{
-		// Count should be equal to AttachmentDescriptionsCount
-		VkImageView* ImageViews = nullptr;
-	};
-
-	struct RenderTarget
-	{
-		AttachmentView AttachmentViews[MAX_SWAPCHAIN_IMAGES_COUNT];
-	};
-
-	struct FramebufferSet
-	{
-		VkFramebuffer FrameBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
-	};
-
-	struct RenderPass
-	{
-		VkRenderPass Pass = nullptr;
-
-		VkClearValue* ClearValues = nullptr;
-		u32 ClearValuesCount = 0;
-
-		FramebufferSet* RenderTargets = nullptr;
-		u32 RenderTargetCount = 0;
-	};
-
 	struct PipelineResourceInfo
 	{
-		u32 ColorAttachmentCount;
-		VkFormat* ColorAttachmentFormats;
-		VkFormat DepthAttachmentFormat;
-		VkFormat StencilAttachmentFormat;
-
-		VkRenderPass RenderPass = nullptr;
-		u32 SubpassIndex = -1;
-
+		AttachmentData PipelineAttachmentData;
 		VkPipelineLayout PipelineLayout = nullptr;
 	};
 
@@ -218,8 +151,6 @@ namespace VulkanInterface
 	VkCommandBuffer BeginDraw(u32 ImageIndex);
 	void EndDraw(u32 ImageIndex);
 
-	void CreateRenderPass(const RenderPassSettings* Settings, const RenderTarget* Targets,
-		VkExtent2D TargetExtent, u32 TargetCount, u32 SwapchainImagesCount, RenderPass* OutPass);
 	VkPipelineLayout CreatePipelineLayout(const VkDescriptorSetLayout* DescriptorLayouts,
 		u32 DescriptorLayoutsCount, const VkPushConstantRange* PushConstant, u32 PushConstantsCount);
 	UniformBuffer CreateUniformBufferInternal(const VkBufferCreateInfo* BufferInfo, VkMemoryPropertyFlags Properties);
@@ -234,7 +165,6 @@ namespace VulkanInterface
 	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, VkDeviceSize AlignedLayerSize,
 		u32 LayersCount, void* Data, u32 Baselayer = 0);
 
-	void DestroyRenderPass(RenderPass* Pass);
 	void DestroyPipelineLayout(VkPipelineLayout Layout);
 	void DestroyPipeline(VkPipeline Pipeline);
 	void DestroyUniformBuffer(UniformBuffer Buffer);

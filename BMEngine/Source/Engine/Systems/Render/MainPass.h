@@ -12,5 +12,4 @@ namespace MainPass
 	void EndPass();
 
 	VulkanInterface::AttachmentData* GetAttachmentData();
-	VkRenderPass TestGetRenderPass();
 }

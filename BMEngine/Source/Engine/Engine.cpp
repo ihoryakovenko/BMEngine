@@ -136,7 +136,7 @@ namespace Engine
 		u32 WindowHeight = 1080;
 
 		Window = Platform::CreatePlatformWindow(WindowWidth, WindowHeight);
-		Platform::DisableCursor(Window);
+		//Platform::DisableCursor(Window);
 
 		Platform::GetWindowSizes(glfwGetWin32Window(Window), &WindowWidth, &WindowHeight);
 

@@ -116,15 +116,11 @@ namespace LightningPass
 		Shaders[0].Code = ShaderCode.data();
 		Shaders[0].CodeSize = ShaderCode.size();
 
-		VulkanInterface::PipelineResourceInfo ResourceInfo;
+		VulkanInterface::PipelineResourceInfo ResourceInfo = { };
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
-		ResourceInfo.RenderPass = nullptr;
-		ResourceInfo.SubpassIndex = 0;
-
-		ResourceInfo.ColorAttachmentCount = 0;
-		ResourceInfo.ColorAttachmentFormats = nullptr;
-		ResourceInfo.DepthAttachmentFormat = DepthFormat;
-		ResourceInfo.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+		ResourceInfo.PipelineAttachmentData.ColorAttachmentCount = 0;
+		ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = DepthFormat;
+		ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
 		const u32 VertexInputCount = 1;
 		VulkanInterface::BMRVertexInputBinding VertexInputBinding[VertexInputCount];
@@ -192,6 +188,7 @@ namespace LightningPass
 
 			VkImageMemoryBarrier2 DepthAttachmentTransitionBefore = { };
 			DepthAttachmentTransitionBefore.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+			// TODO Check transitions
 			DepthAttachmentTransitionBefore.srcStageMask = VK_PIPELINE_STAGE_2_NONE; // because we're coming from UNDEFINED
 			DepthAttachmentTransitionBefore.srcAccessMask = 0;
 			DepthAttachmentTransitionBefore.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
@@ -246,6 +243,7 @@ namespace LightningPass
 			// TODO: move to Main pass?
 			VkImageMemoryBarrier2 DepthAttachmentTransitionAfter = { };
 			DepthAttachmentTransitionAfter.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+			// TODO Check transitions
 			DepthAttachmentTransitionAfter.srcStageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
 			DepthAttachmentTransitionAfter.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			DepthAttachmentTransitionAfter.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;

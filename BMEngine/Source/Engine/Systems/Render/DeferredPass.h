@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
+#include "Render/VulkanInterface/VulkanInterface.h"
 
 namespace DeferredPass
 {
@@ -11,4 +12,7 @@ namespace DeferredPass
 
 	VkImageView* TestDeferredInputColorImageInterface();
 	VkImageView* TestDeferredInputDepthImageInterface();
+
+	VulkanInterface::UniformImage* TestDeferredInputColorImage();
+	VulkanInterface::UniformImage* TestDeferredInputDepthImage();
 }

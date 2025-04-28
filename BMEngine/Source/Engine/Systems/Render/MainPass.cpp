@@ -17,15 +17,13 @@ namespace MainPass
 	static VkDescriptorSetLayout SkyBoxLayout;
 
 	static VulkanInterface::RenderPipeline SkyBoxPipeline;
-	static VulkanInterface::RenderPass RenderPass;
 
 	static VulkanInterface::AttachmentData AttachmentData;
 
 	void Init()
 	{
-		AttachmentData.ColorAttachmentCount = 2;
+		AttachmentData.ColorAttachmentCount = 1;
 		AttachmentData.ColorAttachmentFormats[0] = ColorFormat;
-		AttachmentData.ColorAttachmentFormats[1] = DepthFormat;
 		AttachmentData.DepthAttachmentFormat = DepthFormat;
 
 
@@ -37,19 +35,18 @@ namespace MainPass
 
 
 
-		VulkanInterface::RenderTarget RenderTarget;
-		for (u32 ImageIndex = 0; ImageIndex < VulkanInterface::GetImageCount(); ImageIndex++)
-		{
-			VulkanInterface::AttachmentView* AttachmentView = RenderTarget.AttachmentViews + ImageIndex;
+		//VulkanInterface::RenderTarget RenderTarget;
+		//for (u32 ImageIndex = 0; ImageIndex < VulkanInterface::GetImageCount(); ImageIndex++)
+		//{
+		//	VulkanInterface::AttachmentView* AttachmentView = RenderTarget.AttachmentViews + ImageIndex;
 
-			AttachmentView->ImageViews = Memory::BmMemoryManagementSystem::FrameAlloc<VkImageView>(MainRenderPassSettings.AttachmentDescriptionsCount);
-			AttachmentView->ImageViews[0] = VulkanInterface::GetSwapchainImageViews()[ImageIndex];
-			AttachmentView->ImageViews[1] = DeferredPass::TestDeferredInputColorImageInterface()[ImageIndex];
-			AttachmentView->ImageViews[2] = DeferredPass::TestDeferredInputDepthImageInterface()[ImageIndex];
+		//	AttachmentView->ImageViews = Memory::BmMemoryManagementSystem::FrameAlloc<VkImageView>(MainRenderPassSettings.AttachmentDescriptionsCount);
+		//	AttachmentView->ImageViews[0] = VulkanInterface::GetSwapchainImageViews()[ImageIndex];
+		//	AttachmentView->ImageViews[1] = DeferredPass::TestDeferredInputColorImageInterface()[ImageIndex];
+		//	AttachmentView->ImageViews[2] = DeferredPass::TestDeferredInputDepthImageInterface()[ImageIndex];
 
-		}
+		//}
 
-		VulkanInterface::CreateRenderPass(&MainRenderPassSettings, &RenderTarget, MainScreenExtent, 1, VulkanInterface::GetImageCount(), &RenderPass);
 
 		const VkDescriptorSetLayout VpLayout = FrameManager::GetViewProjectionLayout();
 
@@ -88,8 +85,7 @@ namespace MainPass
 
 		VulkanInterface::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = SkyBoxPipeline.PipelineLayout;
-		ResourceInfo.RenderPass = MainPass::TestGetRenderPass();
-		ResourceInfo.SubpassIndex = 0;
+		ResourceInfo.PipelineAttachmentData = AttachmentData;
 
 		SkyBoxPipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, VertexInputBinding, 1, &SkyBoxPipelineSettings, &ResourceInfo);
 	}
@@ -101,25 +97,91 @@ namespace MainPass
 	void BeginPass()
 	{
 		//const VkDescriptorSet VpSet = FrameManager::GetViewProjectionSet()[ImageIndex];
-		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+		VkRenderingAttachmentInfo ColorAttachment = { };
+		ColorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+		ColorAttachment.imageView = DeferredPass::TestDeferredInputColorImageInterface()[VulkanInterface::TestGetImageIndex()];
+		ColorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		ColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		ColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		ColorAttachment.clearValue.color = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+		VkRenderingAttachmentInfo DepthAttachment = { };
+		DepthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+		DepthAttachment.imageView = DeferredPass::TestDeferredInputDepthImageInterface()[VulkanInterface::TestGetImageIndex()];
+		DepthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		DepthAttachment.clearValue.depthStencil = { 1.0f, 0 }; // Clear depth to 1.0f
 
 		VkRect2D RenderArea;
 		RenderArea.extent = MainScreenExtent;
 		RenderArea.offset = { 0, 0 };
 
-		VkRenderPassBeginInfo DepthRenderPassBeginInfo = { };
-		DepthRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		DepthRenderPassBeginInfo.renderPass = RenderPass.Pass;
-		DepthRenderPassBeginInfo.renderArea = RenderArea;
-		DepthRenderPassBeginInfo.pClearValues = RenderPass.ClearValues;
-		DepthRenderPassBeginInfo.clearValueCount = RenderPass.ClearValuesCount;
-		DepthRenderPassBeginInfo.framebuffer = RenderPass.RenderTargets[0].FrameBuffers[VulkanInterface::TestGetImageIndex()];
+		VkRenderingInfo RenderingInfo = { };
+		RenderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+		RenderingInfo.flags = 0;
+		RenderingInfo.renderArea = RenderArea;
+		RenderingInfo.layerCount = 1;
+		RenderingInfo.viewMask = 0;
+		RenderingInfo.colorAttachmentCount = 1;
+		RenderingInfo.pColorAttachments = &ColorAttachment;
+		RenderingInfo.pDepthAttachment = &DepthAttachment; // Optional, if using depth
+		RenderingInfo.pStencilAttachment = nullptr; // If not using a stencil attachment
 
-		vkCmdBeginRenderPass(CmdBuffer, &DepthRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-	}
+		VkImageMemoryBarrier2 ColorBarrierBefore = { };
+		ColorBarrierBefore.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		ColorBarrierBefore.pNext = nullptr;
+		ColorBarrierBefore.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		ColorBarrierBefore.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		ColorBarrierBefore.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		ColorBarrierBefore.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		ColorBarrierBefore.image = DeferredPass::TestDeferredInputColorImage()[VulkanInterface::TestGetImageIndex()].Image;
+		ColorBarrierBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		ColorBarrierBefore.subresourceRange.baseMipLevel = 0;
+		ColorBarrierBefore.subresourceRange.levelCount = 1;
+		ColorBarrierBefore.subresourceRange.baseArrayLayer = 0;
+		ColorBarrierBefore.subresourceRange.layerCount = 1;
+		// RELEASE: finish all color-writes
+		ColorBarrierBefore.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		ColorBarrierBefore.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		// ACQUIRE: allow shader-reads in frag stage
+		ColorBarrierBefore.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		ColorBarrierBefore.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-	void EndPass()
-	{
+		VkImageMemoryBarrier2 DepthBarrierBefore = { };
+		DepthBarrierBefore.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		DepthBarrierBefore.pNext = nullptr;
+		DepthBarrierBefore.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		DepthBarrierBefore.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		DepthBarrierBefore.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		DepthBarrierBefore.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		DepthBarrierBefore.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		DepthBarrierBefore.image = DeferredPass::TestDeferredInputDepthImage()[VulkanInterface::TestGetImageIndex()].Image;
+		DepthBarrierBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+		DepthBarrierBefore.subresourceRange.baseMipLevel = 0;
+		DepthBarrierBefore.subresourceRange.levelCount = 1;
+		DepthBarrierBefore.subresourceRange.baseArrayLayer = 0;
+		DepthBarrierBefore.subresourceRange.layerCount = 1;
+		// RELEASE nothing (it was UNDEFINED)
+		DepthBarrierBefore.srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		DepthBarrierBefore.srcAccessMask = VK_PIPELINE_STAGE_NONE;
+		// ACQUIRE for depth-writes
+		DepthBarrierBefore.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+			| VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+
+		VkImageMemoryBarrier2 BarriersBefore[] = { ColorBarrierBefore, DepthBarrierBefore };
+
+		VkDependencyInfo DepInfoBefore = { };
+		DepInfoBefore.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+		DepInfoBefore.imageMemoryBarrierCount = 2;
+		DepInfoBefore.pImageMemoryBarriers = BarriersBefore;
+
+		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+
+		vkCmdPipelineBarrier2(CmdBuffer, &DepInfoBefore);
+
+		vkCmdBeginRendering(CmdBuffer, &RenderingInfo);
+
 		//
 		//if (Scene->DrawSkyBox)
 		//{
@@ -142,14 +204,13 @@ namespace MainPass
 		//}
 
 		//MainRenderPass::OnDraw();
-
-		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
-		vkCmdEndRenderPass(CmdBuffer);
 	}
 
-	VkRenderPass TestGetRenderPass()
+	void EndPass()
 	{
-		return RenderPass.Pass;
+		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+
+		vkCmdEndRendering(CmdBuffer);
 	}
 
 	VulkanInterface::AttachmentData* GetAttachmentData()

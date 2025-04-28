@@ -11,8 +11,6 @@ VulkanInterface::PipelineSettings DeferredPipelineSettings;
 VulkanInterface::PipelineSettings SkyBoxPipelineSettings;
 VulkanInterface::PipelineSettings DepthPipelineSettings;
 
-VulkanInterface::RenderPassSettings MainRenderPassSettings;
-
 VkClearValue MainPassClearValues[3];
 VkClearValue DepthPassClearValues;
 
@@ -40,7 +38,6 @@ static VkAttachmentReference DeferredSubpassInputReferences[InputReferencesCount
 static const u32 ExitDependenciesIndex = SubpassIndex::Count;
 static const u32 MainPassSubpassDependenciesCount = SubpassIndex::Count + 1;
 static VkSubpassDependency MainPassSubpassDependencies[MainPassSubpassDependenciesCount];
-static VulkanInterface::SubpassSettings MainRenderPassSubpasses[Count];
 
 static const char DeferredPipelineName[] = "Deferred";
 static const char SkyBoxPipelineName[] = "SkyBox";
@@ -129,20 +126,6 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	MainPassSubpassDependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
 	MainPassSubpassDependencies[1].dependencyFlags = 0;
 
-	MainRenderPassSubpasses[MainSubpass].ColorAttachmentsReferences = &EntitySubpassColourAttachmentReference;
-	MainRenderPassSubpasses[MainSubpass].ColorAttachmentsReferencesCount = 1;
-	MainRenderPassSubpasses[MainSubpass].DepthAttachmentReferences = &EntitySubpassDepthAttachmentReference;
-	MainRenderPassSubpasses[MainSubpass].SubpassName = MainSubpassName;
-
-	MainRenderPassSettings.AttachmentDescriptions = MainPathAttachmentDescriptions;
-	MainRenderPassSettings.AttachmentDescriptionsCount = MainPathAttachmentDescriptionsCount;
-	MainRenderPassSettings.SubpassesSettings = MainRenderPassSubpasses;
-	MainRenderPassSettings.SubpassSettingsCount = Count;
-	MainRenderPassSettings.RenderPassName = MainRenderPassName;
-	MainRenderPassSettings.SubpassDependencies = MainPassSubpassDependencies;
-	MainRenderPassSettings.SubpassDependenciesCount = MainPassSubpassDependenciesCount;
-	MainRenderPassSettings.ClearValues = MainPassClearValues;
-	MainRenderPassSettings.ClearValuesCount = 3;
 
 
 	// Dynamic states TODO

@@ -147,16 +147,12 @@ namespace DeferredPass
 		//Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMeshRender.ini");
 		//PipelineSettings.Extent = MainScreenExtent;
 
-		VkFormat Format = VulkanInterface::GetSurfaceFormat();
-
 		VulkanInterface::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
-		ResourceInfo.RenderPass = nullptr;
-		ResourceInfo.SubpassIndex = 0;
-		ResourceInfo.ColorAttachmentCount = 1;
-		ResourceInfo.ColorAttachmentFormats = &Format;
-		ResourceInfo.DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
-		ResourceInfo.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+		ResourceInfo.PipelineAttachmentData.ColorAttachmentCount = 1;
+		ResourceInfo.PipelineAttachmentData.ColorAttachmentFormats[0] = VulkanInterface::GetSurfaceFormat();
+		ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
+		ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
 		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, nullptr, 0,
 			&DeferredPipelineSettings, &ResourceInfo);
@@ -191,19 +187,18 @@ namespace DeferredPass
 		RenderingInfo.pColorAttachments = &SwapchainColorAttachment;
 		RenderingInfo.pDepthAttachment = nullptr;
 
-	
-
 		VkImageMemoryBarrier2 ColorBarrier = { };
-		ColorBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-		ColorBarrier.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-		ColorBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-		ColorBarrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-		ColorBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-		ColorBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		ColorBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		ColorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-		ColorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-		ColorBarrier.image = DeferredInputColorImage[VulkanInterface::TestGetImageIndex()].Image,
+		ColorBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		// TODO Check transitions
+		ColorBarrier.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		ColorBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		ColorBarrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		ColorBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		ColorBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		ColorBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		ColorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		ColorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		ColorBarrier.image = DeferredInputColorImage[VulkanInterface::TestGetImageIndex()].Image;
 		ColorBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		ColorBarrier.subresourceRange.baseMipLevel = 0;
 		ColorBarrier.subresourceRange.levelCount = 1;
@@ -212,6 +207,7 @@ namespace DeferredPass
 
 		VkImageMemoryBarrier2 DepthBarrier = { };
 		DepthBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		// TODO Check transitions
 		DepthBarrier.srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
 		DepthBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 		DepthBarrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
@@ -229,11 +225,12 @@ namespace DeferredPass
 
 		VkImageMemoryBarrier2 SwapchainAcquireBarrier = { };
 		SwapchainAcquireBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		// TODO Check transitions
 		SwapchainAcquireBarrier.srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 		SwapchainAcquireBarrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
 		SwapchainAcquireBarrier.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 		SwapchainAcquireBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		SwapchainAcquireBarrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		SwapchainAcquireBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		SwapchainAcquireBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		SwapchainAcquireBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		SwapchainAcquireBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -270,6 +267,7 @@ namespace DeferredPass
 
 		VkImageMemoryBarrier2 SwapchainPresentBarrier = { };
 		SwapchainPresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		// TODO Check transitions
 		SwapchainPresentBarrier.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 		SwapchainPresentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		SwapchainPresentBarrier.dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
@@ -305,5 +303,15 @@ namespace DeferredPass
 	VkImageView* TestDeferredInputDepthImageInterface()
 	{
 		return DeferredInputDepthImageInterface;
+	}
+
+	VulkanInterface::UniformImage* TestDeferredInputColorImage()
+	{
+		return DeferredInputColorImage;
+	}
+
+	VulkanInterface::UniformImage* TestDeferredInputDepthImage()
+	{
+		return DeferredInputDepthImage;
 	}
 }

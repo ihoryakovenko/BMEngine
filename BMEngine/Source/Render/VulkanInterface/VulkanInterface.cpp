@@ -413,10 +413,10 @@ namespace VulkanInterface
 		VkPipelineRenderingCreateInfo RenderingInfo = { };
 		RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
 		RenderingInfo.pNext = nullptr;
-		RenderingInfo.colorAttachmentCount = ResourceInfo->ColorAttachmentCount;
-		RenderingInfo.pColorAttachmentFormats = ResourceInfo->ColorAttachmentFormats;
-		RenderingInfo.depthAttachmentFormat = ResourceInfo->DepthAttachmentFormat;
-		RenderingInfo.stencilAttachmentFormat = ResourceInfo->DepthAttachmentFormat;
+		RenderingInfo.colorAttachmentCount = ResourceInfo->PipelineAttachmentData.ColorAttachmentCount;
+		RenderingInfo.pColorAttachmentFormats = ResourceInfo->PipelineAttachmentData.ColorAttachmentFormats;
+		RenderingInfo.depthAttachmentFormat = ResourceInfo->PipelineAttachmentData.DepthAttachmentFormat;
+		RenderingInfo.stencilAttachmentFormat = ResourceInfo->PipelineAttachmentData.DepthAttachmentFormat;
 
 		// CREATE INFO
 		auto PipelineCreateInfo = Memory::BmMemoryManagementSystem::FrameAlloc<VkGraphicsPipelineCreateInfo>();
@@ -432,13 +432,9 @@ namespace VulkanInterface
 		PipelineCreateInfo->pColorBlendState = ColorBlendInfo;
 		PipelineCreateInfo->pDepthStencilState = DepthStencilInfo;
 		PipelineCreateInfo->layout = ResourceInfo->PipelineLayout;
-		PipelineCreateInfo->renderPass = ResourceInfo->RenderPass;
-		PipelineCreateInfo->subpass = ResourceInfo->SubpassIndex;
-
-		if (PipelineCreateInfo->renderPass == nullptr)
-		{
-			PipelineCreateInfo->pNext = &RenderingInfo;
-		}
+		PipelineCreateInfo->renderPass = nullptr;
+		PipelineCreateInfo->subpass = 0;
+		PipelineCreateInfo->pNext = &RenderingInfo;
 
 		// Pipeline Derivatives : Can create multiple pipelines that derive from one another for optimisation
 		PipelineCreateInfo->basePipelineHandle = VK_NULL_HANDLE;
@@ -553,118 +549,6 @@ namespace VulkanInterface
 		}
 
 		CurrentFrame = (CurrentFrame + 1) % MAX_DRAW_FRAMES;
-	}
-
-	void CreateRenderPass(const RenderPassSettings* Settings, const RenderTarget* Targets,
-		VkExtent2D TargetExtent, u32 TargetCount, u32 SwapchainImagesCount, RenderPass* OutPass)
-	{
-		HandleLog(BMRVkLogType_Info, "Initializing RenderPass, Name: %s, Subpass count: %d, Attachments count: %d",
-			Settings->RenderPassName, Settings->SubpassSettingsCount, Settings->AttachmentDescriptionsCount);
-
-		// RenderPass create info
-		auto Subpasses = Memory::BmMemoryManagementSystem::FrameAlloc<VkSubpassDescription>(Settings->SubpassSettingsCount);
-		for (u32 SubpassIndex = 0; SubpassIndex < Settings->SubpassSettingsCount; ++SubpassIndex)
-		{
-			const SubpassSettings* SubpassSettings = Settings->SubpassesSettings + SubpassIndex;
-			VkSubpassDescription* Subpass = Subpasses + SubpassIndex;
-
-			HandleLog(BMRVkLogType_Info, "Initializing Subpass, Name: %s, Color attachments count: %d, "
-				"Depth attachment state: %d, Input attachments count: %d",
-				SubpassSettings->SubpassName, SubpassSettings->ColorAttachmentsReferencesCount,
-				SubpassSettings->DepthAttachmentReferences ? 1 : 0, SubpassSettings->InputAttachmentsReferencesCount);
-
-			*Subpass = { };
-			Subpass->pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-			Subpass->pColorAttachments = SubpassSettings->ColorAttachmentsReferences;
-			Subpass->colorAttachmentCount = SubpassSettings->ColorAttachmentsReferencesCount;
-			Subpass->pDepthStencilAttachment = SubpassSettings->DepthAttachmentReferences;
-
-			if (SubpassIndex != 0)
-			{
-				Subpass->pInputAttachments = SubpassSettings->InputAttachmentsReferences;
-				Subpass->inputAttachmentCount = SubpassSettings->InputAttachmentsReferencesCount;
-			}
-			else if (SubpassSettings->InputAttachmentsReferences != nullptr || SubpassSettings->InputAttachmentsReferencesCount != 0)
-			{
-				HandleLog(BMRVkLogType_Warning, "Attempting to set Input attachment to first subpass");
-			}
-		}
-
-		for (u32 AttachmentDescriptionIndex = 0; AttachmentDescriptionIndex < Settings->AttachmentDescriptionsCount; ++AttachmentDescriptionIndex)
-		{
-			if (Settings->AttachmentDescriptions[AttachmentDescriptionIndex].format == VK_FORMAT_UNDEFINED)
-			{
-				HandleLog(BMRVkLogType_Info, "Setting new %d format for attachment description with index %d",
-					SurfaceFormat.format, AttachmentDescriptionIndex);
-				Settings->AttachmentDescriptions[AttachmentDescriptionIndex].format = SurfaceFormat.format;
-			}
-		}
-
-		VkRenderPassCreateInfo RenderPassCreateInfo = { };
-		RenderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		RenderPassCreateInfo.attachmentCount = Settings->AttachmentDescriptionsCount;
-		RenderPassCreateInfo.pAttachments = Settings->AttachmentDescriptions;
-		RenderPassCreateInfo.subpassCount = Settings->SubpassSettingsCount;
-		RenderPassCreateInfo.pSubpasses = Subpasses;
-		RenderPassCreateInfo.dependencyCount = Settings->SubpassDependenciesCount;
-		RenderPassCreateInfo.pDependencies = Settings->SubpassDependencies;
-
-		const VkResult Result = vkCreateRenderPass(Device.LogicalDevice, &RenderPassCreateInfo, nullptr, &OutPass->Pass);
-		if (Result != VK_SUCCESS)
-		{
-			HandleLog(BMRVkLogType_Error, "vkCreateRenderPass result is %d", Result);
-		}
-
-		// Set clear values
-		OutPass->ClearValues = Memory::BmMemoryManagementSystem::Allocate<VkClearValue>(Settings->AttachmentDescriptionsCount);
-		OutPass->ClearValuesCount = Settings->AttachmentDescriptionsCount;
-		std::memcpy(OutPass->ClearValues, Settings->ClearValues, Settings->AttachmentDescriptionsCount * sizeof(VkClearValue));
-
-		// Creating framebuffers
-		OutPass->RenderTargets = Memory::BmMemoryManagementSystem::Allocate<FramebufferSet>(TargetCount);
-		for (u32 TargetIndex = 0; TargetIndex < TargetCount; ++TargetIndex)
-		{
-			FramebufferSet* FramebufferSet = OutPass->RenderTargets + TargetIndex;
-			const RenderTarget* Target = Targets + TargetIndex;
-
-			for (u32 SwapchainImageIndex = 0; SwapchainImageIndex < SwapchainImagesCount; ++SwapchainImageIndex)
-			{
-				VkFramebuffer* Framebuffer = FramebufferSet->FrameBuffers + SwapchainImageIndex;
-				const AttachmentView* AttachmentView = Target->AttachmentViews + SwapchainImageIndex;
-
-				VkFramebufferCreateInfo Info = { };
-				Info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-				Info.renderPass = OutPass->Pass;
-				Info.attachmentCount = Settings->AttachmentDescriptionsCount;
-				Info.pAttachments = AttachmentView->ImageViews; // List of attachments (1:1 with Render Pass)
-				Info.width = TargetExtent.width;
-				Info.height = TargetExtent.height;
-				Info.layers = 1;
-
-				const VkResult Result = vkCreateFramebuffer(Device.LogicalDevice, &Info, nullptr, Framebuffer);
-				if (Result != VK_SUCCESS)
-				{
-					HandleLog(BMRVkLogType_Error, "vkCreateFramebuffer result is %d", Result);
-				}
-			}
-		}
-
-		OutPass->RenderTargetCount = TargetCount;
-	}
-
-	void DestroyRenderPass(RenderPass* Pass)
-	{
-		for (u32 TargetIndex = 0; TargetIndex < Pass->RenderTargetCount; ++TargetIndex)
-		{
-			for (u32 SwapchainImageIndex = 0; SwapchainImageIndex < SwapInstance.ImagesCount; ++SwapchainImageIndex)
-			{
-				vkDestroyFramebuffer(Device.LogicalDevice, Pass->RenderTargets[TargetIndex].FrameBuffers[SwapchainImageIndex], nullptr);
-			}
-		}
-
-		vkDestroyRenderPass(Device.LogicalDevice, Pass->Pass, nullptr);
-		Memory::BmMemoryManagementSystem::Free(Pass->ClearValues);
-		Memory::BmMemoryManagementSystem::Free(Pass->RenderTargets);
 	}
 
 	void DestroyPipelineLayout(VkPipelineLayout Layout)

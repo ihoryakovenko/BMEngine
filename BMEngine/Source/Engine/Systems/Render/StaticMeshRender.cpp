@@ -205,8 +205,7 @@ namespace StaticMeshRender
 
 		VulkanInterface::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
-		ResourceInfo.RenderPass = MainPass::TestGetRenderPass();
-		ResourceInfo.SubpassIndex = 0;
+		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
 
 		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, VertexInputBinding, 1,
 			&PipelineSettings, &ResourceInfo);

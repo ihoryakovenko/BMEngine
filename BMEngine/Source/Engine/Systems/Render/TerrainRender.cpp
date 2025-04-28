@@ -91,8 +91,7 @@ namespace TerrainRender
 
 		VulkanInterface::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
-		ResourceInfo.RenderPass = MainPass::TestGetRenderPass();
-		ResourceInfo.SubpassIndex = 0;
+		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
 
 		const u32 VertexInputCount = 1;
 		VulkanInterface::BMRVertexInputBinding VertexInputBinding[VertexInputCount];

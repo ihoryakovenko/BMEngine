@@ -27,6 +27,4 @@ extern VulkanInterface::PipelineSettings DepthPipelineSettings;
 
 static const u32 MainPathPipelinesCount = 1;
 
-extern VulkanInterface::RenderPassSettings MainRenderPassSettings;
-
 extern VkClearValue MainPassClearValues[3];
