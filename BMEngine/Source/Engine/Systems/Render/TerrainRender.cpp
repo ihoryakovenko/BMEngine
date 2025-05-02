@@ -50,7 +50,8 @@ namespace TerrainRender
 
 		const VkDescriptorType Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		const VkShaderStageFlags Flags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		SamplerLayout = VulkanInterface::CreateUniformLayout(&Type, &Flags, 1);
+		const VkDescriptorBindingFlags BindingFlags[1] = { };
+		SamplerLayout = VulkanInterface::CreateUniformLayout(&Type, &Flags, BindingFlags, 1, 1);
 
 		VkDescriptorSetLayout TerrainDescriptorLayouts[] =
 		{

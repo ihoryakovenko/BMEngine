@@ -34,7 +34,8 @@ namespace LightningPass
 	{
 		VkDescriptorType LightSpaceMatrixDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		VkShaderStageFlags LightSpaceMatrixStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-		LightSpaceMatrixLayout = VulkanInterface::CreateUniformLayout(&LightSpaceMatrixDescriptorType, &LightSpaceMatrixStageFlags, 1);
+		const VkDescriptorBindingFlags BindingFlags[1] = { };
+		LightSpaceMatrixLayout = VulkanInterface::CreateUniformLayout(&LightSpaceMatrixDescriptorType, &LightSpaceMatrixStageFlags, BindingFlags, 1, 1);
 
 		VulkanInterface::UniformImageInterfaceCreateInfo ShadowMapElement1InterfaceCreateInfo = { };
 		ShadowMapElement1InterfaceCreateInfo.Flags = 0; // No flags
@@ -188,7 +189,6 @@ namespace LightningPass
 
 			VkImageMemoryBarrier2 DepthAttachmentTransitionBefore = { };
 			DepthAttachmentTransitionBefore.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-			// TODO Check transitions
 			DepthAttachmentTransitionBefore.srcStageMask = VK_PIPELINE_STAGE_2_NONE; // because we're coming from UNDEFINED
 			DepthAttachmentTransitionBefore.srcAccessMask = 0;
 			DepthAttachmentTransitionBefore.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
@@ -243,11 +243,7 @@ namespace LightningPass
 			// TODO: move to Main pass?
 			VkImageMemoryBarrier2 DepthAttachmentTransitionAfter = { };
 			DepthAttachmentTransitionAfter.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-			// TODO Check transitions
-			DepthAttachmentTransitionAfter.srcStageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
-			DepthAttachmentTransitionAfter.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-			DepthAttachmentTransitionAfter.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-			DepthAttachmentTransitionAfter.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+
 			DepthAttachmentTransitionAfter.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 			DepthAttachmentTransitionAfter.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			DepthAttachmentTransitionAfter.image = ShadowMapArray[VulkanInterface::TestGetImageIndex()].Image;
@@ -256,6 +252,12 @@ namespace LightningPass
 			DepthAttachmentTransitionAfter.subresourceRange.levelCount = 1;
 			DepthAttachmentTransitionAfter.subresourceRange.baseArrayLayer = LightCaster;
 			DepthAttachmentTransitionAfter.subresourceRange.layerCount = 1;
+			// RELEASE: all depth writes have finished  
+			DepthAttachmentTransitionAfter.srcStageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+			DepthAttachmentTransitionAfter.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			// ACQUIRE: allow sampling in the fragment shader  
+			DepthAttachmentTransitionAfter.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+			DepthAttachmentTransitionAfter.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
 
 			VkDependencyInfo DependencyInfoAfter = { };
 			DependencyInfoAfter.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;

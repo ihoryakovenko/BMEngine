@@ -39,7 +39,7 @@ namespace RenderResourceManager
 		return IndexBuffer;
 	}
 
-	u64 CreateEntity(void* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, VkDescriptorSet TextureSet)
+	u64 CreateEntity(void* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, u32 TextureIndex)
 	{
 		assert(Index < MaxEntities);
 
@@ -52,7 +52,7 @@ namespace RenderResourceManager
 		Render::LoadIndices(&IndexBuffer, Indices, IndicesCount, IndexBuffer.Offset);
 
 		Entity->IndicesCount = IndicesCount;
-		Entity->TextureSet = TextureSet;
+		Entity->TextureIndex = TextureIndex;
 		Entity->Model = glm::mat4(1.0f);
 
 		const u64 EntityIndex = Index;

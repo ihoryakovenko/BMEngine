@@ -29,24 +29,8 @@ namespace MainPass
 
 		const VkDescriptorType Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		const VkShaderStageFlags Flags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		SkyBoxLayout = VulkanInterface::CreateUniformLayout(&Type, &Flags, 1);
-
-
-
-
-
-		//VulkanInterface::RenderTarget RenderTarget;
-		//for (u32 ImageIndex = 0; ImageIndex < VulkanInterface::GetImageCount(); ImageIndex++)
-		//{
-		//	VulkanInterface::AttachmentView* AttachmentView = RenderTarget.AttachmentViews + ImageIndex;
-
-		//	AttachmentView->ImageViews = Memory::BmMemoryManagementSystem::FrameAlloc<VkImageView>(MainRenderPassSettings.AttachmentDescriptionsCount);
-		//	AttachmentView->ImageViews[0] = VulkanInterface::GetSwapchainImageViews()[ImageIndex];
-		//	AttachmentView->ImageViews[1] = DeferredPass::TestDeferredInputColorImageInterface()[ImageIndex];
-		//	AttachmentView->ImageViews[2] = DeferredPass::TestDeferredInputDepthImageInterface()[ImageIndex];
-
-		//}
-
+		const VkDescriptorBindingFlags BindingFlags[1] = { };
+		SkyBoxLayout = VulkanInterface::CreateUniformLayout(&Type, &Flags, BindingFlags, 1, 1);
 
 		const VkDescriptorSetLayout VpLayout = FrameManager::GetViewProjectionLayout();
 
@@ -111,7 +95,7 @@ namespace MainPass
 		DepthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		DepthAttachment.clearValue.depthStencil = { 1.0f, 0 }; // Clear depth to 1.0f
+		DepthAttachment.clearValue.depthStencil = { 1.0f, 0 };
 
 		VkRect2D RenderArea;
 		RenderArea.extent = MainScreenExtent;
@@ -125,8 +109,8 @@ namespace MainPass
 		RenderingInfo.viewMask = 0;
 		RenderingInfo.colorAttachmentCount = 1;
 		RenderingInfo.pColorAttachments = &ColorAttachment;
-		RenderingInfo.pDepthAttachment = &DepthAttachment; // Optional, if using depth
-		RenderingInfo.pStencilAttachment = nullptr; // If not using a stencil attachment
+		RenderingInfo.pDepthAttachment = &DepthAttachment;
+		RenderingInfo.pStencilAttachment = nullptr;
 
 		VkImageMemoryBarrier2 ColorBarrierBefore = { };
 		ColorBarrierBefore.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;

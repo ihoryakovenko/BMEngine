@@ -182,6 +182,19 @@ namespace ResourceManager
 		EngineMaterials[Id] = *SetToAttach;
 	}
 
+	std::vector<VkImageView> TestGetAllImages()
+	{
+		std::vector<VkImageView> Images;
+		Images.reserve(Textures.size());
+
+		for (const auto& Texture : Textures)
+		{
+			Images.push_back(Texture.second.ImageView);
+		}
+
+		return Images;
+	}
+
 	void LoadTextures(const char* Directory)
 	{
 		WIN32_FIND_DATAA FindFileData;

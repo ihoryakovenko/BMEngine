@@ -37,7 +37,7 @@ namespace StaticMeshRender
 	static VkSampler ShadowMapArraySampler;
 
 	static VkDescriptorSetLayout StaticMeshLightLayout;
-	static VkDescriptorSetLayout StaticMeshSamplerLayout;
+	static VkDescriptorSetLayout BindlesTexturesLayout;
 	static VkDescriptorSetLayout StaticMeshMaterialLayout;
 	static VkDescriptorSetLayout ShadowMapArrayLayout;
 
@@ -51,6 +51,14 @@ namespace StaticMeshRender
 	static VkDescriptorSet StaticMeshLightSet;
 	static VkDescriptorSet MaterialSet;
 	static VkDescriptorSet ShadowMapArraySet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+
+	static VkDescriptorSet BindlesTexturesSet;
+
+	struct PushConstantsData
+	{
+		glm::mat4 Model;
+		s32 texIndex;
+	};
 
 	void Init()
 	{
@@ -101,7 +109,57 @@ namespace StaticMeshRender
 
 		const VkShaderStageFlags EntitySamplerInputFlags[2] = { VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
 		const VkDescriptorType EntitySamplerDescriptorType[2] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
-		StaticMeshSamplerLayout = VulkanInterface::CreateUniformLayout(EntitySamplerDescriptorType, EntitySamplerInputFlags, 2);
+		const VkDescriptorBindingFlags BindingFlags[2] = {
+			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
+			VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT |
+			VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
+			VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT |
+			VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT };
+
+		// TODO: Get max textures from limits.maxPerStageDescriptorSampledImages;
+		const u32 MaxTextures = 256;
+		BindlesTexturesLayout = VulkanInterface::CreateUniformLayout(EntitySamplerDescriptorType, EntitySamplerInputFlags, BindingFlags, 2, MaxTextures);
+
+		VulkanInterface::CreateUniformSets(&BindlesTexturesLayout, 1, &BindlesTexturesSet);
+
+		const auto Views = ResourceManager::TestGetAllImages();
+
+		std::vector<VkDescriptorImageInfo> ImageInfosDiffuse(Views.size());
+		std::vector<VkDescriptorImageInfo> ImageInfosSpecular(Views.size());
+		for (u32 i = 0; i < Views.size(); ++i)
+		{
+			ImageInfosDiffuse[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			ImageInfosDiffuse[i].sampler = DiffuseSampler;
+			ImageInfosDiffuse[i].imageView = Views[i];
+
+			ImageInfosSpecular[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			ImageInfosSpecular[i].sampler = SpecularSampler;
+			ImageInfosSpecular[i].imageView = Views[i];
+		}
+
+
+		VkWriteDescriptorSet WriteDiffuse = { };
+		WriteDiffuse.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		WriteDiffuse.dstSet = BindlesTexturesSet;
+		WriteDiffuse.dstBinding = 0;
+		WriteDiffuse.dstArrayElement = 0;
+		WriteDiffuse.descriptorCount = Views.size();
+		WriteDiffuse.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		WriteDiffuse.pImageInfo = ImageInfosSpecular.data();
+
+		VkWriteDescriptorSet WriteSpecular = { };
+		WriteSpecular.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		WriteSpecular.dstSet = BindlesTexturesSet;
+		WriteSpecular.dstBinding = 1;
+		WriteSpecular.dstArrayElement = 0;
+		WriteSpecular.descriptorCount = Views.size();
+		WriteSpecular.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		WriteSpecular.pImageInfo = ImageInfosSpecular.data();
+
+		VkWriteDescriptorSet Writes[] = { WriteDiffuse, WriteSpecular };
+
+		vkUpdateDescriptorSets(VulkanInterface::GetDevice(), 2, Writes, 0, nullptr);
 	
 		const VkDeviceSize MaterialSize = sizeof(Material);
 		VkBufferCreateInfo MaterialBufferInfo = { };
@@ -119,13 +177,15 @@ namespace StaticMeshRender
 
 		const VkDescriptorType MaterialDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		const VkShaderStageFlags MaterialStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		StaticMeshMaterialLayout = VulkanInterface::CreateUniformLayout(&MaterialDescriptorType, &MaterialStageFlags, 1);
+		const VkDescriptorBindingFlags MaterialBindingFlags[1] = { };
+		StaticMeshMaterialLayout = VulkanInterface::CreateUniformLayout(&MaterialDescriptorType, &MaterialStageFlags, MaterialBindingFlags, 1, 1);
 		VulkanInterface::CreateUniformSets(&StaticMeshMaterialLayout, 1, &MaterialSet);
 		VulkanInterface::AttachUniformsToSet(MaterialSet, &MaterialAttachmentInfo, 1);
 
 		const VkDescriptorType ShadowMapArrayDescriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		const VkShaderStageFlags ShadowMapArrayFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		ShadowMapArrayLayout = VulkanInterface::CreateUniformLayout(&ShadowMapArrayDescriptorType, &ShadowMapArrayFlags, 1);
+		const VkDescriptorBindingFlags ShadowMapArrayBindingFlags[1] = { };
+		ShadowMapArrayLayout = VulkanInterface::CreateUniformLayout(&ShadowMapArrayDescriptorType, &ShadowMapArrayFlags, ShadowMapArrayBindingFlags, 1, 1);
 
 		VulkanInterface::UniformImageInterfaceCreateInfo ShadowMapArrayInterfaceCreateInfo = { };
 		ShadowMapArrayInterfaceCreateInfo.Flags = 0; // No flags
@@ -159,8 +219,8 @@ namespace StaticMeshRender
 		VkDescriptorSetLayout StaticMeshDescriptorLayouts[] =
 		{
 			FrameManager::GetViewProjectionLayout(),
+			BindlesTexturesLayout,
 			StaticMeshLightLayout,
-			StaticMeshSamplerLayout,
 			StaticMeshMaterialLayout,
 			ShadowMapArrayLayout
 		};
@@ -170,7 +230,7 @@ namespace StaticMeshRender
 		PushConstants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 		PushConstants.offset = 0;
 		// Todo: check constant and model size?
-		PushConstants.size = sizeof(glm::mat4);
+		PushConstants.size = sizeof(PushConstantsData);
 
 		Pipeline.PipelineLayout = VulkanInterface::CreatePipelineLayout(StaticMeshDescriptorLayouts, StaticMeshDescriptorLayoutCount, &PushConstants, 1);
 
@@ -227,12 +287,6 @@ namespace StaticMeshRender
 		//ResourceManager::CreateEntityMaterial("BlendWindowMaterial", BlendWindow.ImageView, BlendWindow.ImageView, &BlendWindowMaterial);
 		//ResourceManager::CreateEntityMaterial("GrassMaterial", GrassTexture.ImageView, GrassTexture.ImageView, &GrassMaterial);
 
-		AttachTextureToStaticMesh(test.ImageView, test.ImageView, &TestMaterial);
-		AttachTextureToStaticMesh(test.ImageView, test.ImageView, &WhiteMaterial);
-		AttachTextureToStaticMesh(test.ImageView, test.ImageView, &ContainerMaterial);
-		AttachTextureToStaticMesh(test.ImageView, test.ImageView, &BlendWindowMaterial);
-		AttachTextureToStaticMesh(test.ImageView, test.ImageView, &GrassMaterial);
-
 		Util::Model3DData ModelData = Util::LoadModel3DData(".\\Resources\\Models\\uh60.model");
 		Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
 
@@ -245,12 +299,8 @@ namespace StaticMeshRender
 
 			const Render::RenderTexture* Texture = ResourceManager::FindTexture(Uh60Model.DiffuseTexturesHashes[i]);
 			
-			// TODO DELETE!
-			VkDescriptorSet Set;
-			AttachTextureToStaticMesh(Texture->ImageView, Texture->ImageView, &Set);
-
 			RenderResourceManager::CreateEntity(Uh60Model.VertexData + ModelVertexByteOffset, sizeof(StaticMeshVertex), VerticesCount,
-				Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, Set);
+				Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, 0);
 
 			ModelVertexByteOffset += VerticesCount * sizeof(StaticMeshVertex);
 			ModelIndexCountOffset += IndicesCount;
@@ -323,7 +373,7 @@ namespace StaticMeshRender
 		VulkanInterface::DestroyUniformLayout(StaticMeshLightLayout);
 		VulkanInterface::DestroyUniformLayout(StaticMeshMaterialLayout);
 		VulkanInterface::DestroyUniformLayout(ShadowMapArrayLayout);
-		VulkanInterface::DestroyUniformLayout(StaticMeshSamplerLayout);
+		VulkanInterface::DestroyUniformLayout(BindlesTexturesLayout);
 
 		VulkanInterface::DestroySampler(ShadowMapArraySampler);
 		VulkanInterface::DestroySampler(DiffuseSampler);
@@ -343,6 +393,9 @@ namespace StaticMeshRender
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
 			0, 1, &VpSet, 1, &DynamicOffset);
 
+		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
+			1, 1, &BindlesTexturesSet, 0, nullptr);
+
 		const u32 LightDynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(Render::LightBuffer);
 
 		VulkanInterface::VertexBuffer VertexBuffer = RenderResourceManager::GetVertexBuffer();
@@ -355,17 +408,20 @@ namespace StaticMeshRender
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
 				StaticMeshLightSet,
-				DrawEntity->TextureSet,
 				MaterialSet,
 				ShadowMapArraySet[VulkanInterface::TestGetImageIndex()],
 			};
 			const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
+			PushConstantsData Constants;
+			Constants.Model = DrawEntity->Model;
+			Constants.texIndex = DrawEntity->TextureIndex;
+
 			const VkShaderStageFlags Flags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-			vkCmdPushConstants(CmdBuffer, Pipeline.PipelineLayout, Flags, 0, sizeof(glm::mat4), &DrawEntity->Model);
+			vkCmdPushConstants(CmdBuffer, Pipeline.PipelineLayout, Flags, 0, sizeof(PushConstantsData), &Constants);
 
 			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
-				1, DescriptorSetGroupCount, DescriptorSetGroup, 1, &LightDynamicOffset);
+				2, DescriptorSetGroupCount, DescriptorSetGroup, 1, &LightDynamicOffset);
 
 			vkCmdBindVertexBuffers(CmdBuffer, 0, 1, &VertexBuffer.Buffer, &DrawEntity->VertexOffset);
 			vkCmdBindIndexBuffer(CmdBuffer, IndexBuffer.Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
@@ -385,23 +441,6 @@ namespace StaticMeshRender
 			Buffer);
 	}
 
-	void AttachTextureToStaticMesh(VkImageView DefuseImage, VkImageView SpecularImage, VkDescriptorSet* SetToAttach)
-	{
-		VulkanInterface::CreateUniformSets(&StaticMeshSamplerLayout, 1, SetToAttach);
-
-		VulkanInterface::UniformSetAttachmentInfo SetInfo[2];
-		SetInfo[0].ImageInfo.imageView = DefuseImage;
-		SetInfo[0].ImageInfo.sampler = DiffuseSampler;
-		SetInfo[0].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		SetInfo[0].Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-
-		SetInfo[1].ImageInfo.imageView = SpecularImage;
-		SetInfo[1].ImageInfo.sampler = SpecularSampler;
-		SetInfo[1].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		SetInfo[1].Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-
-		VulkanInterface::AttachUniformsToSet(*SetToAttach, SetInfo, 2);
-	}
 
 
 

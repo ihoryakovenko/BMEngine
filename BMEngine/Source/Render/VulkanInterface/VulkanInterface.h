@@ -155,8 +155,10 @@ namespace VulkanInterface
 		u32 DescriptorLayoutsCount, const VkPushConstantRange* PushConstant, u32 PushConstantsCount);
 	UniformBuffer CreateUniformBufferInternal(const VkBufferCreateInfo* BufferInfo, VkMemoryPropertyFlags Properties);
 	UniformImage CreateUniformImage(const VkImageCreateInfo* ImageCreateInfo);
-	VkDescriptorSetLayout CreateUniformLayout(const VkDescriptorType* Types, const VkShaderStageFlags* Stages, u32 Count);
+	VkDescriptorSetLayout CreateUniformLayout(const VkDescriptorType* Types, const VkShaderStageFlags* Stages,
+		const VkDescriptorBindingFlags* BindingFlags, u32 BindingCount, u32 DescriptorCount);
 	void CreateUniformSets(const VkDescriptorSetLayout* Layouts, u32 Count, VkDescriptorSet* OutSets);
+	void CreateUniformSets(const VkDescriptorSetLayout* Layouts, u32* DescriptorCounts, u32 Count, VkDescriptorSet* OutSets);
 	VkImageView CreateImageInterface(const UniformImageInterfaceCreateInfo* InterfaceCreateInfo, VkImage Image);
 	VkSampler CreateSampler(const VkSamplerCreateInfo* CreateInfo);
 	bool CreateShader(const u32* Code, u32 CodeSize, VkShaderModule& VertexShaderModule);
@@ -207,6 +209,7 @@ namespace VulkanInterface
 	IndexBuffer CreateIndexBuffer(u64 Size);
 
 	VkPhysicalDeviceProperties* GetDeviceProperties();
+	VkDevice GetDevice();
 
 
 

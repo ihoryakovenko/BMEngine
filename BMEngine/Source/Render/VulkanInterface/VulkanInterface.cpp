@@ -713,24 +713,31 @@ namespace VulkanInterface
 		vkFreeMemory(Device.LogicalDevice, Image.Memory, nullptr);
 	}
 
-	VkDescriptorSetLayout CreateUniformLayout(const VkDescriptorType* Types, const VkShaderStageFlags* Stages, u32 Count)
+	VkDescriptorSetLayout CreateUniformLayout(const VkDescriptorType* Types, const VkShaderStageFlags* Stages,
+		const VkDescriptorBindingFlags* BindingFlags, u32 BindingCount, u32 DescriptorCount)
 	{
-		auto LayoutBindings = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorSetLayoutBinding>(Count);
-		for (u32 BindingIndex = 0; BindingIndex < Count; ++BindingIndex)
+		auto LayoutBindings = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorSetLayoutBinding>(BindingCount);
+		for (u32 BindingIndex = 0; BindingIndex < BindingCount; ++BindingIndex)
 		{
 			VkDescriptorSetLayoutBinding* LayoutBinding = LayoutBindings + BindingIndex;
 			*LayoutBinding = { };
 			LayoutBinding->binding = BindingIndex;
 			LayoutBinding->descriptorType = Types[BindingIndex];
-			LayoutBinding->descriptorCount = 1;
+			LayoutBinding->descriptorCount = DescriptorCount;
 			LayoutBinding->stageFlags = Stages[BindingIndex];
 			LayoutBinding->pImmutableSamplers = nullptr; // For Texture: Can make sampler data unchangeable (immutable) by specifying in layout	
 		}
 
+		VkDescriptorSetLayoutBindingFlagsCreateInfo BindingFlagsInfo = { };
+		BindingFlagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+		BindingFlagsInfo.bindingCount = BindingCount;
+		BindingFlagsInfo.pBindingFlags = BindingFlags;
+
 		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
 		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = Count;
+		LayoutCreateInfo.bindingCount = BindingCount;
 		LayoutCreateInfo.pBindings = LayoutBindings;
+		LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
 
 		VkDescriptorSetLayout Layout;
 		const VkResult Result = vkCreateDescriptorSetLayout(Device.LogicalDevice, &LayoutCreateInfo, nullptr, &Layout);
@@ -759,6 +766,29 @@ namespace VulkanInterface
 		SetAllocInfo.descriptorPool = MainPool; // Pool to allocate Descriptor Set from
 		SetAllocInfo.descriptorSetCount = Count; // Number of sets to allocate
 		SetAllocInfo.pSetLayouts = Layouts; // Layouts to use to allocate sets (1:1 relationship)
+
+		const VkResult Result = vkAllocateDescriptorSets(Device.LogicalDevice, &SetAllocInfo, (VkDescriptorSet*)OutSets);
+		if (Result != VK_SUCCESS)
+		{
+			HandleLog(BMRVkLogType_Error, "vkAllocateDescriptorSets result is %d", Result);
+		}
+	}
+
+	void CreateUniformSets(const VkDescriptorSetLayout* Layouts, u32* DescriptorCounts, u32 Count, VkDescriptorSet* OutSets)
+	{
+		HandleLog(BMRVkLogType_Info, "Allocating descriptor sets. Size count: %d", Count);
+
+		VkDescriptorSetVariableDescriptorCountAllocateInfo CountInfo = { };
+		CountInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;
+		CountInfo.descriptorSetCount = Count;
+		CountInfo.pDescriptorCounts = DescriptorCounts;
+
+		VkDescriptorSetAllocateInfo SetAllocInfo = { };
+		SetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		SetAllocInfo.descriptorPool = MainPool; // Pool to allocate Descriptor Set from
+		SetAllocInfo.descriptorSetCount = Count; // Number of sets to allocate
+		SetAllocInfo.pSetLayouts = Layouts; // Layouts to use to allocate sets (1:1 relationship)
+		SetAllocInfo.pNext = &CountInfo;
 
 		const VkResult Result = vkAllocateDescriptorSets(Device.LogicalDevice, &SetAllocInfo, (VkDescriptorSet*)OutSets);
 		if (Result != VK_SUCCESS)
@@ -1582,7 +1612,8 @@ namespace VulkanInterface
 		const char* DeviceExtensions[] =
 		{
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-			VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME
+			VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+			VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
 		};
 
 		const u32 DeviceExtensionsSize = sizeof(DeviceExtensions) / sizeof(DeviceExtensions[0]);
@@ -1664,6 +1695,15 @@ namespace VulkanInterface
 		Sync2Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
 		Sync2Features.synchronization2 = VK_TRUE;
 
+		// TODO: Check if supported
+		VkPhysicalDeviceDescriptorIndexingFeatures IndexingFeatures = { };
+		IndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+		IndexingFeatures.runtimeDescriptorArray = VK_TRUE;
+		IndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
+		IndexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
+		IndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+
+		Sync2Features.pNext = &IndexingFeatures;
 		DynamicRenderingFeatures.pNext = &Sync2Features;
 
 		VkDeviceCreateInfo DeviceCreateInfo = { };
@@ -2156,6 +2196,7 @@ namespace VulkanInterface
 		PoolCreateInfo.maxSets = MaxDescriptorCount; // Maximum number of Descriptor Sets that can be created from pool
 		PoolCreateInfo.poolSizeCount = PoolSizeCount; // Amount of Pool Sizes being passed
 		PoolCreateInfo.pPoolSizes = PoolSizes; // Pool Sizes to create pool with
+		PoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
 
 		VkDescriptorPool Pool;
 		VkResult Result = vkCreateDescriptorPool(Device.LogicalDevice, &PoolCreateInfo, nullptr, &Pool);
@@ -2204,6 +2245,11 @@ namespace VulkanInterface
 	VkPhysicalDeviceProperties* GetDeviceProperties()
 	{
 		return &DeviceProperties;
+	}
+
+	VkDevice GetDevice()
+	{
+		return Device.LogicalDevice;
 	}
 
 	VkCommandBuffer GetCommandBuffer()

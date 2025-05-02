@@ -10,6 +10,7 @@ namespace FrameManager
 	static u64 BufferMultiFrameSize;
 
 	static const VkDescriptorType BufferType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+	static const VkDescriptorBindingFlags BindingFlags[1];
 	static VulkanInterface::UniformBuffer Buffer;
 	static u64 BufferAlignment;
 	static u64 NextUniformMemoryHandle;
@@ -30,7 +31,8 @@ namespace FrameManager
 		const VkShaderStageFlags VpStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
 		VpHandle = ReserveUniformMemory(VpBufferSize);
-		VpLayout = VulkanInterface::CreateUniformLayout(&BufferType, &VpStageFlags, 1);
+		const VkDescriptorBindingFlags BindingFlags[1] = { };
+		VpLayout = VulkanInterface::CreateUniformLayout(&BufferType, &VpStageFlags, BindingFlags, 1, 1);
 
 		VpSet = CreateAndBindSet(VpHandle, VpBufferSize, VpLayout);
 	}
@@ -77,7 +79,7 @@ namespace FrameManager
 
 	VkDescriptorSetLayout CreateCompatibleLayout(u32 Flags)
 	{
-		return VulkanInterface::CreateUniformLayout(&BufferType, &Flags, 1);
+		return VulkanInterface::CreateUniformLayout(&BufferType, &Flags, BindingFlags, 1, 1);
 	}
 
 	VkDescriptorSetLayout GetViewProjectionLayout()

@@ -15,7 +15,7 @@ namespace RenderResourceManager
 		u64 VertexOffset;
 		u64 IndexOffset;
 		u32 IndicesCount;
-		VkDescriptorSet TextureSet;
+		u32 TextureIndex;
 		glm::mat4 Model;
 	};
 
@@ -28,7 +28,7 @@ namespace RenderResourceManager
 	VulkanInterface::IndexBuffer GetIndexBuffer();
 
 	// TODO: do something with TextureSet
-	u64 CreateEntity(void* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, VkDescriptorSet TextureSet);
+	u64 CreateEntity(void* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, u32 TextureIndex);
 
 	DrawEntity* GetEntities();
 	u64 GetEntitiesCount();

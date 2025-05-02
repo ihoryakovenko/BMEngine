@@ -29,5 +29,4 @@ namespace StaticMeshRender
 	};
 
 	void UpdateMaterialBuffer(const Material* Buffer);
-	void AttachTextureToStaticMesh(VkImageView DefuseImage, VkImageView SpecularImage, VkDescriptorSet* SetToAttach);
 }

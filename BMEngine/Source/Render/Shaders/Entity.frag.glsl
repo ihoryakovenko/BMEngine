@@ -1,5 +1,7 @@
 #version 450
 
+#extension GL_EXT_nonuniform_qualifier : enable
+
 struct PointLight
 {
 	vec4 Position;
@@ -50,11 +52,11 @@ layout(set = 0, binding = 0) uniform UboViewProjection
 	mat4 Projection;
 } ViewProjection;
 
-layout(set = 2, binding = 0) uniform sampler2D DiffuseTexture;
-layout(set = 2, binding = 1) uniform sampler2D SpecularTexture;
+layout(set = 1, binding = 0) uniform sampler2D DiffuseTexture[];
+layout(set = 1, binding = 1) uniform sampler2D SpecularTexture[];
 
 
-layout(set = 1, binding = 0) uniform LightCasters
+layout(set = 2, binding = 0) uniform LightCasters
 {
 	PointLight pointlight;
 	DirectionLight directionLight;
@@ -73,6 +75,7 @@ layout(set = 4, binding = 0) uniform sampler2DArray ShadowMaps;
 layout(push_constant) uniform PushModel
 {
 	mat4 Model;
+	int TextureIndex;
 } Model;
 
 layout(location = 0) out vec4 OutColor;
@@ -196,8 +199,8 @@ vec3 CastSpotLigh(vec3 FragmentPosition, vec3 DiffuseTexture, vec3 SpecularTextu
 void main()
 {
 	vec3 FragmentPosition = vec3(ViewProjection.View * WorldFragPos);
-	vec4 DiffuseTexture = texture(DiffuseTexture, FragmentTexture);
-	vec3 SpecularTexture = vec3(texture(SpecularTexture, FragmentTexture));
+	vec4 DiffuseTexture = texture(DiffuseTexture[nonuniformEXT(Model.TextureIndex)], FragmentTexture);
+	vec3 SpecularTexture = vec3(texture(SpecularTexture[nonuniformEXT(Model.TextureIndex)], FragmentTexture));
 
 	vec3 ResultLightColor = vec3(0.0);
 	ResultLightColor += CastDirectionLight(FragmentPosition, vec3(DiffuseTexture), SpecularTexture);

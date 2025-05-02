@@ -47,9 +47,10 @@ namespace DeferredPass
 		DepthSamplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
 		DepthSamplerInfo.anisotropyEnable = VK_FALSE;
 
-		VkDescriptorType DeferredInputDescriptorType[2] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
-		VkShaderStageFlags DeferredInputFlags[2] = { VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
-		DeferredInputLayout = VulkanInterface::CreateUniformLayout(DeferredInputDescriptorType, DeferredInputFlags, 2);
+		const VkDescriptorType DeferredInputDescriptorType[2] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
+		const VkShaderStageFlags DeferredInputFlags[2] = { VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
+		const VkDescriptorBindingFlags BindingFlags[2] = { };
+		DeferredInputLayout = VulkanInterface::CreateUniformLayout(DeferredInputDescriptorType, DeferredInputFlags, BindingFlags, 2, 1);
 
 		VkImageCreateInfo DeferredInputDepthUniformCreateInfo = { };
 		DeferredInputDepthUniformCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -189,11 +190,6 @@ namespace DeferredPass
 
 		VkImageMemoryBarrier2 ColorBarrier = { };
 		ColorBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-		// TODO Check transitions
-		ColorBarrier.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		ColorBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		ColorBarrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-		ColorBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 		ColorBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		ColorBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		ColorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -204,14 +200,15 @@ namespace DeferredPass
 		ColorBarrier.subresourceRange.levelCount = 1;
 		ColorBarrier.subresourceRange.baseArrayLayer = 0;
 		ColorBarrier.subresourceRange.layerCount = 1;
+		// RELEASE: wait for all color-attachmet writes to finish
+		ColorBarrier.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		ColorBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		// ACQUIRE: make image ready for sampling in the fragment shader
+		ColorBarrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		ColorBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
 		VkImageMemoryBarrier2 DepthBarrier = { };
 		DepthBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-		// TODO Check transitions
-		DepthBarrier.srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-		DepthBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-		DepthBarrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-		DepthBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 		DepthBarrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		DepthBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -222,14 +219,15 @@ namespace DeferredPass
 		DepthBarrier.subresourceRange.levelCount = 1;
 		DepthBarrier.subresourceRange.baseArrayLayer = 0;
 		DepthBarrier.subresourceRange.layerCount = 1;
+		// RELEASE: wait for all color-attachmet writes to finish
+		DepthBarrier.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		DepthBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		// ACQUIRE: make image ready for sampling in the fragment shader
+		DepthBarrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		DepthBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
 		VkImageMemoryBarrier2 SwapchainAcquireBarrier = { };
 		SwapchainAcquireBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-		// TODO Check transitions
-		SwapchainAcquireBarrier.srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-		SwapchainAcquireBarrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-		SwapchainAcquireBarrier.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		SwapchainAcquireBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		SwapchainAcquireBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		SwapchainAcquireBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		SwapchainAcquireBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -240,6 +238,12 @@ namespace DeferredPass
 		SwapchainAcquireBarrier.subresourceRange.levelCount = 1;
 		SwapchainAcquireBarrier.subresourceRange.baseArrayLayer = 0;
 		SwapchainAcquireBarrier.subresourceRange.layerCount = 1;
+		// RELEASE nothing — we don’t depend on any earlier writes to the swap image
+		SwapchainAcquireBarrier.srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		SwapchainAcquireBarrier.srcAccessMask = 0;
+		// ACQUIRE for our upcoming color-attachment writes
+		SwapchainAcquireBarrier.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		SwapchainAcquireBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
 		VkImageMemoryBarrier2 Barriers[] = {
 			ColorBarrier,
@@ -267,11 +271,6 @@ namespace DeferredPass
 
 		VkImageMemoryBarrier2 SwapchainPresentBarrier = { };
 		SwapchainPresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-		// TODO Check transitions
-		SwapchainPresentBarrier.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		SwapchainPresentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		SwapchainPresentBarrier.dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-		SwapchainPresentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
 		SwapchainPresentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		SwapchainPresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 		SwapchainPresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -282,6 +281,12 @@ namespace DeferredPass
 		SwapchainPresentBarrier.subresourceRange.levelCount = 1;
 		SwapchainPresentBarrier.subresourceRange.baseArrayLayer = 0;
 		SwapchainPresentBarrier.subresourceRange.layerCount = 1;
+		// RELEASE: finish all your color-attachment writes
+		SwapchainPresentBarrier.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		SwapchainPresentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		// ACQUIRE: nothing—present engine will take it
+		SwapchainPresentBarrier.dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+		SwapchainPresentBarrier.dstAccessMask = VK_PIPELINE_STAGE_NONE;
 
 		VkDependencyInfo PresentDepInfo = { };
 		PresentDepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;

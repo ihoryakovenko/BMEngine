@@ -149,7 +149,7 @@ namespace DynamicMapSystem
 
 		VkDescriptorSet TilesMaterial;
 		ResourceManager::CreateSkyBoxTerrainTexture(TilesMaterialId, TextureArrayTiles.ImageView, &TilesMaterial);
-		Scene.MapEntity.TextureSet = TilesMaterial;
+		//Scene.MapEntity.TextureSet = TilesMaterial;
 
 		static httplib::Client ClientInstance("http://tile.openstreetmap.org");
 		Client = &ClientInstance;
@@ -340,7 +340,7 @@ namespace DynamicMapSystem
 
 		const VkDescriptorSet DescriptorSetGroup[] = {
 			FrameManager::GetViewProjectionSet(),
-			Scene.MapEntity.TextureSet,
+			//Scene.MapEntity.TextureSet,
 			MapTileSettingsSet
 		};
 
