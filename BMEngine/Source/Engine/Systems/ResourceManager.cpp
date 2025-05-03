@@ -7,6 +7,7 @@
 
 #include "Engine/Systems/Render/TerrainRender.h"
 #include "Engine/Systems/Render/StaticMeshRender.h"
+#include "Engine/Systems/Render/RenderResources.h"
 
 namespace ResourceManager
 {
@@ -14,8 +15,8 @@ namespace ResourceManager
 
 	static const char TexturesPath[] = ".\\Resources\\Textures";
 
-	static std::map<u64, Render::RenderTexture> Textures;
-	static std::map<std::string, VkDescriptorSet> EngineMaterials;
+	static std::unordered_map<u64, Render::RenderTexture> Textures;
+	static std::unordered_map<std::string, VkDescriptorSet> EngineMaterials;
 
 	static void LoadTextures(const char* Directory);
 
@@ -29,20 +30,10 @@ namespace ResourceManager
 		s32 Channels;
 
 		stbi_uc* Data[1];
-
 		Data[0] = stbi_load_from_memory(DefaultTextureData, DefaultTextureDataCount,
 			&Width, &Height, &Channels, STBI_rgb_alpha);
 
-		Render::TextureArrayInfo Info;
-		Info.Width = Width;
-		Info.Height = Height;
-		Info.Format = STBI_rgb_alpha;
-		Info.LayersCount = 1;
-		Info.Data = Data;
-		Info.ViewType = VK_IMAGE_VIEW_TYPE_2D;
-		Info.Flags = 0;
-
-		Textures[DefaultTextureHash] = Render::CreateTexture(&Info);
+		RenderResources::CreateTexture2DSRGB(DefaultTextureHash, Data, Width, Height);
 
 		LoadTextures(TexturesPath);
 	}
@@ -173,26 +164,13 @@ namespace ResourceManager
 			return &it->second;
 		}
 
-		return &Textures.find(DefaultTextureHash)->second;
+		return 0;
 	}
 
 	void CreateSkyBoxTerrainTexture(const std::string& Id, VkImageView DefuseImage, VkDescriptorSet* SetToAttach)
 	{
 		TerrainRender::TestAttachSkyNoxTerrainTexture(DefuseImage, SetToAttach);
 		EngineMaterials[Id] = *SetToAttach;
-	}
-
-	std::vector<VkImageView> TestGetAllImages()
-	{
-		std::vector<VkImageView> Images;
-		Images.reserve(Textures.size());
-
-		for (const auto& Texture : Textures)
-		{
-			Images.push_back(Texture.second.ImageView);
-		}
-
-		return Images;
 	}
 
 	void LoadTextures(const char* Directory)
@@ -228,7 +206,20 @@ namespace ResourceManager
 			}
 			else
 			{
-				LoadTexture(FileName, { FullPath }, VK_IMAGE_VIEW_TYPE_2D);
+				int Width = 0;
+				int Height = 0;
+				int Channels = 0;
+
+				stbi_uc* ImageData[1];
+				ImageData[0] = stbi_load(FullPath, &Width, &Height, &Channels, STBI_rgb_alpha);
+				assert(ImageData);
+
+				std::hash<std::string> Hasher;
+				RenderResources::CreateTexture2DSRGB(Hasher(FileName), ImageData, Width, Height);
+
+				stbi_image_free(ImageData[0]);
+
+				//LoadTexture(FileName, { FullPath }, VK_IMAGE_VIEW_TYPE_2D);
 			}
 		}
 		while (FindNextFileA(hFind, &FindFileData));

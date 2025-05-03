@@ -8,8 +8,14 @@
 
 #include "Render/VulkanInterface/VulkanInterface.h"
 
-namespace RenderResourceManager
+namespace RenderResources
 {
+	struct ResourceHandle
+	{
+		u32 Index;
+		u32 Generation;
+	};
+
 	struct DrawEntity
 	{
 		u64 VertexOffset;
@@ -19,17 +25,18 @@ namespace RenderResourceManager
 		glm::mat4 Model;
 	};
 
+	void Init(u64 VertexBufferSize, u64 IndexBufferSize, u32 MaxEntities, u32 MaxTextures);
 	void DeInit();
-
-	void AllocateVertexBuffer(u64 Size);
-	void AllocateIndexBuffer(u64 Size);
 
 	VulkanInterface::VertexBuffer GetVertexBuffer();
 	VulkanInterface::IndexBuffer GetIndexBuffer();
 
-	// TODO: do something with TextureSet
 	u64 CreateEntity(void* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, u32 TextureIndex);
+	DrawEntity* GetEntities(u32* Count);
 
-	DrawEntity* GetEntities();
-	u64 GetEntitiesCount();
+	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height);
+	u32 GetTexture2DSRGBIndex(u64 Hash);
+
+
+	VkImageView* GetTextureImageViews(u32* Count);
 }

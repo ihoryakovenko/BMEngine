@@ -4,6 +4,7 @@
 #include "Render/FrameManager.h"
 #include "MainPass.h"
 #include "Engine/Systems/ResourceManager.h"
+#include "Engine/Systems/Render/RenderResources.h"
 #include "Util/Util.h"
 #include "Util/Settings.h"
 
@@ -78,8 +79,9 @@ namespace TerrainRender
 
 		VulkanInterface::CreateUniformSets(&SamplerLayout, 1, &TextureSet);
 
+		u32 TextureImageViewsCount;
 		VulkanInterface::UniformSetAttachmentInfo SetInfo[1];
-		SetInfo[0].ImageInfo.imageView = ResourceManager::FindTexture("1giraffe.jpg")->ImageView;
+		SetInfo[0].ImageInfo.imageView = RenderResources::GetTextureImageViews(&TextureImageViewsCount)[0];
 		SetInfo[0].ImageInfo.sampler = Sampler;
 		SetInfo[0].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		SetInfo[0].Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;

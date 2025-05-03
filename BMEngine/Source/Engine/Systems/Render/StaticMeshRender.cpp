@@ -3,9 +3,11 @@
 #include "Render/VulkanInterface/VulkanInterface.h"
 #include "Render/Render.h"
 #include "Render/FrameManager.h"
-#include "Engine/Systems/Render/RenderResourceManger.h"
+#include "Engine/Systems/Render/RenderResources.h"
 #include "Engine/Systems/Render/LightningPass.h"
 #include "Engine/Systems/Render/MainPass.h"
+
+#include "Memory/MemoryManagmentSystem.h"
 
 #include "Util/Settings.h"
 #include "Util/Util.h"
@@ -123,11 +125,12 @@ namespace StaticMeshRender
 
 		VulkanInterface::CreateUniformSets(&BindlesTexturesLayout, 1, &BindlesTexturesSet);
 
-		const auto Views = ResourceManager::TestGetAllImages();
+		u32 TextureImageViewsCount;
+		VkImageView* Views = RenderResources::GetTextureImageViews(&TextureImageViewsCount);
 
-		std::vector<VkDescriptorImageInfo> ImageInfosDiffuse(Views.size());
-		std::vector<VkDescriptorImageInfo> ImageInfosSpecular(Views.size());
-		for (u32 i = 0; i < Views.size(); ++i)
+		auto ImageInfosDiffuse = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorImageInfo>(TextureImageViewsCount);
+		auto ImageInfosSpecular = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorImageInfo>(TextureImageViewsCount);
+		for (u32 i = 0; i < TextureImageViewsCount; ++i)
 		{
 			ImageInfosDiffuse[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			ImageInfosDiffuse[i].sampler = DiffuseSampler;
@@ -144,18 +147,18 @@ namespace StaticMeshRender
 		WriteDiffuse.dstSet = BindlesTexturesSet;
 		WriteDiffuse.dstBinding = 0;
 		WriteDiffuse.dstArrayElement = 0;
-		WriteDiffuse.descriptorCount = Views.size();
+		WriteDiffuse.descriptorCount = TextureImageViewsCount;
 		WriteDiffuse.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		WriteDiffuse.pImageInfo = ImageInfosSpecular.data();
+		WriteDiffuse.pImageInfo = ImageInfosSpecular;
 
 		VkWriteDescriptorSet WriteSpecular = { };
 		WriteSpecular.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		WriteSpecular.dstSet = BindlesTexturesSet;
 		WriteSpecular.dstBinding = 1;
 		WriteSpecular.dstArrayElement = 0;
-		WriteSpecular.descriptorCount = Views.size();
+		WriteSpecular.descriptorCount = TextureImageViewsCount;
 		WriteSpecular.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		WriteSpecular.pImageInfo = ImageInfosSpecular.data();
+		WriteSpecular.pImageInfo = ImageInfosSpecular;
 
 		VkWriteDescriptorSet Writes[] = { WriteDiffuse, WriteSpecular };
 
@@ -277,16 +280,6 @@ namespace StaticMeshRender
 
 
 
-
-
-		auto test = *ResourceManager::FindTexture("1giraffe.jpg");
-
-		//ResourceManager::CreateEntityMaterial("TestMaterial", TestTexture.ImageView, TestTexture.ImageView, &TestMaterial);
-		//ResourceManager::CreateEntityMaterial("WhiteMaterial", WhiteTexture.ImageView, WhiteTexture.ImageView, &WhiteMaterial);
-		//ResourceManager::CreateEntityMaterial("ContainerMaterial", ContainerTexture.ImageView, ContainerSpecularTexture.ImageView, &ContainerMaterial);
-		//ResourceManager::CreateEntityMaterial("BlendWindowMaterial", BlendWindow.ImageView, BlendWindow.ImageView, &BlendWindowMaterial);
-		//ResourceManager::CreateEntityMaterial("GrassMaterial", GrassTexture.ImageView, GrassTexture.ImageView, &GrassMaterial);
-
 		Util::Model3DData ModelData = Util::LoadModel3DData(".\\Resources\\Models\\uh60.model");
 		Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
 
@@ -295,12 +288,11 @@ namespace StaticMeshRender
 		for (u32 i = 0; i < Uh60Model.MeshCount; i++)
 		{
 			const u64 VerticesCount = Uh60Model.VerticesCounts[i];
-			const u32 IndicesCount = Uh60Model.IndicesCounts[i];
+			const u32 IndicesCount = Uh60Model.IndicesCounts[i];			
+			const u32 TextureIndex = RenderResources::GetTexture2DSRGBIndex(Uh60Model.DiffuseTexturesHashes[i]);
 
-			const Render::RenderTexture* Texture = ResourceManager::FindTexture(Uh60Model.DiffuseTexturesHashes[i]);
-			
-			RenderResourceManager::CreateEntity(Uh60Model.VertexData + ModelVertexByteOffset, sizeof(StaticMeshVertex), VerticesCount,
-				Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, 0);
+			RenderResources::CreateEntity(Uh60Model.VertexData + ModelVertexByteOffset, sizeof(StaticMeshVertex), VerticesCount,
+				Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, TextureIndex);
 
 			ModelVertexByteOffset += VerticesCount * sizeof(StaticMeshVertex);
 			ModelIndexCountOffset += IndicesCount;
@@ -398,12 +390,15 @@ namespace StaticMeshRender
 
 		const u32 LightDynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(Render::LightBuffer);
 
-		VulkanInterface::VertexBuffer VertexBuffer = RenderResourceManager::GetVertexBuffer();
-		VulkanInterface::IndexBuffer IndexBuffer = RenderResourceManager::GetIndexBuffer();
+		VulkanInterface::VertexBuffer VertexBuffer = RenderResources::GetVertexBuffer();
+		VulkanInterface::IndexBuffer IndexBuffer = RenderResources::GetIndexBuffer();
 
-		for (u32 i = 0; i < Scene.DrawEntitiesCount; ++i)
+		u32 EntitiesCount;
+		RenderResources::DrawEntity* Entities = RenderResources::GetEntities(&EntitiesCount);
+
+		for (u32 i = 0; i < EntitiesCount; ++i)
 		{
-			RenderResourceManager::DrawEntity* DrawEntity = Scene.DrawEntities + i;
+			RenderResources::DrawEntity* DrawEntity = Entities + i;
 
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{

@@ -24,7 +24,7 @@
 #include "Render/FrameManager.h"
 #include "Systems/Render/TerrainRender.h"
 #include "Engine/Systems/Render/StaticMeshRender.h"
-#include "Engine/Systems/Render/RenderResourceManger.h"
+#include "Engine/Systems/Render/RenderResources.h"
 #include "Systems/Render/LightningPass.h"
 #include "Systems/Render/MainPass.h"
 #include "Systems/Render/DeferredPass.h"
@@ -81,7 +81,7 @@ namespace Engine
 	static const f32 Near = 0.1f;
 	static const f32 Far = 5000.0f;
 
-	static RenderResourceManager::DrawEntity SkyBox;
+	static RenderResources::DrawEntity SkyBox;
 	static Render::LightBuffer LightData;
 
 	static ImguiIntegration::GuiData GuiData;
@@ -171,8 +171,7 @@ namespace Engine
 		 
 
 		VulkanInterface::Init(glfwGetWin32Window(Window), RenderConfig);
-		RenderResourceManager::AllocateIndexBuffer(MB64);
-		RenderResourceManager::AllocateVertexBuffer(MB64);
+		RenderResources::Init(MB64, MB64, 1024, 512);
 		FrameManager::Init();
 		Render::Init();
 		DeferredPass::Init();
@@ -192,7 +191,7 @@ namespace Engine
 		TerrainRender::DeInit();
 		StaticMeshRender::DeInit();
 
-		RenderResourceManager::DeInit();
+		RenderResources::DeInit();
 		ResourceManager::DeInit();
 		Render::DeInit();
 		MainPass::DeInit();
@@ -241,10 +240,10 @@ namespace Engine
 			Angle -= 360.0f;
 		}
 
-		for (int i = 0; i < Scene.DrawEntitiesCount; ++i)
-		{
-			glm::mat4 TestMat = glm::rotate(Scene.DrawEntities[i].Model, glm::radians(0.5f), glm::vec3(0.0f, 1.0f, 0.0f));
-		}
+		//for (int i = 0; i < Scene.DrawEntitiesCount; ++i)
+		//{
+		//	glm::mat4 TestMat = glm::rotate(Scene.DrawEntities[i].Model, glm::radians(0.5f), glm::vec3(0.0f, 1.0f, 0.0f));
+		//}
 
 		ViewProjection.View = glm::lookAt(MainCamera.Position, MainCamera.Position + MainCamera.Front, MainCamera.Up);
 
@@ -284,9 +283,6 @@ namespace Engine
 			MainCamera.AspectRatio, Near, Far);
 		ViewProjection.Projection[1][1] *= -1;
 		ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
-		Scene.DrawEntities = RenderResourceManager::GetEntities();
-		Scene.DrawEntitiesCount = RenderResourceManager::GetEntitiesCount();
 
 		LightData.PointLight.Position = glm::vec4(0.0f, 0.0f, 10.0f, 1.0f);
 		LightData.PointLight.Ambient = glm::vec3(0.01f, 0.01f, 0.01f);

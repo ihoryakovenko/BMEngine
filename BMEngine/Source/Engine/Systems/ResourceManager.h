@@ -32,6 +32,4 @@ namespace ResourceManager
 
 	// Test
 	void CreateSkyBoxTerrainTexture(const std::string& Id, VkImageView DefuseImage, VkDescriptorSet* SetToAttach);
-
-	std::vector<VkImageView> TestGetAllImages();
 }

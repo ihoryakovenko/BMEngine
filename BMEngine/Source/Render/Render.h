@@ -6,7 +6,7 @@
 #include "VulkanInterface/VulkanInterface.h"
 
 #include "Util/EngineTypes.h"
-#include "Engine/Systems/Render/RenderResourceManger.h"
+#include "Engine/Systems/Render/RenderResources.h"
 
 namespace Render
 {
@@ -70,16 +70,13 @@ namespace Render
 
 	struct DrawScene
 	{
-		RenderResourceManager::DrawEntity* DrawEntities = nullptr;
-		u32 DrawEntitiesCount = 0;
-
-		RenderResourceManager::DrawEntity* DrawTransparentEntities = nullptr;
+		RenderResources::DrawEntity* DrawTransparentEntities = nullptr;
 		u32 DrawTransparentEntitiesCount = 0;
 
-		RenderResourceManager::DrawEntity SkyBox;
+		RenderResources::DrawEntity SkyBox;
 		bool DrawSkyBox = false;
 
-		RenderResourceManager::DrawEntity MapEntity;
+		RenderResources::DrawEntity MapEntity;
 
 		LightBuffer* LightEntity = nullptr;
 	};

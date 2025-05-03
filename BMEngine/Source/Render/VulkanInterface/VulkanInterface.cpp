@@ -56,7 +56,6 @@ namespace VulkanInterface
 	static Memory::FrameArray<VkPresentModeKHR> GetAvailablePresentModes(VkPhysicalDevice PhysicalDevice,
 		VkSurfaceKHR Surface);
 	static Memory::FrameArray<VkImage> GetSwapchainImages(VkDevice LogicalDevice, VkSwapchainKHR VulkanSwapchain);
-	u32 GetMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, u32 AllowedTypes, VkMemoryPropertyFlags Properties);
 
 	static bool CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, u32 AvailableExtensionsCount,
 		const char** RequiredExtensions, u32 RequiredExtensionsCount);
@@ -98,7 +97,7 @@ namespace VulkanInterface
 		const VkAllocationCallbacks* Allocator);
 
 	static VkDescriptorPool AllocateDescriptorPool(VkDescriptorPoolSize* PoolSizes, u32 PoolSizeCount, u32 MaxDescriptorCount);
-	static VkDeviceMemory AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex);
+	
 
 	static VKAPI_ATTR VkBool32 VKAPI_CALL MessengerDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
 		VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
@@ -135,6 +134,7 @@ namespace VulkanInterface
 	static BMRSwapchain SwapInstance;
 	static VkDescriptorPool MainPool = nullptr;
 	static VkCommandBuffer DrawCommandBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VkCommandBuffer TransferCommandBuffer;
 	static u32 CurrentFrame = 0;
 	static u32 CurrentImageIndex = 0;
 
@@ -632,14 +632,6 @@ namespace VulkanInterface
 			Barrier->dstAccessMask = DstAccessMask;		// Memory access stage transition must before...
 		}
 
-		// Todo: Create beginCommandBuffer function?
-		VkCommandBuffer CommandBuffer;
-
-		VkCommandBufferAllocateInfo AllocInfo = { };
-		AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		AllocInfo.commandPool = GraphicsCommandPool;
-		AllocInfo.commandBufferCount = 1;
 
 		VkCommandBufferBeginInfo BeginInfo = { };
 		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -648,13 +640,12 @@ namespace VulkanInterface
 		VkSubmitInfo SubmitInfo = { };
 		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		SubmitInfo.commandBufferCount = 1;
-		SubmitInfo.pCommandBuffers = &CommandBuffer;
+		SubmitInfo.pCommandBuffers = &TransferCommandBuffer;
 
-		vkAllocateCommandBuffers(Device.LogicalDevice, &AllocInfo, &CommandBuffer);
-		vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
+		vkBeginCommandBuffer(TransferCommandBuffer, &BeginInfo);
 
 		vkCmdPipelineBarrier(
-			CommandBuffer,
+			TransferCommandBuffer,
 			SrcStage, DstStage,		// Pipeline stages (match to src and dst AccessMasks)
 			0,						// Dependency flags
 			0, nullptr,				// Memory Barrier count + data
@@ -662,7 +653,7 @@ namespace VulkanInterface
 			LayerDataCount, Barriers	// Image Memory Barrier count + data
 		);
 
-		vkEndCommandBuffer(CommandBuffer);
+		vkEndCommandBuffer(TransferCommandBuffer);
 
 		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
 		vkQueueWaitIdle(GraphicsQueue);
@@ -869,16 +860,6 @@ namespace VulkanInterface
 		std::memcpy(MappedMemory, Data, Size);
 		vkUnmapMemory(Device.LogicalDevice, StagingBuffer.Memory);
 
-		VkCommandBuffer TransferCommandBuffer;
-
-		VkCommandBufferAllocateInfo AllocInfo = { };
-		AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		AllocInfo.commandPool = GraphicsCommandPool;
-		AllocInfo.commandBufferCount = 1;
-
-		vkAllocateCommandBuffers(Device.LogicalDevice, &AllocInfo, &TransferCommandBuffer);
-
 		VkCommandBufferBeginInfo BeginInfo = { };
 		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 		// We're only using the command buffer once, so set up for one time submit
@@ -901,8 +882,6 @@ namespace VulkanInterface
 
 		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
 		vkQueueWaitIdle(GraphicsQueue);
-
-		vkFreeCommandBuffers(Device.LogicalDevice, GraphicsCommandPool, 1, &TransferCommandBuffer);
 	}
 
 	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, VkDeviceSize AlignedLayerSize,
@@ -930,16 +909,6 @@ namespace VulkanInterface
 		}
 
 		vkUnmapMemory(Device.LogicalDevice, StagingBuffer.Memory);
-
-		VkCommandBuffer TransferCommandBuffer;
-
-		VkCommandBufferAllocateInfo AllocInfo = { };
-		AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		AllocInfo.commandPool = GraphicsCommandPool;
-		AllocInfo.commandBufferCount = 1;
-
-		vkAllocateCommandBuffers(Device.LogicalDevice, &AllocInfo, &TransferCommandBuffer);
 
 		VkCommandBufferBeginInfo BeginInfo = { };
 		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -970,8 +939,6 @@ namespace VulkanInterface
 
 		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
 		vkQueueWaitIdle(GraphicsQueue);
-
-		vkFreeCommandBuffers(Device.LogicalDevice, GraphicsCommandPool, 1, &TransferCommandBuffer);
 	}
 
 	// INTERNAL FUNCTIONS
@@ -1986,14 +1953,27 @@ namespace VulkanInterface
 
 	bool CreateDrawCommandBuffers()
 	{
-		VkCommandBufferAllocateInfo CommandBufferAllocateInfo = { };
-		CommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		CommandBufferAllocateInfo.commandPool = GraphicsCommandPool;
-		CommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;	// VK_COMMAND_BUFFER_LEVEL_PRIMARY	: Buffer you submit directly to queue. Cant be called by other buffers.
+		VkCommandBufferAllocateInfo GraphicsCommandBufferAllocateInfo = { };
+		GraphicsCommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		GraphicsCommandBufferAllocateInfo.commandPool = GraphicsCommandPool;
+		GraphicsCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;	// VK_COMMAND_BUFFER_LEVEL_PRIMARY	: Buffer you submit directly to queue. Cant be called by other buffers.
 		// VK_COMMAND_BUFFER_LEVEL_SECONARY	: Buffer can't be called directly. Can be called from other buffers via "vkCmdExecuteCommands" when recording commands in primary buffer
-		CommandBufferAllocateInfo.commandBufferCount = static_cast<u32>(SwapInstance.ImagesCount);
+		GraphicsCommandBufferAllocateInfo.commandBufferCount = static_cast<u32>(SwapInstance.ImagesCount);
 
-		VkResult Result = vkAllocateCommandBuffers(Device.LogicalDevice, &CommandBufferAllocateInfo, DrawCommandBuffers);
+		VkResult Result = vkAllocateCommandBuffers(Device.LogicalDevice, &GraphicsCommandBufferAllocateInfo, DrawCommandBuffers);
+		if (Result != VK_SUCCESS)
+		{
+			HandleLog(BMRVkLogType_Error, "vkAllocateCommandBuffers result is %d", Result);
+			return false;
+		}
+
+		VkCommandBufferAllocateInfo TransferCommandBufferAllocateInfo = { };
+		TransferCommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		TransferCommandBufferAllocateInfo.commandPool = GraphicsCommandPool;
+		TransferCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		TransferCommandBufferAllocateInfo.commandBufferCount = 1;
+
+		Result = vkAllocateCommandBuffers(Device.LogicalDevice, &TransferCommandBufferAllocateInfo, &TransferCommandBuffer);
 		if (Result != VK_SUCCESS)
 		{
 			HandleLog(BMRVkLogType_Error, "vkAllocateCommandBuffers result is %d", Result);
@@ -2252,9 +2232,24 @@ namespace VulkanInterface
 		return Device.LogicalDevice;
 	}
 
+	VkPhysicalDevice GetPhysicalDevice()
+	{
+		return Device.PhysicalDevice;
+	}
+
 	VkCommandBuffer GetCommandBuffer()
 	{
 		return DrawCommandBuffers[CurrentImageIndex];
+	}
+
+	VkCommandBuffer GetTransferCommandBuffer()
+	{
+		return TransferCommandBuffer;
+	}
+
+	VkQueue GetTransferQueue()
+	{
+		return GraphicsQueue;
 	}
 
 	VkFormat GetSurfaceFormat()

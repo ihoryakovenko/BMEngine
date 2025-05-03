@@ -1,9 +1,9 @@
-#include "RenderResourceManger.h"
+#include "RenderResources.h"
 #include "LightningPass.h"
 
 #include <vulkan/vulkan.h>
 
-#include "RenderResourceManger.h"
+#include "RenderResources.h"
 
 #include "Util/Settings.h"
 #include "Util/Util.h"
@@ -213,11 +213,14 @@ namespace LightningPass
 
 			vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
 
-			for (u32 i = 0; i < RenderResourceManager::GetEntitiesCount(); ++i)
-			{
-				RenderResourceManager::DrawEntity* DrawEntity = RenderResourceManager::GetEntities() + i;
+			u32 EntitiesCount;
+			RenderResources::DrawEntity* Entities = RenderResources::GetEntities(&EntitiesCount);
 
-				const VkBuffer VertexBuffers[] = { RenderResourceManager::GetVertexBuffer().Buffer };
+			for (u32 i = 0; i < EntitiesCount; ++i)
+			{
+				RenderResources::DrawEntity* DrawEntity = Entities + i;
+
+				const VkBuffer VertexBuffers[] = { RenderResources::GetVertexBuffer().Buffer };
 				const VkDeviceSize Offsets[] = { DrawEntity->VertexOffset };
 
 				const u32 DescriptorSetGroupCount = 1;
@@ -234,7 +237,7 @@ namespace LightningPass
 					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr);
 
 				vkCmdBindVertexBuffers(CmdBuffer, 0, 1, VertexBuffers, Offsets);
-				vkCmdBindIndexBuffer(CmdBuffer, RenderResourceManager::GetIndexBuffer().Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
+				vkCmdBindIndexBuffer(CmdBuffer, RenderResources::GetIndexBuffer().Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
 				vkCmdDrawIndexed(CmdBuffer, DrawEntity->IndicesCount, 1, 0, 0, 0);
 			}
 
