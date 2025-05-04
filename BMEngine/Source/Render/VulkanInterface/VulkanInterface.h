@@ -211,7 +211,7 @@ namespace VulkanInterface
 	VkPhysicalDeviceProperties* GetDeviceProperties();
 	VkDevice GetDevice();
 	VkPhysicalDevice GetPhysicalDevice();
-	u32 GetMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, u32 AllowedTypes, VkMemoryPropertyFlags Properties);
+	
 	VkDeviceMemory AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex);
 
 

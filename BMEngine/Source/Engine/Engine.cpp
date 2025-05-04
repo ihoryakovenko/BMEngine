@@ -307,10 +307,6 @@ namespace Engine
 		LightData.SpotLight.CutOff = glm::cos(glm::radians(12.5f));
 		LightData.SpotLight.OuterCutOff = glm::cos(glm::radians(17.5f));
 
-		StaticMeshRender::Material Mat;
-		Mat.Shininess = 32.f;
-		StaticMeshRender::UpdateMaterialBuffer(&Mat);
-
 		GuiData.DirectionLightDirection = &LightData.DirectionLight.Direction;
 		GuiData.Eye = &Eye;
 		GuiData.CameraMercatorPosition = &CameraSphericalPosition;

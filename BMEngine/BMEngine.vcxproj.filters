@@ -32,6 +32,8 @@
     <ClCompile Include="Source\Engine\Systems\Render\LightningPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\MainPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\DeferredPass.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\VulkanHalper.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
@@ -63,6 +65,7 @@
     <ClInclude Include="Source\Engine\Systems\Render\LightningPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\MainPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\DeferredPass.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\VulkanHalper.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />

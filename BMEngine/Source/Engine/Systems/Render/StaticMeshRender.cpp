@@ -28,22 +28,14 @@ VkDescriptorSet TerrainMaterial;
 
 namespace StaticMeshRender
 {
-	static void LoadModel(const char* ModelPath, glm::mat4 Model, VkDescriptorSet CustomMaterial = nullptr);
-
 	static const char ModelsBaseDir[] = "./Resources/Models/";
 
 	static VulkanInterface::RenderPipeline Pipeline;
-
-	static VkSampler DiffuseSampler;
-	static VkSampler SpecularSampler;
 	static VkSampler ShadowMapArraySampler;
 
 	static VkDescriptorSetLayout StaticMeshLightLayout;
-	static VkDescriptorSetLayout BindlesTexturesLayout;
-	static VkDescriptorSetLayout StaticMeshMaterialLayout;
 	static VkDescriptorSetLayout ShadowMapArrayLayout;
 
-	static VulkanInterface::UniformBuffer MaterialBuffer;
 	static FrameManager::UniformMemoryHnadle EntityLightBufferHandle;
 	
 	static VkImageView ShadowMapArrayImageInterface[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
@@ -51,38 +43,16 @@ namespace StaticMeshRender
 	static VkPushConstantRange PushConstants;
 
 	static VkDescriptorSet StaticMeshLightSet;
-	static VkDescriptorSet MaterialSet;
 	static VkDescriptorSet ShadowMapArraySet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
-
-	static VkDescriptorSet BindlesTexturesSet;
 
 	struct PushConstantsData
 	{
 		glm::mat4 Model;
-		s32 texIndex;
+		s32 matIndex;
 	};
 
 	void Init()
 	{
-		VkSamplerCreateInfo DiffuseSamplerCreateInfo = { };
-		DiffuseSamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		DiffuseSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
-		DiffuseSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
-		DiffuseSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		DiffuseSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		DiffuseSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		DiffuseSamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-		DiffuseSamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
-		DiffuseSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		DiffuseSamplerCreateInfo.mipLodBias = 0.0f;
-		DiffuseSamplerCreateInfo.minLod = 0.0f;
-		DiffuseSamplerCreateInfo.maxLod = 0.0f;
-		DiffuseSamplerCreateInfo.anisotropyEnable = VK_TRUE;
-		DiffuseSamplerCreateInfo.maxAnisotropy = 16;
-
-		VkSamplerCreateInfo SpecularSamplerCreateInfo = DiffuseSamplerCreateInfo;
-		DiffuseSamplerCreateInfo.maxAnisotropy = 1;
-
 		VkSamplerCreateInfo ShadowMapSamplerCreateInfo = { };
 		ShadowMapSamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 		ShadowMapSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;						// How to render when image is magnified on screen
@@ -99,8 +69,6 @@ namespace StaticMeshRender
 		ShadowMapSamplerCreateInfo.anisotropyEnable = VK_TRUE;
 		ShadowMapSamplerCreateInfo.maxAnisotropy = 1; // Todo: support in config
 
-		DiffuseSampler = VulkanInterface::CreateSampler(&DiffuseSamplerCreateInfo);
-		SpecularSampler = VulkanInterface::CreateSampler(&SpecularSamplerCreateInfo);
 		ShadowMapArraySampler = VulkanInterface::CreateSampler(&ShadowMapSamplerCreateInfo);
 
 
@@ -108,82 +76,6 @@ namespace StaticMeshRender
 		StaticMeshLightLayout = FrameManager::CreateCompatibleLayout(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 		EntityLightBufferHandle = FrameManager::ReserveUniformMemory(LightBufferSize);
 		StaticMeshLightSet = FrameManager::CreateAndBindSet(EntityLightBufferHandle, LightBufferSize, StaticMeshLightLayout);
-
-		const VkShaderStageFlags EntitySamplerInputFlags[2] = { VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
-		const VkDescriptorType EntitySamplerDescriptorType[2] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
-		const VkDescriptorBindingFlags BindingFlags[2] = {
-			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
-			VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT |
-			VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
-			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
-			VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT |
-			VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT };
-
-		// TODO: Get max textures from limits.maxPerStageDescriptorSampledImages;
-		const u32 MaxTextures = 256;
-		BindlesTexturesLayout = VulkanInterface::CreateUniformLayout(EntitySamplerDescriptorType, EntitySamplerInputFlags, BindingFlags, 2, MaxTextures);
-
-		VulkanInterface::CreateUniformSets(&BindlesTexturesLayout, 1, &BindlesTexturesSet);
-
-		u32 TextureImageViewsCount;
-		VkImageView* Views = RenderResources::GetTextureImageViews(&TextureImageViewsCount);
-
-		auto ImageInfosDiffuse = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorImageInfo>(TextureImageViewsCount);
-		auto ImageInfosSpecular = Memory::BmMemoryManagementSystem::FrameAlloc<VkDescriptorImageInfo>(TextureImageViewsCount);
-		for (u32 i = 0; i < TextureImageViewsCount; ++i)
-		{
-			ImageInfosDiffuse[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			ImageInfosDiffuse[i].sampler = DiffuseSampler;
-			ImageInfosDiffuse[i].imageView = Views[i];
-
-			ImageInfosSpecular[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			ImageInfosSpecular[i].sampler = SpecularSampler;
-			ImageInfosSpecular[i].imageView = Views[i];
-		}
-
-
-		VkWriteDescriptorSet WriteDiffuse = { };
-		WriteDiffuse.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		WriteDiffuse.dstSet = BindlesTexturesSet;
-		WriteDiffuse.dstBinding = 0;
-		WriteDiffuse.dstArrayElement = 0;
-		WriteDiffuse.descriptorCount = TextureImageViewsCount;
-		WriteDiffuse.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		WriteDiffuse.pImageInfo = ImageInfosSpecular;
-
-		VkWriteDescriptorSet WriteSpecular = { };
-		WriteSpecular.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		WriteSpecular.dstSet = BindlesTexturesSet;
-		WriteSpecular.dstBinding = 1;
-		WriteSpecular.dstArrayElement = 0;
-		WriteSpecular.descriptorCount = TextureImageViewsCount;
-		WriteSpecular.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		WriteSpecular.pImageInfo = ImageInfosSpecular;
-
-		VkWriteDescriptorSet Writes[] = { WriteDiffuse, WriteSpecular };
-
-		vkUpdateDescriptorSets(VulkanInterface::GetDevice(), 2, Writes, 0, nullptr);
-	
-		const VkDeviceSize MaterialSize = sizeof(Material);
-		VkBufferCreateInfo MaterialBufferInfo = { };
-		MaterialBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		MaterialBufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-		MaterialBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		MaterialBufferInfo.size = MaterialSize;
-		MaterialBuffer = VulkanInterface::CreateUniformBufferInternal(&MaterialBufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-		VulkanInterface::UniformSetAttachmentInfo MaterialAttachmentInfo;
-		MaterialAttachmentInfo.BufferInfo.buffer = MaterialBuffer.Buffer;
-		MaterialAttachmentInfo.BufferInfo.offset = 0;
-		MaterialAttachmentInfo.BufferInfo.range = MaterialSize;
-		MaterialAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-
-		const VkDescriptorType MaterialDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		const VkShaderStageFlags MaterialStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		const VkDescriptorBindingFlags MaterialBindingFlags[1] = { };
-		StaticMeshMaterialLayout = VulkanInterface::CreateUniformLayout(&MaterialDescriptorType, &MaterialStageFlags, MaterialBindingFlags, 1, 1);
-		VulkanInterface::CreateUniformSets(&StaticMeshMaterialLayout, 1, &MaterialSet);
-		VulkanInterface::AttachUniformsToSet(MaterialSet, &MaterialAttachmentInfo, 1);
 
 		const VkDescriptorType ShadowMapArrayDescriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		const VkShaderStageFlags ShadowMapArrayFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -222,9 +114,9 @@ namespace StaticMeshRender
 		VkDescriptorSetLayout StaticMeshDescriptorLayouts[] =
 		{
 			FrameManager::GetViewProjectionLayout(),
-			BindlesTexturesLayout,
+			RenderResources::GetBindlesTexturesLayout(),
 			StaticMeshLightLayout,
-			StaticMeshMaterialLayout,
+			RenderResources::TmpGetMaterialLayout(),
 			ShadowMapArrayLayout
 		};
 
@@ -291,8 +183,14 @@ namespace StaticMeshRender
 			const u32 IndicesCount = Uh60Model.IndicesCounts[i];			
 			const u32 TextureIndex = RenderResources::GetTexture2DSRGBIndex(Uh60Model.DiffuseTexturesHashes[i]);
 
+			RenderResources::Material Mat;
+			Mat.AlbedoTexIndex = TextureIndex;
+			Mat.SpecularTexIndex = TextureIndex;
+			Mat.Shininess = 32.0f;
+			const u32 MaterialIndex = RenderResources::CreateMaterial(&Mat);
+
 			RenderResources::CreateEntity(Uh60Model.VertexData + ModelVertexByteOffset, sizeof(StaticMeshVertex), VerticesCount,
-				Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, TextureIndex);
+				Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, MaterialIndex);
 
 			ModelVertexByteOffset += VerticesCount * sizeof(StaticMeshVertex);
 			ModelIndexCountOffset += IndicesCount;
@@ -301,56 +199,56 @@ namespace StaticMeshRender
 
 		Util::ClearModel3DData(ModelData);
 
-		{
-			glm::vec3 CubePos(0.0f, -5.0f, 0.0f);
-			glm::mat4 Model = glm::mat4(1.0f);
-			Model = glm::translate(Model, CubePos);
-			Model = glm::scale(Model, glm::vec3(20.0f, 1.0f, 20.0f));
-			LoadModel("./Resources/Models/cube.obj", Model, WhiteMaterial);
-			//LoadModel("./Resources/Models/cube.obj", Model, ResourceManager::FindMaterial("WhiteMaterial"));
-		}
+		//{
+		//	glm::vec3 CubePos(0.0f, -5.0f, 0.0f);
+		//	glm::mat4 Model = glm::mat4(1.0f);
+		//	Model = glm::translate(Model, CubePos);
+		//	Model = glm::scale(Model, glm::vec3(20.0f, 1.0f, 20.0f));
+		//	LoadModel("./Resources/Models/cube.obj", Model, WhiteMaterial);
+		//	//LoadModel("./Resources/Models/cube.obj", Model, ResourceManager::FindMaterial("WhiteMaterial"));
+		//}
 
-		{
-			glm::vec3 CubePos(0.0f, 0.0f, 0.0f);
-			glm::mat4 Model = glm::mat4(1.0f);
-			Model = glm::translate(Model, CubePos);
-			Model = glm::scale(Model, glm::vec3(0.2f, 5.0f, 0.2f));
-			LoadModel("./Resources/Models/cube.obj", Model, TestMaterial);
-		}
+		//{
+		//	glm::vec3 CubePos(0.0f, 0.0f, 0.0f);
+		//	glm::mat4 Model = glm::mat4(1.0f);
+		//	Model = glm::translate(Model, CubePos);
+		//	Model = glm::scale(Model, glm::vec3(0.2f, 5.0f, 0.2f));
+		//	LoadModel("./Resources/Models/cube.obj", Model, TestMaterial);
+		//}
 
-		{
-			glm::vec3 CubePos(0.0f, 0.0f, 8.0f);
-			glm::mat4 Model = glm::mat4(1.0f);
-			Model = glm::translate(Model, CubePos);
-			Model = glm::rotate(Model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-			Model = glm::scale(Model, glm::vec3(0.5f));
-			LoadModel("./Resources/Models/cube.obj", Model, GrassMaterial);
-		}
+		//{
+		//	glm::vec3 CubePos(0.0f, 0.0f, 8.0f);
+		//	glm::mat4 Model = glm::mat4(1.0f);
+		//	Model = glm::translate(Model, CubePos);
+		//	Model = glm::rotate(Model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		//	Model = glm::scale(Model, glm::vec3(0.5f));
+		//	LoadModel("./Resources/Models/cube.obj", Model, GrassMaterial);
+		//}
 
-		{
-			glm::vec3 LightCubePos(0.0f, 0.0f, 10.0f);
-			glm::mat4 Model = glm::mat4(1.0f);
-			Model = glm::translate(Model, LightCubePos);
-			Model = glm::scale(Model, glm::vec3(0.2f));
-			LoadModel("./Resources/Models/cube.obj", Model, WhiteMaterial);
-		}
+		//{
+		//	glm::vec3 LightCubePos(0.0f, 0.0f, 10.0f);
+		//	glm::mat4 Model = glm::mat4(1.0f);
+		//	Model = glm::translate(Model, LightCubePos);
+		//	Model = glm::scale(Model, glm::vec3(0.2f));
+		//	LoadModel("./Resources/Models/cube.obj", Model, WhiteMaterial);
+		//}
 
-		{
-			glm::vec3 CubePos(0.0f, 0.0f, 15.0f);
-			glm::mat4 Model = glm::mat4(1.0f);
-			Model = glm::translate(Model, CubePos);
-			Model = glm::scale(Model, glm::vec3(1.0f));
-			LoadModel("./Resources/Models/cube.obj", Model, WhiteMaterial);
-		}
+		//{
+		//	glm::vec3 CubePos(0.0f, 0.0f, 15.0f);
+		//	glm::mat4 Model = glm::mat4(1.0f);
+		//	Model = glm::translate(Model, CubePos);
+		//	Model = glm::scale(Model, glm::vec3(1.0f));
+		//	LoadModel("./Resources/Models/cube.obj", Model, WhiteMaterial);
+		//}
 
-		{
-			glm::vec3 CubePos(5.0f, 0.0f, 10.0f);
-			glm::mat4 Model = glm::mat4(1.0f);
-			Model = glm::translate(Model, CubePos);
-			Model = glm::rotate(Model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-			Model = glm::scale(Model, glm::vec3(1.0f));
-			LoadModel("./Resources/Models/cube.obj", Model, ContainerMaterial);
-		}
+		//{
+		//	glm::vec3 CubePos(5.0f, 0.0f, 10.0f);
+		//	glm::mat4 Model = glm::mat4(1.0f);
+		//	Model = glm::translate(Model, CubePos);
+		//	Model = glm::rotate(Model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		//	Model = glm::scale(Model, glm::vec3(1.0f));
+		//	LoadModel("./Resources/Models/cube.obj", Model, ContainerMaterial);
+		//}
 	}
 
 	void DeInit()
@@ -360,16 +258,10 @@ namespace StaticMeshRender
 			VulkanInterface::DestroyImageInterface(ShadowMapArrayImageInterface[i]);
 		}
 
-		VulkanInterface::DestroyUniformBuffer(MaterialBuffer);
-
 		VulkanInterface::DestroyUniformLayout(StaticMeshLightLayout);
-		VulkanInterface::DestroyUniformLayout(StaticMeshMaterialLayout);
 		VulkanInterface::DestroyUniformLayout(ShadowMapArrayLayout);
-		VulkanInterface::DestroyUniformLayout(BindlesTexturesLayout);
 
 		VulkanInterface::DestroySampler(ShadowMapArraySampler);
-		VulkanInterface::DestroySampler(DiffuseSampler);
-		VulkanInterface::DestroySampler(SpecularSampler);
 	}
 
 	void Draw()
@@ -384,6 +276,8 @@ namespace StaticMeshRender
 		const u32 DynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(FrameManager::ViewProjectionBuffer);
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
 			0, 1, &VpSet, 1, &DynamicOffset);
+
+		VkDescriptorSet BindlesTexturesSet = RenderResources::GetBindlesTexturesSet();
 
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
 			1, 1, &BindlesTexturesSet, 0, nullptr);
@@ -403,14 +297,14 @@ namespace StaticMeshRender
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
 				StaticMeshLightSet,
-				MaterialSet,
+				RenderResources::TmpGetMaterialSet(),
 				ShadowMapArraySet[VulkanInterface::TestGetImageIndex()],
 			};
 			const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
 			PushConstantsData Constants;
 			Constants.Model = DrawEntity->Model;
-			Constants.texIndex = DrawEntity->TextureIndex;
+			Constants.matIndex = DrawEntity->MaterialIndex;
 
 			const VkShaderStageFlags Flags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 			vkCmdPushConstants(CmdBuffer, Pipeline.PipelineLayout, Flags, 0, sizeof(PushConstantsData), &Constants);
@@ -422,26 +316,5 @@ namespace StaticMeshRender
 			vkCmdBindIndexBuffer(CmdBuffer, IndexBuffer.Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
 			vkCmdDrawIndexed(CmdBuffer, DrawEntity->IndicesCount, 1, 0, 0, 0);
 		}
-	}
-
-
-
-
-
-
-	void UpdateMaterialBuffer(const Material* Buffer)
-	{
-		assert(Buffer);
-		VulkanInterface::UpdateUniformBuffer(MaterialBuffer, sizeof(Material), 0,
-			Buffer);
-	}
-
-
-
-
-	void LoadModel(const char* ModelPath, glm::mat4 Model, VkDescriptorSet CustomMaterial)
-	{
-		
-
 	}
 }

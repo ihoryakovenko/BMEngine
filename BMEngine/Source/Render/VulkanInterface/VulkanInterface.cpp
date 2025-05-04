@@ -8,6 +8,7 @@
 #include <glm/glm.hpp>
 
 #include "Memory/MemoryManagmentSystem.h"
+#include "Engine/Systems/Render/VulkanHalper.h"
 
 namespace VulkanInterface
 {
@@ -569,7 +570,7 @@ namespace VulkanInterface
 		VkMemoryRequirements MemoryRequirements;
 		vkGetBufferMemoryRequirements(Device.LogicalDevice, UniformBuffer.Buffer, &MemoryRequirements);
 
-		const u32 MemoryTypeIndex = GetMemoryTypeIndex(Device.PhysicalDevice, MemoryRequirements.memoryTypeBits, Properties);
+		const u32 MemoryTypeIndex = VulkanHelper::GetMemoryTypeIndex(Device.PhysicalDevice, MemoryRequirements.memoryTypeBits, Properties);
 
 		if (BufferInfo->size != MemoryRequirements.size)
 		{
@@ -688,7 +689,7 @@ namespace VulkanInterface
 		VkMemoryRequirements MemoryRequirements;
 		vkGetImageMemoryRequirements(Device.LogicalDevice, Image.Image, &MemoryRequirements);
 
-		const u32 MemoryTypeIndex = GetMemoryTypeIndex(Device.PhysicalDevice, MemoryRequirements.memoryTypeBits,
+		const u32 MemoryTypeIndex = VulkanHelper::GetMemoryTypeIndex(Device.PhysicalDevice, MemoryRequirements.memoryTypeBits,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 		Image.Memory = AllocateMemory(MemoryRequirements.size, MemoryTypeIndex);
@@ -2124,24 +2125,7 @@ namespace VulkanInterface
 		return Memory;
 	}
 
-	u32 GetMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, u32 AllowedTypes, VkMemoryPropertyFlags Properties)
-	{
-		VkPhysicalDeviceMemoryProperties MemoryProperties;
-		vkGetPhysicalDeviceMemoryProperties(PhysicalDevice, &MemoryProperties);
 
-		for (u32 MemoryTypeIndex = 0; MemoryTypeIndex < MemoryProperties.memoryTypeCount; MemoryTypeIndex++)
-		{
-			if ((AllowedTypes & (1 << MemoryTypeIndex))														// Index of memory type must match corresponding bit in allowedTypes
-				&& (MemoryProperties.memoryTypes[MemoryTypeIndex].propertyFlags & Properties) == Properties)	// Desired property bit flags are part of memory type's property flags
-			{
-				// This memory type is valid, so return its index
-				return MemoryTypeIndex;
-			}
-		}
-
-		assert(false);
-		return 0;
-	}
 
 	bool CreateShader(const u32* Code, u32 CodeSize, VkShaderModule& VertexShaderModule)
 	{

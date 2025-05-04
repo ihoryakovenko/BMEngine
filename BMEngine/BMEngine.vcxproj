@@ -32,6 +32,8 @@
     <ClCompile Include="Source\Engine\Systems\Render\DeferredPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\LightningPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\MainPass.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\VulkanHalper.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
     <ClCompile Include="Source\Engine\Systems\ResourceManager.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\StaticMeshRender.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\TerrainRender.cpp" />
@@ -60,6 +62,7 @@
     <ClInclude Include="Source\Engine\Systems\Render\DeferredPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\LightningPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\MainPass.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\VulkanHalper.h" />
     <ClInclude Include="Source\Engine\Systems\ResourceManager.h" />
     <ClInclude Include="Source\Engine\Systems\Render\StaticMeshRender.h" />
     <ClInclude Include="Source\Engine\Systems\Render\TerrainRender.h" />

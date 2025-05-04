@@ -5,6 +5,8 @@
 #include "Render/Render.h"
 
 #include "Memory/MemoryManagmentSystem.h"
+#include "Engine/Systems/Render/VulkanHalper.h"
+#include "Render/Render.h"
 
 namespace RenderResources
 {
@@ -29,7 +31,17 @@ namespace RenderResources
 	static std::unordered_map<u64, u32> TexturesPhysicalIndexes;
 	static u32 TextureIndex;
 
-	
+	static VkSampler DiffuseSampler;
+	static VkSampler SpecularSampler;
+
+	static VkDescriptorSetLayout BindlesTexturesLayout;
+	static VkDescriptorSet BindlesTexturesSet;
+
+	static VkBuffer MaterialBuffer;
+	static VkDeviceMemory MaterialBufferMemory;
+	static VkDescriptorSetLayout MaterialLayout;
+	static VkDescriptorSet MaterialSet;
+	static u32 MaterialIndex;
 
 	//static std::vector<HandleEntry> handleEntries;
 	//static std::array<u32, MaxResources> reverseMapping;
@@ -47,12 +59,86 @@ namespace RenderResources
 		Textures = Memory::BmMemoryManagementSystem::Allocate<VkImage>(MaxTextures);
 		TextureViews = Memory::BmMemoryManagementSystem::Allocate<VkImageView>(MaxTextures);
 		TexturesMemory = Memory::BmMemoryManagementSystem::Allocate<VkDeviceMemory>(MaxTextures);
+
+		VkDevice Device = VulkanInterface::GetDevice();
+
+		VkSamplerCreateInfo DiffuseSamplerCreateInfo = { };
+		DiffuseSamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		DiffuseSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+		DiffuseSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+		DiffuseSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		DiffuseSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		DiffuseSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		DiffuseSamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+		DiffuseSamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+		DiffuseSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		DiffuseSamplerCreateInfo.mipLodBias = 0.0f;
+		DiffuseSamplerCreateInfo.minLod = 0.0f;
+		DiffuseSamplerCreateInfo.maxLod = 0.0f;
+		DiffuseSamplerCreateInfo.anisotropyEnable = VK_TRUE;
+		DiffuseSamplerCreateInfo.maxAnisotropy = 16;
+
+		VkSamplerCreateInfo SpecularSamplerCreateInfo = DiffuseSamplerCreateInfo;
+		DiffuseSamplerCreateInfo.maxAnisotropy = 1;
+
+		DiffuseSampler = VulkanInterface::CreateSampler(&DiffuseSamplerCreateInfo);
+		SpecularSampler = VulkanInterface::CreateSampler(&SpecularSamplerCreateInfo);
+
+		const VkShaderStageFlags EntitySamplerInputFlags[2] = { VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
+		const VkDescriptorType EntitySamplerDescriptorType[2] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
+		const VkDescriptorBindingFlags BindingFlags[2] = {
+			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
+			VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT |
+			VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
+			VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT |
+			VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT };
+
+		// TODO: Get max textures from limits.maxPerStageDescriptorSampledImages;
+		BindlesTexturesLayout = VulkanInterface::CreateUniformLayout(EntitySamplerDescriptorType, EntitySamplerInputFlags, BindingFlags, 2, MaxTextures);
+		VulkanInterface::CreateUniformSets(&BindlesTexturesLayout, 1, &BindlesTexturesSet);
+
+		const VkDeviceSize MaterialBufferSize = sizeof(Material) * MaxEntities;
+		MaterialBuffer = VulkanHelper::CreateBuffer(Device, MaterialBufferSize, VulkanHelper::BufferUsageFlag::Storage);
+		MaterialBufferMemory = VulkanHelper::AllocateAndBindDeviceMemoryForBuffer(VulkanInterface::GetPhysicalDevice(), Device,
+			MaterialBuffer, MaterialBufferSize, VulkanHelper::MemoryPropertyFlag::GPULocal);
+
+		VulkanInterface::UniformSetAttachmentInfo MaterialAttachmentInfo;
+		MaterialAttachmentInfo.BufferInfo.buffer = MaterialBuffer;
+		MaterialAttachmentInfo.BufferInfo.offset = 0;
+		MaterialAttachmentInfo.BufferInfo.range = MaterialBufferSize;
+		MaterialAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+
+		const VkDescriptorType MaterialDescriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		const VkShaderStageFlags MaterialStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		const VkDescriptorBindingFlags MaterialBindingFlags[1] = { };
+		MaterialLayout = VulkanInterface::CreateUniformLayout(&MaterialDescriptorType, &MaterialStageFlags, MaterialBindingFlags, 1, 1);
+		VulkanInterface::CreateUniformSets(&MaterialLayout, 1, &MaterialSet);
+		VulkanInterface::AttachUniformsToSet(MaterialSet, &MaterialAttachmentInfo, 1);
 	}
 
 	void DeInit()
 	{
+		VkDevice Device = VulkanInterface::GetDevice();
+
+		for (uint32_t i = 0; i < TextureIndex; ++i)
+		{
+			vkDestroyImageView(Device, TextureViews[i], nullptr);
+			vkDestroyImage(Device, Textures[i], nullptr);
+			vkFreeMemory(Device, TexturesMemory[i], nullptr);
+		}
+
 		VulkanInterface::DestroyUniformBuffer(VertexBuffer);
 		VulkanInterface::DestroyUniformBuffer(IndexBuffer);
+
+		VulkanInterface::DestroyUniformLayout(BindlesTexturesLayout);
+		VulkanInterface::DestroyUniformLayout(MaterialLayout);
+
+		VulkanInterface::DestroySampler(DiffuseSampler);
+		VulkanInterface::DestroySampler(SpecularSampler);
+
+		vkDestroyBuffer(Device, MaterialBuffer, nullptr);
+		vkFreeMemory(Device, MaterialBufferMemory, nullptr);
 
 		Memory::BmMemoryManagementSystem::Free(DrawEntities);
 		Memory::BmMemoryManagementSystem::Free(Textures);
@@ -69,7 +155,7 @@ namespace RenderResources
 		return IndexBuffer;
 	}
 
-	u64 CreateEntity(void* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, u32 TextureIndex)
+	u32 CreateEntity(void* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, u32 MaterialIndex)
 	{
 		assert(EntityIndex < MaxEntities);
 
@@ -83,10 +169,10 @@ namespace RenderResources
 		Render::LoadIndices(&IndexBuffer, Indices, IndicesCount, IndexBuffer.Offset);
 
 		Entity->IndicesCount = IndicesCount;
-		Entity->TextureIndex = TextureIndex;
+		Entity->MaterialIndex = MaterialIndex;
 		Entity->Model = glm::mat4(1.0f);
 
-		const u64 CurrentEntityIndex = EntityIndex;
+		const u32 CurrentEntityIndex = EntityIndex;
 		++EntityIndex;
 
 		return CurrentEntityIndex;
@@ -100,6 +186,8 @@ namespace RenderResources
 
 	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height)
 	{
+		assert(TextureIndex < MaxTextures);
+
 		VkDevice Device = VulkanInterface::GetDevice();
 		VkCommandBuffer CmdBuffer = VulkanInterface::GetTransferCommandBuffer();
 		VkQueue TransferQueue = VulkanInterface::GetTransferQueue();
@@ -213,7 +301,7 @@ namespace RenderResources
 		VkMemoryRequirements MemoryRequirements;
 		vkGetImageMemoryRequirements(Device, Image, &MemoryRequirements);
 
-		const u32 MemoryTypeIndex = VulkanInterface::GetMemoryTypeIndex(VulkanInterface::GetPhysicalDevice(), MemoryRequirements.memoryTypeBits,
+		const u32 MemoryTypeIndex = VulkanHelper::GetMemoryTypeIndex(VulkanInterface::GetPhysicalDevice(), MemoryRequirements.memoryTypeBits,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 		TexturesMemory[TextureIndex] = VulkanInterface::AllocateMemory(MemoryRequirements.size, MemoryTypeIndex);
@@ -247,10 +335,52 @@ namespace RenderResources
 		vkQueueSubmit(TransferQueue, 1, &SubmitInfo, nullptr);
 		VulkanInterface::WaitDevice(); // TODO: Fix
 
+
+		VkDescriptorImageInfo DiffuseImageInfo = { };
+		DiffuseImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		DiffuseImageInfo.sampler = DiffuseSampler;
+		DiffuseImageInfo.imageView = TextureViews[TextureIndex];
+
+		VkDescriptorImageInfo SpecularImageInfo = { };
+		SpecularImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		SpecularImageInfo.sampler = SpecularSampler;
+		SpecularImageInfo.imageView = TextureViews[TextureIndex];
+
+
+		VkWriteDescriptorSet WriteDiffuse = { };
+		WriteDiffuse.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		WriteDiffuse.dstSet = BindlesTexturesSet;
+		WriteDiffuse.dstBinding = 0;
+		WriteDiffuse.dstArrayElement = TextureIndex;
+		WriteDiffuse.descriptorCount = 1;
+		WriteDiffuse.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		WriteDiffuse.pImageInfo = &DiffuseImageInfo;
+
+		VkWriteDescriptorSet WriteSpecular = { };
+		WriteSpecular.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		WriteSpecular.dstSet = BindlesTexturesSet;
+		WriteSpecular.dstBinding = 1;
+		WriteSpecular.dstArrayElement = TextureIndex;
+		WriteSpecular.descriptorCount = 1;
+		WriteSpecular.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		WriteSpecular.pImageInfo = &SpecularImageInfo;
+
+		VkWriteDescriptorSet Writes[] = { WriteDiffuse, WriteSpecular };
+
+		vkUpdateDescriptorSets(VulkanInterface::GetDevice(), 2, Writes, 0, nullptr);
+
 		const u32 CurrentTextureIndex = TextureIndex++;
 		TexturesPhysicalIndexes[Hash] = CurrentTextureIndex;
 
 		return CurrentTextureIndex;
+	}
+
+	u32 CreateMaterial(Material* Mat)
+	{
+		assert(MaterialIndex < MaxEntities);
+
+		VulkanInterface::CopyDataToBuffer(MaterialBuffer, sizeof(Material) * MaterialIndex, sizeof(Material), Mat);
+		return MaterialIndex++;
 	}
 
 	u32 GetTexture2DSRGBIndex(u64 Hash)
@@ -264,11 +394,42 @@ namespace RenderResources
 		return 0;
 	}
 
-	VkImageView* GetTextureImageViews(u32* Count)
+	VkDescriptorSetLayout GetBindlesTexturesLayout()
 	{
-		*Count = TextureIndex;
-		return TextureViews;
+		return BindlesTexturesLayout;
 	}
+
+	VkDescriptorSet GetBindlesTexturesSet()
+	{
+		return BindlesTexturesSet;
+	}
+
+
+
+
+
+	VkImageView* TmpGetTextureImageViews()
+	{
+		return TextureViews;;
+	}
+
+	VkDescriptorSetLayout TmpGetMaterialLayout()
+	{
+		return MaterialLayout;
+	}
+
+	VkDescriptorSet TmpGetMaterialSet()
+	{
+		return MaterialSet;
+	}
+
+
+
+
+
+
+
+
 
 
 

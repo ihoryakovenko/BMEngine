@@ -22,11 +22,4 @@ namespace StaticMeshRender
 	void DeInit();
 
 	void Draw();
-
-	struct Material
-	{
-		f32 Shininess;
-	};
-
-	void UpdateMaterialBuffer(const Material* Buffer);
 }
