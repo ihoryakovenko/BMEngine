@@ -29,11 +29,11 @@
     <ClCompile Include="Source\Engine\Engine.cpp" />
     <ClCompile Include="Source\Engine\Scene.cpp" />
     <ClCompile Include="Source\Engine\Systems\DynamicMapSystem.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\DebugUI.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\DeferredPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\LightningPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\MainPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanHalper.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
     <ClCompile Include="Source\Engine\Systems\ResourceManager.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\StaticMeshRender.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\TerrainRender.cpp" />
@@ -59,6 +59,7 @@
     <ClInclude Include="Source\Engine\Engine.h" />
     <ClInclude Include="Source\Engine\Scene.h" />
     <ClInclude Include="Source\Engine\Systems\DynamicMapSystem.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\DebugUI.h" />
     <ClInclude Include="Source\Engine\Systems\Render\DeferredPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\LightningPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\MainPass.h" />
@@ -72,7 +73,6 @@
     <ClInclude Include="Source\Platform\WinPlatform.h" />
     <ClInclude Include="Source\Util\Math.h" />
     <ClInclude Include="Source\Util\Settings.h" />
-    <ClInclude Include="Source\ImguiIntegration.h" />
     <ClInclude Include="Source\Memory\MemoryManagmentSystem.h" />
     <ClInclude Include="Source\Render\Render.h" />
     <ClInclude Include="Source\Util\EngineTypes.h" />

@@ -162,6 +162,10 @@ namespace LightningPass
 			&Scene.LightEntity->SpotLight.LightSpaceMatrix,
 		};
 
+		VkImageView Attachments[2];
+		Attachments[0] = ShadowMapElement1ImageInterface[VulkanInterface::TestGetImageIndex()];
+		Attachments[1] = ShadowMapElement2ImageInterface[VulkanInterface::TestGetImageIndex()];
+
 		for (u32 LightCaster = 0; LightCaster < MAX_LIGHT_SOURCES; ++LightCaster)
 		{
 			VulkanInterface::UpdateUniformBuffer(LightSpaceMatrixBuffer[LightCaster], sizeof(glm::mat4), 0,
@@ -173,10 +177,10 @@ namespace LightningPass
 
 			VkRenderingAttachmentInfo DepthAttachment{ };
 			DepthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-			DepthAttachment.imageView = ShadowMapElement1ImageInterface[VulkanInterface::TestGetImageIndex()];
+			DepthAttachment.imageView = Attachments[LightCaster];
 			DepthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
 			DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 			DepthAttachment.clearValue.depthStencil.depth = 1.0f;
 
 			VkRenderingInfo RenderingInfo{ };
@@ -242,33 +246,33 @@ namespace LightningPass
 			}
 
 			vkCmdEndRendering(CmdBuffer);
-
-			// TODO: move to Main pass?
-			VkImageMemoryBarrier2 DepthAttachmentTransitionAfter = { };
-			DepthAttachmentTransitionAfter.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-
-			DepthAttachmentTransitionAfter.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-			DepthAttachmentTransitionAfter.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			DepthAttachmentTransitionAfter.image = ShadowMapArray[VulkanInterface::TestGetImageIndex()].Image;
-			DepthAttachmentTransitionAfter.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-			DepthAttachmentTransitionAfter.subresourceRange.baseMipLevel = 0;
-			DepthAttachmentTransitionAfter.subresourceRange.levelCount = 1;
-			DepthAttachmentTransitionAfter.subresourceRange.baseArrayLayer = LightCaster;
-			DepthAttachmentTransitionAfter.subresourceRange.layerCount = 1;
-			// RELEASE: all depth writes have finished  
-			DepthAttachmentTransitionAfter.srcStageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
-			DepthAttachmentTransitionAfter.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-			// ACQUIRE: allow sampling in the fragment shader  
-			DepthAttachmentTransitionAfter.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-			DepthAttachmentTransitionAfter.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
-
-			VkDependencyInfo DependencyInfoAfter = { };
-			DependencyInfoAfter.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-			DependencyInfoAfter.imageMemoryBarrierCount = 1;
-			DependencyInfoAfter.pImageMemoryBarriers = &DepthAttachmentTransitionAfter;
-
-			vkCmdPipelineBarrier2(CmdBuffer, &DependencyInfoAfter);
 		}
+
+		// TODO: move to Main pass?
+		VkImageMemoryBarrier2 DepthAttachmentTransitionAfter = { };
+		DepthAttachmentTransitionAfter.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+
+		DepthAttachmentTransitionAfter.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		DepthAttachmentTransitionAfter.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		DepthAttachmentTransitionAfter.image = ShadowMapArray[VulkanInterface::TestGetImageIndex()].Image;
+		DepthAttachmentTransitionAfter.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+		DepthAttachmentTransitionAfter.subresourceRange.baseMipLevel = 0;
+		DepthAttachmentTransitionAfter.subresourceRange.levelCount = 1;
+		DepthAttachmentTransitionAfter.subresourceRange.baseArrayLayer = 0;
+		DepthAttachmentTransitionAfter.subresourceRange.layerCount = 2;
+		// RELEASE: all depth writes have finished  
+		DepthAttachmentTransitionAfter.srcStageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+		DepthAttachmentTransitionAfter.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		// ACQUIRE: allow sampling in the fragment shader  
+		DepthAttachmentTransitionAfter.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+		DepthAttachmentTransitionAfter.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+
+		VkDependencyInfo DependencyInfoAfter = { };
+		DependencyInfoAfter.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+		DependencyInfoAfter.imageMemoryBarrierCount = 1;
+		DependencyInfoAfter.pImageMemoryBarriers = &DepthAttachmentTransitionAfter;
+
+		vkCmdPipelineBarrier2(CmdBuffer, &DependencyInfoAfter);
 	}
 
 	VulkanInterface::UniformImage* GetShadowMapArray()

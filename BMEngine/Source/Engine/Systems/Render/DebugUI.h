@@ -3,7 +3,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/epsilon.hpp>
 
-namespace ImguiIntegration
+struct GLFWwindow;
+
+namespace DebugUi
 {
 	typedef void (*TestSetDownload)(bool Download);
 
@@ -17,5 +19,8 @@ namespace ImguiIntegration
 		int* Zoom = nullptr;
 	};
 
-	void DrawLoop(const bool& IsDrawing, GuiData Data);
+	void Init(GLFWwindow* Wnd, GuiData* Data);
+	void DeInit();
+
+	void Draw();
 }

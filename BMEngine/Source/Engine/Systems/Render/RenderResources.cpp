@@ -22,7 +22,9 @@ namespace RenderResources
 	static u32 EntityIndex;
 
 	static VulkanInterface::IndexBuffer IndexBuffer;
+	static u64 IndexOffset;
 	static VulkanInterface::VertexBuffer VertexBuffer;
+	static u64 VertexOffset;
 
 	static u32 MaxTextures = 256;
 	static VkImage* Textures;
@@ -162,11 +164,13 @@ namespace RenderResources
 		DrawEntity* Entity = DrawEntities + EntityIndex;
 		*Entity = { };
 
-		Entity->VertexOffset = VertexBuffer.Offset;
-		Render::LoadVertices(&VertexBuffer, Vertices, VertexSize, VerticesCount, VertexBuffer.Offset);
+		Entity->VertexOffset = VertexOffset;
+		Render::LoadVertices(&VertexBuffer, Vertices, VertexSize, VerticesCount, VertexOffset);
+		VertexOffset += VertexSize * VerticesCount;
 
-		Entity->IndexOffset = IndexBuffer.Offset;
-		Render::LoadIndices(&IndexBuffer, Indices, IndicesCount, IndexBuffer.Offset);
+		Entity->IndexOffset = IndexOffset;
+		Render::LoadIndices(&IndexBuffer, Indices, IndicesCount, IndexOffset);
+		IndexOffset += sizeof(u32) * IndicesCount;
 
 		Entity->IndicesCount = IndicesCount;
 		Entity->MaterialIndex = MaterialIndex;

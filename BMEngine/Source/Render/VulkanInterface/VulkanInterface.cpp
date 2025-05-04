@@ -582,7 +582,6 @@ namespace VulkanInterface
 		vkBindBufferMemory(Device.LogicalDevice, UniformBuffer.Buffer, UniformBuffer.Memory, 0);
 
 		UniformBuffer.Size = MemoryRequirements.size;
-		UniformBuffer.Offset = 0;
 		return UniformBuffer;
 	}
 
@@ -1006,18 +1005,18 @@ namespace VulkanInterface
 
 	bool CreateMainInstance()
 	{
-		const char* ValidationLayers[] =
-		{
-			"VK_LAYER_KHRONOS_validation",
-			"VK_LAYER_LUNARG_monitor",
-		};
-		const u32 ValidationLayersSize = sizeof(ValidationLayers) / sizeof(ValidationLayers[0]);
+		//const char* ValidationLayers[] =
+		//{
+		//	"VK_LAYER_KHRONOS_validation",
+		//	"VK_LAYER_LUNARG_monitor",
+		//};
+		//const u32 ValidationLayersSize = sizeof(ValidationLayers) / sizeof(ValidationLayers[0]);
 
 		const char* ValidationExtensions[] =
 		{
 			VK_EXT_DEBUG_UTILS_EXTENSION_NAME
 		};
-		const u32 ValidationExtensionsSize = Config.EnableValidationLayers ? sizeof(ValidationExtensions) / sizeof(ValidationExtensions[0]) : 0;
+		const u32 ValidationExtensionsSize =  sizeof(ValidationExtensions) / sizeof(ValidationExtensions[0]);
 
 		Memory::FrameArray<VkExtensionProperties> AvailableExtensions = GetAvailableExtensionProperties();
 		Memory::FrameArray<const char*> RequiredExtensions = GetRequiredInstanceExtensions(ValidationExtensions, ValidationExtensionsSize);
@@ -1028,16 +1027,6 @@ namespace VulkanInterface
 			return false;
 		}
 
-		if (Config.EnableValidationLayers)
-		{
-			Memory::FrameArray<VkLayerProperties> LayerPropertiesData = GetAvailableInstanceLayerProperties();
-
-			if (!CheckValidationLayersSupport(LayerPropertiesData.Pointer.Data, LayerPropertiesData.Count,
-				ValidationLayers, ValidationLayersSize))
-			{
-				return false;
-			}
-		}
 
 		VkApplicationInfo ApplicationInfo = { };
 		ApplicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -1055,28 +1044,15 @@ namespace VulkanInterface
 		CreateInfo.enabledExtensionCount = RequiredExtensions.Count;
 		CreateInfo.ppEnabledExtensionNames = RequiredExtensions.Pointer.Data;
 
-		if (Config.EnableValidationLayers)
-		{
-			MessengerCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-			MessengerCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
-				| VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+		MessengerCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+		MessengerCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
+			| VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
 
-			MessengerCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
-				| VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+		MessengerCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
+			| VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 
-			MessengerCreateInfo.pfnUserCallback = MessengerDebugCallback;
-			MessengerCreateInfo.pUserData = nullptr;
+		MessengerCreateInfo.pfnUserCallback = MessengerDebugCallback;
 
-			CreateInfo.pNext = &MessengerCreateInfo;
-			CreateInfo.enabledLayerCount = ValidationLayersSize;
-			CreateInfo.ppEnabledLayerNames = ValidationLayers;
-		}
-		else
-		{
-			CreateInfo.ppEnabledLayerNames = nullptr;
-			CreateInfo.enabledLayerCount = 0;
-			CreateInfo.pNext = nullptr;
-		}
 
 		VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &Instance.VulkanInstance);
 		if (Result != VK_SUCCESS)
@@ -1085,16 +1061,13 @@ namespace VulkanInterface
 			return false;
 		}
 
-		if (Config.EnableValidationLayers)
-		{
-			const bool CreateDebugUtilsMessengerResult =
-				CreateDebugUtilsMessengerEXT(Instance.VulkanInstance, &MessengerCreateInfo, nullptr, &Instance.DebugMessenger);
+		const bool CreateDebugUtilsMessengerResult =
+			CreateDebugUtilsMessengerEXT(Instance.VulkanInstance, &MessengerCreateInfo, nullptr, &Instance.DebugMessenger);
 
-			if (!CreateDebugUtilsMessengerResult)
-			{
-				HandleLog(BMRVkLogType_Error, "Cannot create debug messenger");
-				return false;
-			}
+		if (!CreateDebugUtilsMessengerResult)
+		{
+			HandleLog(BMRVkLogType_Error, "Cannot create debug messenger");
+			return false;
 		}
 
 		return true;
@@ -2239,5 +2212,20 @@ namespace VulkanInterface
 	VkFormat GetSurfaceFormat()
 	{
 		return SurfaceFormat.format;
+	}
+
+	u32 GetQueueGraphicsFamilyIndex()
+	{
+		return Device.Indices.GraphicsFamily;
+	}
+
+	VkDescriptorPool GetDescriptorPool()
+	{
+		return MainPool;
+	}
+
+	VkInstance GetInstance()
+	{
+		return Instance.VulkanInstance;
 	}
 }

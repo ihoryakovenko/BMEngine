@@ -23,7 +23,6 @@ namespace VulkanInterface
 	struct VulkanInterfaceConfig
 	{
 		BMRVkLogHandler LogHandler = nullptr;
-		bool EnableValidationLayers = false;
 		u32 MaxTextures = 0;
 	};
 
@@ -82,7 +81,6 @@ namespace VulkanInterface
 		VkBuffer Buffer;
 		VkDeviceMemory Memory;
 		u64 Size; // Size could be aligned
-		u64 Offset;
 	};
 
 	struct UniformImage
@@ -229,4 +227,7 @@ namespace VulkanInterface
 	VkCommandBuffer GetTransferCommandBuffer();
 	VkQueue GetTransferQueue();
 	VkFormat GetSurfaceFormat();
+	u32 GetQueueGraphicsFamilyIndex();
+	VkDescriptorPool GetDescriptorPool();
+	VkInstance GetInstance();
 }

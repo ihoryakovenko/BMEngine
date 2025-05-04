@@ -4,6 +4,8 @@
 
 namespace VulkanHelper
 {
+	static const u32 BUFFER_ALIGNMENT = 64;
+
 	u32 GetMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, u32 AllowedTypes, VkMemoryPropertyFlags Properties)
 	{
 		VkPhysicalDeviceMemoryProperties MemoryProperties;
@@ -22,6 +24,34 @@ namespace VulkanHelper
 		return 0;
 	}
 
+	u64 CalculateBufferAlignedSize(VkDevice Device, VkBuffer Buffer, u64 BufferSize)
+	{
+		VkMemoryRequirements MemoryRequirements;
+		vkGetBufferMemoryRequirements(Device, Buffer, &MemoryRequirements);
+
+		u32 Padding = 0;
+		if (BufferSize % MemoryRequirements.alignment != 0)
+		{
+			Padding = MemoryRequirements.alignment - (BufferSize % MemoryRequirements.alignment);
+		}
+
+		return BufferSize + Padding;
+	}
+
+	u64 CalculateImageAlignedSize(VkDevice Device, VkImage Image, u64 ImageSize)
+	{
+		VkMemoryRequirements MemoryRequirements;
+		vkGetImageMemoryRequirements(Device, Image, &MemoryRequirements);
+
+		u32 Padding = 0;
+		if (ImageSize % MemoryRequirements.alignment != 0)
+		{
+			Padding = IMAGE_ALIGNMENT - (ImageSize % MemoryRequirements.alignment);
+		}
+
+		return ImageSize + Padding;
+	}
+
 	VkBuffer CreateBuffer(VkDevice Device, u64 Size, BufferUsageFlag Flag)
 	{
 		VkBufferCreateInfo MaterialBufferInfo = { };
@@ -32,12 +62,7 @@ namespace VulkanHelper
 
 		VkBuffer Buffer;
 		VkResult Result = vkCreateBuffer(Device, &MaterialBufferInfo, nullptr, &Buffer);
-		if (Result != VK_SUCCESS)
-		{
-			assert(false);
-			// TODO: 
-			//HandleLog(BMRVkLogType_Error, "vkCreateBuffer result is %d", Result);
-		}
+		assert(Result == VK_SUCCESS);
 
 		return Buffer;
 	}
@@ -48,17 +73,7 @@ namespace VulkanHelper
 		VkMemoryRequirements MemoryRequirements;
 		vkGetBufferMemoryRequirements(Device, Buffer, &MemoryRequirements);
 
-		if (BufferSize != MemoryRequirements.size)
-		{
-			//assert(false);
-			//HandleLog(BMRVkLogType_Warning, "Buffer memory requirement size is %d, allocating %d more then buffer size",
-				//MemoryRequirements.size, MemoryRequirements.size - BufferInfo->size);
-		}
-
 		const u32 MemoryTypeIndex = VulkanHelper::GetMemoryTypeIndex(PhysicalDevice, MemoryRequirements.memoryTypeBits, Properties);
-
-		//HandleLog(BMRVkLogType_Info, "Allocating Device memory. Buffer type: Image, Size count: %d, Index: %d",
-			//AllocationSize, MemoryTypeIndex);
 
 		VkMemoryAllocateInfo MemoryAllocInfo = { };
 		MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -67,11 +82,7 @@ namespace VulkanHelper
 
 		VkDeviceMemory Memory;
 		VkResult Result = vkAllocateMemory(Device, &MemoryAllocInfo, nullptr, &Memory);
-		if (Result != VK_SUCCESS)
-		{
-			assert(false);
-			//HandleLog(BMRVkLogType_Error, "vkAllocateMemory result is %d", Result);
-		}
+		assert(Result == VK_SUCCESS);
 
 		return Memory;
 	}

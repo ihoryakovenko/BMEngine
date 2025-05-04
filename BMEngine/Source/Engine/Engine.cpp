@@ -16,7 +16,6 @@
 #include "Util/Settings.h"
 #include "Render/Render.h"
 #include "Util/Util.h"
-#include "ImguiIntegration.h"
 #include "Systems/DynamicMapSystem.h"
 #include "Systems/ResourceManager.h"
 #include "Scene.h"
@@ -28,6 +27,7 @@
 #include "Systems/Render/LightningPass.h"
 #include "Systems/Render/MainPass.h"
 #include "Systems/Render/DeferredPass.h"
+#include "Systems/Render/DebugUI.h"
 
 namespace std
 {
@@ -84,7 +84,7 @@ namespace Engine
 	static RenderResources::DrawEntity SkyBox;
 	static Render::LightBuffer LightData;
 
-	static ImguiIntegration::GuiData GuiData;
+	static DebugUi::GuiData GuiData;
 
 	static glm::vec3 Eye = glm::vec3(0.0f, 10.0f, 0.0f);
 	static glm::vec3 Up = glm::vec3(0.0f, 0.0f, -1.0f);
@@ -100,14 +100,6 @@ namespace Engine
 
 		Memory::BmMemoryManagementSystem::FrameFree();
 
-		bool DrawImgui = true;
-		std::thread ImguiThread([&]()
-		{
-			// TODO: FIX
-			// UB race condition, 2 threads to variables
-			ImguiIntegration::DrawLoop(DrawImgui, GuiData);
-		});
-
 		while (!glfwWindowShouldClose(Window) && !Close)
 		{
 			glfwPollEvents();
@@ -121,9 +113,6 @@ namespace Engine
 
 			Memory::BmMemoryManagementSystem::FrameFree();
 		}
-
-		DrawImgui = false;
-		ImguiThread.join();
 
 		DeInit();
 
@@ -145,7 +134,6 @@ namespace Engine
 		InitSystems();
 
 		
-		CreateSkyBoxMesh(ResourceManager::FindMaterial("SkyBoxMaterial"));
 
 		SetUpScene();
 		 
@@ -162,16 +150,11 @@ namespace Engine
 		RenderConfig.MaxTextures = 500; // TODO: FIX!!!!
 		RenderConfig.LogHandler = RenderLog;
 
-		RenderConfig.EnableValidationLayers = false;
-
-#ifdef _DEBUG
-		RenderConfig.EnableValidationLayers = true;
-#endif
 
 		 
 
 		VulkanInterface::Init(glfwGetWin32Window(Window), RenderConfig);
-		RenderResources::Init(MB64, MB64, 1024, 512);
+		RenderResources::Init(MB32, MB32, 512, 256);
 		FrameManager::Init();
 		Render::Init();
 		DeferredPass::Init();
@@ -181,6 +164,7 @@ namespace Engine
 		TerrainRender::Init();
 		//DynamicMapSystem::Init();
 		StaticMeshRender::Init();
+		DebugUi::Init(Window, &GuiData);
 
 		return true;
 	}
@@ -188,11 +172,11 @@ namespace Engine
 	void DeInit()
 	{
 		//DynamicMapSystem::DeInit();
+		DebugUi::DeInit();
 		TerrainRender::DeInit();
 		StaticMeshRender::DeInit();
 
 		RenderResources::DeInit();
-		ResourceManager::DeInit();
 		Render::DeInit();
 		MainPass::DeInit();
 		DeferredPass::DeInit();

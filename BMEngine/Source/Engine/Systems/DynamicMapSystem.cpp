@@ -144,11 +144,11 @@ namespace DynamicMapSystem
 
 		IndexBuffer = VulkanInterface::CreateIndexBuffer(MB64);
 
-		Render::RenderTexture TextureArrayTiles = ResourceManager::EmptyTexture(TilesTextureId, TextureTileSize, TextureTileSize,
-			MaxTextureTilesPerAxis, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
+		//Render::RenderTexture TextureArrayTiles = ResourceManager::EmptyTexture(TilesTextureId, TextureTileSize, TextureTileSize,
+			//MaxTextureTilesPerAxis, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
 
 		VkDescriptorSet TilesMaterial;
-		ResourceManager::CreateSkyBoxTerrainTexture(TilesMaterialId, TextureArrayTiles.ImageView, &TilesMaterial);
+		//ResourceManager::CreateSkyBoxTerrainTexture(TilesMaterialId, TextureArrayTiles.ImageView, &TilesMaterial);
 		//Scene.MapEntity.TextureSet = TilesMaterial;
 
 		static httplib::Client ClientInstance("http://tile.openstreetmap.org");
@@ -307,7 +307,7 @@ namespace DynamicMapSystem
 			//TestDownload = false;
 		}
 		
-		Render::RenderTexture* Texture = ResourceManager::FindTexture(TilesTextureId);
+		//Render::RenderTexture* Texture = ResourceManager::FindTexture(TilesTextureId);
 
 		{
 			std::unique_lock Lock(QueueMutex);
@@ -327,7 +327,7 @@ namespace DynamicMapSystem
 				Info.BaseArrayLayer = TileDataCompressed.ArrayLayer;
 				Info.Data = &image;
 
-				Render::UpdateTexture(Texture, &Info);
+				//Render::UpdateTexture(Texture, &Info);
 
 				DownloadQueue.pop();
 			}

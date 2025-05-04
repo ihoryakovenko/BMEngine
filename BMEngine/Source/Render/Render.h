@@ -92,20 +92,8 @@ namespace Render
 	bool Init();
 	void DeInit();
 
-	void TestUpdateUniforBuffer(VulkanInterface::UniformBuffer* Buffer, u64 DataSize, u64 Offset, const void* Data);
-
-	RenderTexture CreateTexture(TextureArrayInfo* Info);
-	RenderTexture CreateEmptyTexture(TextureArrayInfo* Info);
-	void UpdateTexture(RenderTexture* Texture, TextureArrayInfo* Info);
-	void DestroyTexture(RenderTexture* Texture);
-
 	void LoadIndices(VulkanInterface::IndexBuffer* IndexBuffer, const u32* Indices, u32 IndicesCount, u64 Offset);
 	void LoadVertices(VulkanInterface::VertexBuffer* VertexBuffer, const void* Vertices, u32 VertexSize, u64 VerticesCount, u64 Offset);
 
 	void Draw(const DrawScene* Scene);
-
-
-
-	VkDeviceSize CalculateBufferAlignedSize(VkDeviceSize BufferSize);
-	VkDeviceSize CalculateImageAlignedSize(VkDeviceSize BufferSize);
 }

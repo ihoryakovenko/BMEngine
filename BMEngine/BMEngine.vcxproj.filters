@@ -32,8 +32,8 @@
     <ClCompile Include="Source\Engine\Systems\Render\LightningPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\MainPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\DeferredPass.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanHalper.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\DebugUI.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
@@ -48,7 +48,6 @@
     <ClInclude Include="..\External\imgui\imstb_rectpack.h" />
     <ClInclude Include="..\External\imgui\imstb_textedit.h" />
     <ClInclude Include="..\External\imgui\imstb_truetype.h" />
-    <ClInclude Include="Source\ImguiIntegration.h" />
     <ClInclude Include="Source\Render\Render.h" />
     <ClInclude Include="Source\Util\Settings.h" />
     <ClInclude Include="Source\Render\VulkanInterface\VulkanInterface.h" />
@@ -66,6 +65,7 @@
     <ClInclude Include="Source\Engine\Systems\Render\MainPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\DeferredPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\VulkanHalper.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\DebugUI.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />
