@@ -125,12 +125,10 @@ namespace MainPass
 		ColorBarrierBefore.subresourceRange.levelCount = 1;
 		ColorBarrierBefore.subresourceRange.baseArrayLayer = 0;
 		ColorBarrierBefore.subresourceRange.layerCount = 1;
-		// RELEASE: finish all color-writes
-		ColorBarrierBefore.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		ColorBarrierBefore.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		// ACQUIRE: allow shader-reads in frag stage
-		ColorBarrierBefore.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-		ColorBarrierBefore.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		ColorBarrierBefore.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;        // whatever stage last read it
+		ColorBarrierBefore.srcAccessMask = VK_ACCESS_2_SHADER_READ_BIT;                   // reading it as a sampled image
+		ColorBarrierBefore.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT; // the clear/write stage
+		ColorBarrierBefore.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;         // the clear/write access
 
 		VkImageMemoryBarrier2 DepthBarrierBefore = { };
 		DepthBarrierBefore.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;

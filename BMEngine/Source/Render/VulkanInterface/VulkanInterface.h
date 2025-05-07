@@ -146,8 +146,8 @@ namespace VulkanInterface
 	VkImage* GetSwapchainImages();
 	u32 AcquireNextImageIndex(); // Locks thread
 	u32 TestGetImageIndex();
-	VkCommandBuffer BeginDraw(u32 ImageIndex);
-	void EndDraw(u32 ImageIndex);
+	VkCommandBuffer BeginFrame(u32 ImageIndex);
+	void EndFrame(u32 ImageIndex);
 
 	VkPipelineLayout CreatePipelineLayout(const VkDescriptorSetLayout* DescriptorLayouts,
 		u32 DescriptorLayoutsCount, const VkPushConstantRange* PushConstant, u32 PushConstantsCount);

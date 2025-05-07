@@ -56,7 +56,7 @@ namespace Render
 	{
 		const u32 ImageIndex = VulkanInterface::AcquireNextImageIndex();
 
-		VulkanInterface::BeginDraw(ImageIndex);
+		VulkanInterface::BeginFrame(ImageIndex);
 
 		LightningPass::Draw();
 
@@ -64,13 +64,18 @@ namespace Render
 
 		TerrainRender::Draw();
 		StaticMeshRender::Draw();
-		DebugUi::Draw();
 
 		MainPass::EndPass();
-		DeferredPass::Draw();
+		DeferredPass::BeginPass();
 
+		DeferredPass::Draw();
+		DebugUi::Draw();
+
+		DeferredPass::EndPass();
 		
-		
-		VulkanInterface::EndDraw(ImageIndex);
+		VulkanInterface::EndFrame(ImageIndex);
+
+		// !!!!!!!!!!!!!!!!!!!!!!!!!!!
+		//VulkanInterface::WaitDevice();
 	}
 }

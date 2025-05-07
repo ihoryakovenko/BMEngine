@@ -10,9 +10,14 @@ namespace DeferredPass
 
 	void Draw();
 
+	void BeginPass();
+	void EndPass();
+
 	VkImageView* TestDeferredInputColorImageInterface();
 	VkImageView* TestDeferredInputDepthImageInterface();
 
 	VulkanInterface::UniformImage* TestDeferredInputColorImage();
 	VulkanInterface::UniformImage* TestDeferredInputDepthImage();
+
+	VulkanInterface::AttachmentData* GetAttachmentData();
 }

@@ -492,7 +492,7 @@ namespace VulkanInterface
 		return CurrentImageIndex;
 	}
 
-	VkCommandBuffer BeginDraw(u32 ImageIndex)
+	VkCommandBuffer BeginFrame(u32 ImageIndex)
 	{
 		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
 		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -507,7 +507,7 @@ namespace VulkanInterface
 		return CommandBuffer;
 	}
 
-	void EndDraw(u32 ImageIndex)
+	void EndFrame(u32 ImageIndex)
 	{
 		VkResult Result = vkEndCommandBuffer(DrawCommandBuffers[ImageIndex]);
 		if (Result != VK_SUCCESS)
@@ -2006,6 +2006,7 @@ namespace VulkanInterface
 	{
 		u32 Count;
 		vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &Count, nullptr);
+		//Count = 1;
 
 		auto Data = Memory::FrameArray<VkImage>::Create(Count);
 		vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &Count, Data.Pointer.Data);

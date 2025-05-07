@@ -200,18 +200,16 @@ namespace Engine
 	{
 		MoveCamera(Window, DeltaTime, MainCamera);
 
-		CameraSphericalPosition.z = DynamicMapSystem::CalculateCameraAltitude(Zoom);
-		CameraSphericalPosition.z += 1.0f;
+		//CameraSphericalPosition.z = DynamicMapSystem::CalculateCameraAltitude(Zoom);
+		//CameraSphericalPosition.z += 1.0f;
 
-		MainCamera.Position = DynamicMapSystem::SphericalToMercator(CameraSphericalPosition);
-		
-		MainCamera.Front = glm::normalize(-MainCamera.Position);
+		//MainCamera.Position = DynamicMapSystem::SphericalToMercator(CameraSphericalPosition);
+		//
+		//MainCamera.Front = glm::normalize(-MainCamera.Position);
 
-		const glm::vec3 NorthPole(0.0f, 1.0f, 0.0f);
-		const glm::vec3 Right = glm::normalize(glm::cross(NorthPole, MainCamera.Front));
-		MainCamera.Up = glm::normalize(glm::cross(MainCamera.Front, Right));
-
-		FrameManager::UpdateViewProjection(&ViewProjection);
+		//const glm::vec3 NorthPole(0.0f, 1.0f, 0.0f);
+		//const glm::vec3 Right = glm::normalize(glm::cross(NorthPole, MainCamera.Front));
+		//MainCamera.Up = glm::normalize(glm::cross(MainCamera.Front, Right));
 
 		f32 AspectRatio = f32(MainScreenExtent.width) / f32(MainScreenExtent.height);
 		//DynamicMapSystem::Update(DeltaTime, MainCamera, Zoom);
@@ -230,6 +228,7 @@ namespace Engine
 		//}
 
 		ViewProjection.View = glm::lookAt(MainCamera.Position, MainCamera.Position + MainCamera.Front, MainCamera.Up);
+		FrameManager::UpdateViewProjection(&ViewProjection);
 
 		float NearPlane = 0.1f, FarPlane = 100.0f;
 		float HalfSize = 30.0f;

@@ -3,26 +3,16 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
-#include <stdio.h>          // printf, fprintf
-#include <stdlib.h>         // abort
+
 #define GLFW_INCLUDE_NONE
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-
-#include <thread>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 
 #include "Render/VulkanInterface/VulkanInterface.h"
-#include "Engine/Systems/Render/MainPass.h"
-
-
-// Volk headers
-#ifdef IMGUI_IMPL_VULKAN_USE_VOLK
-#define VOLK_IMPLEMENTATION
-#include <volk.h>
-#endif
+#include "Engine/Systems/Render/DeferredPass.h"
 
 // [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with old VS compilers.
 // To link with VS2010-era libraries, VS2015+ requires linking with legacy_stdio_definitions.lib, which we do using this pragma.
@@ -38,7 +28,6 @@
 
 namespace DebugUi
 {
-// Data
 	static VkAllocationCallbacks* g_Allocator = nullptr;
 
 	static ImGui_ImplVulkanH_Window g_MainWindowData;
@@ -81,10 +70,10 @@ namespace DebugUi
 		VkPipelineRenderingCreateInfo RenderingInfo = { };
 		RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
 		RenderingInfo.pNext = nullptr;
-		RenderingInfo.colorAttachmentCount = MainPass::GetAttachmentData()->ColorAttachmentCount;
-		RenderingInfo.pColorAttachmentFormats = MainPass::GetAttachmentData()->ColorAttachmentFormats;
-		RenderingInfo.depthAttachmentFormat = MainPass::GetAttachmentData()->DepthAttachmentFormat;
-		RenderingInfo.stencilAttachmentFormat = MainPass::GetAttachmentData()->DepthAttachmentFormat;
+		RenderingInfo.colorAttachmentCount = DeferredPass::GetAttachmentData()->ColorAttachmentCount;
+		RenderingInfo.pColorAttachmentFormats = DeferredPass::GetAttachmentData()->ColorAttachmentFormats;
+		RenderingInfo.depthAttachmentFormat = DeferredPass::GetAttachmentData()->DepthAttachmentFormat;
+		RenderingInfo.stencilAttachmentFormat = DeferredPass::GetAttachmentData()->DepthAttachmentFormat;
 
 		ImGui_ImplVulkan_InitInfo init_info = { };
 		init_info.Instance = VulkanInterface::GetInstance();

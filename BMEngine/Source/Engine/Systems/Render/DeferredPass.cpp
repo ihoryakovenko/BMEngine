@@ -22,8 +22,15 @@ namespace DeferredPass
 	static VkSampler ColorSampler;
 	static VkSampler DepthSampler;
 
+	static VulkanInterface::AttachmentData AttachmentData;
+
 	void Init()
 	{
+		AttachmentData.ColorAttachmentCount = 1;
+		AttachmentData.ColorAttachmentFormats[0] = VulkanInterface::GetSurfaceFormat();
+		AttachmentData.DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
+		AttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+
 		VkSamplerCreateInfo ColorSamplerCreateInfo = { };
 		ColorSamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 		ColorSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
@@ -150,10 +157,7 @@ namespace DeferredPass
 
 		VulkanInterface::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
-		ResourceInfo.PipelineAttachmentData.ColorAttachmentCount = 1;
-		ResourceInfo.PipelineAttachmentData.ColorAttachmentFormats[0] = VulkanInterface::GetSurfaceFormat();
-		ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
-		ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+		ResourceInfo.PipelineAttachmentData = AttachmentData;
 
 		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, nullptr, 0,
 			&DeferredPipelineSettings, &ResourceInfo);
@@ -166,6 +170,18 @@ namespace DeferredPass
 	}
 
 	void Draw()
+	{
+		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+
+		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
+
+		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
+			0, 1, &DeferredInputSet[VulkanInterface::TestGetImageIndex()], 0, nullptr);
+
+		vkCmdDraw(CmdBuffer, 3, 1, 0, 0); // 3 hardcoded vertices
+	}
+
+	void BeginPass()
 	{
 		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
 
@@ -219,12 +235,11 @@ namespace DeferredPass
 		DepthBarrier.subresourceRange.levelCount = 1;
 		DepthBarrier.subresourceRange.baseArrayLayer = 0;
 		DepthBarrier.subresourceRange.layerCount = 1;
-		// RELEASE: wait for all color-attachmet writes to finish
-		DepthBarrier.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		DepthBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		// ACQUIRE: make image ready for sampling in the fragment shader
-		DepthBarrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-		DepthBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		DepthBarrier.srcStageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+		DepthBarrier.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		DepthBarrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+		DepthBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+
 
 		VkImageMemoryBarrier2 SwapchainAcquireBarrier = { };
 		SwapchainAcquireBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -239,7 +254,7 @@ namespace DeferredPass
 		SwapchainAcquireBarrier.subresourceRange.baseArrayLayer = 0;
 		SwapchainAcquireBarrier.subresourceRange.layerCount = 1;
 		// RELEASE nothing — we don’t depend on any earlier writes to the swap image
-		SwapchainAcquireBarrier.srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		SwapchainAcquireBarrier.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 		SwapchainAcquireBarrier.srcAccessMask = 0;
 		// ACQUIRE for our upcoming color-attachment writes
 		SwapchainAcquireBarrier.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -259,14 +274,11 @@ namespace DeferredPass
 		vkCmdPipelineBarrier2(CmdBuffer, &DepInfo);
 
 		vkCmdBeginRendering(CmdBuffer, &RenderingInfo);
+	}
 
-		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
-
-		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
-			0, 1, &DeferredInputSet[VulkanInterface::TestGetImageIndex()], 0, nullptr);
-
-		vkCmdDraw(CmdBuffer, 3, 1, 0, 0); // 3 hardcoded vertices
-
+	void EndPass()
+	{
+		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
 		vkCmdEndRendering(CmdBuffer);
 
 		VkImageMemoryBarrier2 SwapchainPresentBarrier = { };
@@ -281,12 +293,12 @@ namespace DeferredPass
 		SwapchainPresentBarrier.subresourceRange.levelCount = 1;
 		SwapchainPresentBarrier.subresourceRange.baseArrayLayer = 0;
 		SwapchainPresentBarrier.subresourceRange.layerCount = 1;
-		// RELEASE: finish all your color-attachment writes
-		SwapchainPresentBarrier.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		SwapchainPresentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		// ACQUIRE: nothing—present engine will take it
-		SwapchainPresentBarrier.dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-		SwapchainPresentBarrier.dstAccessMask = VK_PIPELINE_STAGE_NONE;
+		SwapchainPresentBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT
+			| VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+		SwapchainPresentBarrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
+			| VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		SwapchainPresentBarrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE_KHR;  // no further memory dep
+			SwapchainPresentBarrier.dstAccessMask = 0;
 
 		VkDependencyInfo PresentDepInfo = { };
 		PresentDepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
@@ -318,5 +330,10 @@ namespace DeferredPass
 	VulkanInterface::UniformImage* TestDeferredInputDepthImage()
 	{
 		return DeferredInputDepthImage;
+	}
+
+	VulkanInterface::AttachmentData* GetAttachmentData()
+	{
+		return &AttachmentData;
 	}
 }
