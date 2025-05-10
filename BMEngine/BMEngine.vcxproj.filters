@@ -21,7 +21,6 @@
     <ClCompile Include="Source\Util\Settings.cpp" />
     <ClCompile Include="Source\Render\VulkanInterface\VulkanInterface.cpp" />
     <ClCompile Include="Source\Engine\Engine.cpp" />
-    <ClCompile Include="Source\Platform\WinPlatform.cpp" />
     <ClCompile Include="Source\Engine\Systems\DynamicMapSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\ResourceManager.cpp" />
     <ClCompile Include="Source\Engine\Scene.cpp" />
@@ -32,13 +31,13 @@
     <ClCompile Include="Source\Engine\Systems\Render\LightningPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\MainPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\DeferredPass.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\VulkanHalper.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\DebugUI.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
     <ClInclude Include="Source\Util\stb_image.h" />
-    <ClInclude Include="Source\Memory\MemoryManagmentSystem.h" />
+    <ClInclude Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.h" />
     <ClInclude Include="Source\Util\EngineTypes.h" />
     <ClInclude Include="..\External\imgui\backends\imgui_impl_glfw.h" />
     <ClInclude Include="..\External\imgui\backends\imgui_impl_vulkan.h" />
@@ -52,7 +51,6 @@
     <ClInclude Include="Source\Util\Settings.h" />
     <ClInclude Include="Source\Render\VulkanInterface\VulkanInterface.h" />
     <ClInclude Include="Source\Engine\Engine.h" />
-    <ClInclude Include="Source\Platform\WinPlatform.h" />
     <ClInclude Include="Source\Engine\Systems\DynamicMapSystem.h" />
     <ClInclude Include="Source\Engine\Systems\ResourceManager.h" />
     <ClInclude Include="Source\Engine\Scene.h" />
@@ -64,7 +62,7 @@
     <ClInclude Include="Source\Engine\Systems\Render\LightningPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\MainPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\DeferredPass.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\VulkanHalper.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\VulkanHelper.h" />
     <ClInclude Include="Source\Engine\Systems\Render\DebugUI.h" />
   </ItemGroup>
   <ItemGroup>

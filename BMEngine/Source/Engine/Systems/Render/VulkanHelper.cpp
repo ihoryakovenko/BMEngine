@@ -1,0 +1,801 @@
+#include "VulkanHelper.h"
+
+#include <cassert>
+
+#include <glm/glm.hpp>
+
+#include "Util/Util.h"
+
+namespace VulkanHelper
+{
+	Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
+	{
+		u32 Count;
+		const VkResult Result = vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, Surface, &Count, nullptr);
+		assert(Result == VK_SUCCESS);
+
+		auto Data = Memory::FrameArray<VkSurfaceFormatKHR>::Create(Count);
+		vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, Surface, &Count, Data.Pointer.Data);
+
+		return Data;
+	}
+
+	VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface, const VkSurfaceFormatKHR* AvailableFormats, u32 Count)
+	{
+		VkSurfaceFormatKHR SurfaceFormat = { VK_FORMAT_UNDEFINED, static_cast<VkColorSpaceKHR>(0) };
+
+		// All formats available
+		if (Count == 1 && AvailableFormats[0].format == VK_FORMAT_UNDEFINED)
+		{
+			SurfaceFormat = { VK_FORMAT_R8G8B8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
+		}
+		else
+		{
+			for (u32 i = 0; i < Count; ++i)
+			{
+				VkSurfaceFormatKHR AvailableFormat = AvailableFormats[i];
+				if ((AvailableFormat.format == VK_FORMAT_R8G8B8_UNORM || AvailableFormat.format == VK_FORMAT_B8G8R8A8_UNORM)
+					&& AvailableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+				{
+					SurfaceFormat = AvailableFormat;
+					break;
+				}
+			}
+		}
+
+		assert(SurfaceFormat.format != VK_FORMAT_UNDEFINED);
+		return SurfaceFormat;
+	}
+
+	u32 GetMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, u32 AllowedTypes, VkMemoryPropertyFlags Properties)
+	{
+		VkPhysicalDeviceMemoryProperties MemoryProperties;
+		vkGetPhysicalDeviceMemoryProperties(PhysicalDevice, &MemoryProperties);
+
+		for (u32 MemoryTypeIndex = 0; MemoryTypeIndex < MemoryProperties.memoryTypeCount; MemoryTypeIndex++)
+		{
+			if ((AllowedTypes & (1 << MemoryTypeIndex))	// Index of memory type must match corresponding bit in allowedTypes
+				&& (MemoryProperties.memoryTypes[MemoryTypeIndex].propertyFlags & Properties) == Properties) // Desired property bit flags are part of memory type's property flags
+			{
+				return MemoryTypeIndex;
+			}
+		}
+
+		assert(false);
+		return 0;
+	}
+
+	u64 CalculateBufferAlignedSize(VkDevice Device, VkBuffer Buffer, u64 BufferSize)
+	{
+		VkMemoryRequirements MemoryRequirements;
+		vkGetBufferMemoryRequirements(Device, Buffer, &MemoryRequirements);
+
+		u32 Padding = 0;
+		if (BufferSize % MemoryRequirements.alignment != 0)
+		{
+			Padding = MemoryRequirements.alignment - (BufferSize % MemoryRequirements.alignment);
+		}
+
+		return BufferSize + Padding;
+	}
+
+	u64 CalculateImageAlignedSize(VkDevice Device, VkImage Image, u64 ImageSize)
+	{
+		VkMemoryRequirements MemoryRequirements;
+		vkGetImageMemoryRequirements(Device, Image, &MemoryRequirements);
+
+		u32 Padding = 0;
+		if (ImageSize % MemoryRequirements.alignment != 0)
+		{
+			Padding = IMAGE_ALIGNMENT - (ImageSize % MemoryRequirements.alignment);
+		}
+
+		return ImageSize + Padding;
+	}
+
+	VkBuffer CreateBuffer(VkDevice Device, u64 Size, BufferUsageFlag Flag)
+	{
+		VkBufferCreateInfo BufferInfo = { };
+		BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		BufferInfo.size = Size;
+		BufferInfo.usage = Flag;
+		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		VkBuffer Buffer;
+		VkResult Result = vkCreateBuffer(Device, &BufferInfo, nullptr, &Buffer);
+		assert(Result == VK_SUCCESS);
+
+		return Buffer;
+	}
+
+	VkDeviceMemory AllocateDeviceMemoryForBuffer(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer,
+		MemoryPropertyFlag Properties)
+	{
+		VkMemoryRequirements MemoryRequirements;
+		vkGetBufferMemoryRequirements(Device, Buffer, &MemoryRequirements);
+
+		const u32 MemoryTypeIndex = VulkanHelper::GetMemoryTypeIndex(PhysicalDevice, MemoryRequirements.memoryTypeBits, Properties);
+
+		VkMemoryAllocateInfo MemoryAllocInfo = { };
+		MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		MemoryAllocInfo.allocationSize = MemoryRequirements.size;
+		MemoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;
+
+		VkDeviceMemory Memory;
+		VkResult Result = vkAllocateMemory(Device, &MemoryAllocInfo, nullptr, &Memory);
+		assert(Result == VK_SUCCESS);
+
+		return Memory;
+	}
+
+	VkDeviceMemory AllocateDeviceMemoryForImage(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkImage Image, MemoryPropertyFlag Properties)
+	{
+		VkMemoryRequirements MemoryRequirements;
+		vkGetImageMemoryRequirements(Device, Image, &MemoryRequirements);
+
+		const u32 MemoryTypeIndex = VulkanHelper::GetMemoryTypeIndex(PhysicalDevice, MemoryRequirements.memoryTypeBits, Properties);
+
+		VkMemoryAllocateInfo MemoryAllocInfo = { };
+		MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		MemoryAllocInfo.allocationSize = MemoryRequirements.size;
+		MemoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;
+
+		VkDeviceMemory Memory;
+		VkResult Result = vkAllocateMemory(Device, &MemoryAllocInfo, nullptr, &Memory);
+		if (Result != VK_SUCCESS)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Error, "vkAllocateMemory result is %d", Result);
+		}
+
+		return Memory;
+	}
+
+	VkDeviceMemory VulkanHelper::AllocateAndBindDeviceMemoryForBuffer(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer, MemoryPropertyFlag Properties)
+	{
+		VkDeviceMemory Memory = AllocateDeviceMemoryForBuffer(PhysicalDevice, Device, Buffer, Properties);
+		vkBindBufferMemory(Device, Buffer, Memory, 0);
+		return Memory;
+	}
+
+	VkDeviceMemory AllocateAndBindDeviceMemoryForImage(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkImage Image, MemoryPropertyFlag Properties)
+	{
+		VkDeviceMemory Memory = AllocateDeviceMemoryForImage(PhysicalDevice, Device, Image, Properties);
+		vkBindImageMemory(Device, Image, Memory, 0);
+		return Memory;
+	}
+
+	void UpdateHostCompatibleBufferMemory(VkDevice Device, VkDeviceMemory Memory, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data)
+	{
+		void* MappedMemory;
+		vkMapMemory(Device, Memory, Offset, DataSize, 0, &MappedMemory);
+		std::memcpy(MappedMemory, Data, DataSize);
+		vkUnmapMemory(Device, Memory);
+	}
+
+	VkDescriptorPool CreateDescriptorPool(VkDevice Device, VkDescriptorPoolSize* PoolSizes, u32 PoolSizeCount, u32 MaxDescriptorCount)
+	{
+		VkDescriptorPoolCreateInfo PoolCreateInfo = { };
+		PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		PoolCreateInfo.maxSets = MaxDescriptorCount;
+		PoolCreateInfo.poolSizeCount = PoolSizeCount;
+		PoolCreateInfo.pPoolSizes = PoolSizes;
+		PoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
+
+		VkDescriptorPool Pool;
+		VkResult Result = vkCreateDescriptorPool(Device, &PoolCreateInfo, nullptr, &Pool);
+		if (Result != VK_SUCCESS)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateDescriptorPool result is %d", Result);
+		}
+
+		return Pool;
+	}
+
+	Memory::FrameArray<VkExtensionProperties> GetAvailableExtensionProperties()
+	{
+		u32 Count;
+		const VkResult Result = vkEnumerateInstanceExtensionProperties(nullptr, &Count, nullptr);
+		if (Result != VK_SUCCESS)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Error, "vkEnumerateInstanceExtensionProperties result is %d", static_cast<int>(Result));
+		}
+
+		auto Data = Memory::FrameArray<VkExtensionProperties>::Create(Count);
+		vkEnumerateInstanceExtensionProperties(nullptr, &Count, Data.Pointer.Data);
+
+		return Data;
+	}
+
+	Memory::FrameArray<VkLayerProperties> GetAvailableInstanceLayerProperties()
+	{
+		u32 Count;
+		const VkResult Result = vkEnumerateInstanceLayerProperties(&Count, nullptr);
+		if (Result != VK_SUCCESS)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Error, "vkEnumerateInstanceLayerProperties result is %d", Result);
+		}
+
+		auto Data = Memory::FrameArray<VkLayerProperties>::Create(Count);
+		vkEnumerateInstanceLayerProperties(&Count, Data.Pointer.Data);
+
+		return Data;
+	}
+
+	Memory::FrameArray<const char*> GetRequiredInstanceExtensions(const char** RequiredInstanceExtensions, u32 RequiredExtensionsCount,
+		const char** ValidationExtensions, u32 ValidationExtensionsCount)
+	{
+		auto Data = Memory::FrameArray<const char*>::Create(RequiredExtensionsCount + ValidationExtensionsCount);
+
+		for (u32 i = 0; i < RequiredExtensionsCount; ++i)
+		{
+			Data[i] = RequiredInstanceExtensions[i];
+			Util::RenderLog(Util::BMRVkLogType_Info, "Requested %s extension", Data[i]);
+		}
+
+		for (u32 i = 0; i < ValidationExtensionsCount; ++i)
+		{
+			Data[i + RequiredExtensionsCount] = ValidationExtensions[i];
+			Util::RenderLog(Util::BMRVkLogType_Info, "Requested %s extension", Data[i + RequiredExtensionsCount]);
+		}
+
+		return Data;
+	}
+
+	Memory::FrameArray<VkPhysicalDevice> GetPhysicalDeviceList(VkInstance VulkanInstance)
+	{
+		u32 Count;
+		vkEnumeratePhysicalDevices(VulkanInstance, &Count, nullptr);
+
+		auto Data = Memory::FrameArray<VkPhysicalDevice>::Create(Count);
+		vkEnumeratePhysicalDevices(VulkanInstance, &Count, Data.Pointer.Data);
+
+		return Data;
+	}
+
+	Memory::FrameArray<VkExtensionProperties> GetDeviceExtensionProperties(VkPhysicalDevice PhysicalDevice)
+	{
+		u32 Count;
+		const VkResult Result = vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &Count, nullptr);
+		if (Result != VK_SUCCESS)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Error, "vkEnumerateDeviceExtensionProperties result is %d", Result);
+		}
+
+		auto Data = Memory::FrameArray<VkExtensionProperties>::Create(Count);
+		vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &Count, Data.Pointer.Data);
+
+		return Data;
+	}
+
+	Memory::FrameArray<VkQueueFamilyProperties> GetQueueFamilyProperties(VkPhysicalDevice PhysicalDevice)
+	{
+		u32 Count;
+		vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &Count, nullptr);
+
+		auto Data = Memory::FrameArray<VkQueueFamilyProperties>::Create(Count);
+		vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &Count, Data.Pointer.Data);
+
+		return Data;
+	}
+
+	// TODO check function
+	// In current realization if GraphicsFamily is valid but if PresentationFamily is not valid
+	// GraphicsFamily could be overridden on next iteration even when it is valid
+	BMRPhysicalDeviceIndices GetPhysicalDeviceIndices(VkQueueFamilyProperties* Properties, u32 PropertiesCount,
+		VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
+	{
+		BMRPhysicalDeviceIndices Indices;
+		Indices.GraphicsFamily = -1;
+		Indices.PresentationFamily = -1;
+
+		for (u32 i = 0; i < PropertiesCount; ++i)
+		{
+			// check if Queue is graphics type
+			if (Properties[i].queueCount > 0 && Properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			{
+				// if we QueueFamily[i] graphics type but not presentation type
+				// and QueueFamily[i + 1] graphics type and presentation type
+				// then we rewrite GraphicsFamily
+				// toto check what is better rewrite or have different QueueFamilies
+				Indices.GraphicsFamily = i;
+			}
+
+			// check if Queue is presentation type (can be graphics and presentation)
+			VkBool32 PresentationSupport = false;
+			vkGetPhysicalDeviceSurfaceSupportKHR(PhysicalDevice, i, Surface, &PresentationSupport);
+			if (Properties[i].queueCount > 0 && PresentationSupport)
+			{
+				Indices.PresentationFamily = i;
+			}
+
+			if (Indices.GraphicsFamily >= 0 && Indices.PresentationFamily >= 0)
+			{
+				break;
+			}
+		}
+
+		return Indices;
+	}
+
+	bool CheckFormatSupport(VkPhysicalDevice PhysicalDevice, VkFormat Format, VkImageTiling Tiling, VkFormatFeatureFlags FeatureFlags)
+	{
+		VkFormatProperties Properties;
+		vkGetPhysicalDeviceFormatProperties(PhysicalDevice, Format, &Properties);
+
+		if (Tiling == VK_IMAGE_TILING_LINEAR && (Properties.linearTilingFeatures & FeatureFlags) == FeatureFlags)
+		{
+			return true;
+		}
+		else if (Tiling == VK_IMAGE_TILING_OPTIMAL && (Properties.optimalTilingFeatures & FeatureFlags) == FeatureFlags)
+		{
+			return true;
+		}
+	}
+
+	void PrintDeviceData(VkPhysicalDeviceProperties* DeviceProperties, VkPhysicalDeviceFeatures* AvailableFeatures)
+	{
+		Util::RenderLog(Util::BMRVkLogType_Info,
+			"VkPhysicalDeviceProperties:\n"
+			"  apiVersion: %u\n  driverVersion: %u\n  vendorID: %u\n  deviceID: %u\n"
+			"  deviceType: %u\n  deviceName: %s\n"
+			"  pipelineCacheUUID: %02X%02X%02X%02X-%02X%02X%02X%02X-%02X%02X%02X%02X-%02X%02X%02X%02X\n"
+			"  sparseProperties:\n    residencyStandard2DBlockShape: %u\n"
+			"    residencyStandard2DMultisampleBlockShape: %u\n    residencyStandard3DBlockShape: %u\n"
+			"    residencyAlignedMipSize: %u\n    residencyNonResidentStrict: %u",
+			DeviceProperties->apiVersion, DeviceProperties->driverVersion,
+			DeviceProperties->vendorID, DeviceProperties->deviceID,
+			DeviceProperties->deviceType, DeviceProperties->deviceName,
+			DeviceProperties->pipelineCacheUUID[0], DeviceProperties->pipelineCacheUUID[1], DeviceProperties->pipelineCacheUUID[2], DeviceProperties->pipelineCacheUUID[3],
+			DeviceProperties->pipelineCacheUUID[4], DeviceProperties->pipelineCacheUUID[5], DeviceProperties->pipelineCacheUUID[6], DeviceProperties->pipelineCacheUUID[7],
+			DeviceProperties->pipelineCacheUUID[8], DeviceProperties->pipelineCacheUUID[9], DeviceProperties->pipelineCacheUUID[10], DeviceProperties->pipelineCacheUUID[11],
+			DeviceProperties->pipelineCacheUUID[12], DeviceProperties->pipelineCacheUUID[13], DeviceProperties->pipelineCacheUUID[14], DeviceProperties->pipelineCacheUUID[15],
+			DeviceProperties->sparseProperties.residencyStandard2DBlockShape,
+			DeviceProperties->sparseProperties.residencyStandard2DMultisampleBlockShape,
+			DeviceProperties->sparseProperties.residencyStandard3DBlockShape,
+			DeviceProperties->sparseProperties.residencyAlignedMipSize,
+			DeviceProperties->sparseProperties.residencyNonResidentStrict
+		);
+
+		Util::RenderLog(Util::BMRVkLogType_Info,
+			"VkPhysicalDeviceFeatures:\n  robustBufferAccess: %d\n  fullDrawIndexUint32: %d\n"
+			"  imageCubeArray: %d\n  independentBlend: %d\n  geometryShader: %d\n"
+			"  tessellationShader: %d\n  sampleRateShading: %d\n  dualSrcBlend: %d\n"
+			"  logicOp: %d\n  multiDrawIndirect: %d\n  drawIndirectFirstInstance: %d\n"
+			"  depthClamp: %d\n  depthBiasClamp: %d\n  fillModeNonSolid: %d\n"
+			"  depthBounds: %d\n  wideLines: %d\n  largePoints: %d\n  alphaToOne: %d\n"
+			"  multiViewport: %d\n  samplerAnisotropy: %d\n  textureCompressionETC2: %d\n"
+			"  textureCompressionASTC_LDR: %d\n  textureCompressionBC: %d\n"
+			"  occlusionQueryPrecise: %d\n  pipelineStatisticsQuery: %d\n"
+			"  vertexPipelineStoresAndAtomics: %d\n  fragmentStoresAndAtomics: %d\n"
+			"  shaderTessellationAndGeometryPointSize: %d\n  shaderImageGatherExtended: %d\n"
+			"  shaderStorageImageExtendedFormats: %d\n  shaderStorageImageMultisample: %d\n"
+			"  shaderStorageImageReadWithoutFormat: %d\n  shaderStorageImageWriteWithoutFormat: %d\n"
+			"  shaderUniformBufferArrayDynamicIndexing: %d\n  shaderSampledImageArrayDynamicIndexing: %d\n"
+			"  shaderStorageBufferArrayDynamicIndexing: %d\n  shaderStorageImageArrayDynamicIndexing: %d\n"
+			"  shaderClipDistance: %d\n  shaderCullDistance: %d\n  shaderFloat64: %d\n"
+			"  shaderInt64: %d\n  shaderInt16: %d\n  shaderResourceResidency: %d\n"
+			"  shaderResourceMinLod: %d\n  sparseBinding: %d\n  sparseResidencyBuffer: %d\n"
+			"  sparseResidencyImage2D: %d\n  sparseResidencyImage3D: %d\n  sparseResidency2Samples: %d\n"
+			"  sparseResidency4Samples: %d\n  sparseResidency8Samples: %d\n  sparseResidency16Samples: %d\n"
+			"  sparseResidencyAliased: %d\n  variableMultisampleRate: %d\n  inheritedQueries: %d",
+			AvailableFeatures->robustBufferAccess, AvailableFeatures->fullDrawIndexUint32, AvailableFeatures->imageCubeArray,
+			AvailableFeatures->independentBlend, AvailableFeatures->geometryShader, AvailableFeatures->tessellationShader,
+			AvailableFeatures->sampleRateShading, AvailableFeatures->dualSrcBlend, AvailableFeatures->logicOp,
+			AvailableFeatures->multiDrawIndirect, AvailableFeatures->drawIndirectFirstInstance, AvailableFeatures->depthClamp,
+			AvailableFeatures->depthBiasClamp, AvailableFeatures->fillModeNonSolid, AvailableFeatures->depthBounds,
+			AvailableFeatures->wideLines, AvailableFeatures->largePoints, AvailableFeatures->alphaToOne,
+			AvailableFeatures->multiViewport, AvailableFeatures->samplerAnisotropy, AvailableFeatures->textureCompressionETC2,
+			AvailableFeatures->textureCompressionASTC_LDR, AvailableFeatures->textureCompressionBC,
+			AvailableFeatures->occlusionQueryPrecise, AvailableFeatures->pipelineStatisticsQuery,
+			AvailableFeatures->vertexPipelineStoresAndAtomics, AvailableFeatures->fragmentStoresAndAtomics,
+			AvailableFeatures->shaderTessellationAndGeometryPointSize, AvailableFeatures->shaderImageGatherExtended,
+			AvailableFeatures->shaderStorageImageExtendedFormats, AvailableFeatures->shaderStorageImageMultisample,
+			AvailableFeatures->shaderStorageImageReadWithoutFormat, AvailableFeatures->shaderStorageImageWriteWithoutFormat,
+			AvailableFeatures->shaderUniformBufferArrayDynamicIndexing, AvailableFeatures->shaderSampledImageArrayDynamicIndexing,
+			AvailableFeatures->shaderStorageBufferArrayDynamicIndexing, AvailableFeatures->shaderStorageImageArrayDynamicIndexing,
+			AvailableFeatures->shaderClipDistance, AvailableFeatures->shaderCullDistance,
+			AvailableFeatures->shaderFloat64, AvailableFeatures->shaderInt64, AvailableFeatures->shaderInt16,
+			AvailableFeatures->shaderResourceResidency, AvailableFeatures->shaderResourceMinLod,
+			AvailableFeatures->sparseBinding, AvailableFeatures->sparseResidencyBuffer,
+			AvailableFeatures->sparseResidencyImage2D, AvailableFeatures->sparseResidencyImage3D,
+			AvailableFeatures->sparseResidency2Samples, AvailableFeatures->sparseResidency4Samples,
+			AvailableFeatures->sparseResidency8Samples, AvailableFeatures->sparseResidency16Samples,
+			AvailableFeatures->sparseResidencyAliased, AvailableFeatures->variableMultisampleRate,
+			AvailableFeatures->inheritedQueries
+		);
+
+		Util::RenderLog(Util::BMRVkLogType_Info,
+			"VkPhysicalDeviceLimits:\n  maxImageDimension1D: %u\n  maxImageDimension2D: %u\n"
+			"  maxImageDimension3D: %u\n  maxImageDimensionCube: %u\n"
+			"  maxImageArrayLayers: %u\n  maxTexelBufferElements: %u\n"
+			"  maxUniformBufferRange: %u\n  maxStorageBufferRange: %u\n"
+			"  maxPushConstantsSize: %u\n  maxMemoryAllocationCount: %u\n"
+			"  maxSamplerAllocationCount: %u\n  bufferImageGranularity: %llu\n"
+			"  sparseAddressSpaceSize: %llu\n  maxBoundDescriptorSets: %u\n"
+			"  maxPerStageDescriptorSamplers: %u\n  maxPerStageDescriptorUniformBuffers: %u\n"
+			"  maxPerStageDescriptorStorageBuffers: %u\n  maxPerStageDescriptorSampledImages: %u\n"
+			"  maxPerStageDescriptorStorageImages: %u\n  maxPerStageDescriptorInputAttachments: %u\n"
+			"  maxPerStageResources: %u\n  maxDescriptorSetSamplers: %u\n"
+			"  maxDescriptorSetUniformBuffers: %u\n  maxDescriptorSetUniformBuffersDynamic: %u\n"
+			"  maxDescriptorSetStorageBuffers: %u\n  maxDescriptorSetStorageBuffersDynamic: %u\n"
+			"  maxDescriptorSetSampledImages: %u\n  maxDescriptorSetStorageImages: %u\n"
+			"  maxDescriptorSetInputAttachments: %u\n  maxVertexInputAttributes: %u\n"
+			"  maxVertexInputBindings: %u\n  maxVertexInputAttributeOffset: %u\n"
+			"  maxVertexInputBindingStride: %u\n  maxVertexOutputComponents: %u\n"
+			"  maxTessellationGenerationLevel: %u\n  maxTessellationPatchSize: %u\n"
+			"  maxTessellationControlPerVertexInputComponents: %u\n  maxTessellationControlPerVertexOutputComponents: %u\n"
+			"  maxTessellationControlPerPatchOutputComponents: %u\n  maxTessellationControlTotalOutputComponents: %u\n"
+			"  maxTessellationEvaluationInputComponents: %u\n  maxTessellationEvaluationOutputComponents: %u\n"
+			"  maxGeometryShaderInvocations: %u\n  maxGeometryInputComponents: %u\n"
+			"  maxGeometryOutputComponents: %u\n  maxGeometryOutputVertices: %u\n"
+			"  maxGeometryTotalOutputComponents: %u\n  maxFragmentInputComponents: %u\n"
+			"  maxFragmentOutputAttachments: %u\n  maxFragmentDualSrcAttachments: %u\n"
+			"  maxFragmentCombinedOutputResources: %u\n  maxComputeSharedMemorySize: %u\n"
+			"  maxComputeWorkGroupCount[0]: %u\n  maxComputeWorkGroupCount[1]: %u\n"
+			"  maxComputeWorkGroupCount[2]: %u\n  maxComputeWorkGroupInvocations: %u\n"
+			"  maxComputeWorkGroupSize[0]: %u\n  maxComputeWorkGroupSize[1]: %u\n"
+			"  maxComputeWorkGroupSize[2]: %u\n  subPixelPrecisionBits: %u\n"
+			"  subTexelPrecisionBits: %u\n  mipmapPrecisionBits: %u\n"
+			"  maxDrawIndexedIndexValue: %u\n  maxDrawIndirectCount: %u\n"
+			"  maxSamplerLodBias: %f\n  maxSamplerAnisotropy: %f\n"
+			"  maxViewports: %u\n  maxViewportDimensions[0]: %u\n"
+			"  maxViewportDimensions[1]: %u\n  viewportBoundsRange[0]: %f\n"
+			"  viewportBoundsRange[1]: %f\n  viewportSubPixelBits: %u\n"
+			"  minMemoryMapAlignment: %zu\n  minTexelBufferOffsetAlignment: %llu\n"
+			"  minUniformBufferOffsetAlignment: %llu\n  minStorageBufferOffsetAlignment: %llu\n"
+			"  minTexelOffset: %d\n  maxTexelOffset: %u\n"
+			"  minTexelGatherOffset: %d\n  maxTexelGatherOffset: %u\n"
+			"  minInterpolationOffset: %f\n  maxInterpolationOffset: %f\n"
+			"  subPixelInterpolationOffsetBits: %u\n  maxFramebufferWidth: %u\n"
+			"  maxFramebufferHeight: %u\n  maxFramebufferLayers: %u\n"
+			"  framebufferColorSampleCounts: %u\n  framebufferDepthSampleCounts: %u\n"
+			"  framebufferStencilSampleCounts: %u\n  framebufferNoAttachmentsSampleCounts: %u\n"
+			"  maxColorAttachments: %u\n  sampledImageColorSampleCounts: %u\n"
+			"  sampledImageIntegerSampleCounts: %u\n  sampledImageDepthSampleCounts: %u\n"
+			"  sampledImageStencilSampleCounts: %u\n  storageImageSampleCounts: %u\n"
+			"  maxSampleMaskWords: %u\n  timestampComputeAndGraphics: %d\n"
+			"  timestampPeriod: %f\n  maxClipDistances: %u\n"
+			"  maxCullDistances: %u\n  maxCombinedClipAndCullDistances: %u\n"
+			"  discreteQueuePriorities: %u\n  pointSizeRange[0]: %f\n"
+			"  pointSizeRange[1]: %f\n  lineWidthRange[0]: %f\n"
+			"  lineWidthRange[1]: %f\n  pointSizeGranularity: %f\n"
+			"  lineWidthGranularity: %f\n  strictLines: %d\n"
+			"  standardSampleLocations: %d\n  optimalBufferCopyOffsetAlignment: %llu\n"
+			"  optimalBufferCopyRowPitchAlignment: %llu\n  nonCoherentAtomSize: %llu",
+			DeviceProperties->limits.maxImageDimension1D, DeviceProperties->limits.maxImageDimension2D,
+			DeviceProperties->limits.maxImageDimension3D, DeviceProperties->limits.maxImageDimensionCube,
+			DeviceProperties->limits.maxImageArrayLayers, DeviceProperties->limits.maxTexelBufferElements,
+			DeviceProperties->limits.maxUniformBufferRange, DeviceProperties->limits.maxStorageBufferRange,
+			DeviceProperties->limits.maxPushConstantsSize, DeviceProperties->limits.maxMemoryAllocationCount,
+			DeviceProperties->limits.maxSamplerAllocationCount, DeviceProperties->limits.bufferImageGranularity,
+			DeviceProperties->limits.sparseAddressSpaceSize, DeviceProperties->limits.maxBoundDescriptorSets,
+			DeviceProperties->limits.maxPerStageDescriptorSamplers, DeviceProperties->limits.maxPerStageDescriptorUniformBuffers,
+			DeviceProperties->limits.maxPerStageDescriptorStorageBuffers, DeviceProperties->limits.maxPerStageDescriptorSampledImages,
+			DeviceProperties->limits.maxPerStageDescriptorStorageImages, DeviceProperties->limits.maxPerStageDescriptorInputAttachments,
+			DeviceProperties->limits.maxPerStageResources, DeviceProperties->limits.maxDescriptorSetSamplers,
+			DeviceProperties->limits.maxDescriptorSetUniformBuffers, DeviceProperties->limits.maxDescriptorSetUniformBuffersDynamic,
+			DeviceProperties->limits.maxDescriptorSetStorageBuffers, DeviceProperties->limits.maxDescriptorSetStorageBuffersDynamic,
+			DeviceProperties->limits.maxDescriptorSetSampledImages, DeviceProperties->limits.maxDescriptorSetStorageImages,
+			DeviceProperties->limits.maxDescriptorSetInputAttachments, DeviceProperties->limits.maxVertexInputAttributes,
+			DeviceProperties->limits.maxVertexInputBindings, DeviceProperties->limits.maxVertexInputAttributeOffset,
+			DeviceProperties->limits.maxVertexInputBindingStride, DeviceProperties->limits.maxVertexOutputComponents,
+			DeviceProperties->limits.maxTessellationGenerationLevel, DeviceProperties->limits.maxTessellationPatchSize,
+			DeviceProperties->limits.maxTessellationControlPerVertexInputComponents,
+			DeviceProperties->limits.maxTessellationControlPerVertexOutputComponents,
+			DeviceProperties->limits.maxTessellationControlPerPatchOutputComponents,
+			DeviceProperties->limits.maxTessellationControlTotalOutputComponents,
+			DeviceProperties->limits.maxTessellationEvaluationInputComponents,
+			DeviceProperties->limits.maxTessellationEvaluationOutputComponents,
+			DeviceProperties->limits.maxGeometryShaderInvocations, DeviceProperties->limits.maxGeometryInputComponents,
+			DeviceProperties->limits.maxGeometryOutputComponents, DeviceProperties->limits.maxGeometryOutputVertices,
+			DeviceProperties->limits.maxGeometryTotalOutputComponents, DeviceProperties->limits.maxFragmentInputComponents,
+			DeviceProperties->limits.maxFragmentOutputAttachments, DeviceProperties->limits.maxFragmentDualSrcAttachments,
+			DeviceProperties->limits.maxFragmentCombinedOutputResources, DeviceProperties->limits.maxComputeSharedMemorySize,
+			DeviceProperties->limits.maxComputeWorkGroupCount[0], DeviceProperties->limits.maxComputeWorkGroupCount[1],
+			DeviceProperties->limits.maxComputeWorkGroupCount[2], DeviceProperties->limits.maxComputeWorkGroupInvocations,
+			DeviceProperties->limits.maxComputeWorkGroupSize[0], DeviceProperties->limits.maxComputeWorkGroupSize[1],
+			DeviceProperties->limits.maxComputeWorkGroupSize[2], DeviceProperties->limits.subPixelPrecisionBits,
+			DeviceProperties->limits.subTexelPrecisionBits, DeviceProperties->limits.mipmapPrecisionBits,
+			DeviceProperties->limits.maxDrawIndexedIndexValue, DeviceProperties->limits.maxDrawIndirectCount,
+			DeviceProperties->limits.maxSamplerLodBias, DeviceProperties->limits.maxSamplerAnisotropy,
+			DeviceProperties->limits.maxViewports, DeviceProperties->limits.maxViewportDimensions[0],
+			DeviceProperties->limits.maxViewportDimensions[1], DeviceProperties->limits.viewportBoundsRange[0],
+			DeviceProperties->limits.viewportBoundsRange[1], DeviceProperties->limits.viewportSubPixelBits,
+			DeviceProperties->limits.minMemoryMapAlignment, DeviceProperties->limits.minTexelBufferOffsetAlignment,
+			DeviceProperties->limits.minUniformBufferOffsetAlignment, DeviceProperties->limits.minStorageBufferOffsetAlignment,
+			DeviceProperties->limits.minTexelOffset, DeviceProperties->limits.maxTexelOffset,
+			DeviceProperties->limits.minTexelGatherOffset, DeviceProperties->limits.maxTexelGatherOffset,
+			DeviceProperties->limits.minInterpolationOffset, DeviceProperties->limits.maxInterpolationOffset,
+			DeviceProperties->limits.subPixelInterpolationOffsetBits, DeviceProperties->limits.maxFramebufferWidth,
+			DeviceProperties->limits.maxFramebufferHeight, DeviceProperties->limits.maxFramebufferLayers,
+			DeviceProperties->limits.framebufferColorSampleCounts, DeviceProperties->limits.framebufferDepthSampleCounts,
+			DeviceProperties->limits.framebufferStencilSampleCounts, DeviceProperties->limits.framebufferNoAttachmentsSampleCounts,
+			DeviceProperties->limits.maxColorAttachments, DeviceProperties->limits.sampledImageColorSampleCounts,
+			DeviceProperties->limits.sampledImageIntegerSampleCounts, DeviceProperties->limits.sampledImageDepthSampleCounts,
+			DeviceProperties->limits.sampledImageStencilSampleCounts, DeviceProperties->limits.storageImageSampleCounts,
+			DeviceProperties->limits.maxSampleMaskWords, DeviceProperties->limits.timestampComputeAndGraphics,
+			DeviceProperties->limits.timestampPeriod, DeviceProperties->limits.maxClipDistances,
+			DeviceProperties->limits.maxCullDistances, DeviceProperties->limits.maxCombinedClipAndCullDistances,
+			DeviceProperties->limits.discreteQueuePriorities, DeviceProperties->limits.pointSizeRange[0],
+			DeviceProperties->limits.pointSizeRange[1], DeviceProperties->limits.lineWidthRange[0],
+			DeviceProperties->limits.lineWidthRange[1], DeviceProperties->limits.pointSizeGranularity,
+			DeviceProperties->limits.lineWidthGranularity, DeviceProperties->limits.strictLines,
+			DeviceProperties->limits.standardSampleLocations, DeviceProperties->limits.optimalBufferCopyOffsetAlignment,
+			DeviceProperties->limits.optimalBufferCopyRowPitchAlignment, DeviceProperties->limits.nonCoherentAtomSize
+		);
+	}
+
+	VkExtent2D GetBestSwapExtent(VkPhysicalDevice PhysicalDevice, GLFWwindow* WindowHandler, VkSurfaceKHR Surface)
+	{
+		VkSurfaceCapabilitiesKHR SurfaceCapabilities = { };
+
+		VkResult Result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(PhysicalDevice, Surface, &SurfaceCapabilities);
+		if (Result != VK_SUCCESS)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Warning, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR result is %d", Result);
+		}
+
+		VkExtent2D SwapExtent;
+
+		if (SurfaceCapabilities.currentExtent.width != UINT32_MAX)
+		{
+			SwapExtent = SurfaceCapabilities.currentExtent;
+		}
+		else
+		{
+			s32 Width;
+			s32 Height;
+			glfwGetFramebufferSize(WindowHandler, &Width, &Height);
+
+			Width = glm::clamp(static_cast<u32>(Width), SurfaceCapabilities.minImageExtent.width, SurfaceCapabilities.maxImageExtent.width);
+			Height = glm::clamp(static_cast<u32>(Height), SurfaceCapabilities.minImageExtent.height, SurfaceCapabilities.maxImageExtent.height);
+
+			SwapExtent = { static_cast<u32>(Width), static_cast<u32>(Height) };
+		}
+
+		return SwapExtent;
+	}
+
+	VkPresentModeKHR GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
+	{
+		Memory::FrameArray<VkPresentModeKHR> PresentModes = GetAvailablePresentModes(PhysicalDevice, Surface);
+
+		VkPresentModeKHR Mode = VK_PRESENT_MODE_FIFO_KHR;
+		for (u32 i = 0; i < PresentModes.Count; ++i)
+		{
+			if (PresentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR)
+			{
+				Mode = VK_PRESENT_MODE_MAILBOX_KHR;
+			}
+		}
+
+		// Has to be present by spec
+		if (Mode != VK_PRESENT_MODE_MAILBOX_KHR)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Warning, "Using default VK_PRESENT_MODE_FIFO_KHR");
+		}
+
+		return Mode;
+	}
+
+	Memory::FrameArray<VkPresentModeKHR> GetAvailablePresentModes(VkPhysicalDevice PhysicalDevice,
+		VkSurfaceKHR Surface)
+	{
+		u32 Count;
+		const VkResult Result = vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Count, nullptr);
+		if (Result != VK_SUCCESS)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Error, "vkGetPhysicalDeviceSurfacePresentModesKHR result is %d", Result);
+			assert(false);
+		}
+
+		auto Data = Memory::FrameArray<VkPresentModeKHR>::Create(Count);
+		vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Count, Data.Pointer.Data);
+
+		for (u32 i = 0; i < Count; ++i)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Info, "Present mode %d is available", Data[i]);
+		}
+
+		return Data;
+	}
+
+	Memory::FrameArray<VkImage> GetSwapchainImages(VkDevice LogicalDevice,
+		VkSwapchainKHR VulkanSwapchain)
+	{
+		u32 Count;
+		vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &Count, nullptr);
+
+		auto Data = Memory::FrameArray<VkImage>::Create(Count);
+		vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &Count, Data.Pointer.Data);
+
+		return Data;
+	}
+
+	bool CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, u32 AvailableExtensionsCount,
+		const char** RequiredExtensions, u32 RequiredExtensionsCount)
+	{
+		for (u32 i = 0; i < RequiredExtensionsCount; ++i)
+		{
+			bool IsExtensionSupported = false;
+			for (u32 j = 0; j < AvailableExtensionsCount; ++j)
+			{
+				if (std::strcmp(RequiredExtensions[i], AvailableExtensions[j].extensionName) == 0)
+				{
+					IsExtensionSupported = true;
+					break;
+				}
+			}
+
+			if (!IsExtensionSupported)
+			{
+				Util::RenderLog(Util::BMRVkLogType_Error, "Extension %s unsupported", RequiredExtensions[i]);
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	bool CheckValidationLayersSupport(VkLayerProperties* Properties, u32 PropertiesSize,
+		const char** ValidationLeyersToCheck, u32 ValidationLeyersToCheckSize)
+	{
+		for (u32 i = 0; i < ValidationLeyersToCheckSize; ++i)
+		{
+			bool IsLayerAvalible = false;
+			for (u32 j = 0; j < PropertiesSize; ++j)
+			{
+				if (std::strcmp(ValidationLeyersToCheck[i], Properties[j].layerName) == 0)
+				{
+					IsLayerAvalible = true;
+					break;
+				}
+			}
+
+			if (!IsLayerAvalible)
+			{
+				Util::RenderLog(Util::BMRVkLogType_Error, "Validation layer %s unsupported", ValidationLeyersToCheck[i]);
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	bool CheckDeviceExtensionsSupport(VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount,
+		const char** ExtensionsToCheck, u32 ExtensionsToCheckSize)
+	{
+		for (u32 i = 0; i < ExtensionsToCheckSize; ++i)
+		{
+			bool IsDeviceExtensionSupported = false;
+			for (u32 j = 0; j < ExtensionPropertiesCount; ++j)
+			{
+				if (std::strcmp(ExtensionsToCheck[i], ExtensionProperties[j].extensionName) == 0)
+				{
+					IsDeviceExtensionSupported = true;
+					break;
+				}
+			}
+
+			if (!IsDeviceExtensionSupported)
+			{
+				Util::RenderLog(Util::BMRVkLogType_Error, "extension %s unsupported", ExtensionsToCheck[i]);
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	VkCommandPool CreateCommandPool(VkDevice Device, u32 FamilyIndex)
+	{
+		VkCommandPoolCreateInfo PoolInfo = { };
+		PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		PoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+		PoolInfo.queueFamilyIndex = FamilyIndex;
+
+		VkCommandPool CommandPool;
+		VkResult Result = vkCreateCommandPool(Device, &PoolInfo, nullptr, &CommandPool);
+		if (Result != VK_SUCCESS)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateCommandPool result is %d", Result);
+		}
+
+		return CommandPool;
+	}
+
+	VkShaderModule CreateShader(VkDevice Device, const u32* Code, u32 CodeSize)
+	{
+		VkShaderModuleCreateInfo ShaderModuleCreateInfo = { };
+		ShaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		ShaderModuleCreateInfo.codeSize = CodeSize;
+		ShaderModuleCreateInfo.pCode = Code;
+
+		VkShaderModule VertexShaderModule;
+		VkResult Result = vkCreateShaderModule(Device, &ShaderModuleCreateInfo, nullptr, &VertexShaderModule);
+		if (Result != VK_SUCCESS)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateShaderModule result is %d", Result);
+		}
+
+		return VertexShaderModule;
+	}
+
+	VkPipelineLayout CreatePipelineLayout(VkDevice Device, const VkDescriptorSetLayout* DescriptorLayouts,
+		u32 DescriptorLayoutsCount, const VkPushConstantRange* PushConstant, u32 PushConstantsCount)
+	{
+		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
+		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		PipelineLayoutCreateInfo.setLayoutCount = DescriptorLayoutsCount;
+		PipelineLayoutCreateInfo.pSetLayouts = DescriptorLayouts;
+		PipelineLayoutCreateInfo.pushConstantRangeCount = PushConstantsCount;
+		PipelineLayoutCreateInfo.pPushConstantRanges = PushConstant;
+
+		VkPipelineLayout PipelineLayout;
+		const VkResult Result = vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &PipelineLayout);
+		if (Result != VK_SUCCESS)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreatePipelineLayout result is %d", Result);
+		}
+
+		return PipelineLayout;
+	}
+
+	bool CreateDebugUtilsMessengerEXT(VkInstance Instance, const VkDebugUtilsMessengerCreateInfoEXT* CreateInfo,
+		const VkAllocationCallbacks* Allocator, VkDebugUtilsMessengerEXT* InDebugMessenger)
+	{
+		auto CreateMessengerFunc = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(Instance, "vkCreateDebugUtilsMessengerEXT");
+		if (CreateMessengerFunc != nullptr)
+		{
+			const VkResult Result = CreateMessengerFunc(Instance, CreateInfo, Allocator, InDebugMessenger);
+			if (Result != VK_SUCCESS)
+			{
+				Util::RenderLog(Util::BMRVkLogType_Error, "CreateMessengerFunc result is %d", Result);
+				return false;
+			}
+		}
+		else
+		{
+			Util::RenderLog(Util::BMRVkLogType_Error, "CreateMessengerFunc is nullptr");
+			return false;
+		}
+
+		return true;
+	}
+
+	bool DestroyDebugMessenger(VkInstance Instance, VkDebugUtilsMessengerEXT InDebugMessenger,
+		const VkAllocationCallbacks* Allocator)
+	{
+		auto DestroyMessengerFunc = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(Instance, "vkDestroyDebugUtilsMessengerEXT");
+		if (DestroyMessengerFunc != nullptr)
+		{
+			DestroyMessengerFunc(Instance, InDebugMessenger, Allocator);
+			return true;
+		}
+		else
+		{
+			Util::RenderLog(Util::BMRVkLogType_Error, "DestroyMessengerFunc is nullptr");
+			return false;
+		}
+	}
+
+	VKAPI_ATTR VkBool32 VKAPI_CALL MessengerDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
+		[[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
+		[[maybe_unused]] void* UserData)
+	{
+		if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Error, CallbackData->pMessage);
+		}
+		else if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Warning, CallbackData->pMessage);
+		}
+		else
+		{
+			Util::RenderLog(Util::BMRVkLogType_Info, CallbackData->pMessage);
+		}
+
+		return VK_FALSE;
+	}
+}

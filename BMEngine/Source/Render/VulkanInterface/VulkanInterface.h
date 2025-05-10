@@ -3,7 +3,8 @@
 #include <vulkan/vulkan.h>
 
 #include "Util/EngineTypes.h"
-#include "Platform/WinPlatform.h"
+
+struct GLFWwindow;
 
 namespace VulkanInterface
 {
@@ -11,18 +12,8 @@ namespace VulkanInterface
 	static const u32 MAX_VERTEX_INPUTS_ATTRIBUTES = 16;
 	static const u32 MAX_VERTEX_INPUT_BINDINGS = 16;
 
-	enum LogType
-	{
-		BMRVkLogType_Error,
-		BMRVkLogType_Warning,
-		BMRVkLogType_Info
-	};
-
-	typedef void (*BMRVkLogHandler)(LogType, const char*, va_list);
-
 	struct VulkanInterfaceConfig
 	{
-		BMRVkLogHandler LogHandler = nullptr;
 		u32 MaxTextures = 0;
 	};
 
@@ -146,36 +137,22 @@ namespace VulkanInterface
 	VkImage* GetSwapchainImages();
 	u32 AcquireNextImageIndex(); // Locks thread
 	u32 TestGetImageIndex();
-	VkCommandBuffer BeginFrame(u32 ImageIndex);
-	void EndFrame(u32 ImageIndex);
+	VkCommandBuffer BeginFrame();
+	void EndFrame();
 
-	VkPipelineLayout CreatePipelineLayout(const VkDescriptorSetLayout* DescriptorLayouts,
-		u32 DescriptorLayoutsCount, const VkPushConstantRange* PushConstant, u32 PushConstantsCount);
-	UniformBuffer CreateUniformBufferInternal(const VkBufferCreateInfo* BufferInfo, VkMemoryPropertyFlags Properties);
-	UniformImage CreateUniformImage(const VkImageCreateInfo* ImageCreateInfo);
 	VkDescriptorSetLayout CreateUniformLayout(const VkDescriptorType* Types, const VkShaderStageFlags* Stages,
 		const VkDescriptorBindingFlags* BindingFlags, u32 BindingCount, u32 DescriptorCount);
 	void CreateUniformSets(const VkDescriptorSetLayout* Layouts, u32 Count, VkDescriptorSet* OutSets);
 	void CreateUniformSets(const VkDescriptorSetLayout* Layouts, u32* DescriptorCounts, u32 Count, VkDescriptorSet* OutSets);
 	VkImageView CreateImageInterface(const UniformImageInterfaceCreateInfo* InterfaceCreateInfo, VkImage Image);
 	VkSampler CreateSampler(const VkSamplerCreateInfo* CreateInfo);
-	bool CreateShader(const u32* Code, u32 CodeSize, VkShaderModule& VertexShaderModule);
 
 	void CopyDataToBuffer(VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Size, const void* Data);
 	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, VkDeviceSize AlignedLayerSize,
 		u32 LayersCount, void* Data, u32 Baselayer = 0);
 
-	void DestroyPipelineLayout(VkPipelineLayout Layout);
-	void DestroyPipeline(VkPipeline Pipeline);
-	void DestroyUniformBuffer(UniformBuffer Buffer);
-	void DestroyUniformImage(UniformImage Image);
-	void DestroyUniformLayout(VkDescriptorSetLayout Layout);
-	void DestroyImageInterface(VkImageView Interface);
-	void DestroySampler(VkSampler Sampler);
-	void DestroyShader(VkShaderModule Shader);
-
 	void AttachUniformsToSet(VkDescriptorSet Set, const UniformSetAttachmentInfo* Infos, u32 BufferCount);
-	void UpdateUniformBuffer(UniformBuffer Buffer, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);
+	
 	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, u32 LayersCount, void* Data, u32 Baselayer = 0);
 
 	void TransitImageLayout(VkImage Image, VkImageLayout OldLayout, VkImageLayout NewLayout,
@@ -202,27 +179,9 @@ namespace VulkanInterface
 		const BMRVertexInputBinding* VertexInputBinding, u32 VertexInputBindingCount,
 		const PipelineSettings* Settings, const PipelineResourceInfo* ResourceInfo);
 
-	UniformBuffer CreateUniformBuffer(u64 Size);
-	VertexBuffer CreateVertexBuffer(u64 Size);
-	IndexBuffer CreateIndexBuffer(u64 Size);
-
 	VkPhysicalDeviceProperties* GetDeviceProperties();
 	VkDevice GetDevice();
 	VkPhysicalDevice GetPhysicalDevice();
-	
-	VkDeviceMemory AllocateMemory(VkDeviceSize AllocationSize, u32 MemoryTypeIndex);
-
-
-
-
-
-
-
-
-
-
-
-
 	VkCommandBuffer GetCommandBuffer();
 	VkCommandBuffer GetTransferCommandBuffer();
 	VkQueue GetTransferQueue();

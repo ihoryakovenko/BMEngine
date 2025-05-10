@@ -3,7 +3,8 @@
 #include "Render/VulkanInterface/VulkanInterface.h"
 #include "Render/FrameManager.h"
 
-#include "Memory/MemoryManagmentSystem.h"
+#include "Engine/Systems/Memory/MemoryManagmentSystem.h"
+#include "Engine/Systems/Render/VulkanHelper.h"
 
 #include "Util/Util.h"
 #include "Util/Settings.h"
@@ -42,7 +43,7 @@ namespace MainPass
 		};
 
 
-		SkyBoxPipeline.PipelineLayout = VulkanInterface::CreatePipelineLayout(SkyBoxDescriptorLayouts, SkyBoxDescriptorLayoutCount, nullptr, 0);
+		SkyBoxPipeline.PipelineLayout = VulkanHelper::CreatePipelineLayout(VulkanInterface::GetDevice(), SkyBoxDescriptorLayouts, SkyBoxDescriptorLayoutCount, nullptr, 0);
 
 		const u32 ShaderCount = 2;
 		VulkanInterface::Shader Shaders[ShaderCount];
@@ -76,9 +77,11 @@ namespace MainPass
 
 	void DeInit()
 	{
+		VkDevice Device = VulkanInterface::GetDevice();
+
 		vkDestroyDescriptorSetLayout(VulkanInterface::GetDevice(), SkyBoxLayout, nullptr);
-		VulkanInterface::DestroyPipeline(SkyBoxPipeline.Pipeline);
-		VulkanInterface::DestroyPipelineLayout(SkyBoxPipeline.PipelineLayout);
+		vkDestroyPipeline(Device, SkyBoxPipeline.Pipeline, nullptr);
+		vkDestroyPipelineLayout(Device, SkyBoxPipeline.PipelineLayout, nullptr);
 	}
 
 	void BeginPass()
@@ -90,7 +93,7 @@ namespace MainPass
 		ColorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		ColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		ColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		ColorAttachment.clearValue = MainPassClearValues[1];
+		ColorAttachment.clearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 		VkRenderingAttachmentInfo DepthAttachment = { };
 		DepthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -98,7 +101,7 @@ namespace MainPass
 		DepthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		DepthAttachment.clearValue = MainPassClearValues[2];
+		DepthAttachment.clearValue.depthStencil.depth = 1.0f;
 
 		VkRect2D RenderArea;
 		RenderArea.extent = MainScreenExtent;

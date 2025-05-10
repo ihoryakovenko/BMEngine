@@ -2,10 +2,12 @@
 
 #include <vulkan/vulkan.h>
 
+#include <unordered_map>
+
 #include "Render/Render.h"
 
-#include "Memory/MemoryManagmentSystem.h"
-#include "Engine/Systems/Render/VulkanHalper.h"
+#include "Engine/Systems/Memory/MemoryManagmentSystem.h"
+#include "Engine/Systems/Render/VulkanHelper.h"
 #include "Render/Render.h"
 
 namespace RenderResources
@@ -51,18 +53,22 @@ namespace RenderResources
 
 	void Init(u64 VertexBufferSize, u64 IndexBufferSize, u32 MaximumEntities, u32 MaximumTextures)
 	{
+		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
+		VkDevice Device = VulkanInterface::GetDevice();
+
 		MaxEntities = MaximumEntities;
 		MaxTextures = MaximumTextures;
 
-		IndexBuffer = VulkanInterface::CreateIndexBuffer(IndexBufferSize);
-		VertexBuffer = VulkanInterface::CreateVertexBuffer(IndexBufferSize);
+		IndexBuffer.Buffer = VulkanHelper::CreateBuffer(Device, IndexBufferSize, VulkanHelper::BufferUsageFlag::IndexFlag);
+		IndexBuffer.Memory = VulkanHelper::AllocateAndBindDeviceMemoryForBuffer(PhysicalDevice, Device, IndexBuffer.Buffer, VulkanHelper::MemoryPropertyFlag::GPULocal);
 
-		DrawEntities = Memory::BmMemoryManagementSystem::Allocate<DrawEntity>(MaxEntities);
-		Textures = Memory::BmMemoryManagementSystem::Allocate<VkImage>(MaxTextures);
-		TextureViews = Memory::BmMemoryManagementSystem::Allocate<VkImageView>(MaxTextures);
-		TexturesMemory = Memory::BmMemoryManagementSystem::Allocate<VkDeviceMemory>(MaxTextures);
+		VertexBuffer.Buffer = VulkanHelper::CreateBuffer(Device, VertexBufferSize, VulkanHelper::BufferUsageFlag::VertexFlag);
+		VertexBuffer.Memory = VulkanHelper::AllocateAndBindDeviceMemoryForBuffer(PhysicalDevice, Device, VertexBuffer.Buffer, VulkanHelper::MemoryPropertyFlag::GPULocal);
 
-		VkDevice Device = VulkanInterface::GetDevice();
+		DrawEntities = Memory::MemoryManagementSystem::Allocate<DrawEntity>(MaxEntities);
+		Textures = Memory::MemoryManagementSystem::Allocate<VkImage>(MaxTextures);
+		TextureViews = Memory::MemoryManagementSystem::Allocate<VkImageView>(MaxTextures);
+		TexturesMemory = Memory::MemoryManagementSystem::Allocate<VkDeviceMemory>(MaxTextures);
 
 		VkSamplerCreateInfo DiffuseSamplerCreateInfo = { };
 		DiffuseSamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -101,9 +107,9 @@ namespace RenderResources
 		VulkanInterface::CreateUniformSets(&BindlesTexturesLayout, 1, &BindlesTexturesSet);
 
 		const VkDeviceSize MaterialBufferSize = sizeof(Material) * MaxEntities;
-		MaterialBuffer = VulkanHelper::CreateBuffer(Device, MaterialBufferSize, VulkanHelper::BufferUsageFlag::Storage);
+		MaterialBuffer = VulkanHelper::CreateBuffer(Device, MaterialBufferSize, VulkanHelper::BufferUsageFlag::StorageFlag);
 		MaterialBufferMemory = VulkanHelper::AllocateAndBindDeviceMemoryForBuffer(VulkanInterface::GetPhysicalDevice(), Device,
-			MaterialBuffer, MaterialBufferSize, VulkanHelper::MemoryPropertyFlag::GPULocal);
+			MaterialBuffer, VulkanHelper::MemoryPropertyFlag::GPULocal);
 
 		VulkanInterface::UniformSetAttachmentInfo MaterialAttachmentInfo;
 		MaterialAttachmentInfo.BufferInfo.buffer = MaterialBuffer;
@@ -130,22 +136,25 @@ namespace RenderResources
 			vkFreeMemory(Device, TexturesMemory[i], nullptr);
 		}
 
-		VulkanInterface::DestroyUniformBuffer(VertexBuffer);
-		VulkanInterface::DestroyUniformBuffer(IndexBuffer);
+		vkDestroyBuffer(Device, VertexBuffer.Buffer, nullptr);
+		vkFreeMemory(Device, VertexBuffer.Memory, nullptr);
 
-		VulkanInterface::DestroyUniformLayout(BindlesTexturesLayout);
-		VulkanInterface::DestroyUniformLayout(MaterialLayout);
+		vkDestroyBuffer(Device, IndexBuffer.Buffer, nullptr);
+		vkFreeMemory(Device, IndexBuffer.Memory, nullptr);
 
-		VulkanInterface::DestroySampler(DiffuseSampler);
-		VulkanInterface::DestroySampler(SpecularSampler);
+		vkDestroyDescriptorSetLayout(Device, BindlesTexturesLayout, nullptr);
+		vkDestroyDescriptorSetLayout(Device, MaterialLayout, nullptr);
+
+		vkDestroySampler(Device, DiffuseSampler, nullptr);
+		vkDestroySampler(Device, SpecularSampler, nullptr);
 
 		vkDestroyBuffer(Device, MaterialBuffer, nullptr);
 		vkFreeMemory(Device, MaterialBufferMemory, nullptr);
 
-		Memory::BmMemoryManagementSystem::Free(DrawEntities);
-		Memory::BmMemoryManagementSystem::Free(Textures);
-		Memory::BmMemoryManagementSystem::Free(TextureViews);
-		Memory::BmMemoryManagementSystem::Free(TexturesMemory);
+		Memory::MemoryManagementSystem::Free(DrawEntities);
+		Memory::MemoryManagementSystem::Free(Textures);
+		Memory::MemoryManagementSystem::Free(TextureViews);
+		Memory::MemoryManagementSystem::Free(TexturesMemory);
 	}
 
 	VulkanInterface::VertexBuffer GetVertexBuffer()
@@ -158,7 +167,7 @@ namespace RenderResources
 		return IndexBuffer;
 	}
 
-	u32 CreateEntity(void* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, u32 MaterialIndex)
+	u32 CreateEntity(void* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, u32 Material)
 	{
 		assert(EntityIndex < MaxEntities);
 
@@ -174,13 +183,32 @@ namespace RenderResources
 		IndexOffset += sizeof(u32) * IndicesCount;
 
 		Entity->IndicesCount = IndicesCount;
-		Entity->MaterialIndex = MaterialIndex;
+		Entity->MaterialIndex = Material;
 		Entity->Model = glm::mat4(1.0f);
 
 		const u32 CurrentEntityIndex = EntityIndex;
 		++EntityIndex;
 
 		return CurrentEntityIndex;
+	}
+
+	DrawEntity CreateTerrain(void* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, u32 Material)
+	{
+		DrawEntity Entity = { };
+
+		Entity.VertexOffset = VertexOffset;
+		Render::LoadVertices(&VertexBuffer, Vertices, VertexSize, VerticesCount, VertexOffset);
+		VertexOffset += VertexSize * VerticesCount;
+
+		Entity.IndexOffset = IndexOffset;
+		Render::LoadIndices(&IndexBuffer, Indices, IndicesCount, IndexOffset);
+		IndexOffset += sizeof(u32) * IndicesCount;
+
+		Entity.IndicesCount = IndicesCount;
+		Entity.MaterialIndex = Material;
+		Entity.Model = glm::mat4(1.0f);
+
+		return Entity;
 	}
 
 	DrawEntity* GetEntities(u32* Count)
@@ -194,6 +222,7 @@ namespace RenderResources
 		assert(TextureIndex < MaxTextures);
 
 		VkDevice Device = VulkanInterface::GetDevice();
+		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
 		VkCommandBuffer CmdBuffer = VulkanInterface::GetTransferCommandBuffer();
 		VkQueue TransferQueue = VulkanInterface::GetTransferQueue();
 		
@@ -218,7 +247,7 @@ namespace RenderResources
 		{
 			// TODO: Create log layer
 			assert(false);
-			//HandleLog(BMRVkLogType_Error, "CreateImage result is %d", Result);
+			//Util::RenderLog(Util::BMRVkLogType_Error, "CreateImage result is %d", Result);
 		}
 
 		VkImage Image = Textures[TextureIndex];
@@ -303,13 +332,7 @@ namespace RenderResources
 		SubmitInfo.commandBufferCount = 1;
 		SubmitInfo.pCommandBuffers = &CmdBuffer;
 
-		VkMemoryRequirements MemoryRequirements;
-		vkGetImageMemoryRequirements(Device, Image, &MemoryRequirements);
-
-		const u32 MemoryTypeIndex = VulkanHelper::GetMemoryTypeIndex(VulkanInterface::GetPhysicalDevice(), MemoryRequirements.memoryTypeBits,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-		TexturesMemory[TextureIndex] = VulkanInterface::AllocateMemory(MemoryRequirements.size, MemoryTypeIndex);
+		TexturesMemory[TextureIndex] = VulkanHelper::AllocateAndBindDeviceMemoryForImage(PhysicalDevice, Device, Image, VulkanHelper::GPULocal);
 		vkBindImageMemory(Device, Image, TexturesMemory[TextureIndex], 0);
 
 		Result = vkCreateImageView(Device, &ViewCreateInfo, nullptr, TextureViews + TextureIndex);
@@ -317,7 +340,7 @@ namespace RenderResources
 		{
 			// TODO: Create log layer
 			assert(false);
-			//HandleLog(BMRVkLogType_Error, "vkCreateImageView result is %d", Result);
+			//Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateImageView result is %d", Result);
 		}
 
 		VkCommandBufferBeginInfo BeginInfo = { };

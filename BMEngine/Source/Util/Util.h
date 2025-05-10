@@ -16,6 +16,16 @@ namespace Util
 	bool ReadFileFull(FILE* File, std::vector<char>& OutFileData);
 	bool OpenAndReadFileFull(const char* FileName, std::vector<char>& OutFileData, const char* Mode);
 
+	enum LogType
+	{
+		BMRVkLogType_Error,
+		BMRVkLogType_Warning,
+		BMRVkLogType_Info
+	};
+
+	void RenderLog(LogType logType, const char* format, ...);
+	void RenderLog(LogType LogType, const char* Format, va_list Args);
+
 	struct Log
 	{
 		template <typename... TArgs>

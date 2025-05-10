@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 
 #include "VulkanInterface/VulkanInterface.h"
+#include "Engine/Systems/Render/VulkanHelper.h"
 
 namespace FrameManager
 {
@@ -23,8 +24,14 @@ namespace FrameManager
 
 	void Init()
 	{
+		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
+		VkDevice Device = VulkanInterface::GetDevice();
+
 		BufferMultiFrameSize = BufferSingleFrameSize * VulkanInterface::GetImageCount();
-		Buffer = VulkanInterface::CreateUniformBuffer(BufferMultiFrameSize);
+
+		Buffer.Buffer = VulkanHelper::CreateBuffer(Device, BufferMultiFrameSize, VulkanHelper::BufferUsageFlag::UniformFlag);
+		Buffer.Memory = VulkanHelper::AllocateAndBindDeviceMemoryForBuffer(PhysicalDevice, Device, Buffer.Buffer, VulkanHelper::MemoryPropertyFlag::HostCompatible);
+
 		BufferAlignment = VulkanInterface::GetDeviceProperties()->limits.minUniformBufferOffsetAlignment;
 
 		const VkDeviceSize VpBufferSize = sizeof(ViewProjectionBuffer);
@@ -39,8 +46,12 @@ namespace FrameManager
 
 	void DeInit()
 	{
-		VulkanInterface::DestroyUniformLayout(VpLayout);
-		VulkanInterface::DestroyUniformBuffer(Buffer);
+		VkDevice Device = VulkanInterface::GetDevice();
+
+		vkDestroyDescriptorSetLayout(Device, VpLayout, nullptr);
+
+		vkDestroyBuffer(Device, Buffer.Buffer, nullptr);
+		vkFreeMemory(Device, Buffer.Memory, nullptr);
 	}
 
 	void UpdateViewProjection(const ViewProjectionBuffer* Data)
@@ -57,7 +68,7 @@ namespace FrameManager
 
 	void UpdateUniformMemory(UniformMemoryHnadle Handle, const void* Data, u64 Size)
 	{
-		VulkanInterface::UpdateUniformBuffer(Buffer, Size,
+		VulkanHelper::UpdateHostCompatibleBufferMemory(VulkanInterface::GetDevice(), Buffer.Memory, Size,
 			Handle + (Size * VulkanInterface::TestGetImageIndex()), Data);
 	}
 

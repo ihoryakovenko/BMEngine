@@ -11,8 +11,7 @@
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtx/hash.hpp>
 
-#include "Memory/MemoryManagmentSystem.h"
-#include "Platform/WinPlatform.h"
+#include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 #include "Util/Settings.h"
 #include "Render/Render.h"
 #include "Util/Util.h"
@@ -62,8 +61,6 @@ namespace Engine
 
 	static void SetUpScene();
 
-	static void RenderLog(VulkanInterface::LogType LogType, const char* Format, va_list Args);
-
 	static void MoveCamera(GLFWwindow* Window, f32 DeltaTime, DynamicMapSystem::MapCamera& MainCamera);
 
 	static GLFWwindow* Window = nullptr;
@@ -98,7 +95,7 @@ namespace Engine
 	{
 		Init();
 
-		Memory::BmMemoryManagementSystem::FrameFree();
+		Memory::MemoryManagementSystem::FrameFree();
 
 		while (!glfwWindowShouldClose(Window) && !Close)
 		{
@@ -111,7 +108,7 @@ namespace Engine
 			Update(DeltaTime);
 			Render::Draw(ViewProjection);
 
-			Memory::BmMemoryManagementSystem::FrameFree();
+			Memory::MemoryManagementSystem::FrameFree();
 		}
 
 		DeInit();
@@ -121,13 +118,18 @@ namespace Engine
 
 	bool Init()
 	{
-		u32 WindowWidth = 1920;
-		u32 WindowHeight = 1080;
+		s32 WindowWidth = 1920;
+		s32 WindowHeight = 1080;
 
-		Window = Platform::CreatePlatformWindow(WindowWidth, WindowHeight);
-		//Platform::DisableCursor(Window);
+		glfwInit();
 
-		Platform::GetWindowSizes(Window, &WindowWidth, &WindowHeight);
+		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+		glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+
+		Window = glfwCreateWindow(WindowWidth, WindowHeight, "BMEngine", nullptr, nullptr);
+		//glfwSetInputMode(Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+		glfwGetFramebufferSize(Window, &WindowWidth, &WindowHeight);
 
 		LoadSettings(WindowWidth, WindowHeight);
 
@@ -143,7 +145,7 @@ namespace Engine
 	bool InitSystems()
 	{
 		const u32 FrameAllocSize = 1024 * 1024;
-		Memory::BmMemoryManagementSystem::Init(FrameAllocSize);
+		Memory::MemoryManagementSystem::Init(FrameAllocSize);
 
 		Render::Init(Window, &GuiData);
 
@@ -158,11 +160,11 @@ namespace Engine
 
 		glfwTerminate();
 
-		Memory::BmMemoryManagementSystem::DeInit();
+		Memory::MemoryManagementSystem::DeInit();
 
-		if (Memory::BmMemoryManagementSystem::AllocateCounter != 0)
+		if (Memory::MemoryManagementSystem::AllocateCounter != 0)
 		{
-			Util::Log::Error("AllocateCounter in not equal 0, counter is {}", Memory::BmMemoryManagementSystem::AllocateCounter);
+			Util::Log::Error("AllocateCounter in not equal 0, counter is {}", Memory::MemoryManagementSystem::AllocateCounter);
 			assert(false);
 		}
 	}

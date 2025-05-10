@@ -24,7 +24,3 @@ extern VkFormat DepthFormat;
 extern VulkanInterface::PipelineSettings DeferredPipelineSettings;
 extern VulkanInterface::PipelineSettings SkyBoxPipelineSettings;
 extern VulkanInterface::PipelineSettings DepthPipelineSettings;
-
-static const u32 MainPathPipelinesCount = 1;
-
-extern VkClearValue MainPassClearValues[3];

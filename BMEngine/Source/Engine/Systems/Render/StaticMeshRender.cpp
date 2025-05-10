@@ -7,7 +7,8 @@
 #include "Engine/Systems/Render/LightningPass.h"
 #include "Engine/Systems/Render/MainPass.h"
 
-#include "Memory/MemoryManagmentSystem.h"
+#include "Engine/Systems/Memory/MemoryManagmentSystem.h"
+#include "Engine/Systems/Render/VulkanHelper.h"
 
 #include "Util/Settings.h"
 #include "Util/Util.h"
@@ -17,14 +18,6 @@
 
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
-
-VkDescriptorSet TestMaterial;
-VkDescriptorSet WhiteMaterial;
-VkDescriptorSet ContainerMaterial;
-VkDescriptorSet BlendWindowMaterial;
-VkDescriptorSet GrassMaterial;
-VkDescriptorSet SkyBoxMaterial;
-VkDescriptorSet TerrainMaterial;
 
 namespace StaticMeshRender
 {
@@ -127,7 +120,7 @@ namespace StaticMeshRender
 		// Todo: check constant and model size?
 		PushConstants.size = sizeof(PushConstantsData);
 
-		Pipeline.PipelineLayout = VulkanInterface::CreatePipelineLayout(StaticMeshDescriptorLayouts, StaticMeshDescriptorLayoutCount, &PushConstants, 1);
+		Pipeline.PipelineLayout = VulkanHelper::CreatePipelineLayout(VulkanInterface::GetDevice(), StaticMeshDescriptorLayouts, StaticMeshDescriptorLayoutCount, &PushConstants, 1);
 
 		const u32 ShaderCount = 2;
 		VulkanInterface::Shader Shaders[ShaderCount];
@@ -253,18 +246,20 @@ namespace StaticMeshRender
 
 	void DeInit()
 	{
+		VkDevice Device = VulkanInterface::GetDevice();
+
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
-			VulkanInterface::DestroyImageInterface(ShadowMapArrayImageInterface[i]);
+			vkDestroyImageView(Device, ShadowMapArrayImageInterface[i], nullptr);
 		}
 
-		VulkanInterface::DestroyUniformLayout(StaticMeshLightLayout);
-		VulkanInterface::DestroyUniformLayout(ShadowMapArrayLayout);
+		vkDestroyDescriptorSetLayout(Device, StaticMeshLightLayout, nullptr);
+		vkDestroyDescriptorSetLayout(Device, ShadowMapArrayLayout, nullptr);
 
-		VulkanInterface::DestroyPipelineLayout(Pipeline.PipelineLayout);
-		VulkanInterface::DestroyPipeline(Pipeline.Pipeline);
+		vkDestroyPipeline(Device, Pipeline.Pipeline, nullptr);
+		vkDestroyPipelineLayout(Device, Pipeline.PipelineLayout, nullptr);
 
-		VulkanInterface::DestroySampler(ShadowMapArraySampler);
+		vkDestroySampler(Device, ShadowMapArraySampler, nullptr);
 	}
 
 	void Draw()

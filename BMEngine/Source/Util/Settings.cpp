@@ -11,34 +11,6 @@ VulkanInterface::PipelineSettings DeferredPipelineSettings;
 VulkanInterface::PipelineSettings SkyBoxPipelineSettings;
 VulkanInterface::PipelineSettings DepthPipelineSettings;
 
-VkClearValue MainPassClearValues[3];
-VkClearValue DepthPassClearValues;
-
-enum SubpassIndex
-{
-	MainSubpass = 0,
-
-	Count
-};
-
-enum Subpasses
-{
-	Depth,
-
-	Subpasses_Count
-};
-
-static const u32 MainPathAttachmentDescriptionsCount = 3;
-static VkAttachmentDescription MainPathAttachmentDescriptions[MainPathAttachmentDescriptionsCount];
-static VkAttachmentReference EntitySubpassColourAttachmentReference = { };
-static VkAttachmentReference EntitySubpassDepthAttachmentReference = { };
-static VkAttachmentReference SwapchainColorAttachmentReference = { };
-static const u32 InputReferencesCount = 2;
-static VkAttachmentReference DeferredSubpassInputReferences[InputReferencesCount];
-static const u32 ExitDependenciesIndex = SubpassIndex::Count;
-static const u32 MainPassSubpassDependenciesCount = SubpassIndex::Count + 1;
-static VkSubpassDependency MainPassSubpassDependencies[MainPassSubpassDependenciesCount];
-
 static const char DeferredPipelineName[] = "Deferred";
 static const char SkyBoxPipelineName[] = "SkyBox";
 static const char DepthPipelineName[] = "Depth";
@@ -56,89 +28,6 @@ static const char DepthSubpassName[] = "DepthSubpass";
 void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 {
 	MainScreenExtent = { WindowWidth, WindowHeight };
-
-	// MAIN RENDERPASS
-	MainPassClearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
-	MainPassClearValues[1].color = { 0.0f, 0.0f, 0.0f, 1.0f };
-	MainPassClearValues[2].depthStencil.depth = 1.0f;
-
-	const u32 SwapchainColorAttachmentIndex = 0;
-	const u32 SubpassColorAttachmentIndex = 1;
-	const u32 SubpassDepthAttachmentIndex = 2;
-
-	MainPathAttachmentDescriptions[SwapchainColorAttachmentIndex] = { };
-	MainPathAttachmentDescriptions[SwapchainColorAttachmentIndex].format = VK_FORMAT_UNDEFINED;  // Find format in runtime
-	MainPathAttachmentDescriptions[SwapchainColorAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;  // Typically single sample for swapchain
-	MainPathAttachmentDescriptions[SwapchainColorAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;  // Clear the color buffer at the beginning
-	MainPathAttachmentDescriptions[SwapchainColorAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_STORE;  // Store the result so it can be presented
-	MainPathAttachmentDescriptions[SwapchainColorAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	MainPathAttachmentDescriptions[SwapchainColorAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	MainPathAttachmentDescriptions[SwapchainColorAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;  // No need for initial content
-	MainPathAttachmentDescriptions[SwapchainColorAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;  // Make it ready for presentation
-
-	MainPathAttachmentDescriptions[SubpassColorAttachmentIndex] = { };
-	MainPathAttachmentDescriptions[SubpassColorAttachmentIndex].format = ColorFormat;
-	MainPathAttachmentDescriptions[SubpassColorAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
-	MainPathAttachmentDescriptions[SubpassColorAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	MainPathAttachmentDescriptions[SubpassColorAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	MainPathAttachmentDescriptions[SubpassColorAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	MainPathAttachmentDescriptions[SubpassColorAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	MainPathAttachmentDescriptions[SubpassColorAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	MainPathAttachmentDescriptions[SubpassColorAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-	MainPathAttachmentDescriptions[SubpassDepthAttachmentIndex] = { };
-	MainPathAttachmentDescriptions[SubpassDepthAttachmentIndex].format = DepthFormat;
-	MainPathAttachmentDescriptions[SubpassDepthAttachmentIndex].samples = VK_SAMPLE_COUNT_1_BIT;
-	MainPathAttachmentDescriptions[SubpassDepthAttachmentIndex].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	MainPathAttachmentDescriptions[SubpassDepthAttachmentIndex].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	MainPathAttachmentDescriptions[SubpassDepthAttachmentIndex].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	MainPathAttachmentDescriptions[SubpassDepthAttachmentIndex].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	MainPathAttachmentDescriptions[SubpassDepthAttachmentIndex].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	MainPathAttachmentDescriptions[SubpassDepthAttachmentIndex].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-	EntitySubpassColourAttachmentReference.attachment = SubpassColorAttachmentIndex;
-	EntitySubpassColourAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-	EntitySubpassDepthAttachmentReference.attachment = SubpassDepthAttachmentIndex;
-	EntitySubpassDepthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-	SwapchainColorAttachmentReference.attachment = SwapchainColorAttachmentIndex;
-	SwapchainColorAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-	DeferredSubpassInputReferences[0].attachment = 1;
-	DeferredSubpassInputReferences[0].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	DeferredSubpassInputReferences[1].attachment = 2;
-	DeferredSubpassInputReferences[1].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-	MainPassSubpassDependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-	MainPassSubpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-	MainPassSubpassDependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-	MainPassSubpassDependencies[0].dstSubpass = SubpassIndex::MainSubpass;
-	MainPassSubpassDependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	MainPassSubpassDependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	MainPassSubpassDependencies[0].dependencyFlags = 0;
-
-	MainPassSubpassDependencies[1].srcSubpass = SubpassIndex::MainSubpass;
-	MainPassSubpassDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	MainPassSubpassDependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	MainPassSubpassDependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-	MainPassSubpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-	MainPassSubpassDependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-	MainPassSubpassDependencies[1].dependencyFlags = 0;
-
-
-
-	// Dynamic states TODO
-// Use vkCmdSetViewport(Commandbuffer, 0, 1, &Viewport) and vkCmdSetScissor(Commandbuffer, 0, 1, &Scissor)
-//VkDynamicState DynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
-
-//VkPipelineDynamicStateCreateInfo DynamicStateCreateInfo = {};
-//DynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-//DynamicStateCreateInfo.dynamicStateCount = static_cast<u32>(2);
-//DynamicStateCreateInfo.pDynamicStates = DynamicStates;
-
-
-
 
 	// TerrainPipeline
 

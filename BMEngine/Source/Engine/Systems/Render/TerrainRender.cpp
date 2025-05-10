@@ -1,10 +1,13 @@
 #include "TerrainRender.h"
 
+#include <random>
+
 #include "Render/Render.h"
 #include "Render/FrameManager.h"
 #include "MainPass.h"
 #include "Engine/Systems/ResourceManager.h"
 #include "Engine/Systems/Render/RenderResources.h"
+#include "Engine/Systems/Render/VulkanHelper.h"
 #include "Util/Util.h"
 #include "Util/Settings.h"
 
@@ -24,12 +27,12 @@ namespace TerrainRender
 	static TerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
 	static u32 IndicesCount;
 
-	static VulkanInterface::IndexBuffer IndexBuffer;
-	static VulkanInterface::VertexBuffer VertexBuffer;
 	static VulkanInterface::RenderPipeline Pipeline;
 	static VkDescriptorSet TextureSet;
 	static VkDescriptorSetLayout SamplerLayout;
 	static VkSampler Sampler;
+
+	static RenderResources::DrawEntity TerrainDrawObject;
 
 	void Init()
 	{
@@ -89,7 +92,7 @@ namespace TerrainRender
 
 		const u32 LayoutsCount = sizeof(TerrainDescriptorLayouts) / sizeof(TerrainDescriptorLayouts[0]);
 
-		Pipeline.PipelineLayout = VulkanInterface::CreatePipelineLayout(TerrainDescriptorLayouts, LayoutsCount, nullptr, 0);
+		Pipeline.PipelineLayout = VulkanHelper::CreatePipelineLayout(VulkanInterface::GetDevice(), TerrainDescriptorLayouts, LayoutsCount, nullptr, 0);
 
 		VulkanInterface::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
@@ -110,21 +113,17 @@ namespace TerrainRender
 		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, VertexInputBinding, VertexInputCount,
 			&PipelineSettings, &ResourceInfo);
 
-		// TODO: Load data on creation
-		IndexBuffer = VulkanInterface::CreateIndexBuffer(MB64);
-		VertexBuffer = VulkanInterface::CreateVertexBuffer(MB64);
-
 		LoadTerrain();
 	}
 
 	void DeInit()
 	{
-		VulkanInterface::DestroyUniformBuffer(VertexBuffer);
-		VulkanInterface::DestroyUniformBuffer(IndexBuffer);
-		VulkanInterface::DestroySampler(Sampler);
-		VulkanInterface::DestroyUniformLayout(SamplerLayout);
-		VulkanInterface::DestroyPipelineLayout(Pipeline.PipelineLayout);
-		VulkanInterface::DestroyPipeline(Pipeline.Pipeline);
+		VkDevice Device = VulkanInterface::GetDevice();
+
+		vkDestroySampler(Device, Sampler, nullptr);
+		vkDestroyDescriptorSetLayout(Device, SamplerLayout, nullptr);
+		vkDestroyPipeline(Device, Pipeline.Pipeline, nullptr);
+		vkDestroyPipelineLayout(Device, Pipeline.PipelineLayout, nullptr);
 	}
 
 	void Draw()
@@ -143,9 +142,15 @@ namespace TerrainRender
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
 			0, TerrainDescriptorSetGroupCount, Sets, 1, &DynamicOffset);
 
-		const u64 VertexOffset = 0;
-		vkCmdBindVertexBuffers(CmdBuffer, 0, 1, &VertexBuffer.Buffer, &VertexOffset);
-		vkCmdBindIndexBuffer(CmdBuffer, IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+		VkBuffer VertexBuffer = RenderResources::GetVertexBuffer().Buffer;
+		VkBuffer IndexBuffer = RenderResources::GetIndexBuffer().Buffer;
+
+		u32 Count;
+		const u64 VertexOffset = TerrainDrawObject.VertexOffset;
+		const u64 IndexOffset = TerrainDrawObject.IndexOffset;
+
+		vkCmdBindVertexBuffers(CmdBuffer, 0, 1, &VertexBuffer, &VertexOffset);
+		vkCmdBindIndexBuffer(CmdBuffer, IndexBuffer, IndexOffset, VK_INDEX_TYPE_UINT32);
 		vkCmdDrawIndexed(CmdBuffer, IndicesCount, 1, 0, 0, 0);
 	}
 
@@ -156,8 +161,10 @@ namespace TerrainRender
 
 		IndicesCount = TerrainIndices.size();
 
-		Render::LoadVertices(&VertexBuffer, &TerrainVerticesData[0][0], sizeof(TerrainVertex), NumRows * NumCols, 0);
-		Render::LoadIndices(&IndexBuffer, TerrainIndices.data(), IndicesCount, 0);
+		RenderResources::Material Mat = { };
+		u32 MaterialIndex = RenderResources::CreateMaterial(&Mat);
+		TerrainDrawObject = RenderResources::CreateTerrain(&TerrainVerticesData[0][0], sizeof(TerrainVertex), NumRows * NumCols,
+			TerrainIndices.data(), IndicesCount, MaterialIndex);
 	}
 
 	void GenerateTerrain(std::vector<u32>& Indices)

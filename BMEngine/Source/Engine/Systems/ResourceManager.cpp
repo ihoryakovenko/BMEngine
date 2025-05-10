@@ -1,5 +1,7 @@
 #include "ResourceManager.h"
 
+#include <Windows.h>
+
 #include <map>
 
 #define STB_IMAGE_IMPLEMENTATION

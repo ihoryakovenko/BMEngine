@@ -10,6 +10,8 @@
 
 #include "StaticMeshRender.h"
 
+#include "Engine/Systems/Render/VulkanHelper.h"
+
 // todo: delete
 #include "Engine/Scene.h"
 
@@ -32,6 +34,9 @@ namespace LightningPass
 
 	void Init()
 	{
+		VkDevice Device = VulkanInterface::GetDevice();
+		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
+
 		VkDescriptorType LightSpaceMatrixDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		VkShaderStageFlags LightSpaceMatrixStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 		const VkDescriptorBindingFlags BindingFlags[1] = { };
@@ -74,7 +79,8 @@ namespace LightningPass
 
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
-			ShadowMapArray[i] = VulkanInterface::CreateUniformImage(&ShadowMapArrayCreateInfo);
+			vkCreateImage(Device, &ShadowMapArrayCreateInfo, nullptr, &ShadowMapArray[i].Image);
+			ShadowMapArray[i].Memory = VulkanHelper::AllocateAndBindDeviceMemoryForImage(PhysicalDevice, Device, ShadowMapArray[i].Image, VulkanHelper::GPULocal);
 
 			const VkDeviceSize LightSpaceMatrixSize = sizeof(glm::mat4);
 
@@ -84,7 +90,9 @@ namespace LightningPass
 			BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 			BufferInfo.size = LightSpaceMatrixSize;
 
-			LightSpaceMatrixBuffer[i] = VulkanInterface::CreateUniformBufferInternal(&BufferInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			LightSpaceMatrixBuffer[i].Buffer = VulkanHelper::CreateBuffer(Device, LightSpaceMatrixSize, VulkanHelper::BufferUsageFlag::UniformFlag);
+			LightSpaceMatrixBuffer[i].Memory = VulkanHelper::AllocateAndBindDeviceMemoryForBuffer(PhysicalDevice, Device, LightSpaceMatrixBuffer[i].Buffer,
+				VulkanHelper::MemoryPropertyFlag::HostCompatible);
 
 			VulkanInterface::CreateUniformSets(&LightSpaceMatrixLayout, 1, LightSpaceMatrixSet + i);
 
@@ -105,7 +113,7 @@ namespace LightningPass
 		// Todo: check constant and model size?
 		PushConstants.size = sizeof(glm::mat4);
 
-		Pipeline.PipelineLayout = VulkanInterface::CreatePipelineLayout(&LightSpaceMatrixLayout, 1, &PushConstants, 1);
+		Pipeline.PipelineLayout = VulkanHelper::CreatePipelineLayout(VulkanInterface::GetDevice(), &LightSpaceMatrixLayout, 1, &PushConstants, 1);
 
 		std::vector<char> ShaderCode;
 		Util::OpenAndReadFileFull("./Resources/Shaders/Depth_vert.spv", ShaderCode, "rb");
@@ -136,24 +144,29 @@ namespace LightningPass
 
 	void DeInit()
 	{
+		VkDevice Device = VulkanInterface::GetDevice();
+
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
-			VulkanInterface::DestroyUniformBuffer(LightSpaceMatrixBuffer[i]);
+			vkDestroyBuffer(Device, LightSpaceMatrixBuffer[i].Buffer, nullptr);
+			vkFreeMemory(Device, LightSpaceMatrixBuffer[i].Memory, nullptr);
 
-			VulkanInterface::DestroyImageInterface(ShadowMapElement1ImageInterface[i]);
-			VulkanInterface::DestroyImageInterface(ShadowMapElement2ImageInterface[i]);
+			vkDestroyImageView(Device, ShadowMapElement1ImageInterface[i], nullptr);
+			vkDestroyImageView(Device, ShadowMapElement2ImageInterface[i], nullptr);
 
-			VulkanInterface::DestroyUniformImage(ShadowMapArray[i]);
+			vkDestroyImage(Device, ShadowMapArray[i].Image, nullptr);
+			vkFreeMemory(Device, ShadowMapArray[i].Memory, nullptr);
 		}
 
-		VulkanInterface::DestroyUniformLayout(LightSpaceMatrixLayout);
+		vkDestroyDescriptorSetLayout(Device, LightSpaceMatrixLayout, nullptr);
 
-		VulkanInterface::DestroyPipelineLayout(Pipeline.PipelineLayout);
-		VulkanInterface::DestroyPipeline(Pipeline.Pipeline);
+		vkDestroyPipeline(Device, Pipeline.Pipeline, nullptr);
+		vkDestroyPipelineLayout(Device, Pipeline.PipelineLayout, nullptr);
 	}
 
 	void Draw()
 	{
+		VkDevice Device = VulkanInterface::GetDevice();
 		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
 
 		const glm::mat4* LightViews[] =
@@ -168,7 +181,7 @@ namespace LightningPass
 
 		for (u32 LightCaster = 0; LightCaster < MAX_LIGHT_SOURCES; ++LightCaster)
 		{
-			VulkanInterface::UpdateUniformBuffer(LightSpaceMatrixBuffer[LightCaster], sizeof(glm::mat4), 0,
+			VulkanHelper::UpdateHostCompatibleBufferMemory(Device, LightSpaceMatrixBuffer[LightCaster].Memory, sizeof(glm::mat4), 0,
 				LightViews[LightCaster]);
 
 			VkRect2D RenderArea;

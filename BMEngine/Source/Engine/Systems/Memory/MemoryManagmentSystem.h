@@ -1,32 +1,23 @@
 #pragma once
 
 #include <cstdint>
+#include <cassert>
+#include <memory>
 
 #include "Util/EngineTypes.h"
 
 namespace Memory
 {
-	struct BmMemoryManagementSystem
+	struct MemoryManagementSystem
 	{
 	public:
-		static BmMemoryManagementSystem* Get()
+		static MemoryManagementSystem* Get()
 		{
-			static BmMemoryManagementSystem Instance;
+			static MemoryManagementSystem Instance;
 			return &Instance;
 		}
 
 		static inline int AllocateCounter = 0;
-
-		// TODO: HANDLE CONSTRUCTORS AND DESTRUCTORS!!!!!!!!!!!!!!
-		// for (u64 i = 0; i < Count; ++i)
-		// {
-		//	new (memory + i) T(); // Placement new
-		// }
-		// 
-		//for (u64 i = 0; i < Count; ++i)
-		//{
-		//	memory[i].~T();
-		//}
 
 		template <typename T>
 		static T* Allocate(u64 Count = 1)
@@ -34,7 +25,7 @@ namespace Memory
 #ifndef NDEBUG
 			++AllocateCounter;
 #endif
-			return static_cast<T*>(std::malloc(Count * sizeof(T)));
+			return static_cast<T*>(malloc(Count * sizeof(T)));
 		}
 
 		template <typename T>
@@ -44,7 +35,7 @@ namespace Memory
 			++AllocateCounter;
 #endif
 
-			return static_cast<T*>(std::calloc(Count, sizeof(T)));
+			return static_cast<T*>(calloc(Count, sizeof(T)));
 		}
 
 		static void Free(void* Ptr)
@@ -55,7 +46,7 @@ namespace Memory
 				--AllocateCounter;
 			}
 #endif
-			std::free(Ptr);
+			free(Ptr);
 		}
 
 		static void Init(u32 InByteCount)
@@ -70,7 +61,6 @@ namespace Memory
 			Free(MemoryPool);
 		}
 
-		// TODO: HANDLE CONSTRUCTORS AND DESTRUCTORS!!!!!!!!!!!!!!
 		template<typename T>
 		static T* FrameAlloc(u32 Count = 1)
 		{
@@ -98,7 +88,7 @@ namespace Memory
 		static FramePointer<T> Create(u32 InCount = 1)
 		{
 			FramePointer Pointer;
-			Pointer.Data = BmMemoryManagementSystem::Get()->FrameAlloc<T>(InCount);
+			Pointer.Data = MemoryManagementSystem::Get()->FrameAlloc<T>(InCount);
 			return Pointer;
 		}
 
@@ -117,7 +107,7 @@ namespace Memory
 			return Data[index];
 		}
 
-		T* Data = nullptr;
+		T* Data;
 	};
 
 	template <typename T>
@@ -127,7 +117,7 @@ namespace Memory
 		{
 			FrameArray Array;
 			Array.Count = InCount;
-			Array.Pointer.Data = BmMemoryManagementSystem::Get()->FrameAlloc<T>(InCount);
+			Array.Pointer.Data = MemoryManagementSystem::Get()->FrameAlloc<T>(InCount);
 			return Array;
 		}
 
@@ -136,7 +126,59 @@ namespace Memory
 			return Pointer[index];
 		}
 
-		u32 Count = 0;
+		u32 Count;
 		FramePointer<T> Pointer;
 	};
+
+	template <typename T>
+	struct DynamicArray
+	{
+		T* Data;
+		u64 Count;
+		u64 Capacity;
+	};
+
+	template <typename T>
+	static DynamicArray<T> AllocateArray(u64 count)
+	{
+		DynamicArray<T> Arr = { };
+		Arr.Count = 0;
+		Arr.Capacity = count;
+		Arr.Data = MemoryManagementSystem::Allocate<T>(count);
+
+		return Arr;
+	}
+
+	template <typename T>
+	static void FreeArray(DynamicArray<T>* Array)
+	{
+		MemoryManagementSystem::Free(Array->Data);
+		Array->Capacity = 0;
+		Array->Count = 0;
+	}
+
+	template <typename T>
+	static DynamicArray<T> ClearArray(DynamicArray<T>* Array)
+	{
+		Array->Count = 0;
+	}
+
+	template <typename T>
+	static void ArrayIncreaseCapacity(DynamicArray<T>* Array)
+	{
+		const u64 NewCapacity = Array->Capacity + Array->Capacity / 2;
+		T* newData = static_cast<T*>(realloc(Array->Data, NewCapacity * sizeof(T)));
+		Array->Data = newData;
+		Array->Capacity = NewCapacity;
+	}
+
+	template <typename T>
+	static void PushBackToArray(DynamicArray<T>* Array, T* NewElement)
+	{
+		if (Array->Capacity <= Array->Count)
+		{
+			ArrayIncreaseCapacity(Array);
+		}
+		Array->Data[Array->Count++] = *NewElement;
+	}
 }

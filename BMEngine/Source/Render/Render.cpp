@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include "Memory/MemoryManagmentSystem.h"
+#include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 
 #include "Util/Settings.h"
 #include "Util/Util.h"
@@ -13,47 +13,17 @@
 #include "Engine/Systems/Render/MainPass.h"
 #include "Engine/Systems/Render/DeferredPass.h"
 #include "Engine/Systems/Render/TerrainRender.h"
-#include "Engine/Systems/Render/VulkanHalper.h"
+#include "Engine/Systems/Render/VulkanHelper.h"
 #include "Engine/Systems/Render/DebugUi.h"
 #include "Engine/Systems/ResourceManager.h"
 
 namespace Render
 {
-	void RenderLog(VulkanInterface::LogType LogType, const char* Format, va_list Args)
-	{
-		switch (LogType)
-		{
-			case VulkanInterface::LogType::BMRVkLogType_Error:
-			{
-				std::cout << "\033[31;5mError: "; // Set red color
-				vprintf(Format, Args);
-				std::cout << "\n\033[m"; // Reset red color
-				assert(false);
-				break;
-			}
-			case VulkanInterface::LogType::BMRVkLogType_Warning:
-			{
-				std::cout << "\033[33;5mWarning: "; // Set red color
-				vprintf(Format, Args);
-				std::cout << "\n\033[m"; // Reset red color
-				break;
-			}
-			case VulkanInterface::LogType::BMRVkLogType_Info:
-			{
-				std::cout << "Info: ";
-				vprintf(Format, Args);
-				std::cout << '\n';
-				break;
-			}
-		}
-	}
-
 	bool Init(GLFWwindow* Window, DebugUi::GuiData* DataPtr)
 	{
 		VulkanInterface::VulkanInterfaceConfig RenderConfig;
 		//RenderConfig.MaxTextures = 90;
 		RenderConfig.MaxTextures = 500; // TODO: FIX!!!!
-		RenderConfig.LogHandler = RenderLog;
 
 		VulkanInterface::Init(Window, RenderConfig);
 		RenderResources::Init(MB32, MB32, 512, 256);
@@ -90,8 +60,10 @@ namespace Render
 	void Draw(FrameManager::ViewProjectionBuffer ViewProjection)
 	{
 		const u32 ImageIndex = VulkanInterface::AcquireNextImageIndex();
+
 		FrameManager::UpdateViewProjection(&ViewProjection);
-		VulkanInterface::BeginFrame(ImageIndex);
+
+		VulkanInterface::BeginFrame();
 
 		LightningPass::Draw();
 
@@ -108,7 +80,7 @@ namespace Render
 
 		DeferredPass::EndPass();
 
-		VulkanInterface::EndFrame(ImageIndex);
+		VulkanInterface::EndFrame();
 	}
 
 	void LoadIndices(VulkanInterface::IndexBuffer* IndexBuffer, const u32* Indices, u32 IndicesCount, u64 Offset)

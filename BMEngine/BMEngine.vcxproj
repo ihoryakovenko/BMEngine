@@ -33,7 +33,7 @@
     <ClCompile Include="Source\Engine\Systems\Render\DeferredPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\LightningPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\MainPass.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\VulkanHalper.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
     <ClCompile Include="Source\Engine\Systems\ResourceManager.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\StaticMeshRender.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\TerrainRender.cpp" />
@@ -43,7 +43,6 @@
     <ClCompile Include="Source\Render\Render.cpp" />
     <ClCompile Include="Source\ImguiIntegration.cpp" />
     <ClCompile Include="Source\main.cpp" />
-    <ClCompile Include="Source\Platform\WinPlatform.cpp" />
     <ClCompile Include="Source\Util\Settings.cpp" />
     <ClCompile Include="Source\Util\Util.cpp" />
   </ItemGroup>
@@ -63,17 +62,16 @@
     <ClInclude Include="Source\Engine\Systems\Render\DeferredPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\LightningPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\MainPass.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\VulkanHalper.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\VulkanHelper.h" />
     <ClInclude Include="Source\Engine\Systems\ResourceManager.h" />
     <ClInclude Include="Source\Engine\Systems\Render\StaticMeshRender.h" />
     <ClInclude Include="Source\Engine\Systems\Render\TerrainRender.h" />
     <ClInclude Include="Source\Render\FrameManager.h" />
     <ClInclude Include="Source\Engine\Systems\Render\RenderResources.h" />
     <ClInclude Include="Source\Render\VulkanInterface\VulkanInterface.h" />
-    <ClInclude Include="Source\Platform\WinPlatform.h" />
     <ClInclude Include="Source\Util\Math.h" />
     <ClInclude Include="Source\Util\Settings.h" />
-    <ClInclude Include="Source\Memory\MemoryManagmentSystem.h" />
+    <ClInclude Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.h" />
     <ClInclude Include="Source\Render\Render.h" />
     <ClInclude Include="Source\Util\EngineTypes.h" />
     <ClInclude Include="Source\Util\stb_image.h" />

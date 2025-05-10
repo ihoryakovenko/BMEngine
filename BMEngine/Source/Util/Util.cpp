@@ -2,7 +2,7 @@
 
 #include "EngineTypes.h"
 
-#include "Memory/MemoryManagmentSystem.h"
+#include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 
 #include "Engine/Systems/Render/StaticMeshRender.h"
 
@@ -85,6 +85,44 @@ namespace Util
 		Log::Error("Cannot open file {}: Result = {}", FileName, Result);
 		return false;
 	}
+
+	void RenderLog(LogType logType, const char* format, ...)
+	{
+		va_list args;
+		va_start(args, format);
+		RenderLog(logType, format, args);
+		va_end(args);
+	}
+
+	void RenderLog(LogType LogType, const char* Format, va_list Args)
+	{
+		switch (LogType)
+		{
+			case LogType::BMRVkLogType_Error:
+			{
+				std::cout << "\033[31;5mError: "; // Set red color
+				vprintf(Format, Args);
+				std::cout << "\n\033[m"; // Reset red color
+				assert(false);
+				break;
+			}
+			case LogType::BMRVkLogType_Warning:
+			{
+				std::cout << "\033[33;5mWarning: "; // Set red color
+				vprintf(Format, Args);
+				std::cout << "\n\033[m"; // Reset red color
+				break;
+			}
+			case LogType::BMRVkLogType_Info:
+			{
+				std::cout << "Info: ";
+				vprintf(Format, Args);
+				std::cout << '\n';
+				break;
+			}
+		}
+	}
+
 	void LoadPipelineSettings(VulkanInterface::PipelineSettings& Settings, const char* FilePath)
 	{
 		// TODO: static
@@ -146,8 +184,8 @@ namespace Util
 			assert(false);
 		}
 
-		u64* VerticesCounts = Memory::BmMemoryManagementSystem::Allocate<u64>(Shapes.size());
-		u32* IndicesCounts = Memory::BmMemoryManagementSystem::Allocate<u32>(Shapes.size());
+		u64* VerticesCounts = Memory::MemoryManagementSystem::Allocate<u64>(Shapes.size());
+		u32* IndicesCounts = Memory::MemoryManagementSystem::Allocate<u32>(Shapes.size());
 
 		std::unordered_map<StaticMeshRender::StaticMeshVertex, u32,
 			std::hash<StaticMeshRender::StaticMeshVertex>, VertexEqual> uniqueVertices{ };
@@ -240,8 +278,8 @@ namespace Util
 
 		CloseHandle(hFile);
 
-		Memory::BmMemoryManagementSystem::Free(VerticesCounts);
-		Memory::BmMemoryManagementSystem::Free(IndicesCounts);
+		Memory::MemoryManagementSystem::Free(VerticesCounts);
+		Memory::MemoryManagementSystem::Free(IndicesCounts);
 
 		assert(Result);
 	}
@@ -262,7 +300,7 @@ namespace Util
 			assert(false);
 		}
 
-		Model3DData Data = Memory::BmMemoryManagementSystem::Allocate<u8>(FileSize.QuadPart);
+		Model3DData Data = Memory::MemoryManagementSystem::Allocate<u8>(FileSize.QuadPart);
 
 		DWORD BytesRead;
 		BOOL Result = ReadFile(hFile, Data, FileSize.QuadPart, &BytesRead, NULL);
@@ -273,7 +311,7 @@ namespace Util
 
 	void ClearModel3DData(Model3DData Data)
 	{
-		Memory::BmMemoryManagementSystem::Free(Data);
+		Memory::MemoryManagementSystem::Free(Data);
 	}
 
 	Model3D ParseModel3D(Model3DData Data)

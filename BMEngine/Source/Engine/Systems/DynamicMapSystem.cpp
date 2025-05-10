@@ -16,7 +16,7 @@
 #include "Util/Math.h"
 #include "Util/Util.h"
 #include "Util/Settings.h"
-#include "Memory/MemoryManagmentSystem.h"
+#include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 #include "Render/FrameManager.h"
 #include "Render/Render.h"
 
@@ -126,7 +126,7 @@ namespace DynamicMapSystem
 		};
 		const u32 MapDescriptorLayoutCount = sizeof(MapDescriptorLayouts) / sizeof(MapDescriptorLayouts[0]);
 
-		Pipeline.PipelineLayout = VulkanInterface::CreatePipelineLayout(MapDescriptorLayouts, MapDescriptorLayoutCount, nullptr, 0);
+		//Pipeline.PipelineLayout = VulkanInterface::CreatePipelineLayout(MapDescriptorLayouts, MapDescriptorLayoutCount, nullptr, 0);
 
 		VulkanInterface::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
@@ -142,7 +142,7 @@ namespace DynamicMapSystem
 		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, &VertexInput, 0,
 			&PipelineSettings, &ResourceInfo);
 
-		IndexBuffer = VulkanInterface::CreateIndexBuffer(MB64);
+		//IndexBuffer = VulkanInterface::CreateIndexBuffer(MB64);
 
 		//Render::RenderTexture TextureArrayTiles = ResourceManager::EmptyTexture(TilesTextureId, TextureTileSize, TextureTileSize,
 			//MaxTextureTilesPerAxis, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
@@ -365,10 +365,14 @@ namespace DynamicMapSystem
 	{
 		StopDownload = true;
 
-		VulkanInterface::DestroyUniformBuffer(IndexBuffer);
-		VulkanInterface::DestroyUniformLayout(MapTileSettingsLayout);
-		VulkanInterface::DestroyPipeline(Pipeline.Pipeline);
-		VulkanInterface::DestroyPipelineLayout(Pipeline.PipelineLayout);
+		VkDevice Device = VulkanInterface::GetDevice();
+
+		vkDestroyBuffer(Device, IndexBuffer.Buffer, nullptr);
+		vkFreeMemory(Device, IndexBuffer.Memory, nullptr);
+
+		vkDestroyDescriptorSetLayout(Device, MapTileSettingsLayout, nullptr);
+		vkDestroyPipeline(Device, Pipeline.Pipeline, nullptr);
+		vkDestroyPipelineLayout(Device, Pipeline.PipelineLayout, nullptr);
 		
 		std::unique_lock DeInitLock(DeInitMutex);
 	}

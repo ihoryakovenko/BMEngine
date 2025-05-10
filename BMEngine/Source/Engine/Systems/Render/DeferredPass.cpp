@@ -1,6 +1,7 @@
 #include "DeferredPass.h"
 
 #include "Render/VulkanInterface/VulkanInterface.h"
+#include "Engine/Systems/Render/VulkanHelper.h"
 
 #include "Util/Settings.h"
 #include "Util/Util.h"
@@ -26,6 +27,9 @@ namespace DeferredPass
 
 	void Init()
 	{
+		VkDevice Device = VulkanInterface::GetDevice();
+		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
+
 		AttachmentData.ColorAttachmentCount = 1;
 		AttachmentData.ColorAttachmentFormats[0] = VulkanInterface::GetSurfaceFormat();
 		AttachmentData.DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
@@ -105,8 +109,11 @@ namespace DeferredPass
 		{
 			//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
 
-			DeferredInputDepthImage[i] = VulkanInterface::CreateUniformImage(&DeferredInputDepthUniformCreateInfo);
-			DeferredInputColorImage[i] = VulkanInterface::CreateUniformImage(&DeferredInputColorUniformCreateInfo);
+			vkCreateImage(Device, &DeferredInputDepthUniformCreateInfo, nullptr, &DeferredInputDepthImage[i].Image);
+			DeferredInputDepthImage[i].Memory = VulkanHelper::AllocateAndBindDeviceMemoryForImage(PhysicalDevice, Device, DeferredInputDepthImage[i].Image, VulkanHelper::GPULocal);
+
+			vkCreateImage(Device, &DeferredInputColorUniformCreateInfo, nullptr, &DeferredInputColorImage[i].Image);
+			DeferredInputColorImage[i].Memory = VulkanHelper::AllocateAndBindDeviceMemoryForImage(PhysicalDevice, Device, DeferredInputColorImage[i].Image, VulkanHelper::GPULocal);
 
 			DeferredInputDepthImageInterface[i] = VulkanInterface::CreateImageInterface(&InputDepthUniformInterfaceCreateInfo,
 				DeferredInputDepthImage[i].Image);
@@ -133,7 +140,7 @@ namespace DeferredPass
 
 
 
-		Pipeline.PipelineLayout = VulkanInterface::CreatePipelineLayout(&DeferredInputLayout, 1, nullptr, 0);
+		Pipeline.PipelineLayout = VulkanHelper::CreatePipelineLayout(VulkanInterface::GetDevice(), &DeferredInputLayout, 1, nullptr, 0);
 
 		std::vector<char> VertexShaderCode;
 		Util::OpenAndReadFileFull("./Resources/Shaders/second_vert.spv", VertexShaderCode, "rb");
@@ -165,22 +172,27 @@ namespace DeferredPass
 
 	void DeInit()
 	{
-		VulkanInterface::DestroySampler(ColorSampler);
-		VulkanInterface::DestroySampler(DepthSampler);
+		VkDevice Device = VulkanInterface::GetDevice();
+
+		vkDestroySampler(Device, ColorSampler, nullptr);
+		vkDestroySampler(Device, DepthSampler, nullptr);
 
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
-			VulkanInterface::DestroyImageInterface(DeferredInputDepthImageInterface[i]);
-			VulkanInterface::DestroyImageInterface(DeferredInputColorImageInterface[i]);
+			vkDestroyImageView(Device, DeferredInputDepthImageInterface[i], nullptr);
+			vkDestroyImageView(Device, DeferredInputColorImageInterface[i], nullptr);
 
-			VulkanInterface::DestroyUniformImage(DeferredInputDepthImage[i]);
-			VulkanInterface::DestroyUniformImage(DeferredInputColorImage[i]);
+			vkDestroyImage(Device, DeferredInputDepthImage[i].Image, nullptr);
+			vkFreeMemory(Device, DeferredInputDepthImage[i].Memory, nullptr);
+
+			vkDestroyImage(Device, DeferredInputColorImage[i].Image, nullptr);
+			vkFreeMemory(Device, DeferredInputColorImage[i].Memory, nullptr);
 		}
 
 		vkDestroyDescriptorSetLayout(VulkanInterface::GetDevice(), DeferredInputLayout, nullptr);
 
-		VulkanInterface::DestroyPipeline(Pipeline.Pipeline);
-		VulkanInterface::DestroyPipelineLayout(Pipeline.PipelineLayout);
+		vkDestroyPipeline(Device, Pipeline.Pipeline, nullptr);
+		vkDestroyPipelineLayout(Device, Pipeline.PipelineLayout, nullptr);
 	}
 
 	void Draw()
@@ -209,7 +221,7 @@ namespace DeferredPass
 		SwapchainColorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		SwapchainColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		SwapchainColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		SwapchainColorAttachment.clearValue = MainPassClearValues[0];
+		SwapchainColorAttachment.clearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 		VkRenderingInfo RenderingInfo{ };
 		RenderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;

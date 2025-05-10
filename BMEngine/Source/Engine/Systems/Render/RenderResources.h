@@ -36,6 +36,7 @@ namespace RenderResources
 	void DeInit();
 
 	u32 CreateEntity(void* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, u32 MaterialIndex);
+	DrawEntity CreateTerrain(void* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, u32 Material);
 	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height);
 	u32 CreateMaterial(Material* Mat);
 
