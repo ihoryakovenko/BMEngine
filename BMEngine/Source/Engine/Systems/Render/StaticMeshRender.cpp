@@ -157,91 +157,6 @@ namespace StaticMeshRender
 
 		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, VertexInputBinding, 1,
 			&PipelineSettings, &ResourceInfo);
-
-
-
-
-
-
-
-
-		Util::Model3DData ModelData = Util::LoadModel3DData(".\\Resources\\Models\\uh60.model");
-		Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
-
-		u64 ModelVertexByteOffset = 0;
-		u32 ModelIndexCountOffset = 0;
-		for (u32 i = 0; i < Uh60Model.MeshCount; i++)
-		{
-			const u64 VerticesCount = Uh60Model.VerticesCounts[i];
-			const u32 IndicesCount = Uh60Model.IndicesCounts[i];			
-			const u32 TextureIndex = RenderResources::GetTexture2DSRGBIndex(Uh60Model.DiffuseTexturesHashes[i]);
-
-			RenderResources::Material Mat;
-			Mat.AlbedoTexIndex = TextureIndex;
-			Mat.SpecularTexIndex = TextureIndex;
-			Mat.Shininess = 32.0f;
-			const u32 MaterialIndex = RenderResources::CreateMaterial(&Mat);
-
-			RenderResources::CreateEntity(Uh60Model.VertexData + ModelVertexByteOffset, sizeof(StaticMeshVertex), VerticesCount,
-				Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, MaterialIndex);
-
-			ModelVertexByteOffset += VerticesCount * sizeof(StaticMeshVertex);
-			ModelIndexCountOffset += IndicesCount;
-		}
-
-
-		Util::ClearModel3DData(ModelData);
-
-		//{
-		//	glm::vec3 CubePos(0.0f, -5.0f, 0.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::scale(Model, glm::vec3(20.0f, 1.0f, 20.0f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, WhiteMaterial);
-		//	//LoadModel("./Resources/Models/cube.obj", Model, ResourceManager::FindMaterial("WhiteMaterial"));
-		//}
-
-		//{
-		//	glm::vec3 CubePos(0.0f, 0.0f, 0.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::scale(Model, glm::vec3(0.2f, 5.0f, 0.2f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, TestMaterial);
-		//}
-
-		//{
-		//	glm::vec3 CubePos(0.0f, 0.0f, 8.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::rotate(Model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		//	Model = glm::scale(Model, glm::vec3(0.5f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, GrassMaterial);
-		//}
-
-		//{
-		//	glm::vec3 LightCubePos(0.0f, 0.0f, 10.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, LightCubePos);
-		//	Model = glm::scale(Model, glm::vec3(0.2f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, WhiteMaterial);
-		//}
-
-		//{
-		//	glm::vec3 CubePos(0.0f, 0.0f, 15.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::scale(Model, glm::vec3(1.0f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, WhiteMaterial);
-		//}
-
-		//{
-		//	glm::vec3 CubePos(5.0f, 0.0f, 10.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::rotate(Model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		//	Model = glm::scale(Model, glm::vec3(1.0f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, ContainerMaterial);
-		//}
 	}
 
 	void DeInit()
@@ -270,13 +185,11 @@ namespace StaticMeshRender
 		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
 		
 		const VkDescriptorSet VpSet = FrameManager::GetViewProjectionSet();
-
 		const u32 DynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(FrameManager::ViewProjectionBuffer);
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
 			0, 1, &VpSet, 1, &DynamicOffset);
 
 		VkDescriptorSet BindlesTexturesSet = RenderResources::GetBindlesTexturesSet();
-
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
 			1, 1, &BindlesTexturesSet, 0, nullptr);
 

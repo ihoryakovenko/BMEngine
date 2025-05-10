@@ -333,7 +333,6 @@ namespace RenderResources
 		SubmitInfo.pCommandBuffers = &CmdBuffer;
 
 		TexturesMemory[TextureIndex] = VulkanHelper::AllocateAndBindDeviceMemoryForImage(PhysicalDevice, Device, Image, VulkanHelper::GPULocal);
-		vkBindImageMemory(Device, Image, TexturesMemory[TextureIndex], 0);
 
 		Result = vkCreateImageView(Device, &ViewCreateInfo, nullptr, TextureViews + TextureIndex);
 		if (Result != VK_SUCCESS)

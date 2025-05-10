@@ -31,8 +31,8 @@ namespace Render
 
 		DeferredPass::Init();
 		MainPass::Init();
-		ResourceManager::Init();
 		LightningPass::Init();
+
 		TerrainRender::Init();
 		//DynamicMapSystem::Init();
 		StaticMeshRender::Init();

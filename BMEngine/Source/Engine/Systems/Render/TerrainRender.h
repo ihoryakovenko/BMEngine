@@ -10,6 +10,4 @@ namespace TerrainRender
 	void DeInit();
 
 	void Draw();
-
-	void TestAttachSkyNoxTerrainTexture(VkImageView DefuseImage, VkDescriptorSet* SetToAttach);
 }

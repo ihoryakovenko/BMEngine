@@ -39,9 +39,9 @@ struct SpotLight
 };
 
 struct Material {
-    uint AlbedoTexIndex;
-    uint SpecularTexIndex;
-    float Shininess;
+	uint AlbedoTexIndex;
+	uint SpecularTexIndex;
+	float Shininess;
 };
 
 #define MAX_SHADOW_TEXTURES 2
@@ -71,7 +71,7 @@ layout(set = 2, binding = 0) uniform LightCasters
 lightCasters;
 
 layout(std430, set = 3, binding = 0) readonly buffer MaterialsBuffer {
-    Material materials[];
+	Material materials[];
 } Materials;
 
 layout(set = 4, binding = 0) uniform sampler2DArray ShadowMaps;

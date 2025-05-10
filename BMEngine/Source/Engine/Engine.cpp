@@ -27,6 +27,7 @@
 #include "Systems/Render/MainPass.h"
 #include "Systems/Render/DeferredPass.h"
 #include "Systems/Render/DebugUI.h"
+#include "Systems/Render/StaticMeshRender.h"
 
 namespace std
 {
@@ -148,6 +149,61 @@ namespace Engine
 		Memory::MemoryManagementSystem::Init(FrameAllocSize);
 
 		Render::Init(Window, &GuiData);
+
+		ResourceManager::Init();
+		ResourceManager::LoadTextures(".\\Resources\\Textures");
+		ResourceManager::LoadModel(".\\Resources\\Models\\uh60.model");
+
+		//{
+		//	glm::vec3 CubePos(0.0f, -5.0f, 0.0f);
+		//	glm::mat4 Model = glm::mat4(1.0f);
+		//	Model = glm::translate(Model, CubePos);
+		//	Model = glm::scale(Model, glm::vec3(20.0f, 1.0f, 20.0f));
+		//	LoadModel("./Resources/Models/cube.obj", Model, WhiteMaterial);
+		//	//LoadModel("./Resources/Models/cube.obj", Model, ResourceManager::FindMaterial("WhiteMaterial"));
+		//}
+
+		//{
+		//	glm::vec3 CubePos(0.0f, 0.0f, 0.0f);
+		//	glm::mat4 Model = glm::mat4(1.0f);
+		//	Model = glm::translate(Model, CubePos);
+		//	Model = glm::scale(Model, glm::vec3(0.2f, 5.0f, 0.2f));
+		//	LoadModel("./Resources/Models/cube.obj", Model, TestMaterial);
+		//}
+
+		//{
+		//	glm::vec3 CubePos(0.0f, 0.0f, 8.0f);
+		//	glm::mat4 Model = glm::mat4(1.0f);
+		//	Model = glm::translate(Model, CubePos);
+		//	Model = glm::rotate(Model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		//	Model = glm::scale(Model, glm::vec3(0.5f));
+		//	LoadModel("./Resources/Models/cube.obj", Model, GrassMaterial);
+		//}
+
+		//{
+		//	glm::vec3 LightCubePos(0.0f, 0.0f, 10.0f);
+		//	glm::mat4 Model = glm::mat4(1.0f);
+		//	Model = glm::translate(Model, LightCubePos);
+		//	Model = glm::scale(Model, glm::vec3(0.2f));
+		//	LoadModel("./Resources/Models/cube.obj", Model, WhiteMaterial);
+		//}
+
+		//{
+		//	glm::vec3 CubePos(0.0f, 0.0f, 15.0f);
+		//	glm::mat4 Model = glm::mat4(1.0f);
+		//	Model = glm::translate(Model, CubePos);
+		//	Model = glm::scale(Model, glm::vec3(1.0f));
+		//	LoadModel("./Resources/Models/cube.obj", Model, WhiteMaterial);
+		//}
+
+		//{
+		//	glm::vec3 CubePos(5.0f, 0.0f, 10.0f);
+		//	glm::mat4 Model = glm::mat4(1.0f);
+		//	Model = glm::translate(Model, CubePos);
+		//	Model = glm::rotate(Model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		//	Model = glm::scale(Model, glm::vec3(1.0f));
+		//	LoadModel("./Resources/Models/cube.obj", Model, ContainerMaterial);
+		//}
 
 		return true;
 	}

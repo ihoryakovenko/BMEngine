@@ -11,9 +11,7 @@
 
 namespace ResourceManager
 {
-	extern u64 DefaultTextureHash;
-	extern const u8 DefaultTextureData[];
-	extern u64 DefaultTextureDataCount;
-
 	void Init();
+	void LoadModel(const char* FilePath);
+	void LoadTextures(const char* Directory);
 }
