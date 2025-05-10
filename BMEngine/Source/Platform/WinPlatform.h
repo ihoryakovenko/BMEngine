@@ -18,14 +18,12 @@
 
 namespace Platform
 {
-	typedef GLFWwindow BMRTMPWindowHandler;
-	typedef HWND BMRWindowHandler;
 	static const char WinWindowExtension[] = VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
 
-	BMRTMPWindowHandler* CreatePlatformWindow(s32 WindowWidth, s32 WindowHeight);
+	GLFWwindow* CreatePlatformWindow(s32 WindowWidth, s32 WindowHeight);
 
-	VkResult CreateSurface(BMRWindowHandler WindowHandler, VkInstance VulkanInstance, VkSurfaceKHR* Surface);
-	void GetWindowSizes(BMRWindowHandler WindowHandler, u32* Width, u32* Height);
+	VkResult CreateSurface(GLFWwindow* WindowHandler, VkInstance VulkanInstance, VkSurfaceKHR* Surface);
+	void GetWindowSizes(GLFWwindow* WindowHandler, u32* Width, u32* Height);
 
-	void DisableCursor(BMRTMPWindowHandler* Window);
+	void DisableCursor(GLFWwindow* Window);
 }

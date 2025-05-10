@@ -137,7 +137,7 @@ namespace VulkanInterface
 		u32 LayerCount;
 	};
 
-	void Init(Platform::BMRWindowHandler WindowHandler, const VulkanInterfaceConfig& InConfig);
+	void Init(GLFWwindow* WindowHandler, const VulkanInterfaceConfig& InConfig);
 	void DeInit();
 
 	// TO refactor

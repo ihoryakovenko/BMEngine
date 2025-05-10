@@ -66,7 +66,7 @@ namespace Engine
 
 	static void MoveCamera(GLFWwindow* Window, f32 DeltaTime, DynamicMapSystem::MapCamera& MainCamera);
 
-	static Platform::BMRTMPWindowHandler* Window = nullptr;
+	static GLFWwindow* Window = nullptr;
 
 	static DynamicMapSystem::MapCamera MainCamera;
 	static bool Close = false;
@@ -109,7 +109,7 @@ namespace Engine
 			LastTime = CurrentTime;
 
 			Update(DeltaTime);
-			Draw(&Scene);
+			Render::Draw(ViewProjection);
 
 			Memory::BmMemoryManagementSystem::FrameFree();
 		}
@@ -127,7 +127,7 @@ namespace Engine
 		Window = Platform::CreatePlatformWindow(WindowWidth, WindowHeight);
 		//Platform::DisableCursor(Window);
 
-		Platform::GetWindowSizes(glfwGetWin32Window(Window), &WindowWidth, &WindowHeight);
+		Platform::GetWindowSizes(Window, &WindowWidth, &WindowHeight);
 
 		LoadSettings(WindowWidth, WindowHeight);
 
@@ -153,7 +153,7 @@ namespace Engine
 
 		 
 
-		VulkanInterface::Init(glfwGetWin32Window(Window), RenderConfig);
+		VulkanInterface::Init(Window, RenderConfig);
 		RenderResources::Init(MB32, MB32, 512, 256);
 		FrameManager::Init();
 		Render::Init();
@@ -171,6 +171,7 @@ namespace Engine
 
 	void DeInit()
 	{
+		VulkanInterface::WaitDevice();
 		//DynamicMapSystem::DeInit();
 		DebugUi::DeInit();
 		TerrainRender::DeInit();
@@ -179,6 +180,7 @@ namespace Engine
 		RenderResources::DeInit();
 		Render::DeInit();
 		MainPass::DeInit();
+		LightningPass::DeInit();
 		DeferredPass::DeInit();
 		FrameManager::DeInit();
 		VulkanInterface::DeInit();
@@ -228,7 +230,6 @@ namespace Engine
 		//}
 
 		ViewProjection.View = glm::lookAt(MainCamera.Position, MainCamera.Position + MainCamera.Front, MainCamera.Up);
-		FrameManager::UpdateViewProjection(&ViewProjection);
 
 		float NearPlane = 0.1f, FarPlane = 100.0f;
 		float HalfSize = 30.0f;
@@ -251,7 +252,7 @@ namespace Engine
 
 	void SetUpScene()
 	{
-		MainCamera.Fov = 60.0f;
+		MainCamera.Fov = 45.0f;
 		MainCamera.AspectRatio = (float)MainScreenExtent.width / (float)MainScreenExtent.height;
 
 		MainCamera.Position = glm::vec3(0.0f, 0.0f, 20.0f);

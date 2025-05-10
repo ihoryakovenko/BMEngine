@@ -2,7 +2,7 @@
 
 namespace Platform
 {
-	BMRTMPWindowHandler* CreatePlatformWindow(s32 WindowWidth, s32 WindowHeight)
+	GLFWwindow* CreatePlatformWindow(s32 WindowWidth, s32 WindowHeight)
 	{
 		glfwInit();
 
@@ -12,32 +12,20 @@ namespace Platform
 		return glfwCreateWindow(WindowWidth, WindowHeight, "BMEngine", nullptr, nullptr);
 	}
 
-	VkResult CreateSurface(BMRWindowHandler WindowHandler, VkInstance VulkanInstance, VkSurfaceKHR* Surface)
+	VkResult CreateSurface(GLFWwindow* WindowHandler, VkInstance VulkanInstance, VkSurfaceKHR* Surface)
 	{
-		VkWin32SurfaceCreateInfoKHR SurfaceCreateInfo = { };
-		SurfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-		SurfaceCreateInfo.hwnd = WindowHandler;
-		SurfaceCreateInfo.hinstance = GetModuleHandle(nullptr);
-
-		return vkCreateWin32SurfaceKHR(VulkanInstance, &SurfaceCreateInfo, nullptr, Surface);
+		return glfwCreateWindowSurface(VulkanInstance, WindowHandler, nullptr, Surface);
 	}
 
-	void GetWindowSizes(BMRWindowHandler WindowHandler, u32* Width, u32* Height)
+	void GetWindowSizes(GLFWwindow* WindowHandler, u32* Width, u32* Height)
 	{
-		RECT Rect;
-		if (!GetClientRect(WindowHandler, &Rect))
-		{
-			*Width = 0;
-			*Height = 0;
-
-			return;
-		}
-
-		*Width = Rect.right - Rect.left;
-		*Height = Rect.bottom - Rect.top;
+		int width, height;
+		glfwGetFramebufferSize(WindowHandler, &width, &height);
+		*Width = static_cast<u32>(width);
+		*Height = static_cast<u32>(height);
 	}
 
-	void DisableCursor(BMRTMPWindowHandler* Window)
+	void DisableCursor(GLFWwindow* Window)
 	{
 		glfwSetInputMode(Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	}

@@ -76,6 +76,9 @@ namespace MainPass
 
 	void DeInit()
 	{
+		vkDestroyDescriptorSetLayout(VulkanInterface::GetDevice(), SkyBoxLayout, nullptr);
+		VulkanInterface::DestroyPipeline(SkyBoxPipeline.Pipeline);
+		VulkanInterface::DestroyPipelineLayout(SkyBoxPipeline.PipelineLayout);
 	}
 
 	void BeginPass()
@@ -87,7 +90,7 @@ namespace MainPass
 		ColorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		ColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		ColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		ColorAttachment.clearValue.color = { 0.0f, 0.0f, 0.0f, 1.0f };
+		ColorAttachment.clearValue = MainPassClearValues[1];
 
 		VkRenderingAttachmentInfo DepthAttachment = { };
 		DepthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -95,7 +98,7 @@ namespace MainPass
 		DepthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		DepthAttachment.clearValue.depthStencil = { 1.0f, 0 };
+		DepthAttachment.clearValue = MainPassClearValues[2];
 
 		VkRect2D RenderArea;
 		RenderArea.extent = MainScreenExtent;

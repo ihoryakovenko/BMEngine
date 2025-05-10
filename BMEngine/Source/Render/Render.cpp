@@ -52,10 +52,10 @@ namespace Render
 		VulkanInterface::CopyDataToBuffer(VertexBuffer->Buffer, Offset, MeshVerticesSize, Vertices);
 	}
 
-	void Draw(const DrawScene* Scene)
+	void Draw(FrameManager::ViewProjectionBuffer ViewProjection)
 	{
 		const u32 ImageIndex = VulkanInterface::AcquireNextImageIndex();
-
+		FrameManager::UpdateViewProjection(&ViewProjection);
 		VulkanInterface::BeginFrame(ImageIndex);
 
 		LightningPass::Draw();
@@ -74,8 +74,5 @@ namespace Render
 		DeferredPass::EndPass();
 		
 		VulkanInterface::EndFrame(ImageIndex);
-
-		// !!!!!!!!!!!!!!!!!!!!!!!!!!!
-		//VulkanInterface::WaitDevice();
 	}
 }

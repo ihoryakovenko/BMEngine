@@ -145,6 +145,7 @@ namespace RenderResources
 		Memory::BmMemoryManagementSystem::Free(DrawEntities);
 		Memory::BmMemoryManagementSystem::Free(Textures);
 		Memory::BmMemoryManagementSystem::Free(TextureViews);
+		Memory::BmMemoryManagementSystem::Free(TexturesMemory);
 	}
 
 	VulkanInterface::VertexBuffer GetVertexBuffer()

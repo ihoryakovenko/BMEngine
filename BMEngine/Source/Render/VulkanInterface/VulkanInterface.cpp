@@ -52,7 +52,7 @@ namespace VulkanInterface
 	static Memory::FrameArray<VkQueueFamilyProperties> GetQueueFamilyProperties(VkPhysicalDevice PhysicalDevice);
 	static BMRPhysicalDeviceIndices GetPhysicalDeviceIndices(VkQueueFamilyProperties* Properties, u32 PropertiesCount,
 		VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
-	static void GetBestSwapExtent(Platform::BMRWindowHandler WindowHandler);
+	static void GetBestSwapExtent(GLFWwindow* WindowHandler);
 	static VkPresentModeKHR GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
 	static Memory::FrameArray<VkPresentModeKHR> GetAvailablePresentModes(VkPhysicalDevice PhysicalDevice,
 		VkSurfaceKHR Surface);
@@ -144,7 +144,7 @@ namespace VulkanInterface
 	
 
 	// FUNCTIONS IMPLEMENTATIONS
-	void Init(Platform::BMRWindowHandler WindowHandler, const VulkanInterfaceConfig& InConfig)
+	void Init(GLFWwindow* WindowHandler, const VulkanInterfaceConfig& InConfig)
 	{
 		Config = InConfig;
 		LogHandler = Config.LogHandler;
@@ -482,7 +482,7 @@ namespace VulkanInterface
 		vkResetFences(Device.LogicalDevice, 1, Fence);
 
 		vkAcquireNextImageKHR(Device.LogicalDevice, SwapInstance.VulkanSwapchain, UINT64_MAX,
-			ImageAvailable, VK_NULL_HANDLE, &CurrentImageIndex);
+			ImageAvailable, nullptr, &CurrentImageIndex);
 
 		return CurrentImageIndex;
 	}
@@ -1127,9 +1127,13 @@ namespace VulkanInterface
 		[[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
 		[[maybe_unused]] void* UserData)
 	{
-		if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+		if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
 		{
 			HandleLog(BMRVkLogType_Error, CallbackData->pMessage);
+		}
+		else if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+		{
+			HandleLog(BMRVkLogType_Warning, CallbackData->pMessage);
 		}
 		else
 		{
@@ -1728,7 +1732,7 @@ namespace VulkanInterface
 		}
 	}
 
-	void GetBestSwapExtent(Platform::BMRWindowHandler WindowHandler)
+	void GetBestSwapExtent(GLFWwindow* WindowHandler)
 	{
 		VkSurfaceCapabilitiesKHR SurfaceCapabilities = { };
 

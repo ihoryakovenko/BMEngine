@@ -7,6 +7,7 @@
 
 #include "Util/EngineTypes.h"
 #include "Engine/Systems/Render/RenderResources.h"
+#include "Render/FrameManager.h"
 
 namespace Render
 {
@@ -95,5 +96,5 @@ namespace Render
 	void LoadIndices(VulkanInterface::IndexBuffer* IndexBuffer, const u32* Indices, u32 IndicesCount, u64 Offset);
 	void LoadVertices(VulkanInterface::VertexBuffer* VertexBuffer, const void* Vertices, u32 VertexSize, u64 VerticesCount, u64 Offset);
 
-	void Draw(const DrawScene* Scene);
+	void Draw(FrameManager::ViewProjectionBuffer ViewProjection);
 }

@@ -167,6 +167,20 @@ namespace DeferredPass
 	{
 		VulkanInterface::DestroySampler(ColorSampler);
 		VulkanInterface::DestroySampler(DepthSampler);
+
+		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
+		{
+			VulkanInterface::DestroyImageInterface(DeferredInputDepthImageInterface[i]);
+			VulkanInterface::DestroyImageInterface(DeferredInputColorImageInterface[i]);
+
+			VulkanInterface::DestroyUniformImage(DeferredInputDepthImage[i]);
+			VulkanInterface::DestroyUniformImage(DeferredInputColorImage[i]);
+		}
+
+		vkDestroyDescriptorSetLayout(VulkanInterface::GetDevice(), DeferredInputLayout, nullptr);
+
+		VulkanInterface::DestroyPipeline(Pipeline.Pipeline);
+		VulkanInterface::DestroyPipelineLayout(Pipeline.PipelineLayout);
 	}
 
 	void Draw()
@@ -193,8 +207,9 @@ namespace DeferredPass
 		SwapchainColorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 		SwapchainColorAttachment.imageView = VulkanInterface::GetSwapchainImageViews()[VulkanInterface::TestGetImageIndex()];
 		SwapchainColorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		SwapchainColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		SwapchainColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		SwapchainColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		SwapchainColorAttachment.clearValue = MainPassClearValues[0];
 
 		VkRenderingInfo RenderingInfo{ };
 		RenderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;

@@ -181,7 +181,7 @@ namespace LightningPass
 			DepthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
 			DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-			DepthAttachment.clearValue.depthStencil.depth = 1.0f;
+			DepthAttachment.clearValue.depthStencil = { 1.0f, 0 };
 
 			VkRenderingInfo RenderingInfo{ };
 			RenderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
