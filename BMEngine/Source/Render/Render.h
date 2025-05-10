@@ -9,6 +9,11 @@
 #include "Engine/Systems/Render/RenderResources.h"
 #include "Render/FrameManager.h"
 
+namespace DebugUi
+{
+	struct GuiData;
+}
+
 namespace Render
 {
 	struct TextureArrayInfo
@@ -90,7 +95,7 @@ namespace Render
 
 	typedef void (*OnDrawDelegate)(void);
 
-	bool Init();
+	bool Init(GLFWwindow* Window, DebugUi::GuiData* DataPtr);
 	void DeInit();
 
 	void LoadIndices(VulkanInterface::IndexBuffer* IndexBuffer, const u32* Indices, u32 IndicesCount, u64 Offset);

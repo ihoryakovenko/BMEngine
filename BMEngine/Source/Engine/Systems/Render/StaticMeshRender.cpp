@@ -261,6 +261,9 @@ namespace StaticMeshRender
 		VulkanInterface::DestroyUniformLayout(StaticMeshLightLayout);
 		VulkanInterface::DestroyUniformLayout(ShadowMapArrayLayout);
 
+		VulkanInterface::DestroyPipelineLayout(Pipeline.PipelineLayout);
+		VulkanInterface::DestroyPipeline(Pipeline.Pipeline);
+
 		VulkanInterface::DestroySampler(ShadowMapArraySampler);
 	}
 

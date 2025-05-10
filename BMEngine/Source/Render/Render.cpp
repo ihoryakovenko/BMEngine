@@ -15,17 +15,100 @@
 #include "Engine/Systems/Render/TerrainRender.h"
 #include "Engine/Systems/Render/VulkanHalper.h"
 #include "Engine/Systems/Render/DebugUi.h"
+#include "Engine/Systems/ResourceManager.h"
 
 namespace Render
 {
-	bool Init()
+	void RenderLog(VulkanInterface::LogType LogType, const char* Format, va_list Args)
 	{
+		switch (LogType)
+		{
+			case VulkanInterface::LogType::BMRVkLogType_Error:
+			{
+				std::cout << "\033[31;5mError: "; // Set red color
+				vprintf(Format, Args);
+				std::cout << "\n\033[m"; // Reset red color
+				assert(false);
+				break;
+			}
+			case VulkanInterface::LogType::BMRVkLogType_Warning:
+			{
+				std::cout << "\033[33;5mWarning: "; // Set red color
+				vprintf(Format, Args);
+				std::cout << "\n\033[m"; // Reset red color
+				break;
+			}
+			case VulkanInterface::LogType::BMRVkLogType_Info:
+			{
+				std::cout << "Info: ";
+				vprintf(Format, Args);
+				std::cout << '\n';
+				break;
+			}
+		}
+	}
+
+	bool Init(GLFWwindow* Window, DebugUi::GuiData* DataPtr)
+	{
+		VulkanInterface::VulkanInterfaceConfig RenderConfig;
+		//RenderConfig.MaxTextures = 90;
+		RenderConfig.MaxTextures = 500; // TODO: FIX!!!!
+		RenderConfig.LogHandler = RenderLog;
+
+		VulkanInterface::Init(Window, RenderConfig);
+		RenderResources::Init(MB32, MB32, 512, 256);
+		FrameManager::Init();
+
+		DeferredPass::Init();
+		MainPass::Init();
+		ResourceManager::Init();
+		LightningPass::Init();
+		TerrainRender::Init();
+		//DynamicMapSystem::Init();
+		StaticMeshRender::Init();
+		DebugUi::Init(Window, DataPtr);
+
 		return true;
 	}
 
 	void DeInit()
 	{
 		VulkanInterface::WaitDevice();
+		//DynamicMapSystem::DeInit();
+		DebugUi::DeInit();
+		TerrainRender::DeInit();
+		StaticMeshRender::DeInit();
+
+		RenderResources::DeInit();
+		MainPass::DeInit();
+		LightningPass::DeInit();
+		DeferredPass::DeInit();
+		FrameManager::DeInit();
+		VulkanInterface::DeInit();
+	}
+
+	void Draw(FrameManager::ViewProjectionBuffer ViewProjection)
+	{
+		const u32 ImageIndex = VulkanInterface::AcquireNextImageIndex();
+		FrameManager::UpdateViewProjection(&ViewProjection);
+		VulkanInterface::BeginFrame(ImageIndex);
+
+		LightningPass::Draw();
+
+		MainPass::BeginPass();
+
+		TerrainRender::Draw();
+		StaticMeshRender::Draw();
+
+		MainPass::EndPass();
+		DeferredPass::BeginPass();
+
+		DeferredPass::Draw();
+		DebugUi::Draw();
+
+		DeferredPass::EndPass();
+
+		VulkanInterface::EndFrame(ImageIndex);
 	}
 
 	void LoadIndices(VulkanInterface::IndexBuffer* IndexBuffer, const u32* Indices, u32 IndicesCount, u64 Offset)
@@ -50,29 +133,5 @@ namespace Render
 		const VkDeviceSize AlignedSize = MeshVerticesSize;
 
 		VulkanInterface::CopyDataToBuffer(VertexBuffer->Buffer, Offset, MeshVerticesSize, Vertices);
-	}
-
-	void Draw(FrameManager::ViewProjectionBuffer ViewProjection)
-	{
-		const u32 ImageIndex = VulkanInterface::AcquireNextImageIndex();
-		FrameManager::UpdateViewProjection(&ViewProjection);
-		VulkanInterface::BeginFrame(ImageIndex);
-
-		LightningPass::Draw();
-
-		MainPass::BeginPass();
-
-		TerrainRender::Draw();
-		StaticMeshRender::Draw();
-
-		MainPass::EndPass();
-		DeferredPass::BeginPass();
-
-		DeferredPass::Draw();
-		DebugUi::Draw();
-
-		DeferredPass::EndPass();
-		
-		VulkanInterface::EndFrame(ImageIndex);
 	}
 }

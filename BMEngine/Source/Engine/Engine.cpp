@@ -145,45 +145,14 @@ namespace Engine
 		const u32 FrameAllocSize = 1024 * 1024;
 		Memory::BmMemoryManagementSystem::Init(FrameAllocSize);
 
-		VulkanInterface::VulkanInterfaceConfig RenderConfig;
-		//RenderConfig.MaxTextures = 90;
-		RenderConfig.MaxTextures = 500; // TODO: FIX!!!!
-		RenderConfig.LogHandler = RenderLog;
-
-
-		 
-
-		VulkanInterface::Init(Window, RenderConfig);
-		RenderResources::Init(MB32, MB32, 512, 256);
-		FrameManager::Init();
-		Render::Init();
-		DeferredPass::Init();
-		MainPass::Init();
-		ResourceManager::Init();
-		LightningPass::Init();
-		TerrainRender::Init();
-		//DynamicMapSystem::Init();
-		StaticMeshRender::Init();
-		DebugUi::Init(Window, &GuiData);
+		Render::Init(Window, &GuiData);
 
 		return true;
 	}
 
 	void DeInit()
 	{
-		VulkanInterface::WaitDevice();
-		//DynamicMapSystem::DeInit();
-		DebugUi::DeInit();
-		TerrainRender::DeInit();
-		StaticMeshRender::DeInit();
-
-		RenderResources::DeInit();
 		Render::DeInit();
-		MainPass::DeInit();
-		LightningPass::DeInit();
-		DeferredPass::DeInit();
-		FrameManager::DeInit();
-		VulkanInterface::DeInit();
 
 		glfwDestroyWindow(Window);
 
@@ -296,35 +265,6 @@ namespace Engine
 		GuiData.CameraMercatorPosition = &CameraSphericalPosition;
 		GuiData.Zoom = &Zoom;
 		GuiData.OnTestSetDownload = DynamicMapSystem::TestSetDownload;
-	}
-
-	void RenderLog(VulkanInterface::LogType LogType, const char* Format, va_list Args)
-	{
-		switch (LogType)
-		{
-			case VulkanInterface::LogType::BMRVkLogType_Error:
-			{
-				std::cout << "\033[31;5mError: "; // Set red color
-				vprintf(Format, Args);
-				std::cout << "\n\033[m"; // Reset red color
-				assert(false);
-				break;
-			}
-			case VulkanInterface::LogType::BMRVkLogType_Warning:
-			{
-				std::cout << "\033[33;5mWarning: "; // Set red color
-				vprintf(Format, Args);
-				std::cout << "\n\033[m"; // Reset red color
-				break;
-			}
-			case VulkanInterface::LogType::BMRVkLogType_Info:
-			{
-				std::cout << "Info: ";
-				vprintf(Format, Args);
-				std::cout << '\n';
-				break;
-			}
-		}
 	}
 
 	void MoveCamera(GLFWwindow* Window, f32 DeltaTime, DynamicMapSystem::MapCamera& MainCamera)

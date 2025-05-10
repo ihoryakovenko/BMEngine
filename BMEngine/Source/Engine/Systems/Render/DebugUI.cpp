@@ -29,6 +29,7 @@
 namespace DebugUi
 {
 	static VkAllocationCallbacks* g_Allocator = nullptr;
+	VkDescriptorPool DebugUiPool;
 
 	static ImGui_ImplVulkanH_Window g_MainWindowData;
 
@@ -75,16 +76,27 @@ namespace DebugUi
 		RenderingInfo.depthAttachmentFormat = DeferredPass::GetAttachmentData()->DepthAttachmentFormat;
 		RenderingInfo.stencilAttachmentFormat = DeferredPass::GetAttachmentData()->DepthAttachmentFormat;
 
+		VkDescriptorPoolSize pool_sizes[] =
+		{
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 },
+		};
+		VkDescriptorPoolCreateInfo pool_info = { };
+		pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+		pool_info.maxSets = 1;
+		pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
+		pool_info.pPoolSizes = pool_sizes;
+		vkCreateDescriptorPool(VulkanInterface::GetDevice(), &pool_info, g_Allocator, &DebugUiPool);
+
 		ImGui_ImplVulkan_InitInfo init_info = { };
 		init_info.Instance = VulkanInterface::GetInstance();
-		//init_info.Instance = g_Instance;
 		init_info.PhysicalDevice = VulkanInterface::GetPhysicalDevice();
 		init_info.Device = VulkanInterface::GetDevice();
 		init_info.QueueFamily = VulkanInterface::GetQueueGraphicsFamilyIndex();
 		init_info.Queue = VulkanInterface::GetTransferQueue();
 		//init_info.PipelineCache = g_PipelineCache;
 		init_info.PipelineCache = nullptr;
-		init_info.DescriptorPool = VulkanInterface::GetDescriptorPool();
+		init_info.DescriptorPool = DebugUiPool;
 		init_info.RenderPass = nullptr;
 		init_info.UseDynamicRendering = true;
 		init_info.Subpass = 0;
@@ -101,6 +113,7 @@ namespace DebugUi
 	void DeInit()
 	{
 		ImGui_ImplVulkan_Shutdown();
+		vkDestroyDescriptorPool(VulkanInterface::GetDevice(), DebugUiPool, nullptr);
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();
 	}
@@ -111,13 +124,6 @@ namespace DebugUi
 		DeltaTime = CurrentTime - LastTime;
 		LastTime = CurrentTime;
 
-		//if (glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0)
-		//{
-		//	ImGui_ImplGlfw_Sleep(10);
-		//	return;
-		//}
-
-		// Start the Dear ImGui frame
 		ImGui_ImplVulkan_NewFrame();
 		ImGui_ImplVulkan_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
@@ -138,21 +144,21 @@ namespace DebugUi
 			ImGui::DragFloat3("eye", &(*Data->Eye)[0], 0.05, -100, 100);
 
 			//ImGui::DragFloat2("CameraPos", &(*Data.CameraMercatorPosition)[0], 0.01f, -1.0f, 1.0f);
-			ImGui::DragFloat("Camera latitude", &CameraLat, 1.01f, -90.0f, 90.0f);
-			ImGui::DragFloat("Camera longitude", &CameraLon, 1.01f, -180.0f, 180.0f);
-			ImGui::DragInt("Zoom", &(*Data->Zoom), 0.05f, 1.0f, 20.0f);
+			//ImGui::DragFloat("Camera latitude", &CameraLat, 1.01f, -90.0f, 90.0f);
+			//ImGui::DragFloat("Camera longitude", &CameraLon, 1.01f, -180.0f, 180.0f);
+			//ImGui::DragInt("Zoom", &(*Data->Zoom), 0.05f, 1.0f, 20.0f);
 
-			float LatRadians = glm::radians(CameraLat);
-			float MercatorLat = std::log(std::tan(glm::pi<float>() / 4.0f + LatRadians / 2.0f));
-			float NormalizedMercatorLat = MercatorLat / glm::pi<float>();
+			//float LatRadians = glm::radians(CameraLat);
+			//float MercatorLat = std::log(std::tan(glm::pi<float>() / 4.0f + LatRadians / 2.0f));
+			//float NormalizedMercatorLat = MercatorLat / glm::pi<float>();
 
-			Data->CameraMercatorPosition->x = NormalizedMercatorLat;
-			Data->CameraMercatorPosition->y = CameraLon / 180.0f;
+			//Data->CameraMercatorPosition->x = NormalizedMercatorLat;
+			//Data->CameraMercatorPosition->y = CameraLon / 180.0f;
 
-			if (ImGui::Button("Download tiles"))
-			{
-				Data->OnTestSetDownload(true);
-			}
+			//if (ImGui::Button("Download tiles"))
+			//{
+			//	Data->OnTestSetDownload(true);
+			//}
 
 
 			//ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
