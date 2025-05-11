@@ -244,8 +244,12 @@ namespace Util
 				Indices.push_back(uniqueVertices[vertex]);
 			}
 
-			const std::string* Texture = &Materials[Shape->mesh.material_ids[0]].diffuse_texname;
-			TextureHashes[i] = Hasher(*Texture);
+			char FileNameNoExt[MAX_PATH];
+			strncpy(FileNameNoExt, Materials[Shape->mesh.material_ids[0]].diffuse_texname.c_str(), sizeof(FileNameNoExt));
+			FileNameNoExt[sizeof(FileNameNoExt) - 1] = '\0';
+			PathRemoveExtensionA(FileNameNoExt);
+
+			TextureHashes[i] = Hasher(FileNameNoExt);
 			VerticesCounts[i] = Vertices.size();
 			IndicesCounts[i] = Indices.size();
 

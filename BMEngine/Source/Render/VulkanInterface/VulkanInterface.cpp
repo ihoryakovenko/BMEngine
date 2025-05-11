@@ -486,18 +486,6 @@ namespace VulkanInterface
 		CurrentFrame = (CurrentFrame + 1) % MAX_DRAW_FRAMES;
 	}
 
-	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, u32 LayersCount, void* Data, u32 Baselayer)
-	{
-		VkMemoryRequirements MemoryRequirements;
-		vkGetImageMemoryRequirements(Device.LogicalDevice, Image, &MemoryRequirements);
-
-		//CopyDataToImage(Image, Width, Height,
-		//	Format, MemoryRequirements.size / LayersCount, LayersCount, Data);
-
-		CopyDataToImage(Image, Width, Height,
-			Format, Width * Height * Format, LayersCount, Data, Baselayer);
-	}
-
 	void TransitImageLayout(VkImage Image, VkImageLayout OldLayout, VkImageLayout NewLayout,
 		VkAccessFlags SrcAccessMask, VkAccessFlags DstAccessMask,
 		VkPipelineStageFlags SrcStage, VkPipelineStageFlags DstStage,
@@ -721,30 +709,16 @@ namespace VulkanInterface
 		vkQueueWaitIdle(GraphicsQueue);
 	}
 
-	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, u32 Format, VkDeviceSize AlignedLayerSize,
-		u32 LayersCount, void* Data, u32 Baselayer)
+	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, void* Data)
 	{
-		const VkDeviceSize TotalAlignedSize = AlignedLayerSize * LayersCount;
-		assert(TotalAlignedSize <= MB256);
+		VkMemoryRequirements MemoryRequirements;
+		vkGetImageMemoryRequirements(Device.LogicalDevice, Image, &MemoryRequirements);
 
-		const VkDeviceSize ActualLayerSize = Width * Height * Format; // Should be TotalAlignedSize in ideal (assert?)
-		if (ActualLayerSize != AlignedLayerSize)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Warning, "Image memory requirement size for layer is %d, actual size is %d",
-				AlignedLayerSize, ActualLayerSize);
-		}
-
-		VkDeviceSize CopyOffset = 0;
+		assert(MemoryRequirements.size <= MB256);
 
 		void* MappedMemory;
-		vkMapMemory(Device.LogicalDevice, StagingBuffer.Memory, 0, TotalAlignedSize, 0, &MappedMemory);
-
-		for (u32 i = 0; i < LayersCount; ++i)
-		{
-			std::memcpy(static_cast<u8*>(MappedMemory) + CopyOffset, reinterpret_cast<u8**>(Data)[i], ActualLayerSize);
-			CopyOffset += AlignedLayerSize;
-		}
-
+		vkMapMemory(Device.LogicalDevice, StagingBuffer.Memory, 0, MemoryRequirements.size, 0, &MappedMemory);
+		std::memcpy(static_cast<u8*>(MappedMemory), Data, MemoryRequirements.size);
 		vkUnmapMemory(Device.LogicalDevice, StagingBuffer.Memory);
 
 		VkCommandBufferBeginInfo BeginInfo = { };
@@ -759,8 +733,8 @@ namespace VulkanInterface
 		ImageRegion.bufferImageHeight = 0;
 		ImageRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		ImageRegion.imageSubresource.mipLevel = 0;
-		ImageRegion.imageSubresource.baseArrayLayer = Baselayer;
-		ImageRegion.imageSubresource.layerCount = LayersCount;
+		ImageRegion.imageSubresource.baseArrayLayer = 0;
+		ImageRegion.imageSubresource.layerCount = 1;
 		ImageRegion.imageOffset = { 0, 0, 0 };
 		ImageRegion.imageExtent = { Width, Height, 1 };
 

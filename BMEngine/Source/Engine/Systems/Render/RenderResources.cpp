@@ -234,7 +234,7 @@ namespace RenderResources
 		ImageCreateInfo.extent.depth = 1;
 		ImageCreateInfo.mipLevels = 1;
 		ImageCreateInfo.arrayLayers = 1;
-		ImageCreateInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+		ImageCreateInfo.format = VK_FORMAT_BC7_SRGB_BLOCK;
 		ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		ImageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -256,7 +256,7 @@ namespace RenderResources
 		ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		ViewCreateInfo.flags = 0;
 		ViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		ViewCreateInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+		ViewCreateInfo.format = VK_FORMAT_BC7_SRGB_BLOCK;
 		ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 		ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 		ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -353,7 +353,7 @@ namespace RenderResources
 		vkQueueSubmit(TransferQueue, 1, &SubmitInfo, nullptr);
 		VulkanInterface::WaitDevice(); // TODO: Fix
 
-		VulkanInterface::CopyDataToImage(Image, Width, Height, 4, 1, Data); // TODO: 4 is u32 Format, fix
+		VulkanInterface::CopyDataToImage(Image, Width, Height, Data); // TODO: 4 is u32 Format, fix
 
 		vkBeginCommandBuffer(CmdBuffer, &BeginInfo);  // TODO: Fix
 		vkCmdPipelineBarrier2(CmdBuffer, &PresentationDepInfo);

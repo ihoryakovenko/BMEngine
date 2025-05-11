@@ -22,7 +22,6 @@
     <ClCompile Include="..\External\imgui\backends\imgui_impl_glfw.cpp" />
     <ClCompile Include="..\External\imgui\backends\imgui_impl_vulkan.cpp" />
     <ClCompile Include="..\External\imgui\imgui.cpp" />
-    <ClCompile Include="..\External\imgui\imgui_demo.cpp" />
     <ClCompile Include="..\External\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\External\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
@@ -47,18 +46,11 @@
     <ClCompile Include="Source\Util\Util.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\External\imgui\backends\imgui_impl_glfw.h" />
-    <ClInclude Include="..\External\imgui\backends\imgui_impl_vulkan.h" />
-    <ClInclude Include="..\External\imgui\imconfig.h" />
-    <ClInclude Include="..\External\imgui\imgui.h" />
-    <ClInclude Include="..\External\imgui\imgui_internal.h" />
-    <ClInclude Include="..\External\imgui\imstb_rectpack.h" />
-    <ClInclude Include="..\External\imgui\imstb_textedit.h" />
-    <ClInclude Include="..\External\imgui\imstb_truetype.h" />
     <ClInclude Include="Source\Engine\Engine.h" />
     <ClInclude Include="Source\Engine\Scene.h" />
     <ClInclude Include="Source\Engine\Systems\DynamicMapSystem.h" />
     <ClInclude Include="Source\Engine\Systems\Render\DebugUI.h" />
+    <ClInclude Include="Source\Util\DefaultTextureData.h" />
     <ClInclude Include="Source\Engine\Systems\Render\DeferredPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\LightningPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\MainPass.h" />

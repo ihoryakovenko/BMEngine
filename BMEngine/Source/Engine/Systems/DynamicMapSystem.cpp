@@ -20,6 +20,7 @@
 #include "Render/FrameManager.h"
 #include "Render/Render.h"
 
+#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
 namespace DynamicMapSystem
