@@ -10,6 +10,8 @@
 #include "Engine/Systems/Render/VulkanHelper.h"
 #include "Render/Render.h"
 
+#include <atomic>
+
 namespace RenderResources
 {
 	struct HandleEntry
@@ -21,7 +23,7 @@ namespace RenderResources
 
 	static u32 MaxEntities = 1024;
 	static DrawEntity* DrawEntities;
-	static u32 EntityIndex;
+	static std::atomic<u32> EntityIndex;
 
 	static VulkanInterface::IndexBuffer IndexBuffer;
 	static u64 IndexOffset;
@@ -342,26 +344,9 @@ namespace RenderResources
 			//Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateImageView result is %d", Result);
 		}
 
-		VkCommandBufferBeginInfo BeginInfo = { };
-		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-		vkBeginCommandBuffer(CmdBuffer, &BeginInfo);  // TODO: Fix
 		vkCmdPipelineBarrier2(CmdBuffer, &TransferDepInfo);
-		vkEndCommandBuffer(CmdBuffer);  // TODO: Fix
-
-		vkQueueSubmit(TransferQueue, 1, &SubmitInfo, nullptr);
-		VulkanInterface::WaitDevice(); // TODO: Fix
-
-		VulkanInterface::CopyDataToImage(Image, Width, Height, Data); // TODO: 4 is u32 Format, fix
-
-		vkBeginCommandBuffer(CmdBuffer, &BeginInfo);  // TODO: Fix
+		VulkanInterface::CopyDataToImage(Image, Width, Height, Data);
 		vkCmdPipelineBarrier2(CmdBuffer, &PresentationDepInfo);
-		vkEndCommandBuffer(CmdBuffer);  // TODO: Fix
-
-		vkQueueSubmit(TransferQueue, 1, &SubmitInfo, nullptr);
-		VulkanInterface::WaitDevice(); // TODO: Fix
-
 
 		VkDescriptorImageInfo DiffuseImageInfo = { };
 		DiffuseImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;

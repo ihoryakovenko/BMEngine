@@ -13,6 +13,8 @@
 #include "Util/DefaultTextureData.h"
 #include <gli/gli.hpp>
 
+#include <thread>
+
 namespace ResourceManager
 {
 	void Init()
@@ -36,6 +38,15 @@ namespace ResourceManager
 
 	void LoadModel(const char* FilePath)
 	{
+		//std::thread LoadThread(
+		//	[FilePath]()
+		//	{
+
+		//	}
+		//);
+
+		//LoadThread.detach();
+
 		Util::Model3DData ModelData = Util::LoadModel3DData(FilePath);
 		Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
 
@@ -59,7 +70,6 @@ namespace ResourceManager
 			ModelVertexByteOffset += VerticesCount * sizeof(StaticMeshRender::StaticMeshVertex);
 			ModelIndexCountOffset += IndicesCount;
 		}
-
 
 		Util::ClearModel3DData(ModelData);
 	}

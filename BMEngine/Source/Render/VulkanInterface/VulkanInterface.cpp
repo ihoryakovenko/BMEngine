@@ -37,6 +37,15 @@ namespace VulkanInterface
 		VkExtent2D SwapExtent = { };
 	};
 
+	struct StagingPool
+	{
+		VkBuffer Buffer;
+		VkDeviceMemory Memory;
+		VkDeviceSize Size;
+		VkDeviceSize Offset;
+		VkDeviceSize Alignment;
+	};
+
 	// INTERNAL FUNCTIONS DECLARATIONS
 	static bool CheckFormats();
 	static bool CheckDeviceSuitability(const char* DeviceExtensions[], u32 DeviceExtensionsSize,
@@ -78,24 +87,27 @@ namespace VulkanInterface
 	static BMRMainInstance Instance;
 	static BMRDevice Device;
 	static VkPhysicalDeviceProperties DeviceProperties;
-	static VkSurfaceKHR Surface = nullptr;
+	static VkSurfaceKHR Surface;
 	static VkSurfaceFormatKHR SurfaceFormat;
 	static VkExtent2D SwapExtent;
 	static VkSemaphore ImagesAvailable[MAX_DRAW_FRAMES];
 	static VkSemaphore RenderFinished[MAX_DRAW_FRAMES];
+	static VkSemaphore TransferCompleted;
 	static VkFence DrawFences[MAX_DRAW_FRAMES];
-	static VkQueue GraphicsQueue = nullptr;
-	static VkQueue PresentationQueue = nullptr;
-	static VkCommandPool GraphicsCommandPool = nullptr;
+	//static VkFence TransferFence;
+	static VkQueue GraphicsQueue;
+	static VkQueue PresentationQueue;
+	static VkCommandPool GraphicsCommandPool;
 	static BMRSwapchain SwapInstance;
-	static VkDescriptorPool MainPool = nullptr;
+	static VkDescriptorPool MainPool;
 	static VkCommandBuffer DrawCommandBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
 	static VkCommandBuffer TransferCommandBuffer;
-	static u32 CurrentFrame = 0;
-	static u32 CurrentImageIndex = 0;
+	static u32 CurrentFrame;
+	static u32 CurrentImageIndex;
+	static u64 TransferTimelineValue = 0;
 
 	// TODO: move StagingBuffer to external system
-	static VulkanInterface::UniformBuffer StagingBuffer;
+	static StagingPool TransferStagingPool;
 	
 
 	// FUNCTIONS IMPLEMENTATIONS
@@ -156,16 +168,28 @@ namespace VulkanInterface
 		MainPool = VulkanHelper::CreateDescriptorPool(Device.LogicalDevice, TotalPassPoolSizes.Data, PoolSizeCount, TotalDescriptorCount);
 		////////////////////
 
-		StagingBuffer.Buffer = VulkanHelper::CreateBuffer(Device.LogicalDevice, MB256, VulkanHelper::StagingFlag);
-		StagingBuffer.Memory = VulkanHelper::AllocateAndBindDeviceMemoryForBuffer(Device.PhysicalDevice, Device.LogicalDevice, StagingBuffer.Buffer,
+		TransferStagingPool.Buffer = VulkanHelper::CreateBuffer(Device.LogicalDevice, MB32, VulkanHelper::StagingFlag);
+		TransferStagingPool.Memory = VulkanHelper::AllocateAndBindDeviceMemoryForBuffer(Device.PhysicalDevice, Device.LogicalDevice, TransferStagingPool.Buffer,
 			VulkanHelper::HostCompatible);
+		VkMemoryRequirements MemoryRequirements;
+		vkGetBufferMemoryRequirements(Device.LogicalDevice, TransferStagingPool.Buffer, &MemoryRequirements);
+		TransferStagingPool.Alignment = MemoryRequirements.alignment;
+		TransferStagingPool.Size = MB32;
+		TransferStagingPool.Offset = 0;
+	}
+
+	u64 GetOffsetFromStagingPool(StagingPool* Pool, u64 Size)
+	{
+		u64 AlignedOffset = (Pool->Offset + Pool->Alignment - 1) & ~(Pool->Alignment - 1);
+		Pool->Offset = AlignedOffset + Size;
+		return AlignedOffset;
 	}
 
 	void DeInit()
 	{
 		vkDestroyDescriptorPool(Device.LogicalDevice, MainPool, nullptr);
-		vkDestroyBuffer(Device.LogicalDevice, StagingBuffer.Buffer, nullptr);
-		vkFreeMemory(Device.LogicalDevice, StagingBuffer.Memory, nullptr);
+		vkDestroyBuffer(Device.LogicalDevice, TransferStagingPool.Buffer, nullptr);
+		vkFreeMemory(Device.LogicalDevice, TransferStagingPool.Memory, nullptr);
 		DestroySwapchainInstance(Device.LogicalDevice, SwapInstance);
 		vkDestroyCommandPool(Device.LogicalDevice, GraphicsCommandPool, nullptr);
 		DestroySynchronisation();
@@ -409,14 +433,11 @@ namespace VulkanInterface
 
 	u32 AcquireNextImageIndex()
 	{
-		const VkFence* Fence = DrawFences + CurrentFrame;
-		const VkSemaphore ImageAvailable = ImagesAvailable[CurrentFrame];
-
-		vkWaitForFences(Device.LogicalDevice, 1, Fence, VK_TRUE, UINT64_MAX);
-		vkResetFences(Device.LogicalDevice, 1, Fence);
+		vkWaitForFences(Device.LogicalDevice, 1, &DrawFences[CurrentFrame], VK_TRUE, UINT64_MAX);
+		vkResetFences(Device.LogicalDevice, 1, &DrawFences[CurrentFrame]);
 
 		vkAcquireNextImageKHR(Device.LogicalDevice, SwapInstance.VulkanSwapchain, UINT64_MAX,
-			ImageAvailable, nullptr, &CurrentImageIndex);
+			ImagesAvailable[CurrentFrame], nullptr, &CurrentImageIndex);
 
 		return CurrentImageIndex;
 	}
@@ -449,18 +470,38 @@ namespace VulkanInterface
 			Util::RenderLog(Util::BMRVkLogType_Error, "vkBeginCommandBuffer result is %d", Result);
 		}
 
-		VkPipelineStageFlags WaitStages[] = {
-			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+		uint64_t WaitValues[] = {
+			0,
+			TransferTimelineValue
 		};
+
+		VkSemaphore WaitSemaphores[] = {
+			ImagesAvailable[CurrentFrame],
+			TransferCompleted
+		};
+
+		VkPipelineStageFlags WaitStages[] = {
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT
+		};
+
+		// Timeline info
+		VkTimelineSemaphoreSubmitInfo TimelineInfo = { };
+		TimelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+		TimelineInfo.pWaitSemaphoreValues = WaitValues;
+		TimelineInfo.waitSemaphoreValueCount = 2;
+		TimelineInfo.signalSemaphoreValueCount = 0;
+		TimelineInfo.pSignalSemaphoreValues = nullptr;
 
 		VkSubmitInfo SubmitInfo = { };
 		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.waitSemaphoreCount = 1;
+		SubmitInfo.pNext = &TimelineInfo;
+		SubmitInfo.waitSemaphoreCount = 2;
+		SubmitInfo.pWaitSemaphores = WaitSemaphores;
 		SubmitInfo.pWaitDstStageMask = WaitStages;
 		SubmitInfo.commandBufferCount = 1;
+		SubmitInfo.pCommandBuffers = &DrawCommandBuffers[CurrentImageIndex];
 		SubmitInfo.signalSemaphoreCount = 1;
-		SubmitInfo.pWaitSemaphores = ImagesAvailable + CurrentFrame;
-		SubmitInfo.pCommandBuffers = DrawCommandBuffers + CurrentImageIndex;
 		SubmitInfo.pSignalSemaphores = &RenderFinished[CurrentFrame];
 
 		Result = vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, DrawFences[CurrentFrame]);
@@ -486,58 +527,44 @@ namespace VulkanInterface
 		CurrentFrame = (CurrentFrame + 1) % MAX_DRAW_FRAMES;
 	}
 
-	void TransitImageLayout(VkImage Image, VkImageLayout OldLayout, VkImageLayout NewLayout,
-		VkAccessFlags SrcAccessMask, VkAccessFlags DstAccessMask,
-		VkPipelineStageFlags SrcStage, VkPipelineStageFlags DstStage,
-		LayoutLayerTransitionData* LayerData, u32 LayerDataCount)
+	void BeginTransfer()
 	{
-		// TODO: Create system for commandBuffers and Barriers?
-		auto Barriers = Memory::MemoryManagementSystem::FrameAlloc<VkImageMemoryBarrier>(LayerDataCount);
+		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
+		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-		for (u32 i = 0; i < LayerDataCount; ++i)
+		VkResult Result = vkBeginCommandBuffer(TransferCommandBuffer, &CommandBufferBeginInfo);
+		if (Result != VK_SUCCESS)
 		{
-			VkImageMemoryBarrier* Barrier = Barriers + i;
-			*Barrier = { };
-			Barrier->sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-			Barrier->oldLayout = OldLayout;									// Layout to transition from
-			Barrier->newLayout = NewLayout;									// Layout to transition to
-			Barrier->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition from
-			Barrier->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;			// Queue family to transition to
-			Barrier->image = Image;											// Image being accessed and modified as part of barrier
-			Barrier->subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;	// Aspect of image being altered
-			Barrier->subresourceRange.baseMipLevel = 0;						// First mip level to start alterations on
-			Barrier->subresourceRange.levelCount = 1;							// Number of mip levels to alter starting from baseMipLevel
-			Barrier->subresourceRange.baseArrayLayer = LayerData[i].BaseArrayLayer;
-			Barrier->subresourceRange.layerCount = LayerData[i].LayerCount;
-			Barrier->srcAccessMask = SrcAccessMask;								// Memory access stage transition must after...
-			Barrier->dstAccessMask = DstAccessMask;		// Memory access stage transition must before...
+			Util::RenderLog(Util::BMRVkLogType_Error, "vkBeginCommandBuffer result is %d", Result);
 		}
+	}
 
+	void EndTransfer()
+	{
+		TransferTimelineValue++;
 
-		VkCommandBufferBeginInfo BeginInfo = { };
-		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		VkTimelineSemaphoreSubmitInfo TimelineInfo = { };
+		TimelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+		TimelineInfo.waitSemaphoreValueCount = 0;
+		TimelineInfo.signalSemaphoreValueCount = 1;
+		TimelineInfo.pSignalSemaphoreValues = &TransferTimelineValue;
+
 
 		VkSubmitInfo SubmitInfo = { };
 		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		SubmitInfo.commandBufferCount = 1;
 		SubmitInfo.pCommandBuffers = &TransferCommandBuffer;
+		SubmitInfo.signalSemaphoreCount = 1;
+		SubmitInfo.pSignalSemaphores = &TransferCompleted;
+		SubmitInfo.pNext = &TimelineInfo;
 
-		vkBeginCommandBuffer(TransferCommandBuffer, &BeginInfo);
+		VkResult Result = vkEndCommandBuffer(TransferCommandBuffer);
+		if (Result != VK_SUCCESS)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Error, "vkBeginCommandBuffer result is %d", Result);
+		}
 
-		vkCmdPipelineBarrier(
-			TransferCommandBuffer,
-			SrcStage, DstStage,		// Pipeline stages (match to src and dst AccessMasks)
-			0,						// Dependency flags
-			0, nullptr,				// Memory Barrier count + data
-			0, nullptr,				// Buffer Memory Barrier count + data
-			LayerDataCount, Barriers	// Image Memory Barrier count + data
-		);
-
-		vkEndCommandBuffer(TransferCommandBuffer);
-
-		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
-		vkQueueWaitIdle(GraphicsQueue);
+		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, nullptr);
 	}
 
 	void WaitDevice()
@@ -676,37 +703,19 @@ namespace VulkanInterface
 		vkUpdateDescriptorSets(Device.LogicalDevice, BufferCount, SetWrites, 0, nullptr);
 	}
 
-	void CopyDataToBuffer(VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Size, const void* Data)
+	void CopyDataToBuffer(VkBuffer Buffer, VkDeviceSize DstOffset, VkDeviceSize Size, const void* Data)
 	{
 		assert(Size <= MB64);
 
-		void* MappedMemory;
-		vkMapMemory(Device.LogicalDevice, StagingBuffer.Memory, 0, Size, 0, &MappedMemory);
-		std::memcpy(MappedMemory, Data, Size);
-		vkUnmapMemory(Device.LogicalDevice, StagingBuffer.Memory);
-
-		VkCommandBufferBeginInfo BeginInfo = { };
-		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		// We're only using the command buffer once, so set up for one time submit
-		BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-		vkBeginCommandBuffer(TransferCommandBuffer, &BeginInfo);
+		const u64 TransferOffset = GetOffsetFromStagingPool(&TransferStagingPool, Size);
 
 		VkBufferCopy BufferCopyRegion = { };
-		BufferCopyRegion.srcOffset = 0;
-		BufferCopyRegion.dstOffset = Offset;
+		BufferCopyRegion.srcOffset = TransferOffset;
+		BufferCopyRegion.dstOffset = DstOffset;
 		BufferCopyRegion.size = Size;
 
-		vkCmdCopyBuffer(TransferCommandBuffer, StagingBuffer.Buffer, Buffer, 1, &BufferCopyRegion);
-		vkEndCommandBuffer(TransferCommandBuffer);
-
-		VkSubmitInfo SubmitInfo = { };
-		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.commandBufferCount = 1;
-		SubmitInfo.pCommandBuffers = &TransferCommandBuffer;
-
-		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
-		vkQueueWaitIdle(GraphicsQueue);
+		VulkanHelper::UpdateHostCompatibleBufferMemory(Device.LogicalDevice, TransferStagingPool.Memory, Size, TransferOffset, Data);
+		vkCmdCopyBuffer(TransferCommandBuffer, TransferStagingPool.Buffer, Buffer, 1, &BufferCopyRegion);
 	}
 
 	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, void* Data)
@@ -716,19 +725,10 @@ namespace VulkanInterface
 
 		assert(MemoryRequirements.size <= MB256);
 
-		void* MappedMemory;
-		vkMapMemory(Device.LogicalDevice, StagingBuffer.Memory, 0, MemoryRequirements.size, 0, &MappedMemory);
-		std::memcpy(static_cast<u8*>(MappedMemory), Data, MemoryRequirements.size);
-		vkUnmapMemory(Device.LogicalDevice, StagingBuffer.Memory);
-
-		VkCommandBufferBeginInfo BeginInfo = { };
-		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-		vkBeginCommandBuffer(TransferCommandBuffer, &BeginInfo);
+		const u64 TransferOffset = GetOffsetFromStagingPool(&TransferStagingPool, MemoryRequirements.size);
 
 		VkBufferImageCopy ImageRegion = { };
-		ImageRegion.bufferOffset = 0;
+		ImageRegion.bufferOffset = TransferOffset;
 		ImageRegion.bufferRowLength = 0;
 		ImageRegion.bufferImageHeight = 0;
 		ImageRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -738,18 +738,8 @@ namespace VulkanInterface
 		ImageRegion.imageOffset = { 0, 0, 0 };
 		ImageRegion.imageExtent = { Width, Height, 1 };
 
-		// Todo copy multiple regions at once?
-		vkCmdCopyBufferToImage(TransferCommandBuffer, StagingBuffer.Buffer, Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ImageRegion);
-
-		vkEndCommandBuffer(TransferCommandBuffer);
-
-		VkSubmitInfo SubmitInfo = { };
-		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.commandBufferCount = 1;
-		SubmitInfo.pCommandBuffers = &TransferCommandBuffer;
-
-		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
-		vkQueueWaitIdle(GraphicsQueue);
+		VulkanHelper::UpdateHostCompatibleBufferMemory(Device.LogicalDevice, TransferStagingPool.Memory, MemoryRequirements.size, TransferOffset, Data);
+		vkCmdCopyBufferToImage(TransferCommandBuffer, TransferStagingPool.Buffer, Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ImageRegion);
 	}
 
 	bool CreateMainInstance()
@@ -973,10 +963,12 @@ namespace VulkanInterface
 			++FamilyIndicesSize;
 		}
 
-		VkPhysicalDeviceFeatures DeviceFeatures = { };
-		DeviceFeatures.fillModeNonSolid = VK_TRUE; // Todo: get from configs
-		DeviceFeatures.samplerAnisotropy = VK_TRUE; // Todo: get from configs
-		DeviceFeatures.multiViewport = VK_TRUE; // Todo: get from configs
+		// TODO: Check if supported
+		VkPhysicalDeviceFeatures2 DeviceFeatures2 = { };
+		DeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+		DeviceFeatures2.features.fillModeNonSolid = VK_TRUE; // Todo: get from configs
+		DeviceFeatures2.features.samplerAnisotropy = VK_TRUE; // Todo: get from configs
+		DeviceFeatures2.features.multiViewport = VK_TRUE; // Todo: get from configs
 
 		// TODO: Check if supported
 		VkPhysicalDeviceDynamicRenderingFeatures DynamicRenderingFeatures = { };
@@ -996,8 +988,18 @@ namespace VulkanInterface
 		IndexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
 		IndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
 
-		Sync2Features.pNext = &IndexingFeatures;
-		DynamicRenderingFeatures.pNext = &Sync2Features;
+		VkPhysicalDeviceTimelineSemaphoreFeatures TimelineSemaphoreFeatures = { };
+		TimelineSemaphoreFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
+		TimelineSemaphoreFeatures.timelineSemaphore = VK_TRUE;
+
+		VkPhysicalDeviceFeatures DeviceFeatures = { };
+		DeviceFeatures.samplerAnisotropy = VK_TRUE;
+
+		DeviceFeatures2.pNext = &TimelineSemaphoreFeatures;
+		TimelineSemaphoreFeatures.pNext = &IndexingFeatures;
+		IndexingFeatures.pNext = &Sync2Features;
+		Sync2Features.pNext = &DynamicRenderingFeatures;
+
 
 		VkDeviceCreateInfo DeviceCreateInfo = { };
 		DeviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -1005,8 +1007,8 @@ namespace VulkanInterface
 		DeviceCreateInfo.pQueueCreateInfos = QueueCreateInfos;
 		DeviceCreateInfo.enabledExtensionCount = DeviceExtensionsSize;
 		DeviceCreateInfo.ppEnabledExtensionNames = DeviceExtensions;
-		DeviceCreateInfo.pEnabledFeatures = &DeviceFeatures;
-		DeviceCreateInfo.pNext = &DynamicRenderingFeatures;
+		DeviceCreateInfo.pEnabledFeatures = nullptr;
+		DeviceCreateInfo.pNext = &DeviceFeatures2;
 
 		VkDevice LogicalDevice;
 		// Queues are created at the same time as the Device
@@ -1038,6 +1040,28 @@ namespace VulkanInterface
 				assert(false);
 			}
 		}
+
+		VkSemaphoreTypeCreateInfo TypeInfo = { };
+		TypeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+		TypeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+		TypeInfo.initialValue = 0;
+
+
+		VkSemaphoreCreateInfo TimeLineSemaphoreInfo = { };
+		TimeLineSemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+		TimeLineSemaphoreInfo.pNext = &TypeInfo;
+
+		if (vkCreateSemaphore(Device.LogicalDevice, &TimeLineSemaphoreInfo, nullptr, &TransferCompleted) != VK_SUCCESS)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Error, "TransferCompleted creation error");
+			assert(false);
+		}
+
+		//if (vkCreateFence(Device.LogicalDevice, &FenceCreateInfo, nullptr, &TransferFence) != VK_SUCCESS)
+		//{
+		//	Util::RenderLog(Util::BMRVkLogType_Error, "TransferFences creation error");
+		//	assert(false);
+		//}
 	}
 
 	void DestroySynchronisation()
@@ -1048,6 +1072,9 @@ namespace VulkanInterface
 			vkDestroySemaphore(Device.LogicalDevice, ImagesAvailable[i], nullptr);
 			vkDestroyFence(Device.LogicalDevice, DrawFences[i], nullptr);
 		}
+		
+		//vkDestroyFence(Device.LogicalDevice, TransferFence, nullptr);
+		vkDestroySemaphore(Device.LogicalDevice, TransferCompleted, nullptr);
 	}
 
 	bool SetupQueues()

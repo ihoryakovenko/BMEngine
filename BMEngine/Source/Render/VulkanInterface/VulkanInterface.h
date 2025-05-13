@@ -140,6 +140,9 @@ namespace VulkanInterface
 	VkCommandBuffer BeginFrame();
 	void EndFrame();
 
+	void BeginTransfer();
+	void EndTransfer();
+
 	VkDescriptorSetLayout CreateUniformLayout(const VkDescriptorType* Types, const VkShaderStageFlags* Stages,
 		const VkDescriptorBindingFlags* BindingFlags, u32 BindingCount, u32 DescriptorCount);
 	void CreateUniformSets(const VkDescriptorSetLayout* Layouts, u32 Count, VkDescriptorSet* OutSets);
@@ -151,11 +154,6 @@ namespace VulkanInterface
 	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, void* Data);
 
 	void AttachUniformsToSet(VkDescriptorSet Set, const UniformSetAttachmentInfo* Infos, u32 BufferCount);
-
-	void TransitImageLayout(VkImage Image, VkImageLayout OldLayout, VkImageLayout NewLayout,
-		VkAccessFlags SrcAccessMask, VkAccessFlags DstAccessMask,
-		VkPipelineStageFlags SrcStage, VkPipelineStageFlags DstStage,
-		LayoutLayerTransitionData* LayerData, u32 LayerDataCount);
 
 	void WaitDevice();
 

@@ -33,7 +33,7 @@ namespace Render
 		MainPass::Init();
 		LightningPass::Init();
 
-		TerrainRender::Init();
+		//TerrainRender::Init();
 		//DynamicMapSystem::Init();
 		StaticMeshRender::Init();
 		DebugUi::Init(Window, DataPtr);
@@ -46,7 +46,7 @@ namespace Render
 		VulkanInterface::WaitDevice();
 		//DynamicMapSystem::DeInit();
 		DebugUi::DeInit();
-		TerrainRender::DeInit();
+		//TerrainRender::DeInit();
 		StaticMeshRender::DeInit();
 
 		RenderResources::DeInit();
@@ -69,7 +69,7 @@ namespace Render
 
 		MainPass::BeginPass();
 
-		TerrainRender::Draw();
+		//TerrainRender::Draw();
 		StaticMeshRender::Draw();
 
 		MainPass::EndPass();

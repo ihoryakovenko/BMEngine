@@ -149,10 +149,12 @@ namespace Engine
 		Memory::MemoryManagementSystem::Init(FrameAllocSize);
 
 		Render::Init(Window, &GuiData);
-
+		
+		VulkanInterface::BeginTransfer();
 		ResourceManager::Init();
 		ResourceManager::LoadTextures(".\\Resources\\Textures");
 		ResourceManager::LoadModel(".\\Resources\\Models\\uh60.model");
+		VulkanInterface::EndTransfer();
 
 		//{
 		//	glm::vec3 CubePos(0.0f, -5.0f, 0.0f);
