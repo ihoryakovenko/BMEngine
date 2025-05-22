@@ -7,20 +7,13 @@
 #include "Util/EngineTypes.h"
 
 #include "Render/VulkanInterface/VulkanInterface.h"
+#include "Engine/Systems/Render/StaticMeshRender.h"
 
 namespace RenderResources
 {
-	struct ResourceHandle
-	{
-		u32 Index;
-		u32 Generation;
-	};
-
 	struct DrawEntity
 	{
-		u64 VertexOffset;
-		u64 IndexOffset;
-		u32 IndicesCount;
+		u64 StaticMeshIndex;
 		u32 MaterialIndex;
 		glm::mat4 Model;
 	};
@@ -35,13 +28,10 @@ namespace RenderResources
 	void Init(u64 VertexBufferSize, u64 IndexBufferSize, u32 MaxEntities, u32 MaxTextures);
 	void DeInit();
 
-	u32 CreateEntity(void* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, u32 MaterialIndex);
 	DrawEntity CreateTerrain(void* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, u32 Material);
 	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height);
 	u32 CreateMaterial(Material* Mat);
 
-	VulkanInterface::VertexBuffer GetVertexBuffer();
-	VulkanInterface::IndexBuffer GetIndexBuffer();
 	DrawEntity* GetEntities(u32* Count);	
 	u32 GetTexture2DSRGBIndex(u64 Hash);
 	VkDescriptorSetLayout GetBindlesTexturesLayout();

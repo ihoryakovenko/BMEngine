@@ -2,7 +2,7 @@
 
 #include <random>
 
-#include "Render/Render.h"
+#include "Engine/Systems/Render/Render.h"
 #include "Render/FrameManager.h"
 #include "MainPass.h"
 #include "Engine/Systems/ResourceManager.h"
@@ -128,16 +128,16 @@ namespace TerrainRender
 		const VkShaderStageFlags Flags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 		vkCmdPushConstants(CmdBuffer, Pipeline.PipelineLayout, Flags, 0, sizeof(PushConstantsData), &Constants);
 
-		VkBuffer VertexBuffer = RenderResources::GetVertexBuffer().Buffer;
-		VkBuffer IndexBuffer = RenderResources::GetIndexBuffer().Buffer;
+		//VkBuffer VertexBuffer = RenderResources::GetVertexBuffer().Buffer;
+		//VkBuffer IndexBuffer = RenderResources::GetIndexBuffer().Buffer;
 
-		u32 Count;
-		const u64 VertexOffset = TerrainDrawObject.VertexOffset;
-		const u64 IndexOffset = TerrainDrawObject.IndexOffset;
+		//u32 Count;
+		//const u64 VertexOffset = TerrainDrawObject.VertexOffset;
+		//const u64 IndexOffset = TerrainDrawObject.IndexOffset;
 
-		vkCmdBindVertexBuffers(CmdBuffer, 0, 1, &VertexBuffer, &VertexOffset);
-		vkCmdBindIndexBuffer(CmdBuffer, IndexBuffer, IndexOffset, VK_INDEX_TYPE_UINT32);
-		vkCmdDrawIndexed(CmdBuffer, IndicesCount, 1, 0, 0, 0);
+		//vkCmdBindVertexBuffers(CmdBuffer, 0, 1, &VertexBuffer, &VertexOffset);
+		//vkCmdBindIndexBuffer(CmdBuffer, IndexBuffer, IndexOffset, VK_INDEX_TYPE_UINT32);
+		//vkCmdDrawIndexed(CmdBuffer, IndicesCount, 1, 0, 0, 0);
 	}
 
 	void LoadTerrain()

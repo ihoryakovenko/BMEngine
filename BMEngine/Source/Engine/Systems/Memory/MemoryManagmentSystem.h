@@ -152,13 +152,15 @@ namespace Memory
 	template <typename T>
 	static void FreeArray(DynamicArray<T>* Array)
 	{
+		assert(Array->Capacity != 0);
+
 		MemoryManagementSystem::Free(Array->Data);
 		Array->Capacity = 0;
 		Array->Count = 0;
 	}
 
 	template <typename T>
-	static DynamicArray<T> ClearArray(DynamicArray<T>* Array)
+	static void ClearArray(DynamicArray<T>* Array)
 	{
 		Array->Count = 0;
 	}
@@ -166,6 +168,8 @@ namespace Memory
 	template <typename T>
 	static void ArrayIncreaseCapacity(DynamicArray<T>* Array)
 	{
+		assert(Array->Capacity != 0);
+
 		const u64 NewCapacity = Array->Capacity + Array->Capacity / 2;
 		T* newData = static_cast<T*>(realloc(Array->Data, NewCapacity * sizeof(T)));
 		Array->Data = newData;
@@ -175,10 +179,25 @@ namespace Memory
 	template <typename T>
 	static void PushBackToArray(DynamicArray<T>* Array, T* NewElement)
 	{
+		assert(Array->Capacity != 0);
+
 		if (Array->Capacity <= Array->Count)
 		{
 			ArrayIncreaseCapacity(Array);
 		}
 		Array->Data[Array->Count++] = *NewElement;
+	}
+
+	template <typename T>
+	static T* ArrayGetNew(DynamicArray<T>* Array)
+	{
+		assert(Array->Capacity != 0);
+
+		if (Array->Capacity <= Array->Count)
+		{
+			ArrayIncreaseCapacity(Array);
+		}
+
+		return &Array->Data[Array->Count++];
 	}
 }

@@ -18,7 +18,7 @@
 #include "Util/Settings.h"
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 #include "Render/FrameManager.h"
-#include "Render/Render.h"
+#include "Engine/Systems/Render/Render.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -215,7 +215,7 @@ namespace DynamicMapSystem
 			}
 
 			TestIndicesCount = Indices.size();
-			Render::LoadIndices(&IndexBuffer, Indices.data(), Indices.size(), 0);
+			//Render::LoadIndices(&IndexBuffer, Indices.data(), Indices.size(), 0);
 			MapTileSettings.VertexTilesPerAxis = VertexTilesPerAxis;
 		}
 
@@ -320,13 +320,13 @@ namespace DynamicMapSystem
 				int width, height, channels;
 				unsigned char* image = stbi_load_from_memory(data, TileDataCompressed.Data.size(), &width, &height, &channels, 4);
 
-				Render::TextureArrayInfo Info;
-				Info.Width = TextureTileSize;
-				Info.Height = TextureTileSize;
-				Info.Format = 4;
-				Info.LayersCount = 1;
-				Info.BaseArrayLayer = TileDataCompressed.ArrayLayer;
-				Info.Data = &image;
+				//Render::TextureArrayInfo Info;
+				//Info.Width = TextureTileSize;
+				//Info.Height = TextureTileSize;
+				//Info.Format = 4;
+				//Info.LayersCount = 1;
+				//Info.BaseArrayLayer = TileDataCompressed.ArrayLayer;
+				//Info.Data = &image;
 
 				//Render::UpdateTexture(Texture, &Info);
 

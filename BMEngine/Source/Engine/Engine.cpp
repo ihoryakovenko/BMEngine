@@ -13,21 +13,14 @@
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 #include "Util/Settings.h"
-#include "Render/Render.h"
+#include "Engine/Systems/Render/Render.h"
 #include "Util/Util.h"
 #include "Systems/DynamicMapSystem.h"
 #include "Systems/ResourceManager.h"
 #include "Scene.h"
 #include "Util/Math.h"
 #include "Render/FrameManager.h"
-#include "Systems/Render/TerrainRender.h"
-#include "Engine/Systems/Render/StaticMeshRender.h"
-#include "Engine/Systems/Render/RenderResources.h"
-#include "Systems/Render/LightningPass.h"
-#include "Systems/Render/MainPass.h"
-#include "Systems/Render/DeferredPass.h"
-#include "Systems/Render/DebugUI.h"
-#include "Systems/Render/StaticMeshRender.h"
+#include "Engine/Systems/Render/DebugUI.h"
 
 namespace std
 {
@@ -107,7 +100,7 @@ namespace Engine
 			LastTime = CurrentTime;
 
 			Update(DeltaTime);
-			Render::Draw(ViewProjection);
+			Render::Draw(&ViewProjection);
 
 			Memory::MemoryManagementSystem::FrameFree();
 		}
@@ -149,12 +142,16 @@ namespace Engine
 		Memory::MemoryManagementSystem::Init(FrameAllocSize);
 
 		Render::Init(Window, &GuiData);
+
 		
-		VulkanInterface::BeginTransfer();
 		ResourceManager::Init();
 		ResourceManager::LoadTextures(".\\Resources\\Textures");
+
+		VulkanInterface::WaitDevice();
+
 		ResourceManager::LoadModel(".\\Resources\\Models\\uh60.model");
-		VulkanInterface::EndTransfer();
+		
+		
 
 		//{
 		//	glm::vec3 CubePos(0.0f, -5.0f, 0.0f);
@@ -212,6 +209,8 @@ namespace Engine
 
 	void DeInit()
 	{
+
+
 		Render::DeInit();
 
 		glfwDestroyWindow(Window);

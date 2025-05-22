@@ -32,6 +32,7 @@
     <ClCompile Include="Source\Engine\Systems\Render\DeferredPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\LightningPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\MainPass.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
     <ClCompile Include="Source\Engine\Systems\ResourceManager.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\StaticMeshRender.cpp" />
@@ -39,9 +40,9 @@
     <ClCompile Include="Source\Render\FrameManager.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderResources.cpp" />
     <ClCompile Include="Source\Render\VulkanInterface\VulkanInterface.cpp" />
-    <ClCompile Include="Source\Render\Render.cpp" />
     <ClCompile Include="Source\ImguiIntegration.cpp" />
     <ClCompile Include="Source\main.cpp" />
+    <ClCompile Include="Source\Util\SavedCode.cpp" />
     <ClCompile Include="Source\Util\Settings.cpp" />
     <ClCompile Include="Source\Util\Util.cpp" />
   </ItemGroup>
@@ -64,7 +65,7 @@
     <ClInclude Include="Source\Util\Math.h" />
     <ClInclude Include="Source\Util\Settings.h" />
     <ClInclude Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.h" />
-    <ClInclude Include="Source\Render\Render.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\Render.h" />
     <ClInclude Include="Source\Util\EngineTypes.h" />
     <ClInclude Include="Source\Util\stb_image.h" />
     <ClInclude Include="Source\Util\Util.h" />

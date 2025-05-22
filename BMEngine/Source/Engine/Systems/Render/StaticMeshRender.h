@@ -7,7 +7,6 @@
 #include <glm/glm.hpp>
 
 #include <vector>
-#include "Render/Render.h"
 
 namespace StaticMeshRender
 {

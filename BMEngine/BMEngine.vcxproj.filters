@@ -15,7 +15,6 @@
     <ClCompile Include="..\External\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\External\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
-    <ClCompile Include="Source\Render\Render.cpp" />
     <ClCompile Include="Source\ImguiIntegration.cpp" />
     <ClCompile Include="Source\Util\Settings.cpp" />
     <ClCompile Include="Source\Render\VulkanInterface\VulkanInterface.cpp" />
@@ -32,13 +31,15 @@
     <ClCompile Include="Source\Engine\Systems\Render\DeferredPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\DebugUI.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
+    <ClCompile Include="Source\Util\SavedCode.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
     <ClInclude Include="Source\Util\stb_image.h" />
     <ClInclude Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.h" />
     <ClInclude Include="Source\Util\EngineTypes.h" />
-    <ClInclude Include="Source\Render\Render.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\Render.h" />
     <ClInclude Include="Source\Util\Settings.h" />
     <ClInclude Include="Source\Render\VulkanInterface\VulkanInterface.h" />
     <ClInclude Include="Source\Engine\Engine.h" />

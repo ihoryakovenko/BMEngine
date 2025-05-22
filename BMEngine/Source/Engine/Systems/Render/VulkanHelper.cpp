@@ -109,7 +109,7 @@ namespace VulkanHelper
 	}
 
 	VkDeviceMemory AllocateDeviceMemoryForBuffer(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer,
-		MemoryPropertyFlag Properties)
+		MemoryPropertyFlag Properties, u64* OutAlignment, u64* OutSize)
 	{
 		VkMemoryRequirements MemoryRequirements;
 		vkGetBufferMemoryRequirements(Device, Buffer, &MemoryRequirements);
@@ -124,6 +124,9 @@ namespace VulkanHelper
 		VkDeviceMemory Memory;
 		VkResult Result = vkAllocateMemory(Device, &MemoryAllocInfo, nullptr, &Memory);
 		assert(Result == VK_SUCCESS);
+
+		*OutAlignment = MemoryRequirements.alignment;
+		*OutSize = MemoryRequirements.size;
 
 		return Memory;
 	}
@@ -147,13 +150,6 @@ namespace VulkanHelper
 			Util::RenderLog(Util::BMRVkLogType_Error, "vkAllocateMemory result is %d", Result);
 		}
 
-		return Memory;
-	}
-
-	VkDeviceMemory VulkanHelper::AllocateAndBindDeviceMemoryForBuffer(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer, MemoryPropertyFlag Properties)
-	{
-		VkDeviceMemory Memory = AllocateDeviceMemoryForBuffer(PhysicalDevice, Device, Buffer, Properties);
-		vkBindBufferMemory(Device, Buffer, Memory, 0);
 		return Memory;
 	}
 
@@ -278,40 +274,51 @@ namespace VulkanHelper
 		return Data;
 	}
 
-	// TODO check function
-	// In current realization if GraphicsFamily is valid but if PresentationFamily is not valid
-	// GraphicsFamily could be overridden on next iteration even when it is valid
 	BMRPhysicalDeviceIndices GetPhysicalDeviceIndices(VkQueueFamilyProperties* Properties, u32 PropertiesCount,
 		VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
 	{
 		BMRPhysicalDeviceIndices Indices;
 		Indices.GraphicsFamily = -1;
 		Indices.PresentationFamily = -1;
+		Indices.TransferFamily = -1;
 
 		for (u32 i = 0; i < PropertiesCount; ++i)
 		{
-			// check if Queue is graphics type
-			if (Properties[i].queueCount > 0 && Properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			const auto& prop = Properties[i];
+
+			// Select graphics queue (only if not already selected)
+			if (Indices.GraphicsFamily == -1 &&
+				prop.queueCount > 0 &&
+				(prop.queueFlags & VK_QUEUE_GRAPHICS_BIT))
 			{
-				// if we QueueFamily[i] graphics type but not presentation type
-				// and QueueFamily[i + 1] graphics type and presentation type
-				// then we rewrite GraphicsFamily
-				// toto check what is better rewrite or have different QueueFamilies
 				Indices.GraphicsFamily = i;
 			}
 
-			// check if Queue is presentation type (can be graphics and presentation)
-			VkBool32 PresentationSupport = false;
-			vkGetPhysicalDeviceSurfaceSupportKHR(PhysicalDevice, i, Surface, &PresentationSupport);
-			if (Properties[i].queueCount > 0 && PresentationSupport)
+			// Select presentation queue (only if not already selected)
+			if (Indices.PresentationFamily == -1 && prop.queueCount > 0)
 			{
-				Indices.PresentationFamily = i;
+				VkBool32 presentationSupported = VK_FALSE;
+				vkGetPhysicalDeviceSurfaceSupportKHR(PhysicalDevice, i, Surface, &presentationSupported);
+				if (presentationSupported)
+				{
+					Indices.PresentationFamily = i;
+				}
 			}
 
-			if (Indices.GraphicsFamily >= 0 && Indices.PresentationFamily >= 0)
+			// Prefer a dedicated transfer queue
+			if (prop.queueCount > 0 &&
+				(prop.queueFlags & VK_QUEUE_TRANSFER_BIT) &&
+				!(prop.queueFlags & VK_QUEUE_GRAPHICS_BIT) &&  // Prefer not to overlap with graphics
+				Indices.TransferFamily == -1)
 			{
-				break;
+				Indices.TransferFamily = i;
 			}
+		}
+
+		// If no dedicated transfer queue, fall back to graphics queue
+		if (Indices.TransferFamily == -1)
+		{
+			Indices.TransferFamily = Indices.GraphicsFamily;
 		}
 
 		return Indices;
@@ -685,23 +692,6 @@ namespace VulkanHelper
 		}
 
 		return true;
-	}
-
-	VkCommandPool CreateCommandPool(VkDevice Device, u32 FamilyIndex)
-	{
-		VkCommandPoolCreateInfo PoolInfo = { };
-		PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-		PoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		PoolInfo.queueFamilyIndex = FamilyIndex;
-
-		VkCommandPool CommandPool;
-		VkResult Result = vkCreateCommandPool(Device, &PoolInfo, nullptr, &CommandPool);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateCommandPool result is %d", Result);
-		}
-
-		return CommandPool;
 	}
 
 	VkShaderModule CreateShader(VkDevice Device, const u32* Code, u32 CodeSize)

@@ -12,6 +12,9 @@
 
 #include "Util/Util.h"
 
+
+#include "Engine/Systems/Render/Render.h"
+
 namespace VulkanInterface
 {
 	// TYPES DECLARATION
@@ -35,15 +38,6 @@ namespace VulkanInterface
 		VkImageView ImageViews[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkImage Images[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkExtent2D SwapExtent = { };
-	};
-
-	struct StagingPool
-	{
-		VkBuffer Buffer;
-		VkDeviceMemory Memory;
-		VkDeviceSize Size;
-		VkDeviceSize Offset;
-		VkDeviceSize Alignment;
 	};
 
 	// INTERNAL FUNCTIONS DECLARATIONS
@@ -92,23 +86,18 @@ namespace VulkanInterface
 	static VkExtent2D SwapExtent;
 	static VkSemaphore ImagesAvailable[MAX_DRAW_FRAMES];
 	static VkSemaphore RenderFinished[MAX_DRAW_FRAMES];
-	static VkSemaphore TransferCompleted;
 	static VkFence DrawFences[MAX_DRAW_FRAMES];
-	//static VkFence TransferFence;
 	static VkQueue GraphicsQueue;
-	static VkQueue PresentationQueue;
+	//static VkQueue PresentationQueue;
+	//static VkQueue TransferQueue;
 	static VkCommandPool GraphicsCommandPool;
 	static BMRSwapchain SwapInstance;
 	static VkDescriptorPool MainPool;
 	static VkCommandBuffer DrawCommandBuffers[MAX_SWAPCHAIN_IMAGES_COUNT];
-	static VkCommandBuffer TransferCommandBuffer;
+
 	static u32 CurrentFrame;
 	static u32 CurrentImageIndex;
-	static u64 TransferTimelineValue = 0;
 
-	// TODO: move StagingBuffer to external system
-	static StagingPool TransferStagingPool;
-	
 
 	// FUNCTIONS IMPLEMENTATIONS
 	void Init(GLFWwindow* WindowHandler, const VulkanInterfaceConfig& InConfig)
@@ -117,7 +106,7 @@ namespace VulkanInterface
 
 		CreateMainInstance();
 
-		const VkResult Result = glfwCreateWindowSurface(Instance.VulkanInstance, WindowHandler, nullptr, &Surface);
+		VkResult Result = glfwCreateWindowSurface(Instance.VulkanInstance, WindowHandler, nullptr, &Surface);
 		if (Result != VK_SUCCESS)
 		{
 			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateWin32SurfaceKHR result is %d", Result);
@@ -131,7 +120,18 @@ namespace VulkanInterface
 		SwapExtent = VulkanHelper::GetBestSwapExtent(Device.PhysicalDevice, WindowHandler, Surface);
 		CreateSynchronisation();
 		SetupQueues();
-		GraphicsCommandPool = VulkanHelper::CreateCommandPool(Device.LogicalDevice, Device.Indices.GraphicsFamily);
+
+		VkCommandPoolCreateInfo PoolInfo = { };
+		PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		PoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+		PoolInfo.queueFamilyIndex = Device.Indices.GraphicsFamily;
+
+		Result = vkCreateCommandPool(Device.LogicalDevice, &PoolInfo, nullptr, &GraphicsCommandPool);
+		if (Result != VK_SUCCESS)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateCommandPool result is %d", Result);
+		}
+
 		CreateSwapchainInstance(Device.PhysicalDevice, Device.Indices, Device.LogicalDevice, Surface, SurfaceFormat, SwapExtent);
 		CreateCommandBuffers();
 
@@ -167,29 +167,11 @@ namespace VulkanInterface
 
 		MainPool = VulkanHelper::CreateDescriptorPool(Device.LogicalDevice, TotalPassPoolSizes.Data, PoolSizeCount, TotalDescriptorCount);
 		////////////////////
-
-		TransferStagingPool.Buffer = VulkanHelper::CreateBuffer(Device.LogicalDevice, MB32, VulkanHelper::StagingFlag);
-		TransferStagingPool.Memory = VulkanHelper::AllocateAndBindDeviceMemoryForBuffer(Device.PhysicalDevice, Device.LogicalDevice, TransferStagingPool.Buffer,
-			VulkanHelper::HostCompatible);
-		VkMemoryRequirements MemoryRequirements;
-		vkGetBufferMemoryRequirements(Device.LogicalDevice, TransferStagingPool.Buffer, &MemoryRequirements);
-		TransferStagingPool.Alignment = MemoryRequirements.alignment;
-		TransferStagingPool.Size = MB32;
-		TransferStagingPool.Offset = 0;
-	}
-
-	u64 GetOffsetFromStagingPool(StagingPool* Pool, u64 Size)
-	{
-		u64 AlignedOffset = (Pool->Offset + Pool->Alignment - 1) & ~(Pool->Alignment - 1);
-		Pool->Offset = AlignedOffset + Size;
-		return AlignedOffset;
 	}
 
 	void DeInit()
 	{
 		vkDestroyDescriptorPool(Device.LogicalDevice, MainPool, nullptr);
-		vkDestroyBuffer(Device.LogicalDevice, TransferStagingPool.Buffer, nullptr);
-		vkFreeMemory(Device.LogicalDevice, TransferStagingPool.Memory, nullptr);
 		DestroySwapchainInstance(Device.LogicalDevice, SwapInstance);
 		vkDestroyCommandPool(Device.LogicalDevice, GraphicsCommandPool, nullptr);
 		DestroySynchronisation();
@@ -462,7 +444,7 @@ namespace VulkanInterface
 		return CommandBuffer;
 	}
 
-	void EndFrame()
+	void EndFrame(std::mutex& mutex)
 	{
 		VkResult Result = vkEndCommandBuffer(DrawCommandBuffers[CurrentImageIndex]);
 		if (Result != VK_SUCCESS)
@@ -472,18 +454,20 @@ namespace VulkanInterface
 
 		uint64_t WaitValues[] = {
 			0,
-			TransferTimelineValue
+			Render::TmpGetTransferTimelineValue()
 		};
 
 		VkSemaphore WaitSemaphores[] = {
 			ImagesAvailable[CurrentFrame],
-			TransferCompleted
+			Render::TmpGetTransferCompleted()
 		};
 
 		VkPipelineStageFlags WaitStages[] = {
 			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT
 		};
+
+
 
 		// Timeline info
 		VkTimelineSemaphoreSubmitInfo TimelineInfo = { };
@@ -504,13 +488,6 @@ namespace VulkanInterface
 		SubmitInfo.signalSemaphoreCount = 1;
 		SubmitInfo.pSignalSemaphores = &RenderFinished[CurrentFrame];
 
-		Result = vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, DrawFences[CurrentFrame]);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkQueueSubmit result is %d", Result);
-			assert(false);
-		}
-
 		VkPresentInfoKHR PresentInfo = { };
 		PresentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 		PresentInfo.waitSemaphoreCount = 1;
@@ -518,53 +495,16 @@ namespace VulkanInterface
 		PresentInfo.pWaitSemaphores = &RenderFinished[CurrentFrame];
 		PresentInfo.pSwapchains = &SwapInstance.VulkanSwapchain; // Swapchains to present images to
 		PresentInfo.pImageIndices = &CurrentImageIndex; // Index of images in swapchains to present
-		Result = vkQueuePresentKHR(PresentationQueue, &PresentInfo);
-		if (Result != VK_SUCCESS)
+		
+
 		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkQueuePresentKHR result is %d", Result);
+			std::scoped_lock lock(mutex);
+			VULKAN_CHECK_RESULT(vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, DrawFences[CurrentFrame]));
+			VULKAN_CHECK_RESULT(vkQueuePresentKHR(GraphicsQueue, &PresentInfo));
 		}
+
 
 		CurrentFrame = (CurrentFrame + 1) % MAX_DRAW_FRAMES;
-	}
-
-	void BeginTransfer()
-	{
-		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
-		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-		VkResult Result = vkBeginCommandBuffer(TransferCommandBuffer, &CommandBufferBeginInfo);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkBeginCommandBuffer result is %d", Result);
-		}
-	}
-
-	void EndTransfer()
-	{
-		TransferTimelineValue++;
-
-		VkTimelineSemaphoreSubmitInfo TimelineInfo = { };
-		TimelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-		TimelineInfo.waitSemaphoreValueCount = 0;
-		TimelineInfo.signalSemaphoreValueCount = 1;
-		TimelineInfo.pSignalSemaphoreValues = &TransferTimelineValue;
-
-
-		VkSubmitInfo SubmitInfo = { };
-		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.commandBufferCount = 1;
-		SubmitInfo.pCommandBuffers = &TransferCommandBuffer;
-		SubmitInfo.signalSemaphoreCount = 1;
-		SubmitInfo.pSignalSemaphores = &TransferCompleted;
-		SubmitInfo.pNext = &TimelineInfo;
-
-		VkResult Result = vkEndCommandBuffer(TransferCommandBuffer);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkBeginCommandBuffer result is %d", Result);
-		}
-
-		vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, nullptr);
 	}
 
 	void WaitDevice()
@@ -701,45 +641,6 @@ namespace VulkanInterface
 		}
 
 		vkUpdateDescriptorSets(Device.LogicalDevice, BufferCount, SetWrites, 0, nullptr);
-	}
-
-	void CopyDataToBuffer(VkBuffer Buffer, VkDeviceSize DstOffset, VkDeviceSize Size, const void* Data)
-	{
-		assert(Size <= MB64);
-
-		const u64 TransferOffset = GetOffsetFromStagingPool(&TransferStagingPool, Size);
-
-		VkBufferCopy BufferCopyRegion = { };
-		BufferCopyRegion.srcOffset = TransferOffset;
-		BufferCopyRegion.dstOffset = DstOffset;
-		BufferCopyRegion.size = Size;
-
-		VulkanHelper::UpdateHostCompatibleBufferMemory(Device.LogicalDevice, TransferStagingPool.Memory, Size, TransferOffset, Data);
-		vkCmdCopyBuffer(TransferCommandBuffer, TransferStagingPool.Buffer, Buffer, 1, &BufferCopyRegion);
-	}
-
-	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, void* Data)
-	{
-		VkMemoryRequirements MemoryRequirements;
-		vkGetImageMemoryRequirements(Device.LogicalDevice, Image, &MemoryRequirements);
-
-		assert(MemoryRequirements.size <= MB256);
-
-		const u64 TransferOffset = GetOffsetFromStagingPool(&TransferStagingPool, MemoryRequirements.size);
-
-		VkBufferImageCopy ImageRegion = { };
-		ImageRegion.bufferOffset = TransferOffset;
-		ImageRegion.bufferRowLength = 0;
-		ImageRegion.bufferImageHeight = 0;
-		ImageRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		ImageRegion.imageSubresource.mipLevel = 0;
-		ImageRegion.imageSubresource.baseArrayLayer = 0;
-		ImageRegion.imageSubresource.layerCount = 1;
-		ImageRegion.imageOffset = { 0, 0, 0 };
-		ImageRegion.imageExtent = { Width, Height, 1 };
-
-		VulkanHelper::UpdateHostCompatibleBufferMemory(Device.LogicalDevice, TransferStagingPool.Memory, MemoryRequirements.size, TransferOffset, Data);
-		vkCmdCopyBufferToImage(TransferCommandBuffer, TransferStagingPool.Buffer, Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ImageRegion);
 	}
 
 	bool CreateMainInstance()
@@ -1040,28 +941,6 @@ namespace VulkanInterface
 				assert(false);
 			}
 		}
-
-		VkSemaphoreTypeCreateInfo TypeInfo = { };
-		TypeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
-		TypeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-		TypeInfo.initialValue = 0;
-
-
-		VkSemaphoreCreateInfo TimeLineSemaphoreInfo = { };
-		TimeLineSemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-		TimeLineSemaphoreInfo.pNext = &TypeInfo;
-
-		if (vkCreateSemaphore(Device.LogicalDevice, &TimeLineSemaphoreInfo, nullptr, &TransferCompleted) != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "TransferCompleted creation error");
-			assert(false);
-		}
-
-		//if (vkCreateFence(Device.LogicalDevice, &FenceCreateInfo, nullptr, &TransferFence) != VK_SUCCESS)
-		//{
-		//	Util::RenderLog(Util::BMRVkLogType_Error, "TransferFences creation error");
-		//	assert(false);
-		//}
 	}
 
 	void DestroySynchronisation()
@@ -1072,20 +951,20 @@ namespace VulkanInterface
 			vkDestroySemaphore(Device.LogicalDevice, ImagesAvailable[i], nullptr);
 			vkDestroyFence(Device.LogicalDevice, DrawFences[i], nullptr);
 		}
-		
-		//vkDestroyFence(Device.LogicalDevice, TransferFence, nullptr);
-		vkDestroySemaphore(Device.LogicalDevice, TransferCompleted, nullptr);
 	}
 
 	bool SetupQueues()
 	{
 		vkGetDeviceQueue(Device.LogicalDevice, static_cast<u32>(Device.Indices.GraphicsFamily), 0, &GraphicsQueue);
-		vkGetDeviceQueue(Device.LogicalDevice, static_cast<u32>(Device.Indices.PresentationFamily), 0, &PresentationQueue);
+		//vkGetDeviceQueue(Device.LogicalDevice, static_cast<u32>(Device.Indices.PresentationFamily), 0, &PresentationQueue);
+		//vkGetDeviceQueue(Device.LogicalDevice, static_cast<u32>(Device.Indices.TransferFamily), 0, &TransferQueue);
 
-		if (GraphicsQueue == nullptr && PresentationQueue == nullptr)
+		//if (GraphicsQueue == nullptr || PresentationQueue == nullptr || TransferQueue == nullptr)
 		{
-			return false;
+			//return false;
 		}
+
+		return true;
 	}
 
 	bool CreateSwapchainInstance(VkPhysicalDevice PhysicalDevice,
@@ -1232,19 +1111,6 @@ namespace VulkanInterface
 			return false;
 		}
 
-		VkCommandBufferAllocateInfo TransferCommandBufferAllocateInfo = { };
-		TransferCommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		TransferCommandBufferAllocateInfo.commandPool = GraphicsCommandPool;
-		TransferCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		TransferCommandBufferAllocateInfo.commandBufferCount = 1;
-
-		Result = vkAllocateCommandBuffers(Device.LogicalDevice, &TransferCommandBufferAllocateInfo, &TransferCommandBuffer);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkAllocateCommandBuffers result is %d", Result);
-			return false;
-		}
-
 		return true;
 	}
 
@@ -1268,12 +1134,13 @@ namespace VulkanInterface
 		return DrawCommandBuffers[CurrentImageIndex];
 	}
 
-	VkCommandBuffer GetTransferCommandBuffer()
+	VkQueue GetTransferQueue()
 	{
-		return TransferCommandBuffer;
+		//return TransferQueue;
+		return GraphicsQueue;
 	}
 
-	VkQueue GetTransferQueue()
+	VkQueue GetGraphicsQueue()
 	{
 		return GraphicsQueue;
 	}
@@ -1296,5 +1163,10 @@ namespace VulkanInterface
 	VkInstance GetInstance()
 	{
 		return Instance.VulkanInstance;
+	}
+
+	VkCommandPool GetTransferCommandPool()
+	{
+		return GraphicsCommandPool;
 	}
 }

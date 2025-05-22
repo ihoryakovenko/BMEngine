@@ -77,6 +77,9 @@ namespace LightningPass
 		ShadowMapArrayCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 		ShadowMapArrayCreateInfo.arrayLayers = 2;
 
+		u64 Size;
+		u64 Alignment;
+
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
 			vkCreateImage(Device, &ShadowMapArrayCreateInfo, nullptr, &ShadowMapArray[i].Image);
@@ -91,8 +94,9 @@ namespace LightningPass
 			BufferInfo.size = LightSpaceMatrixSize;
 
 			LightSpaceMatrixBuffer[i].Buffer = VulkanHelper::CreateBuffer(Device, LightSpaceMatrixSize, VulkanHelper::BufferUsageFlag::UniformFlag);
-			LightSpaceMatrixBuffer[i].Memory = VulkanHelper::AllocateAndBindDeviceMemoryForBuffer(PhysicalDevice, Device, LightSpaceMatrixBuffer[i].Buffer,
-				VulkanHelper::MemoryPropertyFlag::HostCompatible);
+			LightSpaceMatrixBuffer[i].Memory = VulkanHelper::AllocateDeviceMemoryForBuffer(PhysicalDevice, Device, LightSpaceMatrixBuffer[i].Buffer,
+				VulkanHelper::MemoryPropertyFlag::HostCompatible, &Size, &Alignment);
+			vkBindBufferMemory(Device, LightSpaceMatrixBuffer[i].Buffer, LightSpaceMatrixBuffer[i].Memory, 0);
 
 			VulkanInterface::CreateUniformSets(&LightSpaceMatrixLayout, 1, LightSpaceMatrixSet + i);
 
@@ -179,6 +183,10 @@ namespace LightningPass
 		Attachments[0] = ShadowMapElement1ImageInterface[VulkanInterface::TestGetImageIndex()];
 		Attachments[1] = ShadowMapElement2ImageInterface[VulkanInterface::TestGetImageIndex()];
 
+		u32 EntitiesCount;
+		RenderResources::DrawEntity* Entities = RenderResources::GetEntities(&EntitiesCount);
+		const Render::RenderState* State = Render::GetRenderState();
+
 		for (u32 LightCaster = 0; LightCaster < MAX_LIGHT_SOURCES; ++LightCaster)
 		{
 			VulkanHelper::UpdateHostCompatibleBufferMemory(Device, LightSpaceMatrixBuffer[LightCaster].Memory, sizeof(glm::mat4), 0,
@@ -230,15 +238,13 @@ namespace LightningPass
 
 			vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
 
-			u32 EntitiesCount;
-			RenderResources::DrawEntity* Entities = RenderResources::GetEntities(&EntitiesCount);
-
 			for (u32 i = 0; i < EntitiesCount; ++i)
 			{
 				RenderResources::DrawEntity* DrawEntity = Entities + i;
+				Render::StaticMesh* Mesh = State->StaticMeshLinearStorage.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
 
-				const VkBuffer VertexBuffers[] = { RenderResources::GetVertexBuffer().Buffer };
-				const VkDeviceSize Offsets[] = { DrawEntity->VertexOffset };
+				const VkBuffer VertexBuffers[] = { State->StaticMeshLinearStorage.VertexBuffer.Buffer };
+				const VkDeviceSize Offsets[] = { Mesh->VertexOffset };
 
 				const u32 DescriptorSetGroupCount = 1;
 				const VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] =
@@ -254,8 +260,8 @@ namespace LightningPass
 					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr);
 
 				vkCmdBindVertexBuffers(CmdBuffer, 0, 1, VertexBuffers, Offsets);
-				vkCmdBindIndexBuffer(CmdBuffer, RenderResources::GetIndexBuffer().Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
-				vkCmdDrawIndexed(CmdBuffer, DrawEntity->IndicesCount, 1, 0, 0, 0);
+				vkCmdBindIndexBuffer(CmdBuffer, State->StaticMeshLinearStorage.IndexBuffer.Buffer, Mesh->VertexOffset, VK_INDEX_TYPE_UINT32);
+				vkCmdDrawIndexed(CmdBuffer, Mesh->IndicesCount, 1, 0, 0, 0);
 			}
 
 			vkCmdEndRendering(CmdBuffer);

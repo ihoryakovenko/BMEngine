@@ -29,10 +29,12 @@ namespace FrameManager
 
 		BufferMultiFrameSize = BufferSingleFrameSize * VulkanInterface::GetImageCount();
 
-		Buffer.Buffer = VulkanHelper::CreateBuffer(Device, BufferMultiFrameSize, VulkanHelper::BufferUsageFlag::UniformFlag);
-		Buffer.Memory = VulkanHelper::AllocateAndBindDeviceMemoryForBuffer(PhysicalDevice, Device, Buffer.Buffer, VulkanHelper::MemoryPropertyFlag::HostCompatible);
+		u64 Size;
 
-		BufferAlignment = VulkanInterface::GetDeviceProperties()->limits.minUniformBufferOffsetAlignment;
+		Buffer.Buffer = VulkanHelper::CreateBuffer(Device, BufferMultiFrameSize, VulkanHelper::BufferUsageFlag::UniformFlag);
+		Buffer.Memory = VulkanHelper::AllocateDeviceMemoryForBuffer(PhysicalDevice, Device, Buffer.Buffer, VulkanHelper::MemoryPropertyFlag::HostCompatible,
+			&Size, &BufferAlignment);
+		vkBindBufferMemory(Device, Buffer.Buffer, Buffer.Memory, 0);
 
 		const VkDeviceSize VpBufferSize = sizeof(ViewProjectionBuffer);
 		const VkShaderStageFlags VpStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;

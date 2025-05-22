@@ -4,6 +4,8 @@
 
 #include "Util/EngineTypes.h"
 
+#include <mutex>
+
 struct GLFWwindow;
 
 namespace VulkanInterface
@@ -138,10 +140,7 @@ namespace VulkanInterface
 	u32 AcquireNextImageIndex(); // Locks thread
 	u32 TestGetImageIndex();
 	VkCommandBuffer BeginFrame();
-	void EndFrame();
-
-	void BeginTransfer();
-	void EndTransfer();
+	void EndFrame(std::mutex& mutex);
 
 	VkDescriptorSetLayout CreateUniformLayout(const VkDescriptorType* Types, const VkShaderStageFlags* Stages,
 		const VkDescriptorBindingFlags* BindingFlags, u32 BindingCount, u32 DescriptorCount);
@@ -149,9 +148,6 @@ namespace VulkanInterface
 	void CreateUniformSets(const VkDescriptorSetLayout* Layouts, u32* DescriptorCounts, u32 Count, VkDescriptorSet* OutSets);
 	VkImageView CreateImageInterface(const UniformImageInterfaceCreateInfo* InterfaceCreateInfo, VkImage Image);
 	VkSampler CreateSampler(const VkSamplerCreateInfo* CreateInfo);
-
-	void CopyDataToBuffer(VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Size, const void* Data);
-	void CopyDataToImage(VkImage Image, u32 Width, u32 Height, void* Data);
 
 	void AttachUniformsToSet(VkDescriptorSet Set, const UniformSetAttachmentInfo* Infos, u32 BufferCount);
 
@@ -178,10 +174,14 @@ namespace VulkanInterface
 	VkDevice GetDevice();
 	VkPhysicalDevice GetPhysicalDevice();
 	VkCommandBuffer GetCommandBuffer();
-	VkCommandBuffer GetTransferCommandBuffer();
 	VkQueue GetTransferQueue();
+	VkQueue GetGraphicsQueue();
 	VkFormat GetSurfaceFormat();
 	u32 GetQueueGraphicsFamilyIndex();
 	VkDescriptorPool GetDescriptorPool();
 	VkInstance GetInstance();
+	VkCommandPool GetTransferCommandPool();
+
+
+
 }

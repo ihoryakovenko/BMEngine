@@ -10,6 +10,14 @@ struct GLFWwindow;
 
 #define VK_KHR_WIN32_SURFACE_EXTENSION_NAME "VK_KHR_win32_surface"
 
+#define VULKAN_CHECK_RESULT(call) \
+    { \
+        const VkResult result = (call); \
+        if (result != VK_SUCCESS) { \
+            Util::RenderLog(Util::BMRVkLogType_Error, "%s returned %d at %s:%d", #call, result, __FILE__, __LINE__); \
+        } \
+    }
+
 namespace VulkanHelper
 {
 	enum BufferUsageFlag
@@ -31,6 +39,7 @@ namespace VulkanHelper
 	{
 		s32 GraphicsFamily;
 		s32 PresentationFamily;
+		s32 TransferFamily;
 	};
 
 	Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
@@ -63,9 +72,9 @@ namespace VulkanHelper
 	VkDeviceSize CalculateBufferAlignedSize(VkDevice Device, VkBuffer Buffer, u64 BufferSize);
 	VkDeviceSize CalculateImageAlignedSize(VkDevice Device, VkImage Image, u64 ImageSize);
 
-	VkDeviceMemory AllocateDeviceMemoryForBuffer(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer, MemoryPropertyFlag Properties);
+	VkDeviceMemory AllocateDeviceMemoryForBuffer(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer,
+		MemoryPropertyFlag Properties, u64* OutAlignment, u64* OutSize);
 	VkDeviceMemory AllocateDeviceMemoryForImage(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkImage Image, MemoryPropertyFlag Properties);
-	VkDeviceMemory AllocateAndBindDeviceMemoryForBuffer(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer, MemoryPropertyFlag Properties);
 	VkDeviceMemory AllocateAndBindDeviceMemoryForImage(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkImage Image, MemoryPropertyFlag Properties);
 
 	VkBuffer CreateBuffer(VkDevice Device, u64 Size, BufferUsageFlag Flag);
@@ -73,7 +82,6 @@ namespace VulkanHelper
 	void UpdateHostCompatibleBufferMemory(VkDevice Device, VkDeviceMemory Memory, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);
 
 	VkDescriptorPool CreateDescriptorPool(VkDevice Device, VkDescriptorPoolSize* PoolSizes, u32 PoolSizeCount, u32 MaxDescriptorCount);
-	VkCommandPool CreateCommandPool(VkDevice Device, u32 FamilyIndex);
 	VkShaderModule CreateShader(VkDevice Device, const u32* Code, u32 CodeSize);
 	VkPipelineLayout CreatePipelineLayout(VkDevice Device, const VkDescriptorSetLayout* DescriptorLayouts,
 		u32 DescriptorLayoutsCount, const VkPushConstantRange* PushConstant, u32 PushConstantsCount);

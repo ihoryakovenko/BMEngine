@@ -4,11 +4,12 @@
 
 #include <unordered_map>
 
-#include "Render/Render.h"
+#include "Engine/Systems/Render/Render.h"
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
-#include "Render/Render.h"
+#include "Engine/Systems/Render/Render.h"
+#include "Engine/Systems/Render/StaticMeshRender.h"
 
 #include <atomic>
 
@@ -22,13 +23,6 @@ namespace RenderResources
 	};
 
 	static u32 MaxEntities = 1024;
-	static DrawEntity* DrawEntities;
-	static std::atomic<u32> EntityIndex;
-
-	static VulkanInterface::IndexBuffer IndexBuffer;
-	static u64 IndexOffset;
-	static VulkanInterface::VertexBuffer VertexBuffer;
-	static u64 VertexOffset;
 
 	static u32 MaxTextures = 256;
 	static VkImage* Textures;
@@ -61,13 +55,9 @@ namespace RenderResources
 		MaxEntities = MaximumEntities;
 		MaxTextures = MaximumTextures;
 
-		IndexBuffer.Buffer = VulkanHelper::CreateBuffer(Device, IndexBufferSize, VulkanHelper::BufferUsageFlag::IndexFlag);
-		IndexBuffer.Memory = VulkanHelper::AllocateAndBindDeviceMemoryForBuffer(PhysicalDevice, Device, IndexBuffer.Buffer, VulkanHelper::MemoryPropertyFlag::GPULocal);
+		u64 Size;
+		u64 Alignment;
 
-		VertexBuffer.Buffer = VulkanHelper::CreateBuffer(Device, VertexBufferSize, VulkanHelper::BufferUsageFlag::VertexFlag);
-		VertexBuffer.Memory = VulkanHelper::AllocateAndBindDeviceMemoryForBuffer(PhysicalDevice, Device, VertexBuffer.Buffer, VulkanHelper::MemoryPropertyFlag::GPULocal);
-
-		DrawEntities = Memory::MemoryManagementSystem::Allocate<DrawEntity>(MaxEntities);
 		Textures = Memory::MemoryManagementSystem::Allocate<VkImage>(MaxTextures);
 		TextureViews = Memory::MemoryManagementSystem::Allocate<VkImageView>(MaxTextures);
 		TexturesMemory = Memory::MemoryManagementSystem::Allocate<VkDeviceMemory>(MaxTextures);
@@ -110,8 +100,9 @@ namespace RenderResources
 
 		const VkDeviceSize MaterialBufferSize = sizeof(Material) * MaxEntities;
 		MaterialBuffer = VulkanHelper::CreateBuffer(Device, MaterialBufferSize, VulkanHelper::BufferUsageFlag::StorageFlag);
-		MaterialBufferMemory = VulkanHelper::AllocateAndBindDeviceMemoryForBuffer(VulkanInterface::GetPhysicalDevice(), Device,
-			MaterialBuffer, VulkanHelper::MemoryPropertyFlag::GPULocal);
+		MaterialBufferMemory = VulkanHelper::AllocateDeviceMemoryForBuffer(VulkanInterface::GetPhysicalDevice(), Device,
+			MaterialBuffer, VulkanHelper::MemoryPropertyFlag::GPULocal, &Size, &Alignment);
+		vkBindBufferMemory(Device, MaterialBuffer, MaterialBufferMemory, 0);
 
 		VulkanInterface::UniformSetAttachmentInfo MaterialAttachmentInfo;
 		MaterialAttachmentInfo.BufferInfo.buffer = MaterialBuffer;
@@ -138,12 +129,6 @@ namespace RenderResources
 			vkFreeMemory(Device, TexturesMemory[i], nullptr);
 		}
 
-		vkDestroyBuffer(Device, VertexBuffer.Buffer, nullptr);
-		vkFreeMemory(Device, VertexBuffer.Memory, nullptr);
-
-		vkDestroyBuffer(Device, IndexBuffer.Buffer, nullptr);
-		vkFreeMemory(Device, IndexBuffer.Memory, nullptr);
-
 		vkDestroyDescriptorSetLayout(Device, BindlesTexturesLayout, nullptr);
 		vkDestroyDescriptorSetLayout(Device, MaterialLayout, nullptr);
 
@@ -153,70 +138,37 @@ namespace RenderResources
 		vkDestroyBuffer(Device, MaterialBuffer, nullptr);
 		vkFreeMemory(Device, MaterialBufferMemory, nullptr);
 
-		Memory::MemoryManagementSystem::Free(DrawEntities);
 		Memory::MemoryManagementSystem::Free(Textures);
 		Memory::MemoryManagementSystem::Free(TextureViews);
 		Memory::MemoryManagementSystem::Free(TexturesMemory);
-	}
-
-	VulkanInterface::VertexBuffer GetVertexBuffer()
-	{
-		return VertexBuffer;
-	}
-
-	VulkanInterface::IndexBuffer GetIndexBuffer()
-	{
-		return IndexBuffer;
-	}
-
-	u32 CreateEntity(void* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, u32 Material)
-	{
-		assert(EntityIndex < MaxEntities);
-
-		DrawEntity* Entity = DrawEntities + EntityIndex;
-		*Entity = { };
-
-		Entity->VertexOffset = VertexOffset;
-		Render::LoadVertices(&VertexBuffer, Vertices, VertexSize, VerticesCount, VertexOffset);
-		VertexOffset += VertexSize * VerticesCount;
-
-		Entity->IndexOffset = IndexOffset;
-		Render::LoadIndices(&IndexBuffer, Indices, IndicesCount, IndexOffset);
-		IndexOffset += sizeof(u32) * IndicesCount;
-
-		Entity->IndicesCount = IndicesCount;
-		Entity->MaterialIndex = Material;
-		Entity->Model = glm::mat4(1.0f);
-
-		const u32 CurrentEntityIndex = EntityIndex;
-		++EntityIndex;
-
-		return CurrentEntityIndex;
 	}
 
 	DrawEntity CreateTerrain(void* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, u32 Material)
 	{
 		DrawEntity Entity = { };
 
-		Entity.VertexOffset = VertexOffset;
-		Render::LoadVertices(&VertexBuffer, Vertices, VertexSize, VerticesCount, VertexOffset);
-		VertexOffset += VertexSize * VerticesCount;
+		//Entity.VertexOffset = VertexOffset;
+		//const VkDeviceSize MeshVerticesSize = VertexSize * VerticesCount;
+		//TransferSystem::QueueBufferDataLoad(VertexBuffer.Buffer, VertexOffset, MeshVerticesSize, Vertices);
+		//VertexOffset += VertexSize * VerticesCount;
 
-		Entity.IndexOffset = IndexOffset;
-		Render::LoadIndices(&IndexBuffer, Indices, IndicesCount, IndexOffset);
-		IndexOffset += sizeof(u32) * IndicesCount;
+		//Entity.IndexOffset = IndexOffset;
+		//VkDeviceSize MeshIndicesSize = sizeof(u32) * IndicesCount;
+		//TransferSystem::QueueBufferDataLoad(IndexBuffer.Buffer, IndexOffset, MeshIndicesSize, Indices);
+		//IndexOffset += sizeof(u32) * IndicesCount;
 
-		Entity.IndicesCount = IndicesCount;
-		Entity.MaterialIndex = Material;
-		Entity.Model = glm::mat4(1.0f);
+		//Entity.IndicesCount = IndicesCount;
+		//Entity.MaterialIndex = Material;
+		//Entity.Model = glm::mat4(1.0f);
 
 		return Entity;
 	}
 
 	DrawEntity* GetEntities(u32* Count)
 	{
-		*Count = EntityIndex;
-		return DrawEntities;
+		Render::RenderState* State = Render::GetRenderState();
+		*Count = State->DrawEntities.Count;
+		return State->DrawEntities.Data;
 	}
 
 	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height)
@@ -225,7 +177,6 @@ namespace RenderResources
 
 		VkDevice Device = VulkanInterface::GetDevice();
 		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
-		VkCommandBuffer CmdBuffer = VulkanInterface::GetTransferCommandBuffer();
 		VkQueue TransferQueue = VulkanInterface::GetTransferQueue();
 		
 		VkImageCreateInfo ImageCreateInfo = { };
@@ -270,70 +221,6 @@ namespace RenderResources
 		ViewCreateInfo.subresourceRange.layerCount = 1;
 		ViewCreateInfo.image = Image;
 
-		VkImageMemoryBarrier2 TransferImageBarrier = { };
-		TransferImageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-		TransferImageBarrier.pNext = nullptr;
-		TransferImageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
-		TransferImageBarrier.srcAccessMask = 0;
-		TransferImageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-		TransferImageBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-		TransferImageBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		TransferImageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		TransferImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		TransferImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		TransferImageBarrier.image = Image;
-		TransferImageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		TransferImageBarrier.subresourceRange.baseMipLevel = 0;
-		TransferImageBarrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-		TransferImageBarrier.subresourceRange.baseArrayLayer = 0;
-		TransferImageBarrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-
-		VkDependencyInfo TransferDepInfo = { };
-		TransferDepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-		TransferDepInfo.pNext = nullptr;
-		TransferDepInfo.dependencyFlags = 0;
-		TransferDepInfo.imageMemoryBarrierCount = 1;
-		TransferDepInfo.pImageMemoryBarriers = &TransferImageBarrier;
-		TransferDepInfo.memoryBarrierCount = 0;
-		TransferDepInfo.pMemoryBarriers = nullptr;
-		TransferDepInfo.bufferMemoryBarrierCount = 0;
-		TransferDepInfo.pBufferMemoryBarriers = nullptr;
-
-		VkImageMemoryBarrier2 PresentationBarrier = { };
-		PresentationBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-		PresentationBarrier.pNext = nullptr;
-		PresentationBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-		PresentationBarrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-		PresentationBarrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-		PresentationBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
-		PresentationBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		PresentationBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		PresentationBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		PresentationBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		PresentationBarrier.image = Image;
-
-		PresentationBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		PresentationBarrier.subresourceRange.baseMipLevel = 0;
-		PresentationBarrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-		PresentationBarrier.subresourceRange.baseArrayLayer = 0;
-		PresentationBarrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-
-		VkDependencyInfo PresentationDepInfo = { };
-		PresentationDepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-		PresentationDepInfo.pNext = nullptr;
-		PresentationDepInfo.dependencyFlags = 0;
-		PresentationDepInfo.imageMemoryBarrierCount = 1;
-		PresentationDepInfo.pImageMemoryBarriers = &PresentationBarrier;
-		PresentationDepInfo.memoryBarrierCount = 0;
-		PresentationDepInfo.pMemoryBarriers = nullptr;
-		PresentationDepInfo.bufferMemoryBarrierCount = 0;
-		PresentationDepInfo.pBufferMemoryBarriers = nullptr;
-
-		VkSubmitInfo SubmitInfo = { };
-		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.commandBufferCount = 1;
-		SubmitInfo.pCommandBuffers = &CmdBuffer;
-
 		TexturesMemory[TextureIndex] = VulkanHelper::AllocateAndBindDeviceMemoryForImage(PhysicalDevice, Device, Image, VulkanHelper::GPULocal);
 
 		Result = vkCreateImageView(Device, &ViewCreateInfo, nullptr, TextureViews + TextureIndex);
@@ -344,9 +231,7 @@ namespace RenderResources
 			//Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateImageView result is %d", Result);
 		}
 
-		vkCmdPipelineBarrier2(CmdBuffer, &TransferDepInfo);
-		VulkanInterface::CopyDataToImage(Image, Width, Height, Data);
-		vkCmdPipelineBarrier2(CmdBuffer, &PresentationDepInfo);
+		Render::QueueImageDataLoad(Image, Width, Height, Data);
 
 		VkDescriptorImageInfo DiffuseImageInfo = { };
 		DiffuseImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -391,7 +276,7 @@ namespace RenderResources
 	{
 		assert(MaterialIndex < MaxEntities);
 
-		VulkanInterface::CopyDataToBuffer(MaterialBuffer, sizeof(Material) * MaterialIndex, sizeof(Material), Mat);
+		Render::QueueBufferDataLoad(MaterialBuffer, sizeof(Material) * MaterialIndex, sizeof(Material), Mat);
 		return MaterialIndex++;
 	}
 
@@ -434,92 +319,4 @@ namespace RenderResources
 	{
 		return MaterialSet;
 	}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	//ResourceHandle CreateTexture(VkImage image, VkImageView view)
-	//{
-	//	u32 LogicalIndex;
-
-	//	if (!freeList.empty())
-	//	{
-	//		LogicalIndex = freeList.back();
-	//		freeList.pop_back();
-	//	}
-	//	else
-	//	{
-	//		LogicalIndex = static_cast<u32>(handleEntries.size());
-	//		handleEntries.emplace_back();
-	//	}
-
-	//	const u32 PhysicalIndex = TextureIndex++;
-
-	//	Textures[PhysicalIndex] = image;
-	//	TextureViews[PhysicalIndex] = view;
-
-	//	handleEntries[LogicalIndex].Generation++;
-	//	handleEntries[LogicalIndex].Alive = true;
-	//	handleEntries[LogicalIndex].PhysicalIndex = PhysicalIndex;
-
-	//	reverseMapping[PhysicalIndex] = LogicalIndex;
-
-	//	return ResourceHandle{ LogicalIndex, handleEntries[LogicalIndex].Generation };
-	//}
-
-	//void DestroyTexture(ResourceHandle h)
-	//{
-	//	if (!IsValid(h)) return;
-
-	//	u32 removedPhys = handleEntries[h.Index].PhysicalIndex;
-	//	u32 lastPhys = TextureIndex - 1;
-
-	//	if (removedPhys != lastPhys)
-	//	{
-	//		Textures[removedPhys] = Textures[lastPhys];
-	//		TextureViews[removedPhys] = TextureViews[lastPhys];
-
-	//		u32 movedLogical = reverseMapping[lastPhys];
-	//		handleEntries[movedLogical].PhysicalIndex = removedPhys;
-	//		reverseMapping[removedPhys] = movedLogical;
-	//	}
-
-	//	handleEntries[h.Index].Alive = false;
-	//	freeList.push_back(h.Index);
-	//	--TextureIndex;
-	//}
-
-	//bool IsValid(ResourceHandle h)
-	//{
-	//	return h.Index < handleEntries.size() &&
-	//		handleEntries[h.Index].Alive &&
-	//		handleEntries[h.Index].Generation == h.Generation;
-	//}
-
-	//VkImage GetImage(ResourceHandle h)
-	//{
-	//	assert(IsValid(h));
-	//	const u32 PhysicalIndex = handleEntries[h.Index].PhysicalIndex;
-	//	return Textures[PhysicalIndex];
-	//}
-
-	//VkImageView GetView(ResourceHandle h)
-	//{
-	//	assert(IsValid(h));
-	//	const u32 PhysicalIndex = handleEntries[h.Index].PhysicalIndex;
-	//	return TextureViews[PhysicalIndex];
-	//}
 }

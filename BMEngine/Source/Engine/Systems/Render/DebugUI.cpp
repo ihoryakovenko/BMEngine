@@ -93,7 +93,7 @@ namespace DebugUi
 		init_info.PhysicalDevice = VulkanInterface::GetPhysicalDevice();
 		init_info.Device = VulkanInterface::GetDevice();
 		init_info.QueueFamily = VulkanInterface::GetQueueGraphicsFamilyIndex();
-		init_info.Queue = VulkanInterface::GetTransferQueue();
+		init_info.Queue = VulkanInterface::GetGraphicsQueue();
 		//init_info.PipelineCache = g_PipelineCache;
 		init_info.PipelineCache = nullptr;
 		init_info.DescriptorPool = DebugUiPool;

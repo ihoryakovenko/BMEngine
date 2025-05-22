@@ -1,7 +1,7 @@
 #include "StaticMeshRender.h"
 
 #include "Render/VulkanInterface/VulkanInterface.h"
-#include "Render/Render.h"
+#include "Engine/Systems/Render/Render.h"
 #include "Render/FrameManager.h"
 #include "Engine/Systems/Render/RenderResources.h"
 #include "Engine/Systems/Render/LightningPass.h"
@@ -195,15 +195,14 @@ namespace StaticMeshRender
 
 		const u32 LightDynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(Render::LightBuffer);
 
-		VulkanInterface::VertexBuffer VertexBuffer = RenderResources::GetVertexBuffer();
-		VulkanInterface::IndexBuffer IndexBuffer = RenderResources::GetIndexBuffer();
-
 		u32 EntitiesCount;
 		RenderResources::DrawEntity* Entities = RenderResources::GetEntities(&EntitiesCount);
+		const Render::RenderState* State = Render::GetRenderState();
 
 		for (u32 i = 0; i < EntitiesCount; ++i)
 		{
 			RenderResources::DrawEntity* DrawEntity = Entities + i;
+			Render::StaticMesh* Mesh = State->StaticMeshLinearStorage.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
 
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
@@ -223,9 +222,9 @@ namespace StaticMeshRender
 			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
 				2, DescriptorSetGroupCount, DescriptorSetGroup, 1, &LightDynamicOffset);
 
-			vkCmdBindVertexBuffers(CmdBuffer, 0, 1, &VertexBuffer.Buffer, &DrawEntity->VertexOffset);
-			vkCmdBindIndexBuffer(CmdBuffer, IndexBuffer.Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(CmdBuffer, DrawEntity->IndicesCount, 1, 0, 0, 0);
+			vkCmdBindVertexBuffers(CmdBuffer, 0, 1, &State->StaticMeshLinearStorage.VertexBuffer.Buffer, &Mesh->VertexOffset);
+			vkCmdBindIndexBuffer(CmdBuffer, State->StaticMeshLinearStorage.IndexBuffer.Buffer, Mesh->IndexOffset, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(CmdBuffer, Mesh->IndicesCount, 1, 0, 0, 0);
 		}
 	}
 }

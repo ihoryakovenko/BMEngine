@@ -38,15 +38,6 @@ namespace ResourceManager
 
 	void LoadModel(const char* FilePath)
 	{
-		//std::thread LoadThread(
-		//	[FilePath]()
-		//	{
-
-		//	}
-		//);
-
-		//LoadThread.detach();
-
 		Util::Model3DData ModelData = Util::LoadModel3DData(FilePath);
 		Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
 
@@ -64,14 +55,95 @@ namespace ResourceManager
 			Mat.Shininess = 32.0f;
 			const u32 MaterialIndex = RenderResources::CreateMaterial(&Mat);
 
-			RenderResources::CreateEntity(Uh60Model.VertexData + ModelVertexByteOffset, sizeof(StaticMeshRender::StaticMeshVertex), VerticesCount,
-				Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, MaterialIndex);
-
-			ModelVertexByteOffset += VerticesCount * sizeof(StaticMeshRender::StaticMeshVertex);
+			ModelVertexByteOffset += VerticesCount;
 			ModelIndexCountOffset += IndicesCount;
+
+			Render::Transfer(VulkanInterface::TestGetImageIndex());
 		}
 
+		VulkanInterface::WaitDevice();
+
 		Util::ClearModel3DData(ModelData);
+
+		u32 Index = VulkanInterface::TestGetImageIndex();
+
+		std::thread LoadThread(
+			[FilePath, Index]()
+			{
+				Util::Model3DData ModelData = Util::LoadModel3DData(FilePath);
+				Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
+
+				u64 ModelVertexByteOffset = 0;
+				u32 ModelIndexCountOffset = 0;
+				for (u32 i = 0; i < Uh60Model.MeshCount; i++)
+				{
+					const u64 VerticesCount = Uh60Model.VerticesCounts[i];
+					const u32 IndicesCount = Uh60Model.IndicesCounts[i];
+
+					Render::CreateEntity((StaticMeshRender::StaticMeshVertex*)Uh60Model.VertexData + ModelVertexByteOffset, sizeof(StaticMeshRender::StaticMeshVertex), VerticesCount,
+						Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, 0, Index);
+
+					ModelVertexByteOffset += VerticesCount;
+					ModelIndexCountOffset += IndicesCount;
+					std::this_thread::sleep_for(std::chrono::milliseconds(100));
+				}
+
+				std::this_thread::sleep_for(std::chrono::seconds(5));
+				Util::ClearModel3DData(ModelData);
+			}
+		);
+
+		LoadThread.detach();
+
+		//{
+		//	Util::Model3DData ModelData = Util::LoadModel3DData(FilePath);
+		//	Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
+
+		//	u64 ModelVertexByteOffset = 0;
+		//	u32 ModelIndexCountOffset = 0;
+		//	for (u32 i = 0; i < Uh60Model.MeshCount; i++)
+		//	{
+		//		const u64 VerticesCount = Uh60Model.VerticesCounts[i];
+		//		const u32 IndicesCount = Uh60Model.IndicesCounts[i];
+
+		//		Render::CreateEntity((StaticMeshRender::StaticMeshVertex*)Uh60Model.VertexData + ModelVertexByteOffset, sizeof(StaticMeshRender::StaticMeshVertex), VerticesCount,
+		//			Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, 0, Index);
+
+		//		ModelVertexByteOffset += VerticesCount;
+		//		ModelIndexCountOffset += IndicesCount;
+		//	}
+
+		//	std::this_thread::sleep_for(std::chrono::seconds(5));
+		//	Util::ClearModel3DData(ModelData);
+		//}
+
+		//Util::Model3DData ModelData = Util::LoadModel3DData(FilePath);
+		//Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
+
+		//u64 ModelVertexByteOffset = 0;
+		//u32 ModelIndexCountOffset = 0;
+		//for (u32 i = 0; i < Uh60Model.MeshCount; i++)
+		//{
+		//	const u64 VerticesCount = Uh60Model.VerticesCounts[i];
+		//	const u32 IndicesCount = Uh60Model.IndicesCounts[i];
+		//	const u32 TextureIndex = RenderResources::GetTexture2DSRGBIndex(Uh60Model.DiffuseTexturesHashes[i]);
+
+		//	RenderResources::Material Mat;
+		//	Mat.AlbedoTexIndex = TextureIndex;
+		//	Mat.SpecularTexIndex = TextureIndex;
+		//	Mat.Shininess = 32.0f;
+		//	const u32 MaterialIndex = RenderResources::CreateMaterial(&Mat);
+
+		//	RenderResources::CreateEntity((StaticMeshRender::StaticMeshVertex*)Uh60Model.VertexData + ModelVertexByteOffset, sizeof(StaticMeshRender::StaticMeshVertex), VerticesCount,
+		//		Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, MaterialIndex);
+
+		//	ModelVertexByteOffset += VerticesCount;
+		//	ModelIndexCountOffset += IndicesCount;
+
+		//	TransferSystem::Transfer();
+		//}
+
+		//Util::ClearModel3DData(ModelData);
 	}
 
 	void LoadTextures(const char* Directory)
