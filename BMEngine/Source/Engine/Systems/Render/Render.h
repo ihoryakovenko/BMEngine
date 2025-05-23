@@ -23,6 +23,20 @@ namespace DebugUi
 
 namespace Render
 {
+	struct Material
+	{
+		u32 AlbedoTexIndex;
+		u32 SpecularTexIndex;
+		float Shininess;
+	};
+
+	struct DrawEntity
+	{
+		u64 StaticMeshIndex;
+		u32 MaterialIndex;
+		glm::mat4 Model;
+	};
+
 	struct TextureData
 	{
 		void* RawData;
@@ -90,7 +104,7 @@ namespace Render
 
 	struct TransferTask
 	{
-		RenderResources::DrawEntity Entity;
+		DrawEntity Entity;
 		TransferTaskState State;
 	};
 
@@ -125,7 +139,7 @@ namespace Render
 
 		StaticMeshStorage StaticMeshLinearStorage;
 
-		Memory::DynamicArray<RenderResources::DrawEntity> DrawEntities;
+		Memory::DynamicArray<DrawEntity> DrawEntities;
 
 		TexturesLoadQueue TexturesLoad;
 		TexturesReadyQueue TextureReady;
@@ -136,8 +150,9 @@ namespace Render
 	void Init(GLFWwindow* WindowHandler, DebugUi::GuiData* GuiData);
 	void DeInit();
 
-	u64 LoadStaticMesh(const StaticMeshRender::StaticMeshVertex* Vertices, u64 VerticesCount, const u32* Indices, u64 IndicesCount, u32 FrameIndex);
-	u32 CreateEntity(const StaticMeshRender::StaticMeshVertex* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, u32 MaterialIndex, u32 FrameIndex);
+	u64 CreateStaticMesh(const StaticMeshRender::StaticMeshVertex* Vertices, u64 VerticesCount, const u32* Indices, u64 IndicesCount, u32 FrameIndex);
+	u32 CreateMaterial(Material* Mat, u32 FrameIndex);
+	u32 CreateEntity(const DrawEntity* Entity, u32 FrameIndex);
 
 	void Draw(const FrameManager::ViewProjectionBuffer* Data);
 
@@ -147,11 +162,12 @@ namespace Render
 
 
 	void Transfer(u32 FrameIndex);
-	void QueueBufferDataLoad(VkBuffer Buffer, VkDeviceSize Offset, VkDeviceSize Size, const void* Data);
 	void QueueImageDataLoad(VkImage Image, u32 Width, u32 Height, void* Data);
 
 	u64 TmpGetTransferTimelineValue();
 	VkSemaphore TmpGetTransferCompleted();
+	VkDescriptorSetLayout TmpGetMaterialLayout();
+	VkDescriptorSet TmpGetMaterialSet();
 
 
 
@@ -205,13 +221,13 @@ namespace Render
 
 	struct DrawScene
 	{
-		RenderResources::DrawEntity* DrawTransparentEntities = nullptr;
+		DrawEntity* DrawTransparentEntities = nullptr;
 		u32 DrawTransparentEntitiesCount = 0;
 
-		RenderResources::DrawEntity SkyBox;
+		DrawEntity SkyBox;
 		bool DrawSkyBox = false;
 
-		RenderResources::DrawEntity MapEntity;
+		DrawEntity MapEntity;
 
 		LightBuffer* LightEntity = nullptr;
 	};

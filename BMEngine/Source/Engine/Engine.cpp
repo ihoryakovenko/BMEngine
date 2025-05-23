@@ -72,7 +72,7 @@ namespace Engine
 	static const f32 Near = 0.1f;
 	static const f32 Far = 5000.0f;
 
-	static RenderResources::DrawEntity SkyBox;
+	static Render::DrawEntity SkyBox;
 	static Render::LightBuffer LightData;
 
 	static DebugUi::GuiData GuiData;

@@ -172,6 +172,7 @@ namespace LightningPass
 	{
 		VkDevice Device = VulkanInterface::GetDevice();
 		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+		const Render::RenderState* State = Render::GetRenderState();
 
 		const glm::mat4* LightViews[] =
 		{
@@ -182,10 +183,6 @@ namespace LightningPass
 		VkImageView Attachments[2];
 		Attachments[0] = ShadowMapElement1ImageInterface[VulkanInterface::TestGetImageIndex()];
 		Attachments[1] = ShadowMapElement2ImageInterface[VulkanInterface::TestGetImageIndex()];
-
-		u32 EntitiesCount;
-		RenderResources::DrawEntity* Entities = RenderResources::GetEntities(&EntitiesCount);
-		const Render::RenderState* State = Render::GetRenderState();
 
 		for (u32 LightCaster = 0; LightCaster < MAX_LIGHT_SOURCES; ++LightCaster)
 		{
@@ -238,9 +235,9 @@ namespace LightningPass
 
 			vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
 
-			for (u32 i = 0; i < EntitiesCount; ++i)
+			for (u32 i = 0; i < State->DrawEntities.Count; ++i)
 			{
-				RenderResources::DrawEntity* DrawEntity = Entities + i;
+				Render::DrawEntity* DrawEntity = State->DrawEntities.Data + i;
 				Render::StaticMesh* Mesh = State->StaticMeshLinearStorage.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
 
 				const VkBuffer VertexBuffers[] = { State->StaticMeshLinearStorage.VertexBuffer.Buffer };

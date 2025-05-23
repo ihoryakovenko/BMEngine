@@ -17,7 +17,11 @@ namespace Render
 	static RenderState State;
 
 
-
+	static VkBuffer MaterialBuffer;
+	static VkDeviceMemory MaterialBufferMemory;
+	static VkDescriptorSetLayout MaterialLayout;
+	static VkDescriptorSet MaterialSet;
+	static u32 MaterialIndex;
 
 	struct StagingPool
 	{
@@ -34,16 +38,9 @@ namespace Render
 		VkImage Image;
 	};
 
-	struct BufferCopyData
-	{
-		VkBufferCopy BufferCopyInfo;
-		VkBuffer Buffer;
-	};
-
 	Memory::DynamicArray<VkImageMemoryBarrier2> ImageTransferring;
 	Memory::DynamicArray<VkImageMemoryBarrier2> ImagePresenting;
 	Memory::DynamicArray<ImageCopyData> ImageCopy;
-	Memory::DynamicArray<BufferCopyData> BufferCopy;
 
 	static StagingPool TransferStagingPool;
 	static VkSemaphore TransferCompleted;
@@ -54,8 +51,6 @@ namespace Render
 	static void PrepareImageForPresentation(VkImage Image);
 
 	static u64 GetOffsetFromStagingPool(StagingPool* Pool, u64 Size);
-
-	
 
 	u64 GetOffsetFromStagingPool(StagingPool* Pool, u64 Size)
 	{
@@ -167,16 +162,9 @@ namespace Render
 
 		vkCmdPipelineBarrier2(TransferCommandBuffer, &PresentDepInfo);
 
-		for (u32 i = 0; i < BufferCopy.Count; ++i)
-		{
-			const BufferCopyData* CopyData = BufferCopy.Data + i;
-			vkCmdCopyBuffer(TransferCommandBuffer, TransferStagingPool.Buffer, CopyData->Buffer, 1, &CopyData->BufferCopyInfo);
-		}
-
 		Memory::ClearArray(&ImageTransferring);
 		Memory::ClearArray(&ImagePresenting);
 		Memory::ClearArray(&ImageCopy);
-		Memory::ClearArray(&BufferCopy);
 
 		Result = vkEndCommandBuffer(TransferCommandBuffer);
 		if (Result != VK_SUCCESS)
@@ -190,22 +178,6 @@ namespace Render
 			TransferTimelineValue++;
 			vkQueueSubmit(VulkanInterface::GetTransferQueue(), 1, &SubmitInfo, TransferFence); // TODO Check GetTransferQueue
 		}
-	}
-
-	void QueueBufferDataLoad(VkBuffer Buffer, VkDeviceSize DstOffset, VkDeviceSize Size, const void* Data)
-	{
-		VkDevice Device = VulkanInterface::GetDevice();
-
-		const u64 TransferOffset = GetOffsetFromStagingPool(&TransferStagingPool, Size);
-
-		BufferCopyData* BufferCopyRegion = Memory::ArrayGetNew(&BufferCopy);
-		*BufferCopyRegion = { };
-		BufferCopyRegion->BufferCopyInfo.srcOffset = TransferOffset;
-		BufferCopyRegion->BufferCopyInfo.dstOffset = DstOffset;
-		BufferCopyRegion->BufferCopyInfo.size = Size;
-		BufferCopyRegion->Buffer = Buffer;
-
-		VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferStagingPool.Memory, Size, TransferOffset, Data);
 	}
 
 	void QueueImageDataLoad(VkImage Image, u32 Width, u32 Height, void* Data)
@@ -299,60 +271,26 @@ namespace Render
 
 
 
-
-
-
-
-	u32 CreateEntity(const StaticMeshRender::StaticMeshVertex* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, u32 MaterialIndex, u32 FrameIndex)
+	VkDescriptorSetLayout TmpGetMaterialLayout()
 	{
-		VkDevice Device = VulkanInterface::GetDevice();
+		return MaterialLayout;
+	}
 
-		VkFence TransferFence = State.TransferState.Frames.Fences[FrameIndex];
-		VkCommandBuffer TransferCommandBuffer = State.TransferState.Frames.CommandBuffers[FrameIndex];
-		vkWaitForFences(Device, 1, &TransferFence, VK_TRUE, UINT64_MAX);
-		vkResetFences(Device, 1, &TransferFence);
-
-		RenderResources::DrawEntity Entity = { };
-		Entity.StaticMeshIndex = Render::LoadStaticMesh(Vertices, VerticesCount, Indices, IndicesCount, FrameIndex);
-		Entity.MaterialIndex = MaterialIndex;
-		Entity.Model = glm::mat4(1.0f);
+	VkDescriptorSet TmpGetMaterialSet()
+	{
+		return MaterialSet;
+	}
 
 
 
+	u32 CreateEntity(const DrawEntity* Entity, u32 FrameIndex)
+	{
+		std::scoped_lock lock(State.TransferState.Frames.Tasks[FrameIndex].Mutex);
 
-
-
-
-
-		VkTimelineSemaphoreSubmitInfo TimelineInfo = { };
-		TimelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-		TimelineInfo.waitSemaphoreValueCount = 0;
-		TimelineInfo.signalSemaphoreValueCount = 1;
-		TimelineInfo.pSignalSemaphoreValues = &TransferTimelineValue;
-
-		VkSubmitInfo SubmitInfo = { };
-		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.commandBufferCount = 1;
-		SubmitInfo.pCommandBuffers = &TransferCommandBuffer;
-		SubmitInfo.signalSemaphoreCount = 1;
-		SubmitInfo.pSignalSemaphores = &TransferCompleted;
-		SubmitInfo.pNext = &TimelineInfo;
-
-		{
-			std::scoped_lock lock(State.QueueSubmitMutex);
-
-			TransferTimelineValue++;
-			vkQueueSubmit(VulkanInterface::GetTransferQueue(), 1, &SubmitInfo, TransferFence); // TODO Check GetTransferQueue
-		}
-
-		{
-			std::scoped_lock lock(State.TransferState.Frames.Tasks[FrameIndex].Mutex);
-
-			TransferTask Task = { };
-			Task.State = TransferTaskState::TRANSFER_IN_FLIGHT;
-			Task.Entity = Entity;
-			PushTransferTask(State.TransferState.Frames.Tasks + FrameIndex, &Task);
-		}
+		TransferTask Task = { };
+		Task.State = TransferTaskState::TRANSFER_IN_FLIGHT;
+		Task.Entity = *Entity;
+		PushTransferTask(State.TransferState.Frames.Tasks + FrameIndex, &Task);
 
 		return 0;
 	}
@@ -410,9 +348,8 @@ namespace Render
 		ImageTransferring = Memory::AllocateArray<VkImageMemoryBarrier2>(512);
 		ImagePresenting = Memory::AllocateArray<VkImageMemoryBarrier2>(512);
 		ImageCopy = Memory::AllocateArray<ImageCopyData>(512);
-		BufferCopy = Memory::AllocateArray<BufferCopyData>(512);
 
-		State.DrawEntities = Memory::AllocateArray<RenderResources::DrawEntity>(512);
+		State.DrawEntities = Memory::AllocateArray<DrawEntity>(512);
 
 		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
 		VkDevice Device = VulkanInterface::GetDevice();
@@ -470,9 +407,27 @@ namespace Render
 
 
 
+		u64 Size;
+		u64 Alignment;
 
+		const VkDeviceSize MaterialBufferSize = sizeof(Material) * 512;
+		MaterialBuffer = VulkanHelper::CreateBuffer(Device, MaterialBufferSize, VulkanHelper::BufferUsageFlag::StorageFlag);
+		MaterialBufferMemory = VulkanHelper::AllocateDeviceMemoryForBuffer(VulkanInterface::GetPhysicalDevice(), Device,
+			MaterialBuffer, VulkanHelper::MemoryPropertyFlag::GPULocal, &Size, &Alignment);
+		vkBindBufferMemory(Device, MaterialBuffer, MaterialBufferMemory, 0);
 
+		VulkanInterface::UniformSetAttachmentInfo MaterialAttachmentInfo;
+		MaterialAttachmentInfo.BufferInfo.buffer = MaterialBuffer;
+		MaterialAttachmentInfo.BufferInfo.offset = 0;
+		MaterialAttachmentInfo.BufferInfo.range = MaterialBufferSize;
+		MaterialAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 
+		const VkDescriptorType MaterialDescriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		const VkShaderStageFlags MaterialStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		const VkDescriptorBindingFlags MaterialBindingFlags[1] = { };
+		MaterialLayout = VulkanInterface::CreateUniformLayout(&MaterialDescriptorType, &MaterialStageFlags, MaterialBindingFlags, 1, 1);
+		VulkanInterface::CreateUniformSets(&MaterialLayout, 1, &MaterialSet);
+		VulkanInterface::AttachUniformsToSet(MaterialSet, &MaterialAttachmentInfo, 1);
 
 
 
@@ -541,7 +496,6 @@ namespace Render
 		Memory::FreeArray(&ImageTransferring);
 		Memory::FreeArray(&ImagePresenting);
 		Memory::FreeArray(&ImageCopy);
-		Memory::FreeArray(&BufferCopy);
 		Memory::FreeArray(&State.DrawEntities);
 
 
@@ -556,7 +510,9 @@ namespace Render
 
 
 
-
+		vkDestroyDescriptorSetLayout(Device, MaterialLayout, nullptr);
+		vkDestroyBuffer(Device, MaterialBuffer, nullptr);
+		vkFreeMemory(Device, MaterialBufferMemory, nullptr);
 
 
 
@@ -577,7 +533,60 @@ namespace Render
 		Memory::FreeArray(&State.StaticMeshLinearStorage.StaticMeshes);
 	}
 
-	u64 LoadStaticMesh(const StaticMeshRender::StaticMeshVertex* Vertices, u64 VerticesCount, const u32* Indices, u64 IndicesCount, u32 FrameIndex)
+	void SubmitTransferring(VkCommandBuffer TransferCommandBuffer, VkFence TransferFence)
+	{
+		VkTimelineSemaphoreSubmitInfo TimelineInfo = { };
+		TimelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+		TimelineInfo.waitSemaphoreValueCount = 0;
+		TimelineInfo.signalSemaphoreValueCount = 1;
+		TimelineInfo.pSignalSemaphoreValues = &TransferTimelineValue;
+
+		VkSubmitInfo SubmitInfo = { };
+		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		SubmitInfo.commandBufferCount = 1;
+		SubmitInfo.pCommandBuffers = &TransferCommandBuffer;
+		SubmitInfo.signalSemaphoreCount = 1;
+		SubmitInfo.pSignalSemaphores = &TransferCompleted;
+		SubmitInfo.pNext = &TimelineInfo;
+
+		std::scoped_lock lock(State.QueueSubmitMutex);
+		TransferTimelineValue++;
+		vkQueueSubmit(VulkanInterface::GetTransferQueue(), 1, &SubmitInfo, TransferFence);
+	}
+
+	u32 CreateMaterial(Material* Mat, u32 FrameIndex)
+	{
+		VkDevice Device = VulkanInterface::GetDevice();
+
+		const u64 TransferOffset = GetOffsetFromStagingPool(&TransferStagingPool, sizeof(Material));
+
+		VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferStagingPool.Memory, sizeof(Material), TransferOffset, Mat);
+
+		VkBufferCopy BufferCopyRegion = { };
+		BufferCopyRegion.srcOffset = TransferOffset;
+		BufferCopyRegion.dstOffset = sizeof(Material) * MaterialIndex;
+		BufferCopyRegion.size = sizeof(Material);
+
+		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
+		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+		VkFence TransferFence = State.TransferState.Frames.Fences[FrameIndex];
+		VkCommandBuffer TransferCommandBuffer = State.TransferState.Frames.CommandBuffers[FrameIndex];
+
+		std::scoped_lock Lock(State.TransferState.Frames.Tasks[FrameIndex].Mutex);
+
+		vkWaitForFences(Device, 1, &TransferFence, VK_TRUE, UINT64_MAX);
+		vkResetFences(Device, 1, &TransferFence);
+
+		vkBeginCommandBuffer(TransferCommandBuffer, &CommandBufferBeginInfo);
+		vkCmdCopyBuffer(TransferCommandBuffer, TransferStagingPool.Buffer, MaterialBuffer, 1, &BufferCopyRegion);
+		vkEndCommandBuffer(TransferCommandBuffer);
+
+		SubmitTransferring(TransferCommandBuffer, TransferFence);
+		return MaterialIndex++;
+	}
+
+	u64 CreateStaticMesh(const StaticMeshRender::StaticMeshVertex* Vertices, u64 VerticesCount, const u32* Indices, u64 IndicesCount, u32 FrameIndex)
 	{
 		VkDevice Device = VulkanInterface::GetDevice();
 
@@ -612,13 +621,19 @@ namespace Render
 		State.StaticMeshLinearStorage.IndexBuffer.Offset += sizeof(u32) * IndicesCount;
 		State.StaticMeshLinearStorage.VertexBuffer.Offset += sizeof(StaticMeshRender::StaticMeshVertex) * VerticesCount;
 
+		VkFence TransferFence = State.TransferState.Frames.Fences[FrameIndex];
 		VkCommandBuffer TransferCommandBuffer = State.TransferState.Frames.CommandBuffers[FrameIndex];
+
+		std::scoped_lock Lock(State.TransferState.Frames.Tasks[FrameIndex].Mutex);
+		vkWaitForFences(Device, 1, &TransferFence, VK_TRUE, UINT64_MAX);
+		vkResetFences(Device, 1, &TransferFence);
 
 		vkBeginCommandBuffer(TransferCommandBuffer, &CommandBufferBeginInfo);
 		vkCmdCopyBuffer(TransferCommandBuffer, TransferStagingPool.Buffer, State.StaticMeshLinearStorage.IndexBuffer.Buffer, 1, &IndexBufferCopyRegion);
 		vkCmdCopyBuffer(TransferCommandBuffer, TransferStagingPool.Buffer, State.StaticMeshLinearStorage.VertexBuffer.Buffer, 1, &VertexBufferCopyRegion);
 		vkEndCommandBuffer(TransferCommandBuffer);
 		
+		SubmitTransferring(TransferCommandBuffer, TransferFence);		
 		return Index;
 	}
 

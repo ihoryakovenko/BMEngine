@@ -37,12 +37,6 @@ namespace RenderResources
 	static VkDescriptorSetLayout BindlesTexturesLayout;
 	static VkDescriptorSet BindlesTexturesSet;
 
-	static VkBuffer MaterialBuffer;
-	static VkDeviceMemory MaterialBufferMemory;
-	static VkDescriptorSetLayout MaterialLayout;
-	static VkDescriptorSet MaterialSet;
-	static u32 MaterialIndex;
-
 	//static std::vector<HandleEntry> handleEntries;
 	//static std::array<u32, MaxResources> reverseMapping;
 	//static std::vector<u32> freeList;
@@ -54,9 +48,6 @@ namespace RenderResources
 
 		MaxEntities = MaximumEntities;
 		MaxTextures = MaximumTextures;
-
-		u64 Size;
-		u64 Alignment;
 
 		Textures = Memory::MemoryManagementSystem::Allocate<VkImage>(MaxTextures);
 		TextureViews = Memory::MemoryManagementSystem::Allocate<VkImageView>(MaxTextures);
@@ -97,25 +88,6 @@ namespace RenderResources
 		// TODO: Get max textures from limits.maxPerStageDescriptorSampledImages;
 		BindlesTexturesLayout = VulkanInterface::CreateUniformLayout(EntitySamplerDescriptorType, EntitySamplerInputFlags, BindingFlags, 2, MaxTextures);
 		VulkanInterface::CreateUniformSets(&BindlesTexturesLayout, 1, &BindlesTexturesSet);
-
-		const VkDeviceSize MaterialBufferSize = sizeof(Material) * MaxEntities;
-		MaterialBuffer = VulkanHelper::CreateBuffer(Device, MaterialBufferSize, VulkanHelper::BufferUsageFlag::StorageFlag);
-		MaterialBufferMemory = VulkanHelper::AllocateDeviceMemoryForBuffer(VulkanInterface::GetPhysicalDevice(), Device,
-			MaterialBuffer, VulkanHelper::MemoryPropertyFlag::GPULocal, &Size, &Alignment);
-		vkBindBufferMemory(Device, MaterialBuffer, MaterialBufferMemory, 0);
-
-		VulkanInterface::UniformSetAttachmentInfo MaterialAttachmentInfo;
-		MaterialAttachmentInfo.BufferInfo.buffer = MaterialBuffer;
-		MaterialAttachmentInfo.BufferInfo.offset = 0;
-		MaterialAttachmentInfo.BufferInfo.range = MaterialBufferSize;
-		MaterialAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-
-		const VkDescriptorType MaterialDescriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		const VkShaderStageFlags MaterialStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		const VkDescriptorBindingFlags MaterialBindingFlags[1] = { };
-		MaterialLayout = VulkanInterface::CreateUniformLayout(&MaterialDescriptorType, &MaterialStageFlags, MaterialBindingFlags, 1, 1);
-		VulkanInterface::CreateUniformSets(&MaterialLayout, 1, &MaterialSet);
-		VulkanInterface::AttachUniformsToSet(MaterialSet, &MaterialAttachmentInfo, 1);
 	}
 
 	void DeInit()
@@ -130,22 +102,21 @@ namespace RenderResources
 		}
 
 		vkDestroyDescriptorSetLayout(Device, BindlesTexturesLayout, nullptr);
-		vkDestroyDescriptorSetLayout(Device, MaterialLayout, nullptr);
+		
 
 		vkDestroySampler(Device, DiffuseSampler, nullptr);
 		vkDestroySampler(Device, SpecularSampler, nullptr);
 
-		vkDestroyBuffer(Device, MaterialBuffer, nullptr);
-		vkFreeMemory(Device, MaterialBufferMemory, nullptr);
+
 
 		Memory::MemoryManagementSystem::Free(Textures);
 		Memory::MemoryManagementSystem::Free(TextureViews);
 		Memory::MemoryManagementSystem::Free(TexturesMemory);
 	}
 
-	DrawEntity CreateTerrain(void* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, u32 Material)
-	{
-		DrawEntity Entity = { };
+	//DrawEntity CreateTerrain(void* Vertices, u32 VertexSize, u64 VerticesCount, u32* Indices, u32 IndicesCount, u32 Material)
+	//{
+		//DrawEntity Entity = { };
 
 		//Entity.VertexOffset = VertexOffset;
 		//const VkDeviceSize MeshVerticesSize = VertexSize * VerticesCount;
@@ -161,15 +132,15 @@ namespace RenderResources
 		//Entity.MaterialIndex = Material;
 		//Entity.Model = glm::mat4(1.0f);
 
-		return Entity;
-	}
+		//return Entity;
+	//}
 
-	DrawEntity* GetEntities(u32* Count)
-	{
-		Render::RenderState* State = Render::GetRenderState();
-		*Count = State->DrawEntities.Count;
-		return State->DrawEntities.Data;
-	}
+	//DrawEntity* GetEntities(u32* Count)
+	//{
+	//	Render::RenderState* State = Render::GetRenderState();
+	//	*Count = State->DrawEntities.Count;
+	//	return State->DrawEntities.Data;
+	//}
 
 	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height)
 	{
@@ -272,14 +243,6 @@ namespace RenderResources
 		return CurrentTextureIndex;
 	}
 
-	u32 CreateMaterial(Material* Mat)
-	{
-		assert(MaterialIndex < MaxEntities);
-
-		Render::QueueBufferDataLoad(MaterialBuffer, sizeof(Material) * MaterialIndex, sizeof(Material), Mat);
-		return MaterialIndex++;
-	}
-
 	u32 GetTexture2DSRGBIndex(u64 Hash)
 	{
 		auto it = TexturesPhysicalIndexes.find(Hash);
@@ -307,16 +270,8 @@ namespace RenderResources
 
 	VkImageView* TmpGetTextureImageViews()
 	{
-		return TextureViews;;
+		return TextureViews;
 	}
 
-	VkDescriptorSetLayout TmpGetMaterialLayout()
-	{
-		return MaterialLayout;
-	}
 
-	VkDescriptorSet TmpGetMaterialSet()
-	{
-		return MaterialSet;
-	}
 }

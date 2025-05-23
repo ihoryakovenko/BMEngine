@@ -480,7 +480,8 @@ namespace VulkanInterface
 		VkSubmitInfo SubmitInfo = { };
 		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		SubmitInfo.pNext = &TimelineInfo;
-		SubmitInfo.waitSemaphoreCount = 2;
+		//SubmitInfo.waitSemaphoreCount = 2;
+		SubmitInfo.waitSemaphoreCount = 1;
 		SubmitInfo.pWaitSemaphores = WaitSemaphores;
 		SubmitInfo.pWaitDstStageMask = WaitStages;
 		SubmitInfo.commandBufferCount = 1;

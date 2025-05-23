@@ -109,7 +109,7 @@ namespace StaticMeshRender
 			FrameManager::GetViewProjectionLayout(),
 			RenderResources::GetBindlesTexturesLayout(),
 			StaticMeshLightLayout,
-			RenderResources::TmpGetMaterialLayout(),
+			Render::TmpGetMaterialLayout(),
 			ShadowMapArrayLayout
 		};
 
@@ -179,6 +179,8 @@ namespace StaticMeshRender
 
 	void Draw()
 	{
+		const Render::RenderState* State = Render::GetRenderState();
+
 		FrameManager::UpdateUniformMemory(EntityLightBufferHandle, Scene.LightEntity, sizeof(Render::LightBuffer));
 
 		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
@@ -195,19 +197,15 @@ namespace StaticMeshRender
 
 		const u32 LightDynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(Render::LightBuffer);
 
-		u32 EntitiesCount;
-		RenderResources::DrawEntity* Entities = RenderResources::GetEntities(&EntitiesCount);
-		const Render::RenderState* State = Render::GetRenderState();
-
-		for (u32 i = 0; i < EntitiesCount; ++i)
+		for (u32 i = 0; i < State->DrawEntities.Count; ++i)
 		{
-			RenderResources::DrawEntity* DrawEntity = Entities + i;
+			Render::DrawEntity* DrawEntity = State->DrawEntities.Data + i;
 			Render::StaticMesh* Mesh = State->StaticMeshLinearStorage.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
 
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
 				StaticMeshLightSet,
-				RenderResources::TmpGetMaterialSet(),
+				Render::TmpGetMaterialSet(),
 				ShadowMapArraySet[VulkanInterface::TestGetImageIndex()],
 			};
 			const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);

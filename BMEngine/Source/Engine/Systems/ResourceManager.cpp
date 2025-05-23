@@ -49,12 +49,6 @@ namespace ResourceManager
 			const u32 IndicesCount = Uh60Model.IndicesCounts[i];
 			const u32 TextureIndex = RenderResources::GetTexture2DSRGBIndex(Uh60Model.DiffuseTexturesHashes[i]);
 
-			RenderResources::Material Mat;
-			Mat.AlbedoTexIndex = TextureIndex;
-			Mat.SpecularTexIndex = TextureIndex;
-			Mat.Shininess = 32.0f;
-			const u32 MaterialIndex = RenderResources::CreateMaterial(&Mat);
-
 			ModelVertexByteOffset += VerticesCount;
 			ModelIndexCountOffset += IndicesCount;
 
@@ -80,70 +74,33 @@ namespace ResourceManager
 					const u64 VerticesCount = Uh60Model.VerticesCounts[i];
 					const u32 IndicesCount = Uh60Model.IndicesCounts[i];
 
-					Render::CreateEntity((StaticMeshRender::StaticMeshVertex*)Uh60Model.VertexData + ModelVertexByteOffset, sizeof(StaticMeshRender::StaticMeshVertex), VerticesCount,
-						Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, 0, Index);
+					const u32 TextureIndex = 0;
+
+					Render::Material Mat;
+					Mat.AlbedoTexIndex = TextureIndex;
+					Mat.SpecularTexIndex = TextureIndex;
+					Mat.Shininess = 32.0f;
+					const u32 MaterialIndex = Render::CreateMaterial(&Mat, Index);
+
+					Render::DrawEntity Entity = { };
+					Entity.StaticMeshIndex = Render::CreateStaticMesh((StaticMeshRender::StaticMeshVertex*)Uh60Model.VertexData + ModelVertexByteOffset,
+						VerticesCount, Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, Index);
+					Entity.MaterialIndex = 0;
+					Entity.Model = glm::mat4(1.0f);
+
+					Render::CreateEntity(&Entity, Index);
 
 					ModelVertexByteOffset += VerticesCount;
 					ModelIndexCountOffset += IndicesCount;
-					std::this_thread::sleep_for(std::chrono::milliseconds(100));
+					//std::this_thread::sleep_for(std::chrono::milliseconds(100));
 				}
 
-				std::this_thread::sleep_for(std::chrono::seconds(5));
+				//std::this_thread::sleep_for(std::chrono::seconds(5));
 				Util::ClearModel3DData(ModelData);
 			}
 		);
 
 		LoadThread.detach();
-
-		//{
-		//	Util::Model3DData ModelData = Util::LoadModel3DData(FilePath);
-		//	Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
-
-		//	u64 ModelVertexByteOffset = 0;
-		//	u32 ModelIndexCountOffset = 0;
-		//	for (u32 i = 0; i < Uh60Model.MeshCount; i++)
-		//	{
-		//		const u64 VerticesCount = Uh60Model.VerticesCounts[i];
-		//		const u32 IndicesCount = Uh60Model.IndicesCounts[i];
-
-		//		Render::CreateEntity((StaticMeshRender::StaticMeshVertex*)Uh60Model.VertexData + ModelVertexByteOffset, sizeof(StaticMeshRender::StaticMeshVertex), VerticesCount,
-		//			Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, 0, Index);
-
-		//		ModelVertexByteOffset += VerticesCount;
-		//		ModelIndexCountOffset += IndicesCount;
-		//	}
-
-		//	std::this_thread::sleep_for(std::chrono::seconds(5));
-		//	Util::ClearModel3DData(ModelData);
-		//}
-
-		//Util::Model3DData ModelData = Util::LoadModel3DData(FilePath);
-		//Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
-
-		//u64 ModelVertexByteOffset = 0;
-		//u32 ModelIndexCountOffset = 0;
-		//for (u32 i = 0; i < Uh60Model.MeshCount; i++)
-		//{
-		//	const u64 VerticesCount = Uh60Model.VerticesCounts[i];
-		//	const u32 IndicesCount = Uh60Model.IndicesCounts[i];
-		//	const u32 TextureIndex = RenderResources::GetTexture2DSRGBIndex(Uh60Model.DiffuseTexturesHashes[i]);
-
-		//	RenderResources::Material Mat;
-		//	Mat.AlbedoTexIndex = TextureIndex;
-		//	Mat.SpecularTexIndex = TextureIndex;
-		//	Mat.Shininess = 32.0f;
-		//	const u32 MaterialIndex = RenderResources::CreateMaterial(&Mat);
-
-		//	RenderResources::CreateEntity((StaticMeshRender::StaticMeshVertex*)Uh60Model.VertexData + ModelVertexByteOffset, sizeof(StaticMeshRender::StaticMeshVertex), VerticesCount,
-		//		Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, MaterialIndex);
-
-		//	ModelVertexByteOffset += VerticesCount;
-		//	ModelIndexCountOffset += IndicesCount;
-
-		//	TransferSystem::Transfer();
-		//}
-
-		//Util::ClearModel3DData(ModelData);
 	}
 
 	void LoadTextures(const char* Directory)

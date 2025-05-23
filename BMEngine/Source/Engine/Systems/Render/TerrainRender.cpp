@@ -35,7 +35,7 @@ namespace TerrainRender
 	static u32 IndicesCount;
 
 	static VulkanInterface::RenderPipeline Pipeline;
-	static RenderResources::DrawEntity TerrainDrawObject;
+	static Render::DrawEntity TerrainDrawObject;
 
 	static VkPushConstantRange PushConstants;
 
@@ -61,7 +61,7 @@ namespace TerrainRender
 		{
 			FrameManager::GetViewProjectionLayout(),
 			RenderResources::GetBindlesTexturesLayout(),
-			RenderResources::TmpGetMaterialLayout(),
+			Render::TmpGetMaterialLayout(),
 		};
 
 		const u32 LayoutsCount = sizeof(TerrainDescriptorLayouts) / sizeof(TerrainDescriptorLayouts[0]);
@@ -110,7 +110,7 @@ namespace TerrainRender
 		const VkDescriptorSet Sets[] = {
 			FrameManager::GetViewProjectionSet(),
 			RenderResources::GetBindlesTexturesSet(),
-			RenderResources::TmpGetMaterialSet(),
+			Render::TmpGetMaterialSet(),
 		};
 
 		const u32 TerrainDescriptorSetGroupCount = sizeof(Sets) / sizeof(Sets[0]);
@@ -147,10 +147,10 @@ namespace TerrainRender
 
 		IndicesCount = TerrainIndices.size();
 
-		RenderResources::Material Mat = { };
-		u32 MaterialIndex = RenderResources::CreateMaterial(&Mat);
-		TerrainDrawObject = RenderResources::CreateTerrain(&TerrainVerticesData[0][0], sizeof(TerrainVertex), NumRows * NumCols,
-			TerrainIndices.data(), IndicesCount, MaterialIndex);
+		Render::Material Mat = { };
+		//u32 MaterialIndex = Render::CreateMaterial(&Mat);
+		//TerrainDrawObject = RenderResources::CreateTerrain(&TerrainVerticesData[0][0], sizeof(TerrainVertex), NumRows * NumCols,
+			//TerrainIndices.data(), IndicesCount, MaterialIndex);
 	}
 
 	void GenerateTerrain(std::vector<u32>& Indices)
