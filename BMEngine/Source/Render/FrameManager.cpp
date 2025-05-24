@@ -32,7 +32,7 @@ namespace FrameManager
 		u64 Size;
 
 		Buffer.Buffer = VulkanHelper::CreateBuffer(Device, BufferMultiFrameSize, VulkanHelper::BufferUsageFlag::UniformFlag);
-		Buffer.Memory = VulkanHelper::AllocateDeviceMemoryForBuffer(PhysicalDevice, Device, Buffer.Buffer, VulkanHelper::MemoryPropertyFlag::HostCompatible,
+		Buffer.Memory = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Buffer.Buffer, VulkanHelper::MemoryPropertyFlag::HostCompatible,
 			&Size, &BufferAlignment);
 		vkBindBufferMemory(Device, Buffer.Buffer, Buffer.Memory, 0);
 

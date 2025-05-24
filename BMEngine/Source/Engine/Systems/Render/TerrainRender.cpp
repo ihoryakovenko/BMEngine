@@ -6,7 +6,6 @@
 #include "Render/FrameManager.h"
 #include "MainPass.h"
 #include "Engine/Systems/ResourceManager.h"
-#include "Engine/Systems/Render/RenderResources.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
 #include "Util/Util.h"
 #include "Util/Settings.h"
@@ -57,11 +56,13 @@ namespace TerrainRender
 		Shaders[1].Code = FragmentShaderCode.data();
 		Shaders[1].CodeSize = FragmentShaderCode.size();
 
+		const Render::RenderState* State = Render::GetRenderState();
+
 		VkDescriptorSetLayout TerrainDescriptorLayouts[] =
 		{
 			FrameManager::GetViewProjectionLayout(),
-			RenderResources::GetBindlesTexturesLayout(),
-			Render::TmpGetMaterialLayout(),
+			State->Textures.BindlesTexturesLayout,
+			State->Materials.MaterialLayout,
 		};
 
 		const u32 LayoutsCount = sizeof(TerrainDescriptorLayouts) / sizeof(TerrainDescriptorLayouts[0]);
@@ -105,12 +106,14 @@ namespace TerrainRender
 
 	void Draw()
 	{
+		const Render::RenderState* State = Render::GetRenderState();
+
 		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
 
 		const VkDescriptorSet Sets[] = {
 			FrameManager::GetViewProjectionSet(),
-			RenderResources::GetBindlesTexturesSet(),
-			Render::TmpGetMaterialSet(),
+			State->Textures.BindlesTexturesSet,
+			State->Materials.MaterialSet,
 		};
 
 		const u32 TerrainDescriptorSetGroupCount = sizeof(Sets) / sizeof(Sets[0]);

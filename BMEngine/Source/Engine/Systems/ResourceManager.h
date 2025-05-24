@@ -12,6 +12,6 @@
 namespace ResourceManager
 {
 	void Init();
-	void LoadModel(const char* FilePath);
-	void LoadTextures(const char* Directory);
+	void LoadModel(const char* FilePath, const char* Directory);
+	void LoadTextures(const char* Directory, u32 ImageIndex);
 }

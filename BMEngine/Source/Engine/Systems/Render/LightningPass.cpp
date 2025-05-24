@@ -1,9 +1,7 @@
-#include "RenderResources.h"
 #include "LightningPass.h"
 
 #include <vulkan/vulkan.h>
 
-#include "RenderResources.h"
 
 #include "Util/Settings.h"
 #include "Util/Util.h"
@@ -83,7 +81,9 @@ namespace LightningPass
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
 			vkCreateImage(Device, &ShadowMapArrayCreateInfo, nullptr, &ShadowMapArray[i].Image);
-			ShadowMapArray[i].Memory = VulkanHelper::AllocateAndBindDeviceMemoryForImage(PhysicalDevice, Device, ShadowMapArray[i].Image, VulkanHelper::GPULocal);
+			VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, ShadowMapArray[i].Image, VulkanHelper::GPULocal);
+			ShadowMapArray[i].Memory = AllocResult.Memory;
+			VULKAN_CHECK_RESULT(vkBindImageMemory(Device, ShadowMapArray[i].Image, ShadowMapArray[i].Memory, 0));
 
 			const VkDeviceSize LightSpaceMatrixSize = sizeof(glm::mat4);
 
@@ -94,7 +94,7 @@ namespace LightningPass
 			BufferInfo.size = LightSpaceMatrixSize;
 
 			LightSpaceMatrixBuffer[i].Buffer = VulkanHelper::CreateBuffer(Device, LightSpaceMatrixSize, VulkanHelper::BufferUsageFlag::UniformFlag);
-			LightSpaceMatrixBuffer[i].Memory = VulkanHelper::AllocateDeviceMemoryForBuffer(PhysicalDevice, Device, LightSpaceMatrixBuffer[i].Buffer,
+			LightSpaceMatrixBuffer[i].Memory = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, LightSpaceMatrixBuffer[i].Buffer,
 				VulkanHelper::MemoryPropertyFlag::HostCompatible, &Size, &Alignment);
 			vkBindBufferMemory(Device, LightSpaceMatrixBuffer[i].Buffer, LightSpaceMatrixBuffer[i].Memory, 0);
 
@@ -238,9 +238,9 @@ namespace LightningPass
 			for (u32 i = 0; i < State->DrawEntities.Count; ++i)
 			{
 				Render::DrawEntity* DrawEntity = State->DrawEntities.Data + i;
-				Render::StaticMesh* Mesh = State->StaticMeshLinearStorage.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
+				Render::StaticMesh* Mesh = State->Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
 
-				const VkBuffer VertexBuffers[] = { State->StaticMeshLinearStorage.VertexBuffer.Buffer };
+				const VkBuffer VertexBuffers[] = { State->Meshes.VertexBuffer.Buffer };
 				const VkDeviceSize Offsets[] = { Mesh->VertexOffset };
 
 				const u32 DescriptorSetGroupCount = 1;
@@ -257,7 +257,7 @@ namespace LightningPass
 					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr);
 
 				vkCmdBindVertexBuffers(CmdBuffer, 0, 1, VertexBuffers, Offsets);
-				vkCmdBindIndexBuffer(CmdBuffer, State->StaticMeshLinearStorage.IndexBuffer.Buffer, Mesh->VertexOffset, VK_INDEX_TYPE_UINT32);
+				vkCmdBindIndexBuffer(CmdBuffer, State->Meshes.IndexBuffer.Buffer, Mesh->VertexOffset, VK_INDEX_TYPE_UINT32);
 				vkCmdDrawIndexed(CmdBuffer, Mesh->IndicesCount, 1, 0, 0, 0);
 			}
 

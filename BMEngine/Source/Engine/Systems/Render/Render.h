@@ -6,7 +6,6 @@
 #include "Render/VulkanInterface/VulkanInterface.h"
 
 #include "Util/EngineTypes.h"
-#include "Engine/Systems/Render/RenderResources.h"
 #include "Render/FrameManager.h"
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 #include "Engine/Systems/Render/StaticMeshRender.h"
@@ -15,6 +14,7 @@
 
 #include <atomic>
 #include <mutex>
+#include <unordered_map>
 
 namespace DebugUi
 {
@@ -28,6 +28,15 @@ namespace Render
 		u32 AlbedoTexIndex;
 		u32 SpecularTexIndex;
 		float Shininess;
+	};
+
+	struct MaterialStorage
+	{
+		VkBuffer MaterialBuffer;
+		VkDeviceMemory MaterialBufferMemory;
+		VkDescriptorSetLayout MaterialLayout;
+		VkDescriptorSet MaterialSet;
+		u32 MaterialIndex;
 	};
 
 	struct DrawEntity
@@ -54,7 +63,7 @@ namespace Render
 	struct Texture
 	{
 		VkImage Image;
-		VkDevice Memory;
+		VkDeviceMemory Memory;
 		u64 Size;
 		u64 Alignment;
 	};
@@ -66,6 +75,23 @@ namespace Render
 		u32 IndicesCount;
 	};
 
+	struct MeshTexture2D
+	{
+		Texture MeshTexture;
+		VkImageView View;
+	};
+
+	struct TextureStorage
+	{
+		VkSampler DiffuseSampler;
+		VkSampler SpecularSampler;
+		VkDescriptorSetLayout BindlesTexturesLayout;
+		VkDescriptorSet BindlesTexturesSet;
+		MeshTexture2D* Textures;
+		std::unordered_map<u64, u32> TexturesPhysicalIndexes;
+		u32 TextureIndex;
+	};
+
 	struct GPUBuffer
 	{
 		VkBuffer Buffer;
@@ -75,24 +101,21 @@ namespace Render
 		u64 Offset;
 	};
 
+	struct StagingPool
+	{
+		VkBuffer Buffer;
+		VkDeviceMemory Memory;
+		u64 Size;
+		u64 Offset;
+		u64 Alignment;
+	};
+
 	struct StaticMeshStorage
 	{
 		GPUBuffer VertexBuffer;
 		GPUBuffer IndexBuffer;
 
 		Memory::DynamicArray<StaticMesh> StaticMeshes;
-	};
-
-	struct TexturesLoadQueue
-	{
-		Memory::DynamicArray<TextureData*> Textures;
-		VkFence Fence;
-	};
-
-	struct TexturesReadyQueue
-	{
-		Memory::DynamicArray<Texture> Textures;
-		VkFence Fence;
 	};
 
 	enum TransferTaskState
@@ -129,20 +152,20 @@ namespace Render
 	struct DataTransferState
 	{
 		VkCommandPool TransferCommandPool;
+		StagingPool TransferStagingPool;
 		TransferFrames Frames;
 	};
 
 	struct RenderState
 	{
-		DataTransferState TransferState;
-		std::mutex QueueSubmitMutex;
-
-		StaticMeshStorage StaticMeshLinearStorage;
+		StaticMeshStorage Meshes;
+		TextureStorage Textures;
+		MaterialStorage Materials;
 
 		Memory::DynamicArray<DrawEntity> DrawEntities;
 
-		TexturesLoadQueue TexturesLoad;
-		TexturesReadyQueue TextureReady;
+		DataTransferState TransferState;
+		std::mutex QueueSubmitMutex;	
 	};
 
 
@@ -153,21 +176,22 @@ namespace Render
 	u64 CreateStaticMesh(const StaticMeshRender::StaticMeshVertex* Vertices, u64 VerticesCount, const u32* Indices, u64 IndicesCount, u32 FrameIndex);
 	u32 CreateMaterial(Material* Mat, u32 FrameIndex);
 	u32 CreateEntity(const DrawEntity* Entity, u32 FrameIndex);
+	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height, u32 FrameIndex);
+
+	u32 GetTexture2DSRGBIndex(u64 Hash);
+	RenderState* GetRenderState();
 
 	void Draw(const FrameManager::ViewProjectionBuffer* Data);
 
-	RenderState* GetRenderState();
+	
 
 
 
 
-	void Transfer(u32 FrameIndex);
-	void QueueImageDataLoad(VkImage Image, u32 Width, u32 Height, void* Data);
 
-	u64 TmpGetTransferTimelineValue();
-	VkSemaphore TmpGetTransferCompleted();
-	VkDescriptorSetLayout TmpGetMaterialLayout();
-	VkDescriptorSet TmpGetMaterialSet();
+
+
+
 
 
 

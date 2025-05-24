@@ -110,10 +110,15 @@ namespace DeferredPass
 			//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
 
 			vkCreateImage(Device, &DeferredInputDepthUniformCreateInfo, nullptr, &DeferredInputDepthImage[i].Image);
-			DeferredInputDepthImage[i].Memory = VulkanHelper::AllocateAndBindDeviceMemoryForImage(PhysicalDevice, Device, DeferredInputDepthImage[i].Image, VulkanHelper::GPULocal);
+			VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
+				DeferredInputDepthImage[i].Image, VulkanHelper::GPULocal);
+			DeferredInputDepthImage[i].Memory = AllocResult.Memory;
+			vkBindImageMemory(Device, DeferredInputDepthImage[i].Image, DeferredInputDepthImage[i].Memory, 0);
 
 			vkCreateImage(Device, &DeferredInputColorUniformCreateInfo, nullptr, &DeferredInputColorImage[i].Image);
-			DeferredInputColorImage[i].Memory = VulkanHelper::AllocateAndBindDeviceMemoryForImage(PhysicalDevice, Device, DeferredInputColorImage[i].Image, VulkanHelper::GPULocal);
+			AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, DeferredInputColorImage[i].Image, VulkanHelper::GPULocal);
+			DeferredInputColorImage[i].Memory = AllocResult.Memory;
+			vkBindImageMemory(Device, DeferredInputColorImage[i].Image, DeferredInputColorImage[i].Memory, 0);
 
 			DeferredInputDepthImageInterface[i] = VulkanInterface::CreateImageInterface(&InputDepthUniformInterfaceCreateInfo,
 				DeferredInputDepthImage[i].Image);

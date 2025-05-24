@@ -106,11 +106,7 @@ namespace VulkanInterface
 
 		CreateMainInstance();
 
-		VkResult Result = glfwCreateWindowSurface(Instance.VulkanInstance, WindowHandler, nullptr, &Surface);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateWin32SurfaceKHR result is %d", Result);
-		}
+		VULKAN_CHECK_RESULT(glfwCreateWindowSurface(Instance.VulkanInstance, WindowHandler, nullptr, &Surface));
 
 		CreateDeviceInstance();
 
@@ -126,11 +122,7 @@ namespace VulkanInterface
 		PoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 		PoolInfo.queueFamilyIndex = Device.Indices.GraphicsFamily;
 
-		Result = vkCreateCommandPool(Device.LogicalDevice, &PoolInfo, nullptr, &GraphicsCommandPool);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateCommandPool result is %d", Result);
-		}
+		VULKAN_CHECK_RESULT(vkCreateCommandPool(Device.LogicalDevice, &PoolInfo, nullptr, &GraphicsCommandPool));
 
 		CreateSwapchainInstance(Device.PhysicalDevice, Device.Indices, Device.LogicalDevice, Surface, SurfaceFormat, SwapExtent);
 		CreateCommandBuffers();
@@ -382,13 +374,7 @@ namespace VulkanInterface
 		PipelineCreateInfo->basePipelineIndex = -1;
 
 		VkPipeline Pipeline;
-		const VkResult Result = vkCreateGraphicsPipelines(Device.LogicalDevice, VK_NULL_HANDLE, 1,
-			PipelineCreateInfo, nullptr, &Pipeline);
-
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateGraphicsPipelines result is %d", Result);
-		}
+		VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device.LogicalDevice, VK_NULL_HANDLE, 1, PipelineCreateInfo, nullptr, &Pipeline));
 
 		for (u32 j = 0; j < ShadersCount; ++j)
 		{
@@ -435,31 +421,20 @@ namespace VulkanInterface
 		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
 		VkCommandBuffer CommandBuffer = DrawCommandBuffers[CurrentImageIndex];
-		VkResult Result = vkBeginCommandBuffer(CommandBuffer, &CommandBufferBeginInfo);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkBeginCommandBuffer result is %d", Result);
-		}
-
+		VULKAN_CHECK_RESULT(vkBeginCommandBuffer(CommandBuffer, &CommandBufferBeginInfo));
 		return CommandBuffer;
 	}
 
 	void EndFrame(std::mutex& mutex)
 	{
-		VkResult Result = vkEndCommandBuffer(DrawCommandBuffers[CurrentImageIndex]);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkBeginCommandBuffer result is %d", Result);
-		}
+		VULKAN_CHECK_RESULT(vkEndCommandBuffer(DrawCommandBuffers[CurrentImageIndex]));
 
 		uint64_t WaitValues[] = {
 			0,
-			Render::TmpGetTransferTimelineValue()
 		};
 
 		VkSemaphore WaitSemaphores[] = {
 			ImagesAvailable[CurrentFrame],
-			Render::TmpGetTransferCompleted()
 		};
 
 		VkPipelineStageFlags WaitStages[] = {
@@ -467,13 +442,11 @@ namespace VulkanInterface
 			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT
 		};
 
-
-
 		// Timeline info
 		VkTimelineSemaphoreSubmitInfo TimelineInfo = { };
 		TimelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
 		TimelineInfo.pWaitSemaphoreValues = WaitValues;
-		TimelineInfo.waitSemaphoreValueCount = 2;
+		TimelineInfo.waitSemaphoreValueCount = 1;
 		TimelineInfo.signalSemaphoreValueCount = 0;
 		TimelineInfo.pSignalSemaphoreValues = nullptr;
 
@@ -504,7 +477,6 @@ namespace VulkanInterface
 			VULKAN_CHECK_RESULT(vkQueuePresentKHR(GraphicsQueue, &PresentInfo));
 		}
 
-
 		CurrentFrame = (CurrentFrame + 1) % MAX_DRAW_FRAMES;
 	}
 
@@ -516,12 +488,7 @@ namespace VulkanInterface
 	VkSampler CreateSampler(const VkSamplerCreateInfo* CreateInfo)
 	{
 		VkSampler Sampler;
-		VkResult Result = vkCreateSampler(Device.LogicalDevice, CreateInfo, nullptr, &Sampler);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateSampler result is %d", Result);
-		}
-
+		VULKAN_CHECK_RESULT(vkCreateSampler(Device.LogicalDevice, CreateInfo, nullptr, &Sampler));
 		return Sampler;
 	}
 
@@ -552,12 +519,7 @@ namespace VulkanInterface
 		LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
 
 		VkDescriptorSetLayout Layout;
-		const VkResult Result = vkCreateDescriptorSetLayout(Device.LogicalDevice, &LayoutCreateInfo, nullptr, &Layout);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateDescriptorSetLayout result is %d", Result);
-		}
-
+		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device.LogicalDevice, &LayoutCreateInfo, nullptr, &Layout));
 		return Layout;
 	}
 
@@ -571,11 +533,7 @@ namespace VulkanInterface
 		SetAllocInfo.descriptorSetCount = Count; // Number of sets to allocate
 		SetAllocInfo.pSetLayouts = Layouts; // Layouts to use to allocate sets (1:1 relationship)
 
-		const VkResult Result = vkAllocateDescriptorSets(Device.LogicalDevice, &SetAllocInfo, (VkDescriptorSet*)OutSets);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkAllocateDescriptorSets result is %d", Result);
-		}
+		VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device.LogicalDevice, &SetAllocInfo, (VkDescriptorSet*)OutSets));
 	}
 
 	void CreateUniformSets(const VkDescriptorSetLayout* Layouts, u32* DescriptorCounts, u32 Count, VkDescriptorSet* OutSets)
@@ -594,11 +552,7 @@ namespace VulkanInterface
 		SetAllocInfo.pSetLayouts = Layouts; // Layouts to use to allocate sets (1:1 relationship)
 		SetAllocInfo.pNext = &CountInfo;
 
-		const VkResult Result = vkAllocateDescriptorSets(Device.LogicalDevice, &SetAllocInfo, (VkDescriptorSet*)OutSets);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkAllocateDescriptorSets result is %d", Result);
-		}
+		VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device.LogicalDevice, &SetAllocInfo, (VkDescriptorSet*)OutSets));
 	}
 
 	VkImageView CreateImageInterface(const UniformImageInterfaceCreateInfo* InterfaceCreateInfo, VkImage Image)
@@ -613,12 +567,7 @@ namespace VulkanInterface
 		ViewCreateInfo.pNext = InterfaceCreateInfo->pNext;
 
 		VkImageView ImageView;
-		const VkResult Result = vkCreateImageView(Device.LogicalDevice, &ViewCreateInfo, nullptr, &ImageView);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateImageView result is %d", Result);
-		}
-
+		VULKAN_CHECK_RESULT(vkCreateImageView(Device.LogicalDevice, &ViewCreateInfo, nullptr, &ImageView));
 		return ImageView;
 	}
 
@@ -689,12 +638,7 @@ namespace VulkanInterface
 		MessengerCreateInfo.pfnUserCallback = VulkanHelper::MessengerDebugCallback;
 
 
-		VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &Instance.VulkanInstance);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateInstance result is %d", Result);
-			return false;
-		}
+		VULKAN_CHECK_RESULT(vkCreateInstance(&CreateInfo, nullptr, &Instance.VulkanInstance));
 
 		const bool CreateDebugUtilsMessengerResult =
 			VulkanHelper::CreateDebugUtilsMessengerEXT(Instance.VulkanInstance, &MessengerCreateInfo, nullptr, &Instance.DebugMessenger);
@@ -914,12 +858,7 @@ namespace VulkanInterface
 
 		VkDevice LogicalDevice;
 		// Queues are created at the same time as the Device
-		VkResult Result = vkCreateDevice(Device.PhysicalDevice, &DeviceCreateInfo, nullptr, &LogicalDevice);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateDevice result is %d", Result);
-		}
-
+		VULKAN_CHECK_RESULT(vkCreateDevice(Device.PhysicalDevice, &DeviceCreateInfo, nullptr, &LogicalDevice));
 		return LogicalDevice;
 	}
 
@@ -975,11 +914,7 @@ namespace VulkanInterface
 		SwapInstance.SwapExtent = Extent;
 
 		VkSurfaceCapabilitiesKHR SurfaceCapabilities = { };
-		VkResult Result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(PhysicalDevice, Surface, &SurfaceCapabilities);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Warning, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR result is %d", Result);
-		}
+		VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(PhysicalDevice, Surface, &SurfaceCapabilities));
 
 		VkPresentModeKHR PresentationMode = VulkanHelper::GetBestPresentationMode(PhysicalDevice, Surface);
 
@@ -1012,11 +947,7 @@ namespace VulkanInterface
 
 			// Create image view and return it
 			VkImageView ImageView;
-			VkResult Result = vkCreateImageView(Device.LogicalDevice, &ViewCreateInfo, nullptr, &ImageView);
-			if (Result != VK_SUCCESS)
-			{
-				Util::RenderLog(Util::BMRVkLogType_Info, "Can't create image view");
-			}
+			VULKAN_CHECK_RESULT(vkCreateImageView(Device.LogicalDevice, &ViewCreateInfo, nullptr, &ImageView));
 
 			SwapInstance.ImageViews[i] = ImageView;
 		}
@@ -1086,13 +1017,7 @@ namespace VulkanInterface
 		SwapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
 
 		VkSwapchainKHR Swapchain;
-		VkResult Result = vkCreateSwapchainKHR(LogicalDevice, &SwapchainCreateInfo, nullptr, &Swapchain);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateSwapchainKHR result is %d", Result);
-			assert(false);
-		}
-
+		VULKAN_CHECK_RESULT(vkCreateSwapchainKHR(LogicalDevice, &SwapchainCreateInfo, nullptr, &Swapchain));
 		return Swapchain;
 	}
 
@@ -1105,13 +1030,7 @@ namespace VulkanInterface
 		// VK_COMMAND_BUFFER_LEVEL_SECONARY	: Buffer can't be called directly. Can be called from other buffers via "vkCmdExecuteCommands" when recording commands in primary buffer
 		GraphicsCommandBufferAllocateInfo.commandBufferCount = static_cast<u32>(SwapInstance.ImagesCount);
 
-		VkResult Result = vkAllocateCommandBuffers(Device.LogicalDevice, &GraphicsCommandBufferAllocateInfo, DrawCommandBuffers);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkAllocateCommandBuffers result is %d", Result);
-			return false;
-		}
-
+		VULKAN_CHECK_RESULT(vkAllocateCommandBuffers(Device.LogicalDevice, &GraphicsCommandBufferAllocateInfo, DrawCommandBuffers));
 		return true;
 	}
 

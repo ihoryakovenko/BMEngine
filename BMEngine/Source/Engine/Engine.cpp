@@ -145,11 +145,11 @@ namespace Engine
 
 		
 		ResourceManager::Init();
-		ResourceManager::LoadTextures(".\\Resources\\Textures");
+		//ResourceManager::LoadTextures(".\\Resources\\Textures");
 
-		VulkanInterface::WaitDevice();
+		//VulkanInterface::WaitDevice();
 
-		ResourceManager::LoadModel(".\\Resources\\Models\\uh60.model");
+		ResourceManager::LoadModel(".\\Resources\\Models\\uh60.model", ".\\Resources\\Textures");
 		
 		
 

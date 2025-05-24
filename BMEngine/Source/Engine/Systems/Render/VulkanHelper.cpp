@@ -11,8 +11,7 @@ namespace VulkanHelper
 	Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
 	{
 		u32 Count;
-		const VkResult Result = vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, Surface, &Count, nullptr);
-		assert(Result == VK_SUCCESS);
+		VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, Surface, &Count, nullptr));
 
 		auto Data = Memory::FrameArray<VkSurfaceFormatKHR>::Create(Count);
 		vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, Surface, &Count, Data.Pointer.Data);
@@ -102,13 +101,11 @@ namespace VulkanHelper
 		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 		VkBuffer Buffer;
-		VkResult Result = vkCreateBuffer(Device, &BufferInfo, nullptr, &Buffer);
-		assert(Result == VK_SUCCESS);
-
+		VULKAN_CHECK_RESULT(vkCreateBuffer(Device, &BufferInfo, nullptr, &Buffer));
 		return Buffer;
 	}
 
-	VkDeviceMemory AllocateDeviceMemoryForBuffer(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer,
+	VkDeviceMemory AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer,
 		MemoryPropertyFlag Properties, u64* OutAlignment, u64* OutSize)
 	{
 		VkMemoryRequirements MemoryRequirements;
@@ -122,16 +119,14 @@ namespace VulkanHelper
 		MemoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;
 
 		VkDeviceMemory Memory;
-		VkResult Result = vkAllocateMemory(Device, &MemoryAllocInfo, nullptr, &Memory);
-		assert(Result == VK_SUCCESS);
+		VULKAN_CHECK_RESULT(vkAllocateMemory(Device, &MemoryAllocInfo, nullptr, &Memory));
 
 		*OutAlignment = MemoryRequirements.alignment;
 		*OutSize = MemoryRequirements.size;
-
 		return Memory;
 	}
 
-	VkDeviceMemory AllocateDeviceMemoryForImage(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkImage Image, MemoryPropertyFlag Properties)
+	DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkImage Image, MemoryPropertyFlag Properties)
 	{
 		VkMemoryRequirements MemoryRequirements;
 		vkGetImageMemoryRequirements(Device, Image, &MemoryRequirements);
@@ -143,21 +138,12 @@ namespace VulkanHelper
 		MemoryAllocInfo.allocationSize = MemoryRequirements.size;
 		MemoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;
 
-		VkDeviceMemory Memory;
-		VkResult Result = vkAllocateMemory(Device, &MemoryAllocInfo, nullptr, &Memory);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkAllocateMemory result is %d", Result);
-		}
+		DeviceMemoryAllocResult Result;
+		VULKAN_CHECK_RESULT(vkAllocateMemory(Device, &MemoryAllocInfo, nullptr, &Result.Memory));
+		Result.Alignment = MemoryRequirements.alignment;
+		Result.Size = MemoryRequirements.size;
 
-		return Memory;
-	}
-
-	VkDeviceMemory AllocateAndBindDeviceMemoryForImage(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkImage Image, MemoryPropertyFlag Properties)
-	{
-		VkDeviceMemory Memory = AllocateDeviceMemoryForImage(PhysicalDevice, Device, Image, Properties);
-		vkBindImageMemory(Device, Image, Memory, 0);
-		return Memory;
+		return Result;
 	}
 
 	void UpdateHostCompatibleBufferMemory(VkDevice Device, VkDeviceMemory Memory, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data)
@@ -178,23 +164,14 @@ namespace VulkanHelper
 		PoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
 
 		VkDescriptorPool Pool;
-		VkResult Result = vkCreateDescriptorPool(Device, &PoolCreateInfo, nullptr, &Pool);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateDescriptorPool result is %d", Result);
-		}
-
+		VULKAN_CHECK_RESULT(vkCreateDescriptorPool(Device, &PoolCreateInfo, nullptr, &Pool));
 		return Pool;
 	}
 
 	Memory::FrameArray<VkExtensionProperties> GetAvailableExtensionProperties()
 	{
 		u32 Count;
-		const VkResult Result = vkEnumerateInstanceExtensionProperties(nullptr, &Count, nullptr);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkEnumerateInstanceExtensionProperties result is %d", static_cast<int>(Result));
-		}
+		VULKAN_CHECK_RESULT(vkEnumerateInstanceExtensionProperties(nullptr, &Count, nullptr));
 
 		auto Data = Memory::FrameArray<VkExtensionProperties>::Create(Count);
 		vkEnumerateInstanceExtensionProperties(nullptr, &Count, Data.Pointer.Data);
@@ -205,11 +182,7 @@ namespace VulkanHelper
 	Memory::FrameArray<VkLayerProperties> GetAvailableInstanceLayerProperties()
 	{
 		u32 Count;
-		const VkResult Result = vkEnumerateInstanceLayerProperties(&Count, nullptr);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkEnumerateInstanceLayerProperties result is %d", Result);
-		}
+		VULKAN_CHECK_RESULT(vkEnumerateInstanceLayerProperties(&Count, nullptr));
 
 		auto Data = Memory::FrameArray<VkLayerProperties>::Create(Count);
 		vkEnumerateInstanceLayerProperties(&Count, Data.Pointer.Data);
@@ -251,11 +224,7 @@ namespace VulkanHelper
 	Memory::FrameArray<VkExtensionProperties> GetDeviceExtensionProperties(VkPhysicalDevice PhysicalDevice)
 	{
 		u32 Count;
-		const VkResult Result = vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &Count, nullptr);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkEnumerateDeviceExtensionProperties result is %d", Result);
-		}
+		VULKAN_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &Count, nullptr));
 
 		auto Data = Memory::FrameArray<VkExtensionProperties>::Create(Count);
 		vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &Count, Data.Pointer.Data);
@@ -536,11 +505,7 @@ namespace VulkanHelper
 	{
 		VkSurfaceCapabilitiesKHR SurfaceCapabilities = { };
 
-		VkResult Result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(PhysicalDevice, Surface, &SurfaceCapabilities);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Warning, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR result is %d", Result);
-		}
+		VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(PhysicalDevice, Surface, &SurfaceCapabilities));
 
 		VkExtent2D SwapExtent;
 
@@ -589,12 +554,7 @@ namespace VulkanHelper
 		VkSurfaceKHR Surface)
 	{
 		u32 Count;
-		const VkResult Result = vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Count, nullptr);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkGetPhysicalDeviceSurfacePresentModesKHR result is %d", Result);
-			assert(false);
-		}
+		VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Count, nullptr));
 
 		auto Data = Memory::FrameArray<VkPresentModeKHR>::Create(Count);
 		vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Count, Data.Pointer.Data);
@@ -702,12 +662,7 @@ namespace VulkanHelper
 		ShaderModuleCreateInfo.pCode = Code;
 
 		VkShaderModule VertexShaderModule;
-		VkResult Result = vkCreateShaderModule(Device, &ShaderModuleCreateInfo, nullptr, &VertexShaderModule);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateShaderModule result is %d", Result);
-		}
-
+		VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &ShaderModuleCreateInfo, nullptr, &VertexShaderModule));
 		return VertexShaderModule;
 	}
 
@@ -722,11 +677,7 @@ namespace VulkanHelper
 		PipelineLayoutCreateInfo.pPushConstantRanges = PushConstant;
 
 		VkPipelineLayout PipelineLayout;
-		const VkResult Result = vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &PipelineLayout);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkCreatePipelineLayout result is %d", Result);
-		}
+		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &PipelineLayout));
 
 		return PipelineLayout;
 	}
@@ -737,12 +688,7 @@ namespace VulkanHelper
 		auto CreateMessengerFunc = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(Instance, "vkCreateDebugUtilsMessengerEXT");
 		if (CreateMessengerFunc != nullptr)
 		{
-			const VkResult Result = CreateMessengerFunc(Instance, CreateInfo, Allocator, InDebugMessenger);
-			if (Result != VK_SUCCESS)
-			{
-				Util::RenderLog(Util::BMRVkLogType_Error, "CreateMessengerFunc result is %d", Result);
-				return false;
-			}
+			VULKAN_CHECK_RESULT(CreateMessengerFunc(Instance, CreateInfo, Allocator, InDebugMessenger));
 		}
 		else
 		{

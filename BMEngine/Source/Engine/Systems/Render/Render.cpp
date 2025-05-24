@@ -2,7 +2,6 @@
 
 #include "Engine/Systems/Render/TerrainRender.h"
 #include "Engine/Systems/Render/StaticMeshRender.h"
-#include "Engine/Systems/Render/RenderResources.h"
 #include "Engine/Systems/Render/LightningPass.h"
 #include "Engine/Systems/Render/MainPass.h"
 #include "Engine/Systems/Render/DeferredPass.h"
@@ -15,44 +14,252 @@
 namespace Render
 {
 	static RenderState State;
-
-
-	static VkBuffer MaterialBuffer;
-	static VkDeviceMemory MaterialBufferMemory;
-	static VkDescriptorSetLayout MaterialLayout;
-	static VkDescriptorSet MaterialSet;
-	static u32 MaterialIndex;
-
-	struct StagingPool
-	{
-		VkBuffer Buffer;
-		VkDeviceMemory Memory;
-		VkDeviceSize Size;
-		VkDeviceSize Offset;
-		VkDeviceSize Alignment;
-	};
-
-	struct ImageCopyData
-	{
-		VkBufferImageCopy BufferImageCopyInfo;
-		VkImage Image;
-	};
-
-	Memory::DynamicArray<VkImageMemoryBarrier2> ImageTransferring;
-	Memory::DynamicArray<VkImageMemoryBarrier2> ImagePresenting;
-	Memory::DynamicArray<ImageCopyData> ImageCopy;
-
-	static StagingPool TransferStagingPool;
-	static VkSemaphore TransferCompleted;
-	static u64 TransferTimelineValue = 0;
 	
+	static u64 StagingPoolGetMemory(StagingPool* Pool, u64 Size);
+	static void ProcessCompletedTransferTasks(VkDevice Device, TaskQueue* Queue, VkFence Fence);
 
-	static void PrepareImageForTransferring(VkImage Image);
-	static void PrepareImageForPresentation(VkImage Image);
+	void InitStaticMeshStorage(VkDevice Device, VkPhysicalDevice PhysicalDevice, StaticMeshStorage* Buffer, u64 VertexCapacity, u64 IndexCapacity)
+	{
+		Buffer->StaticMeshes = Memory::AllocateArray<StaticMesh>(256);
 
-	static u64 GetOffsetFromStagingPool(StagingPool* Pool, u64 Size);
+		Buffer->IndexBuffer.Offset = 0;
+		Buffer->VertexBuffer.Offset = 0;
 
-	u64 GetOffsetFromStagingPool(StagingPool* Pool, u64 Size)
+		Buffer->VertexBuffer.Buffer = VulkanHelper::CreateBuffer(Device, VertexCapacity, VulkanHelper::BufferUsageFlag::VertexFlag);
+		Buffer->VertexBuffer.Memory = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Buffer->VertexBuffer.Buffer,
+			VulkanHelper::MemoryPropertyFlag::GPULocal, &Buffer->VertexBuffer.Alignment, &Buffer->VertexBuffer.Capacity);
+		vkBindBufferMemory(Device, Buffer->VertexBuffer.Buffer, Buffer->VertexBuffer.Memory, 0);
+
+		Buffer->IndexBuffer.Buffer = VulkanHelper::CreateBuffer(Device, VertexCapacity, VulkanHelper::BufferUsageFlag::IndexFlag);
+		Buffer->IndexBuffer.Memory = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Buffer->IndexBuffer.Buffer,
+			VulkanHelper::MemoryPropertyFlag::GPULocal, &Buffer->IndexBuffer.Alignment, &Buffer->IndexBuffer.Capacity);
+		vkBindBufferMemory(Device, Buffer->IndexBuffer.Buffer, Buffer->IndexBuffer.Memory, 0);
+
+		VkFenceCreateInfo FenceCreateInfo = { };
+		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+		FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+	}
+
+	void InitMaterialStorage(VkDevice Device, MaterialStorage* Storage)
+	{
+		u64 Size;
+		u64 Alignment;
+
+		const VkDeviceSize MaterialBufferSize = sizeof(Material) * 512;
+		Storage->MaterialBuffer = VulkanHelper::CreateBuffer(Device, MaterialBufferSize, VulkanHelper::BufferUsageFlag::StorageFlag);
+		Storage->MaterialBufferMemory = VulkanHelper::AllocateDeviceMemory(VulkanInterface::GetPhysicalDevice(), Device,
+			Storage->MaterialBuffer, VulkanHelper::MemoryPropertyFlag::GPULocal, &Size, &Alignment);
+		vkBindBufferMemory(Device, Storage->MaterialBuffer, Storage->MaterialBufferMemory, 0);
+
+		VulkanInterface::UniformSetAttachmentInfo MaterialAttachmentInfo;
+		MaterialAttachmentInfo.BufferInfo.buffer = Storage->MaterialBuffer;
+		MaterialAttachmentInfo.BufferInfo.offset = 0;
+		MaterialAttachmentInfo.BufferInfo.range = MaterialBufferSize;
+		MaterialAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+
+		const VkDescriptorType MaterialDescriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		const VkShaderStageFlags MaterialStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		const VkDescriptorBindingFlags MaterialBindingFlags[1] = { };
+		Storage->MaterialLayout = VulkanInterface::CreateUniformLayout(&MaterialDescriptorType, &MaterialStageFlags, MaterialBindingFlags, 1, 1);
+		VulkanInterface::CreateUniformSets(&Storage->MaterialLayout, 1, &Storage->MaterialSet);
+		VulkanInterface::AttachUniformsToSet(Storage->MaterialSet, &MaterialAttachmentInfo, 1);
+	}
+
+	void InitTextureStorage(VkDevice Device, VkPhysicalDevice PhysicalDevice, TextureStorage* Storage)
+	{
+		const u32 MaxTextures = 512;
+
+		Storage->Textures = Memory::MemoryManagementSystem::Allocate<MeshTexture2D>(MaxTextures);
+
+		VkSamplerCreateInfo DiffuseSamplerCreateInfo = { };
+		DiffuseSamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		DiffuseSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+		DiffuseSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+		DiffuseSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		DiffuseSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		DiffuseSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		DiffuseSamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+		DiffuseSamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+		DiffuseSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		DiffuseSamplerCreateInfo.mipLodBias = 0.0f;
+		DiffuseSamplerCreateInfo.minLod = 0.0f;
+		DiffuseSamplerCreateInfo.maxLod = 0.0f;
+		DiffuseSamplerCreateInfo.anisotropyEnable = VK_TRUE;
+		DiffuseSamplerCreateInfo.maxAnisotropy = 16;
+
+		VkSamplerCreateInfo SpecularSamplerCreateInfo = DiffuseSamplerCreateInfo;
+		DiffuseSamplerCreateInfo.maxAnisotropy = 1;
+
+		Storage->DiffuseSampler = VulkanInterface::CreateSampler(&DiffuseSamplerCreateInfo);
+		Storage->SpecularSampler = VulkanInterface::CreateSampler(&SpecularSamplerCreateInfo);
+
+		const VkShaderStageFlags EntitySamplerInputFlags[2] = { VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
+		const VkDescriptorType EntitySamplerDescriptorType[2] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
+		const VkDescriptorBindingFlags BindingFlags[2] = {
+			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
+			VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT |
+			VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
+			VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT |
+			VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT };
+
+		// TODO: Get max textures from limits.maxPerStageDescriptorSampledImages;
+		Storage->BindlesTexturesLayout = VulkanInterface::CreateUniformLayout(EntitySamplerDescriptorType, EntitySamplerInputFlags, BindingFlags, 2, MaxTextures);
+		VulkanInterface::CreateUniformSets(&Storage->BindlesTexturesLayout, 1, &Storage->BindlesTexturesSet);
+	}
+
+	void InitTransferState(VkDevice Device, VkPhysicalDevice PhysicalDevice, DataTransferState* TransferState)
+	{
+		VkCommandPoolCreateInfo PoolInfo = { };
+		PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		PoolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+		PoolInfo.queueFamilyIndex = VulkanInterface::GetQueueGraphicsFamilyIndex();
+
+		VULKAN_CHECK_RESULT(vkCreateCommandPool(Device, &PoolInfo, nullptr, &TransferState->TransferCommandPool));
+
+		VkCommandBufferAllocateInfo TransferCommandBufferAllocateInfo = { };
+		TransferCommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		TransferCommandBufferAllocateInfo.commandPool = TransferState->TransferCommandPool;
+		TransferCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		TransferCommandBufferAllocateInfo.commandBufferCount = VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT;
+
+		VULKAN_CHECK_RESULT(vkAllocateCommandBuffers(Device, &TransferCommandBufferAllocateInfo, TransferState->Frames.CommandBuffers));
+
+		VkFenceCreateInfo FenceCreateInfo = { };
+		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+		FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+		for (u32 i = 0; i < VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT; ++i)
+		{
+			VULKAN_CHECK_RESULT(vkCreateFence(Device, &FenceCreateInfo, nullptr, TransferState->Frames.Fences + i));
+		}
+
+		TransferState->TransferStagingPool.Buffer = VulkanHelper::CreateBuffer(Device, MB32, VulkanHelper::StagingFlag);
+		TransferState->TransferStagingPool.Memory = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, TransferState->TransferStagingPool.Buffer, VulkanHelper::HostCompatible,
+			&TransferState->TransferStagingPool.Alignment, &TransferState->TransferStagingPool.Size);
+		TransferState->TransferStagingPool.Offset = 0;
+		vkBindBufferMemory(Device, TransferState->TransferStagingPool.Buffer, TransferState->TransferStagingPool.Memory, 0);
+	}
+
+	void Init(GLFWwindow* WindowHandler, DebugUi::GuiData* GuiData)
+	{
+		VulkanInterface::VulkanInterfaceConfig RenderConfig;
+		//RenderConfig.MaxTextures = 90;
+		RenderConfig.MaxTextures = 500; // TODO: FIX!!!!
+
+		State.DrawEntities = Memory::AllocateArray<DrawEntity>(512);
+
+		VulkanInterface::Init(WindowHandler, RenderConfig);
+		
+		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
+		VkDevice Device = VulkanInterface::GetDevice();
+
+		InitTransferState(Device, PhysicalDevice, &State.TransferState);
+		InitTextureStorage(Device, PhysicalDevice, &State.Textures);
+		InitMaterialStorage(Device, &State.Materials);
+
+		FrameManager::Init();
+
+		DeferredPass::Init();
+		MainPass::Init();
+		LightningPass::Init();
+
+		//TerrainRender::Init();
+		//DynamicMapSystem::Init();
+		StaticMeshRender::Init();
+		//DebugUi::Init(WindowHandler, GuiData);
+
+		InitStaticMeshStorage(Device, PhysicalDevice, &State.Meshes, MB32, MB32);
+
+	}
+
+	void DeInit()
+	{
+		VulkanInterface::WaitDevice();
+
+		VkDevice Device = VulkanInterface::GetDevice();
+
+		vkDestroyBuffer(Device, State.Meshes.IndexBuffer.Buffer, nullptr);
+		vkDestroyBuffer(Device, State.Meshes.VertexBuffer.Buffer, nullptr);
+
+		vkFreeMemory(Device, State.Meshes.VertexBuffer.Memory, nullptr);
+		vkFreeMemory(Device, State.Meshes.IndexBuffer.Memory, nullptr);
+
+		vkDestroyBuffer(Device, State.TransferState.TransferStagingPool.Buffer, nullptr);
+		vkFreeMemory(Device, State.TransferState.TransferStagingPool.Memory, nullptr);
+
+		vkDestroyCommandPool(Device, State.TransferState.TransferCommandPool, nullptr);
+
+		for (u32 i = 0; i < VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT; ++i)
+		{
+			vkDestroyFence(Device, State.TransferState.Frames.Fences[i], nullptr);
+		}
+
+		for (uint32_t i = 0; i < State.Textures.TextureIndex; ++i)
+		{
+			vkDestroyImageView(Device, State.Textures.Textures[i].View, nullptr);
+			vkDestroyImage(Device, State.Textures.Textures[i].MeshTexture.Image, nullptr);
+			vkFreeMemory(Device, State.Textures.Textures[i].MeshTexture.Memory, nullptr);
+		}
+
+		vkDestroyDescriptorSetLayout(Device, State.Textures.BindlesTexturesLayout, nullptr);
+
+		vkDestroySampler(Device, State.Textures.DiffuseSampler, nullptr);
+		vkDestroySampler(Device, State.Textures.SpecularSampler, nullptr);
+
+		vkDestroyDescriptorSetLayout(Device, State.Materials.MaterialLayout, nullptr);
+		vkDestroyBuffer(Device, State.Materials.MaterialBuffer, nullptr);
+		vkFreeMemory(Device, State.Materials.MaterialBufferMemory, nullptr);
+
+		//DebugUi::DeInit();
+		//TerrainRender::DeInit();
+		StaticMeshRender::DeInit();
+
+		MainPass::DeInit();
+		LightningPass::DeInit();
+		DeferredPass::DeInit();
+		FrameManager::DeInit();
+		VulkanInterface::DeInit();
+
+		Memory::FreeArray(&State.Meshes.StaticMeshes);
+		Memory::MemoryManagementSystem::Free(State.Textures.Textures);
+		Memory::FreeArray(&State.DrawEntities);
+	}
+
+	void Draw(const FrameManager::ViewProjectionBuffer* Data)
+	{
+		VkDevice Device = VulkanInterface::GetDevice();
+
+		const u32 CurrentIndex = VulkanInterface::TestGetImageIndex();
+		ProcessCompletedTransferTasks(Device, State.TransferState.Frames.Tasks + CurrentIndex,
+			State.TransferState.Frames.Fences[CurrentIndex]);
+
+
+		const u32 ImageIndex = VulkanInterface::AcquireNextImageIndex();
+
+		FrameManager::UpdateViewProjection(Data);
+
+		VulkanInterface::BeginFrame();
+
+		LightningPass::Draw();
+
+		MainPass::BeginPass();
+
+		//TerrainRender::Draw();
+		StaticMeshRender::Draw();
+
+		MainPass::EndPass();
+		DeferredPass::BeginPass();
+
+		DeferredPass::Draw();
+		//DebugUi::Draw();
+
+		DeferredPass::EndPass();
+
+		VulkanInterface::EndFrame(State.QueueSubmitMutex);
+	}
+
+	u64 StagingPoolGetMemory(StagingPool* Pool, u64 Size)
 	{
 		u64 AlignedOffset = (Pool->Offset + Pool->Alignment - 1) & ~(Pool->Alignment - 1);
 		Pool->Offset = AlignedOffset + Size;
@@ -97,191 +304,17 @@ namespace Render
 		}
 	}
 
-	void Transfer(u32 FrameIndex)
+	void SubmitTransferring(VkCommandBuffer TransferCommandBuffer, VkFence TransferFence)
 	{
-		VkDevice Device = VulkanInterface::GetDevice();
-
-		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
-		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-		VkDependencyInfo TransferDepInfo = { };
-		TransferDepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-		TransferDepInfo.pNext = nullptr;
-		TransferDepInfo.dependencyFlags = 0;
-		TransferDepInfo.imageMemoryBarrierCount = ImageTransferring.Count;
-		TransferDepInfo.pImageMemoryBarriers = ImageTransferring.Data;
-		TransferDepInfo.memoryBarrierCount = 0;
-		TransferDepInfo.pMemoryBarriers = nullptr;
-		TransferDepInfo.bufferMemoryBarrierCount = 0;
-		TransferDepInfo.pBufferMemoryBarriers = nullptr;
-
-		VkDependencyInfo PresentDepInfo = { };
-		PresentDepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-		PresentDepInfo.pNext = nullptr;
-		PresentDepInfo.dependencyFlags = 0;
-		PresentDepInfo.imageMemoryBarrierCount = ImagePresenting.Count;
-		PresentDepInfo.pImageMemoryBarriers = ImagePresenting.Data;
-		PresentDepInfo.memoryBarrierCount = 0;
-		PresentDepInfo.pMemoryBarriers = nullptr;
-		PresentDepInfo.bufferMemoryBarrierCount = 0;
-		PresentDepInfo.pBufferMemoryBarriers = nullptr;
-
-		VkFence TransferFence = State.TransferState.Frames.Fences[FrameIndex];
-		VkCommandBuffer TransferCommandBuffer = State.TransferState.Frames.CommandBuffers[FrameIndex];
-		vkWaitForFences(Device, 1, &TransferFence, VK_TRUE, UINT64_MAX);
-		vkResetFences(Device, 1, &TransferFence);
-
-		VkTimelineSemaphoreSubmitInfo TimelineInfo = { };
-		TimelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-		TimelineInfo.waitSemaphoreValueCount = 0;
-		TimelineInfo.signalSemaphoreValueCount = 1;
-		TimelineInfo.pSignalSemaphoreValues = &TransferTimelineValue;
-
 		VkSubmitInfo SubmitInfo = { };
 		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		SubmitInfo.commandBufferCount = 1;
 		SubmitInfo.pCommandBuffers = &TransferCommandBuffer;
-		SubmitInfo.signalSemaphoreCount = 1;
-		SubmitInfo.pSignalSemaphores = &TransferCompleted;
-		SubmitInfo.pNext = &TimelineInfo;
+		SubmitInfo.signalSemaphoreCount = 0;
 
-		VkResult Result = vkBeginCommandBuffer(TransferCommandBuffer, &CommandBufferBeginInfo);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkBeginCommandBuffer result is %d", Result);
-		}
-
-		vkCmdPipelineBarrier2(TransferCommandBuffer, &TransferDepInfo);
-
-		for (u32 i = 0; i < ImageCopy.Count; ++i)
-		{
-			const ImageCopyData* CopyData = ImageCopy.Data + i;
-			vkCmdCopyBufferToImage(TransferCommandBuffer, TransferStagingPool.Buffer, CopyData->Image,
-				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &CopyData->BufferImageCopyInfo);
-		}
-
-		vkCmdPipelineBarrier2(TransferCommandBuffer, &PresentDepInfo);
-
-		Memory::ClearArray(&ImageTransferring);
-		Memory::ClearArray(&ImagePresenting);
-		Memory::ClearArray(&ImageCopy);
-
-		Result = vkEndCommandBuffer(TransferCommandBuffer);
-		if (Result != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "vkBeginCommandBuffer result is %d", Result);
-		}
-
-		{
-			std::scoped_lock lock(State.QueueSubmitMutex);
-
-			TransferTimelineValue++;
-			vkQueueSubmit(VulkanInterface::GetTransferQueue(), 1, &SubmitInfo, TransferFence); // TODO Check GetTransferQueue
-		}
+		std::scoped_lock lock(State.QueueSubmitMutex);
+		vkQueueSubmit(VulkanInterface::GetTransferQueue(), 1, &SubmitInfo, TransferFence);
 	}
-
-	void QueueImageDataLoad(VkImage Image, u32 Width, u32 Height, void* Data)
-	{
-		VkDevice Device = VulkanInterface::GetDevice();
-
-		VkMemoryRequirements MemoryRequirements;
-		vkGetImageMemoryRequirements(Device, Image, &MemoryRequirements); // todo do not use vkGetImageMemoryRequirements
-
-		const u64 TransferOffset = GetOffsetFromStagingPool(&TransferStagingPool, MemoryRequirements.size);
-
-		ImageCopyData* ImageRegion = Memory::ArrayGetNew(&ImageCopy);
-		*ImageRegion = { };
-		ImageRegion->BufferImageCopyInfo.bufferOffset = TransferOffset;
-		ImageRegion->BufferImageCopyInfo.bufferRowLength = 0;
-		ImageRegion->BufferImageCopyInfo.bufferImageHeight = 0;
-		ImageRegion->BufferImageCopyInfo.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		ImageRegion->BufferImageCopyInfo.imageSubresource.mipLevel = 0;
-		ImageRegion->BufferImageCopyInfo.imageSubresource.baseArrayLayer = 0;
-		ImageRegion->BufferImageCopyInfo.imageSubresource.layerCount = 1;
-		ImageRegion->BufferImageCopyInfo.imageOffset = { 0, 0, 0 };
-		ImageRegion->BufferImageCopyInfo.imageExtent = { Width, Height, 1 };
-		ImageRegion->Image = Image;
-
-		VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferStagingPool.Memory, MemoryRequirements.size, TransferOffset, Data);
-		PrepareImageForTransferring(Image);
-		PrepareImageForPresentation(Image);
-	}
-
-	void PrepareImageForTransferring(VkImage Image)
-	{
-		VkImageMemoryBarrier2* TransferImageBarrier = Memory::ArrayGetNew(&ImageTransferring);
-		*TransferImageBarrier = { };
-		TransferImageBarrier->sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-		TransferImageBarrier->pNext = nullptr;
-		TransferImageBarrier->srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
-		TransferImageBarrier->srcAccessMask = 0;
-		TransferImageBarrier->dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-		TransferImageBarrier->dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-		TransferImageBarrier->oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		TransferImageBarrier->newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		TransferImageBarrier->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		TransferImageBarrier->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		TransferImageBarrier->image = Image;
-		TransferImageBarrier->subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		TransferImageBarrier->subresourceRange.baseMipLevel = 0;
-		TransferImageBarrier->subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-		TransferImageBarrier->subresourceRange.baseArrayLayer = 0;
-		TransferImageBarrier->subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-	}
-
-	void PrepareImageForPresentation(VkImage Image)
-	{
-		VkImageMemoryBarrier2* PresentationBarrier = Memory::ArrayGetNew(&ImagePresenting);
-		*PresentationBarrier = { };
-		PresentationBarrier->sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-		PresentationBarrier->pNext = nullptr;
-		PresentationBarrier->srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-		PresentationBarrier->srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-		PresentationBarrier->dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-		PresentationBarrier->dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
-		PresentationBarrier->oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		PresentationBarrier->newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		PresentationBarrier->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		PresentationBarrier->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		PresentationBarrier->image = Image;
-		PresentationBarrier->subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		PresentationBarrier->subresourceRange.baseMipLevel = 0;
-		PresentationBarrier->subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-		PresentationBarrier->subresourceRange.baseArrayLayer = 0;
-		PresentationBarrier->subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-	}
-
-
-
-
-
-
-
-
-	u64 TmpGetTransferTimelineValue()
-	{
-		return TransferTimelineValue;
-	}
-
-	VkSemaphore TmpGetTransferCompleted()
-	{
-		return TransferCompleted;
-	}
-
-
-
-
-	VkDescriptorSetLayout TmpGetMaterialLayout()
-	{
-		return MaterialLayout;
-	}
-
-	VkDescriptorSet TmpGetMaterialSet()
-	{
-		return MaterialSet;
-	}
-
-
 
 	u32 CreateEntity(const DrawEntity* Entity, u32 FrameIndex)
 	{
@@ -295,276 +328,17 @@ namespace Render
 		return 0;
 	}
 
-
-
-	
-
-	static void InitStaticSceneBuffer(VkDevice Device, VkPhysicalDevice PhysicalDevice, StaticMeshStorage* Buffer, u64 VertexCapacity, u64 IndexCapacity);
-
-	void InitStaticSceneBuffer(VkDevice Device, VkPhysicalDevice PhysicalDevice, StaticMeshStorage* Buffer, u64 VertexCapacity, u64 IndexCapacity)
-	{
-		Buffer->StaticMeshes = Memory::AllocateArray<StaticMesh>(256);
-
-		Buffer->IndexBuffer.Offset = 0;
-		Buffer->VertexBuffer.Offset = 0;
-
-		Buffer->VertexBuffer.Buffer = VulkanHelper::CreateBuffer(Device, VertexCapacity, VulkanHelper::BufferUsageFlag::VertexFlag);
-		Buffer->VertexBuffer.Memory = VulkanHelper::AllocateDeviceMemoryForBuffer(PhysicalDevice, Device, Buffer->VertexBuffer.Buffer,
-			VulkanHelper::MemoryPropertyFlag::GPULocal, &Buffer->VertexBuffer.Alignment, &Buffer->VertexBuffer.Capacity);
-		vkBindBufferMemory(Device, Buffer->VertexBuffer.Buffer, Buffer->VertexBuffer.Memory, 0);
-
-		Buffer->IndexBuffer.Buffer = VulkanHelper::CreateBuffer(Device, VertexCapacity, VulkanHelper::BufferUsageFlag::IndexFlag);
-		Buffer->IndexBuffer.Memory = VulkanHelper::AllocateDeviceMemoryForBuffer(PhysicalDevice, Device, Buffer->IndexBuffer.Buffer,
-			VulkanHelper::MemoryPropertyFlag::GPULocal, &Buffer->IndexBuffer.Alignment, &Buffer->IndexBuffer.Capacity);
-		vkBindBufferMemory(Device, Buffer->IndexBuffer.Buffer, Buffer->IndexBuffer.Memory, 0);
-
-		VkFenceCreateInfo FenceCreateInfo = { };
-		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-		FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-		//VULKAN_CHECK_RESULT(vkCreateFence(Device, &FenceCreateInfo, nullptr, &Buffer->CPUArrayLock));
-	}
-
-	void Init(GLFWwindow* WindowHandler, DebugUi::GuiData* GuiData)
-	{
-		VkFenceCreateInfo FenceCreateInfo = { };
-		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-		FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-		VulkanInterface::VulkanInterfaceConfig RenderConfig;
-		//RenderConfig.MaxTextures = 90;
-		RenderConfig.MaxTextures = 500; // TODO: FIX!!!!
-
-		VulkanInterface::Init(WindowHandler, RenderConfig);
-		
-
-
-
-
-
-
-
-
-		ImageTransferring = Memory::AllocateArray<VkImageMemoryBarrier2>(512);
-		ImagePresenting = Memory::AllocateArray<VkImageMemoryBarrier2>(512);
-		ImageCopy = Memory::AllocateArray<ImageCopyData>(512);
-
-		State.DrawEntities = Memory::AllocateArray<DrawEntity>(512);
-
-		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
-		VkDevice Device = VulkanInterface::GetDevice();
-
-		VkCommandPoolCreateInfo PoolInfo = { };
-		PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-		PoolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		PoolInfo.queueFamilyIndex = VulkanInterface::GetQueueGraphicsFamilyIndex();
-
-		vkCreateCommandPool(Device, &PoolInfo, nullptr, &State.TransferState.TransferCommandPool);
-
-		VkCommandBufferAllocateInfo TransferCommandBufferAllocateInfo = { };
-		TransferCommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		TransferCommandBufferAllocateInfo.commandPool = State.TransferState.TransferCommandPool;
-		TransferCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		TransferCommandBufferAllocateInfo.commandBufferCount = VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT;
-		
-		VULKAN_CHECK_RESULT(vkAllocateCommandBuffers(Device, &TransferCommandBufferAllocateInfo, State.TransferState.Frames.CommandBuffers));
-
-		for (u32 i = 0; i < VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT; ++i)
-		{
-			VULKAN_CHECK_RESULT(vkCreateFence(Device, &FenceCreateInfo, nullptr, State.TransferState.Frames.Fences + i));
-		}
-
-		
-
-		VkSemaphoreTypeCreateInfo TypeInfo = { };
-		TypeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
-		TypeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-		TypeInfo.initialValue = 0;
-
-
-		VkSemaphoreCreateInfo TimeLineSemaphoreInfo = { };
-		TimeLineSemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-		TimeLineSemaphoreInfo.pNext = &TypeInfo;
-
-		if (vkCreateSemaphore(Device, &TimeLineSemaphoreInfo, nullptr, &TransferCompleted) != VK_SUCCESS)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "TransferCompleted creation error");
-			assert(false);
-		}
-
-		TransferStagingPool.Buffer = VulkanHelper::CreateBuffer(Device, MB32, VulkanHelper::StagingFlag);
-		TransferStagingPool.Memory = VulkanHelper::AllocateDeviceMemoryForBuffer(PhysicalDevice, Device, TransferStagingPool.Buffer, VulkanHelper::HostCompatible,
-			&TransferStagingPool.Alignment, &TransferStagingPool.Size);
-		TransferStagingPool.Offset = 0;
-		vkBindBufferMemory(Device, TransferStagingPool.Buffer, TransferStagingPool.Memory, 0);
-
-
-
-
-
-
-
-
-
-
-		u64 Size;
-		u64 Alignment;
-
-		const VkDeviceSize MaterialBufferSize = sizeof(Material) * 512;
-		MaterialBuffer = VulkanHelper::CreateBuffer(Device, MaterialBufferSize, VulkanHelper::BufferUsageFlag::StorageFlag);
-		MaterialBufferMemory = VulkanHelper::AllocateDeviceMemoryForBuffer(VulkanInterface::GetPhysicalDevice(), Device,
-			MaterialBuffer, VulkanHelper::MemoryPropertyFlag::GPULocal, &Size, &Alignment);
-		vkBindBufferMemory(Device, MaterialBuffer, MaterialBufferMemory, 0);
-
-		VulkanInterface::UniformSetAttachmentInfo MaterialAttachmentInfo;
-		MaterialAttachmentInfo.BufferInfo.buffer = MaterialBuffer;
-		MaterialAttachmentInfo.BufferInfo.offset = 0;
-		MaterialAttachmentInfo.BufferInfo.range = MaterialBufferSize;
-		MaterialAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-
-		const VkDescriptorType MaterialDescriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		const VkShaderStageFlags MaterialStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		const VkDescriptorBindingFlags MaterialBindingFlags[1] = { };
-		MaterialLayout = VulkanInterface::CreateUniformLayout(&MaterialDescriptorType, &MaterialStageFlags, MaterialBindingFlags, 1, 1);
-		VulkanInterface::CreateUniformSets(&MaterialLayout, 1, &MaterialSet);
-		VulkanInterface::AttachUniformsToSet(MaterialSet, &MaterialAttachmentInfo, 1);
-
-
-
-
-		RenderResources::Init(MB32, MB32, 512, 256);
-		FrameManager::Init();
-
-		DeferredPass::Init();
-		MainPass::Init();
-		LightningPass::Init();
-
-		//TerrainRender::Init();
-		//DynamicMapSystem::Init();
-		StaticMeshRender::Init();
-		//DebugUi::Init(WindowHandler, GuiData);
-
-
-		VkPhysicalDevice PhDevice = VulkanInterface::GetPhysicalDevice();
-
-		InitStaticSceneBuffer(Device, PhDevice, &State.StaticMeshLinearStorage, MB32, MB32);
-
-
-
-		State.TexturesLoad.Textures = Memory::AllocateArray<TextureData*>(512);
-		State.TextureReady.Textures = Memory::AllocateArray<Texture>(512);
-
-		VULKAN_CHECK_RESULT(vkCreateFence(Device, &FenceCreateInfo, nullptr, &State.TexturesLoad.Fence));
-		VULKAN_CHECK_RESULT(vkCreateFence(Device, &FenceCreateInfo, nullptr, &State.TextureReady.Fence));
-	}
-
-	void DeInit()
-	{
-		VulkanInterface::WaitDevice();
-
-		VkDevice Device = VulkanInterface::GetDevice();
-
-		vkDestroyFence(Device, State.TexturesLoad.Fence, nullptr);
-		vkDestroyFence(Device, State.TextureReady.Fence, nullptr);
-
-		vkDestroyBuffer(Device, State.StaticMeshLinearStorage.IndexBuffer.Buffer, nullptr);
-		vkDestroyBuffer(Device, State.StaticMeshLinearStorage.VertexBuffer.Buffer, nullptr);
-
-		vkFreeMemory(Device, State.StaticMeshLinearStorage.VertexBuffer.Memory, nullptr);
-		vkFreeMemory(Device, State.StaticMeshLinearStorage.IndexBuffer.Memory, nullptr);
-
-		//DynamicMapSystem::DeInit();
-		
-
-
-
-
-
-
-
-		vkDestroyBuffer(Device, TransferStagingPool.Buffer, nullptr);
-		vkFreeMemory(Device, TransferStagingPool.Memory, nullptr);
-		vkDestroySemaphore(Device, TransferCompleted, nullptr);
-
-		vkDestroyCommandPool(Device, State.TransferState.TransferCommandPool, nullptr);
-
-		for (u32 i = 0; i < VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT; ++i)
-		{
-			vkDestroyFence(Device, State.TransferState.Frames.Fences[i], nullptr);
-		}
-
-		Memory::FreeArray(&ImageTransferring);
-		Memory::FreeArray(&ImagePresenting);
-		Memory::FreeArray(&ImageCopy);
-		Memory::FreeArray(&State.DrawEntities);
-
-
-
-
-
-
-
-
-
-
-
-
-
-		vkDestroyDescriptorSetLayout(Device, MaterialLayout, nullptr);
-		vkDestroyBuffer(Device, MaterialBuffer, nullptr);
-		vkFreeMemory(Device, MaterialBufferMemory, nullptr);
-
-
-
-
-		//DebugUi::DeInit();
-		//TerrainRender::DeInit();
-		StaticMeshRender::DeInit();
-
-		RenderResources::DeInit();
-		MainPass::DeInit();
-		LightningPass::DeInit();
-		DeferredPass::DeInit();
-		FrameManager::DeInit();
-		VulkanInterface::DeInit();
-
-		Memory::FreeArray(&State.TexturesLoad.Textures);
-		Memory::FreeArray(&State.TextureReady.Textures);
-		Memory::FreeArray(&State.StaticMeshLinearStorage.StaticMeshes);
-	}
-
-	void SubmitTransferring(VkCommandBuffer TransferCommandBuffer, VkFence TransferFence)
-	{
-		VkTimelineSemaphoreSubmitInfo TimelineInfo = { };
-		TimelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-		TimelineInfo.waitSemaphoreValueCount = 0;
-		TimelineInfo.signalSemaphoreValueCount = 1;
-		TimelineInfo.pSignalSemaphoreValues = &TransferTimelineValue;
-
-		VkSubmitInfo SubmitInfo = { };
-		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.commandBufferCount = 1;
-		SubmitInfo.pCommandBuffers = &TransferCommandBuffer;
-		SubmitInfo.signalSemaphoreCount = 1;
-		SubmitInfo.pSignalSemaphores = &TransferCompleted;
-		SubmitInfo.pNext = &TimelineInfo;
-
-		std::scoped_lock lock(State.QueueSubmitMutex);
-		TransferTimelineValue++;
-		vkQueueSubmit(VulkanInterface::GetTransferQueue(), 1, &SubmitInfo, TransferFence);
-	}
-
 	u32 CreateMaterial(Material* Mat, u32 FrameIndex)
 	{
 		VkDevice Device = VulkanInterface::GetDevice();
 
-		const u64 TransferOffset = GetOffsetFromStagingPool(&TransferStagingPool, sizeof(Material));
+		const u64 TransferOffset = StagingPoolGetMemory(&State.TransferState.TransferStagingPool, sizeof(Material));
 
-		VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferStagingPool.Memory, sizeof(Material), TransferOffset, Mat);
+		VulkanHelper::UpdateHostCompatibleBufferMemory(Device, State.TransferState.TransferStagingPool.Memory, sizeof(Material), TransferOffset, Mat);
 
 		VkBufferCopy BufferCopyRegion = { };
 		BufferCopyRegion.srcOffset = TransferOffset;
-		BufferCopyRegion.dstOffset = sizeof(Material) * MaterialIndex;
+		BufferCopyRegion.dstOffset = sizeof(Material) * State.Materials.MaterialIndex;
 		BufferCopyRegion.size = sizeof(Material);
 
 		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
@@ -575,15 +349,15 @@ namespace Render
 
 		std::scoped_lock Lock(State.TransferState.Frames.Tasks[FrameIndex].Mutex);
 
-		vkWaitForFences(Device, 1, &TransferFence, VK_TRUE, UINT64_MAX);
-		vkResetFences(Device, 1, &TransferFence);
+		VULKAN_CHECK_RESULT(vkWaitForFences(Device, 1, &TransferFence, VK_TRUE, UINT64_MAX));
+		VULKAN_CHECK_RESULT(vkResetFences(Device, 1, &TransferFence));
 
-		vkBeginCommandBuffer(TransferCommandBuffer, &CommandBufferBeginInfo);
-		vkCmdCopyBuffer(TransferCommandBuffer, TransferStagingPool.Buffer, MaterialBuffer, 1, &BufferCopyRegion);
-		vkEndCommandBuffer(TransferCommandBuffer);
+		VULKAN_CHECK_RESULT(vkBeginCommandBuffer(TransferCommandBuffer, &CommandBufferBeginInfo));
+		vkCmdCopyBuffer(TransferCommandBuffer, State.TransferState.TransferStagingPool.Buffer, State.Materials.MaterialBuffer, 1, &BufferCopyRegion);
+		VULKAN_CHECK_RESULT(vkEndCommandBuffer(TransferCommandBuffer));
 
 		SubmitTransferring(TransferCommandBuffer, TransferFence);
-		return MaterialIndex++;
+		return State.Materials.MaterialIndex++;
 	}
 
 	u64 CreateStaticMesh(const StaticMeshRender::StaticMeshVertex* Vertices, u64 VerticesCount, const u32* Indices, u64 IndicesCount, u32 FrameIndex)
@@ -593,81 +367,226 @@ namespace Render
 		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
 		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-		const u64 Index = State.StaticMeshLinearStorage.StaticMeshes.Count;
+		const u64 Index = State.Meshes.StaticMeshes.Count;
 
-		StaticMesh* Mesh = Memory::ArrayGetNew(&State.StaticMeshLinearStorage.StaticMeshes);
+		StaticMesh* Mesh = Memory::ArrayGetNew(&State.Meshes.StaticMeshes);
 		Mesh->IndicesCount = IndicesCount;
-		Mesh->IndexOffset = State.StaticMeshLinearStorage.IndexBuffer.Offset;
-		Mesh->VertexOffset = State.StaticMeshLinearStorage.VertexBuffer.Offset;
+		Mesh->IndexOffset = State.Meshes.IndexBuffer.Offset;
+		Mesh->VertexOffset = State.Meshes.VertexBuffer.Offset;
 
 		const u64 IndicesSize = sizeof(u32) * IndicesCount;
-		u64 TransferOffset = GetOffsetFromStagingPool(&TransferStagingPool, IndicesSize);
+		u64 TransferOffset = StagingPoolGetMemory(&State.TransferState.TransferStagingPool, IndicesSize);
 
 		VkBufferCopy IndexBufferCopyRegion = { };
 		IndexBufferCopyRegion.srcOffset = TransferOffset;
-		IndexBufferCopyRegion.dstOffset = State.StaticMeshLinearStorage.IndexBuffer.Offset;
+		IndexBufferCopyRegion.dstOffset = State.Meshes.IndexBuffer.Offset;
 		IndexBufferCopyRegion.size = IndicesSize;
-		VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferStagingPool.Memory, IndicesSize, TransferOffset, Indices);
+		VulkanHelper::UpdateHostCompatibleBufferMemory(Device, State.TransferState.TransferStagingPool.Memory, IndicesSize, TransferOffset, Indices);
 
 		const u64 VerticesSize = sizeof(StaticMeshRender::StaticMeshVertex) * VerticesCount;
-		TransferOffset = GetOffsetFromStagingPool(&TransferStagingPool, VerticesSize);
+		TransferOffset = StagingPoolGetMemory(&State.TransferState.TransferStagingPool, VerticesSize);
 
 		VkBufferCopy VertexBufferCopyRegion = { };
 		VertexBufferCopyRegion.srcOffset = TransferOffset;
-		VertexBufferCopyRegion.dstOffset = State.StaticMeshLinearStorage.VertexBuffer.Offset;
+		VertexBufferCopyRegion.dstOffset = State.Meshes.VertexBuffer.Offset;
 		VertexBufferCopyRegion.size = VerticesSize;
-		VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferStagingPool.Memory, VerticesSize, TransferOffset, Vertices);
+		VulkanHelper::UpdateHostCompatibleBufferMemory(Device, State.TransferState.TransferStagingPool.Memory, VerticesSize, TransferOffset, Vertices);
 
-		State.StaticMeshLinearStorage.IndexBuffer.Offset += sizeof(u32) * IndicesCount;
-		State.StaticMeshLinearStorage.VertexBuffer.Offset += sizeof(StaticMeshRender::StaticMeshVertex) * VerticesCount;
+		State.Meshes.IndexBuffer.Offset += sizeof(u32) * IndicesCount;
+		State.Meshes.VertexBuffer.Offset += sizeof(StaticMeshRender::StaticMeshVertex) * VerticesCount;
 
 		VkFence TransferFence = State.TransferState.Frames.Fences[FrameIndex];
 		VkCommandBuffer TransferCommandBuffer = State.TransferState.Frames.CommandBuffers[FrameIndex];
 
 		std::scoped_lock Lock(State.TransferState.Frames.Tasks[FrameIndex].Mutex);
-		vkWaitForFences(Device, 1, &TransferFence, VK_TRUE, UINT64_MAX);
-		vkResetFences(Device, 1, &TransferFence);
+		VULKAN_CHECK_RESULT(vkWaitForFences(Device, 1, &TransferFence, VK_TRUE, UINT64_MAX));
+		VULKAN_CHECK_RESULT(vkResetFences(Device, 1, &TransferFence));
 
-		vkBeginCommandBuffer(TransferCommandBuffer, &CommandBufferBeginInfo);
-		vkCmdCopyBuffer(TransferCommandBuffer, TransferStagingPool.Buffer, State.StaticMeshLinearStorage.IndexBuffer.Buffer, 1, &IndexBufferCopyRegion);
-		vkCmdCopyBuffer(TransferCommandBuffer, TransferStagingPool.Buffer, State.StaticMeshLinearStorage.VertexBuffer.Buffer, 1, &VertexBufferCopyRegion);
-		vkEndCommandBuffer(TransferCommandBuffer);
+		VULKAN_CHECK_RESULT(vkBeginCommandBuffer(TransferCommandBuffer, &CommandBufferBeginInfo));
+		vkCmdCopyBuffer(TransferCommandBuffer, State.TransferState.TransferStagingPool.Buffer, State.Meshes.IndexBuffer.Buffer, 1, &IndexBufferCopyRegion);
+		vkCmdCopyBuffer(TransferCommandBuffer, State.TransferState.TransferStagingPool.Buffer, State.Meshes.VertexBuffer.Buffer, 1, &VertexBufferCopyRegion);
+		VULKAN_CHECK_RESULT(vkEndCommandBuffer(TransferCommandBuffer));
 		
-		SubmitTransferring(TransferCommandBuffer, TransferFence);		
+		SubmitTransferring(TransferCommandBuffer, TransferFence);
 		return Index;
 	}
 
-	void Draw(const FrameManager::ViewProjectionBuffer* Data)
+	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height, u32 FrameIndex)
 	{
+		assert(State.Textures.TextureIndex < 512);
+
 		VkDevice Device = VulkanInterface::GetDevice();
+		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
+		VkQueue TransferQueue = VulkanInterface::GetTransferQueue();
+		MeshTexture2D* NextTexture = State.Textures.Textures + State.Textures.TextureIndex;
 
-		const u32 CurrentIndex = VulkanInterface::TestGetImageIndex();
-		ProcessCompletedTransferTasks(Device, State.TransferState.Frames.Tasks + CurrentIndex,
-			State.TransferState.Frames.Fences[CurrentIndex]);
+		VkImageCreateInfo ImageCreateInfo = { };
+		ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+		ImageCreateInfo.extent.width = Width;
+		ImageCreateInfo.extent.height = Height;
+		ImageCreateInfo.extent.depth = 1;
+		ImageCreateInfo.mipLevels = 1;
+		ImageCreateInfo.arrayLayers = 1;
+		ImageCreateInfo.format = VK_FORMAT_BC7_SRGB_BLOCK;
+		ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		ImageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		ImageCreateInfo.flags = 0;
 
+		VULKAN_CHECK_RESULT(vkCreateImage(Device, &ImageCreateInfo, nullptr, &NextTexture->MeshTexture.Image));
+		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
+			NextTexture->MeshTexture.Image, VulkanHelper::GPULocal);
+		NextTexture->MeshTexture.Memory = AllocResult.Memory;
+		NextTexture->MeshTexture.Alignment = AllocResult.Alignment;
+		NextTexture->MeshTexture.Size = AllocResult.Size;
+		VULKAN_CHECK_RESULT(vkBindImageMemory(Device, NextTexture->MeshTexture.Image, NextTexture->MeshTexture.Memory, 0));
 
-		const u32 ImageIndex = VulkanInterface::AcquireNextImageIndex();
+		VkImageViewCreateInfo ViewCreateInfo = { };
+		ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		ViewCreateInfo.flags = 0;
+		ViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		ViewCreateInfo.format = VK_FORMAT_BC7_SRGB_BLOCK;
+		ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		ViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		ViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		ViewCreateInfo.subresourceRange.baseMipLevel = 0;
+		ViewCreateInfo.subresourceRange.levelCount = 1;
+		ViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+		ViewCreateInfo.subresourceRange.layerCount = 1;
+		ViewCreateInfo.image = NextTexture->MeshTexture.Image;
 
-		FrameManager::UpdateViewProjection(Data);
+		VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo, nullptr, &NextTexture->View));
 
-		VulkanInterface::BeginFrame();
+		VkDescriptorImageInfo DiffuseImageInfo = { };
+		DiffuseImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		DiffuseImageInfo.sampler = State.Textures.DiffuseSampler;
+		DiffuseImageInfo.imageView = NextTexture->View;
 
-		LightningPass::Draw();
+		VkDescriptorImageInfo SpecularImageInfo = { };
+		SpecularImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		SpecularImageInfo.sampler = State.Textures.SpecularSampler;
+		SpecularImageInfo.imageView = NextTexture->View;
 
-		MainPass::BeginPass();
+		VkWriteDescriptorSet WriteDiffuse = { };
+		WriteDiffuse.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		WriteDiffuse.dstSet = State.Textures.BindlesTexturesSet;
+		WriteDiffuse.dstBinding = 0;
+		WriteDiffuse.dstArrayElement = State.Textures.TextureIndex;
+		WriteDiffuse.descriptorCount = 1;
+		WriteDiffuse.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		WriteDiffuse.pImageInfo = &DiffuseImageInfo;
 
-		//TerrainRender::Draw();
-		StaticMeshRender::Draw();
+		VkWriteDescriptorSet WriteSpecular = { };
+		WriteSpecular.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		WriteSpecular.dstSet = State.Textures.BindlesTexturesSet;
+		WriteSpecular.dstBinding = 1;
+		WriteSpecular.dstArrayElement = State.Textures.TextureIndex;
+		WriteSpecular.descriptorCount = 1;
+		WriteSpecular.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		WriteSpecular.pImageInfo = &SpecularImageInfo;
 
-		MainPass::EndPass();
-		DeferredPass::BeginPass();
+		VkWriteDescriptorSet Writes[] = { WriteDiffuse, WriteSpecular };
+		vkUpdateDescriptorSets(VulkanInterface::GetDevice(), 2, Writes, 0, nullptr);
 
-		DeferredPass::Draw();
-		//DebugUi::Draw();
+		const u64 TransferOffset = StagingPoolGetMemory(&State.TransferState.TransferStagingPool, NextTexture->MeshTexture.Size);
+		VulkanHelper::UpdateHostCompatibleBufferMemory(Device, State.TransferState.TransferStagingPool.Memory, NextTexture->MeshTexture.Size, TransferOffset, Data);
 
-		DeferredPass::EndPass();
+		VkImageMemoryBarrier2 TransferImageBarrier = { };
+		TransferImageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		TransferImageBarrier.pNext = nullptr;
+		TransferImageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+		TransferImageBarrier.srcAccessMask = 0;
+		TransferImageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+		TransferImageBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+		TransferImageBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		TransferImageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		TransferImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		TransferImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		TransferImageBarrier.image = NextTexture->MeshTexture.Image;
+		TransferImageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		TransferImageBarrier.subresourceRange.baseMipLevel = 0;
+		TransferImageBarrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+		TransferImageBarrier.subresourceRange.baseArrayLayer = 0;
+		TransferImageBarrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
-		VulkanInterface::EndFrame(State.QueueSubmitMutex);
+		VkDependencyInfo TransferDepInfo = { };
+		TransferDepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+		TransferDepInfo.pNext = nullptr;
+		TransferDepInfo.dependencyFlags = 0;
+		TransferDepInfo.imageMemoryBarrierCount = 1;
+		TransferDepInfo.pImageMemoryBarriers = &TransferImageBarrier;
+		TransferDepInfo.memoryBarrierCount = 0;
+		TransferDepInfo.pMemoryBarriers = nullptr;
+		TransferDepInfo.bufferMemoryBarrierCount = 0;
+		TransferDepInfo.pBufferMemoryBarriers = nullptr;
+
+		VkImageMemoryBarrier2 PresentationBarrier = { };
+		PresentationBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		PresentationBarrier.pNext = nullptr;
+		PresentationBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+		PresentationBarrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+		PresentationBarrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+		PresentationBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+		PresentationBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		PresentationBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		PresentationBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		PresentationBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		PresentationBarrier.image = NextTexture->MeshTexture.Image;
+		PresentationBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		PresentationBarrier.subresourceRange.baseMipLevel = 0;
+		PresentationBarrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+		PresentationBarrier.subresourceRange.baseArrayLayer = 0;
+		PresentationBarrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+
+		VkDependencyInfo PresentDepInfo = { };
+		PresentDepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+		PresentDepInfo.pNext = nullptr;
+		PresentDepInfo.dependencyFlags = 0;
+		PresentDepInfo.imageMemoryBarrierCount = 1;
+		PresentDepInfo.pImageMemoryBarriers = &PresentationBarrier;
+		PresentDepInfo.memoryBarrierCount = 0;
+		PresentDepInfo.pMemoryBarriers = nullptr;
+		PresentDepInfo.bufferMemoryBarrierCount = 0;
+		PresentDepInfo.pBufferMemoryBarriers = nullptr;
+
+		VkBufferImageCopy ImageRegion = { };
+		ImageRegion.bufferOffset = TransferOffset;
+		ImageRegion.bufferRowLength = 0;
+		ImageRegion.bufferImageHeight = 0;
+		ImageRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		ImageRegion.imageSubresource.mipLevel = 0;
+		ImageRegion.imageSubresource.baseArrayLayer = 0;
+		ImageRegion.imageSubresource.layerCount = 1;
+		ImageRegion.imageOffset = { 0, 0, 0 };
+		ImageRegion.imageExtent = { Width, Height, 1 };
+
+		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
+		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+		State.Textures.TexturesPhysicalIndexes[Hash] = State.Textures.TextureIndex;
+
+		VkFence TransferFence = State.TransferState.Frames.Fences[FrameIndex];
+		VkCommandBuffer TransferCommandBuffer = State.TransferState.Frames.CommandBuffers[FrameIndex];
+
+		std::scoped_lock Lock(State.TransferState.Frames.Tasks[FrameIndex].Mutex);
+		VULKAN_CHECK_RESULT(vkWaitForFences(Device, 1, &TransferFence, VK_TRUE, UINT64_MAX));
+		VULKAN_CHECK_RESULT(vkResetFences(Device, 1, &TransferFence));
+
+		VULKAN_CHECK_RESULT(vkBeginCommandBuffer(TransferCommandBuffer, &CommandBufferBeginInfo));
+		vkCmdPipelineBarrier2(TransferCommandBuffer, &TransferDepInfo);
+		vkCmdCopyBufferToImage(TransferCommandBuffer, State.TransferState.TransferStagingPool.Buffer,
+			NextTexture->MeshTexture.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ImageRegion);
+		vkCmdPipelineBarrier2(TransferCommandBuffer, &PresentDepInfo);
+		VULKAN_CHECK_RESULT(vkEndCommandBuffer(TransferCommandBuffer));
+
+		SubmitTransferring(TransferCommandBuffer, TransferFence);
+
+		return State.Textures.TextureIndex++;
 	}
 
 	RenderState* GetRenderState()
@@ -675,4 +594,14 @@ namespace Render
 		return &State;
 	}
 
+	u32 GetTexture2DSRGBIndex(u64 Hash)
+	{
+		auto it = State.Textures.TexturesPhysicalIndexes.find(Hash);
+		if (it != State.Textures.TexturesPhysicalIndexes.end())
+		{
+			return it->second;
+		}
+
+		return 0;
+	}
 }

@@ -42,6 +42,13 @@ namespace VulkanHelper
 		s32 TransferFamily;
 	};
 
+	struct DeviceMemoryAllocResult
+	{
+		VkDeviceMemory Memory;
+		u64 Alignment;
+		u64 Size;
+	};
+
 	Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
 	VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface, const VkSurfaceFormatKHR* AvailableFormats, u32 Count);
 	Memory::FrameArray<VkExtensionProperties> GetAvailableExtensionProperties();
@@ -72,10 +79,9 @@ namespace VulkanHelper
 	VkDeviceSize CalculateBufferAlignedSize(VkDevice Device, VkBuffer Buffer, u64 BufferSize);
 	VkDeviceSize CalculateImageAlignedSize(VkDevice Device, VkImage Image, u64 ImageSize);
 
-	VkDeviceMemory AllocateDeviceMemoryForBuffer(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer,
+	VkDeviceMemory AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer,
 		MemoryPropertyFlag Properties, u64* OutAlignment, u64* OutSize);
-	VkDeviceMemory AllocateDeviceMemoryForImage(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkImage Image, MemoryPropertyFlag Properties);
-	VkDeviceMemory AllocateAndBindDeviceMemoryForImage(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkImage Image, MemoryPropertyFlag Properties);
+	DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkImage Image, MemoryPropertyFlag Properties);
 
 	VkBuffer CreateBuffer(VkDevice Device, u64 Size, BufferUsageFlag Flag);
 

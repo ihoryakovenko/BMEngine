@@ -25,7 +25,6 @@
     <ClCompile Include="Source\Render\FrameManager.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\TerrainRender.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\StaticMeshRender.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\RenderResources.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\LightningPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\MainPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\DeferredPass.cpp" />
@@ -50,7 +49,6 @@
     <ClInclude Include="Source\Render\FrameManager.h" />
     <ClInclude Include="Source\Engine\Systems\Render\TerrainRender.h" />
     <ClInclude Include="Source\Engine\Systems\Render\StaticMeshRender.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\RenderResources.h" />
     <ClInclude Include="Source\Engine\Systems\Render\LightningPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\MainPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\DeferredPass.h" />

@@ -8,7 +8,6 @@
 
 #include "Engine/Systems/Render/TerrainRender.h"
 #include "Engine/Systems/Render/StaticMeshRender.h"
-#include "Engine/Systems/Render/RenderResources.h"
 #include "Util/Util.h"
 #include "Util/DefaultTextureData.h"
 #include <gli/gli.hpp>
@@ -33,37 +32,18 @@ namespace ResourceManager
 		//u32 MipLevels = static_cast<uint32_t>(Texture.levels());
 		glm::tvec3<u32> Extent = Texture.extent();
 
-		RenderResources::CreateTexture2DSRGB(Hasher("Default"), Texture.data(), Extent.x, Extent.y);
+		Render::CreateTexture2DSRGB(Hasher("Default"), Texture.data(), Extent.x, Extent.y, VulkanInterface::TestGetImageIndex());
 	}
 
-	void LoadModel(const char* FilePath)
+	void LoadModel(const char* FilePath, const char* Directory)
 	{
-		Util::Model3DData ModelData = Util::LoadModel3DData(FilePath);
-		Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
-
-		u64 ModelVertexByteOffset = 0;
-		u32 ModelIndexCountOffset = 0;
-		for (u32 i = 0; i < Uh60Model.MeshCount; i++)
-		{
-			const u64 VerticesCount = Uh60Model.VerticesCounts[i];
-			const u32 IndicesCount = Uh60Model.IndicesCounts[i];
-			const u32 TextureIndex = RenderResources::GetTexture2DSRGBIndex(Uh60Model.DiffuseTexturesHashes[i]);
-
-			ModelVertexByteOffset += VerticesCount;
-			ModelIndexCountOffset += IndicesCount;
-
-			Render::Transfer(VulkanInterface::TestGetImageIndex());
-		}
-
-		VulkanInterface::WaitDevice();
-
-		Util::ClearModel3DData(ModelData);
-
 		u32 Index = VulkanInterface::TestGetImageIndex();
 
 		std::thread LoadThread(
-			[FilePath, Index]()
+			[FilePath, Index, Directory]()
 			{
+				LoadTextures(Directory, Index);
+
 				Util::Model3DData ModelData = Util::LoadModel3DData(FilePath);
 				Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
 
@@ -74,7 +54,7 @@ namespace ResourceManager
 					const u64 VerticesCount = Uh60Model.VerticesCounts[i];
 					const u32 IndicesCount = Uh60Model.IndicesCounts[i];
 
-					const u32 TextureIndex = 0;
+					const u32 TextureIndex = Render::GetTexture2DSRGBIndex(Uh60Model.DiffuseTexturesHashes[i]);
 
 					Render::Material Mat;
 					Mat.AlbedoTexIndex = TextureIndex;
@@ -85,7 +65,7 @@ namespace ResourceManager
 					Render::DrawEntity Entity = { };
 					Entity.StaticMeshIndex = Render::CreateStaticMesh((StaticMeshRender::StaticMeshVertex*)Uh60Model.VertexData + ModelVertexByteOffset,
 						VerticesCount, Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, Index);
-					Entity.MaterialIndex = 0;
+					Entity.MaterialIndex = MaterialIndex;
 					Entity.Model = glm::mat4(1.0f);
 
 					Render::CreateEntity(&Entity, Index);
@@ -103,7 +83,7 @@ namespace ResourceManager
 		LoadThread.detach();
 	}
 
-	void LoadTextures(const char* Directory)
+	void LoadTextures(const char* Directory, u32 ImageIndex)
 	{
 		WIN32_FIND_DATAA FindFileData;
 		HANDLE hFind;
@@ -132,7 +112,7 @@ namespace ResourceManager
 
 			if (FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 			{
-				LoadTextures(FullPath);
+				LoadTextures(FullPath, ImageIndex);
 			}
 			else
 			{
@@ -153,7 +133,7 @@ namespace ResourceManager
 				//u32 MipLevels = static_cast<uint32_t>(Texture.levels());
 				glm::tvec3<u32> Extent = Texture.extent();
 
-				RenderResources::CreateTexture2DSRGB(Hasher(FileNameNoExt), Texture.data(), Extent.x, Extent.y);
+				Render::CreateTexture2DSRGB(Hasher(FileNameNoExt), Texture.data(), Extent.x, Extent.y, ImageIndex);
 			}
 		}
 		while (FindNextFileA(hFind, &FindFileData));
