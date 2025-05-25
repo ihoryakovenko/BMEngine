@@ -1,8 +1,11 @@
 #pragma once
 
 #include <cstdint>
-#include <cassert>
 #include <memory>
+
+#ifndef CUSTOM_ASSERT
+#include <cassert>
+#endif
 
 #include "Util/EngineTypes.h"
 
@@ -138,6 +141,17 @@ namespace Memory
 		u64 Capacity;
 	};
 
+	template<typename T>
+	struct RingBuffer
+	{
+		T* DataArray;
+		u64 Head;
+		u64 Tail;
+		u64 Capacity;
+		u64 Leftover;
+		bool Wrapped;
+	};
+
 	template <typename T>
 	static DynamicArray<T> AllocateArray(u64 count)
 	{
@@ -199,5 +213,170 @@ namespace Memory
 		}
 
 		return &Array->Data[Array->Count++];
+	}
+
+	template <typename T>
+	static RingBuffer<T> AllocateRingBuffer(u64 Capacity)
+	{
+		assert(Capacity != 0);
+
+		RingBuffer<T> Buffer = { };
+		Buffer.DataArray = MemoryManagementSystem::Allocate<T>(Capacity);
+		Buffer.Capacity = Capacity;
+		return Buffer;
+	};
+
+	template <typename T>
+	static void FreeRingBuffer(RingBuffer<T>* Buffer)
+	{
+		assert(Buffer->Capacity != 0);
+		MemoryManagementSystem::Free(Buffer->DataArray);
+		*Buffer = { };
+	}
+
+	template<typename T>
+	static bool IsRingBufferEmpty(const RingBuffer<T>* Buffer)
+	{
+		assert(Buffer->Capacity != 0);
+		return (Buffer->Head == Buffer->Tail && !Buffer->Wrapped);
+	}
+
+	template<typename T>
+	static bool IsRingBufferFull(const RingBuffer<T>* Buffer)
+	{
+		assert(Buffer->Capacity != 0);
+		return Buffer->Head == Buffer->Tail && Buffer->Wrapped;
+	}
+
+	template<typename T>
+	static void PushToRingBuffer(RingBuffer<T>* Buffer, const T* NewItem)
+	{
+		assert(Buffer->Capacity != 0);
+		assert(!IsRingBufferFull(Buffer));
+
+		Buffer->DataArray[Buffer->Head] = *NewItem;
+		Buffer->Head = (Buffer->Head + 1) % Buffer->Capacity;
+
+		if (Buffer->Head == 0)
+		{
+			Buffer->Wrapped = true;
+		}
+	}
+
+	template<typename T>
+	static T* RingBufferGetFirst(const RingBuffer<T>* Buffer)
+	{
+		assert(Buffer->Capacity != 0);
+		assert(!IsRingBufferEmpty(Buffer));
+		return &Buffer->DataArray[Buffer->Tail];
+	}
+
+	template<typename T>
+	static void RingBufferPopFirst(RingBuffer<T>* Buffer)
+	{
+		assert(Buffer->Capacity != 0);
+		assert(!IsRingBufferEmpty(Buffer));
+
+		Buffer->Tail = (Buffer->Tail + 1) % Buffer->Capacity;
+
+		if (Buffer->Tail == Buffer->Head)
+		{
+			Buffer->Wrapped = false;
+		}
+	}
+
+	template<typename T>
+	static bool RingIsFit(RingBuffer<T>* Buffer, u64 Count)
+	{
+		assert(Buffer->Capacity != 0);
+		assert(Count != 0);
+
+		const u64 Used = !Buffer->Wrapped
+			? Buffer->Head - Buffer->Tail
+			: Buffer->Capacity - Buffer->Tail + Buffer->Head;
+
+		const u64 Free = Buffer->Capacity - Used;
+		if (Free < Count)
+		{
+			return false;
+		}
+
+		if (!Buffer->Wrapped && Buffer->Head + Count <= Buffer->Capacity)
+		{
+			return true;
+		}
+
+		return Count <= Buffer->Tail;
+	}
+
+	template<typename T>
+	static u64 RingUsed(RingBuffer<T>* Buffer)
+	{
+		assert(Buffer->Capacity != 0);
+
+		if (!Buffer->Wrapped)
+		{
+			return Buffer->Head - Buffer->Tail;
+		}
+
+		return Buffer->Capacity - Buffer->Tail + Buffer->Head;
+	}
+
+	template<typename T>
+	static T* RingAlloc(RingBuffer<T>* Buffer, u64 Count)
+	{
+		assert(Buffer->Capacity != 0);
+		assert(Count != 0);
+		assert(RingIsFit(Buffer, Count));
+
+		if ((!Buffer->Wrapped && Buffer->Head + Count <= Buffer->Capacity) ||
+			(Buffer->Wrapped && Buffer->Head >= Buffer->Tail && Buffer->Head + Count <= Buffer->Capacity))
+		{
+			T* ptr = &Buffer->DataArray[Buffer->Head];
+			Buffer->Head = (Buffer->Head + Count) % Buffer->Capacity;
+			if (Buffer->Head == Buffer->Tail)
+			{
+				Buffer->Wrapped = true;
+			}
+
+			return ptr;
+		}
+
+		if (!Buffer->Wrapped && Count <= Buffer->Tail)
+		{
+			Buffer->Leftover = Buffer->Capacity - Buffer->Head;
+			Buffer->Wrapped = true;
+			Buffer->Head = Count;
+			return &Buffer->DataArray[0];
+		}
+
+		assert(false);
+		return &Buffer->DataArray[0];
+	}
+
+	template<typename T>
+	static void  RingFree(RingBuffer<T>* Buffer, u64 Count)
+	{
+		assert(Buffer->Capacity != 0);
+		assert(Count != 0);
+		assert(Count <= RingUsed(Buffer));
+
+		if (Buffer->Tail + Count <= Buffer->Capacity)
+		{
+			Buffer->Tail = (Buffer->Tail + Count) % Buffer->Capacity;
+		}
+		else
+		{
+			Buffer->Tail = (Buffer->Tail + Count + Buffer->Leftover) % Buffer->Capacity;
+			Buffer->Leftover = 0;
+		}
+
+		if (Buffer->Tail == Buffer->Head)
+		{
+			Buffer->Tail = 0;
+			Buffer->Head = 0;
+			if (Buffer->Wrapped)
+			Buffer->Wrapped = false;
+		}
 	}
 }

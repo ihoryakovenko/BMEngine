@@ -75,9 +75,6 @@ namespace LightningPass
 		ShadowMapArrayCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 		ShadowMapArrayCreateInfo.arrayLayers = 2;
 
-		u64 Size;
-		u64 Alignment;
-
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
 			vkCreateImage(Device, &ShadowMapArrayCreateInfo, nullptr, &ShadowMapArray[i].Image);
@@ -94,8 +91,9 @@ namespace LightningPass
 			BufferInfo.size = LightSpaceMatrixSize;
 
 			LightSpaceMatrixBuffer[i].Buffer = VulkanHelper::CreateBuffer(Device, LightSpaceMatrixSize, VulkanHelper::BufferUsageFlag::UniformFlag);
-			LightSpaceMatrixBuffer[i].Memory = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, LightSpaceMatrixBuffer[i].Buffer,
-				VulkanHelper::MemoryPropertyFlag::HostCompatible, &Size, &Alignment);
+			AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, LightSpaceMatrixBuffer[i].Buffer,
+				VulkanHelper::MemoryPropertyFlag::HostCompatible);
+			LightSpaceMatrixBuffer[i].Memory = AllocResult.Memory;
 			vkBindBufferMemory(Device, LightSpaceMatrixBuffer[i].Buffer, LightSpaceMatrixBuffer[i].Memory, 0);
 
 			VulkanInterface::CreateUniformSets(&LightSpaceMatrixLayout, 1, LightSpaceMatrixSet + i);

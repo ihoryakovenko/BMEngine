@@ -29,11 +29,11 @@ namespace FrameManager
 
 		BufferMultiFrameSize = BufferSingleFrameSize * VulkanInterface::GetImageCount();
 
-		u64 Size;
-
 		Buffer.Buffer = VulkanHelper::CreateBuffer(Device, BufferMultiFrameSize, VulkanHelper::BufferUsageFlag::UniformFlag);
-		Buffer.Memory = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Buffer.Buffer, VulkanHelper::MemoryPropertyFlag::HostCompatible,
-			&Size, &BufferAlignment);
+		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Buffer.Buffer,
+			VulkanHelper::MemoryPropertyFlag::HostCompatible);
+		Buffer.Memory = AllocResult.Memory;
+		BufferAlignment = AllocResult.Alignment;
 		vkBindBufferMemory(Device, Buffer.Buffer, Buffer.Memory, 0);
 
 		const VkDeviceSize VpBufferSize = sizeof(ViewProjectionBuffer);

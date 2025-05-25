@@ -26,13 +26,19 @@ namespace Render
 		Buffer->VertexBuffer.Offset = 0;
 
 		Buffer->VertexBuffer.Buffer = VulkanHelper::CreateBuffer(Device, VertexCapacity, VulkanHelper::BufferUsageFlag::VertexFlag);
-		Buffer->VertexBuffer.Memory = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Buffer->VertexBuffer.Buffer,
-			VulkanHelper::MemoryPropertyFlag::GPULocal, &Buffer->VertexBuffer.Alignment, &Buffer->VertexBuffer.Capacity);
+		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Buffer->VertexBuffer.Buffer,
+			VulkanHelper::MemoryPropertyFlag::GPULocal);
+		Buffer->VertexBuffer.Memory = AllocResult.Memory;
+		Buffer->VertexBuffer.Alignment = AllocResult.Alignment;
+		Buffer->VertexBuffer.Capacity = AllocResult.Size;
 		vkBindBufferMemory(Device, Buffer->VertexBuffer.Buffer, Buffer->VertexBuffer.Memory, 0);
 
 		Buffer->IndexBuffer.Buffer = VulkanHelper::CreateBuffer(Device, VertexCapacity, VulkanHelper::BufferUsageFlag::IndexFlag);
-		Buffer->IndexBuffer.Memory = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Buffer->IndexBuffer.Buffer,
-			VulkanHelper::MemoryPropertyFlag::GPULocal, &Buffer->IndexBuffer.Alignment, &Buffer->IndexBuffer.Capacity);
+		AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Buffer->IndexBuffer.Buffer,
+			VulkanHelper::MemoryPropertyFlag::GPULocal);
+		Buffer->IndexBuffer.Memory = AllocResult.Memory;
+		Buffer->IndexBuffer.Alignment = AllocResult.Alignment;
+		Buffer->IndexBuffer.Capacity = AllocResult.Size;
 		vkBindBufferMemory(Device, Buffer->IndexBuffer.Buffer, Buffer->IndexBuffer.Memory, 0);
 
 		VkFenceCreateInfo FenceCreateInfo = { };
@@ -42,13 +48,11 @@ namespace Render
 
 	void InitMaterialStorage(VkDevice Device, MaterialStorage* Storage)
 	{
-		u64 Size;
-		u64 Alignment;
-
 		const VkDeviceSize MaterialBufferSize = sizeof(Material) * 512;
 		Storage->MaterialBuffer = VulkanHelper::CreateBuffer(Device, MaterialBufferSize, VulkanHelper::BufferUsageFlag::StorageFlag);
-		Storage->MaterialBufferMemory = VulkanHelper::AllocateDeviceMemory(VulkanInterface::GetPhysicalDevice(), Device,
-			Storage->MaterialBuffer, VulkanHelper::MemoryPropertyFlag::GPULocal, &Size, &Alignment);
+		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(VulkanInterface::GetPhysicalDevice(), Device,
+			Storage->MaterialBuffer, VulkanHelper::MemoryPropertyFlag::GPULocal);
+		Storage->MaterialBufferMemory = AllocResult.Memory;
 		vkBindBufferMemory(Device, Storage->MaterialBuffer, Storage->MaterialBufferMemory, 0);
 
 		VulkanInterface::UniformSetAttachmentInfo MaterialAttachmentInfo;
@@ -132,11 +136,16 @@ namespace Render
 		for (u32 i = 0; i < VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT; ++i)
 		{
 			VULKAN_CHECK_RESULT(vkCreateFence(Device, &FenceCreateInfo, nullptr, TransferState->Frames.Fences + i));
+
+			TransferState->Frames.Tasks[i].TaskBuffer = Memory::AllocateRingBuffer<TransferTask>(MaxTasks);
 		}
 
 		TransferState->TransferStagingPool.Buffer = VulkanHelper::CreateBuffer(Device, MB32, VulkanHelper::StagingFlag);
-		TransferState->TransferStagingPool.Memory = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, TransferState->TransferStagingPool.Buffer, VulkanHelper::HostCompatible,
-			&TransferState->TransferStagingPool.Alignment, &TransferState->TransferStagingPool.Size);
+		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
+			TransferState->TransferStagingPool.Buffer, VulkanHelper::HostCompatible);
+		TransferState->TransferStagingPool.Memory = AllocResult.Memory;
+		TransferState->TransferStagingPool.Alignment = AllocResult.Alignment;
+		TransferState->TransferStagingPool.Capacity = AllocResult.Size;
 		TransferState->TransferStagingPool.Offset = 0;
 		vkBindBufferMemory(Device, TransferState->TransferStagingPool.Buffer, TransferState->TransferStagingPool.Memory, 0);
 	}
@@ -193,6 +202,7 @@ namespace Render
 		for (u32 i = 0; i < VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT; ++i)
 		{
 			vkDestroyFence(Device, State.TransferState.Frames.Fences[i], nullptr);
+			Memory::FreeRingBuffer(&State.TransferState.Frames.Tasks[i].TaskBuffer); 
 		}
 
 		for (uint32_t i = 0; i < State.Textures.TextureIndex; ++i)
@@ -266,36 +276,18 @@ namespace Render
 		return AlignedOffset;
 	}
 
-	bool PushTransferTask(TaskQueue* queue, const TransferTask* NewTask)
-	{
-		if (queue->Count >= MaxTasks)
-		{
-			assert(false);
-			return false;
-		}
-
-		queue->Tasks[queue->Tail] = *NewTask;
-		queue->Tail = (queue->Tail + 1) % MaxTasks;
-		queue->Count++;
-
-		return true;
-	}
-
 	void ProcessCompletedTransferTasks(VkDevice Device, TaskQueue* Queue, VkFence Fence)
 	{
-		while (Queue->Count > 0)
-		{
-			std::scoped_lock Lock(Queue->Mutex);
+		std::scoped_lock lock(Queue->Mutex);
 
-			TransferTask* Task = &Queue->Tasks[Queue->Head];
+		while (Queue->TaskBuffer.Head != Queue->TaskBuffer.Tail)
+		{
+			TransferTask* Task = Memory::RingBufferGetFirst(&Queue->TaskBuffer);
 			if (vkGetFenceStatus(Device, Fence) == VK_SUCCESS)
 			{
 				Task->State = TRANSFER_COMPLETE;
-
 				Memory::PushBackToArray(&State.DrawEntities, &Task->Entity);
-
-				Queue->Head = (Queue->Head + 1) % MaxTasks;
-				Queue->Count--;
+				Memory::RingBufferPopFirst(&Queue->TaskBuffer);
 			}
 			else
 			{
@@ -323,7 +315,7 @@ namespace Render
 		TransferTask Task = { };
 		Task.State = TransferTaskState::TRANSFER_IN_FLIGHT;
 		Task.Entity = *Entity;
-		PushTransferTask(State.TransferState.Frames.Tasks + FrameIndex, &Task);
+		Memory::PushToRingBuffer(&State.TransferState.Frames.Tasks[FrameIndex].TaskBuffer, &Task);
 
 		return 0;
 	}

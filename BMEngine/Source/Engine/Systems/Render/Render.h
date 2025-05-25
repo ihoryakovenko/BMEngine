@@ -23,41 +23,11 @@ namespace DebugUi
 
 namespace Render
 {
-	struct Material
+	struct StaticMesh
 	{
-		u32 AlbedoTexIndex;
-		u32 SpecularTexIndex;
-		float Shininess;
-	};
-
-	struct MaterialStorage
-	{
-		VkBuffer MaterialBuffer;
-		VkDeviceMemory MaterialBufferMemory;
-		VkDescriptorSetLayout MaterialLayout;
-		VkDescriptorSet MaterialSet;
-		u32 MaterialIndex;
-	};
-
-	struct DrawEntity
-	{
-		u64 StaticMeshIndex;
-		u32 MaterialIndex;
-		glm::mat4 Model;
-	};
-
-	struct TextureData
-	{
-		void* RawData;
-		u32 Width;
-		u32 Height;
-		u64 Size;
-	};
-
-	struct VertexData
-	{
-		void* RawData;
-		u64 Size;
+		u64 VertexOffset;
+		u32 IndexOffset;
+		u32 IndicesCount;
 	};
 
 	struct Texture
@@ -68,28 +38,24 @@ namespace Render
 		u64 Alignment;
 	};
 
-	struct StaticMesh
-	{
-		u64 VertexOffset;
-		u32 IndexOffset;
-		u32 IndicesCount;
-	};
-
 	struct MeshTexture2D
 	{
 		Texture MeshTexture;
 		VkImageView View;
 	};
 
-	struct TextureStorage
+	struct Material
 	{
-		VkSampler DiffuseSampler;
-		VkSampler SpecularSampler;
-		VkDescriptorSetLayout BindlesTexturesLayout;
-		VkDescriptorSet BindlesTexturesSet;
-		MeshTexture2D* Textures;
-		std::unordered_map<u64, u32> TexturesPhysicalIndexes;
-		u32 TextureIndex;
+		u32 AlbedoTexIndex;
+		u32 SpecularTexIndex;
+		float Shininess;
+	};
+
+	struct DrawEntity
+	{
+		u64 StaticMeshIndex;
+		u32 MaterialIndex;
+		glm::mat4 Model;
 	};
 
 	struct GPUBuffer
@@ -105,7 +71,7 @@ namespace Render
 	{
 		VkBuffer Buffer;
 		VkDeviceMemory Memory;
-		u64 Size;
+		u64 Capacity;
 		u64 Offset;
 		u64 Alignment;
 	};
@@ -125,6 +91,26 @@ namespace Render
 		TRANSFER_COMPLETE
 	};
 
+	struct MaterialStorage
+	{
+		VkBuffer MaterialBuffer;
+		VkDeviceMemory MaterialBufferMemory;
+		VkDescriptorSetLayout MaterialLayout;
+		VkDescriptorSet MaterialSet;
+		u32 MaterialIndex;
+	};
+
+	struct TextureStorage
+	{
+		VkSampler DiffuseSampler;
+		VkSampler SpecularSampler;
+		VkDescriptorSetLayout BindlesTexturesLayout;
+		VkDescriptorSet BindlesTexturesSet;
+		MeshTexture2D* Textures;
+		std::unordered_map<u64, u32> TexturesPhysicalIndexes;
+		u32 TextureIndex;
+	};
+
 	struct TransferTask
 	{
 		DrawEntity Entity;
@@ -135,10 +121,7 @@ namespace Render
 
 	struct TaskQueue
 	{
-		TransferTask Tasks[MaxTasks];
-		u32 Head;
-		u32 Tail;
-		u32 Count;
+		Memory::RingBuffer<TransferTask> TaskBuffer;
 		std::mutex Mutex;
 	};
 
@@ -168,8 +151,6 @@ namespace Render
 		std::mutex QueueSubmitMutex;	
 	};
 
-
-
 	void Init(GLFWwindow* WindowHandler, DebugUi::GuiData* GuiData);
 	void DeInit();
 
@@ -178,10 +159,12 @@ namespace Render
 	u32 CreateEntity(const DrawEntity* Entity, u32 FrameIndex);
 	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height, u32 FrameIndex);
 
+	void Draw(const FrameManager::ViewProjectionBuffer* Data);
+
 	u32 GetTexture2DSRGBIndex(u64 Hash);
 	RenderState* GetRenderState();
 
-	void Draw(const FrameManager::ViewProjectionBuffer* Data);
+	
 
 	
 
@@ -189,7 +172,19 @@ namespace Render
 
 
 
+	struct TextureData
+	{
+		void* RawData;
+		u32 Width;
+		u32 Height;
+		u64 Size;
+	};
 
+	struct VertexData
+	{
+		void* RawData;
+		u64 Size;
+	};
 
 
 

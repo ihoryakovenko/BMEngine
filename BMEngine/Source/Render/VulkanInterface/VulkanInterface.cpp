@@ -28,7 +28,7 @@ namespace VulkanInterface
 	{
 		VkPhysicalDevice PhysicalDevice = nullptr;
 		VkDevice LogicalDevice = nullptr;
-		VulkanHelper::BMRPhysicalDeviceIndices Indices;
+		VulkanHelper::PhysicalDeviceIndices Indices;
 	};
 
 	struct BMRSwapchain
@@ -43,22 +43,22 @@ namespace VulkanInterface
 	// INTERNAL FUNCTIONS DECLARATIONS
 	static bool CheckFormats();
 	static bool CheckDeviceSuitability(const char* DeviceExtensions[], u32 DeviceExtensionsSize,
-		VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount, VulkanHelper::BMRPhysicalDeviceIndices Indices,
+		VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount, VulkanHelper::PhysicalDeviceIndices Indices,
 		VkPhysicalDevice Device);
 
 
 	static bool CreateMainInstance();
 	static bool CreateDeviceInstance();
-	static VkDevice CreateLogicalDevice(VulkanHelper::BMRPhysicalDeviceIndices Indices, const char* DeviceExtensions[],
+	static VkDevice CreateLogicalDevice(VulkanHelper::PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
 		u32 DeviceExtensionsSize);
 	static void CreateSynchronisation();
 	static bool SetupQueues();
 	static bool CreateSwapchainInstance(VkPhysicalDevice PhysicalDevice,
-		VulkanHelper::BMRPhysicalDeviceIndices Indices, VkDevice LogicalDevice, VkSurfaceKHR Surface,
+		VulkanHelper::PhysicalDeviceIndices Indices, VkDevice LogicalDevice, VkSurfaceKHR Surface,
 		VkSurfaceFormatKHR SurfaceFormat, VkExtent2D Extent);
 	static VkSwapchainKHR CreateSwapchain(VkDevice LogicalDevice, const VkSurfaceCapabilitiesKHR& SurfaceCapabilities,
 		VkSurfaceKHR Surface, VkSurfaceFormatKHR SurfaceFormat, VkExtent2D SwapExtent, VkPresentModeKHR PresentationMode,
-		VulkanHelper::BMRPhysicalDeviceIndices DeviceIndices);
+		VulkanHelper::PhysicalDeviceIndices DeviceIndices);
 	bool CreateCommandBuffers();
 
 	static void DestroyMainInstance(BMRMainInstance& Instance);
@@ -692,7 +692,7 @@ namespace VulkanInterface
 	}
 
 	bool CheckDeviceSuitability(const char* DeviceExtensions[], u32 DeviceExtensionsSize,
-		VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount, VulkanHelper::BMRPhysicalDeviceIndices Indices,
+		VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount, VulkanHelper::PhysicalDeviceIndices Indices,
 		VkPhysicalDevice Device)
 	{
 		VkPhysicalDeviceFeatures AvailableFeatures;
@@ -784,7 +784,7 @@ namespace VulkanInterface
 		return true;
 	}
 
-	VkDevice CreateLogicalDevice(VulkanHelper::BMRPhysicalDeviceIndices Indices, const char* DeviceExtensions[],
+	VkDevice CreateLogicalDevice(VulkanHelper::PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
 		u32 DeviceExtensionsSize)
 	{
 		const f32 Priority = 1.0f;
@@ -908,7 +908,7 @@ namespace VulkanInterface
 	}
 
 	bool CreateSwapchainInstance(VkPhysicalDevice PhysicalDevice,
-		VulkanHelper::BMRPhysicalDeviceIndices Indices, VkDevice LogicalDevice, VkSurfaceKHR Surface,
+		VulkanHelper::PhysicalDeviceIndices Indices, VkDevice LogicalDevice, VkSurfaceKHR Surface,
 		VkSurfaceFormatKHR SurfaceFormat, VkExtent2D Extent)
 	{
 		SwapInstance.SwapExtent = Extent;
@@ -967,7 +967,7 @@ namespace VulkanInterface
 
 	VkSwapchainKHR CreateSwapchain(VkDevice LogicalDevice, const VkSurfaceCapabilitiesKHR& SurfaceCapabilities,
 		VkSurfaceKHR Surface, VkSurfaceFormatKHR SurfaceFormat, VkExtent2D SwapExtent, VkPresentModeKHR PresentationMode,
-		VulkanHelper::BMRPhysicalDeviceIndices DeviceIndices)
+		VulkanHelper::PhysicalDeviceIndices DeviceIndices)
 	{
 		// How many images are in the swap chain
 		// Get 1 more then the minimum to allow triple buffering

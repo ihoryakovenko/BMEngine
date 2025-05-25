@@ -105,8 +105,7 @@ namespace VulkanHelper
 		return Buffer;
 	}
 
-	VkDeviceMemory AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer,
-		MemoryPropertyFlag Properties, u64* OutAlignment, u64* OutSize)
+	DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer, MemoryPropertyFlag Properties)
 	{
 		VkMemoryRequirements MemoryRequirements;
 		vkGetBufferMemoryRequirements(Device, Buffer, &MemoryRequirements);
@@ -118,12 +117,12 @@ namespace VulkanHelper
 		MemoryAllocInfo.allocationSize = MemoryRequirements.size;
 		MemoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;
 
-		VkDeviceMemory Memory;
-		VULKAN_CHECK_RESULT(vkAllocateMemory(Device, &MemoryAllocInfo, nullptr, &Memory));
+		DeviceMemoryAllocResult Result;
+		VULKAN_CHECK_RESULT(vkAllocateMemory(Device, &MemoryAllocInfo, nullptr, &Result.Memory));
+		Result.Alignment = MemoryRequirements.alignment;
+		Result.Size = MemoryRequirements.size;
 
-		*OutAlignment = MemoryRequirements.alignment;
-		*OutSize = MemoryRequirements.size;
-		return Memory;
+		return Result;
 	}
 
 	DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkImage Image, MemoryPropertyFlag Properties)
@@ -243,10 +242,10 @@ namespace VulkanHelper
 		return Data;
 	}
 
-	BMRPhysicalDeviceIndices GetPhysicalDeviceIndices(VkQueueFamilyProperties* Properties, u32 PropertiesCount,
+	PhysicalDeviceIndices GetPhysicalDeviceIndices(VkQueueFamilyProperties* Properties, u32 PropertiesCount,
 		VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
 	{
-		BMRPhysicalDeviceIndices Indices;
+		PhysicalDeviceIndices Indices;
 		Indices.GraphicsFamily = -1;
 		Indices.PresentationFamily = -1;
 		Indices.TransferFamily = -1;
