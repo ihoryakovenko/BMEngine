@@ -71,17 +71,14 @@ namespace Render
 	{
 		VkBuffer Buffer;
 		VkDeviceMemory Memory;
-		u64 Capacity;
-		u64 Offset;
 		u64 Alignment;
+		Memory::RingBufferControl ControlBlock;
 	};
 
 	struct StaticMeshStorage
 	{
-		GPUBuffer VertexBuffer;
-		GPUBuffer IndexBuffer;
-
-		Memory::DynamicArray<StaticMesh> StaticMeshes;
+		GPUBuffer VertexStageData;
+		Memory::DynamicHeapArray<StaticMesh> StaticMeshes;
 	};
 
 	enum TransferTaskState
@@ -121,7 +118,7 @@ namespace Render
 
 	struct TaskQueue
 	{
-		Memory::RingBuffer<TransferTask> TaskBuffer;
+		Memory::HeapRingBuffer<TransferTask> TaskBuffer;
 		std::mutex Mutex;
 	};
 
@@ -145,7 +142,7 @@ namespace Render
 		TextureStorage Textures;
 		MaterialStorage Materials;
 
-		Memory::DynamicArray<DrawEntity> DrawEntities;
+		Memory::DynamicHeapArray<DrawEntity> DrawEntities;
 
 		DataTransferState TransferState;
 		std::mutex QueueSubmitMutex;	
@@ -154,7 +151,7 @@ namespace Render
 	void Init(GLFWwindow* WindowHandler, DebugUi::GuiData* GuiData);
 	void DeInit();
 
-	u64 CreateStaticMesh(const StaticMeshRender::StaticMeshVertex* Vertices, u64 VerticesCount, const u32* Indices, u64 IndicesCount, u32 FrameIndex);
+	u64 CreateStaticMesh(void* MeshVertexData, u64 VertexSize, u64 VerticesCount, u64 IndicesCount, u32 FrameIndex);
 	u32 CreateMaterial(Material* Mat, u32 FrameIndex);
 	u32 CreateEntity(const DrawEntity* Entity, u32 FrameIndex);
 	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height, u32 FrameIndex);

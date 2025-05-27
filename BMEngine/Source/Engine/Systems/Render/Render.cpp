@@ -15,31 +15,20 @@ namespace Render
 {
 	static RenderState State;
 	
-	static u64 StagingPoolGetMemory(StagingPool* Pool, u64 Size);
 	static void ProcessCompletedTransferTasks(VkDevice Device, TaskQueue* Queue, VkFence Fence);
 
-	void InitStaticMeshStorage(VkDevice Device, VkPhysicalDevice PhysicalDevice, StaticMeshStorage* Buffer, u64 VertexCapacity, u64 IndexCapacity)
+	void InitStaticMeshStorage(VkDevice Device, VkPhysicalDevice PhysicalDevice, StaticMeshStorage* Buffer, u64 VertexCapacity)
 	{
 		Buffer->StaticMeshes = Memory::AllocateArray<StaticMesh>(256);
 
-		Buffer->IndexBuffer.Offset = 0;
-		Buffer->VertexBuffer.Offset = 0;
-
-		Buffer->VertexBuffer.Buffer = VulkanHelper::CreateBuffer(Device, VertexCapacity, VulkanHelper::BufferUsageFlag::VertexFlag);
-		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Buffer->VertexBuffer.Buffer,
+		Buffer->VertexStageData = { };
+		Buffer->VertexStageData.Buffer = VulkanHelper::CreateBuffer(Device, VertexCapacity, VulkanHelper::BufferUsageFlag::CombinedVertexIndexFlag);
+		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Buffer->VertexStageData.Buffer,
 			VulkanHelper::MemoryPropertyFlag::GPULocal);
-		Buffer->VertexBuffer.Memory = AllocResult.Memory;
-		Buffer->VertexBuffer.Alignment = AllocResult.Alignment;
-		Buffer->VertexBuffer.Capacity = AllocResult.Size;
-		vkBindBufferMemory(Device, Buffer->VertexBuffer.Buffer, Buffer->VertexBuffer.Memory, 0);
-
-		Buffer->IndexBuffer.Buffer = VulkanHelper::CreateBuffer(Device, VertexCapacity, VulkanHelper::BufferUsageFlag::IndexFlag);
-		AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Buffer->IndexBuffer.Buffer,
-			VulkanHelper::MemoryPropertyFlag::GPULocal);
-		Buffer->IndexBuffer.Memory = AllocResult.Memory;
-		Buffer->IndexBuffer.Alignment = AllocResult.Alignment;
-		Buffer->IndexBuffer.Capacity = AllocResult.Size;
-		vkBindBufferMemory(Device, Buffer->IndexBuffer.Buffer, Buffer->IndexBuffer.Memory, 0);
+		Buffer->VertexStageData.Memory = AllocResult.Memory;
+		Buffer->VertexStageData.Alignment = AllocResult.Alignment;
+		Buffer->VertexStageData.Capacity = AllocResult.Size;
+		vkBindBufferMemory(Device, Buffer->VertexStageData.Buffer, Buffer->VertexStageData.Memory, 0);
 
 		VkFenceCreateInfo FenceCreateInfo = { };
 		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -140,13 +129,14 @@ namespace Render
 			TransferState->Frames.Tasks[i].TaskBuffer = Memory::AllocateRingBuffer<TransferTask>(MaxTasks);
 		}
 
+		TransferState->TransferStagingPool = { };
+
 		TransferState->TransferStagingPool.Buffer = VulkanHelper::CreateBuffer(Device, MB32, VulkanHelper::StagingFlag);
 		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
 			TransferState->TransferStagingPool.Buffer, VulkanHelper::HostCompatible);
 		TransferState->TransferStagingPool.Memory = AllocResult.Memory;
 		TransferState->TransferStagingPool.Alignment = AllocResult.Alignment;
-		TransferState->TransferStagingPool.Capacity = AllocResult.Size;
-		TransferState->TransferStagingPool.Offset = 0;
+		TransferState->TransferStagingPool.ControlBlock.Capacity = AllocResult.Size;
 		vkBindBufferMemory(Device, TransferState->TransferStagingPool.Buffer, TransferState->TransferStagingPool.Memory, 0);
 	}
 
@@ -178,7 +168,7 @@ namespace Render
 		StaticMeshRender::Init();
 		//DebugUi::Init(WindowHandler, GuiData);
 
-		InitStaticMeshStorage(Device, PhysicalDevice, &State.Meshes, MB32, MB32);
+		InitStaticMeshStorage(Device, PhysicalDevice, &State.Meshes, MB32 / 8);
 
 	}
 
@@ -188,11 +178,8 @@ namespace Render
 
 		VkDevice Device = VulkanInterface::GetDevice();
 
-		vkDestroyBuffer(Device, State.Meshes.IndexBuffer.Buffer, nullptr);
-		vkDestroyBuffer(Device, State.Meshes.VertexBuffer.Buffer, nullptr);
-
-		vkFreeMemory(Device, State.Meshes.VertexBuffer.Memory, nullptr);
-		vkFreeMemory(Device, State.Meshes.IndexBuffer.Memory, nullptr);
+		vkDestroyBuffer(Device, State.Meshes.VertexStageData.Buffer, nullptr);
+		vkFreeMemory(Device, State.Meshes.VertexStageData.Memory, nullptr);
 
 		vkDestroyBuffer(Device, State.TransferState.TransferStagingPool.Buffer, nullptr);
 		vkFreeMemory(Device, State.TransferState.TransferStagingPool.Memory, nullptr);
@@ -269,18 +256,11 @@ namespace Render
 		VulkanInterface::EndFrame(State.QueueSubmitMutex);
 	}
 
-	u64 StagingPoolGetMemory(StagingPool* Pool, u64 Size)
-	{
-		u64 AlignedOffset = (Pool->Offset + Pool->Alignment - 1) & ~(Pool->Alignment - 1);
-		Pool->Offset = AlignedOffset + Size;
-		return AlignedOffset;
-	}
-
 	void ProcessCompletedTransferTasks(VkDevice Device, TaskQueue* Queue, VkFence Fence)
 	{
 		std::scoped_lock lock(Queue->Mutex);
 
-		while (Queue->TaskBuffer.Head != Queue->TaskBuffer.Tail)
+		while (!IsRingBufferEmpty(&Queue->TaskBuffer))
 		{
 			TransferTask* Task = Memory::RingBufferGetFirst(&Queue->TaskBuffer);
 			if (vkGetFenceStatus(Device, Fence) == VK_SUCCESS)
@@ -324,8 +304,7 @@ namespace Render
 	{
 		VkDevice Device = VulkanInterface::GetDevice();
 
-		const u64 TransferOffset = StagingPoolGetMemory(&State.TransferState.TransferStagingPool, sizeof(Material));
-
+		const u64 TransferOffset = Memory::RingAlloc(&State.TransferState.TransferStagingPool.ControlBlock, sizeof(Material));
 		VulkanHelper::UpdateHostCompatibleBufferMemory(Device, State.TransferState.TransferStagingPool.Memory, sizeof(Material), TransferOffset, Mat);
 
 		VkBufferCopy BufferCopyRegion = { };
@@ -352,54 +331,44 @@ namespace Render
 		return State.Materials.MaterialIndex++;
 	}
 
-	u64 CreateStaticMesh(const StaticMeshRender::StaticMeshVertex* Vertices, u64 VerticesCount, const u32* Indices, u64 IndicesCount, u32 FrameIndex)
+	u64 CreateStaticMesh(void* MeshVertexData, u64 VertexSize, u64 VerticesCount, u64 IndicesCount, u32 FrameIndex)
 	{
 		VkDevice Device = VulkanInterface::GetDevice();
 
-		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
-		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-		const u64 Index = State.Meshes.StaticMeshes.Count;
-
-		StaticMesh* Mesh = Memory::ArrayGetNew(&State.Meshes.StaticMeshes);
-		Mesh->IndicesCount = IndicesCount;
-		Mesh->IndexOffset = State.Meshes.IndexBuffer.Offset;
-		Mesh->VertexOffset = State.Meshes.VertexBuffer.Offset;
-
-		const u64 IndicesSize = sizeof(u32) * IndicesCount;
-		u64 TransferOffset = StagingPoolGetMemory(&State.TransferState.TransferStagingPool, IndicesSize);
+		const u64 VerticesSize = VertexSize * VerticesCount;
+		const u64 AllocSize = sizeof(u32) * IndicesCount + VerticesSize;
+		const u64 TransferOffset = Memory::RingAlloc(&State.TransferState.TransferStagingPool.ControlBlock, AllocSize);
 
 		VkBufferCopy IndexBufferCopyRegion = { };
 		IndexBufferCopyRegion.srcOffset = TransferOffset;
-		IndexBufferCopyRegion.dstOffset = State.Meshes.IndexBuffer.Offset;
-		IndexBufferCopyRegion.size = IndicesSize;
-		VulkanHelper::UpdateHostCompatibleBufferMemory(Device, State.TransferState.TransferStagingPool.Memory, IndicesSize, TransferOffset, Indices);
-
-		const u64 VerticesSize = sizeof(StaticMeshRender::StaticMeshVertex) * VerticesCount;
-		TransferOffset = StagingPoolGetMemory(&State.TransferState.TransferStagingPool, VerticesSize);
-
-		VkBufferCopy VertexBufferCopyRegion = { };
-		VertexBufferCopyRegion.srcOffset = TransferOffset;
-		VertexBufferCopyRegion.dstOffset = State.Meshes.VertexBuffer.Offset;
-		VertexBufferCopyRegion.size = VerticesSize;
-		VulkanHelper::UpdateHostCompatibleBufferMemory(Device, State.TransferState.TransferStagingPool.Memory, VerticesSize, TransferOffset, Vertices);
-
-		State.Meshes.IndexBuffer.Offset += sizeof(u32) * IndicesCount;
-		State.Meshes.VertexBuffer.Offset += sizeof(StaticMeshRender::StaticMeshVertex) * VerticesCount;
+		IndexBufferCopyRegion.dstOffset = State.Meshes.VertexStageData.Offset;
+		IndexBufferCopyRegion.size = AllocSize;
+		VulkanHelper::UpdateHostCompatibleBufferMemory(Device, State.TransferState.TransferStagingPool.Memory, AllocSize, TransferOffset, MeshVertexData);
 
 		VkFence TransferFence = State.TransferState.Frames.Fences[FrameIndex];
 		VkCommandBuffer TransferCommandBuffer = State.TransferState.Frames.CommandBuffers[FrameIndex];
 
-		std::scoped_lock Lock(State.TransferState.Frames.Tasks[FrameIndex].Mutex);
+		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
+		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+		std::unique_lock Lock(State.TransferState.Frames.Tasks[FrameIndex].Mutex);
 		VULKAN_CHECK_RESULT(vkWaitForFences(Device, 1, &TransferFence, VK_TRUE, UINT64_MAX));
 		VULKAN_CHECK_RESULT(vkResetFences(Device, 1, &TransferFence));
 
 		VULKAN_CHECK_RESULT(vkBeginCommandBuffer(TransferCommandBuffer, &CommandBufferBeginInfo));
-		vkCmdCopyBuffer(TransferCommandBuffer, State.TransferState.TransferStagingPool.Buffer, State.Meshes.IndexBuffer.Buffer, 1, &IndexBufferCopyRegion);
-		vkCmdCopyBuffer(TransferCommandBuffer, State.TransferState.TransferStagingPool.Buffer, State.Meshes.VertexBuffer.Buffer, 1, &VertexBufferCopyRegion);
+		vkCmdCopyBuffer(TransferCommandBuffer, State.TransferState.TransferStagingPool.Buffer, State.Meshes.VertexStageData.Buffer, 1, &IndexBufferCopyRegion);
 		VULKAN_CHECK_RESULT(vkEndCommandBuffer(TransferCommandBuffer));
 		
 		SubmitTransferring(TransferCommandBuffer, TransferFence);
+		Lock.unlock();
+
+		const u64 Index = State.Meshes.StaticMeshes.Count;
+		StaticMesh* Mesh = Memory::ArrayGetNew(&State.Meshes.StaticMeshes);
+		Mesh->IndicesCount = IndicesCount;
+		Mesh->VertexOffset = State.Meshes.VertexStageData.Offset;
+		Mesh->IndexOffset = State.Meshes.VertexStageData.Offset + VerticesSize;
+
+		State.Meshes.VertexStageData.Offset += AllocSize;
 		return Index;
 	}
 
@@ -485,7 +454,7 @@ namespace Render
 		VkWriteDescriptorSet Writes[] = { WriteDiffuse, WriteSpecular };
 		vkUpdateDescriptorSets(VulkanInterface::GetDevice(), 2, Writes, 0, nullptr);
 
-		const u64 TransferOffset = StagingPoolGetMemory(&State.TransferState.TransferStagingPool, NextTexture->MeshTexture.Size);
+		const u64 TransferOffset = Memory::RingAlloc(&State.TransferState.TransferStagingPool.ControlBlock, NextTexture->MeshTexture.Size);
 		VulkanHelper::UpdateHostCompatibleBufferMemory(Device, State.TransferState.TransferStagingPool.Memory, NextTexture->MeshTexture.Size, TransferOffset, Data);
 
 		VkImageMemoryBarrier2 TransferImageBarrier = { };

@@ -221,8 +221,8 @@ namespace StaticMeshRender
 			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
 				2, DescriptorSetGroupCount, DescriptorSetGroup, 1, &LightDynamicOffset);
 
-			vkCmdBindVertexBuffers(CmdBuffer, 0, 1, &State->Meshes.VertexBuffer.Buffer, &Mesh->VertexOffset);
-			vkCmdBindIndexBuffer(CmdBuffer, State->Meshes.IndexBuffer.Buffer, Mesh->IndexOffset, VK_INDEX_TYPE_UINT32);
+			vkCmdBindVertexBuffers(CmdBuffer, 0, 1, &State->Meshes.VertexStageData.Buffer, &Mesh->VertexOffset);
+			vkCmdBindIndexBuffer(CmdBuffer, State->Meshes.VertexStageData.Buffer, Mesh->IndexOffset, VK_INDEX_TYPE_UINT32);
 			vkCmdDrawIndexed(CmdBuffer, Mesh->IndicesCount, 1, 0, 0, 0);
 		}
 	}

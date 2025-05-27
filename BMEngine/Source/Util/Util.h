@@ -78,16 +78,14 @@ namespace Util
 
 	struct Model3DFileHeader
 	{
-		u64 VerticesCount;
+		u64 VertexDataSize;
 		u32 MeshCount;
-		u32 IndicesCount;
 	};
 
 	struct Model3D
 	{
 		u8* VertexData;
 		u64* VerticesCounts;
-		u32* IndexData;
 		u32* IndicesCounts;
 		u64* DiffuseTexturesHashes;
 		u32 MeshCount;

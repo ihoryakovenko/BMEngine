@@ -193,8 +193,7 @@ namespace Util
 		std::hash<std::string> Hasher;
 
 		std::vector<u64> TextureHashes(Shapes.size());
-		std::vector<StaticMeshRender::StaticMeshVertex> AllVertices;
-		std::vector<u32> AllIndices;
+		std::vector<u8> VerticesAndIndices;
 
 		std::vector<StaticMeshRender::StaticMeshVertex> Vertices;
 		std::vector<u32> Indices;
@@ -253,8 +252,14 @@ namespace Util
 			VerticesCounts[i] = Vertices.size();
 			IndicesCounts[i] = Indices.size();
 
-			AllVertices.insert(AllVertices.end(), Vertices.begin(), Vertices.end());
-			AllIndices.insert(AllIndices.end(), Indices.begin(), Indices.end());
+			u64 VertexBytes = Vertices.size() * sizeof(StaticMeshRender::StaticMeshVertex);
+			u64 IndexBytes = Indices.size() * sizeof(u32);
+
+			u64 CurrentOffset = VerticesAndIndices.size();
+			VerticesAndIndices.resize(CurrentOffset + VertexBytes + IndexBytes);
+
+			std::memcpy(VerticesAndIndices.data() + CurrentOffset, Vertices.data(), VertexBytes);
+			std::memcpy(VerticesAndIndices.data() + CurrentOffset + VertexBytes, Indices.data(), IndexBytes);
 		}
 
 		HANDLE hFile = CreateFileA(NewAssetPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -270,13 +275,11 @@ namespace Util
 
 		Model3DFileHeader Header;
 		Header.MeshCount = Shapes.size();
-		Header.VerticesCount = AllVertices.size();
-		Header.IndicesCount = AllIndices.size();
+		Header.VertexDataSize = VerticesAndIndices.size();
 
 		Result &= WriteFile(hFile, &Header, sizeof(Header), &BytesWritten, NULL);
-		Result &= WriteFile(hFile, AllVertices.data(), Header.VerticesCount * sizeof(AllVertices[0]), &BytesWritten, NULL);
+		Result &= WriteFile(hFile, VerticesAndIndices.data(), Header.VertexDataSize, &BytesWritten, NULL);
 		Result &= WriteFile(hFile, VerticesCounts, Header.MeshCount * sizeof(VerticesCounts[0]), &BytesWritten, NULL);
-		Result &= WriteFile(hFile, AllIndices.data(), Header.IndicesCount * sizeof(AllIndices[0]), &BytesWritten, NULL);
 		Result &= WriteFile(hFile, IndicesCounts, Header.MeshCount * sizeof(IndicesCounts[0]), &BytesWritten, NULL);
 		Result &= WriteFile(hFile, TextureHashes.data(), Header.MeshCount * sizeof(TextureHashes[0]), &BytesWritten, NULL);
 
@@ -327,13 +330,10 @@ namespace Util
 		Model.MeshCount = Header->MeshCount;
 
 		Model.VertexData = Data;
-		Data += Header->VerticesCount * sizeof(StaticMeshRender::StaticMeshVertex);
+		Data += Header->VertexDataSize;
 
 		Model.VerticesCounts = (u64*)Data;
 		Data += Header->MeshCount * sizeof(u64);
-
-		Model.IndexData = (u32*)Data;
-		Data += Header->IndicesCount * sizeof(u32);
 
 		Model.IndicesCounts = (u32*)Data;
 		Data += Header->MeshCount * sizeof(u32);

@@ -48,7 +48,6 @@ namespace ResourceManager
 				Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
 
 				u64 ModelVertexByteOffset = 0;
-				u32 ModelIndexCountOffset = 0;
 				for (u32 i = 0; i < Uh60Model.MeshCount; i++)
 				{
 					const u64 VerticesCount = Uh60Model.VerticesCounts[i];
@@ -63,15 +62,14 @@ namespace ResourceManager
 					const u32 MaterialIndex = Render::CreateMaterial(&Mat, Index);
 
 					Render::DrawEntity Entity = { };
-					Entity.StaticMeshIndex = Render::CreateStaticMesh((StaticMeshRender::StaticMeshVertex*)Uh60Model.VertexData + ModelVertexByteOffset,
-						VerticesCount, Uh60Model.IndexData + ModelIndexCountOffset, IndicesCount, Index);
+					Entity.StaticMeshIndex = Render::CreateStaticMesh(Uh60Model.VertexData + ModelVertexByteOffset,
+						sizeof(StaticMeshRender::StaticMeshVertex), VerticesCount, IndicesCount, Index);
 					Entity.MaterialIndex = MaterialIndex;
 					Entity.Model = glm::mat4(1.0f);
 
 					Render::CreateEntity(&Entity, Index);
 
-					ModelVertexByteOffset += VerticesCount;
-					ModelIndexCountOffset += IndicesCount;
+					ModelVertexByteOffset += VerticesCount * sizeof(StaticMeshRender::StaticMeshVertex) + IndicesCount * sizeof(u32);
 					//std::this_thread::sleep_for(std::chrono::milliseconds(100));
 				}
 

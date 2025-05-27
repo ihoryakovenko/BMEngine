@@ -134,17 +134,15 @@ namespace Memory
 	};
 
 	template <typename T>
-	struct DynamicArray
+	struct DynamicHeapArray
 	{
 		T* Data;
 		u64 Count;
 		u64 Capacity;
 	};
 
-	template<typename T>
-	struct RingBuffer
+	struct RingBufferControl
 	{
-		T* DataArray;
 		u64 Head;
 		u64 Tail;
 		u64 Capacity;
@@ -153,9 +151,16 @@ namespace Memory
 	};
 
 	template <typename T>
-	static DynamicArray<T> AllocateArray(u64 count)
+	struct HeapRingBuffer
 	{
-		DynamicArray<T> Arr = { };
+		T* DataArray;
+		RingBufferControl ControlBlock;
+	};
+
+	template <typename T>
+	static DynamicHeapArray<T> AllocateArray(u64 count)
+	{
+		DynamicHeapArray<T> Arr = { };
 		Arr.Count = 0;
 		Arr.Capacity = count;
 		Arr.Data = MemoryManagementSystem::Allocate<T>(count);
@@ -164,7 +169,7 @@ namespace Memory
 	}
 
 	template <typename T>
-	static void FreeArray(DynamicArray<T>* Array)
+	static void FreeArray(DynamicHeapArray<T>* Array)
 	{
 		assert(Array->Capacity != 0);
 
@@ -174,24 +179,24 @@ namespace Memory
 	}
 
 	template <typename T>
-	static void ClearArray(DynamicArray<T>* Array)
+	static void ClearArray(DynamicHeapArray<T>* Array)
 	{
 		Array->Count = 0;
 	}
 
 	template <typename T>
-	static void ArrayIncreaseCapacity(DynamicArray<T>* Array)
+	static void ArrayIncreaseCapacity(DynamicHeapArray<T>* Array)
 	{
 		assert(Array->Capacity != 0);
 
 		const u64 NewCapacity = Array->Capacity + Array->Capacity / 2;
-		T* newData = static_cast<T*>(realloc(Array->Data, NewCapacity * sizeof(T)));
-		Array->Data = newData;
+		T* NewData = static_cast<T*>(realloc(Array->Data, NewCapacity * sizeof(T)));
+		Array->Data = NewData;
 		Array->Capacity = NewCapacity;
 	}
 
 	template <typename T>
-	static void PushBackToArray(DynamicArray<T>* Array, T* NewElement)
+	static void PushBackToArray(DynamicHeapArray<T>* Array, T* NewElement)
 	{
 		assert(Array->Capacity != 0);
 
@@ -203,7 +208,7 @@ namespace Memory
 	}
 
 	template <typename T>
-	static T* ArrayGetNew(DynamicArray<T>* Array)
+	static T* ArrayGetNew(DynamicHeapArray<T>* Array)
 	{
 		assert(Array->Capacity != 0);
 
@@ -216,167 +221,163 @@ namespace Memory
 	}
 
 	template <typename T>
-	static RingBuffer<T> AllocateRingBuffer(u64 Capacity)
+	static HeapRingBuffer<T> AllocateRingBuffer(u64 Capacity)
 	{
 		assert(Capacity != 0);
 
-		RingBuffer<T> Buffer = { };
+		HeapRingBuffer<T> Buffer = { };
 		Buffer.DataArray = MemoryManagementSystem::Allocate<T>(Capacity);
-		Buffer.Capacity = Capacity;
+		Buffer.ControlBlock.Capacity = Capacity;
 		return Buffer;
 	};
 
 	template <typename T>
-	static void FreeRingBuffer(RingBuffer<T>* Buffer)
+	static void FreeRingBuffer(HeapRingBuffer<T>* Buffer)
 	{
-		assert(Buffer->Capacity != 0);
+		assert(Buffer->ControlBlock.Capacity != 0);
 		MemoryManagementSystem::Free(Buffer->DataArray);
 		*Buffer = { };
 	}
 
 	template<typename T>
-	static bool IsRingBufferEmpty(const RingBuffer<T>* Buffer)
+	static bool IsRingBufferEmpty(const HeapRingBuffer<T>* Buffer)
 	{
-		assert(Buffer->Capacity != 0);
-		return (Buffer->Head == Buffer->Tail && !Buffer->Wrapped);
+		assert(Buffer->ControlBlock.Capacity != 0);
+		return (Buffer->ControlBlock.Head == Buffer->ControlBlock.Tail && !Buffer->ControlBlock.Wrapped);
 	}
 
 	template<typename T>
-	static bool IsRingBufferFull(const RingBuffer<T>* Buffer)
+	static bool IsRingBufferFull(const HeapRingBuffer<T>* Buffer)
 	{
-		assert(Buffer->Capacity != 0);
-		return Buffer->Head == Buffer->Tail && Buffer->Wrapped;
+		assert(Buffer->ControlBlock.Capacity != 0);
+		return Buffer->ControlBlock.Head == Buffer->ControlBlock.Tail && Buffer->ControlBlock.Wrapped;
 	}
 
 	template<typename T>
-	static void PushToRingBuffer(RingBuffer<T>* Buffer, const T* NewItem)
+	static void PushToRingBuffer(HeapRingBuffer<T>* Buffer, const T* NewItem)
 	{
-		assert(Buffer->Capacity != 0);
+		assert(Buffer->ControlBlock.Capacity != 0);
 		assert(!IsRingBufferFull(Buffer));
 
-		Buffer->DataArray[Buffer->Head] = *NewItem;
-		Buffer->Head = (Buffer->Head + 1) % Buffer->Capacity;
+		Buffer->DataArray[Buffer->ControlBlock.Head] = *NewItem;
+		Buffer->ControlBlock.Head = (Buffer->ControlBlock.Head + 1) % Buffer->ControlBlock.Capacity;
 
-		if (Buffer->Head == 0)
+		if (Buffer->ControlBlock.Head == 0)
 		{
-			Buffer->Wrapped = true;
+			Buffer->ControlBlock.Wrapped = true;
 		}
 	}
 
 	template<typename T>
-	static T* RingBufferGetFirst(const RingBuffer<T>* Buffer)
+	static T* RingBufferGetFirst(const HeapRingBuffer<T>* Buffer)
 	{
-		assert(Buffer->Capacity != 0);
+		assert(Buffer->ControlBlock.Capacity != 0);
 		assert(!IsRingBufferEmpty(Buffer));
-		return &Buffer->DataArray[Buffer->Tail];
+		return &Buffer->DataArray[Buffer->ControlBlock.Tail];
 	}
 
 	template<typename T>
-	static void RingBufferPopFirst(RingBuffer<T>* Buffer)
+	static void RingBufferPopFirst(HeapRingBuffer<T>* Buffer)
 	{
-		assert(Buffer->Capacity != 0);
+		assert(Buffer->ControlBlock.Capacity != 0);
 		assert(!IsRingBufferEmpty(Buffer));
 
-		Buffer->Tail = (Buffer->Tail + 1) % Buffer->Capacity;
+		Buffer->ControlBlock.Tail = (Buffer->ControlBlock.Tail + 1) % Buffer->ControlBlock.Capacity;
 
-		if (Buffer->Tail == Buffer->Head)
+		if (Buffer->ControlBlock.Tail == Buffer->ControlBlock.Head)
 		{
-			Buffer->Wrapped = false;
+			Buffer->ControlBlock.Wrapped = false;
 		}
 	}
 
-	template<typename T>
-	static bool RingIsFit(RingBuffer<T>* Buffer, u64 Count)
+	static bool RingIsFit(const RingBufferControl* ControlBlock, u64 Count)
 	{
-		assert(Buffer->Capacity != 0);
+		assert(ControlBlock->Capacity != 0);
 		assert(Count != 0);
 
-		const u64 Used = !Buffer->Wrapped
-			? Buffer->Head - Buffer->Tail
-			: Buffer->Capacity - Buffer->Tail + Buffer->Head;
+		const u64 Used = !ControlBlock->Wrapped
+			? ControlBlock->Head - ControlBlock->Tail
+			: ControlBlock->Capacity - ControlBlock->Tail + ControlBlock->Head;
 
-		const u64 Free = Buffer->Capacity - Used;
+		const u64 Free = ControlBlock->Capacity - Used;
 		if (Free < Count)
 		{
 			return false;
 		}
 
-		if (!Buffer->Wrapped && Buffer->Head + Count <= Buffer->Capacity)
+		if (!ControlBlock->Wrapped && ControlBlock->Head + Count <= ControlBlock->Capacity)
 		{
 			return true;
 		}
 
-		return Count <= Buffer->Tail;
+		return Count <= ControlBlock->Tail;
 	}
 
-	template<typename T>
-	static u64 RingUsed(RingBuffer<T>* Buffer)
+	static u64 RingUsed(const RingBufferControl* ControlBlock)
 	{
-		assert(Buffer->Capacity != 0);
+		assert(ControlBlock->Capacity != 0);
 
-		if (!Buffer->Wrapped)
+		if (!ControlBlock->Wrapped)
 		{
-			return Buffer->Head - Buffer->Tail;
+			return ControlBlock->Head - ControlBlock->Tail;
 		}
 
-		return Buffer->Capacity - Buffer->Tail + Buffer->Head;
+		return ControlBlock->Capacity - ControlBlock->Tail + ControlBlock->Head;
 	}
 
-	template<typename T>
-	static T* RingAlloc(RingBuffer<T>* Buffer, u64 Count)
+	static u64 RingAlloc(RingBufferControl* ControlBlock, u64 Count)
 	{
-		assert(Buffer->Capacity != 0);
+		assert(ControlBlock->Capacity != 0);
 		assert(Count != 0);
-		assert(RingIsFit(Buffer, Count));
+		assert(RingIsFit(ControlBlock, Count));
 
-		if ((!Buffer->Wrapped && Buffer->Head + Count <= Buffer->Capacity) ||
-			(Buffer->Wrapped && Buffer->Head >= Buffer->Tail && Buffer->Head + Count <= Buffer->Capacity))
+		if ((!ControlBlock->Wrapped && ControlBlock->Head + Count <= ControlBlock->Capacity) ||
+			(ControlBlock->Wrapped && ControlBlock->Head >= ControlBlock->Tail && ControlBlock->Head + Count <= ControlBlock->Capacity))
 		{
-			T* ptr = &Buffer->DataArray[Buffer->Head];
-			Buffer->Head = (Buffer->Head + Count) % Buffer->Capacity;
-			if (Buffer->Head == Buffer->Tail)
+			const u64 Offset = ControlBlock->Head;
+			ControlBlock->Head = (ControlBlock->Head + Count) % ControlBlock->Capacity;
+			if (ControlBlock->Head == ControlBlock->Tail)
 			{
-				Buffer->Wrapped = true;
+				ControlBlock->Wrapped = true;
 			}
 
-			return ptr;
+			return Offset;
 		}
 
-		if (!Buffer->Wrapped && Count <= Buffer->Tail)
+		if (!ControlBlock->Wrapped && Count <= ControlBlock->Tail)
 		{
-			Buffer->Leftover = Buffer->Capacity - Buffer->Head;
-			Buffer->Wrapped = true;
-			Buffer->Head = Count;
-			return &Buffer->DataArray[0];
+			ControlBlock->Leftover = ControlBlock->Capacity - ControlBlock->Head;
+			ControlBlock->Wrapped = true;
+			ControlBlock->Head = Count;
+			return 0;
 		}
 
 		assert(false);
-		return &Buffer->DataArray[0];
+		return 0;
 	}
 
-	template<typename T>
-	static void  RingFree(RingBuffer<T>* Buffer, u64 Count)
+	static void RingFree(RingBufferControl* ControlBlock, u64 Count)
 	{
-		assert(Buffer->Capacity != 0);
+		assert(ControlBlock->Capacity != 0);
 		assert(Count != 0);
-		assert(Count <= RingUsed(Buffer));
+		assert(Count <= RingUsed(ControlBlock));
 
-		if (Buffer->Tail + Count <= Buffer->Capacity)
+		if (ControlBlock->Tail + Count <= ControlBlock->Capacity)
 		{
-			Buffer->Tail = (Buffer->Tail + Count) % Buffer->Capacity;
+			ControlBlock->Tail = (ControlBlock->Tail + Count) % ControlBlock->Capacity;
 		}
 		else
 		{
-			Buffer->Tail = (Buffer->Tail + Count + Buffer->Leftover) % Buffer->Capacity;
-			Buffer->Leftover = 0;
+			ControlBlock->Tail = (ControlBlock->Tail + Count + ControlBlock->Leftover) % ControlBlock->Capacity;
+			ControlBlock->Leftover = 0;
 		}
 
-		if (Buffer->Tail == Buffer->Head)
+		if (ControlBlock->Tail == ControlBlock->Head)
 		{
-			Buffer->Tail = 0;
-			Buffer->Head = 0;
-			if (Buffer->Wrapped)
-			Buffer->Wrapped = false;
+			ControlBlock->Tail = 0;
+			ControlBlock->Head = 0;
+			if (ControlBlock->Wrapped)
+			ControlBlock->Wrapped = false;
 		}
 	}
 }

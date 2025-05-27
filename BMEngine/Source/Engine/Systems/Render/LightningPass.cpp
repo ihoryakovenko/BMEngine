@@ -238,7 +238,7 @@ namespace LightningPass
 				Render::DrawEntity* DrawEntity = State->DrawEntities.Data + i;
 				Render::StaticMesh* Mesh = State->Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
 
-				const VkBuffer VertexBuffers[] = { State->Meshes.VertexBuffer.Buffer };
+				const VkBuffer VertexBuffers[] = { State->Meshes.VertexStageData.Buffer };
 				const VkDeviceSize Offsets[] = { Mesh->VertexOffset };
 
 				const u32 DescriptorSetGroupCount = 1;
@@ -255,7 +255,7 @@ namespace LightningPass
 					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr);
 
 				vkCmdBindVertexBuffers(CmdBuffer, 0, 1, VertexBuffers, Offsets);
-				vkCmdBindIndexBuffer(CmdBuffer, State->Meshes.IndexBuffer.Buffer, Mesh->VertexOffset, VK_INDEX_TYPE_UINT32);
+				vkCmdBindIndexBuffer(CmdBuffer, State->Meshes.VertexStageData.Buffer, Mesh->VertexOffset, VK_INDEX_TYPE_UINT32);
 				vkCmdDrawIndexed(CmdBuffer, Mesh->IndicesCount, 1, 0, 0, 0);
 			}
 

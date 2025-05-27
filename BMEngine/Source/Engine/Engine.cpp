@@ -154,7 +154,8 @@ namespace Engine
 		//auto p4 = Memory::RingAlloc(&Test, 1u);
 		//Memory::RingFree(&Test, p3, 2);
 
-		Memory::RingBuffer<u8> Test = Memory::AllocateRingBuffer<u8>(5);
+		Memory::RingBufferControl Test{ };
+		Test.Capacity = 5;
 		auto p = Memory::RingAlloc(&Test, 1u);
 		auto p1 = Memory::RingAlloc(&Test, 1u);
 		auto p2 = Memory::RingAlloc(&Test, 1u);
