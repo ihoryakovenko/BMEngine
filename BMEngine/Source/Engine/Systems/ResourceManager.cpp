@@ -16,72 +16,64 @@
 
 namespace ResourceManager
 {
+	static gli::texture DefaultTexture;
+
 	void Init()
 	{
 		const u64 DefaultTextureDataCount = sizeof(DefaultTextureData) / sizeof(DefaultTextureData[0]);
 
 		std::hash<std::string> Hasher;
 
-		gli::texture Texture = gli::load((char const*)DefaultTextureData, DefaultTextureDataCount);
-		if (Texture.empty())
+		DefaultTexture = gli::load((char const*)DefaultTextureData, DefaultTextureDataCount);
+		if (DefaultTexture.empty())
 		{
 			assert(false);
 		}
 
 		//VkFormat Format = static_cast<VkFormat>(gli::internal_format(Texture.format()));
 		//u32 MipLevels = static_cast<uint32_t>(Texture.levels());
-		glm::tvec3<u32> Extent = Texture.extent();
+		glm::tvec3<u32> Extent = DefaultTexture.extent();
 
-		Render::CreateTexture2DSRGB(Hasher("Default"), Texture.data(), Extent.x, Extent.y, VulkanInterface::TestGetImageIndex());
+		Render::CreateTexture2DSRGB(Hasher("Default"), DefaultTexture.data(), Extent.x, Extent.y);
 	}
 
 	void LoadModel(const char* FilePath, const char* Directory)
 	{
-		u32 Index = VulkanInterface::TestGetImageIndex();
+		LoadTextures(Directory);
 
-		std::thread LoadThread(
-			[FilePath, Index, Directory]()
-			{
-				LoadTextures(Directory, Index);
+		Util::Model3DData ModelData = Util::LoadModel3DData(FilePath);
+		Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
 
-				Util::Model3DData ModelData = Util::LoadModel3DData(FilePath);
-				Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
+		u64 ModelVertexByteOffset = 0;
+		for (u32 i = 0; i < Uh60Model.MeshCount; i++)
+		{
+			const u64 VerticesCount = Uh60Model.VerticesCounts[i];
+			const u32 IndicesCount = Uh60Model.IndicesCounts[i];
 
-				u64 ModelVertexByteOffset = 0;
-				for (u32 i = 0; i < Uh60Model.MeshCount; i++)
-				{
-					const u64 VerticesCount = Uh60Model.VerticesCounts[i];
-					const u32 IndicesCount = Uh60Model.IndicesCounts[i];
+			const u32 TextureIndex = Render::GetTexture2DSRGBIndex(Uh60Model.DiffuseTexturesHashes[i]);
 
-					const u32 TextureIndex = Render::GetTexture2DSRGBIndex(Uh60Model.DiffuseTexturesHashes[i]);
+			Render::Material Mat;
+			Mat.AlbedoTexIndex = TextureIndex;
+			Mat.SpecularTexIndex = TextureIndex;
+			Mat.Shininess = 32.0f;
+			const u32 MaterialIndex = Render::CreateMaterial(&Mat);
 
-					Render::Material Mat;
-					Mat.AlbedoTexIndex = TextureIndex;
-					Mat.SpecularTexIndex = TextureIndex;
-					Mat.Shininess = 32.0f;
-					const u32 MaterialIndex = Render::CreateMaterial(&Mat, Index);
+			Render::DrawEntity Entity = { };
+			Entity.StaticMeshIndex = Render::CreateStaticMesh(Uh60Model.VertexData + ModelVertexByteOffset,
+				sizeof(StaticMeshRender::StaticMeshVertex), VerticesCount, IndicesCount);
+			Entity.MaterialIndex = MaterialIndex;
+			Entity.Model = glm::mat4(1.0f);
 
-					Render::DrawEntity Entity = { };
-					Entity.StaticMeshIndex = Render::CreateStaticMesh(Uh60Model.VertexData + ModelVertexByteOffset,
-						sizeof(StaticMeshRender::StaticMeshVertex), VerticesCount, IndicesCount, Index);
-					Entity.MaterialIndex = MaterialIndex;
-					Entity.Model = glm::mat4(1.0f);
+			Render::CreateEntity(&Entity);
 
-					Render::CreateEntity(&Entity, Index);
+			ModelVertexByteOffset += VerticesCount * sizeof(StaticMeshRender::StaticMeshVertex) + IndicesCount * sizeof(u32);
+		}
 
-					ModelVertexByteOffset += VerticesCount * sizeof(StaticMeshRender::StaticMeshVertex) + IndicesCount * sizeof(u32);
-					//std::this_thread::sleep_for(std::chrono::milliseconds(100));
-				}
-
-				//std::this_thread::sleep_for(std::chrono::seconds(5));
-				Util::ClearModel3DData(ModelData);
-			}
-		);
-
-		LoadThread.detach();
+		//Util::ClearModel3DData(ModelData);
+		Render::NotifyTransfer();
 	}
 
-	void LoadTextures(const char* Directory, u32 ImageIndex)
+	void LoadTextures(const char* Directory)
 	{
 		WIN32_FIND_DATAA FindFileData;
 		HANDLE hFind;
@@ -110,7 +102,7 @@ namespace ResourceManager
 
 			if (FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 			{
-				LoadTextures(FullPath, ImageIndex);
+				LoadTextures(FullPath);
 			}
 			else
 			{
@@ -121,17 +113,21 @@ namespace ResourceManager
 
 				std::hash<std::string> Hasher;
 
-				gli::texture Texture = gli::load(FullPath);
-				if (Texture.empty())
-				{
-					assert(false);
-				}
+				//gli::texture Texture = gli::load(FullPath);
+				// TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+				//if (Texture.empty())
+				//{
+				//	assert(false);
+				//}
+
+				gli::texture* Texture = new gli::texture(gli::load(FullPath)); // TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 				//VkFormat Format = static_cast<VkFormat>(gli::internal_format(Texture.format()));
 				//u32 MipLevels = static_cast<uint32_t>(Texture.levels());
-				glm::tvec3<u32> Extent = Texture.extent();
+				glm::tvec3<u32> Extent = Texture->extent();
 
-				Render::CreateTexture2DSRGB(Hasher(FileNameNoExt), Texture.data(), Extent.x, Extent.y, ImageIndex);
+				Render::CreateTexture2DSRGB(Hasher(FileNameNoExt), Texture->data(), Extent.x, Extent.y);
 			}
 		}
 		while (FindNextFileA(hFind, &FindFileData));

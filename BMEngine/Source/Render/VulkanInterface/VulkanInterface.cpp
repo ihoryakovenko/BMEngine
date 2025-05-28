@@ -75,8 +75,6 @@ namespace VulkanInterface
 		VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
 	};
 
-	static const u32 MAX_DRAW_FRAMES = 3;
-
 	// Vulkan variables
 	static BMRMainInstance Instance;
 	static BMRDevice Device;

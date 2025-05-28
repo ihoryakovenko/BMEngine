@@ -141,35 +141,6 @@ namespace Engine
 		const u32 FrameAllocSize = 1024 * 1024;
 		Memory::MemoryManagementSystem::Init(FrameAllocSize);
 
-
-		//Memory::RingBuffer<u8> Test = Memory::AllocateRingBuffer<u8>(4);
-		//auto p = Memory::RingAlloc(&Test, 1u);
-		//auto p1 = Memory::RingAlloc(&Test, 1u);
-		//auto p2 = Memory::RingAlloc(&Test, 1u);
-		//auto p22 = Memory::RingAlloc(&Test, 1u);
-		//Memory::RingFree(&Test, p, 1);
-		//Memory::RingFree(&Test, p1, 1);
-		//auto p3 = Memory::RingAlloc(&Test, 2u);
-		//Memory::RingFree(&Test, p2, 1);
-		//auto p4 = Memory::RingAlloc(&Test, 1u);
-		//Memory::RingFree(&Test, p3, 2);
-
-		Memory::RingBufferControl Test{ };
-		Test.Capacity = 5;
-		auto p = Memory::RingAlloc(&Test, 1u);
-		auto p1 = Memory::RingAlloc(&Test, 1u);
-		auto p2 = Memory::RingAlloc(&Test, 1u);
-		auto p22 = Memory::RingAlloc(&Test, 1u);
-		Memory::RingFree(&Test, 1);
-		Memory::RingFree(&Test, 1);
-		auto p3 = Memory::RingAlloc(&Test, 2u);
-		Memory::RingFree(&Test, 1);
-		Memory::RingFree(&Test, 1);
-		Memory::RingFree(&Test, 2);
-
-
-
-
 		Render::Init(Window, &GuiData);
 
 		

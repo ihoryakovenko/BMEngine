@@ -237,6 +237,14 @@ namespace LightningPass
 			{
 				Render::DrawEntity* DrawEntity = State->DrawEntities.Data + i;
 				Render::StaticMesh* Mesh = State->Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
+				Render::Material* Material = State->Materials.Materials.Data + DrawEntity->MaterialIndex;
+				Render::MeshTexture2D* AlbedoTexture = State->Textures.Textures + Material->AlbedoTexIndex;
+				Render::MeshTexture2D* SpecTexture = State->Textures.Textures + Material->SpecularTexIndex;
+
+				if (!Mesh->IsLoaded || !Material->IsLoaded || !AlbedoTexture->IsLoaded || !SpecTexture->IsLoaded)
+				{
+					continue;
+				}
 
 				const VkBuffer VertexBuffers[] = { State->Meshes.VertexStageData.Buffer };
 				const VkDeviceSize Offsets[] = { Mesh->VertexOffset };
@@ -255,7 +263,7 @@ namespace LightningPass
 					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr);
 
 				vkCmdBindVertexBuffers(CmdBuffer, 0, 1, VertexBuffers, Offsets);
-				vkCmdBindIndexBuffer(CmdBuffer, State->Meshes.VertexStageData.Buffer, Mesh->VertexOffset, VK_INDEX_TYPE_UINT32);
+				vkCmdBindIndexBuffer(CmdBuffer, State->Meshes.VertexStageData.Buffer, Mesh->IndexOffset, VK_INDEX_TYPE_UINT32);
 				vkCmdDrawIndexed(CmdBuffer, Mesh->IndicesCount, 1, 0, 0, 0);
 			}
 

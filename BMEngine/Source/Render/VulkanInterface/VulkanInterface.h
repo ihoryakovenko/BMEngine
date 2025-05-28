@@ -13,6 +13,7 @@ namespace VulkanInterface
 	static const u32 MAX_SWAPCHAIN_IMAGES_COUNT = 3;
 	static const u32 MAX_VERTEX_INPUTS_ATTRIBUTES = 16;
 	static const u32 MAX_VERTEX_INPUT_BINDINGS = 16;
+	static const u32 MAX_DRAW_FRAMES = 3;
 
 	struct VulkanInterfaceConfig
 	{

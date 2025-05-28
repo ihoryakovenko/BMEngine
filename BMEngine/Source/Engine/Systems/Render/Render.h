@@ -14,6 +14,7 @@
 
 #include <atomic>
 #include <mutex>
+#include <condition_variable>
 #include <unordered_map>
 
 namespace DebugUi
@@ -28,6 +29,7 @@ namespace Render
 		u64 VertexOffset;
 		u32 IndexOffset;
 		u32 IndicesCount;
+		bool IsLoaded; //todo tmp solution?
 	};
 
 	struct Texture
@@ -42,6 +44,7 @@ namespace Render
 	{
 		Texture MeshTexture;
 		VkImageView View;
+		bool IsLoaded; //todo tmp solution?
 	};
 
 	struct Material
@@ -49,6 +52,7 @@ namespace Render
 		u32 AlbedoTexIndex;
 		u32 SpecularTexIndex;
 		float Shininess;
+		bool IsLoaded; //todo tmp solution?
 	};
 
 	struct DrawEntity
@@ -71,7 +75,6 @@ namespace Render
 	{
 		VkBuffer Buffer;
 		VkDeviceMemory Memory;
-		u64 Alignment;
 		Memory::RingBufferControl ControlBlock;
 	};
 
@@ -81,20 +84,13 @@ namespace Render
 		Memory::DynamicHeapArray<StaticMesh> StaticMeshes;
 	};
 
-	enum TransferTaskState
-	{
-		TRANSFER_IDLE,
-		TRANSFER_IN_FLIGHT,
-		TRANSFER_COMPLETE
-	};
-
 	struct MaterialStorage
 	{
+		Memory::DynamicHeapArray<Material> Materials;
 		VkBuffer MaterialBuffer;
 		VkDeviceMemory MaterialBufferMemory;
 		VkDescriptorSetLayout MaterialLayout;
 		VkDescriptorSet MaterialSet;
-		u32 MaterialIndex;
 	};
 
 	struct TextureStorage
@@ -108,17 +104,42 @@ namespace Render
 		u32 TextureIndex;
 	};
 
-	struct TransferTask
+	enum TransferTaskType
 	{
-		DrawEntity Entity;
-		TransferTaskState State;
+		TransferTaskType_Texture,
+		TransferTaskType_Data
 	};
 
-	static const u32 MaxTasks = 512;
+	struct TextureTaskDescription
+	{
+		VkImage DstImage;
+		u32 Width;
+		u32 Height;
+	};
+
+	struct DataTaskDescription
+	{
+		VkBuffer DstBuffer;
+		u64 DstOffset;
+	};
+
+	struct TransferTask
+	{
+		union
+		{
+			TextureTaskDescription TextureDescr;
+			DataTaskDescription DataDescr;
+		};
+
+		void* RawData;
+		u64 DataSize;
+		bool* OnCompleted; //todo tmp solution?
+		TransferTaskType Type;
+	};
 
 	struct TaskQueue
 	{
-		Memory::HeapRingBuffer<TransferTask> TaskBuffer;
+		Memory::HeapRingBuffer<TransferTask> TasksBuffer;
 		std::mutex Mutex;
 	};
 
@@ -126,14 +147,20 @@ namespace Render
 	{
 		VkFence Fences[3];
 		VkCommandBuffer CommandBuffers[3];
-		TaskQueue Tasks[3];
 	};
 
 	struct DataTransferState
 	{
 		VkCommandPool TransferCommandPool;
 		StagingPool TransferStagingPool;
+
+		TaskQueue PendingTransferTasksQueue;
+		TaskQueue ActiveTransferTasksQueue;
+
+		std::condition_variable PendingCv;
+
 		TransferFrames Frames;
+		u32 CurrentFrame;
 	};
 
 	struct RenderState
@@ -151,12 +178,14 @@ namespace Render
 	void Init(GLFWwindow* WindowHandler, DebugUi::GuiData* GuiData);
 	void DeInit();
 
-	u64 CreateStaticMesh(void* MeshVertexData, u64 VertexSize, u64 VerticesCount, u64 IndicesCount, u32 FrameIndex);
-	u32 CreateMaterial(Material* Mat, u32 FrameIndex);
-	u32 CreateEntity(const DrawEntity* Entity, u32 FrameIndex);
-	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height, u32 FrameIndex);
+	u64 CreateStaticMesh(void* MeshVertexData, u64 VertexSize, u64 VerticesCount, u64 IndicesCount);
+	u32 CreateMaterial(Material* Mat);
+	u32 CreateEntity(const DrawEntity* Entity);
+	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height);
 
 	void Draw(const FrameManager::ViewProjectionBuffer* Data);
+	void Transfer();
+	void NotifyTransfer();
 
 	u32 GetTexture2DSRGBIndex(u64 Hash);
 	RenderState* GetRenderState();
@@ -169,13 +198,7 @@ namespace Render
 
 
 
-	struct TextureData
-	{
-		void* RawData;
-		u32 Width;
-		u32 Height;
-		u64 Size;
-	};
+
 
 	struct VertexData
 	{

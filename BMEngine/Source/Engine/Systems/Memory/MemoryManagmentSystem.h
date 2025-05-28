@@ -196,11 +196,11 @@ namespace Memory
 	}
 
 	template <typename T>
-	static void PushBackToArray(DynamicHeapArray<T>* Array, T* NewElement)
+	static void PushBackToArray(DynamicHeapArray<T>* Array, const T* NewElement)
 	{
 		assert(Array->Capacity != 0);
 
-		if (Array->Capacity <= Array->Count)
+		if (Array->Count >= Array->Capacity)
 		{
 			ArrayIncreaseCapacity(Array);
 		}
@@ -212,7 +212,7 @@ namespace Memory
 	{
 		assert(Array->Capacity != 0);
 
-		if (Array->Capacity <= Array->Count)
+		if (Array->Count >= Array->Capacity)
 		{
 			ArrayIncreaseCapacity(Array);
 		}
@@ -228,6 +228,7 @@ namespace Memory
 		HeapRingBuffer<T> Buffer = { };
 		Buffer.DataArray = MemoryManagementSystem::Allocate<T>(Capacity);
 		Buffer.ControlBlock.Capacity = Capacity;
+		//Buffer.ControlBlock.Alignment = 1;
 		return Buffer;
 	};
 
@@ -327,6 +328,8 @@ namespace Memory
 
 	static u64 RingAlloc(RingBufferControl* ControlBlock, u64 Count)
 	{
+		//Count = (Count + ControlBlock->Alignment - 1) & ~(ControlBlock->Alignment - 1);
+
 		assert(ControlBlock->Capacity != 0);
 		assert(Count != 0);
 		assert(RingIsFit(ControlBlock, Count));
@@ -358,6 +361,8 @@ namespace Memory
 
 	static void RingFree(RingBufferControl* ControlBlock, u64 Count)
 	{
+		//Count = (Count + ControlBlock->Alignment - 1) & ~(ControlBlock->Alignment - 1);
+
 		assert(ControlBlock->Capacity != 0);
 		assert(Count != 0);
 		assert(Count <= RingUsed(ControlBlock));

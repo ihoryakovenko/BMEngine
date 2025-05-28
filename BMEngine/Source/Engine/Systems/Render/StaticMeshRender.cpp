@@ -202,6 +202,14 @@ namespace StaticMeshRender
 		{
 			Render::DrawEntity* DrawEntity = State->DrawEntities.Data + i;
 			Render::StaticMesh* Mesh = State->Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
+			Render::Material* Material = State->Materials.Materials.Data + DrawEntity->MaterialIndex;
+			Render::MeshTexture2D* AlbedoTexture = State->Textures.Textures + Material->AlbedoTexIndex;
+			Render::MeshTexture2D* SpecTexture = State->Textures.Textures + Material->SpecularTexIndex;
+
+			if (!Mesh->IsLoaded || !Material->IsLoaded || !AlbedoTexture->IsLoaded || !SpecTexture->IsLoaded)
+			{
+				continue;
+			}
 
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
