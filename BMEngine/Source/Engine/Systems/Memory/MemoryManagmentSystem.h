@@ -382,7 +382,9 @@ namespace Memory
 			ControlBlock->Tail = 0;
 			ControlBlock->Head = 0;
 			if (ControlBlock->Wrapped)
-			ControlBlock->Wrapped = false;
+			{
+				ControlBlock->Wrapped = false;
+			}
 		}
 	}
 }

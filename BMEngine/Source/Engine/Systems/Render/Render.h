@@ -29,7 +29,8 @@ namespace Render
 		u64 VertexOffset;
 		u32 IndexOffset;
 		u32 IndicesCount;
-		bool IsLoaded; //todo tmp solution?
+		u64 VertexDataSize;
+		bool IsLoaded;
 	};
 
 	struct Texture
@@ -44,7 +45,7 @@ namespace Render
 	{
 		Texture MeshTexture;
 		VkImageView View;
-		bool IsLoaded; //todo tmp solution?
+		bool IsLoaded;
 	};
 
 	struct Material
@@ -52,7 +53,7 @@ namespace Render
 		u32 AlbedoTexIndex;
 		u32 SpecularTexIndex;
 		float Shininess;
-		bool IsLoaded; //todo tmp solution?
+		bool IsLoaded;
 	};
 
 	struct DrawEntity
@@ -107,7 +108,8 @@ namespace Render
 	enum TransferTaskType
 	{
 		TransferTaskType_Texture,
-		TransferTaskType_Data
+		TransferTaskType_Mesh,
+		TransferTaskType_Material
 	};
 
 	struct TextureTaskDescription
@@ -125,6 +127,8 @@ namespace Render
 
 	struct TransferTask
 	{
+		TransferTaskType Type;
+
 		union
 		{
 			TextureTaskDescription TextureDescr;
@@ -133,8 +137,8 @@ namespace Render
 
 		void* RawData;
 		u64 DataSize;
-		bool* OnCompleted; //todo tmp solution?
-		TransferTaskType Type;
+
+		u32 ResourceIndex;
 	};
 
 	struct TaskQueue
@@ -151,13 +155,18 @@ namespace Render
 
 	struct DataTransferState
 	{
+		Memory::HeapRingBuffer<u8> TransferMemory;
+
 		VkCommandPool TransferCommandPool;
 		StagingPool TransferStagingPool;
 
-		TaskQueue PendingTransferTasksQueue;
-		TaskQueue ActiveTransferTasksQueue;
+		VkSemaphore TransferSemaphore;
+		u64 TasksInFly;
+		u64 CompletedTransfer;
 
+		TaskQueue PendingTransferTasksQueue;
 		std::condition_variable PendingCv;
+		TaskQueue ActiveTransferTasksQueue;
 
 		TransferFrames Frames;
 		u32 CurrentFrame;
@@ -174,43 +183,6 @@ namespace Render
 		DataTransferState TransferState;
 		std::mutex QueueSubmitMutex;	
 	};
-
-	void Init(GLFWwindow* WindowHandler, DebugUi::GuiData* GuiData);
-	void DeInit();
-
-	u64 CreateStaticMesh(void* MeshVertexData, u64 VertexSize, u64 VerticesCount, u64 IndicesCount);
-	u32 CreateMaterial(Material* Mat);
-	u32 CreateEntity(const DrawEntity* Entity);
-	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height);
-
-	void Draw(const FrameManager::ViewProjectionBuffer* Data);
-	void Transfer();
-	void NotifyTransfer();
-
-	u32 GetTexture2DSRGBIndex(u64 Hash);
-	RenderState* GetRenderState();
-
-	
-
-	
-
-
-
-
-
-
-
-	struct VertexData
-	{
-		void* RawData;
-		u64 Size;
-	};
-
-
-
-
-
-
 
 	struct PointLight
 	{
@@ -270,4 +242,19 @@ namespace Render
 
 		LightBuffer* LightEntity = nullptr;
 	};
+
+	void Init(GLFWwindow* WindowHandler, DebugUi::GuiData* GuiData);
+	void DeInit();
+
+	u64 CreateStaticMesh(void* MeshVertexData, u64 VertexSize, u64 VerticesCount, u64 IndicesCount);
+	u32 CreateMaterial(Material* Mat);
+	u32 CreateEntity(const DrawEntity* Entity);
+	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height);
+
+	void Draw(const FrameManager::ViewProjectionBuffer* Data);
+	void Transfer();
+	void NotifyTransfer();
+
+	u32 GetTexture2DSRGBIndex(u64 Hash);
+	RenderState* GetRenderState();
 }

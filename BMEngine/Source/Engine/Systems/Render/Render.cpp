@@ -13,7 +13,13 @@
 
 namespace Render
 {
+	static const u64 MaxTransferSizePerFrame = MB4;
+
 	static RenderState State;
+
+	static void AddTask(TransferTask* Task);
+
+	static void* RequestTransferMemory(u64 Size);
 	
 	void InitStaticMeshStorage(VkDevice Device, VkPhysicalDevice PhysicalDevice, StaticMeshStorage* Buffer, u64 VertexCapacity)
 	{
@@ -129,18 +135,35 @@ namespace Render
 			VULKAN_CHECK_RESULT(vkCreateFence(Device, &FenceCreateInfo, nullptr, TransferState->Frames.Fences + i));
 		}
 
+		VkSemaphoreTypeCreateInfo TimelineCreateInfo = { };
+		TimelineCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+		TimelineCreateInfo.pNext = nullptr;
+		TimelineCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+		TimelineCreateInfo.initialValue = 0;
+
+		VkSemaphoreCreateInfo SemaphoreInfo = { };
+		SemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+		SemaphoreInfo.pNext = &TimelineCreateInfo;
+		SemaphoreInfo.flags = 0;
+
+		VULKAN_CHECK_RESULT(vkCreateSemaphore(Device, &SemaphoreInfo, nullptr, &TransferState->TransferSemaphore));
+		TransferState->CompletedTransfer = 0;
+		TransferState->TasksInFly = 0;
+
 		TransferState->PendingTransferTasksQueue.TasksBuffer = Memory::AllocateRingBuffer<TransferTask>(1024);
 		TransferState->ActiveTransferTasksQueue.TasksBuffer = Memory::AllocateRingBuffer<TransferTask>(1024);
 
 		TransferState->TransferStagingPool = { };
 
-		TransferState->TransferStagingPool.Buffer = VulkanHelper::CreateBuffer(Device, MB32, VulkanHelper::StagingFlag);
+		TransferState->TransferStagingPool.Buffer = VulkanHelper::CreateBuffer(Device, MB16, VulkanHelper::StagingFlag);
 		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
 			TransferState->TransferStagingPool.Buffer, VulkanHelper::HostCompatible);
 		TransferState->TransferStagingPool.Memory = AllocResult.Memory;
 		//TransferState->TransferStagingPool.ControlBlock.Alignment = AllocResult.Alignment;
 		TransferState->TransferStagingPool.ControlBlock.Capacity = AllocResult.Size;
 		vkBindBufferMemory(Device, TransferState->TransferStagingPool.Buffer, TransferState->TransferStagingPool.Memory, 0);
+
+		TransferState->TransferMemory = Memory::AllocateRingBuffer<u8>(MB16);
 	}
 
 	void Init(GLFWwindow* WindowHandler, DebugUi::GuiData* GuiData)
@@ -171,9 +194,17 @@ namespace Render
 		StaticMeshRender::Init();
 		//DebugUi::Init(WindowHandler, GuiData);
 
-		InitStaticMeshStorage(Device, PhysicalDevice, &State.Meshes, MB32 / 8);
+		InitStaticMeshStorage(Device, PhysicalDevice, &State.Meshes, MB4);
 
-		std::thread TransferThread(&Transfer);
+		std::thread TransferThread(
+			[]()
+			{
+				while (true)
+				{
+					Transfer();
+				}
+			});
+
 		TransferThread.detach();
 	}
 
@@ -212,6 +243,8 @@ namespace Render
 		vkDestroyBuffer(Device, State.Materials.MaterialBuffer, nullptr);
 		vkFreeMemory(Device, State.Materials.MaterialBufferMemory, nullptr);
 
+		vkDestroySemaphore(Device, State.TransferState.TransferSemaphore, nullptr);
+
 		//DebugUi::DeInit();
 		//TerrainRender::DeInit();
 		StaticMeshRender::DeInit();
@@ -228,67 +261,13 @@ namespace Render
 		Memory::FreeArray(&State.DrawEntities);
 		Memory::FreeRingBuffer(&State.TransferState.PendingTransferTasksQueue.TasksBuffer);
 		Memory::FreeRingBuffer(&State.TransferState.ActiveTransferTasksQueue.TasksBuffer);
-	}
-
-	void Draw(const FrameManager::ViewProjectionBuffer* Data)
-	{
-		VkDevice Device = VulkanInterface::GetDevice();
-
-		//const u32 CurrentIndex = VulkanInterface::TestGetImageIndex();
-		const u32 CurrentIndex = 0;
-		std::unique_lock Lock(State.TransferState.PendingTransferTasksQueue.Mutex);
-
-		while (!Memory::IsRingBufferEmpty(&State.TransferState.ActiveTransferTasksQueue.TasksBuffer))
-		{
-			TransferTask* Task = Memory::RingBufferGetFirst(&State.TransferState.ActiveTransferTasksQueue.TasksBuffer);
-			if (vkGetFenceStatus(Device, State.TransferState.Frames.Fences[CurrentIndex]) == VK_SUCCESS)
-			{
-				*Task->OnCompleted = true;
-				Memory::RingBufferPopFirst(&State.TransferState.ActiveTransferTasksQueue.TasksBuffer);
-			}
-			else
-			{
-				break;
-			}
-		}
-
-		Lock.unlock();
-
-
-		const u32 ImageIndex = VulkanInterface::AcquireNextImageIndex();
-
-		FrameManager::UpdateViewProjection(Data);
-
-		VulkanInterface::BeginFrame();
-
-		LightningPass::Draw();
-
-		MainPass::BeginPass();
-
-		//TerrainRender::Draw();
-		StaticMeshRender::Draw();
-
-		MainPass::EndPass();
-		DeferredPass::BeginPass();
-
-		DeferredPass::Draw();
-		//DebugUi::Draw();
-
-		DeferredPass::EndPass();
-
-		VulkanInterface::EndFrame(State.QueueSubmitMutex);
+		Memory::FreeRingBuffer(&State.TransferState.TransferMemory);
 	}
 
 	void Transfer()
 	{
-		std::unique_lock<std::mutex> PendingLock(State.TransferState.PendingTransferTasksQueue.Mutex);
-		State.TransferState.PendingCv.wait(PendingLock, []
-			{
-				return !Memory::IsRingBufferEmpty(&State.TransferState.PendingTransferTasksQueue.TasksBuffer);
-			});
-
+		u64 FrameTotalTransferSize = 0;
 		const u32 CurrentFrame = State.TransferState.CurrentFrame;
-
 		VkDevice Device = VulkanInterface::GetDevice();
 
 		VkFence TransferFence = State.TransferState.Frames.Fences[CurrentFrame];
@@ -302,33 +281,82 @@ namespace Render
 
 		VULKAN_CHECK_RESULT(vkBeginCommandBuffer(TransferCommandBuffer, &CommandBufferBeginInfo));
 
+		std::unique_lock<std::mutex> PendingLock(State.TransferState.PendingTransferTasksQueue.Mutex);
+		State.TransferState.PendingCv.wait(PendingLock, []
+		{
+			return !Memory::IsRingBufferEmpty(&State.TransferState.PendingTransferTasksQueue.TasksBuffer);
+		});
+
 		while (!Memory::IsRingBufferEmpty(&State.TransferState.PendingTransferTasksQueue.TasksBuffer))
 		{
 			TransferTask* Task = Memory::RingBufferGetFirst(&State.TransferState.PendingTransferTasksQueue.TasksBuffer);
+
+			const u64 TransferOffset = Memory::RingAlloc(&State.TransferState.TransferStagingPool.ControlBlock, Task->DataSize);
+			VulkanHelper::UpdateHostCompatibleBufferMemory(Device, State.TransferState.TransferStagingPool.Memory, Task->DataSize,
+				TransferOffset, Task->RawData);
+
 			switch (Task->Type)
 			{
-				case TransferTaskType::TransferTaskType_Data:
+				case TransferTaskType::TransferTaskType_Mesh:
 				{
-					const u64 TransferOffset = Memory::RingAlloc(&State.TransferState.TransferStagingPool.ControlBlock, Task->DataSize);
+					VkBufferMemoryBarrier2 Barrier = { };
+					Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+					Barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+					Barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+					Barrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
+					Barrier.dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
+					Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+					Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+					Barrier.buffer = Task->DataDescr.DstBuffer;
+					Barrier.offset = Task->DataDescr.DstOffset;
+					Barrier.size = Task->DataSize;
+
+					VkDependencyInfo DepInfo = { };
+					DepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+					DepInfo.bufferMemoryBarrierCount = 1;
+					DepInfo.pBufferMemoryBarriers = &Barrier;
 
 					VkBufferCopy IndexBufferCopyRegion = { };
 					IndexBufferCopyRegion.srcOffset = TransferOffset;
 					IndexBufferCopyRegion.dstOffset = Task->DataDescr.DstOffset;
 					IndexBufferCopyRegion.size = Task->DataSize;
-					VulkanHelper::UpdateHostCompatibleBufferMemory(Device, State.TransferState.TransferStagingPool.Memory, Task->DataSize,
-						TransferOffset, Task->RawData);
 
-					Material* Mat = (Material*)Task->RawData;
+					vkCmdPipelineBarrier2(TransferCommandBuffer, &DepInfo);
+					vkCmdCopyBuffer(TransferCommandBuffer, State.TransferState.TransferStagingPool.Buffer, Task->DataDescr.DstBuffer, 1, &IndexBufferCopyRegion);
 
+					break;
+				}
+				case TransferTaskType::TransferTaskType_Material:
+				{
+					VkBufferMemoryBarrier2 Barrier = { };
+					Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+					Barrier.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+					Barrier.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT;
+					Barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+					Barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+					Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+					Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+					Barrier.buffer = Task->DataDescr.DstBuffer;
+					Barrier.offset = Task->DataDescr.DstOffset;
+					Barrier.size = Task->DataSize;
+
+					VkDependencyInfo DepInfo = { };
+					DepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+					DepInfo.bufferMemoryBarrierCount = 1;
+					DepInfo.pBufferMemoryBarriers = &Barrier;
+
+					VkBufferCopy IndexBufferCopyRegion = { };
+					IndexBufferCopyRegion.srcOffset = TransferOffset;
+					IndexBufferCopyRegion.dstOffset = Task->DataDescr.DstOffset;
+					IndexBufferCopyRegion.size = Task->DataSize;
+
+					vkCmdPipelineBarrier2(TransferCommandBuffer, &DepInfo);
 					vkCmdCopyBuffer(TransferCommandBuffer, State.TransferState.TransferStagingPool.Buffer, Task->DataDescr.DstBuffer, 1, &IndexBufferCopyRegion);
 
 					break;
 				}
 				case TransferTaskType::TransferTaskType_Texture:
 				{
-					const u64 TransferOffset = Memory::RingAlloc(&State.TransferState.TransferStagingPool.ControlBlock, Task->DataSize);
-					VulkanHelper::UpdateHostCompatibleBufferMemory(Device, State.TransferState.TransferStagingPool.Memory, Task->DataSize, TransferOffset, Task->RawData);
-
 					VkImageMemoryBarrier2 TransferImageBarrier = { };
 					TransferImageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
 					TransferImageBarrier.pNext = nullptr;
@@ -407,26 +435,160 @@ namespace Render
 				}
 			}
 
-			//std::unique_lock ActiveTasksLock(State.TransferState.ActiveTransferTasksQueue.Mutex);
+			std::unique_lock ActiveTasksLock(State.TransferState.ActiveTransferTasksQueue.Mutex);
 			Memory::PushToRingBuffer(&State.TransferState.ActiveTransferTasksQueue.TasksBuffer, Task);
-			//ActiveTasksLock.unlock();
+			++State.TransferState.TasksInFly;
+			ActiveTasksLock.unlock();
 
 			Memory::RingBufferPopFirst(&State.TransferState.PendingTransferTasksQueue.TasksBuffer);
+
+			FrameTotalTransferSize += Task->DataSize;
+			if (FrameTotalTransferSize >= MaxTransferSizePerFrame)
+			{
+				break;
+			}
 		}
 
+		PendingLock.unlock();
+
 		VULKAN_CHECK_RESULT(vkEndCommandBuffer(TransferCommandBuffer));
+
+		const u64 TasksInFly = State.TransferState.TasksInFly;
+
+		VkTimelineSemaphoreSubmitInfo TimelineSubmitInfo = { };
+		TimelineSubmitInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+		TimelineSubmitInfo.signalSemaphoreValueCount = 1;
+		TimelineSubmitInfo.pSignalSemaphoreValues = &TasksInFly;
 
 		VkSubmitInfo SubmitInfo = { };
 		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		SubmitInfo.commandBufferCount = 1;
 		SubmitInfo.pCommandBuffers = &TransferCommandBuffer;
-		SubmitInfo.signalSemaphoreCount = 0;
+		SubmitInfo.pNext = &TimelineSubmitInfo;
+		SubmitInfo.signalSemaphoreCount = 1;
+		SubmitInfo.pSignalSemaphores = &State.TransferState.TransferSemaphore;
 
 		std::unique_lock SubmitLock(State.QueueSubmitMutex);
 		vkQueueSubmit(VulkanInterface::GetTransferQueue(), 1, &SubmitInfo, TransferFence);
 		SubmitLock.unlock();
 
 		State.TransferState.CurrentFrame = (CurrentFrame + 1) % VulkanInterface::MAX_DRAW_FRAMES;
+	}
+
+	void Draw(const FrameManager::ViewProjectionBuffer* Data)
+	{
+		VkDevice Device = VulkanInterface::GetDevice();
+
+		const u32 ImageIndex = VulkanInterface::AcquireNextImageIndex();
+
+		FrameManager::UpdateViewProjection(Data);
+
+		VulkanInterface::BeginFrame();
+
+		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+
+		u64 CompletedCounter = 0;
+		vkGetSemaphoreCounterValue(Device, State.TransferState.TransferSemaphore, &CompletedCounter);
+
+		u64 Counter = CompletedCounter - State.TransferState.CompletedTransfer;
+		if (Counter > 0)
+		{
+			std::unique_lock Lock(State.TransferState.ActiveTransferTasksQueue.Mutex);
+
+			while (Counter--)
+			{
+				TransferTask* Task = Memory::RingBufferGetFirst(&State.TransferState.ActiveTransferTasksQueue.TasksBuffer);
+
+				switch (Task->Type)
+				{
+					case TransferTaskType::TransferTaskType_Mesh:
+					{
+						VkBufferMemoryBarrier2 Barrier = { };
+						Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+						Barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+						Barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+						Barrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
+						Barrier.dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
+						Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+						Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+						Barrier.buffer = Task->DataDescr.DstBuffer;
+						Barrier.offset = Task->DataDescr.DstOffset;
+						Barrier.size = Task->DataSize;
+
+						VkDependencyInfo DepInfo = { };
+						DepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+						DepInfo.bufferMemoryBarrierCount = 1;
+						DepInfo.pBufferMemoryBarriers = &Barrier;
+
+						vkCmdPipelineBarrier2(CmdBuffer, &DepInfo);
+
+						State.Meshes.StaticMeshes.Data[Task->ResourceIndex].IsLoaded = true;
+						Memory::RingFree(&State.TransferState.TransferMemory.ControlBlock, Task->DataSize);
+
+						break;
+					}
+					case TransferTaskType::TransferTaskType_Material:
+					{
+						VkBufferMemoryBarrier2 Barrier = { };
+						Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+						Barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+						Barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+						Barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+						Barrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT;
+						Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+						Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+						Barrier.buffer = Task->DataDescr.DstBuffer;
+						Barrier.offset = Task->DataDescr.DstOffset;
+						Barrier.size = Task->DataSize;
+
+						VkDependencyInfo DepInfo = { };
+						DepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+						DepInfo.bufferMemoryBarrierCount = 1;
+						DepInfo.pBufferMemoryBarriers = &Barrier;
+
+						vkCmdPipelineBarrier2(CmdBuffer, &DepInfo);
+
+						State.Materials.Materials.Data[Task->ResourceIndex].IsLoaded = true;
+
+						break;
+					}
+					case TransferTaskType::TransferTaskType_Texture:
+					{
+						State.Textures.Textures[Task->ResourceIndex].IsLoaded = true;
+						Memory::RingFree(&State.TransferState.TransferMemory.ControlBlock, Task->DataSize);
+
+						break;
+					}
+				}
+
+				Memory::RingBufferPopFirst(&State.TransferState.ActiveTransferTasksQueue.TasksBuffer);
+			}
+
+			State.TransferState.CompletedTransfer = CompletedCounter;
+		}
+
+		LightningPass::Draw();
+
+		MainPass::BeginPass();
+
+		//TerrainRender::Draw();
+		StaticMeshRender::Draw();
+
+		MainPass::EndPass();
+		DeferredPass::BeginPass();
+
+		DeferredPass::Draw();
+		//DebugUi::Draw();
+
+		DeferredPass::EndPass();
+
+		VulkanInterface::EndFrame(State.QueueSubmitMutex);
+	}
+
+	void AddTask(TransferTask* Task)
+	{
+		std::unique_lock<std::mutex> PendingLock(State.TransferState.PendingTransferTasksQueue.Mutex);
+		Memory::PushToRingBuffer(&State.TransferState.PendingTransferTasksQueue.TasksBuffer, Task);
 	}
 
 	void NotifyTransfer()
@@ -455,12 +617,10 @@ namespace Render
 		//Task.DataDescr.DstOffset = sizeof(Material) * Index;
 		Task.DataDescr.DstOffset = 12 * Index;
 		Task.RawData = NewMaterial;
-		Task.OnCompleted = &NewMaterial->IsLoaded;
-		Task.Type = TransferTaskType::TransferTaskType_Data;
+		Task.ResourceIndex = Index;
+		Task.Type = TransferTaskType::TransferTaskType_Material;
 
-		std::unique_lock Lock(State.TransferState.PendingTransferTasksQueue.Mutex);
-		Memory::PushToRingBuffer(&State.TransferState.PendingTransferTasksQueue.TasksBuffer, &Task);
-		Lock.unlock();
+		AddTask(&Task);
 
 		return Index;
 	}
@@ -470,24 +630,27 @@ namespace Render
 		const u64 VerticesSize = VertexSize * VerticesCount;
 		const u64 DataSize = sizeof(u32) * IndicesCount + VerticesSize;
 
+		// TODO: TMP solution
+		void* TransferMemory = Render::RequestTransferMemory(DataSize);
+		memcpy(TransferMemory, MeshVertexData, DataSize);
+
 		const u64 Index = State.Meshes.StaticMeshes.Count;
 		StaticMesh* Mesh = Memory::ArrayGetNew(&State.Meshes.StaticMeshes);
 		*Mesh = { };
 		Mesh->IndicesCount = IndicesCount;
 		Mesh->VertexOffset = State.Meshes.VertexStageData.Offset;
 		Mesh->IndexOffset = State.Meshes.VertexStageData.Offset + VerticesSize;
+		Mesh->VertexDataSize = DataSize;
 
 		TransferTask Task = { };
 		Task.DataSize = DataSize;
 		Task.DataDescr.DstBuffer = State.Meshes.VertexStageData.Buffer;
 		Task.DataDescr.DstOffset = State.Meshes.VertexStageData.Offset;
-		Task.RawData = MeshVertexData;
-		Task.OnCompleted = &Mesh->IsLoaded;
-		Task.Type = TransferTaskType::TransferTaskType_Data;
+		Task.RawData = TransferMemory;
+		Task.ResourceIndex = Index;
+		Task.Type = TransferTaskType::TransferTaskType_Mesh;
 
-		std::unique_lock Lock(State.TransferState.PendingTransferTasksQueue.Mutex);
-		Memory::PushToRingBuffer(&State.TransferState.PendingTransferTasksQueue.TasksBuffer, &Task);
-		Lock.unlock();
+		AddTask(&Task);
 
 		State.Meshes.VertexStageData.Offset += DataSize;
 		return Index;
@@ -577,21 +740,28 @@ namespace Render
 		VkWriteDescriptorSet Writes[] = { WriteDiffuse, WriteSpecular };
 		vkUpdateDescriptorSets(VulkanInterface::GetDevice(), 2, Writes, 0, nullptr);
 
+		// TODO: TMP solution
+		void* TransferMemory = Render::RequestTransferMemory(NextTexture->MeshTexture.Size);
+		memcpy(TransferMemory, Data, NextTexture->MeshTexture.Size);
+
 		TransferTask Task = { };
 		Task.DataSize = NextTexture->MeshTexture.Size;
 		Task.TextureDescr.DstImage = NextTexture->MeshTexture.Image;
 		Task.TextureDescr.Width = Width;
 		Task.TextureDescr.Height = Height;
-		Task.RawData = Data;
-		Task.OnCompleted = &NextTexture->IsLoaded;
+		Task.RawData = TransferMemory;
+		Task.ResourceIndex = State.Textures.TextureIndex;
 		Task.Type = TransferTaskType::TransferTaskType_Texture;
 
-		std::unique_lock Lock(State.TransferState.PendingTransferTasksQueue.Mutex);
-		Memory::PushToRingBuffer(&State.TransferState.PendingTransferTasksQueue.TasksBuffer, &Task);
-		Lock.unlock();
+		AddTask(&Task);
 
 		State.Textures.TexturesPhysicalIndexes[Hash] = State.Textures.TextureIndex;
 		return State.Textures.TextureIndex++;
+	}
+
+	void* RequestTransferMemory(u64 Size)
+	{
+		return State.TransferState.TransferMemory.DataArray + Memory::RingAlloc(&State.TransferState.TransferMemory.ControlBlock, Size);
 	}
 
 	RenderState* GetRenderState()

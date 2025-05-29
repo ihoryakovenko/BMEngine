@@ -16,15 +16,13 @@
 
 namespace ResourceManager
 {
-	static gli::texture DefaultTexture;
-
 	void Init()
 	{
 		const u64 DefaultTextureDataCount = sizeof(DefaultTextureData) / sizeof(DefaultTextureData[0]);
 
 		std::hash<std::string> Hasher;
 
-		DefaultTexture = gli::load((char const*)DefaultTextureData, DefaultTextureDataCount);
+		gli::texture DefaultTexture = gli::load((char const*)DefaultTextureData, DefaultTextureDataCount);
 		if (DefaultTexture.empty())
 		{
 			assert(false);
@@ -69,7 +67,7 @@ namespace ResourceManager
 			ModelVertexByteOffset += VerticesCount * sizeof(StaticMeshRender::StaticMeshVertex) + IndicesCount * sizeof(u32);
 		}
 
-		//Util::ClearModel3DData(ModelData);
+		Util::ClearModel3DData(ModelData);
 		Render::NotifyTransfer();
 	}
 
@@ -113,21 +111,17 @@ namespace ResourceManager
 
 				std::hash<std::string> Hasher;
 
-				//gli::texture Texture = gli::load(FullPath);
-				// TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-				//if (Texture.empty())
-				//{
-				//	assert(false);
-				//}
-
-				gli::texture* Texture = new gli::texture(gli::load(FullPath)); // TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+				gli::texture Texture = gli::load(FullPath);
+				if (Texture.empty())
+				{
+					assert(false);
+				}
 
 				//VkFormat Format = static_cast<VkFormat>(gli::internal_format(Texture.format()));
 				//u32 MipLevels = static_cast<uint32_t>(Texture.levels());
-				glm::tvec3<u32> Extent = Texture->extent();
+				glm::tvec3<u32> Extent = Texture.extent();
 
-				Render::CreateTexture2DSRGB(Hasher(FileNameNoExt), Texture->data(), Extent.x, Extent.y);
+				Render::CreateTexture2DSRGB(Hasher(FileNameNoExt), Texture.data(), Extent.x, Extent.y);
 			}
 		}
 		while (FindNextFileA(hFind, &FindFileData));
