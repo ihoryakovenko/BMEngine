@@ -13,5 +13,5 @@ namespace ResourceManager
 {
 	void Init();
 	void LoadModel(const char* FilePath, const char* Directory);
-	void LoadTextures(const char* Directory);
+	void InitTextureAssets(const char* Directory);
 }

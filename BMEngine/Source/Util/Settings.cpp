@@ -1,5 +1,4 @@
 #include "Settings.h"
-#include "Engine/Systems/Render/StaticMeshRender.h"
 
 VkExtent2D MainScreenExtent;
 VkExtent2D DepthViewportExtent = { 1024, 1024 };

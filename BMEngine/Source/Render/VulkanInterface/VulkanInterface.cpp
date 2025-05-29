@@ -210,7 +210,12 @@ namespace VulkanInterface
 			ShaderStageCreateInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 			ShaderStageCreateInfo->stage = Shaders[i].Stage;
 			ShaderStageCreateInfo->pName = "main";
-			ShaderStageCreateInfo->module = VulkanHelper::CreateShader(Device.LogicalDevice, (const u32*)Shaders[i].Code, Shaders[i].CodeSize);
+
+			VkShaderModuleCreateInfo ShaderModuleCreateInfo = { };
+			ShaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+			ShaderModuleCreateInfo.codeSize = Shaders[i].CodeSize;
+			ShaderModuleCreateInfo.pCode = (const u32*)Shaders[i].Code;
+			VULKAN_CHECK_RESULT(vkCreateShaderModule(Device.LogicalDevice, &ShaderModuleCreateInfo, nullptr, &ShaderStageCreateInfo->module));
 		}
 
 		// INPUTASSEMBLY

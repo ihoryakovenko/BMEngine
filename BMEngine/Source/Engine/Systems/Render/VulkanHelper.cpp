@@ -604,23 +604,23 @@ namespace VulkanHelper
 	}
 
 	bool CheckValidationLayersSupport(VkLayerProperties* Properties, u32 PropertiesSize,
-		const char** ValidationLeyersToCheck, u32 ValidationLeyersToCheckSize)
+		const char** ValidationLayersToCheck, u32 ValidationLayersToCheckSize)
 	{
-		for (u32 i = 0; i < ValidationLeyersToCheckSize; ++i)
+		for (u32 i = 0; i < ValidationLayersToCheckSize; ++i)
 		{
-			bool IsLayerAvalible = false;
+			bool IsLayerAvailable = false;
 			for (u32 j = 0; j < PropertiesSize; ++j)
 			{
-				if (std::strcmp(ValidationLeyersToCheck[i], Properties[j].layerName) == 0)
+				if (std::strcmp(ValidationLayersToCheck[i], Properties[j].layerName) == 0)
 				{
-					IsLayerAvalible = true;
+					IsLayerAvailable = true;
 					break;
 				}
 			}
 
-			if (!IsLayerAvalible)
+			if (!IsLayerAvailable)
 			{
-				Util::RenderLog(Util::BMRVkLogType_Error, "Validation layer %s unsupported", ValidationLeyersToCheck[i]);
+				Util::RenderLog(Util::BMRVkLogType_Error, "Validation layer %s unsupported", ValidationLayersToCheck[i]);
 				return false;
 			}
 		}
@@ -651,34 +651,6 @@ namespace VulkanHelper
 		}
 
 		return true;
-	}
-
-	VkShaderModule CreateShader(VkDevice Device, const u32* Code, u32 CodeSize)
-	{
-		VkShaderModuleCreateInfo ShaderModuleCreateInfo = { };
-		ShaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-		ShaderModuleCreateInfo.codeSize = CodeSize;
-		ShaderModuleCreateInfo.pCode = Code;
-
-		VkShaderModule VertexShaderModule;
-		VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &ShaderModuleCreateInfo, nullptr, &VertexShaderModule));
-		return VertexShaderModule;
-	}
-
-	VkPipelineLayout CreatePipelineLayout(VkDevice Device, const VkDescriptorSetLayout* DescriptorLayouts,
-		u32 DescriptorLayoutsCount, const VkPushConstantRange* PushConstant, u32 PushConstantsCount)
-	{
-		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
-		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		PipelineLayoutCreateInfo.setLayoutCount = DescriptorLayoutsCount;
-		PipelineLayoutCreateInfo.pSetLayouts = DescriptorLayouts;
-		PipelineLayoutCreateInfo.pushConstantRangeCount = PushConstantsCount;
-		PipelineLayoutCreateInfo.pPushConstantRanges = PushConstant;
-
-		VkPipelineLayout PipelineLayout;
-		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &PipelineLayout));
-
-		return PipelineLayout;
 	}
 
 	bool CreateDebugUtilsMessengerEXT(VkInstance Instance, const VkDebugUtilsMessengerCreateInfoEXT* CreateInfo,

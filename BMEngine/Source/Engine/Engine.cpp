@@ -15,7 +15,6 @@
 #include "Util/Settings.h"
 #include "Engine/Systems/Render/Render.h"
 #include "Util/Util.h"
-#include "Systems/DynamicMapSystem.h"
 #include "Systems/ResourceManager.h"
 #include "Scene.h"
 #include "Util/Math.h"
@@ -37,12 +36,13 @@ namespace std
 
 namespace Engine
 {
-	struct VertexEqual
+	struct Camera
 	{
-		bool operator()(const SkyBoxVertex& lhs, const SkyBoxVertex& rhs) const
-		{
-			return lhs.Position == rhs.Position;
-		}
+		f32 Fov;
+		f32 AspectRatio;
+		glm::vec3 Position;
+		glm::vec3 Front;
+		glm::vec3 Up;
 	};
 
 	static bool Init();
@@ -55,11 +55,11 @@ namespace Engine
 
 	static void SetUpScene();
 
-	static void MoveCamera(GLFWwindow* Window, f32 DeltaTime, DynamicMapSystem::MapCamera& MainCamera);
+	static void MoveCamera(GLFWwindow* Window, f32 DeltaTime, Camera& MainCamera);
 
 	static GLFWwindow* Window = nullptr;
 
-	static DynamicMapSystem::MapCamera MainCamera;
+	static Camera MainCamera;
 	static bool Close = false;
 	static bool FirstMouse = true;
 	static f32 LastX = 400, LastY = 300;
@@ -321,10 +321,9 @@ namespace Engine
 		GuiData.Eye = &Eye;
 		GuiData.CameraMercatorPosition = &CameraSphericalPosition;
 		GuiData.Zoom = &Zoom;
-		GuiData.OnTestSetDownload = DynamicMapSystem::TestSetDownload;
 	}
 
-	void MoveCamera(GLFWwindow* Window, f32 DeltaTime, DynamicMapSystem::MapCamera& MainCamera)
+	void MoveCamera(GLFWwindow* Window, f32 DeltaTime, Camera& MainCamera)
 	{
 		const f32 RotationSpeed = 0.1f;
 		const f32 CameraSpeed = 10.0f;

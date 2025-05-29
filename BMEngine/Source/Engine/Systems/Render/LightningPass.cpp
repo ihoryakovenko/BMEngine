@@ -6,8 +6,6 @@
 #include "Util/Settings.h"
 #include "Util/Util.h"
 
-#include "StaticMeshRender.h"
-
 #include "Engine/Systems/Render/VulkanHelper.h"
 
 // todo: delete
@@ -115,7 +113,14 @@ namespace LightningPass
 		// Todo: check constant and model size?
 		PushConstants.size = sizeof(glm::mat4);
 
-		Pipeline.PipelineLayout = VulkanHelper::CreatePipelineLayout(VulkanInterface::GetDevice(), &LightSpaceMatrixLayout, 1, &PushConstants, 1);
+		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
+		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		PipelineLayoutCreateInfo.setLayoutCount = 1;
+		PipelineLayoutCreateInfo.pSetLayouts = &LightSpaceMatrixLayout;
+		PipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+		PipelineLayoutCreateInfo.pPushConstantRanges = &PushConstants;
+
+		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &Pipeline.PipelineLayout));
 
 		std::vector<char> ShaderCode;
 		Util::OpenAndReadFileFull("./Resources/Shaders/Depth_vert.spv", ShaderCode, "rb");
@@ -135,10 +140,10 @@ namespace LightningPass
 
 		const u32 VertexInputCount = 1;
 		VulkanInterface::BMRVertexInputBinding VertexInputBinding[VertexInputCount];
-		VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshRender::StaticMeshVertex, Position) };
+		VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(Render::StaticMeshVertex, Position) };
 		VertexInputBinding[0].InputAttributesCount = 1;
 		VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-		VertexInputBinding[0].Stride = sizeof(StaticMeshRender::StaticMeshVertex);
+		VertexInputBinding[0].Stride = sizeof(Render::StaticMeshVertex);
 		VertexInputBinding[0].VertexInputBindingName = "MeshVertex";
 
 		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, VertexInputBinding, VertexInputCount, &DepthPipelineSettings, &ResourceInfo);
@@ -233,20 +238,20 @@ namespace LightningPass
 
 			vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
 
-			for (u32 i = 0; i < State->DrawEntities.Count; ++i)
+			for (u32 i = 0; i < State->RenderResources.DrawEntities.Count; ++i)
 			{
-				Render::DrawEntity* DrawEntity = State->DrawEntities.Data + i;
-				Render::StaticMesh* Mesh = State->Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
-				Render::Material* Material = State->Materials.Materials.Data + DrawEntity->MaterialIndex;
-				Render::MeshTexture2D* AlbedoTexture = State->Textures.Textures + Material->AlbedoTexIndex;
-				Render::MeshTexture2D* SpecTexture = State->Textures.Textures + Material->SpecularTexIndex;
+				Render::DrawEntity* DrawEntity = State->RenderResources.DrawEntities.Data + i;
+				Render::StaticMesh* Mesh = State->RenderResources.Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
+				Render::Material* Material = State->RenderResources.Materials.Materials.Data + DrawEntity->MaterialIndex;
+				Render::MeshTexture2D* AlbedoTexture = State->RenderResources.Textures.Textures.Data + Material->AlbedoTexIndex;
+				Render::MeshTexture2D* SpecTexture = State->RenderResources.Textures.Textures.Data + Material->SpecularTexIndex;
 
 				if (!Mesh->IsLoaded || !Material->IsLoaded || !AlbedoTexture->IsLoaded || !SpecTexture->IsLoaded)
 				{
 					continue;
 				}
 
-				const VkBuffer VertexBuffers[] = { State->Meshes.VertexStageData.Buffer };
+				const VkBuffer VertexBuffers[] = { State->RenderResources.Meshes.VertexStageData.Buffer };
 				const VkDeviceSize Offsets[] = { Mesh->VertexOffset };
 
 				const u32 DescriptorSetGroupCount = 1;
@@ -263,7 +268,7 @@ namespace LightningPass
 					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr);
 
 				vkCmdBindVertexBuffers(CmdBuffer, 0, 1, VertexBuffers, Offsets);
-				vkCmdBindIndexBuffer(CmdBuffer, State->Meshes.VertexStageData.Buffer, Mesh->IndexOffset, VK_INDEX_TYPE_UINT32);
+				vkCmdBindIndexBuffer(CmdBuffer, State->RenderResources.Meshes.VertexStageData.Buffer, Mesh->IndexOffset, VK_INDEX_TYPE_UINT32);
 				vkCmdDrawIndexed(CmdBuffer, Mesh->IndicesCount, 1, 0, 0, 0);
 			}
 

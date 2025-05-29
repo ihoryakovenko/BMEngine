@@ -4,7 +4,7 @@
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 
-#include "Engine/Systems/Render/StaticMeshRender.h"
+#include "Engine/Systems/Render/Render.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -19,15 +19,15 @@
 
 struct VertexEqual
 {
-	bool operator()(const StaticMeshRender::StaticMeshVertex& lhs, const StaticMeshRender::StaticMeshVertex& rhs) const
+	bool operator()(const Render::StaticMeshVertex& lhs, const Render::StaticMeshVertex& rhs) const
 	{
 		return lhs.Position == rhs.Position && lhs.TextureCoords == rhs.TextureCoords;
 	}
 };
 
-template<> struct std::hash<StaticMeshRender::StaticMeshVertex>
+template<> struct std::hash<Render::StaticMeshVertex>
 {
-	size_t operator()(StaticMeshRender::StaticMeshVertex const& vertex) const
+	size_t operator()(Render::StaticMeshVertex const& vertex) const
 	{
 		size_t hashPosition = std::hash<glm::vec3>()(vertex.Position);
 		size_t hashTextureCoords = std::hash<glm::vec2>()(vertex.TextureCoords);
@@ -187,15 +187,15 @@ namespace Util
 		u64* VerticesCounts = Memory::MemoryManagementSystem::Allocate<u64>(Shapes.size());
 		u32* IndicesCounts = Memory::MemoryManagementSystem::Allocate<u32>(Shapes.size());
 
-		std::unordered_map<StaticMeshRender::StaticMeshVertex, u32,
-			std::hash<StaticMeshRender::StaticMeshVertex>, VertexEqual> uniqueVertices{ };
+		std::unordered_map<Render::StaticMeshVertex, u32,
+			std::hash<Render::StaticMeshVertex>, VertexEqual> uniqueVertices{ };
 
 		std::hash<std::string> Hasher;
 
 		std::vector<u64> TextureHashes(Shapes.size());
 		std::vector<u8> VerticesAndIndices;
 
-		std::vector<StaticMeshRender::StaticMeshVertex> Vertices;
+		std::vector<Render::StaticMeshVertex> Vertices;
 		std::vector<u32> Indices;
 
 		for (u32 i = 0; i < Shapes.size(); i++)
@@ -209,7 +209,7 @@ namespace Util
 			{
 				tinyobj::index_t Index = Shape->mesh.indices[j];
 
-				StaticMeshRender::StaticMeshVertex vertex = { };
+				Render::StaticMeshVertex vertex = { };
 
 				vertex.Position =
 				{
@@ -252,7 +252,7 @@ namespace Util
 			VerticesCounts[i] = Vertices.size();
 			IndicesCounts[i] = Indices.size();
 
-			u64 VertexBytes = Vertices.size() * sizeof(StaticMeshRender::StaticMeshVertex);
+			u64 VertexBytes = Vertices.size() * sizeof(Render::StaticMeshVertex);
 			u64 IndexBytes = Indices.size() * sizeof(u32);
 
 			u64 CurrentOffset = VerticesAndIndices.size();

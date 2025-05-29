@@ -291,83 +291,76 @@ namespace Memory
 		}
 	}
 
-	static bool RingIsFit(const RingBufferControl* ControlBlock, u64 Count)
+	static bool RingIsFit(u64 Capacity, u64 Head, u64 Tail, bool Wrapped, u64 Count)
 	{
-		assert(ControlBlock->Capacity != 0);
+		assert(Capacity != 0);
 		assert(Count != 0);
 
-		const u64 Used = !ControlBlock->Wrapped
-			? ControlBlock->Head - ControlBlock->Tail
-			: ControlBlock->Capacity - ControlBlock->Tail + ControlBlock->Head;
+		const u64 Used = !Wrapped ? Head - Tail : Capacity - Tail + Head;
 
-		const u64 Free = ControlBlock->Capacity - Used;
+		const u64 Free = Capacity - Used;
 		if (Free < Count)
 		{
 			return false;
 		}
 
-		if (!ControlBlock->Wrapped && ControlBlock->Head + Count <= ControlBlock->Capacity)
+		if (!Wrapped && Head + Count <= Capacity)
 		{
 			return true;
 		}
 
-		return Count <= ControlBlock->Tail;
+		return Count <= Tail;
 	}
 
-	static u64 RingUsed(const RingBufferControl* ControlBlock)
+	static u64 RingUsed(u64 Capacity, u64 Head, u64 Tail, bool Wrapped)
 	{
-		assert(ControlBlock->Capacity != 0);
+		assert(Capacity != 0);
 
-		if (!ControlBlock->Wrapped)
+		if (!Wrapped)
 		{
-			return ControlBlock->Head - ControlBlock->Tail;
+			return Head - Tail;
 		}
 
-		return ControlBlock->Capacity - ControlBlock->Tail + ControlBlock->Head;
+		return Capacity - Tail + Head;
 	}
 
-	static u64 RingAlloc(RingBufferControl* ControlBlock, u64 Count)
+	static u64 RingAlloc(RingBufferControl* ControlBlock, u64 Count, u32 HeadAlignment)
 	{
-		//Count = (Count + ControlBlock->Alignment - 1) & ~(ControlBlock->Alignment - 1);
-
 		assert(ControlBlock->Capacity != 0);
 		assert(Count != 0);
-		assert(RingIsFit(ControlBlock, Count));
 
-		if ((!ControlBlock->Wrapped && ControlBlock->Head + Count <= ControlBlock->Capacity) ||
-			(ControlBlock->Wrapped && ControlBlock->Head >= ControlBlock->Tail && ControlBlock->Head + Count <= ControlBlock->Capacity))
+		const u64 AlignedHead = (ControlBlock->Head + (HeadAlignment - 1)) & ~(HeadAlignment - 1);
+		assert(RingIsFit(ControlBlock->Capacity, AlignedHead, ControlBlock->Tail, ControlBlock->Wrapped, Count));
+
+		if ((!ControlBlock->Wrapped && AlignedHead + Count <= ControlBlock->Capacity) ||
+			(ControlBlock->Wrapped && AlignedHead >= ControlBlock->Tail && ControlBlock->Head + Count <= ControlBlock->Capacity))
 		{
-			const u64 Offset = ControlBlock->Head;
-			ControlBlock->Head = (ControlBlock->Head + Count) % ControlBlock->Capacity;
+			ControlBlock->Head = (AlignedHead + Count) % ControlBlock->Capacity;
 			if (ControlBlock->Head == ControlBlock->Tail)
 			{
 				ControlBlock->Wrapped = true;
 			}
 
-			return Offset;
+			return AlignedHead;
 		}
 
-		if (!ControlBlock->Wrapped && Count <= ControlBlock->Tail)
-		{
-			ControlBlock->Leftover = ControlBlock->Capacity - ControlBlock->Head;
-			ControlBlock->Wrapped = true;
-			ControlBlock->Head = Count;
-			return 0;
-		}
-
-		assert(false);
+		ControlBlock->Leftover = ControlBlock->Capacity - ControlBlock->Head;
+		ControlBlock->Wrapped = true;
+		ControlBlock->Head = Count;
 		return 0;
 	}
 
-	static void RingFree(RingBufferControl* ControlBlock, u64 Count)
+	static void RingFree(RingBufferControl* ControlBlock, u64 Count, u32 HeadAlignment)
 	{
-		//Count = (Count + ControlBlock->Alignment - 1) & ~(ControlBlock->Alignment - 1);
-
 		assert(ControlBlock->Capacity != 0);
 		assert(Count != 0);
-		assert(Count <= RingUsed(ControlBlock));
 
-		if (ControlBlock->Tail + Count <= ControlBlock->Capacity)
+		const u64 AlignedTail = (ControlBlock->Tail + (HeadAlignment - 1)) & ~(HeadAlignment - 1);
+		Count += AlignedTail - ControlBlock->Tail;
+
+		assert(Count <= RingUsed(ControlBlock->Capacity, ControlBlock->Head, ControlBlock->Tail, ControlBlock->Wrapped));
+
+		if (AlignedTail + Count <= ControlBlock->Capacity)
 		{
 			ControlBlock->Tail = (ControlBlock->Tail + Count) % ControlBlock->Capacity;
 		}

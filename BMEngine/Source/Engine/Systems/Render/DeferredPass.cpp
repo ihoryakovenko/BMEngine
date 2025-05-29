@@ -143,9 +143,12 @@ namespace DeferredPass
 		}
 
 
+		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
+		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		PipelineLayoutCreateInfo.setLayoutCount = 1;
+		PipelineLayoutCreateInfo.pSetLayouts = &DeferredInputLayout;
 
-
-		Pipeline.PipelineLayout = VulkanHelper::CreatePipelineLayout(VulkanInterface::GetDevice(), &DeferredInputLayout, 1, nullptr, 0);
+		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &Pipeline.PipelineLayout));
 
 		std::vector<char> VertexShaderCode;
 		Util::OpenAndReadFileFull("./Resources/Shaders/second_vert.spv", VertexShaderCode, "rb");

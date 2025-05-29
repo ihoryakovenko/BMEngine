@@ -40,6 +40,8 @@ namespace TerrainRender
 
 	void Init()
 	{
+		VkDevice Device = VulkanInterface::GetDevice();
+
 		const u32 ShaderCount = 2;
 		VulkanInterface::Shader Shaders[ShaderCount];
 
@@ -61,8 +63,8 @@ namespace TerrainRender
 		VkDescriptorSetLayout TerrainDescriptorLayouts[] =
 		{
 			FrameManager::GetViewProjectionLayout(),
-			State->Textures.BindlesTexturesLayout,
-			State->Materials.MaterialLayout,
+			State->RenderResources.Textures.BindlesTexturesLayout,
+			State->RenderResources.Materials.MaterialLayout,
 		};
 
 		const u32 LayoutsCount = sizeof(TerrainDescriptorLayouts) / sizeof(TerrainDescriptorLayouts[0]);
@@ -72,7 +74,14 @@ namespace TerrainRender
 		// Todo: check constant and model size?
 		PushConstants.size = sizeof(PushConstantsData);
 
-		Pipeline.PipelineLayout = VulkanHelper::CreatePipelineLayout(VulkanInterface::GetDevice(), TerrainDescriptorLayouts, LayoutsCount, &PushConstants, 1);
+		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
+		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		PipelineLayoutCreateInfo.setLayoutCount = LayoutsCount;
+		PipelineLayoutCreateInfo.pSetLayouts = TerrainDescriptorLayouts;
+		PipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+		PipelineLayoutCreateInfo.pPushConstantRanges = &PushConstants;
+
+		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &Pipeline.PipelineLayout));
 
 		VulkanInterface::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
@@ -112,8 +121,8 @@ namespace TerrainRender
 
 		const VkDescriptorSet Sets[] = {
 			FrameManager::GetViewProjectionSet(),
-			State->Textures.BindlesTexturesSet,
-			State->Materials.MaterialSet,
+			State->RenderResources.Textures.BindlesTexturesSet,
+			State->RenderResources.Materials.MaterialSet,
 		};
 
 		const u32 TerrainDescriptorSetGroupCount = sizeof(Sets) / sizeof(Sets[0]);

@@ -8,7 +8,6 @@
 #include "Util/EngineTypes.h"
 #include "Render/FrameManager.h"
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
-#include "Engine/Systems/Render/StaticMeshRender.h"
 
 #include "Render/FrameManager.h"
 
@@ -24,6 +23,13 @@ namespace DebugUi
 
 namespace Render
 {
+	struct StaticMeshVertex
+	{
+		glm::vec3 Position;
+		glm::vec2 TextureCoords;
+		glm::vec3 Normal;
+	};
+
 	struct StaticMesh
 	{
 		u64 VertexOffset;
@@ -98,11 +104,11 @@ namespace Render
 	{
 		VkSampler DiffuseSampler;
 		VkSampler SpecularSampler;
+
 		VkDescriptorSetLayout BindlesTexturesLayout;
 		VkDescriptorSet BindlesTexturesSet;
-		MeshTexture2D* Textures;
-		std::unordered_map<u64, u32> TexturesPhysicalIndexes;
-		u32 TextureIndex;
+
+		Memory::DynamicHeapArray<MeshTexture2D> Textures;
 	};
 
 	enum TransferTaskType
@@ -147,10 +153,24 @@ namespace Render
 		std::mutex Mutex;
 	};
 
+	struct DrawFrames
+	{
+		VkFence Fences[3];
+		VkCommandBuffer CommandBuffers[3];
+	};
+
 	struct TransferFrames
 	{
 		VkFence Fences[3];
 		VkCommandBuffer CommandBuffers[3];
+	};
+
+	struct ResourceStorage
+	{
+		StaticMeshStorage Meshes;
+		TextureStorage Textures;
+		MaterialStorage Materials;
+		Memory::DynamicHeapArray<DrawEntity> DrawEntities;
 	};
 
 	struct DataTransferState
@@ -172,16 +192,32 @@ namespace Render
 		u32 CurrentFrame;
 	};
 
+	struct StaticMeshPipeline
+	{
+		VulkanInterface::RenderPipeline Pipeline;
+		VkSampler ShadowMapArraySampler;
+
+		VkDescriptorSetLayout StaticMeshLightLayout;
+		VkDescriptorSetLayout ShadowMapArrayLayout;
+
+		FrameManager::UniformMemoryHnadle EntityLightBufferHandle;
+
+		VkImageView ShadowMapArrayImageInterface[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+
+		VkPushConstantRange PushConstants;
+
+		VkDescriptorSet StaticMeshLightSet;
+		VkDescriptorSet ShadowMapArraySet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+	};
+
 	struct RenderState
 	{
-		StaticMeshStorage Meshes;
-		TextureStorage Textures;
-		MaterialStorage Materials;
-
-		Memory::DynamicHeapArray<DrawEntity> DrawEntities;
+		ResourceStorage RenderResources;
 
 		DataTransferState TransferState;
 		std::mutex QueueSubmitMutex;	
+
+		StaticMeshPipeline MeshPipeline;
 	};
 
 	struct PointLight
@@ -252,9 +288,7 @@ namespace Render
 	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height);
 
 	void Draw(const FrameManager::ViewProjectionBuffer* Data);
-	void Transfer();
 	void NotifyTransfer();
 
-	u32 GetTexture2DSRGBIndex(u64 Hash);
 	RenderState* GetRenderState();
 }

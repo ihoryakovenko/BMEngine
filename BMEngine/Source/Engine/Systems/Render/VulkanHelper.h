@@ -88,9 +88,6 @@ namespace VulkanHelper
 	void UpdateHostCompatibleBufferMemory(VkDevice Device, VkDeviceMemory Memory, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);
 
 	VkDescriptorPool CreateDescriptorPool(VkDevice Device, VkDescriptorPoolSize* PoolSizes, u32 PoolSizeCount, u32 MaxDescriptorCount);
-	VkShaderModule CreateShader(VkDevice Device, const u32* Code, u32 CodeSize);
-	VkPipelineLayout CreatePipelineLayout(VkDevice Device, const VkDescriptorSetLayout* DescriptorLayouts,
-		u32 DescriptorLayoutsCount, const VkPushConstantRange* PushConstant, u32 PushConstantsCount);
 
 	bool CreateDebugUtilsMessengerEXT(VkInstance Instance, const VkDebugUtilsMessengerCreateInfoEXT* CreateInfo,
 		const VkAllocationCallbacks* Allocator, VkDebugUtilsMessengerEXT* InDebugMessenger);

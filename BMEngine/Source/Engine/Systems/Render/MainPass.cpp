@@ -23,6 +23,8 @@ namespace MainPass
 
 	void Init()
 	{
+		VkDevice Device = VulkanInterface::GetDevice();
+
 		AttachmentData.ColorAttachmentCount = 1;
 		AttachmentData.ColorAttachmentFormats[0] = ColorFormat;
 		AttachmentData.DepthAttachmentFormat = DepthFormat;
@@ -42,8 +44,12 @@ namespace MainPass
 			SkyBoxLayout,
 		};
 
+		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
+		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		PipelineLayoutCreateInfo.setLayoutCount = SkyBoxDescriptorLayoutCount;
+		PipelineLayoutCreateInfo.pSetLayouts = SkyBoxDescriptorLayouts;
 
-		SkyBoxPipeline.PipelineLayout = VulkanHelper::CreatePipelineLayout(VulkanInterface::GetDevice(), SkyBoxDescriptorLayouts, SkyBoxDescriptorLayoutCount, nullptr, 0);
+		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &SkyBoxPipeline.PipelineLayout));
 
 		const u32 ShaderCount = 2;
 		VulkanInterface::Shader Shaders[ShaderCount];
