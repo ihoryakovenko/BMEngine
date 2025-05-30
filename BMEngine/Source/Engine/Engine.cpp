@@ -21,19 +21,6 @@
 #include "Render/FrameManager.h"
 #include "Engine/Systems/Render/DebugUI.h"
 
-namespace std
-{
-	template<> struct hash<SkyBoxVertex>
-	{
-		size_t operator()(SkyBoxVertex const& vertex) const
-		{
-			size_t hashPosition = std::hash<glm::vec3>()(vertex.Position);
-			size_t combinedHash = hashPosition;
-			return combinedHash;
-		}
-	};
-}
-
 namespace Engine
 {
 	struct Camera
@@ -50,8 +37,6 @@ namespace Engine
 	static void DeInit();
 
 	static void Update(f64 DeltaTime);
-
-	static void CreateSkyBoxMesh(VkDescriptorSet Material);
 
 	static void SetUpScene();
 
@@ -143,67 +128,9 @@ namespace Engine
 
 		Render::Init(Window, &GuiData);
 
-		
 		ResourceManager::Init();
-		//ResourceManager::LoadTextures(".\\Resources\\Textures");
-
-		//VulkanInterface::WaitDevice();
-
 		ResourceManager::LoadModel(".\\Resources\\Models\\uh60.model", ".\\Resources\\Textures");
 		
-		
-
-		//{
-		//	glm::vec3 CubePos(0.0f, -5.0f, 0.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::scale(Model, glm::vec3(20.0f, 1.0f, 20.0f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, WhiteMaterial);
-		//	//LoadModel("./Resources/Models/cube.obj", Model, ResourceManager::FindMaterial("WhiteMaterial"));
-		//}
-
-		//{
-		//	glm::vec3 CubePos(0.0f, 0.0f, 0.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::scale(Model, glm::vec3(0.2f, 5.0f, 0.2f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, TestMaterial);
-		//}
-
-		//{
-		//	glm::vec3 CubePos(0.0f, 0.0f, 8.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::rotate(Model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		//	Model = glm::scale(Model, glm::vec3(0.5f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, GrassMaterial);
-		//}
-
-		//{
-		//	glm::vec3 LightCubePos(0.0f, 0.0f, 10.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, LightCubePos);
-		//	Model = glm::scale(Model, glm::vec3(0.2f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, WhiteMaterial);
-		//}
-
-		//{
-		//	glm::vec3 CubePos(0.0f, 0.0f, 15.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::scale(Model, glm::vec3(1.0f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, WhiteMaterial);
-		//}
-
-		//{
-		//	glm::vec3 CubePos(5.0f, 0.0f, 10.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::rotate(Model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		//	Model = glm::scale(Model, glm::vec3(1.0f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, ContainerMaterial);
-		//}
-
 		return true;
 	}
 
@@ -227,20 +154,6 @@ namespace Engine
 	void Update(f64 DeltaTime)
 	{
 		MoveCamera(Window, DeltaTime, MainCamera);
-
-		//CameraSphericalPosition.z = DynamicMapSystem::CalculateCameraAltitude(Zoom);
-		//CameraSphericalPosition.z += 1.0f;
-
-		//MainCamera.Position = DynamicMapSystem::SphericalToMercator(CameraSphericalPosition);
-		//
-		//MainCamera.Front = glm::normalize(-MainCamera.Position);
-
-		//const glm::vec3 NorthPole(0.0f, 1.0f, 0.0f);
-		//const glm::vec3 Right = glm::normalize(glm::cross(NorthPole, MainCamera.Front));
-		//MainCamera.Up = glm::normalize(glm::cross(MainCamera.Front, Right));
-
-		f32 AspectRatio = f32(MainScreenExtent.width) / f32(MainScreenExtent.height);
-		//DynamicMapSystem::Update(DeltaTime, MainCamera, Zoom);
 
 		static f32 Angle = 0.0f;
 
@@ -367,50 +280,5 @@ namespace Engine
 		Front.y = sin(glm::radians(Pitch));
 		Front.z = sin(glm::radians(Yaw)) * cos(glm::radians(Pitch));
 		MainCamera.Front = glm::normalize(Front);
-	}
-
-	void CreateSkyBoxMesh(VkDescriptorSet Material)
-	{
-		/*const char* SkyBoxObj = "./Resources/Models/SkyBox.obj";
-
-		tinyobj::attrib_t Attrib;
-		std::vector<tinyobj::shape_t> Shapes;
-		std::vector<tinyobj::material_t> Materials;
-		std::string Warn, Err;
-
-		if (!tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &Warn, &Err, SkyBoxObj, ModelsBaseDir))
-		{
-			assert(false);
-		}
-
-		std::vector<SkyBoxVertex> vertices;
-		std::vector<u32> indices;
-
-		std::unordered_map<SkyBoxVertex, u32, std::hash<SkyBoxVertex>, VertexEqual> uniqueVertices{ };
-
-		for (const auto& index : Shapes[0].mesh.indices)
-		{
-			SkyBoxVertex vertex{ };
-
-			vertex.Position =
-			{
-				Attrib.vertices[3 * index.vertex_index + 0],
-				Attrib.vertices[3 * index.vertex_index + 1],
-				Attrib.vertices[3 * index.vertex_index + 2]
-			};
-
-			if (!uniqueVertices.count(vertex))
-			{
-				uniqueVertices[vertex] = static_cast<u32>(vertices.size());
-				vertices.push_back(vertex);
-			}
-
-			indices.push_back(uniqueVertices[vertex]);
-		}
-
-		SkyBox.VertexOffset = Render::LoadVertices(vertices.data(), sizeof(StaticMeshVertex), vertices.size());
-		SkyBox.IndexOffset = Render::LoadIndices(indices.data(), indices.size());
-		SkyBox.IndicesCount = indices.size();
-		SkyBox.TextureSet = Material;*/
 	}
 }
