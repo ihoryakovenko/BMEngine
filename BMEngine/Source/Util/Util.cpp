@@ -123,7 +123,7 @@ namespace Util
 		}
 	}
 
-	void LoadPipelineSettings(VulkanInterface::PipelineSettings& Settings, const char* FilePath)
+	void LoadPipelineSettings(VulkanHelper::PipelineSettings& Settings, const char* FilePath)
 	{
 		// TODO: static
 		static char buffer[256];

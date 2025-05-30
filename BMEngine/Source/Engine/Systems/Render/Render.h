@@ -8,6 +8,7 @@
 #include "Util/EngineTypes.h"
 #include "Render/FrameManager.h"
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
+#include "Engine/Systems/Render/VulkanCoreContext.h"
 
 #include "Render/FrameManager.h"
 
@@ -153,16 +154,20 @@ namespace Render
 		std::mutex Mutex;
 	};
 
+	static const u32 MAX_DRAW_FRAMES = 3;
+
 	struct DrawFrames
 	{
-		VkFence Fences[3];
-		VkCommandBuffer CommandBuffers[3];
+		VkFence Fences[MAX_DRAW_FRAMES];
+		VkCommandBuffer CommandBuffers[MAX_DRAW_FRAMES];
+		VkSemaphore ImagesAvailable[MAX_DRAW_FRAMES];
+		VkSemaphore RenderFinished[MAX_DRAW_FRAMES];
 	};
 
 	struct TransferFrames
 	{
-		VkFence Fences[3];
-		VkCommandBuffer CommandBuffers[3];
+		VkFence Fences[MAX_DRAW_FRAMES];
+		VkCommandBuffer CommandBuffers[MAX_DRAW_FRAMES];
 	};
 
 	struct ResourceStorage
@@ -173,8 +178,20 @@ namespace Render
 		Memory::DynamicHeapArray<DrawEntity> DrawEntities;
 	};
 
+	struct DrawState
+	{
+		VkCommandPool GraphicsCommandPool;
+		VkDescriptorPool MainPool;
+
+		DrawFrames Frames;
+		u32 CurrentFrame;
+		u32 CurrentImageIndex;
+	};
+
 	struct DataTransferState
 	{
+		const u64 MaxTransferSizePerFrame = MB4;
+
 		Memory::HeapRingBuffer<u8> TransferMemory;
 
 		VkCommandPool TransferCommandPool;
@@ -202,18 +219,19 @@ namespace Render
 
 		FrameManager::UniformMemoryHnadle EntityLightBufferHandle;
 
-		VkImageView ShadowMapArrayImageInterface[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkImageView ShadowMapArrayImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		VkPushConstantRange PushConstants;
 
 		VkDescriptorSet StaticMeshLightSet;
-		VkDescriptorSet ShadowMapArraySet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+		VkDescriptorSet ShadowMapArraySet[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 	};
 
 	struct RenderState
 	{
+		VulkanCoreContext::VulkanCoreContext CoreContext;
 		ResourceStorage RenderResources;
-
+		DrawState RenderDrawState;
 		DataTransferState TransferState;
 		std::mutex QueueSubmitMutex;	
 

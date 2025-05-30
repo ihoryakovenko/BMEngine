@@ -19,8 +19,6 @@ namespace Render
 		s32 matIndex;
 	};
 
-	static const u64 MaxTransferSizePerFrame = MB4;
-
 	static void AddTask(TransferTask* Task, TaskQueue* Queue)
 	{
 		std::unique_lock<std::mutex> PendingLock(Queue->Mutex);
@@ -54,8 +52,7 @@ namespace Render
 		ShadowMapSamplerCreateInfo.anisotropyEnable = VK_TRUE;
 		ShadowMapSamplerCreateInfo.maxAnisotropy = 1; // Todo: support in config
 
-		MeshPipeline->ShadowMapArraySampler = VulkanInterface::CreateSampler(&ShadowMapSamplerCreateInfo);
-
+		VULKAN_CHECK_RESULT(vkCreateSampler(Device, &ShadowMapSamplerCreateInfo, nullptr, &MeshPipeline->ShadowMapArraySampler));
 
 		const VkDeviceSize LightBufferSize = sizeof(Render::LightBuffer);
 		MeshPipeline->StaticMeshLightLayout = FrameManager::CreateCompatibleLayout(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -122,7 +119,7 @@ namespace Render
 		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &MeshPipeline->Pipeline.PipelineLayout));
 
 		const u32 ShaderCount = 2;
-		VulkanInterface::Shader Shaders[ShaderCount];
+		VulkanHelper::Shader Shaders[ShaderCount];
 
 		std::vector<char> VertexShaderCode;
 		Util::OpenAndReadFileFull("./Resources/Shaders/vert.spv", VertexShaderCode, "rb");
@@ -137,7 +134,7 @@ namespace Render
 		Shaders[1].Code = FragmentShaderCode.data();
 		Shaders[1].CodeSize = FragmentShaderCode.size();
 
-		VulkanInterface::BMRVertexInputBinding VertexInputBinding[1];
+		VulkanHelper::BMRVertexInputBinding VertexInputBinding[1];
 		VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshVertex, Position) };
 		VertexInputBinding[0].InputAttributes[1] = { "TextureCoords", VK_FORMAT_R32G32_SFLOAT, offsetof(StaticMeshVertex, TextureCoords) };
 		VertexInputBinding[0].InputAttributes[2] = { "Normal", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshVertex, Normal) };
@@ -146,15 +143,15 @@ namespace Render
 		VertexInputBinding[0].Stride = sizeof(StaticMeshVertex);
 		VertexInputBinding[0].VertexInputBindingName = "EntityVertex";
 
-		VulkanInterface::PipelineSettings PipelineSettings;
+		VulkanHelper::PipelineSettings PipelineSettings;
 		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMeshRender.ini");
 		PipelineSettings.Extent = MainScreenExtent;
 
-		VulkanInterface::PipelineResourceInfo ResourceInfo;
+		VulkanHelper::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = MeshPipeline->Pipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
 
-		MeshPipeline->Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, VertexInputBinding, 1,
+		MeshPipeline->Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, VertexInputBinding, 1,
 			&PipelineSettings, &ResourceInfo);
 	}
 
@@ -225,6 +222,79 @@ namespace Render
 		}
 	}
 
+	static void InitDrawState(VkDevice Device, u32 GraphicsFamily, u32 MaxDrawFrames, DrawState* State)
+	{
+		VkCommandPoolCreateInfo PoolInfo = { };
+		PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		PoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+		PoolInfo.queueFamilyIndex = GraphicsFamily;
+
+		VULKAN_CHECK_RESULT(vkCreateCommandPool(Device, &PoolInfo, nullptr, &State->GraphicsCommandPool));
+		
+		VkCommandBufferAllocateInfo GraphicsCommandBufferAllocateInfo = { };
+		GraphicsCommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		GraphicsCommandBufferAllocateInfo.commandPool = State->GraphicsCommandPool;
+		GraphicsCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		GraphicsCommandBufferAllocateInfo.commandBufferCount = MaxDrawFrames;
+
+		VULKAN_CHECK_RESULT(vkAllocateCommandBuffers(Device, &GraphicsCommandBufferAllocateInfo, State->Frames.CommandBuffers));
+
+		VkFenceCreateInfo FenceCreateInfo = { };
+		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+		FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+		VkSemaphoreCreateInfo SemaphoreCreateInfo = { };
+		SemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+		for (u64 i = 0; i < MaxDrawFrames; i++)
+		{
+			VULKAN_CHECK_RESULT(vkCreateFence(Device, &FenceCreateInfo, nullptr, &State->Frames.Fences[i]));
+			VULKAN_CHECK_RESULT(vkCreateSemaphore(Device, &SemaphoreCreateInfo, nullptr, &State->Frames.ImagesAvailable[i]));
+			VULKAN_CHECK_RESULT(vkCreateSemaphore(Device, &SemaphoreCreateInfo, nullptr, &State->Frames.RenderFinished[i]));
+		}
+
+		const u32 PoolSizeCount = 11;
+		auto TotalPassPoolSizes = Memory::FramePointer<VkDescriptorPoolSize>::Create(PoolSizeCount);
+		u32 TotalDescriptorLayouts = 21;
+		TotalPassPoolSizes[0] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
+		TotalPassPoolSizes[1] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
+		TotalPassPoolSizes[2] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
+		TotalPassPoolSizes[3] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3 };
+		TotalPassPoolSizes[4] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3 };
+		TotalPassPoolSizes[5] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3 };
+		TotalPassPoolSizes[6] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
+		TotalPassPoolSizes[7] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
+		TotalPassPoolSizes[8] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
+		TotalPassPoolSizes[9] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 256 };
+		TotalPassPoolSizes[10] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
+
+		u32 TotalDescriptorCount = TotalDescriptorLayouts * 3;
+		TotalDescriptorCount += 256;
+
+		VkDescriptorPoolCreateInfo PoolCreateInfo = { };
+		PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		PoolCreateInfo.maxSets = TotalDescriptorCount;
+		PoolCreateInfo.poolSizeCount = PoolSizeCount;
+		PoolCreateInfo.pPoolSizes = TotalPassPoolSizes.Data;
+		PoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
+
+		VULKAN_CHECK_RESULT(vkCreateDescriptorPool(Device, &PoolCreateInfo, nullptr, &State->MainPool));
+	}
+
+	static void DeInitDrawState(VkDevice Device, u32 MaxDrawFrames, DrawState* State)
+	{
+		vkDestroyCommandPool(Device, State->GraphicsCommandPool, nullptr);
+
+		for (u64 i = 0; i < MaxDrawFrames; i++)
+		{
+			vkDestroyFence(Device, State->Frames.Fences[i], nullptr);
+			vkDestroySemaphore(Device, State->Frames.ImagesAvailable[i], nullptr);
+			vkDestroySemaphore(Device, State->Frames.RenderFinished[i], nullptr);
+		}
+
+		vkDestroyDescriptorPool(Device, State->MainPool, nullptr);
+	}
+
 	static void InitStaticMeshStorage(VkDevice Device, VkPhysicalDevice PhysicalDevice, StaticMeshStorage* Storage, u64 VertexCapacity)
 	{
 		Storage->StaticMeshes = Memory::AllocateArray<StaticMesh>(512);
@@ -236,7 +306,7 @@ namespace Render
 		Storage->VertexStageData.Memory = AllocResult.Memory;
 		Storage->VertexStageData.Alignment = 1;
 		Storage->VertexStageData.Capacity = AllocResult.Size;
-		vkBindBufferMemory(Device, Storage->VertexStageData.Buffer, Storage->VertexStageData.Memory, 0);
+		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, Storage->VertexStageData.Buffer, Storage->VertexStageData.Memory, 0));
 
 		VkFenceCreateInfo FenceCreateInfo = { };
 		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -259,7 +329,7 @@ namespace Render
 		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(VulkanInterface::GetPhysicalDevice(), Device,
 			Storage->MaterialBuffer, VulkanHelper::MemoryPropertyFlag::GPULocal);
 		Storage->MaterialBufferMemory = AllocResult.Memory;
-		vkBindBufferMemory(Device, Storage->MaterialBuffer, Storage->MaterialBufferMemory, 0);
+		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, Storage->MaterialBuffer, Storage->MaterialBufferMemory, 0));
 
 		VulkanInterface::UniformSetAttachmentInfo MaterialAttachmentInfo;
 		MaterialAttachmentInfo.BufferInfo.buffer = Storage->MaterialBuffer;
@@ -285,9 +355,9 @@ namespace Render
 
 	static void InitTextureStorage(VkDevice Device, VkPhysicalDevice PhysicalDevice, TextureStorage* Storage)
 	{
-		const u32 MaxTextures = 512;
+		const u32 MaxTextures = 64;
 
-		Storage->Textures = Memory::AllocateArray<MeshTexture2D>(64);
+		Storage->Textures = Memory::AllocateArray<MeshTexture2D>(MaxTextures);
 
 		VkSamplerCreateInfo DiffuseSamplerCreateInfo = { };
 		DiffuseSamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -308,8 +378,8 @@ namespace Render
 		VkSamplerCreateInfo SpecularSamplerCreateInfo = DiffuseSamplerCreateInfo;
 		DiffuseSamplerCreateInfo.maxAnisotropy = 1;
 
-		Storage->DiffuseSampler = VulkanInterface::CreateSampler(&DiffuseSamplerCreateInfo);
-		Storage->SpecularSampler = VulkanInterface::CreateSampler(&SpecularSamplerCreateInfo);
+		VULKAN_CHECK_RESULT(vkCreateSampler(Device, &DiffuseSamplerCreateInfo, nullptr, &Storage->DiffuseSampler));
+		VULKAN_CHECK_RESULT(vkCreateSampler(Device, &SpecularSamplerCreateInfo, nullptr, &Storage->SpecularSampler));
 
 		const VkShaderStageFlags EntitySamplerInputFlags[2] = { VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
 		const VkDescriptorType EntitySamplerDescriptorType[2] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
@@ -358,7 +428,7 @@ namespace Render
 		TransferCommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		TransferCommandBufferAllocateInfo.commandPool = TransferState->TransferCommandPool;
 		TransferCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		TransferCommandBufferAllocateInfo.commandBufferCount = VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT;
+		TransferCommandBufferAllocateInfo.commandBufferCount = VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT;
 
 		VULKAN_CHECK_RESULT(vkAllocateCommandBuffers(Device, &TransferCommandBufferAllocateInfo, TransferState->Frames.CommandBuffers));
 
@@ -366,7 +436,7 @@ namespace Render
 		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 		FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-		for (u32 i = 0; i < VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT; ++i)
+		for (u32 i = 0; i < VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT; ++i)
 		{
 			VULKAN_CHECK_RESULT(vkCreateFence(Device, &FenceCreateInfo, nullptr, TransferState->Frames.Fences + i));
 		}
@@ -397,7 +467,7 @@ namespace Render
 		TransferState->TransferStagingPool.Memory = AllocResult.Memory;
 		//TransferState->TransferStagingPool.ControlBlock.Alignment = AllocResult.Alignment;
 		TransferState->TransferStagingPool.ControlBlock.Capacity = AllocResult.Size;
-		vkBindBufferMemory(Device, TransferState->TransferStagingPool.Buffer, TransferState->TransferStagingPool.Memory, 0);
+		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, TransferState->TransferStagingPool.Buffer, TransferState->TransferStagingPool.Memory, 0));
 
 		TransferState->TransferMemory = Memory::AllocateRingBuffer<u8>(MB16);
 	}
@@ -409,7 +479,7 @@ namespace Render
 
 		vkDestroyCommandPool(Device, TransferState->TransferCommandPool, nullptr);
 
-		for (u32 i = 0; i < VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT; ++i)
+		for (u32 i = 0; i < VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT; ++i)
 		{
 			vkDestroyFence(Device, TransferState->Frames.Fences[i], nullptr);
 		}
@@ -608,7 +678,7 @@ namespace Render
 			Memory::RingBufferPopFirst(&TransferState->PendingTransferTasksQueue.TasksBuffer);
 
 			FrameTotalTransferSize += Task->DataSize;
-			if (FrameTotalTransferSize >= MaxTransferSizePerFrame)
+			if (FrameTotalTransferSize >= TransferState->MaxTransferSizePerFrame)
 			{
 				break;
 			}
@@ -637,7 +707,7 @@ namespace Render
 		vkQueueSubmit(VulkanInterface::GetTransferQueue(), 1, &SubmitInfo, TransferFence);
 		SubmitLock.unlock();
 
-		TransferState->CurrentFrame = (CurrentFrame + 1) % VulkanInterface::MAX_DRAW_FRAMES;
+		TransferState->CurrentFrame = (CurrentFrame + 1) % MAX_DRAW_FRAMES;
 	}
 
 	static void ProcessTransferTasks(VkDevice Device, VkCommandBuffer CmdBuffer, DataTransferState* TransferState, const ResourceStorage* Storage)
@@ -725,6 +795,12 @@ namespace Render
 
 
 
+
+
+
+
+
+
 	static RenderState State;
 
 	static void* RequestTransferMemory(u64 Size)
@@ -734,17 +810,14 @@ namespace Render
 
 	void Init(GLFWwindow* WindowHandler, DebugUi::GuiData* GuiData)
 	{
-		VulkanInterface::VulkanInterfaceConfig RenderConfig;
-		//RenderConfig.MaxTextures = 90;
-		RenderConfig.MaxTextures = 500; // TODO: FIX!!!!
-
 		State.RenderResources.DrawEntities = Memory::AllocateArray<DrawEntity>(512);
 
-		VulkanInterface::Init(WindowHandler, RenderConfig);
+		VulkanCoreContext::CreateCoreContext(&State.CoreContext, WindowHandler);
 		
 		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
 		VkDevice Device = VulkanInterface::GetDevice();
 
+		InitDrawState(Device, VulkanInterface::GetQueueGraphicsFamilyIndex(), MAX_DRAW_FRAMES, &State.RenderDrawState);
 		InitTransferState(Device, PhysicalDevice, &State.TransferState);
 		InitTextureStorage(Device, PhysicalDevice, &State.RenderResources.Textures);
 		InitMaterialStorage(Device, &State.RenderResources.Materials);
@@ -760,8 +833,6 @@ namespace Render
 		//DynamicMapSystem::Init();
 		InitStaticMeshPipeline(Device, &State.RenderResources, &State.MeshPipeline);
 		DebugUi::Init(WindowHandler, GuiData);
-
-		
 
 		std::thread TransferThread(
 			[]()
@@ -785,6 +856,7 @@ namespace Render
 		DeInitTextureStorage(Device, &State.RenderResources.Textures);
 		DeInitMaterialStorage(Device, &State.RenderResources.Materials);
 		DeInitStaticMeshStorage(Device, &State.RenderResources.Meshes);
+		DeInitDrawState(Device, MAX_DRAW_FRAMES, &State.RenderDrawState);
 
 		DebugUi::DeInit();
 		//TerrainRender::DeInit();
@@ -794,44 +866,77 @@ namespace Render
 		LightningPass::DeInit();
 		DeferredPass::DeInit();
 		FrameManager::DeInit();
-		VulkanInterface::DeInit();
-
-
+		VulkanCoreContext::DestroyCoreContext(&State.CoreContext);
 
 		Memory::FreeArray(&State.RenderResources.DrawEntities);
 	}
 
 	void Draw(const FrameManager::ViewProjectionBuffer* Data)
 	{
-		VkDevice Device = VulkanInterface::GetDevice();
+		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
+		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-		const u32 ImageIndex = VulkanInterface::AcquireNextImageIndex();
+		VkDevice Device = VulkanInterface::GetDevice();
+		const u32 CurrentFrame = State.RenderDrawState.CurrentFrame;
+		u32 ImageIndex;
+		VkFence FrameFence = State.RenderDrawState.Frames.Fences[CurrentFrame];
+		VkSemaphore ImagesAvailable = State.RenderDrawState.Frames.ImagesAvailable[CurrentFrame];
+
+		VULKAN_CHECK_RESULT(vkWaitForFences(Device, 1, &FrameFence, VK_TRUE, UINT64_MAX));
+		VULKAN_CHECK_RESULT(vkResetFences(Device, 1, &FrameFence));
+		VULKAN_CHECK_RESULT(vkAcquireNextImageKHR(Device, VulkanInterface::GetSwapchain(), UINT64_MAX, ImagesAvailable, nullptr, &ImageIndex));
+		State.RenderDrawState.CurrentImageIndex = ImageIndex;
 
 		FrameManager::UpdateViewProjection(Data);
 
-		VulkanInterface::BeginFrame();
+		VkCommandBuffer DrawCmdBuffer = State.RenderDrawState.Frames.CommandBuffers[ImageIndex];
+		VULKAN_CHECK_RESULT(vkBeginCommandBuffer(DrawCmdBuffer, &CommandBufferBeginInfo));
 
-		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
-
-		ProcessTransferTasks(Device, CmdBuffer, &State.TransferState, &State.RenderResources);
+		ProcessTransferTasks(Device, DrawCmdBuffer, &State.TransferState, &State.RenderResources);
 
 		LightningPass::Draw();
-
 		MainPass::BeginPass();
-
 		//TerrainRender::Draw();
-
-		DrawStaticMeshes(Device, CmdBuffer, &State.RenderResources, &State.MeshPipeline);
-
+		DrawStaticMeshes(Device, DrawCmdBuffer, &State.RenderResources, &State.MeshPipeline);
 		MainPass::EndPass();
 		DeferredPass::BeginPass();
-
 		DeferredPass::Draw();
 		DebugUi::Draw();
-
 		DeferredPass::EndPass();
 
-		VulkanInterface::EndFrame(State.QueueSubmitMutex);
+		VULKAN_CHECK_RESULT(vkEndCommandBuffer(DrawCmdBuffer));
+
+		VkPipelineStageFlags WaitStages[] = {
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		};
+
+		VkSemaphore RenderFinished = State.RenderDrawState.Frames.RenderFinished[CurrentFrame];
+		VkSwapchainKHR Swapchain = VulkanInterface::GetSwapchain();
+
+		VkSubmitInfo SubmitInfo = { };
+		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		SubmitInfo.waitSemaphoreCount = 1;
+		SubmitInfo.pWaitSemaphores = &ImagesAvailable;
+		SubmitInfo.pWaitDstStageMask = WaitStages;
+		SubmitInfo.commandBufferCount = 1;
+		SubmitInfo.pCommandBuffers = &DrawCmdBuffer;
+		SubmitInfo.signalSemaphoreCount = 1;
+		SubmitInfo.pSignalSemaphores = &RenderFinished;
+
+		VkPresentInfoKHR PresentInfo = { };
+		PresentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+		PresentInfo.waitSemaphoreCount = 1;
+		PresentInfo.swapchainCount = 1;
+		PresentInfo.pWaitSemaphores = &RenderFinished;
+		PresentInfo.pSwapchains = &Swapchain;
+		PresentInfo.pImageIndices = &ImageIndex;
+
+		std::unique_lock Lock(State.QueueSubmitMutex);
+		VULKAN_CHECK_RESULT(vkQueueSubmit(VulkanInterface::GetGraphicsQueue(), 1, &SubmitInfo, FrameFence));
+		VULKAN_CHECK_RESULT(vkQueuePresentKHR(VulkanInterface::GetGraphicsQueue(), &PresentInfo));
+		Lock.unlock();
+
+		State.RenderDrawState.CurrentFrame = (CurrentFrame + 1) % MAX_DRAW_FRAMES;
 	}
 
 	void NotifyTransfer()

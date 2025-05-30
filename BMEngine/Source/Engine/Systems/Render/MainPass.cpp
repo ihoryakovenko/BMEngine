@@ -19,7 +19,7 @@ namespace MainPass
 
 	static VulkanInterface::RenderPipeline SkyBoxPipeline;
 
-	static VulkanInterface::AttachmentData AttachmentData;
+	static VulkanHelper::AttachmentData AttachmentData;
 
 	void Init()
 	{
@@ -52,7 +52,7 @@ namespace MainPass
 		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &SkyBoxPipeline.PipelineLayout));
 
 		const u32 ShaderCount = 2;
-		VulkanInterface::Shader Shaders[ShaderCount];
+		VulkanHelper::Shader Shaders[ShaderCount];
 
 		std::vector<char> VertexShaderCode;
 		Util::OpenAndReadFileFull("./Resources/Shaders/SkyBox_vert.spv", VertexShaderCode, "rb");
@@ -67,18 +67,18 @@ namespace MainPass
 		Shaders[1].Code = FragmentShaderCode.data();
 		Shaders[1].CodeSize = FragmentShaderCode.size();
 
-		VulkanInterface::BMRVertexInputBinding VertexInputBinding[1];
+		VulkanHelper::BMRVertexInputBinding VertexInputBinding[1];
 		VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(SkyBoxVertex, Position) };
 		VertexInputBinding[0].InputAttributesCount = 1;
 		VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 		VertexInputBinding[0].Stride = sizeof(SkyBoxVertex);
 		VertexInputBinding[0].VertexInputBindingName = "EntityVertex";
 
-		VulkanInterface::PipelineResourceInfo ResourceInfo;
+		VulkanHelper::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = SkyBoxPipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData = AttachmentData;
 
-		SkyBoxPipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, VertexInputBinding, 1, &SkyBoxPipelineSettings, &ResourceInfo);
+		SkyBoxPipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, VertexInputBinding, 1, &SkyBoxPipelineSettings, &ResourceInfo);
 	}
 
 	void DeInit()
@@ -207,7 +207,7 @@ namespace MainPass
 		vkCmdEndRendering(CmdBuffer);
 	}
 
-	VulkanInterface::AttachmentData* GetAttachmentData()
+	VulkanHelper::AttachmentData* GetAttachmentData()
 	{
 		return &AttachmentData;
 	}

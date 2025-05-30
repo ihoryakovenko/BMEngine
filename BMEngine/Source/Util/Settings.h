@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine/Systems/Render/Render.h"
+#include "Engine/Systems/Render/VulkanHelper.h"
 
 void LoadSettings(u32 WindowWidth, u32 WindowHeight);
 
@@ -21,6 +22,6 @@ extern VkExtent2D DepthViewportExtent;
 extern VkFormat ColorFormat;
 extern VkFormat DepthFormat;
 
-extern VulkanInterface::PipelineSettings DeferredPipelineSettings;
-extern VulkanInterface::PipelineSettings SkyBoxPipelineSettings;
-extern VulkanInterface::PipelineSettings DepthPipelineSettings;
+extern VulkanHelper::PipelineSettings DeferredPipelineSettings;
+extern VulkanHelper::PipelineSettings SkyBoxPipelineSettings;
+extern VulkanHelper::PipelineSettings DepthPipelineSettings;

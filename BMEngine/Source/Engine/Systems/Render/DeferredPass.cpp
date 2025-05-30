@@ -2,6 +2,7 @@
 
 #include "Render/VulkanInterface/VulkanInterface.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
+#include "VulkanCoreContext.h"
 
 #include "Util/Settings.h"
 #include "Util/Util.h"
@@ -12,18 +13,18 @@ namespace DeferredPass
 
 	static VkDescriptorSetLayout DeferredInputLayout;
 
-	static VulkanInterface::UniformImage DeferredInputDepthImage[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
-	static VulkanInterface::UniformImage DeferredInputColorImage[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VulkanInterface::UniformImage DeferredInputDepthImage[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VulkanInterface::UniformImage DeferredInputColorImage[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
-	static VkImageView DeferredInputDepthImageInterface[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
-	static VkImageView DeferredInputColorImageInterface[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VkImageView DeferredInputDepthImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VkImageView DeferredInputColorImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
-	static VkDescriptorSet DeferredInputSet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VkDescriptorSet DeferredInputSet[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 	static VkSampler ColorSampler;
 	static VkSampler DepthSampler;
 
-	static VulkanInterface::AttachmentData AttachmentData;
+	static VulkanHelper::AttachmentData AttachmentData;
 
 	void Init()
 	{
@@ -102,8 +103,8 @@ namespace DeferredPass
 		InputUniformColorInterfaceCreateInfo.Format = ColorFormat;
 		InputUniformColorInterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
-		ColorSampler = VulkanInterface::CreateSampler(&ColorSamplerCreateInfo);
-		DepthSampler = VulkanInterface::CreateSampler(&DepthSamplerInfo);
+		VULKAN_CHECK_RESULT(vkCreateSampler(Device, &ColorSamplerCreateInfo, nullptr, &ColorSampler));
+		VULKAN_CHECK_RESULT(vkCreateSampler(Device, &DepthSamplerInfo, nullptr, &DepthSampler));
 
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
@@ -156,7 +157,7 @@ namespace DeferredPass
 		Util::OpenAndReadFileFull("./Resources/Shaders/second_frag.spv", FragmentShaderCode, "rb");
 
 		const u32 ShaderCount = 2;
-		VulkanInterface::Shader Shaders[ShaderCount];
+		VulkanHelper::Shader Shaders[ShaderCount];
 
 		Shaders[0].Stage = VK_SHADER_STAGE_VERTEX_BIT;
 		Shaders[0].Code = VertexShaderCode.data();
@@ -170,11 +171,11 @@ namespace DeferredPass
 		//Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMeshRender.ini");
 		//PipelineSettings.Extent = MainScreenExtent;
 
-		VulkanInterface::PipelineResourceInfo ResourceInfo;
+		VulkanHelper::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData = AttachmentData;
 
-		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, nullptr, 0,
+		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, nullptr, 0,
 			&DeferredPipelineSettings, &ResourceInfo);
 	}
 
@@ -367,7 +368,7 @@ namespace DeferredPass
 		return DeferredInputDepthImage;
 	}
 
-	VulkanInterface::AttachmentData* GetAttachmentData()
+	VulkanHelper::AttachmentData* GetAttachmentData()
 	{
 		return &AttachmentData;
 	}

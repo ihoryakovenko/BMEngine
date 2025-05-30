@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan.h>
 #include "Render/VulkanInterface/VulkanInterface.h"
+#include "Engine/Systems/Render/VulkanHelper.h"
 
 namespace MainPass
 {
@@ -11,5 +12,5 @@ namespace MainPass
 	void BeginPass();
 	void EndPass();
 
-	VulkanInterface::AttachmentData* GetAttachmentData();
+	VulkanHelper::AttachmentData* GetAttachmentData();
 }

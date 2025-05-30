@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan.h>
 #include "Render/VulkanInterface/VulkanInterface.h"
+#include "Engine/Systems/Render/VulkanHelper.h"
 
 namespace DeferredPass
 {
@@ -19,5 +20,5 @@ namespace DeferredPass
 	VulkanInterface::UniformImage* TestDeferredInputColorImage();
 	VulkanInterface::UniformImage* TestDeferredInputDepthImage();
 
-	VulkanInterface::AttachmentData* GetAttachmentData();
+	VulkanHelper::AttachmentData* GetAttachmentData();
 }

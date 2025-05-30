@@ -32,6 +32,7 @@
     <ClCompile Include="Source\Engine\Systems\Render\LightningPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\MainPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\VulkanCoreContext.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
     <ClCompile Include="Source\Engine\Systems\ResourceManager.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\TerrainRender.cpp" />
@@ -47,6 +48,7 @@
     <ClInclude Include="Source\Engine\Engine.h" />
     <ClInclude Include="Source\Engine\Scene.h" />
     <ClInclude Include="Source\Engine\Systems\Render\DebugUI.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\VulkanCoreContext.h" />
     <ClInclude Include="Source\Util\DefaultTextureData.h" />
     <ClInclude Include="Source\Engine\Systems\Render\DeferredPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\LightningPass.h" />

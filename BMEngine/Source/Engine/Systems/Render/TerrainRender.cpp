@@ -43,7 +43,7 @@ namespace TerrainRender
 		VkDevice Device = VulkanInterface::GetDevice();
 
 		const u32 ShaderCount = 2;
-		VulkanInterface::Shader Shaders[ShaderCount];
+		VulkanHelper::Shader Shaders[ShaderCount];
 
 		std::vector<char> VertexShaderCode;
 		Util::OpenAndReadFileFull("./Resources/Shaders/TerrainGenerator_vert.spv", VertexShaderCode, "rb");
@@ -83,23 +83,23 @@ namespace TerrainRender
 
 		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &Pipeline.PipelineLayout));
 
-		VulkanInterface::PipelineResourceInfo ResourceInfo;
+		VulkanHelper::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
 
 		const u32 VertexInputCount = 1;
-		VulkanInterface::BMRVertexInputBinding VertexInputBinding[VertexInputCount];
+		VulkanHelper::BMRVertexInputBinding VertexInputBinding[VertexInputCount];
 		VertexInputBinding[0].InputAttributes[0] = { "Altitude", VK_FORMAT_R32_SFLOAT, offsetof(TerrainVertex, Altitude) };
 		VertexInputBinding[0].InputAttributesCount = 1;
 		VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 		VertexInputBinding[0].Stride = sizeof(TerrainVertex);
 		VertexInputBinding[0].VertexInputBindingName = "TerrainVertex";
 
-		VulkanInterface::PipelineSettings PipelineSettings;
+		VulkanHelper::PipelineSettings PipelineSettings;
 		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMeshRender.ini");
 		PipelineSettings.Extent = MainScreenExtent;
 
-		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, VertexInputBinding, VertexInputCount,
+		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, VertexInputBinding, VertexInputCount,
 			&PipelineSettings, &ResourceInfo);
 
 		LoadTerrain();

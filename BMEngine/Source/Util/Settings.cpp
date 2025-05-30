@@ -6,9 +6,9 @@ VkExtent2D DepthViewportExtent = { 1024, 1024 };
 VkFormat ColorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Todo: check if VK_FORMAT_R8G8B8A8_UNORM supported
 VkFormat DepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
 
-VulkanInterface::PipelineSettings DeferredPipelineSettings;
-VulkanInterface::PipelineSettings SkyBoxPipelineSettings;
-VulkanInterface::PipelineSettings DepthPipelineSettings;
+VulkanHelper::PipelineSettings DeferredPipelineSettings;
+VulkanHelper::PipelineSettings SkyBoxPipelineSettings;
+VulkanHelper::PipelineSettings DepthPipelineSettings;
 
 static const char DeferredPipelineName[] = "Deferred";
 static const char SkyBoxPipelineName[] = "SkyBox";

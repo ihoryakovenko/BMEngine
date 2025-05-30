@@ -10,6 +10,7 @@
 #include <GLFW/glfw3.h>
 
 #include "Render/VulkanInterface/VulkanInterface.h"
+#include "Engine/Systems/Render/VulkanHelper.h"
 
 namespace Util
 {
@@ -66,7 +67,7 @@ namespace Util
 		}
 	};
 
-	void LoadPipelineSettings(VulkanInterface::PipelineSettings& settings, const char* filePath);
+	void LoadPipelineSettings(VulkanHelper::PipelineSettings& settings, const char* filePath);
 
 #ifdef NDEBUG
 	static bool EnableValidationLayers = false;

@@ -7,22 +7,23 @@
 #include "Util/Util.h"
 
 #include "Engine/Systems/Render/VulkanHelper.h"
+#include "VulkanCoreContext.h"
 
 // todo: delete
 #include "Engine/Scene.h"
 
 namespace LightningPass
 {
-	static VulkanInterface::UniformImage ShadowMapArray[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VulkanInterface::UniformImage ShadowMapArray[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 	static VkDescriptorSetLayout LightSpaceMatrixLayout;
 
-	static VulkanInterface::UniformBuffer LightSpaceMatrixBuffer[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VulkanInterface::UniformBuffer LightSpaceMatrixBuffer[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
-	static VkDescriptorSet LightSpaceMatrixSet[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VkDescriptorSet LightSpaceMatrixSet[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
-	static VkImageView ShadowMapElement1ImageInterface[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
-	static VkImageView ShadowMapElement2ImageInterface[VulkanInterface::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VkImageView ShadowMapElement1ImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VkImageView ShadowMapElement2ImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 	static VkPushConstantRange PushConstants;
 
@@ -126,27 +127,27 @@ namespace LightningPass
 		Util::OpenAndReadFileFull("./Resources/Shaders/Depth_vert.spv", ShaderCode, "rb");
 
 		const u32 ShaderCount = 1;
-		VulkanInterface::Shader Shaders[ShaderCount];
+		VulkanHelper::Shader Shaders[ShaderCount];
 
 		Shaders[0].Stage = VK_SHADER_STAGE_VERTEX_BIT;
 		Shaders[0].Code = ShaderCode.data();
 		Shaders[0].CodeSize = ShaderCode.size();
 
-		VulkanInterface::PipelineResourceInfo ResourceInfo = { };
+		VulkanHelper::PipelineResourceInfo ResourceInfo = { };
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData.ColorAttachmentCount = 0;
 		ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = DepthFormat;
 		ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
 		const u32 VertexInputCount = 1;
-		VulkanInterface::BMRVertexInputBinding VertexInputBinding[VertexInputCount];
+		VulkanHelper::BMRVertexInputBinding VertexInputBinding[VertexInputCount];
 		VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(Render::StaticMeshVertex, Position) };
 		VertexInputBinding[0].InputAttributesCount = 1;
 		VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 		VertexInputBinding[0].Stride = sizeof(Render::StaticMeshVertex);
 		VertexInputBinding[0].VertexInputBindingName = "MeshVertex";
 
-		Pipeline.Pipeline = VulkanInterface::BatchPipelineCreation(Shaders, ShaderCount, VertexInputBinding, VertexInputCount, &DepthPipelineSettings, &ResourceInfo);
+		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, VertexInputBinding, VertexInputCount, &DepthPipelineSettings, &ResourceInfo);
 	}
 
 	void DeInit()

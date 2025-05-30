@@ -153,20 +153,6 @@ namespace VulkanHelper
 		vkUnmapMemory(Device, Memory);
 	}
 
-	VkDescriptorPool CreateDescriptorPool(VkDevice Device, VkDescriptorPoolSize* PoolSizes, u32 PoolSizeCount, u32 MaxDescriptorCount)
-	{
-		VkDescriptorPoolCreateInfo PoolCreateInfo = { };
-		PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		PoolCreateInfo.maxSets = MaxDescriptorCount;
-		PoolCreateInfo.poolSizeCount = PoolSizeCount;
-		PoolCreateInfo.pPoolSizes = PoolSizes;
-		PoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
-
-		VkDescriptorPool Pool;
-		VULKAN_CHECK_RESULT(vkCreateDescriptorPool(Device, &PoolCreateInfo, nullptr, &Pool));
-		return Pool;
-	}
-
 	Memory::FrameArray<VkExtensionProperties> GetAvailableExtensionProperties()
 	{
 		u32 Count;
@@ -705,4 +691,251 @@ namespace VulkanHelper
 
 		return VK_FALSE;
 	}
+
+	VkPipeline BatchPipelineCreation(VkDevice Device, const Shader* Shaders, u32 ShadersCount,
+		const BMRVertexInputBinding* VertexInputBinding, u32 VertexInputBindingCount,
+		const PipelineSettings* Settings, const PipelineResourceInfo* ResourceInfo)
+	{
+		Util::RenderLog(Util::BMRVkLogType_Info,
+			"CREATING PIPELINE %s\n"
+			"Extent - Width: %d, Height: %d\n"
+			"DepthClampEnable: %d, RasterizerDiscardEnable: %d\n"
+			"PolygonMode: %d, LineWidth: %f, CullMode: %d, FrontFace: %d, DepthBiasEnable: %d\n"
+			"LogicOpEnable: %d, AttachmentCount: %d, ColorWriteMask: %d\n"
+			"BlendEnable: %d, SrcColorBlendFactor: %d, DstColorBlendFactor: %d, ColorBlendOp: %d\n"
+			"SrcAlphaBlendFactor: %d, DstAlphaBlendFactor: %d, AlphaBlendOp: %d\n"
+			"DepthTestEnable: %d, DepthWriteEnable: %d, DepthCompareOp: %d\n"
+			"DepthBoundsTestEnable: %d, StencilTestEnable: %d",
+			Settings->PipelineName,
+			Settings->Extent.width, Settings->Extent.height,
+			Settings->DepthClampEnable, Settings->RasterizerDiscardEnable,
+			Settings->PolygonMode, Settings->LineWidth, Settings->CullMode,
+			Settings->FrontFace, Settings->DepthBiasEnable,
+			Settings->LogicOpEnable, Settings->AttachmentCount, Settings->ColorWriteMask,
+			Settings->BlendEnable, Settings->SrcColorBlendFactor,
+			Settings->DstColorBlendFactor, Settings->ColorBlendOp,
+			Settings->SrcAlphaBlendFactor, Settings->DstAlphaBlendFactor,
+			Settings->AlphaBlendOp,
+			Settings->DepthTestEnable, Settings->DepthWriteEnable,
+			Settings->DepthCompareOp, Settings->DepthBoundsTestEnable,
+			Settings->StencilTestEnable
+		);
+
+		Util::RenderLog(Util::BMRVkLogType_Info, "Creating VkPipelineShaderStageCreateInfo, ShadersCount: %u", ShadersCount);
+
+		auto ShaderStageCreateInfos = Memory::MemoryManagementSystem::FrameAlloc<VkPipelineShaderStageCreateInfo>(ShadersCount);
+		for (u32 i = 0; i < ShadersCount; ++i)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Info, "Shader #%d, Stage: %d", i, Shaders[i].Stage);
+
+			VkPipelineShaderStageCreateInfo* ShaderStageCreateInfo = ShaderStageCreateInfos + i;
+			*ShaderStageCreateInfo = { };
+			ShaderStageCreateInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			ShaderStageCreateInfo->stage = Shaders[i].Stage;
+			ShaderStageCreateInfo->pName = "main";
+
+			VkShaderModuleCreateInfo ShaderModuleCreateInfo = { };
+			ShaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+			ShaderModuleCreateInfo.codeSize = Shaders[i].CodeSize;
+			ShaderModuleCreateInfo.pCode = (const u32*)Shaders[i].Code;
+			VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &ShaderModuleCreateInfo, nullptr, &ShaderStageCreateInfo->module));
+		}
+
+		// INPUTASSEMBLY
+		VkPipelineInputAssemblyStateCreateInfo InputAssemblyStateCreateInfo = { };
+		InputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+		InputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		InputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;
+
+		// MULTISAMPLING
+		VkPipelineMultisampleStateCreateInfo MultisampleStateCreateInfo = { };
+		MultisampleStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+		MultisampleStateCreateInfo.sampleShadingEnable = VK_FALSE;					// Enable multisample shading or not
+		MultisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;	// Number of samples to use per fragment
+
+		// VERTEX INPUT
+		auto VertexInputBindings = Memory::MemoryManagementSystem::FrameAlloc<VkVertexInputBindingDescription>(VertexInputBindingCount);
+		auto VertexInputAttributes = Memory::MemoryManagementSystem::FrameAlloc<VkVertexInputAttributeDescription>(VertexInputBindingCount * MAX_VERTEX_INPUTS_ATTRIBUTES);
+		u32 VertexInputAttributesIndex = 0;
+
+		Util::RenderLog(Util::BMRVkLogType_Info, "Creating vertex input, VertexInputBindingCount: %d", VertexInputBindingCount);
+
+		for (u32 BindingIndex = 0; BindingIndex < VertexInputBindingCount; ++BindingIndex)
+		{
+			const BMRVertexInputBinding* BMRBinding = VertexInputBinding + BindingIndex;
+			VkVertexInputBindingDescription* VertexInputBinding = VertexInputBindings + BindingIndex;
+
+			VertexInputBinding->binding = BindingIndex;
+			VertexInputBinding->inputRate = BMRBinding->InputRate;
+			VertexInputBinding->stride = BMRBinding->Stride;
+
+			Util::RenderLog(Util::BMRVkLogType_Info, "Initialized VkVertexInputBindingDescription, BindingName: %s, "
+				"BindingIndex: %d, VkInputRate: %d, Stride: %d, InputAttributesCount: %d",
+				BMRBinding->VertexInputBindingName, VertexInputBinding->binding, VertexInputBinding->inputRate,
+				VertexInputBinding->stride, BMRBinding->InputAttributesCount);
+
+			for (u32 CurrentAttributeIndex = 0; CurrentAttributeIndex < BMRBinding->InputAttributesCount; ++CurrentAttributeIndex)
+			{
+				const VertexInputAttribute* BMRAttribute = BMRBinding->InputAttributes + CurrentAttributeIndex;
+				VkVertexInputAttributeDescription* VertexInputAttribute = VertexInputAttributes + VertexInputAttributesIndex;
+
+				VertexInputAttribute->binding = BindingIndex;
+				VertexInputAttribute->location = CurrentAttributeIndex;
+				VertexInputAttribute->format = BMRAttribute->Format;
+				VertexInputAttribute->offset = BMRAttribute->AttributeOffset;
+
+				Util::RenderLog(Util::BMRVkLogType_Info, "Initialized VkVertexInputAttributeDescription, "
+					"AttributeName: %s, BindingIndex: %d, Location: %d, VkFormat: %d, Offset: %d, Index in creation array: %d",
+					BMRAttribute->VertexInputAttributeName, BindingIndex, CurrentAttributeIndex,
+					VertexInputAttribute->format, VertexInputAttribute->offset, VertexInputAttributesIndex);
+
+				++VertexInputAttributesIndex;
+			}
+		}
+		auto VertexInputInfo = Memory::MemoryManagementSystem::FrameAlloc<VkPipelineVertexInputStateCreateInfo>();
+		*VertexInputInfo = { };
+		VertexInputInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		VertexInputInfo->vertexBindingDescriptionCount = VertexInputBindingCount;
+		VertexInputInfo->pVertexBindingDescriptions = VertexInputBindings;
+		VertexInputInfo->vertexAttributeDescriptionCount = VertexInputAttributesIndex;
+		VertexInputInfo->pVertexAttributeDescriptions = VertexInputAttributes;
+
+		// VIEWPORT
+		auto Viewport = Memory::MemoryManagementSystem::FrameAlloc<VkViewport>();
+		Viewport->width = Settings->Extent.width;
+		Viewport->height = Settings->Extent.height;
+		Viewport->minDepth = 0.0f;
+		Viewport->maxDepth = 1.0f;
+		Viewport->x = 0.0f;
+		Viewport->y = 0.0f;
+
+		auto Scissor = Memory::MemoryManagementSystem::FrameAlloc<VkRect2D>();
+		Scissor->extent.width = Settings->Extent.width;
+		Scissor->extent.height = Settings->Extent.height;
+		Scissor->offset = { };
+
+		auto ViewportStateCreateInfo = Memory::MemoryManagementSystem::FrameAlloc<VkPipelineViewportStateCreateInfo>();
+		*ViewportStateCreateInfo = { };
+		ViewportStateCreateInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+		ViewportStateCreateInfo->viewportCount = 1;
+		ViewportStateCreateInfo->pViewports = Viewport;
+		ViewportStateCreateInfo->scissorCount = 1;
+		ViewportStateCreateInfo->pScissors = Scissor;
+
+		// RASTERIZATION
+		auto RasterizationStateCreateInfo = Memory::MemoryManagementSystem::FrameAlloc<VkPipelineRasterizationStateCreateInfo>();
+		*RasterizationStateCreateInfo = { };
+		RasterizationStateCreateInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+		RasterizationStateCreateInfo->depthClampEnable = Settings->DepthClampEnable;
+		// Whether to discard data and skip rasterizer. Never creates fragments, only suitable for pipeline without framebuffer output
+		RasterizationStateCreateInfo->rasterizerDiscardEnable = Settings->RasterizerDiscardEnable;
+		RasterizationStateCreateInfo->polygonMode = Settings->PolygonMode;
+		RasterizationStateCreateInfo->lineWidth = Settings->LineWidth;
+		RasterizationStateCreateInfo->cullMode = Settings->CullMode;
+		RasterizationStateCreateInfo->frontFace = Settings->FrontFace;
+		// Whether to add depth bias to fragments (good for stopping "shadow acne" in shadow mapping)
+		RasterizationStateCreateInfo->depthBiasEnable = Settings->DepthBiasEnable;
+
+		// COLOR BLENDING
+		// Colors to apply blending to
+		auto ColorBlendAttachmentState = Memory::MemoryManagementSystem::FrameAlloc<VkPipelineColorBlendAttachmentState>();
+		ColorBlendAttachmentState->colorWriteMask = Settings->ColorWriteMask;
+		ColorBlendAttachmentState->blendEnable = Settings->BlendEnable;
+		// Blending uses equation: (srcColorBlendFactor * new color) colorBlendOp (dstColorBlendFactor * old color)// Enable blending
+		ColorBlendAttachmentState->srcColorBlendFactor = Settings->SrcColorBlendFactor;
+		ColorBlendAttachmentState->dstColorBlendFactor = Settings->DstColorBlendFactor;
+		ColorBlendAttachmentState->colorBlendOp = Settings->ColorBlendOp;
+		ColorBlendAttachmentState->srcAlphaBlendFactor = Settings->SrcAlphaBlendFactor;
+		// Summarised: (VK_BLEND_FACTOR_SRC_ALPHA * new color) + (VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA * old color)
+//			   (new color alpha * new color) + ((1 - new color alpha) * old color)
+		ColorBlendAttachmentState->dstAlphaBlendFactor = Settings->DstAlphaBlendFactor;
+		ColorBlendAttachmentState->alphaBlendOp = Settings->AlphaBlendOp;
+		// Summarised: (1 * new alpha) + (0 * old alpha) = new alpharesult != VK_SUCCESS
+
+		auto ColorBlendInfo = Memory::MemoryManagementSystem::FrameAlloc<VkPipelineColorBlendStateCreateInfo>();
+		*ColorBlendInfo = { };
+		ColorBlendInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		ColorBlendInfo->logicOpEnable = Settings->LogicOpEnable; // Alternative to calculations is to use logical operations
+		ColorBlendInfo->attachmentCount = Settings->AttachmentCount;
+		ColorBlendInfo->pAttachments = Settings->AttachmentCount > 0 ? ColorBlendAttachmentState : nullptr;
+
+		// DEPTH STENCIL
+		auto DepthStencilInfo = Memory::MemoryManagementSystem::FrameAlloc<VkPipelineDepthStencilStateCreateInfo>();
+		*DepthStencilInfo = { };
+		DepthStencilInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		DepthStencilInfo->depthTestEnable = Settings->DepthTestEnable;
+		DepthStencilInfo->depthWriteEnable = Settings->DepthWriteEnable;
+		DepthStencilInfo->depthCompareOp = Settings->DepthCompareOp;
+		DepthStencilInfo->depthBoundsTestEnable = Settings->DepthBoundsTestEnable;
+		DepthStencilInfo->stencilTestEnable = Settings->StencilTestEnable;
+
+		VkPipelineRenderingCreateInfo RenderingInfo = { };
+		RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+		RenderingInfo.pNext = nullptr;
+		RenderingInfo.colorAttachmentCount = ResourceInfo->PipelineAttachmentData.ColorAttachmentCount;
+		RenderingInfo.pColorAttachmentFormats = ResourceInfo->PipelineAttachmentData.ColorAttachmentFormats;
+		RenderingInfo.depthAttachmentFormat = ResourceInfo->PipelineAttachmentData.DepthAttachmentFormat;
+		RenderingInfo.stencilAttachmentFormat = ResourceInfo->PipelineAttachmentData.DepthAttachmentFormat;
+
+		// CREATE INFO
+		auto PipelineCreateInfo = Memory::MemoryManagementSystem::FrameAlloc<VkGraphicsPipelineCreateInfo>();
+		PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		PipelineCreateInfo->stageCount = ShadersCount;
+		PipelineCreateInfo->pStages = ShaderStageCreateInfos;
+		PipelineCreateInfo->pVertexInputState = VertexInputInfo;
+		PipelineCreateInfo->pInputAssemblyState = &InputAssemblyStateCreateInfo;
+		PipelineCreateInfo->pViewportState = ViewportStateCreateInfo;
+		PipelineCreateInfo->pDynamicState = nullptr;
+		PipelineCreateInfo->pRasterizationState = RasterizationStateCreateInfo;
+		PipelineCreateInfo->pMultisampleState = &MultisampleStateCreateInfo;
+		PipelineCreateInfo->pColorBlendState = ColorBlendInfo;
+		PipelineCreateInfo->pDepthStencilState = DepthStencilInfo;
+		PipelineCreateInfo->layout = ResourceInfo->PipelineLayout;
+		PipelineCreateInfo->renderPass = nullptr;
+		PipelineCreateInfo->subpass = 0;
+		PipelineCreateInfo->pNext = &RenderingInfo;
+
+		// Pipeline Derivatives : Can create multiple pipelines that derive from one another for optimisation
+		PipelineCreateInfo->basePipelineHandle = VK_NULL_HANDLE;
+		PipelineCreateInfo->basePipelineIndex = -1;
+
+		VkPipeline Pipeline;
+		VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, 1, PipelineCreateInfo, nullptr, &Pipeline));
+
+		for (u32 j = 0; j < ShadersCount; ++j)
+		{
+			vkDestroyShaderModule(Device, ShaderStageCreateInfos[j].module, nullptr);
+		}
+
+		return Pipeline;
+	}
+
+	bool CheckFormats(VkPhysicalDevice PhDevice)
+	{
+		const u32 FormatPrioritySize = 3;
+		VkFormat FormatPriority[FormatPrioritySize] = { VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT };
+
+		bool IsSupportedFormatFound = false;
+		for (u32 i = 0; i < FormatPrioritySize; ++i)
+		{
+			VkFormat FormatToCheck = FormatPriority[i];
+			if (VulkanHelper::CheckFormatSupport(PhDevice, FormatToCheck, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT))
+			{
+				IsSupportedFormatFound = true;
+				break;
+			}
+
+			Util::RenderLog(Util::BMRVkLogType_Warning, "Format %d is not supported", FormatToCheck);
+		}
+
+		if (!IsSupportedFormatFound)
+		{
+			Util::RenderLog(Util::BMRVkLogType_Error, "No supported format found");
+			return false;
+		}
+
+		return true;
+	}
+
+
 }
