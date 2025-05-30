@@ -1,5 +1,22 @@
 #pragma once
 
+
+
+
+
+
+//////////////////////////////////////
+// TODO: DEPRECATED TO REFACTOR
+//////////////////////////////////////
+
+
+
+
+
+
+
+
+
 #include <glm/glm.hpp>
 
 #include "Util/EngineTypes.h"
@@ -18,13 +35,17 @@ namespace FrameManager
 		glm::mat4 Projection;
 	};
 
+	typedef u64 UniformMemoryHnadle;
+
 	void Init();
 	void DeInit();
 
 	void UpdateViewProjection(const ViewProjectionBuffer* Data);
 
-	u64 ReserveUniformMemory(u64 Size);
-	void UpdateUniformMemory(u64 Offset, const void* Data, u64 Size);
+	UniformMemoryHnadle ReserveUniformMemory(u64 Size);
+	void UpdateUniformMemory(UniformMemoryHnadle Handle, const void* Data, u64 Size);
+	VkDescriptorSet CreateAndBindSet(UniformMemoryHnadle Handle, u64 Size, VkDescriptorSetLayout Layout);
+	VkDescriptorSetLayout CreateCompatibleLayout(u32 Flags);
 
 	VkDescriptorSetLayout GetViewProjectionLayout();
 	VkDescriptorSet GetViewProjectionSet();

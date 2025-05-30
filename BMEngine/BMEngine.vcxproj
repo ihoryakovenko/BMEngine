@@ -22,44 +22,46 @@
     <ClCompile Include="..\External\imgui\backends\imgui_impl_glfw.cpp" />
     <ClCompile Include="..\External\imgui\backends\imgui_impl_vulkan.cpp" />
     <ClCompile Include="..\External\imgui\imgui.cpp" />
-    <ClCompile Include="..\External\imgui\imgui_demo.cpp" />
     <ClCompile Include="..\External\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\External\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Source\Engine\Engine.cpp" />
     <ClCompile Include="Source\Engine\Scene.cpp" />
-    <ClCompile Include="Source\Engine\Systems\DynamicMapSystem.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\DebugUI.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\DeferredPass.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\LightningPass.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\MainPass.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\VulkanCoreContext.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
     <ClCompile Include="Source\Engine\Systems\ResourceManager.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\TerrainRender.cpp" />
     <ClCompile Include="Source\Render\FrameManager.cpp" />
     <ClCompile Include="Source\Render\VulkanInterface\VulkanInterface.cpp" />
-    <ClCompile Include="Source\Render\Render.cpp" />
     <ClCompile Include="Source\ImguiIntegration.cpp" />
     <ClCompile Include="Source\main.cpp" />
-    <ClCompile Include="Source\Platform\WinPlatform.cpp" />
+    <ClCompile Include="Source\Util\SavedCode.cpp" />
     <ClCompile Include="Source\Util\Settings.cpp" />
     <ClCompile Include="Source\Util\Util.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\External\imgui\backends\imgui_impl_glfw.h" />
-    <ClInclude Include="..\External\imgui\backends\imgui_impl_vulkan.h" />
-    <ClInclude Include="..\External\imgui\imconfig.h" />
-    <ClInclude Include="..\External\imgui\imgui.h" />
-    <ClInclude Include="..\External\imgui\imgui_internal.h" />
-    <ClInclude Include="..\External\imgui\imstb_rectpack.h" />
-    <ClInclude Include="..\External\imgui\imstb_textedit.h" />
-    <ClInclude Include="..\External\imgui\imstb_truetype.h" />
     <ClInclude Include="Source\Engine\Engine.h" />
     <ClInclude Include="Source\Engine\Scene.h" />
-    <ClInclude Include="Source\Engine\Systems\DynamicMapSystem.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\DebugUI.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\VulkanCoreContext.h" />
+    <ClInclude Include="Source\Util\DefaultTextureData.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\DeferredPass.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\LightningPass.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\MainPass.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\VulkanHelper.h" />
     <ClInclude Include="Source\Engine\Systems\ResourceManager.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\TerrainRender.h" />
     <ClInclude Include="Source\Render\FrameManager.h" />
     <ClInclude Include="Source\Render\VulkanInterface\VulkanInterface.h" />
-    <ClInclude Include="Source\Platform\WinPlatform.h" />
     <ClInclude Include="Source\Util\Math.h" />
     <ClInclude Include="Source\Util\Settings.h" />
-    <ClInclude Include="Source\ImguiIntegration.h" />
-    <ClInclude Include="Source\Memory\MemoryManagmentSystem.h" />
-    <ClInclude Include="Source\Render\Render.h" />
+    <ClInclude Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\Render.h" />
     <ClInclude Include="Source\Util\EngineTypes.h" />
     <ClInclude Include="Source\Util\stb_image.h" />
     <ClInclude Include="Source\Util\Util.h" />
@@ -199,7 +201,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)External\GLFW\lib-vc2022;$(VULKAN_SDK)\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
       <Command>
@@ -233,7 +235,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)External\GLFW\lib-vc2022;$(VULKAN_SDK)\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
       <Command>

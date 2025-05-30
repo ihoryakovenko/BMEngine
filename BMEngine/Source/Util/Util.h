@@ -9,10 +9,23 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include "Render/VulkanInterface/VulkanInterface.h"
+#include "Engine/Systems/Render/VulkanHelper.h"
+
 namespace Util
 {
 	bool ReadFileFull(FILE* File, std::vector<char>& OutFileData);
 	bool OpenAndReadFileFull(const char* FileName, std::vector<char>& OutFileData, const char* Mode);
+
+	enum LogType
+	{
+		BMRVkLogType_Error,
+		BMRVkLogType_Warning,
+		BMRVkLogType_Info
+	};
+
+	void RenderLog(LogType logType, const char* format, ...);
+	void RenderLog(LogType LogType, const char* Format, va_list Args);
 
 	struct Log
 	{
@@ -54,9 +67,36 @@ namespace Util
 		}
 	};
 
+	void LoadPipelineSettings(VulkanHelper::PipelineSettings& settings, const char* filePath);
+
 #ifdef NDEBUG
 	static bool EnableValidationLayers = false;
 #else
 	static bool EnableValidationLayers = true;
 #endif
+
+	typedef u8* Model3DData;
+
+	struct Model3DFileHeader
+	{
+		u64 VertexDataSize;
+		u32 MeshCount;
+	};
+
+	struct Model3D
+	{
+		u8* VertexData;
+		u64* VerticesCounts;
+		u32* IndicesCounts;
+		u64* DiffuseTexturesHashes;
+		u32 MeshCount;
+	};
+
+	void ObjToModel3D(const char* FilePath, const char* OutputPath);
+
+	Model3DData LoadModel3DData(const char* FilePath);
+	void ClearModel3DData(Model3DData Data);
+
+	Model3D ParseModel3D(Model3DData Data);
+
 }

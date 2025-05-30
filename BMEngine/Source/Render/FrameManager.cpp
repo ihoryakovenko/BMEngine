@@ -1,65 +1,115 @@
 #include "FrameManager.h"
 
+
+
+
+
+
+//////////////////////////////////////
+// TODO: DEPRECATED TO REFACTOR
+//////////////////////////////////////
+
+
+
+
+
+
+
+
+
 #include <vulkan/vulkan.h>
 
 #include "VulkanInterface/VulkanInterface.h"
+#include "Engine/Systems/Render/VulkanHelper.h"
 
 namespace FrameManager
 {
 	static const u64 BufferSingleFrameSize = 1024 * 1024 * 10;
 	static u64 BufferMultiFrameSize;
 
+	static const VkDescriptorType BufferType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+	static const VkDescriptorBindingFlags BindingFlags[1];
 	static VulkanInterface::UniformBuffer Buffer;
-	static u64 Offset;
+	static u64 BufferAlignment;
+	static u64 NextUniformMemoryHandle;
 
 	static VkDescriptorSetLayout VpLayout;
-	static u64 VpOffset;
+	static UniformMemoryHnadle VpHandle;
 	static VkDescriptorSet VpSet;
+
+	static VkPushConstantRange PushConstants;
 
 	void Init()
 	{
+		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
+		VkDevice Device = VulkanInterface::GetDevice();
+
 		BufferMultiFrameSize = BufferSingleFrameSize * VulkanInterface::GetImageCount();
 
+		Buffer.Buffer = VulkanHelper::CreateBuffer(Device, BufferMultiFrameSize, VulkanHelper::BufferUsageFlag::UniformFlag);
+		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Buffer.Buffer,
+			VulkanHelper::MemoryPropertyFlag::HostCompatible);
+		Buffer.Memory = AllocResult.Memory;
+		BufferAlignment = AllocResult.Alignment;
+		vkBindBufferMemory(Device, Buffer.Buffer, Buffer.Memory, 0);
+
 		const VkDeviceSize VpBufferSize = sizeof(ViewProjectionBuffer);
-		Buffer = VulkanInterface::CreateUniformBuffer(BufferMultiFrameSize);
-
-		const VkDescriptorType VpDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 		const VkShaderStageFlags VpStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-		VpLayout = VulkanInterface::CreateUniformLayout(&VpDescriptorType, &VpStageFlags, 1);
 
-		VulkanInterface::CreateUniformSets(&VpLayout, 1, &VpSet);
+		VpHandle = ReserveUniformMemory(VpBufferSize);
+		const VkDescriptorBindingFlags BindingFlags[1] = { };
+		VpLayout = VulkanInterface::CreateUniformLayout(&BufferType, &VpStageFlags, BindingFlags, 1, 1);
 
-		VulkanInterface::UniformSetAttachmentInfo VpBufferAttachmentInfo;
-		VpBufferAttachmentInfo.BufferInfo.buffer = Buffer.Buffer;
-		VpBufferAttachmentInfo.BufferInfo.offset = 0;
-		VpBufferAttachmentInfo.BufferInfo.range = VpBufferSize;
-		VpBufferAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-
-		VulkanInterface::AttachUniformsToSet(VpSet, &VpBufferAttachmentInfo, 1);
+		VpSet = CreateAndBindSet(VpHandle, VpBufferSize, VpLayout);
 	}
 
 	void DeInit()
 	{
-		VulkanInterface::DestroyUniformLayout(VpLayout);
-		VulkanInterface::DestroyUniformBuffer(Buffer);
+		VkDevice Device = VulkanInterface::GetDevice();
+
+		vkDestroyDescriptorSetLayout(Device, VpLayout, nullptr);
+
+		vkDestroyBuffer(Device, Buffer.Buffer, nullptr);
+		vkFreeMemory(Device, Buffer.Memory, nullptr);
 	}
 
 	void UpdateViewProjection(const ViewProjectionBuffer* Data)
 	{
-		UpdateUniformMemory(VpOffset, Data, sizeof(ViewProjectionBuffer));
+		UpdateUniformMemory(VpHandle, Data, sizeof(ViewProjectionBuffer));
 	}
 
-	u64 ReserveUniformMemory(u64 Size)
+	UniformMemoryHnadle ReserveUniformMemory(u64 Size)
 	{
-		const u64 OldOffset = Offset;
-		Offset += Size * VulkanInterface::GetImageCount();
-		return OldOffset;
+		const UniformMemoryHnadle Handle = NextUniformMemoryHandle;
+		NextUniformMemoryHandle += Size * VulkanInterface::GetImageCount();
+		return Handle;
 	}
 
-	void UpdateUniformMemory(u64 Offset, const void* Data, u64 Size)
+	void UpdateUniformMemory(UniformMemoryHnadle Handle, const void* Data, u64 Size)
 	{
-		VulkanInterface::UpdateUniformBuffer(Buffer, Size,
-			Offset + (Size * VulkanInterface::TestGetImageIndex()), Data);
+		VulkanHelper::UpdateHostCompatibleBufferMemory(VulkanInterface::GetDevice(), Buffer.Memory, Size,
+			Handle + (Size * VulkanInterface::TestGetImageIndex()), Data);
+	}
+
+	VkDescriptorSet CreateAndBindSet(UniformMemoryHnadle Handle, u64 Size, VkDescriptorSetLayout Layout)
+	{
+		VkDescriptorSet NewSet;
+		VulkanInterface::CreateUniformSets(&Layout, 1, &NewSet);
+
+		VulkanInterface::UniformSetAttachmentInfo VpBufferAttachmentInfo;
+		VpBufferAttachmentInfo.BufferInfo.buffer = Buffer.Buffer;
+		VpBufferAttachmentInfo.BufferInfo.offset = Handle;
+		VpBufferAttachmentInfo.BufferInfo.range = Size;
+		VpBufferAttachmentInfo.Type = BufferType;
+
+		VulkanInterface::AttachUniformsToSet(NewSet, &VpBufferAttachmentInfo, 1);
+
+		return NewSet;
+	}
+
+	VkDescriptorSetLayout CreateCompatibleLayout(u32 Flags)
+	{
+		return VulkanInterface::CreateUniformLayout(&BufferType, &Flags, BindingFlags, 1, 1);
 	}
 
 	VkDescriptorSetLayout GetViewProjectionLayout()

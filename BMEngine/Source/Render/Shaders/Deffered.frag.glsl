@@ -1,7 +1,9 @@
 #version 450
 
-layout(input_attachment_index = 0, binding = 0) uniform subpassInput InputColor; // Color output from subpass 1
-layout(input_attachment_index = 1, binding = 1) uniform subpassInput InputDepth;  // Depth output from subpass 1
+layout(set = 0, binding = 0) uniform sampler2D InputColor;
+layout(set = 0, binding = 1) uniform sampler2D InputDepth; // TODO: sampler2DShadow?
+
+layout(location = 0) in vec2 vUV;
 
 layout(location = 0) out vec4 Color;
 
@@ -18,6 +20,9 @@ vec3 Grayscale(vec3 Color)
 
 void main()
 {
+	vec4 SceneColor = texture(InputColor, vUV);
+    float depth = texture(InputDepth, vUV).r;
+
 	float Gamma = 2.2;
 
 	int xHalf = 1600;
@@ -27,15 +32,12 @@ void main()
 		float lowerBound = 0.99;
 		float upperBound = 1;
 		
-		vec4 SceneColor = subpassLoad(InputColor).rgba;
-		float depth = subpassLoad(InputDepth).r;
 		float depthColorScaled = 1.0f - ((depth - lowerBound) / (upperBound - lowerBound));
 		Color = vec4(0.0f, depthColorScaled, 0.0f, SceneColor.a);
 		//Color = vec4(subpassLoad(InputColor).rgb * depthColorScaled, 1.0f);
 	}
 	else
 	{
-		vec4 SceneColor = subpassLoad(InputColor).rgba;
 		//Color = vec4(Grayscale(SceneColor.rgb), SceneColor.a);
 		//Color = vec4(InverseColor(SceneColor.rgb), SceneColor.a);
 		Color = SceneColor;

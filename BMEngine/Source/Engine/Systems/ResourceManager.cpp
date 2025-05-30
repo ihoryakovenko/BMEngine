@@ -1,181 +1,163 @@
 #include "ResourceManager.h"
 
+#define NOMINMAX
+#include <Windows.h>
+#include <shlwapi.h>
+
 #include <map>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "Engine/Systems/Render/TerrainRender.h"
+#include "Util/Util.h"
+#include "Util/DefaultTextureData.h"
+#include <gli/gli.hpp>
+
+#include <thread>
 
 namespace ResourceManager
 {
-	static const std::string TexturesPath = "./Resources/Textures/";
+	struct TextureAsset
+	{
+		u64 Id;
+		std::string Path;
+		u32 RenderTextureIndex;
+		bool IsRenderResourceCreated;
+	};
 
-	static std::map<std::string, Render::RenderTexture> Textures;
-	static std::map<std::string, VkDescriptorSet> EngineMaterials;
+	static std::map<u64, TextureAsset> TextureAssets;
 
 	void Init()
 	{
-		// Default resources
-		Render::RenderTexture TestTexture = LoadTexture("1giraffe", std::vector<std::string> {"1giraffe.jpg"}, VK_IMAGE_VIEW_TYPE_2D);
-		Render::RenderTexture WhiteTexture = LoadTexture("White", std::vector<std::string> {"White.png"}, VK_IMAGE_VIEW_TYPE_2D);
-		Render::RenderTexture ContainerTexture = LoadTexture("container2", std::vector<std::string> {"container2.png"}, VK_IMAGE_VIEW_TYPE_2D);
-		Render::RenderTexture ContainerSpecularTexture = LoadTexture("container2_specular", std::vector<std::string> {"container2_specular.png"}, VK_IMAGE_VIEW_TYPE_2D);
-		Render::RenderTexture BlendWindow = LoadTexture("blending_transparent_window", std::vector<std::string> {"blending_transparent_window.png"}, VK_IMAGE_VIEW_TYPE_2D);
-		Render::RenderTexture GrassTexture = LoadTexture("grass", std::vector<std::string> {"grass.png"}, VK_IMAGE_VIEW_TYPE_2D);
-		Render::RenderTexture SkyBoxCubeTexture = LoadTexture("skybox", std::vector<std::string> {
-			"skybox/right.jpg",
-				"skybox/left.jpg",
-				"skybox/top.jpg",
-				"skybox/bottom.jpg",
-				"skybox/front.jpg",
-				"skybox/back.jpg", }, VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
+		const u64 DefaultTextureDataCount = sizeof(DefaultTextureData) / sizeof(DefaultTextureData[0]);
 
-		VkDescriptorSet TestMaterial;
-		VkDescriptorSet WhiteMaterial;
-		VkDescriptorSet ContainerMaterial;
-		VkDescriptorSet BlendWindowMaterial;
-		VkDescriptorSet GrassMaterial;
-		VkDescriptorSet SkyBoxMaterial;
-		VkDescriptorSet TerrainMaterial;
+		std::hash<std::string> Hasher;
 
-		CreateEntityMaterial("TestMaterial", TestTexture.ImageView, TestTexture.ImageView, &TestMaterial);
-		CreateEntityMaterial("WhiteMaterial", WhiteTexture.ImageView, WhiteTexture.ImageView, &WhiteMaterial);
-		CreateEntityMaterial("ContainerMaterial", ContainerTexture.ImageView, ContainerSpecularTexture.ImageView, &ContainerMaterial);
-		CreateEntityMaterial("BlendWindowMaterial", BlendWindow.ImageView, BlendWindow.ImageView, &BlendWindowMaterial);
-		CreateEntityMaterial("GrassMaterial", GrassTexture.ImageView, GrassTexture.ImageView, &GrassMaterial);
-		CreateSkyBoxTerrainTexture("SkyBoxMaterial", SkyBoxCubeTexture.ImageView, &SkyBoxMaterial);
-		CreateSkyBoxTerrainTexture("TerrainMaterial", TestTexture.ImageView, &TerrainMaterial);
-	}
-
-	void DeInit()
-	{
-		for (auto& Texture : Textures)
+		gli::texture DefaultTexture = gli::load((char const*)DefaultTextureData, DefaultTextureDataCount);
+		if (DefaultTexture.empty())
 		{
-			Render::DestroyTexture(&Texture.second);
+			assert(false);
 		}
+
+		glm::tvec3<u32> Extent = DefaultTexture.extent();
+
+		TextureAsset DefaultTextureAsset;
+		DefaultTextureAsset.Id = Hasher("Default");
+		DefaultTextureAsset.IsRenderResourceCreated = false;
+		DefaultTextureAsset.RenderTextureIndex = Render::CreateTexture2DSRGB(DefaultTextureAsset.Id, DefaultTexture.data(), Extent.x, Extent.y);
+
+		TextureAssets.emplace(DefaultTextureAsset.Id, std::move(DefaultTextureAsset));
 	}
 
-	Render::RenderTexture LoadTexture(const std::string& Id, const std::vector<std::string>& PathNames,
-		VkImageViewType Type, VkImageCreateFlags Flags)
+	void LoadModel(const char* FilePath, const char* Directory)
 	{
-		assert(PathNames.size() > 0);
-		std::vector<stbi_uc*> ImageData(PathNames.size());
+		InitTextureAssets(Directory);
 
-		int Width = 0;
-		int Height = 0;
-		int Channels = 0;
+		Util::Model3DData ModelData = Util::LoadModel3DData(FilePath);
+		Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
 
-		for (u32 i = 0; i < PathNames.size(); ++i)
+		u64 ModelVertexByteOffset = 0;
+		for (u32 i = 0; i < Uh60Model.MeshCount; i++)
 		{
-			ImageData[i] = stbi_load((TexturesPath + PathNames[i]).c_str(), &Width, &Height, &Channels, STBI_rgb_alpha);
+			const u64 VerticesCount = Uh60Model.VerticesCounts[i];
+			const u32 IndicesCount = Uh60Model.IndicesCounts[i];
 
-			if (ImageData[i] == nullptr)
+			u32 TextureIndex = 0;
+
+			auto it = TextureAssets.find(Uh60Model.DiffuseTexturesHashes[i]);
+			if (it != TextureAssets.end())
 			{
-				assert(false);
+				if (it->second.IsRenderResourceCreated)
+				{
+					TextureIndex = it->second.RenderTextureIndex;
+				}
+				else
+				{
+					gli::texture Texture = gli::load(it->second.Path);
+					if (Texture.empty())
+					{
+						assert(false);
+					}
+
+					glm::tvec3<u32> Extent = Texture.extent();
+					TextureIndex = Render::CreateTexture2DSRGB(it->second.Id, Texture.data(), Extent.x, Extent.y);
+
+					it->second.RenderTextureIndex = TextureIndex;
+					it->second.IsRenderResourceCreated = true;
+				}
+			}
+
+			Render::Material Mat;
+			Mat.AlbedoTexIndex = TextureIndex;
+			Mat.SpecularTexIndex = TextureIndex;
+			Mat.Shininess = 32.0f;
+			const u32 MaterialIndex = Render::CreateMaterial(&Mat);
+
+			Render::DrawEntity Entity = { };
+			Entity.StaticMeshIndex = Render::CreateStaticMesh(Uh60Model.VertexData + ModelVertexByteOffset,
+				sizeof(Render::StaticMeshVertex), VerticesCount, IndicesCount);
+			Entity.MaterialIndex = MaterialIndex;
+			Entity.Model = glm::mat4(1.0f);
+
+			Render::CreateEntity(&Entity);
+
+			ModelVertexByteOffset += VerticesCount * sizeof(Render::StaticMeshVertex) + IndicesCount * sizeof(u32);
+		}
+
+		Util::ClearModel3DData(ModelData);
+		Render::NotifyTransfer();
+	}
+
+	void InitTextureAssets(const char* Directory)
+	{
+		// Check on resource leak
+		WIN32_FIND_DATAA FindFileData;
+		HANDLE hFind;
+
+		char SearchPath[MAX_PATH];
+		snprintf(SearchPath, sizeof(SearchPath), "%s\\*", Directory);
+
+		hFind = FindFirstFileA(SearchPath, &FindFileData);
+		if (hFind == INVALID_HANDLE_VALUE)
+		{
+			assert(false);
+			return;
+		}
+
+		do
+		{
+			const char* FileName = FindFileData.cFileName;
+
+			if (strcmp(FileName, ".") == 0 || strcmp(FileName, "..") == 0)
+			{
+				continue;
+			}
+
+			char FullPath[MAX_PATH];
+			snprintf(FullPath, sizeof(FullPath), "%s\\%s", Directory, FileName);
+
+			if (FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			{
+				InitTextureAssets(FullPath);
+			}
+			else
+			{
+				char FileNameNoExt[MAX_PATH];
+				strncpy(FileNameNoExt, FileName, sizeof(FileNameNoExt));
+				FileNameNoExt[sizeof(FileNameNoExt) - 1] = '\0';
+				PathRemoveExtensionA(FileNameNoExt);
+
+				std::hash<std::string> Hasher;
+
+				TextureAsset DefaultTextureAsset;
+				DefaultTextureAsset.Id = Hasher(FileNameNoExt);
+				DefaultTextureAsset.Path = FullPath;
+				DefaultTextureAsset.IsRenderResourceCreated = false;
+				DefaultTextureAsset.RenderTextureIndex = 0;
+
+				TextureAssets.emplace(DefaultTextureAsset.Id, std::move(DefaultTextureAsset));
 			}
 		}
+		while (FindNextFileA(hFind, &FindFileData));
 
-		Render::TextureArrayInfo Info;
-		Info.Width = Width;
-		Info.Height = Height;
-		Info.Format = STBI_rgb_alpha;
-		Info.LayersCount = PathNames.size();
-		Info.Data = ImageData.data();
-		Info.ViewType = Type;
-		Info.Flags = Flags;
-
-		Render::RenderTexture Texture = Render::CreateTexture(&Info);
-
-		for (u32 i = 0; i < PathNames.size(); ++i)
-		{
-			stbi_image_free(ImageData[i]);
-		};
-
-		Textures[Id] = Texture;
-		return Texture;
-	}
-
-	Render::RenderTexture EmptyTexture(const std::string& Id, u32 Width, u32 Height, u32 Layers,
-		VkImageViewType Type, VkImageCreateFlags Flags)
-	{
-		Render::TextureArrayInfo Info;
-		Info.Width = Width;
-		Info.Height = Height;
-		Info.Format = STBI_rgb_alpha;
-		Info.LayersCount = Layers;
-		Info.ViewType = Type;
-		Info.Flags = Flags;
-
-		Render::RenderTexture Texture = Render::CreateEmptyTexture(&Info);
-
-		Textures[Id] = Texture;
-		return Texture;
-	}
-
-	void LoadToTexture(Render::RenderTexture* Texture, const std::vector<std::string>& PathNames)
-	{
-		assert(PathNames.size() > 0);
-		std::vector<stbi_uc*> ImageData(PathNames.size());
-
-		int Width = 0;
-		int Height = 0;
-		int Channels = 0;
-
-		for (u32 i = 0; i < PathNames.size(); ++i)
-		{
-			ImageData[i] = stbi_load((TexturesPath + PathNames[i]).c_str(), &Width, &Height, &Channels, STBI_rgb_alpha);
-
-			if (ImageData[i] == nullptr)
-			{
-				assert(false);
-			}
-		}
-
-		Render::TextureArrayInfo Info;
-		Info.Width = Width;
-		Info.Height = Height;
-		Info.Format = STBI_rgb_alpha;
-		Info.LayersCount = PathNames.size();
-		Info.Data = ImageData.data();
-
-		Render::UpdateTexture(Texture, &Info);
-
-		for (u32 i = 0; i < PathNames.size(); ++i)
-		{
-			stbi_image_free(ImageData[i]);
-		};
-	}
-
-	VkDescriptorSet FindMaterial(const std::string& Id)
-	{
-		auto it = EngineMaterials.find(Id);
-		if (it != EngineMaterials.end())
-		{
-			return it->second;
-		}
-
-		return nullptr;
-	}
-
-	Render::RenderTexture* FindTexture(const std::string& Id)
-	{
-		auto it = Textures.find(Id);
-		if (it != Textures.end())
-		{
-			return &it->second;
-		}
-
-		return nullptr;
-	}
-
-	void CreateEntityMaterial(const std::string& Id, VkImageView DefuseImage, VkImageView SpecularImage, VkDescriptorSet* SetToAttach)
-	{
-		Render::TestAttachEntityTexture(DefuseImage, SpecularImage, SetToAttach);
-		EngineMaterials[Id] = *SetToAttach;
-	}
-
-	void CreateSkyBoxTerrainTexture(const std::string& Id, VkImageView DefuseImage, VkDescriptorSet* SetToAttach)
-	{
-		Render::TestAttachSkyNoxTerrainTexture(DefuseImage, SetToAttach);
-		EngineMaterials[Id] = *SetToAttach;
+		FindClose(hFind);
 	}
 }
