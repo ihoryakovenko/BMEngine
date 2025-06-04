@@ -34,7 +34,6 @@
     <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanCoreContext.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
-    <ClCompile Include="Source\Engine\Systems\ResourceManager.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\TerrainRender.cpp" />
     <ClCompile Include="Source\Render\FrameManager.cpp" />
     <ClCompile Include="Source\Render\VulkanInterface\VulkanInterface.cpp" />
@@ -54,7 +53,6 @@
     <ClInclude Include="Source\Engine\Systems\Render\LightningPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\MainPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\VulkanHelper.h" />
-    <ClInclude Include="Source\Engine\Systems\ResourceManager.h" />
     <ClInclude Include="Source\Engine\Systems\Render\TerrainRender.h" />
     <ClInclude Include="Source\Render\FrameManager.h" />
     <ClInclude Include="Source\Render\VulkanInterface\VulkanInterface.h" />

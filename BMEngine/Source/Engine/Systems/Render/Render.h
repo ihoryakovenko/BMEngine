@@ -63,6 +63,13 @@ namespace Render
 		bool IsLoaded;
 	};
 
+	struct InstanceData
+	{
+		glm::mat4 ModelMatrix;
+		u32 MaterialIndex;
+		u32 MeshIndex;
+	};
+
 	struct DrawEntity
 	{
 		u64 StaticMeshIndex;

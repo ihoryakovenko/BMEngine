@@ -117,12 +117,6 @@ namespace VulkanCoreContext
 			return false;
 		}
 
-		if (!AvailableFeatures.multiViewport)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Warning, "Feature multiViewport is not supported");
-			return false;
-		}
-
 		return true;
 	}
 

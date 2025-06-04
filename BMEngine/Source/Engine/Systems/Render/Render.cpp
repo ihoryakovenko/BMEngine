@@ -144,7 +144,7 @@ namespace Render
 		VertexInputBinding[0].VertexInputBindingName = "EntityVertex";
 
 		VulkanHelper::PipelineSettings PipelineSettings;
-		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMeshRender.ini");
+		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMeshSystem.ini");
 		PipelineSettings.Extent = MainScreenExtent;
 
 		VulkanHelper::PipelineResourceInfo ResourceInfo;
@@ -528,9 +528,9 @@ namespace Render
 
 					VkBufferMemoryBarrier2 Barrier = { };
 					Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-					Barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+					Barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
 					Barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-					Barrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
+					Barrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT;
 					Barrier.dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
 					Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 					Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -548,8 +548,8 @@ namespace Render
 					IndexBufferCopyRegion.dstOffset = Task->DataDescr.DstOffset;
 					IndexBufferCopyRegion.size = Task->DataSize;
 
-					vkCmdPipelineBarrier2(TransferCommandBuffer, &DepInfo);
 					vkCmdCopyBuffer(TransferCommandBuffer, TransferState->TransferStagingPool.Buffer, Task->DataDescr.DstBuffer, 1, &IndexBufferCopyRegion);
+					vkCmdPipelineBarrier2(TransferCommandBuffer, &DepInfo);
 
 					break;
 				}
@@ -561,10 +561,10 @@ namespace Render
 
 					VkBufferMemoryBarrier2 Barrier = { };
 					Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-					Barrier.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-					Barrier.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT;
-					Barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-					Barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+					Barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+					Barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+					Barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+					Barrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT;
 					Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 					Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 					Barrier.buffer = Task->DataDescr.DstBuffer;
@@ -581,8 +581,8 @@ namespace Render
 					IndexBufferCopyRegion.dstOffset = Task->DataDescr.DstOffset;
 					IndexBufferCopyRegion.size = Task->DataSize;
 
-					vkCmdPipelineBarrier2(TransferCommandBuffer, &DepInfo);
 					vkCmdCopyBuffer(TransferCommandBuffer, TransferState->TransferStagingPool.Buffer, Task->DataDescr.DstBuffer, 1, &IndexBufferCopyRegion);
+					vkCmdPipelineBarrier2(TransferCommandBuffer, &DepInfo);
 
 					break;
 				}
@@ -728,25 +728,6 @@ namespace Render
 				{
 					case TransferTaskType::TransferTaskType_Mesh:
 					{
-						VkBufferMemoryBarrier2 Barrier = { };
-						Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-						Barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-						Barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-						Barrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
-						Barrier.dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
-						Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-						Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-						Barrier.buffer = Task->DataDescr.DstBuffer;
-						Barrier.offset = Task->DataDescr.DstOffset;
-						Barrier.size = Task->DataSize;
-
-						VkDependencyInfo DepInfo = { };
-						DepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-						DepInfo.bufferMemoryBarrierCount = 1;
-						DepInfo.pBufferMemoryBarriers = &Barrier;
-
-						vkCmdPipelineBarrier2(CmdBuffer, &DepInfo);
-
 						Storage->Meshes.StaticMeshes.Data[Task->ResourceIndex].IsLoaded = true;
 						Memory::RingFree(&TransferState->TransferMemory.ControlBlock, Task->DataSize, 1);
 
@@ -754,25 +735,6 @@ namespace Render
 					}
 					case TransferTaskType::TransferTaskType_Material:
 					{
-						VkBufferMemoryBarrier2 Barrier = { };
-						Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-						Barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-						Barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-						Barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-						Barrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT;
-						Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-						Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-						Barrier.buffer = Task->DataDescr.DstBuffer;
-						Barrier.offset = Task->DataDescr.DstOffset;
-						Barrier.size = Task->DataSize;
-
-						VkDependencyInfo DepInfo = { };
-						DepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-						DepInfo.bufferMemoryBarrierCount = 1;
-						DepInfo.pBufferMemoryBarriers = &Barrier;
-
-						vkCmdPipelineBarrier2(CmdBuffer, &DepInfo);
-
 						Storage->Materials.Materials.Data[Task->ResourceIndex].IsLoaded = true;
 
 						break;

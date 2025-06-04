@@ -19,7 +19,6 @@
     <ClCompile Include="Source\Util\Settings.cpp" />
     <ClCompile Include="Source\Render\VulkanInterface\VulkanInterface.cpp" />
     <ClCompile Include="Source\Engine\Engine.cpp" />
-    <ClCompile Include="Source\Engine\Systems\ResourceManager.cpp" />
     <ClCompile Include="Source\Engine\Scene.cpp" />
     <ClCompile Include="Source\Render\FrameManager.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\TerrainRender.cpp" />
@@ -41,7 +40,6 @@
     <ClInclude Include="Source\Util\Settings.h" />
     <ClInclude Include="Source\Render\VulkanInterface\VulkanInterface.h" />
     <ClInclude Include="Source\Engine\Engine.h" />
-    <ClInclude Include="Source\Engine\Systems\ResourceManager.h" />
     <ClInclude Include="Source\Engine\Scene.h" />
     <ClInclude Include="Source\Util\Math.h" />
     <ClInclude Include="Source\Render\FrameManager.h" />

@@ -697,7 +697,7 @@ namespace VulkanHelper
 		const PipelineSettings* Settings, const PipelineResourceInfo* ResourceInfo)
 	{
 		Util::RenderLog(Util::BMRVkLogType_Info,
-			"CREATING PIPELINE %s\n"
+			"CREATING PIPELINE "
 			"Extent - Width: %d, Height: %d\n"
 			"DepthClampEnable: %d, RasterizerDiscardEnable: %d\n"
 			"PolygonMode: %d, LineWidth: %f, CullMode: %d, FrontFace: %d, DepthBiasEnable: %d\n"
@@ -706,7 +706,6 @@ namespace VulkanHelper
 			"SrcAlphaBlendFactor: %d, DstAlphaBlendFactor: %d, AlphaBlendOp: %d\n"
 			"DepthTestEnable: %d, DepthWriteEnable: %d, DepthCompareOp: %d\n"
 			"DepthBoundsTestEnable: %d, StencilTestEnable: %d",
-			Settings->PipelineName,
 			Settings->Extent.width, Settings->Extent.height,
 			Settings->DepthClampEnable, Settings->RasterizerDiscardEnable,
 			Settings->PolygonMode, Settings->LineWidth, Settings->CullMode,

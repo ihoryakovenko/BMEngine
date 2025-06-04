@@ -30,8 +30,6 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 
 	// TerrainPipeline
 
-	// DeferredPipelineSettings
-	DeferredPipelineSettings.PipelineName = DeferredPipelineName;
 	// Rasterizer
 	DeferredPipelineSettings.Extent = MainScreenExtent;
 	DeferredPipelineSettings.DepthClampEnable = VK_FALSE;
@@ -60,7 +58,6 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	DeferredPipelineSettings.StencilTestEnable = VK_FALSE;
 
 	// SkyBoxPipelineSettings
-	SkyBoxPipelineSettings.PipelineName = SkyBoxPipelineName;
 	// Rasterizer
 	SkyBoxPipelineSettings.Extent = MainScreenExtent;
 	SkyBoxPipelineSettings.DepthClampEnable = VK_FALSE;
@@ -89,7 +86,6 @@ void LoadSettings(u32 WindowWidth, u32 WindowHeight)
 	SkyBoxPipelineSettings.StencilTestEnable = VK_FALSE;
 
 	// DepthPipelineSettings
-	DepthPipelineSettings.PipelineName = DepthPipelineName;
 	// Rasterizer
 	DepthPipelineSettings.Extent = DepthViewportExtent;
 	DepthPipelineSettings.DepthClampEnable = VK_FALSE;

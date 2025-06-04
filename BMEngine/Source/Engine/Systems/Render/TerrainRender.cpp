@@ -5,7 +5,6 @@
 #include "Engine/Systems/Render/Render.h"
 #include "Render/FrameManager.h"
 #include "MainPass.h"
-#include "Engine/Systems/ResourceManager.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
 #include "Util/Util.h"
 #include "Util/Settings.h"

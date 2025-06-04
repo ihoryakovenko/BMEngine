@@ -62,6 +62,11 @@ namespace Memory
 		static void DeInit()
 		{
 			Free(MemoryPool);
+
+			if (Memory::MemoryManagementSystem::AllocateCounter != 0)
+			{
+				assert(false);
+			}
 		}
 
 		template<typename T>

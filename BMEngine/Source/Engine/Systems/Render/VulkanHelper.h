@@ -80,8 +80,6 @@ namespace VulkanHelper
 
 	struct PipelineSettings
 	{
-		const char* PipelineName = nullptr;
-
 		VkExtent2D Extent;
 
 		VkBool32 DepthClampEnable = VK_FALSE;
