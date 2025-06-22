@@ -83,14 +83,6 @@ namespace VulkanInterface
 	VkImage* GetSwapchainImages();
 	u32 TestGetImageIndex();
 
-	VkDescriptorSetLayout CreateUniformLayout(const VkDescriptorType* Types, const VkShaderStageFlags* Stages,
-		const VkDescriptorBindingFlags* BindingFlags, u32 BindingCount, u32 DescriptorCount);
-	void CreateUniformSets(const VkDescriptorSetLayout* Layouts, u32 Count, VkDescriptorSet* OutSets);
-	void CreateUniformSets(const VkDescriptorSetLayout* Layouts, u32* DescriptorCounts, u32 Count, VkDescriptorSet* OutSets);
-	VkImageView CreateImageInterface(const UniformImageInterfaceCreateInfo* InterfaceCreateInfo, VkImage Image);
-
-	void AttachUniformsToSet(VkDescriptorSet Set, const UniformSetAttachmentInfo* Infos, u32 BufferCount);
-
 	void WaitDevice();
 
 

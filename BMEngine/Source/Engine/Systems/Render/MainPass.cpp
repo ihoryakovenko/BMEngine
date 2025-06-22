@@ -1,7 +1,7 @@
 #include "MainPass.h"
 
-#include "Render/VulkanInterface/VulkanInterface.h"
-#include "Render/FrameManager.h"
+#include "Deprecated/VulkanInterface/VulkanInterface.h"
+#include "Deprecated/FrameManager.h"
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
@@ -32,8 +32,22 @@ namespace MainPass
 
 		const VkDescriptorType Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		const VkShaderStageFlags Flags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		const VkDescriptorBindingFlags BindingFlags[1] = { };
-		SkyBoxLayout = VulkanInterface::CreateUniformLayout(&Type, &Flags, BindingFlags, 1, 1);
+		
+		VkDescriptorSetLayoutBinding LayoutBinding = { };
+		LayoutBinding.binding = 0;
+		LayoutBinding.descriptorType = Type;
+		LayoutBinding.descriptorCount = 1;
+		LayoutBinding.stageFlags = Flags;
+		LayoutBinding.pImmutableSamplers = nullptr;
+
+		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
+		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		LayoutCreateInfo.bindingCount = 1;
+		LayoutCreateInfo.pBindings = &LayoutBinding;
+		LayoutCreateInfo.flags = 0;
+		LayoutCreateInfo.pNext = nullptr;
+
+		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(VulkanInterface::GetDevice(), &LayoutCreateInfo, nullptr, &SkyBoxLayout));
 
 		const VkDescriptorSetLayout VpLayout = FrameManager::GetViewProjectionLayout();
 

@@ -11,7 +11,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 
-#include "Render/VulkanInterface/VulkanInterface.h"
+#include "Deprecated/VulkanInterface/VulkanInterface.h"
 #include "Engine/Systems/Render/DeferredPass.h"
 
 // [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with old VS compilers.

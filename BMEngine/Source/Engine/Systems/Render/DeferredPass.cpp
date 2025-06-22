@@ -1,6 +1,6 @@
 #include "DeferredPass.h"
 
-#include "Render/VulkanInterface/VulkanInterface.h"
+#include "Deprecated/VulkanInterface/VulkanInterface.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
 #include "VulkanCoreContext.h"
 
@@ -61,8 +61,26 @@ namespace DeferredPass
 
 		const VkDescriptorType DeferredInputDescriptorType[2] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
 		const VkShaderStageFlags DeferredInputFlags[2] = { VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
-		const VkDescriptorBindingFlags BindingFlags[2] = { };
-		DeferredInputLayout = VulkanInterface::CreateUniformLayout(DeferredInputDescriptorType, DeferredInputFlags, BindingFlags, 2, 1);
+		
+		VkDescriptorSetLayoutBinding LayoutBindings[2];
+		for (u32 BindingIndex = 0; BindingIndex < 2; ++BindingIndex)
+		{
+			LayoutBindings[BindingIndex] = { };
+			LayoutBindings[BindingIndex].binding = BindingIndex;
+			LayoutBindings[BindingIndex].descriptorType = DeferredInputDescriptorType[BindingIndex];
+			LayoutBindings[BindingIndex].descriptorCount = 1;
+			LayoutBindings[BindingIndex].stageFlags = DeferredInputFlags[BindingIndex];
+			LayoutBindings[BindingIndex].pImmutableSamplers = nullptr;
+		}
+
+		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
+		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		LayoutCreateInfo.bindingCount = 2;
+		LayoutCreateInfo.pBindings = LayoutBindings;
+		LayoutCreateInfo.flags = 0;
+		LayoutCreateInfo.pNext = nullptr;
+
+		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(VulkanInterface::GetDevice(), &LayoutCreateInfo, nullptr, &DeferredInputLayout));
 
 		VkImageCreateInfo DeferredInputDepthUniformCreateInfo = { };
 		DeferredInputDepthUniformCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -121,13 +139,34 @@ namespace DeferredPass
 			DeferredInputColorImage[i].Memory = AllocResult.Memory;
 			vkBindImageMemory(Device, DeferredInputColorImage[i].Image, DeferredInputColorImage[i].Memory, 0);
 
-			DeferredInputDepthImageInterface[i] = VulkanInterface::CreateImageInterface(&InputDepthUniformInterfaceCreateInfo,
-				DeferredInputDepthImage[i].Image);
-			DeferredInputColorImageInterface[i] = VulkanInterface::CreateImageInterface(&InputUniformColorInterfaceCreateInfo,
-				DeferredInputColorImage[i].Image);
+			VkImageViewCreateInfo DepthViewCreateInfo = {};
+			DepthViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			DepthViewCreateInfo.image = DeferredInputDepthImage[i].Image;
+			DepthViewCreateInfo.viewType = InputDepthUniformInterfaceCreateInfo.ViewType;
+			DepthViewCreateInfo.format = InputDepthUniformInterfaceCreateInfo.Format;
+			DepthViewCreateInfo.components = InputDepthUniformInterfaceCreateInfo.Components;
+			DepthViewCreateInfo.subresourceRange = InputDepthUniformInterfaceCreateInfo.SubresourceRange;
+			DepthViewCreateInfo.pNext = InputDepthUniformInterfaceCreateInfo.pNext;
 
-			VulkanInterface::CreateUniformSets(&DeferredInputLayout, 1, DeferredInputSet + i);
+			VULKAN_CHECK_RESULT(vkCreateImageView(Device, &DepthViewCreateInfo, nullptr, &DeferredInputDepthImageInterface[i]));
 
+			VkImageViewCreateInfo ColorViewCreateInfo = {};
+			ColorViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			ColorViewCreateInfo.image = DeferredInputColorImage[i].Image;
+			ColorViewCreateInfo.viewType = InputUniformColorInterfaceCreateInfo.ViewType;
+			ColorViewCreateInfo.format = InputUniformColorInterfaceCreateInfo.Format;
+			ColorViewCreateInfo.components = InputUniformColorInterfaceCreateInfo.Components;
+			ColorViewCreateInfo.subresourceRange = InputUniformColorInterfaceCreateInfo.SubresourceRange;
+			ColorViewCreateInfo.pNext = InputUniformColorInterfaceCreateInfo.pNext;
+
+			VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ColorViewCreateInfo, nullptr, &DeferredInputColorImageInterface[i]));
+
+			VkDescriptorSetAllocateInfo AllocInfo = {};
+			AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			AllocInfo.descriptorPool = VulkanInterface::GetDescriptorPool();
+			AllocInfo.descriptorSetCount = 1;
+			AllocInfo.pSetLayouts = &DeferredInputLayout;
+			VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, DeferredInputSet + i));
 
 			VulkanInterface::UniformSetAttachmentInfo DeferredInputAttachmentInfo[2];
 			DeferredInputAttachmentInfo[0].ImageInfo.imageView = DeferredInputColorImageInterface[i];
@@ -140,7 +179,27 @@ namespace DeferredPass
 			DeferredInputAttachmentInfo[1].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			DeferredInputAttachmentInfo[1].Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
-			VulkanInterface::AttachUniformsToSet(DeferredInputSet[i], DeferredInputAttachmentInfo, 2);
+			VkWriteDescriptorSet WriteDescriptorSets[2] = {};
+			
+			WriteDescriptorSets[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			WriteDescriptorSets[0].dstSet = DeferredInputSet[i];
+			WriteDescriptorSets[0].dstBinding = 0;
+			WriteDescriptorSets[0].dstArrayElement = 0;
+			WriteDescriptorSets[0].descriptorType = DeferredInputAttachmentInfo[0].Type;
+			WriteDescriptorSets[0].descriptorCount = 1;
+			WriteDescriptorSets[0].pBufferInfo = nullptr;
+			WriteDescriptorSets[0].pImageInfo = &DeferredInputAttachmentInfo[0].ImageInfo;
+
+			WriteDescriptorSets[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			WriteDescriptorSets[1].dstSet = DeferredInputSet[i];
+			WriteDescriptorSets[1].dstBinding = 1;
+			WriteDescriptorSets[1].dstArrayElement = 0;
+			WriteDescriptorSets[1].descriptorType = DeferredInputAttachmentInfo[1].Type;
+			WriteDescriptorSets[1].descriptorCount = 1;
+			WriteDescriptorSets[1].pBufferInfo = nullptr;
+			WriteDescriptorSets[1].pImageInfo = &DeferredInputAttachmentInfo[1].ImageInfo;
+
+			vkUpdateDescriptorSets(Device, 2, WriteDescriptorSets, 0, nullptr);
 		}
 
 
@@ -152,9 +211,9 @@ namespace DeferredPass
 		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &Pipeline.PipelineLayout));
 
 		std::vector<char> VertexShaderCode;
-		Util::OpenAndReadFileFull("./Resources/Shaders/second_vert.spv", VertexShaderCode, "rb");
+		Util::OpenAndReadFileFull("./Resources/Shaders/Deferred_vert.spv", VertexShaderCode, "rb");
 		std::vector<char> FragmentShaderCode;
-		Util::OpenAndReadFileFull("./Resources/Shaders/second_frag.spv", FragmentShaderCode, "rb");
+		Util::OpenAndReadFileFull("./Resources/Shaders/Deferred_frag.spv", FragmentShaderCode, "rb");
 
 		const u32 ShaderCount = 2;
 		VulkanHelper::Shader Shaders[ShaderCount];
@@ -289,7 +348,7 @@ namespace DeferredPass
 		SwapchainAcquireBarrier.subresourceRange.levelCount = 1;
 		SwapchainAcquireBarrier.subresourceRange.baseArrayLayer = 0;
 		SwapchainAcquireBarrier.subresourceRange.layerCount = 1;
-		// RELEASE nothing — we don’t depend on any earlier writes to the swap image
+		// RELEASE nothing we don't depend on any earlier writes to the swap image
 		SwapchainAcquireBarrier.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 		SwapchainAcquireBarrier.srcAccessMask = 0;
 		// ACQUIRE for our upcoming color-attachment writes

@@ -9,7 +9,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include "Render/VulkanInterface/VulkanInterface.h"
+#include "Deprecated/VulkanInterface/VulkanInterface.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
 
 namespace Util

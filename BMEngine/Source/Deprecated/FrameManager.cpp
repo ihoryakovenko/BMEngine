@@ -22,13 +22,14 @@
 #include "VulkanInterface/VulkanInterface.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
 
+#include "Util/Util.h"
+
 namespace FrameManager
 {
 	static const u64 BufferSingleFrameSize = 1024 * 1024 * 10;
 	static u64 BufferMultiFrameSize;
 
 	static const VkDescriptorType BufferType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-	static const VkDescriptorBindingFlags BindingFlags[1];
 	static VulkanInterface::UniformBuffer Buffer;
 	static u64 BufferAlignment;
 	static u64 NextUniformMemoryHandle;
@@ -57,8 +58,22 @@ namespace FrameManager
 		const VkShaderStageFlags VpStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
 		VpHandle = ReserveUniformMemory(VpBufferSize);
-		const VkDescriptorBindingFlags BindingFlags[1] = { };
-		VpLayout = VulkanInterface::CreateUniformLayout(&BufferType, &VpStageFlags, BindingFlags, 1, 1);
+		
+		VkDescriptorSetLayoutBinding LayoutBinding = { };
+		LayoutBinding.binding = 0;
+		LayoutBinding.descriptorType = BufferType;
+		LayoutBinding.descriptorCount = 1;
+		LayoutBinding.stageFlags = VpStageFlags;
+		LayoutBinding.pImmutableSamplers = nullptr;
+
+		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
+		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		LayoutCreateInfo.bindingCount = 1;
+		LayoutCreateInfo.pBindings = &LayoutBinding;
+		LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+		LayoutCreateInfo.pNext = nullptr;
+
+		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(VulkanInterface::GetDevice(), &LayoutCreateInfo, nullptr, &VpLayout));
 
 		VpSet = CreateAndBindSet(VpHandle, VpBufferSize, VpLayout);
 	}
@@ -94,7 +109,12 @@ namespace FrameManager
 	VkDescriptorSet CreateAndBindSet(UniformMemoryHnadle Handle, u64 Size, VkDescriptorSetLayout Layout)
 	{
 		VkDescriptorSet NewSet;
-		VulkanInterface::CreateUniformSets(&Layout, 1, &NewSet);
+		VkDescriptorSetAllocateInfo AllocInfo = {};
+		AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		AllocInfo.descriptorPool = VulkanInterface::GetDescriptorPool();
+		AllocInfo.descriptorSetCount = 1;
+		AllocInfo.pSetLayouts = &Layout;
+		VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(VulkanInterface::GetDevice(), &AllocInfo, &NewSet));
 
 		VulkanInterface::UniformSetAttachmentInfo VpBufferAttachmentInfo;
 		VpBufferAttachmentInfo.BufferInfo.buffer = Buffer.Buffer;
@@ -102,14 +122,40 @@ namespace FrameManager
 		VpBufferAttachmentInfo.BufferInfo.range = Size;
 		VpBufferAttachmentInfo.Type = BufferType;
 
-		VulkanInterface::AttachUniformsToSet(NewSet, &VpBufferAttachmentInfo, 1);
+		VkWriteDescriptorSet WriteDescriptorSet = {};
+		WriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		WriteDescriptorSet.dstSet = NewSet;
+		WriteDescriptorSet.dstBinding = 0;
+		WriteDescriptorSet.dstArrayElement = 0;
+		WriteDescriptorSet.descriptorType = VpBufferAttachmentInfo.Type;
+		WriteDescriptorSet.descriptorCount = 1;
+		WriteDescriptorSet.pBufferInfo = &VpBufferAttachmentInfo.BufferInfo;
+		WriteDescriptorSet.pImageInfo = nullptr;
+
+		vkUpdateDescriptorSets(VulkanInterface::GetDevice(), 1, &WriteDescriptorSet, 0, nullptr);
 
 		return NewSet;
 	}
 
 	VkDescriptorSetLayout CreateCompatibleLayout(u32 Flags)
 	{
-		return VulkanInterface::CreateUniformLayout(&BufferType, &Flags, BindingFlags, 1, 1);
+		VkDescriptorSetLayoutBinding LayoutBinding = { };
+		LayoutBinding.binding = 0;
+		LayoutBinding.descriptorType = BufferType;
+		LayoutBinding.descriptorCount = 1;
+		LayoutBinding.stageFlags = Flags;
+		LayoutBinding.pImmutableSamplers = nullptr;
+
+		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
+		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		LayoutCreateInfo.bindingCount = 1;
+		LayoutCreateInfo.pBindings = &LayoutBinding;
+		LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+		LayoutCreateInfo.pNext = nullptr;
+
+		VkDescriptorSetLayout Layout;
+		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(VulkanInterface::GetDevice(), &LayoutCreateInfo, nullptr, &Layout));
+		return Layout;
 	}
 
 	VkDescriptorSetLayout GetViewProjectionLayout()

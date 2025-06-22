@@ -9,9 +9,6 @@
 #include "Engine/Systems/Render/VulkanHelper.h"
 #include "VulkanCoreContext.h"
 
-// todo: delete
-#include "Engine/Scene.h"
-
 namespace LightningPass
 {
 	static VulkanInterface::UniformImage ShadowMapArray[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
@@ -36,8 +33,22 @@ namespace LightningPass
 
 		VkDescriptorType LightSpaceMatrixDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		VkShaderStageFlags LightSpaceMatrixStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-		const VkDescriptorBindingFlags BindingFlags[1] = { };
-		LightSpaceMatrixLayout = VulkanInterface::CreateUniformLayout(&LightSpaceMatrixDescriptorType, &LightSpaceMatrixStageFlags, BindingFlags, 1, 1);
+		
+		VkDescriptorSetLayoutBinding LayoutBinding = { };
+		LayoutBinding.binding = 0;
+		LayoutBinding.descriptorType = LightSpaceMatrixDescriptorType;
+		LayoutBinding.descriptorCount = 1;
+		LayoutBinding.stageFlags = LightSpaceMatrixStageFlags;
+		LayoutBinding.pImmutableSamplers = nullptr;
+
+		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
+		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		LayoutCreateInfo.bindingCount = 1;
+		LayoutCreateInfo.pBindings = &LayoutBinding;
+		LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+		LayoutCreateInfo.pNext = nullptr;
+
+		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(VulkanInterface::GetDevice(), &LayoutCreateInfo, nullptr, &LightSpaceMatrixLayout));
 
 		VulkanInterface::UniformImageInterfaceCreateInfo ShadowMapElement1InterfaceCreateInfo = { };
 		ShadowMapElement1InterfaceCreateInfo.Flags = 0; // No flags
@@ -95,10 +106,34 @@ namespace LightningPass
 			LightSpaceMatrixBuffer[i].Memory = AllocResult.Memory;
 			vkBindBufferMemory(Device, LightSpaceMatrixBuffer[i].Buffer, LightSpaceMatrixBuffer[i].Memory, 0);
 
-			VulkanInterface::CreateUniformSets(&LightSpaceMatrixLayout, 1, LightSpaceMatrixSet + i);
+			VkDescriptorSetAllocateInfo AllocInfo = {};
+			AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			AllocInfo.descriptorPool = VulkanInterface::GetDescriptorPool();
+			AllocInfo.descriptorSetCount = 1;
+			AllocInfo.pSetLayouts = &LightSpaceMatrixLayout;
+			VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, LightSpaceMatrixSet + i));
 
-			ShadowMapElement1ImageInterface[i] = VulkanInterface::CreateImageInterface(&ShadowMapElement1InterfaceCreateInfo, ShadowMapArray[i].Image);
-			ShadowMapElement2ImageInterface[i] = VulkanInterface::CreateImageInterface(&ShadowMapElement2InterfaceCreateInfo, ShadowMapArray[i].Image);
+			VkImageViewCreateInfo ViewCreateInfo1 = {};
+			ViewCreateInfo1.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			ViewCreateInfo1.image = ShadowMapArray[i].Image;
+			ViewCreateInfo1.viewType = ShadowMapElement1InterfaceCreateInfo.ViewType;
+			ViewCreateInfo1.format = ShadowMapElement1InterfaceCreateInfo.Format;
+			ViewCreateInfo1.components = ShadowMapElement1InterfaceCreateInfo.Components;
+			ViewCreateInfo1.subresourceRange = ShadowMapElement1InterfaceCreateInfo.SubresourceRange;
+			ViewCreateInfo1.pNext = ShadowMapElement1InterfaceCreateInfo.pNext;
+
+			VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo1, nullptr, &ShadowMapElement1ImageInterface[i]));
+
+			VkImageViewCreateInfo ViewCreateInfo2 = {};
+			ViewCreateInfo2.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			ViewCreateInfo2.image = ShadowMapArray[i].Image;
+			ViewCreateInfo2.viewType = ShadowMapElement2InterfaceCreateInfo.ViewType;
+			ViewCreateInfo2.format = ShadowMapElement2InterfaceCreateInfo.Format;
+			ViewCreateInfo2.components = ShadowMapElement2InterfaceCreateInfo.Components;
+			ViewCreateInfo2.subresourceRange = ShadowMapElement2InterfaceCreateInfo.SubresourceRange;
+			ViewCreateInfo2.pNext = ShadowMapElement2InterfaceCreateInfo.pNext;
+
+			VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo2, nullptr, &ShadowMapElement2ImageInterface[i]));
 
 			VulkanInterface::UniformSetAttachmentInfo LightSpaceMatrixAttachmentInfo;
 			LightSpaceMatrixAttachmentInfo.BufferInfo.buffer = LightSpaceMatrixBuffer[i].Buffer;
@@ -106,7 +141,17 @@ namespace LightningPass
 			LightSpaceMatrixAttachmentInfo.BufferInfo.range = LightSpaceMatrixSize;
 			LightSpaceMatrixAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 
-			VulkanInterface::AttachUniformsToSet(LightSpaceMatrixSet[i], &LightSpaceMatrixAttachmentInfo, 1);
+			VkWriteDescriptorSet WriteDescriptorSet = {};
+			WriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			WriteDescriptorSet.dstSet = LightSpaceMatrixSet[i];
+			WriteDescriptorSet.dstBinding = 0;
+			WriteDescriptorSet.dstArrayElement = 0;
+			WriteDescriptorSet.descriptorType = LightSpaceMatrixAttachmentInfo.Type;
+			WriteDescriptorSet.descriptorCount = 1;
+			WriteDescriptorSet.pBufferInfo = &LightSpaceMatrixAttachmentInfo.BufferInfo;
+			WriteDescriptorSet.pImageInfo = nullptr;
+
+			vkUpdateDescriptorSets(Device, 1, &WriteDescriptorSet, 0, nullptr);
 		}
 
 		PushConstants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
@@ -172,7 +217,7 @@ namespace LightningPass
 		vkDestroyPipelineLayout(Device, Pipeline.PipelineLayout, nullptr);
 	}
 
-	void Draw()
+	void Draw(const Render::DrawScene* Scene)
 	{
 		VkDevice Device = VulkanInterface::GetDevice();
 		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
@@ -180,8 +225,8 @@ namespace LightningPass
 
 		const glm::mat4* LightViews[] =
 		{
-			&Scene.LightEntity->DirectionLight.LightSpaceMatrix,
-			&Scene.LightEntity->SpotLight.LightSpaceMatrix,
+			&Scene->LightEntity->DirectionLight.LightSpaceMatrix,
+			&Scene->LightEntity->SpotLight.LightSpaceMatrix,
 		};
 
 		VkImageView Attachments[2];

@@ -3,7 +3,7 @@
 #include <random>
 
 #include "Engine/Systems/Render/Render.h"
-#include "Render/FrameManager.h"
+#include "Deprecated/FrameManager.h"
 #include "MainPass.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
 #include "Util/Util.h"

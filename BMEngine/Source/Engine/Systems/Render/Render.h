@@ -3,14 +3,14 @@
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 
-#include "Render/VulkanInterface/VulkanInterface.h"
+#include "Deprecated/VulkanInterface/VulkanInterface.h"
 
 #include "Util/EngineTypes.h"
-#include "Render/FrameManager.h"
+#include "Deprecated/FrameManager.h"
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 #include "Engine/Systems/Render/VulkanCoreContext.h"
 
-#include "Render/FrameManager.h"
+#include "Deprecated/FrameManager.h"
 
 #include <atomic>
 #include <mutex>
@@ -293,13 +293,15 @@ namespace Render
 
 	struct DrawScene
 	{
+		FrameManager::ViewProjectionBuffer ViewProjection;
+
+		Memory::DynamicHeapArray<DrawEntity> Entities;
+
 		DrawEntity* DrawTransparentEntities = nullptr;
 		u32 DrawTransparentEntitiesCount = 0;
 
 		DrawEntity SkyBox;
 		bool DrawSkyBox = false;
-
-		DrawEntity MapEntity;
 
 		LightBuffer* LightEntity = nullptr;
 	};
@@ -312,7 +314,7 @@ namespace Render
 	u32 CreateEntity(const DrawEntity* Entity);
 	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height);
 
-	void Draw(const FrameManager::ViewProjectionBuffer* Data);
+	void Draw(const DrawScene* Data);
 	void NotifyTransfer();
 
 	RenderState* GetRenderState();

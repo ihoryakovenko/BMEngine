@@ -16,9 +16,8 @@
 #include "Util/Settings.h"
 #include "Engine/Systems/Render/Render.h"
 #include "Util/Util.h"
-#include "Scene.h"
 #include "Util/Math.h"
-#include "Render/FrameManager.h"
+#include "Deprecated/FrameManager.h"
 #include "Engine/Systems/Render/DebugUI.h"
 #include "Util/DefaultTextureData.h"
 
@@ -84,6 +83,8 @@ namespace Engine
 
 	static std::map<u64, TextureAsset> TextureAssets;
 
+	static Render::DrawScene Scene;
+
 	static void LoadTestData()
 	{
 		const u64 DefaultTextureDataCount = sizeof(DefaultTextureData) / sizeof(DefaultTextureData[0]);
@@ -105,7 +106,6 @@ namespace Engine
 		TextureAssets.emplace(DefaultTextureAsset.Id, std::move(DefaultTextureAsset));
 
 		const char* TexturesFolder = ".\\Resources\\Textures";
-		const char* ModelPath = ".\\Resources\\Models\\uh60.model";
 
 		namespace fs = std::filesystem;
 
@@ -132,59 +132,123 @@ namespace Engine
 			TextureAssets.emplace(DefaultTextureAsset.Id, std::move(DefaultTextureAsset));
 		}
 
-		Util::Model3DData ModelData = Util::LoadModel3DData(ModelPath);
-		Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
-
-		u64 ModelVertexByteOffset = 0;
-		for (u32 i = 0; i < Uh60Model.MeshCount; i++)
 		{
-			const u64 VerticesCount = Uh60Model.VerticesCounts[i];
-			const u32 IndicesCount = Uh60Model.IndicesCounts[i];
+			const char* ModelPath = ".\\Resources\\Models\\uh60.model";
+			Util::Model3DData ModelData = Util::LoadModel3DData(ModelPath);
+			Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
 
-			u32 TextureIndex = 0;
-
-			auto it = TextureAssets.find(Uh60Model.DiffuseTexturesHashes[i]);
-			if (it != TextureAssets.end())
+			u64 ModelVertexByteOffset = 0;
+			for (u32 i = 0; i < Uh60Model.MeshCount; i++)
 			{
-				if (it->second.IsRenderResourceCreated)
+				const u64 VerticesCount = Uh60Model.VerticesCounts[i];
+				const u32 IndicesCount = Uh60Model.IndicesCounts[i];
+
+				u32 TextureIndex = 0;
+
+				auto it = TextureAssets.find(Uh60Model.DiffuseTexturesHashes[i]);
+				if (it != TextureAssets.end())
 				{
-					TextureIndex = it->second.RenderTextureIndex;
-				}
-				else
-				{
-					gli::texture Texture = gli::load(it->second.Path);
-					if (Texture.empty())
+					if (it->second.IsRenderResourceCreated)
 					{
-						assert(false);
+						TextureIndex = it->second.RenderTextureIndex;
 					}
+					else
+					{
+						gli::texture Texture = gli::load(it->second.Path);
+						if (Texture.empty())
+						{
+							assert(false);
+						}
 
-					glm::tvec3<u32> Extent = Texture.extent();
-					TextureIndex = Render::CreateTexture2DSRGB(it->second.Id, Texture.data(), Extent.x, Extent.y);
+						glm::tvec3<u32> Extent = Texture.extent();
+						TextureIndex = Render::CreateTexture2DSRGB(it->second.Id, Texture.data(), Extent.x, Extent.y);
 
-					it->second.RenderTextureIndex = TextureIndex;
-					it->second.IsRenderResourceCreated = true;
+						it->second.RenderTextureIndex = TextureIndex;
+						it->second.IsRenderResourceCreated = true;
+					}
 				}
+
+				Render::Material Mat;
+				Mat.AlbedoTexIndex = TextureIndex;
+				Mat.SpecularTexIndex = TextureIndex;
+				Mat.Shininess = 32.0f;
+				const u32 MaterialIndex = Render::CreateMaterial(&Mat);
+
+				Render::DrawEntity Entity = { };
+				Entity.StaticMeshIndex = Render::CreateStaticMesh(Uh60Model.VertexData + ModelVertexByteOffset,
+					sizeof(Render::StaticMeshVertex), VerticesCount, IndicesCount);
+				Entity.MaterialIndex = MaterialIndex;
+				Entity.Model = glm::mat4(1.0f);
+
+				Render::CreateEntity(&Entity);
+
+				ModelVertexByteOffset += VerticesCount * sizeof(Render::StaticMeshVertex) + IndicesCount * sizeof(u32);
 			}
 
-			Render::Material Mat;
-			Mat.AlbedoTexIndex = TextureIndex;
-			Mat.SpecularTexIndex = TextureIndex;
-			Mat.Shininess = 32.0f;
-			const u32 MaterialIndex = Render::CreateMaterial(&Mat);
 
-			Render::DrawEntity Entity = { };
-			Entity.StaticMeshIndex = Render::CreateStaticMesh(Uh60Model.VertexData + ModelVertexByteOffset,
-				sizeof(Render::StaticMeshVertex), VerticesCount, IndicesCount);
-			Entity.MaterialIndex = MaterialIndex;
-			Entity.Model = glm::mat4(1.0f);
-
-			Render::CreateEntity(&Entity);
-
-			ModelVertexByteOffset += VerticesCount * sizeof(Render::StaticMeshVertex) + IndicesCount * sizeof(u32);
+			Util::ClearModel3DData(ModelData);
+			Render::NotifyTransfer();
 		}
 
-		Util::ClearModel3DData(ModelData);
-		Render::NotifyTransfer();
+		//{
+		//	const char* CubeModelPath = ".\\Resources\\Models\\cube.model";
+		//	Util::Model3DData ModelData = Util::LoadModel3DData(CubeModelPath);
+		//	Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
+
+		//	u64 ModelVertexByteOffset = 0;
+		//	for (u32 i = 0; i < Uh60Model.MeshCount; i++)
+		//	{
+		//		const u64 VerticesCount = Uh60Model.VerticesCounts[i];
+		//		const u32 IndicesCount = Uh60Model.IndicesCounts[i];
+
+		//		u32 TextureIndex = 0;
+
+		//		auto it = TextureAssets.find(Uh60Model.DiffuseTexturesHashes[i]);
+		//		if (it != TextureAssets.end())
+		//		{
+		//			if (it->second.IsRenderResourceCreated)
+		//			{
+		//				TextureIndex = it->second.RenderTextureIndex;
+		//			}
+		//			else
+		//			{
+		//				gli::texture Texture = gli::load(it->second.Path);
+		//				if (Texture.empty())
+		//				{
+		//					assert(false);
+		//				}
+
+		//				glm::tvec3<u32> Extent = Texture.extent();
+		//				TextureIndex = Render::CreateTexture2DSRGB(it->second.Id, Texture.data(), Extent.x, Extent.y);
+
+		//				it->second.RenderTextureIndex = TextureIndex;
+		//				it->second.IsRenderResourceCreated = true;
+		//			}
+		//		}
+
+		//		Render::Material Mat;
+		//		Mat.AlbedoTexIndex = TextureIndex;
+		//		Mat.SpecularTexIndex = TextureIndex;
+		//		Mat.Shininess = 32.0f;
+		//		const u32 MaterialIndex = Render::CreateMaterial(&Mat);
+
+		//		Render::DrawEntity Entity = { };
+		//		Entity.StaticMeshIndex = Render::CreateStaticMesh(Uh60Model.VertexData + ModelVertexByteOffset,
+		//			sizeof(Render::StaticMeshVertex), VerticesCount, IndicesCount);
+		//		Entity.MaterialIndex = MaterialIndex;
+		//		Entity.Model = glm::mat4(1.0f);
+
+		//		Render::CreateEntity(&Entity);
+
+		//		ModelVertexByteOffset += VerticesCount * sizeof(Render::StaticMeshVertex) + IndicesCount * sizeof(u32);
+		// 
+		// 			Util::ClearModel3DData(ModelData);
+				//Render::NotifyTransfer();
+		//	}
+
+
+
+		//}
 	}
 
 	int Main()
@@ -202,7 +266,7 @@ namespace Engine
 			LastTime = CurrentTime;
 
 			Update(DeltaTime);
-			Render::Draw(&ViewProjection);
+			Render::Draw(&Scene);
 
 			Memory::MemoryManagementSystem::FrameFree();
 		}
@@ -295,6 +359,8 @@ namespace Engine
 
 		GuiData.DirectionLightDirection = &LightData.DirectionLight.Direction;
 		GuiData.Eye = &Eye;
+
+		Scene.ViewProjection = ViewProjection;
 	}
 
 	void SetUpScene()

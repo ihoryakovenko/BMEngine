@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
-#include "Render/VulkanInterface/VulkanInterface.h"
+#include "Deprecated/VulkanInterface/VulkanInterface.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
 
 namespace MainPass
