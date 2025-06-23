@@ -254,7 +254,12 @@ namespace Util
 				Indices.push_back(uniqueVertices[vertex]);
 			}
 
-			std::string diffuseTexName = Materials[Shape->mesh.material_ids[0]].diffuse_texname;
+			std::string diffuseTexName;
+			if (!Materials.empty())
+			{
+				diffuseTexName = Materials[Shape->mesh.material_ids[0]].diffuse_texname;
+			}
+
 			fs::path texturePath = diffuseTexName;
 			std::string FileNameNoExt = texturePath.stem().string();
 

@@ -26,7 +26,6 @@
     <ClCompile Include="..\External\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Source\Engine\Engine.cpp" />
-    <ClCompile Include="Source\Engine\Scene.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\DebugUI.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\DeferredPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\LightningPass.cpp" />
@@ -35,9 +34,8 @@
     <ClCompile Include="Source\Engine\Systems\Render\VulkanCoreContext.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\TerrainRender.cpp" />
-    <ClCompile Include="Source\Render\FrameManager.cpp" />
-    <ClCompile Include="Source\Render\VulkanInterface\VulkanInterface.cpp" />
-    <ClCompile Include="Source\ImguiIntegration.cpp" />
+    <ClCompile Include="Source\Deprecated\FrameManager.cpp" />
+    <ClCompile Include="Source\Deprecated\VulkanInterface\VulkanInterface.cpp" />
     <ClCompile Include="Source\main.cpp" />
     <ClCompile Include="Source\Util\SavedCode.cpp" />
     <ClCompile Include="Source\Util\Settings.cpp" />
@@ -45,7 +43,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Engine\Engine.h" />
-    <ClInclude Include="Source\Engine\Scene.h" />
     <ClInclude Include="Source\Engine\Systems\Render\DebugUI.h" />
     <ClInclude Include="Source\Engine\Systems\Render\VulkanCoreContext.h" />
     <ClInclude Include="Source\Util\DefaultTextureData.h" />
@@ -54,8 +51,8 @@
     <ClInclude Include="Source\Engine\Systems\Render\MainPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\VulkanHelper.h" />
     <ClInclude Include="Source\Engine\Systems\Render\TerrainRender.h" />
-    <ClInclude Include="Source\Render\FrameManager.h" />
-    <ClInclude Include="Source\Render\VulkanInterface\VulkanInterface.h" />
+    <ClInclude Include="Source\Deprecated\FrameManager.h" />
+    <ClInclude Include="Source\Deprecated\VulkanInterface\VulkanInterface.h" />
     <ClInclude Include="Source\Util\Math.h" />
     <ClInclude Include="Source\Util\Settings.h" />
     <ClInclude Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.h" />
@@ -210,7 +207,7 @@
       <Message>1</Message>
     </PostBuildEvent>
     <CustomBuildStep>
-      <Command>call $(SolutionDir)$(ProjectName)\Source\Render\Shaders\CompileShaders.bat $(ProjectDir)</Command>
+      <Command>call $(SolutionDir)$(ProjectName)\Source\Engine\Systems\Render\Shaders\CompileShaders.bat $(ProjectDir)</Command>
       <Outputs>1</Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>
@@ -244,7 +241,7 @@
       <Message>1</Message>
     </PostBuildEvent>
     <CustomBuildStep>
-      <Command>call $(SolutionDir)$(ProjectName)\Source\Render\Shaders\CompileShaders.bat $(ProjectDir)</Command>
+      <Command>call $(SolutionDir)$(ProjectName)\Source\Engine\Systems\Render\Shaders\CompileShaders.bat $(ProjectDir)</Command>
       <Outputs>1</Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>

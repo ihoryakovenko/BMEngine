@@ -122,6 +122,12 @@ namespace VulkanHelper
 		VkPipelineLayout PipelineLayout = nullptr;
 	};
 
+	struct RenderPipeline
+	{
+		VkPipeline Pipeline;
+		VkPipelineLayout PipelineLayout;
+	};
+
 	Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
 	VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface, const VkSurfaceFormatKHR* AvailableFormats, u32 Count);
 	Memory::FrameArray<VkExtensionProperties> GetAvailableExtensionProperties();

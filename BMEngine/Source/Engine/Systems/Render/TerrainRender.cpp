@@ -3,7 +3,7 @@
 #include <random>
 
 #include "Engine/Systems/Render/Render.h"
-#include "Render/FrameManager.h"
+#include "Deprecated/FrameManager.h"
 #include "MainPass.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
 #include "Util/Util.h"
@@ -32,7 +32,9 @@ namespace TerrainRender
 	static TerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
 	static u32 IndicesCount;
 
-	static VulkanInterface::RenderPipeline Pipeline;
+	static VkDescriptorSet TerrainSet;
+
+	static VulkanHelper::RenderPipeline Pipeline;
 	static Render::DrawEntity TerrainDrawObject;
 
 	static VkPushConstantRange PushConstants;
