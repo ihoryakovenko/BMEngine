@@ -25,11 +25,6 @@ struct GLFWwindow;
 
 namespace VulkanInterface
 {
-	struct VulkanInterfaceConfig
-	{
-		u32 MaxTextures = 0;
-	};
-
 	struct UniformBuffer
 	{
 		VkBuffer Buffer;
@@ -44,37 +39,10 @@ namespace VulkanInterface
 		u64 Size; // Size could be aligned
 	};
 
-	struct UniformSetAttachmentInfo
-	{
-		union
-		{
-			VkDescriptorBufferInfo BufferInfo;
-			VkDescriptorImageInfo ImageInfo;
-		};
-
-		VkDescriptorType Type = VK_DESCRIPTOR_TYPE_MAX_ENUM;
-	};
-
-	struct UniformImageInterfaceCreateInfo
-	{
-		const void* pNext = nullptr;
-		VkImageViewCreateFlags Flags = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
-		VkImageViewType ViewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
-		VkFormat Format = VK_FORMAT_UNDEFINED;
-		VkComponentMapping Components;
-		VkImageSubresourceRange SubresourceRange;
-	};
-
 	struct RenderPipeline
 	{
-		VkPipeline Pipeline = nullptr;
-		VkPipelineLayout PipelineLayout = nullptr;
-	};
-
-	struct LayoutLayerTransitionData
-	{
-		u32 BaseArrayLayer;
-		u32 LayerCount;
+		VkPipeline Pipeline;
+		VkPipelineLayout PipelineLayout;
 	};
 
 	// TO refactor

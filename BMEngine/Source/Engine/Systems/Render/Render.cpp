@@ -77,44 +77,37 @@ namespace Render
 
 		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, nullptr, &MeshPipeline->ShadowMapArrayLayout));
 
-		VulkanInterface::UniformImageInterfaceCreateInfo ShadowMapArrayInterfaceCreateInfo = { };
-		ShadowMapArrayInterfaceCreateInfo.Flags = 0; // No flags
-		ShadowMapArrayInterfaceCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-		ShadowMapArrayInterfaceCreateInfo.Format = DepthFormat;
-		ShadowMapArrayInterfaceCreateInfo.Components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-		ShadowMapArrayInterfaceCreateInfo.Components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-		ShadowMapArrayInterfaceCreateInfo.Components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-		ShadowMapArrayInterfaceCreateInfo.Components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-		ShadowMapArrayInterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-		ShadowMapArrayInterfaceCreateInfo.SubresourceRange.baseMipLevel = 0;
-		ShadowMapArrayInterfaceCreateInfo.SubresourceRange.levelCount = 1;
-		ShadowMapArrayInterfaceCreateInfo.SubresourceRange.baseArrayLayer = 0;
-		ShadowMapArrayInterfaceCreateInfo.SubresourceRange.layerCount = 2;
-
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
 			VkImageViewCreateInfo ViewCreateInfo = {};
 			ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 			ViewCreateInfo.image = LightningPass::GetShadowMapArray()[i].Image;
-			ViewCreateInfo.viewType = ShadowMapArrayInterfaceCreateInfo.ViewType;
-			ViewCreateInfo.format = ShadowMapArrayInterfaceCreateInfo.Format;
-			ViewCreateInfo.components = ShadowMapArrayInterfaceCreateInfo.Components;
-			ViewCreateInfo.subresourceRange = ShadowMapArrayInterfaceCreateInfo.SubresourceRange;
-			ViewCreateInfo.pNext = ShadowMapArrayInterfaceCreateInfo.pNext;
+			ViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+			ViewCreateInfo.format = DepthFormat;
+			ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+			ViewCreateInfo.subresourceRange.baseMipLevel = 0;
+			ViewCreateInfo.subresourceRange.levelCount = 1;
+			ViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+			ViewCreateInfo.subresourceRange.layerCount = 2;
+			ViewCreateInfo.pNext = nullptr;
 
 			VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo, nullptr, &MeshPipeline->ShadowMapArrayImageInterface[i]));
 
-			VulkanInterface::UniformSetAttachmentInfo ShadowMapArrayAttachmentInfo;
-			ShadowMapArrayAttachmentInfo.ImageInfo.imageView = MeshPipeline->ShadowMapArrayImageInterface[i];
-			ShadowMapArrayAttachmentInfo.ImageInfo.sampler = MeshPipeline->ShadowMapArraySampler;
-			ShadowMapArrayAttachmentInfo.ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			ShadowMapArrayAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			VkDescriptorImageInfo ShadowMapArrayImageInfo;
+			ShadowMapArrayImageInfo.imageView = MeshPipeline->ShadowMapArrayImageInterface[i];
+			ShadowMapArrayImageInfo.sampler = MeshPipeline->ShadowMapArraySampler;
+			ShadowMapArrayImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 			VkDescriptorSetAllocateInfo AllocInfo = {};
 			AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 			AllocInfo.descriptorPool = VulkanInterface::GetDescriptorPool();
 			AllocInfo.descriptorSetCount = 1;
 			AllocInfo.pSetLayouts = &MeshPipeline->ShadowMapArrayLayout;
+			
 			VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, MeshPipeline->ShadowMapArraySet + i));
 
 			VkWriteDescriptorSet WriteDescriptorSet = {};
@@ -122,10 +115,10 @@ namespace Render
 			WriteDescriptorSet.dstSet = MeshPipeline->ShadowMapArraySet[i];
 			WriteDescriptorSet.dstBinding = 0;
 			WriteDescriptorSet.dstArrayElement = 0;
-			WriteDescriptorSet.descriptorType = ShadowMapArrayAttachmentInfo.Type;
+			WriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			WriteDescriptorSet.descriptorCount = 1;
 			WriteDescriptorSet.pBufferInfo = nullptr;
-			WriteDescriptorSet.pImageInfo = &ShadowMapArrayAttachmentInfo.ImageInfo;
+			WriteDescriptorSet.pImageInfo = &ShadowMapArrayImageInfo;
 
 			vkUpdateDescriptorSets(Device, 1, &WriteDescriptorSet, 0, nullptr);
 		}
@@ -368,11 +361,10 @@ namespace Render
 		Storage->MaterialBufferMemory = AllocResult.Memory;
 		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, Storage->MaterialBuffer, Storage->MaterialBufferMemory, 0));
 
-		VulkanInterface::UniformSetAttachmentInfo MaterialAttachmentInfo;
-		MaterialAttachmentInfo.BufferInfo.buffer = Storage->MaterialBuffer;
-		MaterialAttachmentInfo.BufferInfo.offset = 0;
-		MaterialAttachmentInfo.BufferInfo.range = MaterialBufferSize;
-		MaterialAttachmentInfo.Type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		VkDescriptorBufferInfo MaterialBufferInfo;
+		MaterialBufferInfo.buffer = Storage->MaterialBuffer;
+		MaterialBufferInfo.offset = 0;
+		MaterialBufferInfo.range = MaterialBufferSize;
 
 		const VkDescriptorType MaterialDescriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		const VkShaderStageFlags MaterialStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -405,9 +397,9 @@ namespace Render
 		WriteDescriptorSet.dstSet = Storage->MaterialSet;
 		WriteDescriptorSet.dstBinding = 0;
 		WriteDescriptorSet.dstArrayElement = 0;
-		WriteDescriptorSet.descriptorType = MaterialAttachmentInfo.Type;
+		WriteDescriptorSet.descriptorType = MaterialDescriptorType;
 		WriteDescriptorSet.descriptorCount = 1;
-		WriteDescriptorSet.pBufferInfo = &MaterialAttachmentInfo.BufferInfo;
+		WriteDescriptorSet.pBufferInfo = &MaterialBufferInfo;
 		WriteDescriptorSet.pImageInfo = nullptr;
 
 		vkUpdateDescriptorSets(Device, 1, &WriteDescriptorSet, 0, nullptr);

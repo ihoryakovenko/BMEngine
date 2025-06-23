@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 
 #include "Deprecated/VulkanInterface/VulkanInterface.h"
+#include "Engine/Systems/Render/VulkanHelper.h"
 
 #include "Util/EngineTypes.h"
 #include "Deprecated/FrameManager.h"
@@ -218,7 +219,7 @@ namespace Render
 
 	struct StaticMeshPipeline
 	{
-		VulkanInterface::RenderPipeline Pipeline;
+		VulkanHelper::RenderPipeline Pipeline;
 		VkSampler ShadowMapArraySampler;
 
 		VkDescriptorSetLayout StaticMeshLightLayout;

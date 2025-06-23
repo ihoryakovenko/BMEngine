@@ -116,20 +116,19 @@ namespace FrameManager
 		AllocInfo.pSetLayouts = &Layout;
 		VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(VulkanInterface::GetDevice(), &AllocInfo, &NewSet));
 
-		VulkanInterface::UniformSetAttachmentInfo VpBufferAttachmentInfo;
-		VpBufferAttachmentInfo.BufferInfo.buffer = Buffer.Buffer;
-		VpBufferAttachmentInfo.BufferInfo.offset = Handle;
-		VpBufferAttachmentInfo.BufferInfo.range = Size;
-		VpBufferAttachmentInfo.Type = BufferType;
+		VkDescriptorBufferInfo VpBufferInfo;
+		VpBufferInfo.buffer = Buffer.Buffer;
+		VpBufferInfo.offset = Handle;
+		VpBufferInfo.range = Size;
 
 		VkWriteDescriptorSet WriteDescriptorSet = {};
 		WriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		WriteDescriptorSet.dstSet = NewSet;
 		WriteDescriptorSet.dstBinding = 0;
 		WriteDescriptorSet.dstArrayElement = 0;
-		WriteDescriptorSet.descriptorType = VpBufferAttachmentInfo.Type;
+		WriteDescriptorSet.descriptorType = BufferType;
 		WriteDescriptorSet.descriptorCount = 1;
-		WriteDescriptorSet.pBufferInfo = &VpBufferAttachmentInfo.BufferInfo;
+		WriteDescriptorSet.pBufferInfo = &VpBufferInfo;
 		WriteDescriptorSet.pImageInfo = nullptr;
 
 		vkUpdateDescriptorSets(VulkanInterface::GetDevice(), 1, &WriteDescriptorSet, 0, nullptr);

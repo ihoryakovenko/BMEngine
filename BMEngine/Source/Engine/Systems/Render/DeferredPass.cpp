@@ -9,7 +9,7 @@
 
 namespace DeferredPass
 {
-	static VulkanInterface::RenderPipeline Pipeline;
+	static VulkanHelper::RenderPipeline Pipeline;
 
 	static VkDescriptorSetLayout DeferredInputLayout;
 
@@ -102,25 +102,6 @@ namespace DeferredPass
 		DeferredInputColorUniformCreateInfo.format = ColorFormat;
 		DeferredInputColorUniformCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
-		VulkanInterface::UniformImageInterfaceCreateInfo InputDepthUniformInterfaceCreateInfo = { };
-		InputDepthUniformInterfaceCreateInfo = { };
-		InputDepthUniformInterfaceCreateInfo.Flags = 0; // No flags
-		InputDepthUniformInterfaceCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D;
-		InputDepthUniformInterfaceCreateInfo.Format = DepthFormat;
-		InputDepthUniformInterfaceCreateInfo.Components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-		InputDepthUniformInterfaceCreateInfo.Components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-		InputDepthUniformInterfaceCreateInfo.Components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-		InputDepthUniformInterfaceCreateInfo.Components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-		InputDepthUniformInterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-		InputDepthUniformInterfaceCreateInfo.SubresourceRange.baseMipLevel = 0;
-		InputDepthUniformInterfaceCreateInfo.SubresourceRange.levelCount = 1;
-		InputDepthUniformInterfaceCreateInfo.SubresourceRange.baseArrayLayer = 0;
-		InputDepthUniformInterfaceCreateInfo.SubresourceRange.layerCount = 1;
-
-		VulkanInterface::UniformImageInterfaceCreateInfo InputUniformColorInterfaceCreateInfo = InputDepthUniformInterfaceCreateInfo;
-		InputUniformColorInterfaceCreateInfo.Format = ColorFormat;
-		InputUniformColorInterfaceCreateInfo.SubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-
 		VULKAN_CHECK_RESULT(vkCreateSampler(Device, &ColorSamplerCreateInfo, nullptr, &ColorSampler));
 		VULKAN_CHECK_RESULT(vkCreateSampler(Device, &DepthSamplerInfo, nullptr, &DepthSampler));
 
@@ -142,22 +123,36 @@ namespace DeferredPass
 			VkImageViewCreateInfo DepthViewCreateInfo = {};
 			DepthViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 			DepthViewCreateInfo.image = DeferredInputDepthImage[i].Image;
-			DepthViewCreateInfo.viewType = InputDepthUniformInterfaceCreateInfo.ViewType;
-			DepthViewCreateInfo.format = InputDepthUniformInterfaceCreateInfo.Format;
-			DepthViewCreateInfo.components = InputDepthUniformInterfaceCreateInfo.Components;
-			DepthViewCreateInfo.subresourceRange = InputDepthUniformInterfaceCreateInfo.SubresourceRange;
-			DepthViewCreateInfo.pNext = InputDepthUniformInterfaceCreateInfo.pNext;
+			DepthViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			DepthViewCreateInfo.format = DepthFormat;
+			DepthViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+			DepthViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+			DepthViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+			DepthViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+			DepthViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+			DepthViewCreateInfo.subresourceRange.baseMipLevel = 0;
+			DepthViewCreateInfo.subresourceRange.levelCount = 1;
+			DepthViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+			DepthViewCreateInfo.subresourceRange.layerCount = 1;
+			DepthViewCreateInfo.pNext = nullptr;
 
 			VULKAN_CHECK_RESULT(vkCreateImageView(Device, &DepthViewCreateInfo, nullptr, &DeferredInputDepthImageInterface[i]));
 
 			VkImageViewCreateInfo ColorViewCreateInfo = {};
 			ColorViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 			ColorViewCreateInfo.image = DeferredInputColorImage[i].Image;
-			ColorViewCreateInfo.viewType = InputUniformColorInterfaceCreateInfo.ViewType;
-			ColorViewCreateInfo.format = InputUniformColorInterfaceCreateInfo.Format;
-			ColorViewCreateInfo.components = InputUniformColorInterfaceCreateInfo.Components;
-			ColorViewCreateInfo.subresourceRange = InputUniformColorInterfaceCreateInfo.SubresourceRange;
-			ColorViewCreateInfo.pNext = InputUniformColorInterfaceCreateInfo.pNext;
+			ColorViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			ColorViewCreateInfo.format = ColorFormat;
+			ColorViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ColorViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ColorViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ColorViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ColorViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			ColorViewCreateInfo.subresourceRange.baseMipLevel = 0;
+			ColorViewCreateInfo.subresourceRange.levelCount = 1;
+			ColorViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+			ColorViewCreateInfo.subresourceRange.layerCount = 1;
+			ColorViewCreateInfo.pNext = nullptr;
 
 			VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ColorViewCreateInfo, nullptr, &DeferredInputColorImageInterface[i]));
 
@@ -168,16 +163,14 @@ namespace DeferredPass
 			AllocInfo.pSetLayouts = &DeferredInputLayout;
 			VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, DeferredInputSet + i));
 
-			VulkanInterface::UniformSetAttachmentInfo DeferredInputAttachmentInfo[2];
-			DeferredInputAttachmentInfo[0].ImageInfo.imageView = DeferredInputColorImageInterface[i];
-			DeferredInputAttachmentInfo[0].ImageInfo.sampler = ColorSampler;
-			DeferredInputAttachmentInfo[0].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			DeferredInputAttachmentInfo[0].Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			VkDescriptorImageInfo DeferredInputImageInfo[2];
+			DeferredInputImageInfo[0].imageView = DeferredInputColorImageInterface[i];
+			DeferredInputImageInfo[0].sampler = ColorSampler;
+			DeferredInputImageInfo[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-			DeferredInputAttachmentInfo[1].ImageInfo.imageView = DeferredInputDepthImageInterface[i];
-			DeferredInputAttachmentInfo[1].ImageInfo.sampler = DepthSampler;
-			DeferredInputAttachmentInfo[1].ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			DeferredInputAttachmentInfo[1].Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			DeferredInputImageInfo[1].imageView = DeferredInputDepthImageInterface[i];
+			DeferredInputImageInfo[1].sampler = DepthSampler;
+			DeferredInputImageInfo[1].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 			VkWriteDescriptorSet WriteDescriptorSets[2] = {};
 			
@@ -185,19 +178,19 @@ namespace DeferredPass
 			WriteDescriptorSets[0].dstSet = DeferredInputSet[i];
 			WriteDescriptorSets[0].dstBinding = 0;
 			WriteDescriptorSets[0].dstArrayElement = 0;
-			WriteDescriptorSets[0].descriptorType = DeferredInputAttachmentInfo[0].Type;
+			WriteDescriptorSets[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			WriteDescriptorSets[0].descriptorCount = 1;
 			WriteDescriptorSets[0].pBufferInfo = nullptr;
-			WriteDescriptorSets[0].pImageInfo = &DeferredInputAttachmentInfo[0].ImageInfo;
+			WriteDescriptorSets[0].pImageInfo = &DeferredInputImageInfo[0];
 
 			WriteDescriptorSets[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 			WriteDescriptorSets[1].dstSet = DeferredInputSet[i];
 			WriteDescriptorSets[1].dstBinding = 1;
 			WriteDescriptorSets[1].dstArrayElement = 0;
-			WriteDescriptorSets[1].descriptorType = DeferredInputAttachmentInfo[1].Type;
+			WriteDescriptorSets[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			WriteDescriptorSets[1].descriptorCount = 1;
 			WriteDescriptorSets[1].pBufferInfo = nullptr;
-			WriteDescriptorSets[1].pImageInfo = &DeferredInputAttachmentInfo[1].ImageInfo;
+			WriteDescriptorSets[1].pImageInfo = &DeferredInputImageInfo[1];
 
 			vkUpdateDescriptorSets(Device, 2, WriteDescriptorSets, 0, nullptr);
 		}

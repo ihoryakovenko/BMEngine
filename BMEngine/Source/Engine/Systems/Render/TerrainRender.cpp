@@ -32,7 +32,9 @@ namespace TerrainRender
 	static TerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
 	static u32 IndicesCount;
 
-	static VulkanInterface::RenderPipeline Pipeline;
+	static VkDescriptorSet TerrainSet;
+
+	static VulkanHelper::RenderPipeline Pipeline;
 	static Render::DrawEntity TerrainDrawObject;
 
 	static VkPushConstantRange PushConstants;

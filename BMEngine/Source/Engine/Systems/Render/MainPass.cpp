@@ -17,7 +17,9 @@ namespace MainPass
 {
 	static VkDescriptorSetLayout SkyBoxLayout;
 
-	static VulkanInterface::RenderPipeline SkyBoxPipeline;
+	static VkDescriptorSet SkyBoxSet;
+
+	static VulkanHelper::RenderPipeline SkyBoxPipeline;
 
 	static VulkanHelper::AttachmentData AttachmentData;
 
