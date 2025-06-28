@@ -282,19 +282,20 @@ namespace LightningPass
 
 			for (u32 i = 0; i < State->RenderResources.DrawEntities.Count; ++i)
 			{
-				Render::DrawEntity* DrawEntity = State->RenderResources.DrawEntities.Data + i;
-				Render::StaticMesh* Mesh = State->RenderResources.Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
-				Render::Material* Material = State->RenderResources.Materials.Materials.Data + DrawEntity->MaterialIndex;
-				Render::MeshTexture2D* AlbedoTexture = State->RenderResources.Textures.Textures.Data + Material->AlbedoTexIndex;
-				Render::MeshTexture2D* SpecTexture = State->RenderResources.Textures.Textures.Data + Material->SpecularTexIndex;
+				//Render::DrawEntity* DrawEntity = State->RenderResources.DrawEntities.Data + i;
+				//Render::StaticMesh* Mesh = State->RenderResources.Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
+				//Render::Material* Material = State->RenderResources.Materials.Materials.Data + DrawEntity->MaterialIndex;
+				//Render::MeshTexture2D* AlbedoTexture = State->RenderResources.Textures.Textures.Data + Material->AlbedoTexIndex;
+				//Render::MeshTexture2D* SpecTexture = State->RenderResources.Textures.Textures.Data + Material->SpecularTexIndex;
 
-				if (!Mesh->IsLoaded || !Material->IsLoaded || !AlbedoTexture->IsLoaded || !SpecTexture->IsLoaded)
+				//if (!Mesh->IsLoaded || !Material->IsLoaded || !AlbedoTexture->IsLoaded || !SpecTexture->IsLoaded)
 				{
 					continue;
 				}
 
 				const VkBuffer VertexBuffers[] = { State->RenderResources.Meshes.VertexStageData.Buffer };
-				const VkDeviceSize Offsets[] = { Mesh->VertexOffset };
+				VkDeviceSize Offsets[1];
+				//const VkDeviceSize Offsets[] = { Mesh->VertexOffset };
 
 				const u32 DescriptorSetGroupCount = 1;
 				const VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] =
@@ -304,14 +305,14 @@ namespace LightningPass
 
 				const VkPipelineLayout PipelineLayout = Pipeline.PipelineLayout;
 
-				vkCmdPushConstants(CmdBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &DrawEntity->Model);
+				//vkCmdPushConstants(CmdBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &DrawEntity->Model);
 
 				vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
 					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr);
 
 				vkCmdBindVertexBuffers(CmdBuffer, 0, 1, VertexBuffers, Offsets);
-				vkCmdBindIndexBuffer(CmdBuffer, State->RenderResources.Meshes.VertexStageData.Buffer, Mesh->IndexOffset, VK_INDEX_TYPE_UINT32);
-				vkCmdDrawIndexed(CmdBuffer, Mesh->IndicesCount, 1, 0, 0, 0);
+				//vkCmdBindIndexBuffer(CmdBuffer, State->RenderResources.Meshes.VertexStageData.Buffer, Mesh->IndexOffset, VK_INDEX_TYPE_UINT32);
+				//vkCmdDrawIndexed(CmdBuffer, Mesh->IndicesCount, 1, 0, 0, 0);
 			}
 
 			vkCmdEndRendering(CmdBuffer);

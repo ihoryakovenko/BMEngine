@@ -805,3 +805,77 @@
 		//	Model = glm::scale(Model, glm::vec3(1.0f));
 		//	LoadModel("./Resources/Models/cube.obj", Model, ContainerMaterial);
 		//}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//{
+		//	const char* CubeModelPath = ".\\Resources\\Models\\cube.model";
+		//	Util::Model3DData ModelData = Util::LoadModel3DData(CubeModelPath);
+		//	Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
+
+		//	u64 ModelVertexByteOffset = 0;
+		//	for (u32 i = 0; i < Uh60Model.MeshCount; i++)
+		//	{
+		//		const u64 VerticesCount = Uh60Model.VerticesCounts[i];
+		//		const u32 IndicesCount = Uh60Model.IndicesCounts[i];
+
+		//		u32 TextureIndex = 0;
+
+		//		auto it = TextureAssets.find(Uh60Model.DiffuseTexturesHashes[i]);
+		//		if (it != TextureAssets.end())
+		//		{
+		//			if (it->second.IsRenderResourceCreated)
+		//			{
+		//				TextureIndex = it->second.RenderTextureIndex;
+		//			}
+		//			else
+		//			{
+		//				gli::texture Texture = gli::load(it->second.Path);
+		//				if (Texture.empty())
+		//				{
+		//					assert(false);
+		//				}
+
+		//				glm::tvec3<u32> Extent = Texture.extent();
+		//				TextureIndex = Render::CreateTexture2DSRGB(it->second.Id, Texture.data(), Extent.x, Extent.y);
+
+		//				it->second.RenderTextureIndex = TextureIndex;
+		//				it->second.IsRenderResourceCreated = true;
+		//			}
+		//		}
+
+		//		Render::Material Mat;
+		//		Mat.AlbedoTexIndex = TextureIndex;
+		//		Mat.SpecularTexIndex = TextureIndex;
+		//		Mat.Shininess = 32.0f;
+		//		const u32 MaterialIndex = Render::CreateMaterial(&Mat);
+
+		//		Render::DrawEntity Entity = { };
+		//		Entity.StaticMeshIndex = Render::CreateStaticMesh(Uh60Model.VertexData + ModelVertexByteOffset,
+		//			sizeof(Render::StaticMeshVertex), VerticesCount, IndicesCount);
+		//		Entity.MaterialIndex = MaterialIndex;
+		//		Entity.Model = glm::mat4(1.0f);
+
+		//		Render::CreateEntity(&Entity);
+
+		//		ModelVertexByteOffset += VerticesCount * sizeof(Render::StaticMeshVertex) + IndicesCount * sizeof(u32);
+		// 
+		// 			Util::ClearModel3DData(ModelData);
+				//Render::NotifyTransfer();
+		//	}
+
+
+
+		//}

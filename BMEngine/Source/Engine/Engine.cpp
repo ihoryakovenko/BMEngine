@@ -54,6 +54,7 @@ namespace Engine
 	static void MoveCamera(GLFWwindow* Window, f32 DeltaTime, Camera& MainCamera);
 
 	static GLFWwindow* Window = nullptr;
+	static bool IsMinimized = false;
 
 	static Camera MainCamera;
 	static bool Close = false;
@@ -174,11 +175,20 @@ namespace Engine
 				Mat.Shininess = 32.0f;
 				const u32 MaterialIndex = Render::CreateMaterial(&Mat);
 
+				Render::InstanceData Instance;
+				Instance.IsLoaded = false;
+				Instance.MaterialIndex = MaterialIndex;
+				Instance.ModelMatrix = glm::mat4(1.0f);
+
 				Render::DrawEntity Entity = { };
 				Entity.StaticMeshIndex = Render::CreateStaticMesh(Uh60Model.VertexData + ModelVertexByteOffset,
 					sizeof(Render::StaticMeshVertex), VerticesCount, IndicesCount);
-				Entity.MaterialIndex = MaterialIndex;
-				Entity.Model = glm::mat4(1.0f);
+				Entity.Instances = 2;
+				Entity.InstanceDataIndex = Render::CreateStaticMeshInstance(&Instance);
+
+				Instance.ModelMatrix = glm::translate(Instance.ModelMatrix, glm::vec3(0.0f, 5.0f, 0.0f));
+
+				Render::CreateStaticMeshInstance(&Instance);
 
 				Render::CreateEntity(&Entity);
 
@@ -189,66 +199,18 @@ namespace Engine
 			Util::ClearModel3DData(ModelData);
 			Render::NotifyTransfer();
 		}
+	}
 
-		//{
-		//	const char* CubeModelPath = ".\\Resources\\Models\\cube.model";
-		//	Util::Model3DData ModelData = Util::LoadModel3DData(CubeModelPath);
-		//	Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
-
-		//	u64 ModelVertexByteOffset = 0;
-		//	for (u32 i = 0; i < Uh60Model.MeshCount; i++)
-		//	{
-		//		const u64 VerticesCount = Uh60Model.VerticesCounts[i];
-		//		const u32 IndicesCount = Uh60Model.IndicesCounts[i];
-
-		//		u32 TextureIndex = 0;
-
-		//		auto it = TextureAssets.find(Uh60Model.DiffuseTexturesHashes[i]);
-		//		if (it != TextureAssets.end())
-		//		{
-		//			if (it->second.IsRenderResourceCreated)
-		//			{
-		//				TextureIndex = it->second.RenderTextureIndex;
-		//			}
-		//			else
-		//			{
-		//				gli::texture Texture = gli::load(it->second.Path);
-		//				if (Texture.empty())
-		//				{
-		//					assert(false);
-		//				}
-
-		//				glm::tvec3<u32> Extent = Texture.extent();
-		//				TextureIndex = Render::CreateTexture2DSRGB(it->second.Id, Texture.data(), Extent.x, Extent.y);
-
-		//				it->second.RenderTextureIndex = TextureIndex;
-		//				it->second.IsRenderResourceCreated = true;
-		//			}
-		//		}
-
-		//		Render::Material Mat;
-		//		Mat.AlbedoTexIndex = TextureIndex;
-		//		Mat.SpecularTexIndex = TextureIndex;
-		//		Mat.Shininess = 32.0f;
-		//		const u32 MaterialIndex = Render::CreateMaterial(&Mat);
-
-		//		Render::DrawEntity Entity = { };
-		//		Entity.StaticMeshIndex = Render::CreateStaticMesh(Uh60Model.VertexData + ModelVertexByteOffset,
-		//			sizeof(Render::StaticMeshVertex), VerticesCount, IndicesCount);
-		//		Entity.MaterialIndex = MaterialIndex;
-		//		Entity.Model = glm::mat4(1.0f);
-
-		//		Render::CreateEntity(&Entity);
-
-		//		ModelVertexByteOffset += VerticesCount * sizeof(Render::StaticMeshVertex) + IndicesCount * sizeof(u32);
-		// 
-		// 			Util::ClearModel3DData(ModelData);
-				//Render::NotifyTransfer();
-		//	}
-
-
-
-		//}
+	void WindowIconifyCallback(GLFWwindow* window, int iconified)
+	{
+		if (iconified)
+		{
+			IsMinimized = true;
+		}
+		else
+		{
+			IsMinimized = false;
+		}
 	}
 
 	int Main()
@@ -266,7 +228,11 @@ namespace Engine
 			LastTime = CurrentTime;
 
 			Update(DeltaTime);
-			Render::Draw(&Scene);
+
+			if (!IsMinimized)
+			{
+				Render::Draw(&Scene);
+			}
 
 			Memory::MemoryManagementSystem::FrameFree();
 		}
@@ -289,6 +255,7 @@ namespace Engine
 		Window = glfwCreateWindow(WindowWidth, WindowHeight, "BMEngine", nullptr, nullptr);
 		//glfwSetInputMode(Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
+		glfwSetWindowIconifyCallback(Window, WindowIconifyCallback);
 		glfwGetFramebufferSize(Window, &WindowWidth, &WindowHeight);
 
 		LoadSettings(WindowWidth, WindowHeight);

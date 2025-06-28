@@ -68,14 +68,15 @@ namespace Render
 	{
 		glm::mat4 ModelMatrix;
 		u32 MaterialIndex;
-		u32 MeshIndex;
+		bool IsLoaded;
+		uint32_t padding[2]; // tmp
 	};
 
 	struct DrawEntity
 	{
 		u64 StaticMeshIndex;
-		u32 MaterialIndex;
-		glm::mat4 Model;
+		u32 InstanceDataIndex;
+		u32 Instances;
 	};
 
 	struct GPUBuffer
@@ -97,6 +98,8 @@ namespace Render
 	struct StaticMeshStorage
 	{
 		GPUBuffer VertexStageData;
+		GPUBuffer GPUInstances;
+		Memory::DynamicHeapArray<InstanceData> MeshInstances;
 		Memory::DynamicHeapArray<StaticMesh> StaticMeshes;
 	};
 
@@ -124,7 +127,8 @@ namespace Render
 	{
 		TransferTaskType_Texture,
 		TransferTaskType_Mesh,
-		TransferTaskType_Material
+		TransferTaskType_Material,
+		TransferTaskType_Instance,
 	};
 
 	struct TextureTaskDescription
@@ -314,6 +318,7 @@ namespace Render
 	u32 CreateMaterial(Material* Mat);
 	u32 CreateEntity(const DrawEntity* Entity);
 	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height);
+	u32 CreateStaticMeshInstance(InstanceData* Data);
 
 	void Draw(const DrawScene* Data);
 	void NotifyTransfer();

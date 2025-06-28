@@ -779,7 +779,7 @@ namespace VulkanHelper
 				VkVertexInputAttributeDescription* VertexInputAttribute = VertexInputAttributes + VertexInputAttributesIndex;
 
 				VertexInputAttribute->binding = BindingIndex;
-				VertexInputAttribute->location = CurrentAttributeIndex;
+				VertexInputAttribute->location = VertexInputAttributesIndex;
 				VertexInputAttribute->format = BMRAttribute->Format;
 				VertexInputAttribute->offset = BMRAttribute->AttributeOffset;
 
