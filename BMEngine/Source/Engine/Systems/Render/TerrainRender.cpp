@@ -135,8 +135,8 @@ namespace TerrainRender
 			0, TerrainDescriptorSetGroupCount, Sets, 1, &DynamicOffset);
 
 		PushConstantsData Constants;
-		Constants.Model = TerrainDrawObject.Model;
-		Constants.matIndex = TerrainDrawObject.MaterialIndex;
+		//Constants.Model = TerrainDrawObject.Model;
+		//Constants.matIndex = TerrainDrawObject.MaterialIndex;
 
 		const VkShaderStageFlags Flags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 		vkCmdPushConstants(CmdBuffer, Pipeline.PipelineLayout, Flags, 0, sizeof(PushConstantsData), &Constants);

@@ -12,7 +12,9 @@ typedef float f32;
 typedef double f64;
 
 // TODO: move to globals?
-static const u32 MB4 = 1024 * 1024 * 4;
+static const u32 MB1 = 1024 * 1024;
+static const u32 MB2 = MB1 * 2;
+static const u32 MB4 = MB2 * 4;
 static const u32 MB8 = MB4 * 2;
 static const u32 MB16 = MB8 * 2;
 static const u32 MB32 = MB16 * 2;

@@ -1,7 +1,0 @@
-1. Used $(VULKAN_SDK) environment variable for vulkan SDK
-
-2. Used "Show All Files" as standart project layout
-
-3. GLM is used from vulkan SDK
-
-4. Preprocessor Definitions GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_FORCE_RADIANS

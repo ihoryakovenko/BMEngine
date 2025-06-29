@@ -51,6 +51,7 @@ struct Material {
 layout(location = 0) in vec2 FragmentTexture;
 layout(location = 1) in vec3 FragmentNormal;
 layout(location = 2) in vec4 WorldFragPos;
+layout(location = 3) in flat uint FragmentMaterialIndex;
 
 layout(set = 0, binding = 0) uniform UboViewProjection
 {
@@ -75,12 +76,6 @@ layout(std430, set = 3, binding = 0) readonly buffer MaterialsBuffer {
 } Materials;
 
 layout(set = 4, binding = 0) uniform sampler2DArray ShadowMaps;
-
-layout(push_constant) uniform PushModel
-{
-	mat4 Model;
-	int MaterialIndex;
-} Model;
 
 layout(location = 0) out vec4 OutColor;
 
@@ -204,7 +199,7 @@ void main()
 {
 	vec3 FragmentPosition = vec3(ViewProjection.View * WorldFragPos);
 
-	Material Mat = Materials.materials[Model.MaterialIndex];
+	Material Mat = Materials.materials[FragmentMaterialIndex];
 	vec4 DiffuseTexture = texture(DiffuseTexture[nonuniformEXT(Mat.AlbedoTexIndex)], FragmentTexture);
 	vec3 SpecularTexture = vec3(texture(SpecularTexture[nonuniformEXT(Mat.SpecularTexIndex)], FragmentTexture));
 

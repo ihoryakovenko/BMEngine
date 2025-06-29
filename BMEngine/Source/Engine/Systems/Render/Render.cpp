@@ -12,25 +12,10 @@
 
 namespace Render
 {
-	struct PushConstantsData
-	{
-		glm::mat4 Model;
-		s32 matIndex;
-	};
-
 	static void AddTask(TransferTask* Task, TaskQueue* Queue)
 	{
 		std::unique_lock<std::mutex> PendingLock(Queue->Mutex);
 		Memory::PushToRingBuffer(&Queue->TasksBuffer, Task);
-	}
-
-	static bool IsDrawEntityLoaded(const ResourceStorage* Storage, const DrawEntity* Entity)
-	{
-		Render::StaticMesh* Mesh = Storage->Meshes.StaticMeshes.Data + Entity->StaticMeshIndex;
-		Render::Material* Material = Storage->Materials.Materials.Data + Entity->MaterialIndex;
-		Render::MeshTexture2D* AlbedoTexture = Storage->Textures.Textures.Data + Material->AlbedoTexIndex;
-		Render::MeshTexture2D* SpecTexture = Storage->Textures.Textures.Data + Material->SpecularTexIndex;
-		return Mesh->IsLoaded && Material->IsLoaded && AlbedoTexture->IsLoaded && SpecTexture->IsLoaded;
 	}
 
 	static void InitStaticMeshPipeline(VkDevice Device, const ResourceStorage* Storage, StaticMeshPipeline* MeshPipeline)
@@ -134,16 +119,11 @@ namespace Render
 
 		const u32 StaticMeshDescriptorLayoutCount = sizeof(StaticMeshDescriptorLayouts) / sizeof(StaticMeshDescriptorLayouts[0]);
 
-		MeshPipeline->PushConstants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-		MeshPipeline->PushConstants.offset = 0;
-		// Todo: check constant and model size?
-		MeshPipeline->PushConstants.size = sizeof(PushConstantsData);
-
 		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
 		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		PipelineLayoutCreateInfo.setLayoutCount = StaticMeshDescriptorLayoutCount;
 		PipelineLayoutCreateInfo.pSetLayouts = StaticMeshDescriptorLayouts;
-		PipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+		PipelineLayoutCreateInfo.pushConstantRangeCount = 0;
 		PipelineLayoutCreateInfo.pPushConstantRanges = &MeshPipeline->PushConstants;
 
 		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &MeshPipeline->Pipeline.PipelineLayout));
@@ -164,7 +144,7 @@ namespace Render
 		Shaders[1].Code = FragmentShaderCode.data();
 		Shaders[1].CodeSize = FragmentShaderCode.size();
 
-		VulkanHelper::BMRVertexInputBinding VertexInputBinding[1];
+		VulkanHelper::BMRVertexInputBinding VertexInputBinding[2];
 		VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshVertex, Position) };
 		VertexInputBinding[0].InputAttributes[1] = { "TextureCoords", VK_FORMAT_R32G32_SFLOAT, offsetof(StaticMeshVertex, TextureCoords) };
 		VertexInputBinding[0].InputAttributes[2] = { "Normal", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshVertex, Normal) };
@@ -172,6 +152,17 @@ namespace Render
 		VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 		VertexInputBinding[0].Stride = sizeof(StaticMeshVertex);
 		VertexInputBinding[0].VertexInputBindingName = "EntityVertex";
+
+		u32 Offset = 0;
+		VertexInputBinding[1].InputAttributes[0] = { "InstanceModel0", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
+		VertexInputBinding[1].InputAttributes[1] = { "InstanceModel1", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
+		VertexInputBinding[1].InputAttributes[2] = { "InstanceModel2", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
+		VertexInputBinding[1].InputAttributes[3] = { "InstanceModel3", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
+		VertexInputBinding[1].InputAttributes[4] = { "InstanceMaterialIndex", VK_FORMAT_R32_UINT, Offset }; Offset += sizeof(u32);
+		VertexInputBinding[1].InputAttributesCount = 5;
+		VertexInputBinding[1].InputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+		VertexInputBinding[1].Stride = sizeof(InstanceData);
+		VertexInputBinding[1].VertexInputBindingName = "InstanceData";
 
 		VulkanHelper::PipelineSettings PipelineSettings;
 		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMeshSystem.ini");
@@ -181,7 +172,7 @@ namespace Render
 		ResourceInfo.PipelineLayout = MeshPipeline->Pipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
 
-		MeshPipeline->Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, VertexInputBinding, 1,
+		MeshPipeline->Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, VertexInputBinding, 2,
 			&PipelineSettings, &ResourceInfo);
 	}
 
@@ -203,7 +194,7 @@ namespace Render
 
 	static void DrawStaticMeshes(VkDevice Device, VkCommandBuffer CmdBuffer, const ResourceStorage* Storage, StaticMeshPipeline* MeshPipeline, const DrawScene* Scene)
 	{
-		FrameManager::UpdateUniformMemory(MeshPipeline->EntityLightBufferHandle, Scene->LightEntity, sizeof(Render::LightBuffer));
+		FrameManager::UpdateUniformMemory(MeshPipeline->EntityLightBufferHandle, Scene->LightEntity, sizeof(LightBuffer));
 
 		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MeshPipeline->Pipeline.Pipeline);
 
@@ -216,17 +207,18 @@ namespace Render
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MeshPipeline->Pipeline.PipelineLayout,
 			1, 1, &BindlesTexturesSet, 0, nullptr);
 
-		const u32 LightDynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(Render::LightBuffer);
+		const u32 LightDynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(LightBuffer);
 
 		for (u32 i = 0; i < Storage->DrawEntities.Count; ++i)
 		{
-			Render::DrawEntity* DrawEntity = Storage->DrawEntities.Data + i;
-			Render::StaticMesh* Mesh = Storage->Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
-
+			DrawEntity* DrawEntity = Storage->DrawEntities.Data + i;
 			if (!IsDrawEntityLoaded(Storage, DrawEntity))
 			{
 				continue;
 			}
+
+			StaticMesh* Mesh = Storage->Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
+			InstanceData* Instance = Storage->Meshes.MeshInstances.Data + DrawEntity->InstanceDataIndex;
 
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
@@ -236,19 +228,24 @@ namespace Render
 			};
 			const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
-			PushConstantsData Constants;
-			Constants.Model = DrawEntity->Model;
-			Constants.matIndex = DrawEntity->MaterialIndex;
+			const VkBuffer Buffers[] =
+			{
+				Storage->Meshes.VertexStageData.Buffer,
+				Storage->Meshes.GPUInstances.Buffer
+			};
 
-			const VkShaderStageFlags Flags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-			vkCmdPushConstants(CmdBuffer, MeshPipeline->Pipeline.PipelineLayout, Flags, 0, sizeof(PushConstantsData), &Constants);
+			const u64 Offsets[] = 
+			{
+				Mesh->VertexOffset,
+				80 * DrawEntity->InstanceDataIndex
+			};
 
 			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MeshPipeline->Pipeline.PipelineLayout,
 				2, DescriptorSetGroupCount, DescriptorSetGroup, 1, &LightDynamicOffset);
 
-			vkCmdBindVertexBuffers(CmdBuffer, 0, 1, &Storage->Meshes.VertexStageData.Buffer, &Mesh->VertexOffset);
+			vkCmdBindVertexBuffers(CmdBuffer, 0, 2, Buffers, Offsets);
 			vkCmdBindIndexBuffer(CmdBuffer, Storage->Meshes.VertexStageData.Buffer, Mesh->IndexOffset, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(CmdBuffer, Mesh->IndicesCount, 1, 0, 0, 0);
+			vkCmdDrawIndexed(CmdBuffer, Mesh->IndicesCount, DrawEntity->Instances, 0, 0, 0);
 		}
 	}
 
@@ -325,29 +322,37 @@ namespace Render
 		vkDestroyDescriptorPool(Device, State->MainPool, nullptr);
 	}
 
-	static void InitStaticMeshStorage(VkDevice Device, VkPhysicalDevice PhysicalDevice, StaticMeshStorage* Storage, u64 VertexCapacity)
+	static void InitStaticMeshStorage(VkDevice Device, VkPhysicalDevice PhysicalDevice, StaticMeshStorage* Storage, u64 VertexCapacity, u64 InstanceCapacity)
 	{
+		*Storage = { };
 		Storage->StaticMeshes = Memory::AllocateArray<StaticMesh>(512);
+		Storage->MeshInstances = Memory::AllocateArray<InstanceData>(512 * 200);
 
-		Storage->VertexStageData = { };
 		Storage->VertexStageData.Buffer = VulkanHelper::CreateBuffer(Device, VertexCapacity, VulkanHelper::BufferUsageFlag::CombinedVertexIndexFlag);
 		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Storage->VertexStageData.Buffer,
 			VulkanHelper::MemoryPropertyFlag::GPULocal);
 		Storage->VertexStageData.Memory = AllocResult.Memory;
-		Storage->VertexStageData.Alignment = 1;
+		Storage->VertexStageData.Alignment = AllocResult.Alignment;
 		Storage->VertexStageData.Capacity = AllocResult.Size;
 		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, Storage->VertexStageData.Buffer, Storage->VertexStageData.Memory, 0));
 
-		VkFenceCreateInfo FenceCreateInfo = { };
-		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-		FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+		Storage->GPUInstances.Buffer = VulkanHelper::CreateBuffer(Device, InstanceCapacity, VulkanHelper::BufferUsageFlag::InstanceFlag);
+		AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Storage->GPUInstances.Buffer,
+			VulkanHelper::MemoryPropertyFlag::GPULocal);
+		Storage->GPUInstances.Memory = AllocResult.Memory;
+		Storage->GPUInstances.Alignment = AllocResult.Alignment;
+		Storage->GPUInstances.Capacity = AllocResult.Size;
+		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, Storage->GPUInstances.Buffer, Storage->GPUInstances.Memory, 0));
 	}
 
 	static void DeInitStaticMeshStorage(VkDevice Device, StaticMeshStorage* Storage)
 	{
 		vkDestroyBuffer(Device, Storage->VertexStageData.Buffer, nullptr);
 		vkFreeMemory(Device, Storage->VertexStageData.Memory, nullptr);
+		vkDestroyBuffer(Device, Storage->GPUInstances.Buffer, nullptr);
+		vkFreeMemory(Device, Storage->GPUInstances.Memory, nullptr);
 		Memory::FreeArray(&Storage->StaticMeshes);
+		Memory::FreeArray(&Storage->MeshInstances);
 	}
 
 	static void InitMaterialStorage(VkDevice Device, MaterialStorage* Storage)
@@ -531,8 +536,8 @@ namespace Render
 		TransferState->CompletedTransfer = 0;
 		TransferState->TasksInFly = 0;
 
-		TransferState->PendingTransferTasksQueue.TasksBuffer = Memory::AllocateRingBuffer<TransferTask>(1024);
-		TransferState->ActiveTransferTasksQueue.TasksBuffer = Memory::AllocateRingBuffer<TransferTask>(1024);
+		TransferState->PendingTransferTasksQueue.TasksBuffer = Memory::AllocateRingBuffer<TransferTask>(1024 * 100);
+		TransferState->ActiveTransferTasksQueue.TasksBuffer = Memory::AllocateRingBuffer<TransferTask>(1024 * 100);
 
 		TransferState->TransferStagingPool = { };
 
@@ -629,6 +634,7 @@ namespace Render
 					break;
 				}
 				case TransferTaskType::TransferTaskType_Material:
+				case TransferTaskType::TransferTaskType_Instance:
 				{
 					const u64 TransferOffset = Memory::RingAlloc(&TransferState->TransferStagingPool.ControlBlock, Task->DataSize, 1);
 					VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState->TransferStagingPool.Memory, Task->DataSize,
@@ -814,6 +820,12 @@ namespace Render
 
 						break;
 					}
+					case TransferTaskType::TransferTaskType_Instance:
+					{
+						Storage->Meshes.MeshInstances.Data[Task->ResourceIndex].IsLoaded = true;
+
+						break;
+					}
 					case TransferTaskType::TransferTaskType_Texture:
 					{
 						Storage->Textures.Textures.Data[Task->ResourceIndex].IsLoaded = true;
@@ -850,7 +862,7 @@ namespace Render
 		InitTransferState(Device, PhysicalDevice, &State.TransferState);
 		InitTextureStorage(Device, PhysicalDevice, &State.RenderResources.Textures);
 		InitMaterialStorage(Device, &State.RenderResources.Materials);
-		InitStaticMeshStorage(Device, PhysicalDevice, &State.RenderResources.Meshes, MB4);
+		InitStaticMeshStorage(Device, PhysicalDevice, &State.RenderResources.Meshes, MB4, MB4);
 
 		FrameManager::Init();
 
@@ -923,7 +935,7 @@ namespace Render
 
 		ProcessTransferTasks(Device, DrawCmdBuffer, &State.TransferState, &State.RenderResources);
 
-		LightningPass::Draw(Scene);
+		LightningPass::Draw(Scene, &State.RenderResources);
 		MainPass::BeginPass();
 		//TerrainRender::Draw();
 		DrawStaticMeshes(Device, DrawCmdBuffer, &State.RenderResources, &State.MeshPipeline, Scene);
@@ -984,7 +996,8 @@ namespace Render
 		Mat->IsLoaded = false;
 		const u64 Index = State.RenderResources.Materials.Materials.Count;
 
-		Material* NewMaterial = State.RenderResources.Materials.Materials.Data + State.RenderResources.Materials.Materials.Count;
+		// TODO: check
+		Material* NewMaterial = State.RenderResources.Materials.Materials.Data + Index;
 		Memory::PushBackToArray(&State.RenderResources.Materials.Materials, Mat);
 
 		TransferTask Task = { };
@@ -1135,8 +1148,52 @@ namespace Render
 		return Index;
 	}
 
+	u32 CreateStaticMeshInstance(InstanceData* Data)
+	{
+		Data->IsLoaded = false;
+		const u64 Index = State.RenderResources.Meshes.MeshInstances.Count;
+
+		// TODO: check
+		InstanceData* NewInstance = State.RenderResources.Meshes.MeshInstances.Data + Index;
+		Memory::PushBackToArray(&State.RenderResources.Meshes.MeshInstances, Data);
+
+		TransferTask Task = { };
+		Task.DataSize = sizeof(glm::mat4) + sizeof(u32);
+		Task.DataDescr.DstBuffer = State.RenderResources.Meshes.GPUInstances.Buffer;
+		//Task.DataDescr.DstOffset = (sizeof(glm::mat4) + sizeof(u32)) * Index;
+		Task.DataDescr.DstOffset = 80 * Index;
+		Task.RawData = NewInstance;
+		Task.ResourceIndex = Index;
+		Task.Type = TransferTaskType::TransferTaskType_Instance;
+
+		AddTask(&Task, &State.TransferState.PendingTransferTasksQueue);
+
+		return Index;
+	}
+
 	RenderState* GetRenderState()
 	{
 		return &State;
+	}
+
+	bool IsDrawEntityLoaded(const ResourceStorage* Storage, const DrawEntity* Entity)
+	{
+		StaticMesh* Mesh = Storage->Meshes.StaticMeshes.Data + Entity->StaticMeshIndex;
+		if (!Mesh->IsLoaded) return false;
+
+		InstanceData* Instance = Storage->Meshes.MeshInstances.Data + Entity->InstanceDataIndex;
+		for (u32 i = Entity->InstanceDataIndex; i < Entity->Instances; ++i)
+		{
+			Instance = Storage->Meshes.MeshInstances.Data + i;
+			if (!Instance->IsLoaded) return false;
+		}
+
+		Material* Material = Storage->Materials.Materials.Data + Instance->MaterialIndex;
+		if (!Material->IsLoaded) return false;
+		MeshTexture2D* AlbedoTexture = Storage->Textures.Textures.Data + Material->AlbedoTexIndex;
+		if (!AlbedoTexture->IsLoaded) return false;
+		MeshTexture2D* SpecTexture = Storage->Textures.Textures.Data + Material->SpecularTexIndex;
+		if (!SpecTexture->IsLoaded) return false;
+		return true;
 	}
 }
