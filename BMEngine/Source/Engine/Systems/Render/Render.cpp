@@ -18,27 +18,6 @@ namespace Render
 		Memory::PushToRingBuffer(&Queue->TasksBuffer, Task);
 	}
 
-	static bool IsDrawEntityLoaded(const ResourceStorage* Storage, const DrawEntity* Entity)
-	{
-		StaticMesh* Mesh = Storage->Meshes.StaticMeshes.Data + Entity->StaticMeshIndex;
-		if (!Mesh->IsLoaded) return false;
-
-		InstanceData* Instance = Storage->Meshes.MeshInstances.Data + Entity->InstanceDataIndex;
-		for (u32 i = Entity->InstanceDataIndex; i < Entity->Instances; ++i)
-		{
-			Instance = Storage->Meshes.MeshInstances.Data + i;
-			if (!Instance->IsLoaded) return false;
-		}
-
-		Material* Material = Storage->Materials.Materials.Data + Instance->MaterialIndex;
-		if (!Material->IsLoaded) return false;
-		MeshTexture2D* AlbedoTexture = Storage->Textures.Textures.Data + Material->AlbedoTexIndex;
-		if (!AlbedoTexture->IsLoaded) return false;
-		MeshTexture2D* SpecTexture = Storage->Textures.Textures.Data + Material->SpecularTexIndex;
-		if (!SpecTexture->IsLoaded) return false;
-		return true;
-	}
-
 	static void InitStaticMeshPipeline(VkDevice Device, const ResourceStorage* Storage, StaticMeshPipeline* MeshPipeline)
 	{
 		VkSamplerCreateInfo ShadowMapSamplerCreateInfo = { };
@@ -180,7 +159,6 @@ namespace Render
 		VertexInputBinding[1].InputAttributes[2] = { "InstanceModel2", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
 		VertexInputBinding[1].InputAttributes[3] = { "InstanceModel3", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
 		VertexInputBinding[1].InputAttributes[4] = { "InstanceMaterialIndex", VK_FORMAT_R32_UINT, Offset }; Offset += sizeof(u32);
-		// Optionally: add padding offset += 12;
 		VertexInputBinding[1].InputAttributesCount = 5;
 		VertexInputBinding[1].InputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
 		VertexInputBinding[1].Stride = sizeof(InstanceData);
@@ -259,7 +237,6 @@ namespace Render
 			const u64 Offsets[] = 
 			{
 				Mesh->VertexOffset,
-				//(sizeof(glm::mat4) + sizeof(u32)) * DrawEntity->InstanceDataIndex
 				80 * DrawEntity->InstanceDataIndex
 			};
 
@@ -958,7 +935,7 @@ namespace Render
 
 		ProcessTransferTasks(Device, DrawCmdBuffer, &State.TransferState, &State.RenderResources);
 
-		LightningPass::Draw(Scene);
+		LightningPass::Draw(Scene, &State.RenderResources);
 		MainPass::BeginPass();
 		//TerrainRender::Draw();
 		DrawStaticMeshes(Device, DrawCmdBuffer, &State.RenderResources, &State.MeshPipeline, Scene);
@@ -1197,5 +1174,26 @@ namespace Render
 	RenderState* GetRenderState()
 	{
 		return &State;
+	}
+
+	bool IsDrawEntityLoaded(const ResourceStorage* Storage, const DrawEntity* Entity)
+	{
+		StaticMesh* Mesh = Storage->Meshes.StaticMeshes.Data + Entity->StaticMeshIndex;
+		if (!Mesh->IsLoaded) return false;
+
+		InstanceData* Instance = Storage->Meshes.MeshInstances.Data + Entity->InstanceDataIndex;
+		for (u32 i = Entity->InstanceDataIndex; i < Entity->Instances; ++i)
+		{
+			Instance = Storage->Meshes.MeshInstances.Data + i;
+			if (!Instance->IsLoaded) return false;
+		}
+
+		Material* Material = Storage->Materials.Materials.Data + Instance->MaterialIndex;
+		if (!Material->IsLoaded) return false;
+		MeshTexture2D* AlbedoTexture = Storage->Textures.Textures.Data + Material->AlbedoTexIndex;
+		if (!AlbedoTexture->IsLoaded) return false;
+		MeshTexture2D* SpecTexture = Storage->Textures.Textures.Data + Material->SpecularTexIndex;
+		if (!SpecTexture->IsLoaded) return false;
+		return true;
 	}
 }

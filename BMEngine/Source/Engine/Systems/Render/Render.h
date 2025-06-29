@@ -324,4 +324,5 @@ namespace Render
 	void NotifyTransfer();
 
 	RenderState* GetRenderState();
+	bool IsDrawEntityLoaded(const ResourceStorage* Storage, const DrawEntity* Entity);
 }
