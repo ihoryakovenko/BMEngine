@@ -349,7 +349,7 @@ namespace Render
 	{
 		*Storage = { };
 		Storage->StaticMeshes = Memory::AllocateArray<StaticMesh>(512);
-		Storage->MeshInstances = Memory::AllocateArray<InstanceData>(1024 * 5);
+		Storage->MeshInstances = Memory::AllocateArray<InstanceData>(512 * 200);
 
 		Storage->VertexStageData.Buffer = VulkanHelper::CreateBuffer(Device, VertexCapacity, VulkanHelper::BufferUsageFlag::CombinedVertexIndexFlag);
 		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Storage->VertexStageData.Buffer,
@@ -559,8 +559,8 @@ namespace Render
 		TransferState->CompletedTransfer = 0;
 		TransferState->TasksInFly = 0;
 
-		TransferState->PendingTransferTasksQueue.TasksBuffer = Memory::AllocateRingBuffer<TransferTask>(1024 * 2);
-		TransferState->ActiveTransferTasksQueue.TasksBuffer = Memory::AllocateRingBuffer<TransferTask>(1024 * 2);
+		TransferState->PendingTransferTasksQueue.TasksBuffer = Memory::AllocateRingBuffer<TransferTask>(1024 * 100);
+		TransferState->ActiveTransferTasksQueue.TasksBuffer = Memory::AllocateRingBuffer<TransferTask>(1024 * 100);
 
 		TransferState->TransferStagingPool = { };
 
@@ -885,7 +885,7 @@ namespace Render
 		InitTransferState(Device, PhysicalDevice, &State.TransferState);
 		InitTextureStorage(Device, PhysicalDevice, &State.RenderResources.Textures);
 		InitMaterialStorage(Device, &State.RenderResources.Materials);
-		InitStaticMeshStorage(Device, PhysicalDevice, &State.RenderResources.Meshes, MB4, MB1);
+		InitStaticMeshStorage(Device, PhysicalDevice, &State.RenderResources.Meshes, MB4, MB4);
 
 		FrameManager::Init();
 

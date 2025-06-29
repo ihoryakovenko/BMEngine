@@ -175,29 +175,54 @@ namespace Engine
 				Mat.Shininess = 32.0f;
 				const u32 MaterialIndex = Render::CreateMaterial(&Mat);
 
+				const u32 GroupWidth = 10;
+				const u32 GroupHeight = 5;
+				const u32 GroupDepth = 4;
+				const f32 Spacing = 15.0f;
+				const f32 StartX = -(f32)(GroupWidth - 1) * Spacing * 0.5f;
+				const f32 StartY = -(f32)(GroupHeight - 1) * Spacing * 0.5f;
+				const f32 StartZ = -(f32)(GroupDepth - 1) * Spacing * 0.5f;
+
 				Render::InstanceData Instance;
 				Instance.IsLoaded = false;
 				Instance.MaterialIndex = MaterialIndex;
+
 				Instance.ModelMatrix = glm::mat4(1.0f);
 
 				Render::DrawEntity Entity = { };
 				Entity.StaticMeshIndex = Render::CreateStaticMesh(Uh60Model.VertexData + ModelVertexByteOffset,
 					sizeof(Render::StaticMeshVertex), VerticesCount, IndicesCount);
-				Entity.Instances = 2;
+				Entity.Instances = 1;
 				Entity.InstanceDataIndex = Render::CreateStaticMeshInstance(&Instance);
 
-				Instance.ModelMatrix = glm::translate(Instance.ModelMatrix, glm::vec3(0.0f, 5.0f, 0.0f));
+				for (u32 z = 0; z < GroupDepth; z++)
+				{
+					for (u32 y = 0; y < GroupHeight; y++)
+					{
+						for (u32 x = 0; x < GroupWidth; x++)
+						{
+							if (x == 0 && y == 0 && z == 0)
+							{
+								continue;
+							}
 
-				Render::CreateStaticMeshInstance(&Instance);
+							const glm::vec3 Position = glm::vec3(StartX + x * Spacing, StartY + y * Spacing,StartZ + z * Spacing);
+
+							Instance.ModelMatrix = glm::translate(glm::mat4(1.0f), Position);
+							Render::CreateStaticMeshInstance(&Instance);
+
+							++Entity.Instances;
+						}
+					}
+				}
 
 				Render::CreateEntity(&Entity);
 
 				ModelVertexByteOffset += VerticesCount * sizeof(Render::StaticMeshVertex) + IndicesCount * sizeof(u32);
+				Render::NotifyTransfer();
 			}
 
-
 			Util::ClearModel3DData(ModelData);
-			Render::NotifyTransfer();
 		}
 	}
 
