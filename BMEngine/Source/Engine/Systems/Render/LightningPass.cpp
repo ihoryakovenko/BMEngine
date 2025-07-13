@@ -298,8 +298,8 @@ namespace LightningPass
 					continue;
 				}
 
-				Render::StaticMesh* Mesh = Storage->Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
-				Render::InstanceData* Instance = Storage->Meshes.MeshInstances.Data + DrawEntity->InstanceDataIndex;
+				Render::RenderResource<Render::StaticMesh>* MeshResource = Storage->Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
+				Render::StaticMesh* Mesh = &MeshResource->Resource;
 
 				const VkBuffer Buffers[] =
 				{
@@ -310,7 +310,7 @@ namespace LightningPass
 				const u64 Offsets[] =
 				{
 					Mesh->VertexOffset,
-					80 * DrawEntity->InstanceDataIndex
+					sizeof(Render::InstanceData) * DrawEntity->InstanceDataIndex
 				};
 
 				const u32 DescriptorSetGroupCount = 1;

@@ -38,7 +38,6 @@ namespace Render
 		u32 IndexOffset;
 		u32 IndicesCount;
 		u64 VertexDataSize;
-		bool IsLoaded;
 	};
 
 	struct Texture
@@ -60,16 +59,20 @@ namespace Render
 	{
 		u32 AlbedoTexIndex;
 		u32 SpecularTexIndex;
-		float Shininess;
-		bool IsLoaded;
+		f32 Shininess;
 	};
 
 	struct InstanceData
 	{
 		glm::mat4 ModelMatrix;
 		u32 MaterialIndex;
+	};
+
+	template<typename T>
+	struct RenderResource
+	{
+		T Resource;
 		bool IsLoaded;
-		uint32_t padding[2]; // tmp
 	};
 
 	struct DrawEntity
@@ -99,13 +102,13 @@ namespace Render
 	{
 		GPUBuffer VertexStageData;
 		GPUBuffer GPUInstances;
-		Memory::DynamicHeapArray<InstanceData> MeshInstances;
-		Memory::DynamicHeapArray<StaticMesh> StaticMeshes;
+		Memory::DynamicHeapArray<RenderResource<InstanceData>> MeshInstances;
+		Memory::DynamicHeapArray<RenderResource<StaticMesh>> StaticMeshes;
 	};
 
 	struct MaterialStorage
 	{
-		Memory::DynamicHeapArray<Material> Materials;
+		Memory::DynamicHeapArray<RenderResource<Material>> Materials;
 		VkBuffer MaterialBuffer;
 		VkDeviceMemory MaterialBufferMemory;
 		VkDescriptorSetLayout MaterialLayout;

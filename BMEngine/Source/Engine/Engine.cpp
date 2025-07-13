@@ -175,7 +175,7 @@ namespace Engine
 				Mat.Shininess = 32.0f;
 				const u32 MaterialIndex = Render::CreateMaterial(&Mat);
 
-				const u32 GroupWidth = 10;
+				const u32 GroupWidth = 5;
 				const u32 GroupHeight = 5;
 				const u32 GroupDepth = 4;
 				const f32 Spacing = 15.0f;
@@ -184,7 +184,6 @@ namespace Engine
 				const f32 StartZ = -(f32)(GroupDepth - 1) * Spacing * 0.5f;
 
 				Render::InstanceData Instance;
-				Instance.IsLoaded = false;
 				Instance.MaterialIndex = MaterialIndex;
 
 				Instance.ModelMatrix = glm::mat4(1.0f);

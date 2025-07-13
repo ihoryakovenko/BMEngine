@@ -217,8 +217,11 @@ namespace Render
 				continue;
 			}
 
-			StaticMesh* Mesh = Storage->Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
-			InstanceData* Instance = Storage->Meshes.MeshInstances.Data + DrawEntity->InstanceDataIndex;
+			RenderResource<StaticMesh>* MeshResource = Storage->Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
+			StaticMesh* Mesh = &MeshResource->Resource;
+
+			RenderResource<InstanceData>* InstanceResource = Storage->Meshes.MeshInstances.Data + DrawEntity->InstanceDataIndex;
+			InstanceData* Instance = &InstanceResource->Resource;
 
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
@@ -237,7 +240,7 @@ namespace Render
 			const u64 Offsets[] = 
 			{
 				Mesh->VertexOffset,
-				80 * DrawEntity->InstanceDataIndex
+				sizeof(Render::InstanceData)* DrawEntity->InstanceDataIndex
 			};
 
 			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MeshPipeline->Pipeline.PipelineLayout,
@@ -325,8 +328,8 @@ namespace Render
 	static void InitStaticMeshStorage(VkDevice Device, VkPhysicalDevice PhysicalDevice, StaticMeshStorage* Storage, u64 VertexCapacity, u64 InstanceCapacity)
 	{
 		*Storage = { };
-		Storage->StaticMeshes = Memory::AllocateArray<StaticMesh>(512);
-		Storage->MeshInstances = Memory::AllocateArray<InstanceData>(512 * 200);
+		Storage->StaticMeshes = Memory::AllocateArray<RenderResource<StaticMesh>>(512);
+		Storage->MeshInstances = Memory::AllocateArray<RenderResource<InstanceData>>(512 * 200);
 
 		Storage->VertexStageData.Buffer = VulkanHelper::CreateBuffer(Device, VertexCapacity, VulkanHelper::BufferUsageFlag::CombinedVertexIndexFlag);
 		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Storage->VertexStageData.Buffer,
@@ -357,7 +360,7 @@ namespace Render
 
 	static void InitMaterialStorage(VkDevice Device, MaterialStorage* Storage)
 	{
-		Storage->Materials = Memory::AllocateArray<Material>(512);
+		Storage->Materials = Memory::AllocateArray<RenderResource<Material>>(512);
 
 		const VkDeviceSize MaterialBufferSize = sizeof(Material) * 512;
 		Storage->MaterialBuffer = VulkanHelper::CreateBuffer(Device, MaterialBufferSize, VulkanHelper::BufferUsageFlag::StorageFlag);
@@ -993,12 +996,13 @@ namespace Render
 
 	u32 CreateMaterial(Material* Mat)
 	{
-		Mat->IsLoaded = false;
 		const u64 Index = State.RenderResources.Materials.Materials.Count;
 
 		// TODO: check
-		Material* NewMaterial = State.RenderResources.Materials.Materials.Data + Index;
-		Memory::PushBackToArray(&State.RenderResources.Materials.Materials, Mat);
+		RenderResource<Material>* NewMaterialResource = Memory::ArrayGetNew(&State.RenderResources.Materials.Materials);
+		NewMaterialResource->IsLoaded = false;
+		NewMaterialResource->Resource = *Mat;
+		Material* NewMaterial = &NewMaterialResource->Resource;
 
 		TransferTask Task = { };
 		//Task.DataSize = sizeof(Material);
@@ -1025,7 +1029,8 @@ namespace Render
 		memcpy(TransferMemory, MeshVertexData, DataSize);
 
 		const u64 Index = State.RenderResources.Meshes.StaticMeshes.Count;
-		StaticMesh* Mesh = Memory::ArrayGetNew(&State.RenderResources.Meshes.StaticMeshes);
+		RenderResource<StaticMesh>* Resource = Memory::ArrayGetNew(&State.RenderResources.Meshes.StaticMeshes);
+		StaticMesh* Mesh = &Resource->Resource;
 		*Mesh = { };
 		Mesh->IndicesCount = IndicesCount;
 		Mesh->VertexOffset = State.RenderResources.Meshes.VertexStageData.Offset;
@@ -1150,19 +1155,19 @@ namespace Render
 
 	u32 CreateStaticMeshInstance(InstanceData* Data)
 	{
-		Data->IsLoaded = false;
 		const u64 Index = State.RenderResources.Meshes.MeshInstances.Count;
 
 		// TODO: check
-		InstanceData* NewInstance = State.RenderResources.Meshes.MeshInstances.Data + Index;
-		Memory::PushBackToArray(&State.RenderResources.Meshes.MeshInstances, Data);
+		RenderResource<InstanceData>* NewInstanceResource = State.RenderResources.Meshes.MeshInstances.Data + Index;
+		NewInstanceResource->IsLoaded = false;
+		NewInstanceResource->Resource = *Data; //TODO: fis copying
+		Memory::PushBackToArray(&State.RenderResources.Meshes.MeshInstances, NewInstanceResource);
 
 		TransferTask Task = { };
 		Task.DataSize = sizeof(glm::mat4) + sizeof(u32);
 		Task.DataDescr.DstBuffer = State.RenderResources.Meshes.GPUInstances.Buffer;
-		//Task.DataDescr.DstOffset = (sizeof(glm::mat4) + sizeof(u32)) * Index;
-		Task.DataDescr.DstOffset = 80 * Index;
-		Task.RawData = NewInstance;
+		Task.DataDescr.DstOffset = sizeof(Render::InstanceData) * Index;
+		Task.RawData = NewInstanceResource;
 		Task.ResourceIndex = Index;
 		Task.Type = TransferTaskType::TransferTaskType_Instance;
 
@@ -1178,18 +1183,19 @@ namespace Render
 
 	bool IsDrawEntityLoaded(const ResourceStorage* Storage, const DrawEntity* Entity)
 	{
-		StaticMesh* Mesh = Storage->Meshes.StaticMeshes.Data + Entity->StaticMeshIndex;
-		if (!Mesh->IsLoaded) return false;
+		RenderResource<StaticMesh>* MeshResource = Storage->Meshes.StaticMeshes.Data + Entity->StaticMeshIndex;
+		if (!MeshResource->IsLoaded) return false;
 
-		InstanceData* Instance = Storage->Meshes.MeshInstances.Data + Entity->InstanceDataIndex;
+		RenderResource<InstanceData>* InstanceResource = Storage->Meshes.MeshInstances.Data + Entity->InstanceDataIndex;
 		for (u32 i = Entity->InstanceDataIndex; i < Entity->Instances; ++i)
 		{
-			Instance = Storage->Meshes.MeshInstances.Data + i;
-			if (!Instance->IsLoaded) return false;
+			InstanceResource = Storage->Meshes.MeshInstances.Data + i;
+			if (!InstanceResource->IsLoaded) return false;
 		}
 
-		Material* Material = Storage->Materials.Materials.Data + Instance->MaterialIndex;
-		if (!Material->IsLoaded) return false;
+		RenderResource<Material>* MaterialResource = Storage->Materials.Materials.Data + InstanceResource->Resource.MaterialIndex;
+		if (!MaterialResource->IsLoaded) return false;
+		Material* Material = &MaterialResource->Resource;
 		MeshTexture2D* AlbedoTexture = Storage->Textures.Textures.Data + Material->AlbedoTexIndex;
 		if (!AlbedoTexture->IsLoaded) return false;
 		MeshTexture2D* SpecTexture = Storage->Textures.Textures.Data + Material->SpecularTexIndex;
