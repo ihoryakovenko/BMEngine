@@ -13,12 +13,12 @@
 #include <glm/gtx/hash.hpp>
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
+#include "Engine/Systems/UI/UI.h"
 #include "Util/Settings.h"
 #include "Engine/Systems/Render/Render.h"
 #include "Util/Util.h"
 #include "Util/Math.h"
 #include "Deprecated/FrameManager.h"
-#include "Engine/Systems/Render/DebugUI.h"
 #include "Util/DefaultTextureData.h"
 
 #include <gli/gli.hpp>
@@ -72,7 +72,7 @@ namespace Engine
 	static Render::DrawEntity SkyBox;
 	static Render::LightBuffer LightData;
 
-	static DebugUi::GuiData GuiData;
+	static UI::GuiData GuiData;
 
 	static glm::vec3 Eye = glm::vec3(0.0f, 10.0f, 0.0f);
 	static glm::vec3 Up = glm::vec3(0.0f, 0.0f, -1.0f);
@@ -218,7 +218,7 @@ namespace Engine
 				Render::CreateEntity(&Entity);
 
 				ModelVertexByteOffset += VerticesCount * sizeof(Render::StaticMeshVertex) + IndicesCount * sizeof(u32);
-				Render::NotifyTransfer();
+				//Render::NotifyTransfer();
 			}
 
 			Util::ClearModel3DData(ModelData);
@@ -298,7 +298,8 @@ namespace Engine
 		const u32 FrameAllocSize = 1024 * 1024;
 		Memory::MemoryManagementSystem::Init(FrameAllocSize);
 
-		Render::Init(Window, &GuiData);
+		UI::Init(&GuiData);
+		Render::Init(Window);
 		
 		return true;
 	}
@@ -306,6 +307,7 @@ namespace Engine
 	void DeInit()
 	{
 		Render::DeInit();
+		UI::DeInit();
 
 		glfwDestroyWindow(Window);
 
@@ -352,6 +354,8 @@ namespace Engine
 		GuiData.Eye = &Eye;
 
 		Scene.ViewProjection = ViewProjection;
+
+		UI::Update();
 	}
 
 	void SetUpScene()

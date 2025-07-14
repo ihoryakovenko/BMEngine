@@ -18,11 +18,6 @@
 #include <condition_variable>
 #include <unordered_map>
 
-namespace DebugUi
-{
-	struct GuiData;
-}
-
 namespace Render
 {
 	struct StaticMeshVertex
@@ -251,6 +246,8 @@ namespace Render
 		std::mutex QueueSubmitMutex;	
 
 		StaticMeshPipeline MeshPipeline;
+
+		VkDescriptorPool DebugUiPool; // TODO: ?
 	};
 
 	struct PointLight
@@ -314,7 +311,7 @@ namespace Render
 		LightBuffer* LightEntity = nullptr;
 	};
 
-	void Init(GLFWwindow* WindowHandler, DebugUi::GuiData* GuiData);
+	void Init(GLFWwindow* WindowHandler);
 	void DeInit();
 
 	u64 CreateStaticMesh(void* MeshVertexData, u64 VertexSize, u64 VerticesCount, u64 IndicesCount);

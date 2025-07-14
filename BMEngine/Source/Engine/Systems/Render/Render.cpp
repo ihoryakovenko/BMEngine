@@ -4,8 +4,11 @@
 #include "Engine/Systems/Render/LightningPass.h"
 #include "Engine/Systems/Render/MainPass.h"
 #include "Engine/Systems/Render/DeferredPass.h"
-#include "Engine/Systems/Render/DebugUI.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
+
+#include "imgui.h"
+#include "imgui_impl_vulkan.h"
+#include "imgui_impl_glfw.h"
 
 #include "Util/Util.h"
 #include "Util/Settings.h"
@@ -16,6 +19,56 @@ namespace Render
 	{
 		std::unique_lock<std::mutex> PendingLock(Queue->Mutex);
 		Memory::PushToRingBuffer(&Queue->TasksBuffer, Task);
+		Render::NotifyTransfer();
+	}
+
+	static void InitImGuiPipeline(VkDescriptorPool* ImGuiPool, VulkanCoreContext::VulkanCoreContext* CoreContext, GLFWwindow* Wnd)
+	{
+		ImGui_ImplGlfw_InitForVulkan(Wnd, true);
+
+		VkPipelineRenderingCreateInfo RenderingInfo = { };
+		RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+		RenderingInfo.pNext = nullptr;
+		RenderingInfo.colorAttachmentCount = DeferredPass::GetAttachmentData()->ColorAttachmentCount;
+		RenderingInfo.pColorAttachmentFormats = DeferredPass::GetAttachmentData()->ColorAttachmentFormats;
+		RenderingInfo.depthAttachmentFormat = DeferredPass::GetAttachmentData()->DepthAttachmentFormat;
+		RenderingInfo.stencilAttachmentFormat = DeferredPass::GetAttachmentData()->DepthAttachmentFormat;
+
+		VkDescriptorPoolSize PoolSizes[] =
+		{
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 },
+		};
+		VkDescriptorPoolCreateInfo PoolInfo = { };
+		PoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		PoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+		PoolInfo.maxSets = 1;
+		PoolInfo.poolSizeCount = (uint32_t)IM_ARRAYSIZE(PoolSizes);
+		PoolInfo.pPoolSizes = PoolSizes;
+		vkCreateDescriptorPool(CoreContext->LogicalDevice, &PoolInfo, nullptr, ImGuiPool);
+
+		ImGui_ImplVulkan_InitInfo InitInfo = { };
+		InitInfo.Instance = CoreContext->VulkanInstance;
+		InitInfo.PhysicalDevice = CoreContext->PhysicalDevice;
+		InitInfo.Device = CoreContext->LogicalDevice;
+		InitInfo.QueueFamily = CoreContext->Indices.GraphicsFamily;
+		InitInfo.Queue = CoreContext->GraphicsQueue;
+		InitInfo.PipelineCache = nullptr;
+		InitInfo.DescriptorPool = *ImGuiPool;
+		InitInfo.RenderPass = nullptr;
+		InitInfo.UseDynamicRendering = true;
+		InitInfo.MinImageCount = 2;
+		InitInfo.ImageCount = 3;
+		InitInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+		InitInfo.PipelineRenderingCreateInfo = RenderingInfo;
+		ImGui_ImplVulkan_Init(&InitInfo);
+
+		ImGui_ImplVulkan_CreateFontsTexture();
+	}
+
+	static void DeInitImGuiPipeline(VkDevice Device, VkDescriptorPool ImGuiPool)
+	{
+		ImGui_ImplVulkan_Shutdown();
+		vkDestroyDescriptorPool(Device, ImGuiPool, nullptr);
 	}
 
 	static void InitStaticMeshPipeline(VkDevice Device, const ResourceStorage* Storage, StaticMeshPipeline* MeshPipeline)
@@ -329,7 +382,7 @@ namespace Render
 	{
 		*Storage = { };
 		Storage->StaticMeshes = Memory::AllocateArray<RenderResource<StaticMesh>>(512);
-		Storage->MeshInstances = Memory::AllocateArray<RenderResource<InstanceData>>(512 * 200);
+		Storage->MeshInstances = Memory::AllocateArray<RenderResource<InstanceData>>(512);
 
 		Storage->VertexStageData.Buffer = VulkanHelper::CreateBuffer(Device, VertexCapacity, VulkanHelper::BufferUsageFlag::CombinedVertexIndexFlag);
 		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Storage->VertexStageData.Buffer,
@@ -813,7 +866,6 @@ namespace Render
 					case TransferTaskType::TransferTaskType_Mesh:
 					{
 						Storage->Meshes.StaticMeshes.Data[Task->ResourceIndex].IsLoaded = true;
-						Memory::RingFree(&TransferState->TransferMemory.ControlBlock, Task->DataSize, 1);
 
 						break;
 					}
@@ -832,12 +884,12 @@ namespace Render
 					case TransferTaskType::TransferTaskType_Texture:
 					{
 						Storage->Textures.Textures.Data[Task->ResourceIndex].IsLoaded = true;
-						Memory::RingFree(&TransferState->TransferMemory.ControlBlock, Task->DataSize, 1);
 
 						break;
 					}
 				}
 
+				Memory::RingFree(&TransferState->TransferMemory.ControlBlock, Task->DataSize, 1);
 				Memory::RingBufferPopFirst(&TransferState->ActiveTransferTasksQueue.TasksBuffer);
 			}
 
@@ -852,7 +904,7 @@ namespace Render
 		return State.TransferState.TransferMemory.DataArray + Memory::RingAlloc(&State.TransferState.TransferMemory.ControlBlock, Size, 1);
 	}
 
-	void Init(GLFWwindow* WindowHandler, DebugUi::GuiData* GuiData)
+	void Init(GLFWwindow* WindowHandler)
 	{
 		State.RenderResources.DrawEntities = Memory::AllocateArray<DrawEntity>(512);
 
@@ -876,7 +928,7 @@ namespace Render
 		//TerrainRender::Init();
 		//DynamicMapSystem::Init();
 		InitStaticMeshPipeline(Device, &State.RenderResources, &State.MeshPipeline);
-		DebugUi::Init(WindowHandler, GuiData);
+		InitImGuiPipeline(&State.DebugUiPool, &State.CoreContext, WindowHandler);
 
 		std::thread TransferThread(
 			[]()
@@ -896,13 +948,13 @@ namespace Render
 
 		VkDevice Device = VulkanInterface::GetDevice();
 
+		DeInitImGuiPipeline(Device, State.DebugUiPool);
 		DeInitTransferState(Device, &State.TransferState);
 		DeInitTextureStorage(Device, &State.RenderResources.Textures);
 		DeInitMaterialStorage(Device, &State.RenderResources.Materials);
 		DeInitStaticMeshStorage(Device, &State.RenderResources.Meshes);
 		DeInitDrawState(Device, MAX_DRAW_FRAMES, &State.RenderDrawState);
 
-		DebugUi::DeInit();
 		//TerrainRender::DeInit();
 		DeInitStaticMeshPipeline(Device, &State.MeshPipeline);
 
@@ -945,7 +997,9 @@ namespace Render
 		MainPass::EndPass();
 		DeferredPass::BeginPass();
 		DeferredPass::Draw();
-		DebugUi::Draw();
+		ImGui::Render();
+		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), CmdBuffer);
 		DeferredPass::EndPass();
 
 		VULKAN_CHECK_RESULT(vkEndCommandBuffer(DrawCmdBuffer));
@@ -998,19 +1052,19 @@ namespace Render
 	{
 		const u64 Index = State.RenderResources.Materials.Materials.Count;
 
-		// TODO: check
 		RenderResource<Material>* NewMaterialResource = Memory::ArrayGetNew(&State.RenderResources.Materials.Materials);
 		NewMaterialResource->IsLoaded = false;
 		NewMaterialResource->Resource = *Mat;
-		Material* NewMaterial = &NewMaterialResource->Resource;
+
+		// TODO: TMP solution
+		void* TransferMemory = Render::RequestTransferMemory(sizeof(Material));
+		memcpy(TransferMemory, &NewMaterialResource->Resource, sizeof(Material));
 
 		TransferTask Task = { };
-		//Task.DataSize = sizeof(Material);
-		Task.DataSize = 12;
+		Task.DataSize = sizeof(Material);
 		Task.DataDescr.DstBuffer = State.RenderResources.Materials.MaterialBuffer;
-		//Task.DataDescr.DstOffset = sizeof(Material) * Index;
-		Task.DataDescr.DstOffset = 12 * Index;
-		Task.RawData = NewMaterial;
+		Task.DataDescr.DstOffset = sizeof(Material) * Index;
+		Task.RawData = TransferMemory;
 		Task.ResourceIndex = Index;
 		Task.Type = TransferTaskType::TransferTaskType_Material;
 
@@ -1157,17 +1211,19 @@ namespace Render
 	{
 		const u64 Index = State.RenderResources.Meshes.MeshInstances.Count;
 
-		// TODO: check
-		RenderResource<InstanceData>* NewInstanceResource = State.RenderResources.Meshes.MeshInstances.Data + Index;
+		RenderResource<InstanceData>* NewInstanceResource = Memory::ArrayGetNew(&State.RenderResources.Meshes.MeshInstances);
 		NewInstanceResource->IsLoaded = false;
-		NewInstanceResource->Resource = *Data; //TODO: fis copying
-		Memory::PushBackToArray(&State.RenderResources.Meshes.MeshInstances, NewInstanceResource);
+		NewInstanceResource->Resource = *Data;
+
+		// TODO: TMP solution
+		void* TransferMemory = Render::RequestTransferMemory(sizeof(InstanceData));
+		memcpy(TransferMemory, &NewInstanceResource->Resource, sizeof(InstanceData));
 
 		TransferTask Task = { };
-		Task.DataSize = sizeof(glm::mat4) + sizeof(u32);
+		Task.DataSize = sizeof(InstanceData);
 		Task.DataDescr.DstBuffer = State.RenderResources.Meshes.GPUInstances.Buffer;
-		Task.DataDescr.DstOffset = sizeof(Render::InstanceData) * Index;
-		Task.RawData = NewInstanceResource;
+		Task.DataDescr.DstOffset = sizeof(InstanceData) * Index;
+		Task.RawData = TransferMemory;
 		Task.ResourceIndex = Index;
 		Task.Type = TransferTaskType::TransferTaskType_Instance;
 
