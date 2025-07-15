@@ -137,36 +137,44 @@ namespace Util
 
 		const char* pipelineName = ini.GetValue("Pipeline", "PipelineName", "None");
 
-		const char* pipelineFilePath = ini.GetValue("Pipeline", "PipelineSettingsFile", AbsolutePath.c_str());
-		std::string finalFilePath = pipelineFilePath;
+		auto getString = [&](const char* key, const char* def)
+		{
+			return ini.GetValue("Pipeline", key, def);
+		};
 
 		auto getInt = [&](const char* key, int def)
 		{
 			return std::stoi(ini.GetValue("Pipeline", key, std::to_string(def).c_str()));
 		};
 
-		Settings.DepthClampEnable = getInt("DepthClampEnable", 0);
-		Settings.RasterizerDiscardEnable = getInt("RasterizerDiscardEnable", 0);
-		Settings.PolygonMode = static_cast<VkPolygonMode>(getInt("PolygonMode", VK_POLYGON_MODE_FILL));
+		auto parseString = [&](const char* key, const char* defaultValue, auto parseFunc)
+		{
+			const char* value = getString(key, defaultValue);
+			return parseFunc(value, strlen(value));
+		};
+
+		Settings.DepthClampEnable = parseString("DepthClampEnable", "false", VulkanHelper::ParseBool);
+		Settings.RasterizerDiscardEnable = parseString("RasterizerDiscardEnable", "false", VulkanHelper::ParseBool);
+		Settings.PolygonMode = parseString("PolygonMode", "fill", VulkanHelper::ParsePolygonMode);
 		Settings.LineWidth = static_cast<float>(getInt("LineWidth", 1));
-		Settings.CullMode = static_cast<VkCullModeFlags>(getInt("CullMode", VK_CULL_MODE_BACK_BIT));
-		Settings.FrontFace = static_cast<VkFrontFace>(getInt("FrontFace", VK_FRONT_FACE_COUNTER_CLOCKWISE));
-		Settings.DepthBiasEnable = getInt("DepthBiasEnable", 0);
-		Settings.BlendEnable = getInt("BlendEnable", 1);
-		Settings.LogicOpEnable = getInt("LogicOpEnable", 0);
+		Settings.CullMode = parseString("CullMode", "back", VulkanHelper::ParseCullMode);
+		Settings.FrontFace = parseString("FrontFace", "counter_clockwise", VulkanHelper::ParseFrontFace);
+		Settings.DepthBiasEnable = parseString("DepthBiasEnable", "false", VulkanHelper::ParseBool);
+		Settings.BlendEnable = parseString("BlendEnable", "true", VulkanHelper::ParseBool);
+		Settings.LogicOpEnable = parseString("LogicOpEnable", "false", VulkanHelper::ParseBool);
 		Settings.AttachmentCount = getInt("AttachmentCount", 1);
-		Settings.ColorWriteMask = getInt("ColorWriteMask", VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT);
-		Settings.SrcColorBlendFactor = static_cast<VkBlendFactor>(getInt("SrcColorBlendFactor", VK_BLEND_FACTOR_SRC_ALPHA));
-		Settings.DstColorBlendFactor = static_cast<VkBlendFactor>(getInt("DstColorBlendFactor", VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA));
-		Settings.ColorBlendOp = static_cast<VkBlendOp>(getInt("ColorBlendOp", VK_BLEND_OP_ADD));
-		Settings.SrcAlphaBlendFactor = static_cast<VkBlendFactor>(getInt("SrcAlphaBlendFactor", VK_BLEND_FACTOR_ONE));
-		Settings.DstAlphaBlendFactor = static_cast<VkBlendFactor>(getInt("DstAlphaBlendFactor", VK_BLEND_FACTOR_ZERO));
-		Settings.AlphaBlendOp = static_cast<VkBlendOp>(getInt("AlphaBlendOp", VK_BLEND_OP_ADD));
-		Settings.DepthTestEnable = getInt("DepthTestEnable", 1);
-		Settings.DepthWriteEnable = getInt("DepthWriteEnable", 1);
-		Settings.DepthCompareOp = static_cast<VkCompareOp>(getInt("DepthCompareOp", VK_COMPARE_OP_LESS));
-		Settings.DepthBoundsTestEnable = getInt("DepthBoundsTestEnable", 0);
-		Settings.StencilTestEnable = getInt("StencilTestEnable", 0);
+		Settings.ColorWriteMask = parseString("ColorWriteMask", "RGBA", VulkanHelper::ParseColorWriteMask);
+		Settings.SrcColorBlendFactor = parseString("SrcColorBlendFactor", "src_alpha", VulkanHelper::ParseBlendFactor);
+		Settings.DstColorBlendFactor = parseString("DstColorBlendFactor", "one_minus_src_alpha", VulkanHelper::ParseBlendFactor);
+		Settings.ColorBlendOp = parseString("ColorBlendOp", "add", VulkanHelper::ParseBlendOp);
+		Settings.SrcAlphaBlendFactor = parseString("SrcAlphaBlendFactor", "one", VulkanHelper::ParseBlendFactor);
+		Settings.DstAlphaBlendFactor = parseString("DstAlphaBlendFactor", "zero", VulkanHelper::ParseBlendFactor);
+		Settings.AlphaBlendOp = parseString("AlphaBlendOp", "add", VulkanHelper::ParseBlendOp);
+		Settings.DepthTestEnable = parseString("DepthTestEnable", "true", VulkanHelper::ParseBool);
+		Settings.DepthWriteEnable = parseString("DepthWriteEnable", "true", VulkanHelper::ParseBool);
+		Settings.DepthCompareOp = parseString("DepthCompareOp", "less", VulkanHelper::ParseCompareOp);
+		Settings.DepthBoundsTestEnable = parseString("DepthBoundsTestEnable", "false", VulkanHelper::ParseBool);
+		Settings.StencilTestEnable = parseString("StencilTestEnable", "false", VulkanHelper::ParseBool);
 	}
 
 	void ObjToModel3D(const char* FilePath, const char* OutputPath)

@@ -178,4 +178,13 @@ namespace VulkanHelper
 	VKAPI_ATTR VkBool32 VKAPI_CALL MessengerDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
 		VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
 		void* UserData);
+
+	VkBool32 ParseBool(const char* Value, u32 Length);
+	VkPolygonMode ParsePolygonMode(const char* Value, u32 Length);
+	VkCullModeFlags ParseCullMode(const char* Value, u32 Length);
+	VkFrontFace ParseFrontFace(const char* Value, u32 Length);
+	VkColorComponentFlags ParseColorWriteMask(const char* Value, u32 Length);
+	VkBlendFactor ParseBlendFactor(const char* Value, u32 Length);
+	VkBlendOp ParseBlendOp(const char* Value, u32 Length);
+	VkCompareOp ParseCompareOp(const char* Value, u32 Length);
 }

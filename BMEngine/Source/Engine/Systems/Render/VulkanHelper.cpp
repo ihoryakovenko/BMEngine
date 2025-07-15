@@ -936,5 +936,106 @@ namespace VulkanHelper
 		return true;
 	}
 
+	VkBool32 ParseBool(const char* Value, u32 Length)
+	{
+		if (Length == 0) return VK_FALSE;
+		
+		if (strncmp(Value, "true", 4) == 0) return VK_TRUE;
+		if (Length == 1 && Value[0] == '1') return VK_TRUE;
+		if (strncmp(Value, "yes", 3) == 0) return VK_TRUE;
+		if (strncmp(Value, "on", 2) == 0) return VK_TRUE;
+		
+		if (strncmp(Value, "false", 5) == 0) return VK_FALSE;
+		if (Length == 1 && Value[0] == '0') return VK_FALSE;
+		if (strncmp(Value, "no", 2) == 0) return VK_FALSE;
+		if (strncmp(Value, "off", 3) == 0) return VK_FALSE;
+		
+		return VK_FALSE;
+	}
+
+	VkPolygonMode ParsePolygonMode(const char* Value, u32 Length)
+	{
+		if (strncmp(Value, "fill", 4) == 0) return VK_POLYGON_MODE_FILL;
+		if (strncmp(Value, "line", 4) == 0) return VK_POLYGON_MODE_LINE;
+		if (strncmp(Value, "point", 5) == 0) return VK_POLYGON_MODE_POINT;
+		
+		return VK_POLYGON_MODE_FILL;
+	}
+
+	VkCullModeFlags ParseCullMode(const char* Value, u32 Length)
+	{
+		if (strncmp(Value, "none", 4) == 0) return VK_CULL_MODE_NONE;
+		if (strncmp(Value, "back", 4) == 0) return VK_CULL_MODE_BACK_BIT;
+		if (strncmp(Value, "front", 5) == 0) return VK_CULL_MODE_FRONT_BIT;
+		if (strncmp(Value, "front_back", 9) == 0) return VK_CULL_MODE_FRONT_AND_BACK;
+		
+		return VK_CULL_MODE_BACK_BIT;
+	}
+
+	VkFrontFace ParseFrontFace(const char* Value, u32 Length)
+	{
+		if (strncmp(Value, "counter_clockwise", 15) == 0) return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		if (strncmp(Value, "clockwise", 10) == 0) return VK_FRONT_FACE_CLOCKWISE;
+		
+		return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	}
+
+	VkColorComponentFlags ParseColorWriteMask(const char* Value, u32 Length)
+	{
+		VkColorComponentFlags Flags = 0;
+		
+		for (u32 i = 0; i < Length; ++i)
+		{
+			if (Value[i] == 'R' || Value[i] == 'r') Flags |= VK_COLOR_COMPONENT_R_BIT;
+			if (Value[i] == 'G' || Value[i] == 'g') Flags |= VK_COLOR_COMPONENT_G_BIT;
+			if (Value[i] == 'B' || Value[i] == 'b') Flags |= VK_COLOR_COMPONENT_B_BIT;
+			if (Value[i] == 'A' || Value[i] == 'a') Flags |= VK_COLOR_COMPONENT_A_BIT;
+		}
+		
+		if (Flags == 0) Flags = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+		
+		return Flags;
+	}
+
+	VkBlendFactor ParseBlendFactor(const char* Value, u32 Length)
+	{
+		if (strncmp(Value, "one_minus_src_alpha", 18) == 0) return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		if (strncmp(Value, "one_minus_dst_alpha", 18) == 0) return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+		if (strncmp(Value, "one_minus_src_color", 17) == 0) return VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+		if (strncmp(Value, "one_minus_dst_color", 17) == 0) return VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
+		if (strncmp(Value, "src_color", 9) == 0) return VK_BLEND_FACTOR_SRC_COLOR;
+		if (strncmp(Value, "dst_color", 9) == 0) return VK_BLEND_FACTOR_DST_COLOR;
+		if (strncmp(Value, "src_alpha", 9) == 0) return VK_BLEND_FACTOR_SRC_ALPHA;
+		if (strncmp(Value, "dst_alpha", 9) == 0) return VK_BLEND_FACTOR_DST_ALPHA;
+		if (strncmp(Value, "zero", 4) == 0) return VK_BLEND_FACTOR_ZERO;
+		if (strncmp(Value, "one", 3) == 0) return VK_BLEND_FACTOR_ONE;
+		
+		return VK_BLEND_FACTOR_SRC_ALPHA;
+	}
+
+	VkBlendOp ParseBlendOp(const char* Value, u32 Length)
+	{
+		if (strncmp(Value, "reverse_subtract", 15) == 0) return VK_BLEND_OP_REVERSE_SUBTRACT;
+		if (strncmp(Value, "subtract", 8) == 0) return VK_BLEND_OP_SUBTRACT;
+		if (strncmp(Value, "add", 3) == 0) return VK_BLEND_OP_ADD;
+		if (strncmp(Value, "min", 3) == 0) return VK_BLEND_OP_MIN;
+		if (strncmp(Value, "max", 3) == 0) return VK_BLEND_OP_MAX;
+		
+		return VK_BLEND_OP_ADD;
+	}
+
+	VkCompareOp ParseCompareOp(const char* Value, u32 Length)
+	{
+		if (strncmp(Value, "greater_or_equal", 15) == 0) return VK_COMPARE_OP_GREATER_OR_EQUAL;
+		if (strncmp(Value, "less_or_equal", 12) == 0) return VK_COMPARE_OP_LESS_OR_EQUAL;
+		if (strncmp(Value, "not_equal", 9) == 0) return VK_COMPARE_OP_NOT_EQUAL;
+		if (strncmp(Value, "greater", 7) == 0) return VK_COMPARE_OP_GREATER;
+		if (strncmp(Value, "always", 6) == 0) return VK_COMPARE_OP_ALWAYS;
+		if (strncmp(Value, "never", 5) == 0) return VK_COMPARE_OP_NEVER;
+		if (strncmp(Value, "equal", 5) == 0) return VK_COMPARE_OP_EQUAL;
+		if (strncmp(Value, "less", 4) == 0) return VK_COMPARE_OP_LESS;
+		
+		return VK_COMPARE_OP_LESS;
+	}
 
 }

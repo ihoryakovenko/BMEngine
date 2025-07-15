@@ -10,6 +10,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 
+#include <Engine/Systems/Render/Render.h>
+
 namespace UI
 {
 	static GuiData* Data;
@@ -42,8 +44,11 @@ namespace UI
 
 		ImGui::Begin("Options");
 
-		ImGui::DragFloat3("DirectionLightDirection", &(*Data->DirectionLightDirection)[0], 0.05, -1, 1);
-		ImGui::DragFloat3("eye", &(*Data->Eye)[0], 0.05, -100, 100);
+		//ImGui::DragFloat3("DirectionLightDirection", &(*Data->DirectionLightDirection)[0], 0.05, -1, 1);
+		//ImGui::DragFloat3("eye", &(*Data->Eye)[0], 0.05, -100, 100);
+
+		Render::RenderState* State =  Render::GetRenderState();
+
 
 
 		ImGuiIO& GuiIo = ImGui::GetIO();
