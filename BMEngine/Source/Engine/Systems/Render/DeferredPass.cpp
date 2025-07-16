@@ -219,16 +219,16 @@ namespace DeferredPass
 		Shaders[1].Code = FragmentShaderCode.data();
 		Shaders[1].CodeSize = FragmentShaderCode.size();
 
-		//VulkanInterface::PipelineSettings PipelineSettings;
-		//Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMeshRender.ini");
-		//PipelineSettings.Extent = MainScreenExtent;
-
 		VulkanHelper::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData = AttachmentData;
 
+		VulkanHelper::PipelineSettings PipelineSettings;
+		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/DeferredPipeline.ini");
+		PipelineSettings.Extent = MainScreenExtent;
+
 		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, nullptr, 0,
-			&DeferredPipelineSettings, &ResourceInfo);
+			&PipelineSettings, &ResourceInfo);
 	}
 
 	void DeInit()

@@ -94,7 +94,11 @@ namespace MainPass
 		ResourceInfo.PipelineLayout = SkyBoxPipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData = AttachmentData;
 
-		SkyBoxPipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, VertexInputBinding, 1, &SkyBoxPipelineSettings, &ResourceInfo);
+		VulkanHelper::PipelineSettings PipelineSettings;
+		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/SkyBoxPipeline.ini");
+		PipelineSettings.Extent = MainScreenExtent;
+
+		SkyBoxPipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, VertexInputBinding, 1, &PipelineSettings, &ResourceInfo);
 	}
 
 	void DeInit()

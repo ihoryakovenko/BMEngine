@@ -97,7 +97,7 @@ namespace TerrainRender
 		VertexInputBinding[0].VertexInputBindingName = "TerrainVertex";
 
 		VulkanHelper::PipelineSettings PipelineSettings;
-		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMeshRender.ini");
+		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/TerrainPipeline.ini");
 		PipelineSettings.Extent = MainScreenExtent;
 
 		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, VertexInputBinding, VertexInputCount,

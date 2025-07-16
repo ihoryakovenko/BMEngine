@@ -198,7 +198,11 @@ namespace LightningPass
 		VertexInputBinding[1].Stride = sizeof(Render::InstanceData);
 		VertexInputBinding[1].VertexInputBindingName = "InstanceData";
 
-		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, VertexInputBinding, VertexInputCount, &DepthPipelineSettings, &ResourceInfo);
+		VulkanHelper::PipelineSettings PipelineSettings;
+		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/DepthPipeline.ini");
+		PipelineSettings.Extent = DepthViewportExtent;
+
+		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, VertexInputBinding, VertexInputCount, &PipelineSettings, &ResourceInfo);
 	}
 
 	void DeInit()
