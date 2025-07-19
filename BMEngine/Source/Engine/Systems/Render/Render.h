@@ -20,6 +20,12 @@
 
 namespace Render
 {
+	enum class RenderPipelines
+	{
+		StaticMeshPipeline = 0,
+		DeferredPipeline
+	};
+
 	struct StaticMeshVertex
 	{
 		glm::vec3 Position;
@@ -182,6 +188,7 @@ namespace Render
 
 	struct ResourceStorage
 	{
+
 		StaticMeshStorage Meshes;
 		TextureStorage Textures;
 		MaterialStorage Materials;

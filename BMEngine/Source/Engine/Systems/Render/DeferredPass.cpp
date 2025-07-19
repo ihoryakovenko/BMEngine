@@ -203,31 +203,15 @@ namespace DeferredPass
 
 		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &Pipeline.PipelineLayout));
 
-		std::vector<char> VertexShaderCode;
-		Util::OpenAndReadFileFull("./Resources/Shaders/Deferred_vert.spv", VertexShaderCode, "rb");
-		std::vector<char> FragmentShaderCode;
-		Util::OpenAndReadFileFull("./Resources/Shaders/Deferred_frag.spv", FragmentShaderCode, "rb");
-
-		const u32 ShaderCount = 2;
-		VulkanHelper::Shader Shaders[ShaderCount];
-
-		Shaders[0].Stage = VK_SHADER_STAGE_VERTEX_BIT;
-		Shaders[0].Code = VertexShaderCode.data();
-		Shaders[0].CodeSize = VertexShaderCode.size();
-
-		Shaders[1].Stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		Shaders[1].Code = FragmentShaderCode.data();
-		Shaders[1].CodeSize = FragmentShaderCode.size();
-
 		VulkanHelper::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData = AttachmentData;
 
 		VulkanHelper::PipelineSettings PipelineSettings;
-		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/DeferredPipeline.ini");
+		Util::LoadPipelineSettingsYAML(PipelineSettings, "./Resources/Settings/DeferredPipeline.yaml");
 		PipelineSettings.Extent = MainScreenExtent;
 
-		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, nullptr, 0,
+		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, PipelineSettings.Shaders.Data, PipelineSettings.Shaders.Count, nullptr, 0,
 			&PipelineSettings, &ResourceInfo);
 	}
 

@@ -1,0 +1,46 @@
+shaders:
+  vertex:   "./Resources/Shaders/Depth_vert.spv"
+
+rasterization:
+  depthClampEnable: false
+  rasterizerDiscardEnable: false
+  polygonMode: FILL
+  lineWidth: 1
+  cullMode: BACK
+  frontFace: COUNTER_CLOCKWISE
+  depthBiasEnable: false
+
+colorBlend:
+  logicOpEnable: false
+  attachmentCount: 1
+  colorWriteMask: RGBA
+  blendEnable: true
+  srcColorBlendFactor: SRC_ALPHA
+  dstColorBlendFactor: ONE_MINUS_SRC_ALPHA
+  colorBlendOp: ADD
+  srcAlphaBlendFactor: ONE
+  dstAlphaBlendFactor: ZERO
+  alphaBlendOp: ADD
+
+depthStencil:
+  depthTestEnable: true
+  depthWriteEnable: true
+  depthCompareOp: LESS
+  depthBoundsTestEnable: false
+  stencilTestEnable: false
+
+multisample:
+  sampleShadingEnable: false
+  rasterizationSamples: 1
+
+inputAssembly:
+  topology: TRIANGLE_LIST
+  primitiveRestartEnable: false
+
+viewport:
+  viewportCount: 1
+  scissorCount: 1
+  minDepth: 0.0
+  maxDepth: 1.0
+  x: 0.0
+  y: 0.0 

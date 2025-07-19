@@ -696,6 +696,23 @@ namespace VulkanHelper
 		const BMRVertexInputBinding* VertexInputBinding, u32 VertexInputBindingCount,
 		const PipelineSettings* Settings, const PipelineResourceInfo* ResourceInfo)
 	{
+		VkViewport Viewport = Settings->Viewport;
+		Viewport.width = Settings->Extent.width;
+		Viewport.height = Settings->Extent.height;
+		Viewport.minDepth = 0.0f;
+		Viewport.maxDepth = 1.0f;
+		Viewport.x = 0.0f;
+		Viewport.y = 0.0f;
+
+		VkRect2D Scissor = Settings->Scissor;
+		Scissor.extent.width = Settings->Extent.width;
+		Scissor.extent.height = Settings->Extent.height;
+		Scissor.offset = {};
+
+		VkPipelineViewportStateCreateInfo ViewportState = Settings->ViewportState;
+		ViewportState.pViewports = &Viewport;
+		ViewportState.pScissors = &Scissor;
+
 		Util::RenderLog(Util::BMRVkLogType_Info,
 			"CREATING PIPELINE "
 			"Extent - Width: %d, Height: %d\n"
@@ -707,17 +724,17 @@ namespace VulkanHelper
 			"DepthTestEnable: %d, DepthWriteEnable: %d, DepthCompareOp: %d\n"
 			"DepthBoundsTestEnable: %d, StencilTestEnable: %d",
 			Settings->Extent.width, Settings->Extent.height,
-			Settings->DepthClampEnable, Settings->RasterizerDiscardEnable,
-			Settings->PolygonMode, Settings->LineWidth, Settings->CullMode,
-			Settings->FrontFace, Settings->DepthBiasEnable,
-			Settings->LogicOpEnable, Settings->AttachmentCount, Settings->ColorWriteMask,
-			Settings->BlendEnable, Settings->SrcColorBlendFactor,
-			Settings->DstColorBlendFactor, Settings->ColorBlendOp,
-			Settings->SrcAlphaBlendFactor, Settings->DstAlphaBlendFactor,
-			Settings->AlphaBlendOp,
-			Settings->DepthTestEnable, Settings->DepthWriteEnable,
-			Settings->DepthCompareOp, Settings->DepthBoundsTestEnable,
-			Settings->StencilTestEnable
+			Settings->RasterizationState.depthClampEnable, Settings->RasterizationState.rasterizerDiscardEnable,
+			Settings->RasterizationState.polygonMode, Settings->RasterizationState.lineWidth, Settings->RasterizationState.cullMode,
+			Settings->RasterizationState.frontFace, Settings->RasterizationState.depthBiasEnable,
+			Settings->ColorBlendState.logicOpEnable, Settings->ColorBlendState.attachmentCount, Settings->ColorBlendAttachment.colorWriteMask,
+			Settings->ColorBlendAttachment.blendEnable, Settings->ColorBlendAttachment.srcColorBlendFactor,
+			Settings->ColorBlendAttachment.dstColorBlendFactor, Settings->ColorBlendAttachment.colorBlendOp,
+			Settings->ColorBlendAttachment.srcAlphaBlendFactor, Settings->ColorBlendAttachment.dstAlphaBlendFactor,
+			Settings->ColorBlendAttachment.alphaBlendOp,
+			Settings->DepthStencilState.depthTestEnable, Settings->DepthStencilState.depthWriteEnable,
+			Settings->DepthStencilState.depthCompareOp, Settings->DepthStencilState.depthBoundsTestEnable,
+			Settings->DepthStencilState.stencilTestEnable
 		);
 
 		Util::RenderLog(Util::BMRVkLogType_Info, "Creating VkPipelineShaderStageCreateInfo, ShadersCount: %u", ShadersCount);
@@ -740,19 +757,6 @@ namespace VulkanHelper
 			VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &ShaderModuleCreateInfo, nullptr, &ShaderStageCreateInfo->module));
 		}
 
-		// INPUTASSEMBLY
-		VkPipelineInputAssemblyStateCreateInfo InputAssemblyStateCreateInfo = { };
-		InputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-		InputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-		InputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;
-
-		// MULTISAMPLING
-		VkPipelineMultisampleStateCreateInfo MultisampleStateCreateInfo = { };
-		MultisampleStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-		MultisampleStateCreateInfo.sampleShadingEnable = VK_FALSE;					// Enable multisample shading or not
-		MultisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;	// Number of samples to use per fragment
-
-		// VERTEX INPUT
 		auto VertexInputBindings = Memory::MemoryManagementSystem::FrameAlloc<VkVertexInputBindingDescription>(VertexInputBindingCount);
 		auto VertexInputAttributes = Memory::MemoryManagementSystem::FrameAlloc<VkVertexInputAttributeDescription>(VertexInputBindingCount * MAX_VERTEX_INPUTS_ATTRIBUTES);
 		u32 VertexInputAttributesIndex = 0;
@@ -799,75 +803,6 @@ namespace VulkanHelper
 		VertexInputInfo->vertexAttributeDescriptionCount = VertexInputAttributesIndex;
 		VertexInputInfo->pVertexAttributeDescriptions = VertexInputAttributes;
 
-		// VIEWPORT
-		auto Viewport = Memory::MemoryManagementSystem::FrameAlloc<VkViewport>();
-		Viewport->width = Settings->Extent.width;
-		Viewport->height = Settings->Extent.height;
-		Viewport->minDepth = 0.0f;
-		Viewport->maxDepth = 1.0f;
-		Viewport->x = 0.0f;
-		Viewport->y = 0.0f;
-
-		auto Scissor = Memory::MemoryManagementSystem::FrameAlloc<VkRect2D>();
-		Scissor->extent.width = Settings->Extent.width;
-		Scissor->extent.height = Settings->Extent.height;
-		Scissor->offset = { };
-
-		auto ViewportStateCreateInfo = Memory::MemoryManagementSystem::FrameAlloc<VkPipelineViewportStateCreateInfo>();
-		*ViewportStateCreateInfo = { };
-		ViewportStateCreateInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-		ViewportStateCreateInfo->viewportCount = 1;
-		ViewportStateCreateInfo->pViewports = Viewport;
-		ViewportStateCreateInfo->scissorCount = 1;
-		ViewportStateCreateInfo->pScissors = Scissor;
-
-		// RASTERIZATION
-		auto RasterizationStateCreateInfo = Memory::MemoryManagementSystem::FrameAlloc<VkPipelineRasterizationStateCreateInfo>();
-		*RasterizationStateCreateInfo = { };
-		RasterizationStateCreateInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-		RasterizationStateCreateInfo->depthClampEnable = Settings->DepthClampEnable;
-		// Whether to discard data and skip rasterizer. Never creates fragments, only suitable for pipeline without framebuffer output
-		RasterizationStateCreateInfo->rasterizerDiscardEnable = Settings->RasterizerDiscardEnable;
-		RasterizationStateCreateInfo->polygonMode = Settings->PolygonMode;
-		RasterizationStateCreateInfo->lineWidth = Settings->LineWidth;
-		RasterizationStateCreateInfo->cullMode = Settings->CullMode;
-		RasterizationStateCreateInfo->frontFace = Settings->FrontFace;
-		// Whether to add depth bias to fragments (good for stopping "shadow acne" in shadow mapping)
-		RasterizationStateCreateInfo->depthBiasEnable = Settings->DepthBiasEnable;
-
-		// COLOR BLENDING
-		// Colors to apply blending to
-		auto ColorBlendAttachmentState = Memory::MemoryManagementSystem::FrameAlloc<VkPipelineColorBlendAttachmentState>();
-		ColorBlendAttachmentState->colorWriteMask = Settings->ColorWriteMask;
-		ColorBlendAttachmentState->blendEnable = Settings->BlendEnable;
-		// Blending uses equation: (srcColorBlendFactor * new color) colorBlendOp (dstColorBlendFactor * old color)// Enable blending
-		ColorBlendAttachmentState->srcColorBlendFactor = Settings->SrcColorBlendFactor;
-		ColorBlendAttachmentState->dstColorBlendFactor = Settings->DstColorBlendFactor;
-		ColorBlendAttachmentState->colorBlendOp = Settings->ColorBlendOp;
-		ColorBlendAttachmentState->srcAlphaBlendFactor = Settings->SrcAlphaBlendFactor;
-		// Summarised: (VK_BLEND_FACTOR_SRC_ALPHA * new color) + (VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA * old color)
-//			   (new color alpha * new color) + ((1 - new color alpha) * old color)
-		ColorBlendAttachmentState->dstAlphaBlendFactor = Settings->DstAlphaBlendFactor;
-		ColorBlendAttachmentState->alphaBlendOp = Settings->AlphaBlendOp;
-		// Summarised: (1 * new alpha) + (0 * old alpha) = new alpharesult != VK_SUCCESS
-
-		auto ColorBlendInfo = Memory::MemoryManagementSystem::FrameAlloc<VkPipelineColorBlendStateCreateInfo>();
-		*ColorBlendInfo = { };
-		ColorBlendInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-		ColorBlendInfo->logicOpEnable = Settings->LogicOpEnable; // Alternative to calculations is to use logical operations
-		ColorBlendInfo->attachmentCount = Settings->AttachmentCount;
-		ColorBlendInfo->pAttachments = Settings->AttachmentCount > 0 ? ColorBlendAttachmentState : nullptr;
-
-		// DEPTH STENCIL
-		auto DepthStencilInfo = Memory::MemoryManagementSystem::FrameAlloc<VkPipelineDepthStencilStateCreateInfo>();
-		*DepthStencilInfo = { };
-		DepthStencilInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-		DepthStencilInfo->depthTestEnable = Settings->DepthTestEnable;
-		DepthStencilInfo->depthWriteEnable = Settings->DepthWriteEnable;
-		DepthStencilInfo->depthCompareOp = Settings->DepthCompareOp;
-		DepthStencilInfo->depthBoundsTestEnable = Settings->DepthBoundsTestEnable;
-		DepthStencilInfo->stencilTestEnable = Settings->StencilTestEnable;
-
 		VkPipelineRenderingCreateInfo RenderingInfo = { };
 		RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
 		RenderingInfo.pNext = nullptr;
@@ -876,25 +811,23 @@ namespace VulkanHelper
 		RenderingInfo.depthAttachmentFormat = ResourceInfo->PipelineAttachmentData.DepthAttachmentFormat;
 		RenderingInfo.stencilAttachmentFormat = ResourceInfo->PipelineAttachmentData.DepthAttachmentFormat;
 
-		// CREATE INFO
 		auto PipelineCreateInfo = Memory::MemoryManagementSystem::FrameAlloc<VkGraphicsPipelineCreateInfo>();
 		PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 		PipelineCreateInfo->stageCount = ShadersCount;
 		PipelineCreateInfo->pStages = ShaderStageCreateInfos;
 		PipelineCreateInfo->pVertexInputState = VertexInputInfo;
-		PipelineCreateInfo->pInputAssemblyState = &InputAssemblyStateCreateInfo;
-		PipelineCreateInfo->pViewportState = ViewportStateCreateInfo;
+		PipelineCreateInfo->pInputAssemblyState = &Settings->InputAssemblyState;
+		PipelineCreateInfo->pViewportState = &ViewportState;
 		PipelineCreateInfo->pDynamicState = nullptr;
-		PipelineCreateInfo->pRasterizationState = RasterizationStateCreateInfo;
-		PipelineCreateInfo->pMultisampleState = &MultisampleStateCreateInfo;
-		PipelineCreateInfo->pColorBlendState = ColorBlendInfo;
-		PipelineCreateInfo->pDepthStencilState = DepthStencilInfo;
+		PipelineCreateInfo->pRasterizationState = &Settings->RasterizationState;
+		PipelineCreateInfo->pMultisampleState = &Settings->MultisampleState;
+		PipelineCreateInfo->pColorBlendState = &Settings->ColorBlendState;
+		PipelineCreateInfo->pDepthStencilState = &Settings->DepthStencilState;
 		PipelineCreateInfo->layout = ResourceInfo->PipelineLayout;
 		PipelineCreateInfo->renderPass = nullptr;
 		PipelineCreateInfo->subpass = 0;
 		PipelineCreateInfo->pNext = &RenderingInfo;
 
-		// Pipeline Derivatives : Can create multiple pipelines that derive from one another for optimisation
 		PipelineCreateInfo->basePipelineHandle = VK_NULL_HANDLE;
 		PipelineCreateInfo->basePipelineIndex = -1;
 
@@ -955,27 +888,27 @@ namespace VulkanHelper
 
 	VkPolygonMode ParsePolygonMode(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "fill", 4) == 0) return VK_POLYGON_MODE_FILL;
-		if (strncmp(Value, "line", 4) == 0) return VK_POLYGON_MODE_LINE;
-		if (strncmp(Value, "point", 5) == 0) return VK_POLYGON_MODE_POINT;
+		if (strncmp(Value, "fill", 4) == 0 || strncmp(Value, "FILL", 4) == 0) return VK_POLYGON_MODE_FILL;
+		if (strncmp(Value, "line", 4) == 0 || strncmp(Value, "LINE", 4) == 0) return VK_POLYGON_MODE_LINE;
+		if (strncmp(Value, "point", 5) == 0 || strncmp(Value, "POINT", 5) == 0) return VK_POLYGON_MODE_POINT;
 		
 		return VK_POLYGON_MODE_FILL;
 	}
 
 	VkCullModeFlags ParseCullMode(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "none", 4) == 0) return VK_CULL_MODE_NONE;
-		if (strncmp(Value, "back", 4) == 0) return VK_CULL_MODE_BACK_BIT;
-		if (strncmp(Value, "front", 5) == 0) return VK_CULL_MODE_FRONT_BIT;
-		if (strncmp(Value, "front_back", 9) == 0) return VK_CULL_MODE_FRONT_AND_BACK;
+		if (strncmp(Value, "none", 4) == 0 || strncmp(Value, "NONE", 4) == 0) return VK_CULL_MODE_NONE;
+		if (strncmp(Value, "back", 4) == 0 || strncmp(Value, "BACK", 4) == 0) return VK_CULL_MODE_BACK_BIT;
+		if (strncmp(Value, "front", 5) == 0 || strncmp(Value, "FRONT", 5) == 0) return VK_CULL_MODE_FRONT_BIT;
+		if (strncmp(Value, "front_back", 9) == 0 || strncmp(Value, "FRONT_BACK", 9) == 0) return VK_CULL_MODE_FRONT_AND_BACK;
 		
 		return VK_CULL_MODE_BACK_BIT;
 	}
 
 	VkFrontFace ParseFrontFace(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "counter_clockwise", 15) == 0) return VK_FRONT_FACE_COUNTER_CLOCKWISE;
-		if (strncmp(Value, "clockwise", 10) == 0) return VK_FRONT_FACE_CLOCKWISE;
+		if (strncmp(Value, "counter_clockwise", 15) == 0 || strncmp(Value, "COUNTER_CLOCKWISE", 15) == 0) return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		if (strncmp(Value, "clockwise", 10) == 0 || strncmp(Value, "CLOCKWISE", 10) == 0) return VK_FRONT_FACE_CLOCKWISE;
 		
 		return VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	}
@@ -999,43 +932,73 @@ namespace VulkanHelper
 
 	VkBlendFactor ParseBlendFactor(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "one_minus_src_alpha", 18) == 0) return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		if (strncmp(Value, "one_minus_dst_alpha", 18) == 0) return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
-		if (strncmp(Value, "one_minus_src_color", 17) == 0) return VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
-		if (strncmp(Value, "one_minus_dst_color", 17) == 0) return VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
-		if (strncmp(Value, "src_color", 9) == 0) return VK_BLEND_FACTOR_SRC_COLOR;
-		if (strncmp(Value, "dst_color", 9) == 0) return VK_BLEND_FACTOR_DST_COLOR;
-		if (strncmp(Value, "src_alpha", 9) == 0) return VK_BLEND_FACTOR_SRC_ALPHA;
-		if (strncmp(Value, "dst_alpha", 9) == 0) return VK_BLEND_FACTOR_DST_ALPHA;
-		if (strncmp(Value, "zero", 4) == 0) return VK_BLEND_FACTOR_ZERO;
-		if (strncmp(Value, "one", 3) == 0) return VK_BLEND_FACTOR_ONE;
+		if (strncmp(Value, "one_minus_src_alpha", 18) == 0 || strncmp(Value, "ONE_MINUS_SRC_ALPHA", 18) == 0) return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		if (strncmp(Value, "one_minus_dst_alpha", 18) == 0 || strncmp(Value, "ONE_MINUS_DST_ALPHA", 18) == 0) return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+		if (strncmp(Value, "one_minus_src_color", 17) == 0 || strncmp(Value, "ONE_MINUS_SRC_COLOR", 17) == 0) return VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+		if (strncmp(Value, "one_minus_dst_color", 17) == 0 || strncmp(Value, "ONE_MINUS_DST_COLOR", 17) == 0) return VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
+		if (strncmp(Value, "src_color", 9) == 0 || strncmp(Value, "SRC_COLOR", 9) == 0) return VK_BLEND_FACTOR_SRC_COLOR;
+		if (strncmp(Value, "dst_color", 9) == 0 || strncmp(Value, "DST_COLOR", 9) == 0) return VK_BLEND_FACTOR_DST_COLOR;
+		if (strncmp(Value, "src_alpha", 9) == 0 || strncmp(Value, "SRC_ALPHA", 9) == 0) return VK_BLEND_FACTOR_SRC_ALPHA;
+		if (strncmp(Value, "dst_alpha", 9) == 0 || strncmp(Value, "DST_ALPHA", 9) == 0) return VK_BLEND_FACTOR_DST_ALPHA;
+		if (strncmp(Value, "zero", 4) == 0 || strncmp(Value, "ZERO", 4) == 0) return VK_BLEND_FACTOR_ZERO;
+		if (strncmp(Value, "one", 3) == 0 || strncmp(Value, "ONE", 3) == 0) return VK_BLEND_FACTOR_ONE;
 		
 		return VK_BLEND_FACTOR_SRC_ALPHA;
 	}
 
 	VkBlendOp ParseBlendOp(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "reverse_subtract", 15) == 0) return VK_BLEND_OP_REVERSE_SUBTRACT;
-		if (strncmp(Value, "subtract", 8) == 0) return VK_BLEND_OP_SUBTRACT;
-		if (strncmp(Value, "add", 3) == 0) return VK_BLEND_OP_ADD;
-		if (strncmp(Value, "min", 3) == 0) return VK_BLEND_OP_MIN;
-		if (strncmp(Value, "max", 3) == 0) return VK_BLEND_OP_MAX;
+		if (strncmp(Value, "reverse_subtract", 15) == 0 || strncmp(Value, "REVERSE_SUBTRACT", 15) == 0) return VK_BLEND_OP_REVERSE_SUBTRACT;
+		if (strncmp(Value, "subtract", 8) == 0 || strncmp(Value, "SUBTRACT", 8) == 0) return VK_BLEND_OP_SUBTRACT;
+		if (strncmp(Value, "add", 3) == 0 || strncmp(Value, "ADD", 3) == 0) return VK_BLEND_OP_ADD;
+		if (strncmp(Value, "min", 3) == 0 || strncmp(Value, "MIN", 3) == 0) return VK_BLEND_OP_MIN;
+		if (strncmp(Value, "max", 3) == 0 || strncmp(Value, "MAX", 3) == 0) return VK_BLEND_OP_MAX;
 		
 		return VK_BLEND_OP_ADD;
 	}
 
 	VkCompareOp ParseCompareOp(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "greater_or_equal", 15) == 0) return VK_COMPARE_OP_GREATER_OR_EQUAL;
-		if (strncmp(Value, "less_or_equal", 12) == 0) return VK_COMPARE_OP_LESS_OR_EQUAL;
-		if (strncmp(Value, "not_equal", 9) == 0) return VK_COMPARE_OP_NOT_EQUAL;
-		if (strncmp(Value, "greater", 7) == 0) return VK_COMPARE_OP_GREATER;
-		if (strncmp(Value, "always", 6) == 0) return VK_COMPARE_OP_ALWAYS;
-		if (strncmp(Value, "never", 5) == 0) return VK_COMPARE_OP_NEVER;
-		if (strncmp(Value, "equal", 5) == 0) return VK_COMPARE_OP_EQUAL;
-		if (strncmp(Value, "less", 4) == 0) return VK_COMPARE_OP_LESS;
+		if (strncmp(Value, "never", 5) == 0 || strncmp(Value, "NEVER", 5) == 0) return VK_COMPARE_OP_NEVER;
+		if (strncmp(Value, "less", 4) == 0 || strncmp(Value, "LESS", 4) == 0) return VK_COMPARE_OP_LESS;
+		if (strncmp(Value, "equal", 5) == 0 || strncmp(Value, "EQUAL", 5) == 0) return VK_COMPARE_OP_EQUAL;
+		if (strncmp(Value, "less_or_equal", 12) == 0 || strncmp(Value, "LESS_OR_EQUAL", 12) == 0) return VK_COMPARE_OP_LESS_OR_EQUAL;
+		if (strncmp(Value, "greater", 7) == 0 || strncmp(Value, "GREATER", 7) == 0) return VK_COMPARE_OP_GREATER;
+		if (strncmp(Value, "not_equal", 9) == 0 || strncmp(Value, "NOT_EQUAL", 9) == 0) return VK_COMPARE_OP_NOT_EQUAL;
+		if (strncmp(Value, "greater_or_equal", 15) == 0 || strncmp(Value, "GREATER_OR_EQUAL", 15) == 0) return VK_COMPARE_OP_GREATER_OR_EQUAL;
+		if (strncmp(Value, "always", 6) == 0 || strncmp(Value, "ALWAYS", 6) == 0) return VK_COMPARE_OP_ALWAYS;
 		
 		return VK_COMPARE_OP_LESS;
+	}
+
+	VkSampleCountFlagBits ParseSampleCount(const char* Value, u32 Length)
+	{
+		if (strncmp(Value, "1", 1) == 0) return VK_SAMPLE_COUNT_1_BIT;
+		if (strncmp(Value, "2", 1) == 0) return VK_SAMPLE_COUNT_2_BIT;
+		if (strncmp(Value, "4", 1) == 0) return VK_SAMPLE_COUNT_4_BIT;
+		if (strncmp(Value, "8", 1) == 0) return VK_SAMPLE_COUNT_8_BIT;
+		if (strncmp(Value, "16", 2) == 0) return VK_SAMPLE_COUNT_16_BIT;
+		if (strncmp(Value, "32", 2) == 0) return VK_SAMPLE_COUNT_32_BIT;
+		if (strncmp(Value, "64", 2) == 0) return VK_SAMPLE_COUNT_64_BIT;
+		
+		return VK_SAMPLE_COUNT_1_BIT;
+	}
+
+	VkPrimitiveTopology ParseTopology(const char* Value, u32 Length)
+	{
+		if (strncmp(Value, "point_list", 10) == 0 || strncmp(Value, "POINT_LIST", 10) == 0) return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+		if (strncmp(Value, "line_list", 9) == 0 || strncmp(Value, "LINE_LIST", 9) == 0) return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+		if (strncmp(Value, "line_strip", 10) == 0 || strncmp(Value, "LINE_STRIP", 10) == 0) return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+		if (strncmp(Value, "triangle_list", 13) == 0 || strncmp(Value, "TRIANGLE_LIST", 13) == 0) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		if (strncmp(Value, "triangle_strip", 14) == 0 || strncmp(Value, "TRIANGLE_STRIP", 14) == 0) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+		if (strncmp(Value, "triangle_fan", 12) == 0 || strncmp(Value, "TRIANGLE_FAN", 12) == 0) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
+		if (strncmp(Value, "line_list_with_adjacency", 23) == 0 || strncmp(Value, "LINE_LIST_WITH_ADJACENCY", 23) == 0) return VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY;
+		if (strncmp(Value, "line_strip_with_adjacency", 24) == 0 || strncmp(Value, "LINE_STRIP_WITH_ADJACENCY", 24) == 0) return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY;
+		if (strncmp(Value, "triangle_list_with_adjacency", 27) == 0 || strncmp(Value, "TRIANGLE_LIST_WITH_ADJACENCY", 27) == 0) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY;
+		if (strncmp(Value, "triangle_strip_with_adjacency", 28) == 0 || strncmp(Value, "TRIANGLE_STRIP_WITH_ADJACENCY", 28) == 0) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY;
+		if (strncmp(Value, "patch_list", 10) == 0 || strncmp(Value, "PATCH_LIST", 10) == 0) return VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
+		
+		return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	}
 
 }

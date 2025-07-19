@@ -164,16 +164,6 @@ namespace LightningPass
 
 		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &Pipeline.PipelineLayout));
 
-		std::vector<char> ShaderCode;
-		Util::OpenAndReadFileFull("./Resources/Shaders/Depth_vert.spv", ShaderCode, "rb");
-
-		const u32 ShaderCount = 1;
-		VulkanHelper::Shader Shaders[ShaderCount];
-
-		Shaders[0].Stage = VK_SHADER_STAGE_VERTEX_BIT;
-		Shaders[0].Code = ShaderCode.data();
-		Shaders[0].CodeSize = ShaderCode.size();
-
 		VulkanHelper::PipelineResourceInfo ResourceInfo = { };
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData.ColorAttachmentCount = 0;
@@ -199,10 +189,10 @@ namespace LightningPass
 		VertexInputBinding[1].VertexInputBindingName = "InstanceData";
 
 		VulkanHelper::PipelineSettings PipelineSettings;
-		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/DepthPipeline.ini");
+		Util::LoadPipelineSettingsYAML(PipelineSettings, "./Resources/Settings/DepthPipeline.yaml");
 		PipelineSettings.Extent = DepthViewportExtent;
 
-		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, VertexInputBinding, VertexInputCount, &PipelineSettings, &ResourceInfo);
+		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, PipelineSettings.Shaders.Data, PipelineSettings.Shaders.Count, VertexInputBinding, VertexInputCount, &PipelineSettings, &ResourceInfo);
 	}
 
 	void DeInit()

@@ -194,7 +194,7 @@ namespace Memory
 	{
 		assert(Array->Capacity != 0);
 
-		const u64 NewCapacity = Array->Capacity + Array->Capacity / 2;
+		const u64 NewCapacity = Array->Capacity * 2;
 		T* NewData = static_cast<T*>(realloc(Array->Data, NewCapacity * sizeof(T)));
 		Array->Data = NewData;
 		Array->Capacity = NewCapacity;

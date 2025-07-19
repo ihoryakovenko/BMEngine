@@ -67,7 +67,7 @@ namespace Util
 		}
 	};
 
-	void LoadPipelineSettings(VulkanHelper::PipelineSettings& settings, const char* filePath);
+	void LoadPipelineSettingsYAML(VulkanHelper::PipelineSettings& settings, const char* filePath);
 
 #ifdef NDEBUG
 	static bool EnableValidationLayers = false;

@@ -67,22 +67,6 @@ namespace MainPass
 
 		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &SkyBoxPipeline.PipelineLayout));
 
-		const u32 ShaderCount = 2;
-		VulkanHelper::Shader Shaders[ShaderCount];
-
-		std::vector<char> VertexShaderCode;
-		Util::OpenAndReadFileFull("./Resources/Shaders/SkyBox_vert.spv", VertexShaderCode, "rb");
-		std::vector<char> FragmentShaderCode;
-		Util::OpenAndReadFileFull("./Resources/Shaders/SkyBox_frag.spv", FragmentShaderCode, "rb");
-
-		Shaders[0].Stage = VK_SHADER_STAGE_VERTEX_BIT;
-		Shaders[0].Code = VertexShaderCode.data();
-		Shaders[0].CodeSize = VertexShaderCode.size();
-
-		Shaders[1].Stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		Shaders[1].Code = FragmentShaderCode.data();
-		Shaders[1].CodeSize = FragmentShaderCode.size();
-
 		VulkanHelper::BMRVertexInputBinding VertexInputBinding[1];
 		VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(SkyBoxVertex, Position) };
 		VertexInputBinding[0].InputAttributesCount = 1;
@@ -95,10 +79,10 @@ namespace MainPass
 		ResourceInfo.PipelineAttachmentData = AttachmentData;
 
 		VulkanHelper::PipelineSettings PipelineSettings;
-		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/SkyBoxPipeline.ini");
+		Util::LoadPipelineSettingsYAML(PipelineSettings, "./Resources/Settings/SkyBoxPipeline.yaml");
 		PipelineSettings.Extent = MainScreenExtent;
 
-		SkyBoxPipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, VertexInputBinding, 1, &PipelineSettings, &ResourceInfo);
+		SkyBoxPipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, PipelineSettings.Shaders.Data, PipelineSettings.Shaders.Count, VertexInputBinding, 1, &PipelineSettings, &ResourceInfo);
 	}
 
 	void DeInit()

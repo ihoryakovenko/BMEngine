@@ -181,22 +181,6 @@ namespace Render
 
 		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &MeshPipeline->Pipeline.PipelineLayout));
 
-		const u32 ShaderCount = 2;
-		VulkanHelper::Shader Shaders[ShaderCount];
-
-		std::vector<char> VertexShaderCode;
-		Util::OpenAndReadFileFull("./Resources/Shaders/Entity_vert.spv", VertexShaderCode, "rb");
-		std::vector<char> FragmentShaderCode;
-		Util::OpenAndReadFileFull("./Resources/Shaders/Entity_frag.spv", FragmentShaderCode, "rb");
-
-		Shaders[0].Stage = VK_SHADER_STAGE_VERTEX_BIT;
-		Shaders[0].Code = VertexShaderCode.data();
-		Shaders[0].CodeSize = VertexShaderCode.size();
-
-		Shaders[1].Stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		Shaders[1].Code = FragmentShaderCode.data();
-		Shaders[1].CodeSize = FragmentShaderCode.size();
-
 		VulkanHelper::BMRVertexInputBinding VertexInputBinding[2];
 		VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshVertex, Position) };
 		VertexInputBinding[0].InputAttributes[1] = { "TextureCoords", VK_FORMAT_R32G32_SFLOAT, offsetof(StaticMeshVertex, TextureCoords) };
@@ -218,14 +202,14 @@ namespace Render
 		VertexInputBinding[1].VertexInputBindingName = "InstanceData";
 
 		VulkanHelper::PipelineSettings PipelineSettings;
-		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMeshSystem.ini");
+		Util::LoadPipelineSettingsYAML(PipelineSettings, "./Resources/Settings/StaticMesh.yaml");
 		PipelineSettings.Extent = MainScreenExtent;
 
 		VulkanHelper::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = MeshPipeline->Pipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
 
-		MeshPipeline->Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, VertexInputBinding, 2,
+		MeshPipeline->Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, PipelineSettings.Shaders.Data, PipelineSettings.Shaders.Count, VertexInputBinding, 2,
 			&PipelineSettings, &ResourceInfo);
 	}
 

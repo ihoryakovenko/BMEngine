@@ -29,6 +29,7 @@
     <ClCompile Include="Source\Util\SavedCode.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanCoreContext.cpp" />
     <ClCompile Include="Source\Engine\Systems\UI\UI.cpp" />
+    <ClCompile Include="..\External\mini-yaml\yaml\Yaml.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
