@@ -5,6 +5,7 @@
 #include "Engine/Systems/Render/MainPass.h"
 #include "Engine/Systems/Render/DeferredPass.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
+#include "RenderResources.h"
 
 #include "imgui.h"
 #include "imgui_impl_vulkan.h"
@@ -73,47 +74,14 @@ namespace Render
 
 	static void InitStaticMeshPipeline(VkDevice Device, const ResourceStorage* Storage, StaticMeshPipeline* MeshPipeline)
 	{
-		VkSamplerCreateInfo ShadowMapSamplerCreateInfo = { };
-		ShadowMapSamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		ShadowMapSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;						// How to render when image is magnified on screen
-		ShadowMapSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;						// How to render when image is minified on screen
-		ShadowMapSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;	// How to handle texture wrap in U (x) direction
-		ShadowMapSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;	// How to handle texture wrap in V (y) direction
-		ShadowMapSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;	// How to handle texture wrap in W (z) direction
-		ShadowMapSamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;	// Border beyond texture (only workds for border clamp)
-		ShadowMapSamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;				// Whether coords should be normalized (between 0 and 1)
-		ShadowMapSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;		// Mipmap interpolation mode
-		ShadowMapSamplerCreateInfo.mipLodBias = 0.0f;								// Level of Details bias for mip level
-		ShadowMapSamplerCreateInfo.minLod = 0.0f;									// Minimum Level of Detail to pick mip level
-		ShadowMapSamplerCreateInfo.maxLod = 0.0f;									// Maximum Level of Detail to pick mip level
-		ShadowMapSamplerCreateInfo.anisotropyEnable = VK_TRUE;
-		ShadowMapSamplerCreateInfo.maxAnisotropy = 1; // Todo: support in config
-
-		VULKAN_CHECK_RESULT(vkCreateSampler(Device, &ShadowMapSamplerCreateInfo, nullptr, &MeshPipeline->ShadowMapArraySampler));
+		MeshPipeline->ShadowMapArraySampler = RenderResources::GetSampler("ShadowMap");
 
 		const VkDeviceSize LightBufferSize = sizeof(Render::LightBuffer);
 		MeshPipeline->StaticMeshLightLayout = FrameManager::CreateCompatibleLayout(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 		MeshPipeline->EntityLightBufferHandle = FrameManager::ReserveUniformMemory(LightBufferSize);
 		MeshPipeline->StaticMeshLightSet = FrameManager::CreateAndBindSet(MeshPipeline->EntityLightBufferHandle, LightBufferSize, MeshPipeline->StaticMeshLightLayout);
 
-		const VkDescriptorType ShadowMapArrayDescriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		const VkShaderStageFlags ShadowMapArrayFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		
-		VkDescriptorSetLayoutBinding LayoutBinding = { };
-		LayoutBinding.binding = 0;
-		LayoutBinding.descriptorType = ShadowMapArrayDescriptorType;
-		LayoutBinding.descriptorCount = 1;
-		LayoutBinding.stageFlags = ShadowMapArrayFlags;
-		LayoutBinding.pImmutableSamplers = nullptr;
-
-		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
-		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = 1;
-		LayoutCreateInfo.pBindings = &LayoutBinding;
-		LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-		LayoutCreateInfo.pNext = nullptr;
-
-		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, nullptr, &MeshPipeline->ShadowMapArrayLayout));
+		MeshPipeline->ShadowMapArrayLayout = RenderResources::GetSetLayout("ShadowMapArrayLayout");
 
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
@@ -202,7 +170,7 @@ namespace Render
 		VertexInputBinding[1].VertexInputBindingName = "InstanceData";
 
 		VulkanHelper::PipelineSettings PipelineSettings;
-		Util::LoadPipelineSettingsYAML(PipelineSettings, "./Resources/Settings/StaticMesh.yaml");
+		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMesh.yaml");
 		PipelineSettings.Extent = MainScreenExtent;
 
 		VulkanHelper::PipelineResourceInfo ResourceInfo;
@@ -221,12 +189,9 @@ namespace Render
 		}
 
 		vkDestroyDescriptorSetLayout(Device, MeshPipeline->StaticMeshLightLayout, nullptr);
-		vkDestroyDescriptorSetLayout(Device, MeshPipeline->ShadowMapArrayLayout, nullptr);
 
 		vkDestroyPipeline(Device, MeshPipeline->Pipeline.Pipeline, nullptr);
 		vkDestroyPipelineLayout(Device, MeshPipeline->Pipeline.PipelineLayout, nullptr);
-
-		vkDestroySampler(Device, MeshPipeline->ShadowMapArraySampler, nullptr);
 	}
 
 	static void DrawStaticMeshes(VkDevice Device, VkCommandBuffer CmdBuffer, const ResourceStorage* Storage, StaticMeshPipeline* MeshPipeline, const DrawScene* Scene)
@@ -414,21 +379,7 @@ namespace Render
 		const VkDescriptorType MaterialDescriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		const VkShaderStageFlags MaterialStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		
-		VkDescriptorSetLayoutBinding LayoutBinding = { };
-		LayoutBinding.binding = 0;
-		LayoutBinding.descriptorType = MaterialDescriptorType;
-		LayoutBinding.descriptorCount = 1;
-		LayoutBinding.stageFlags = MaterialStageFlags;
-		LayoutBinding.pImmutableSamplers = nullptr;
-
-		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
-		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = 1;
-		LayoutCreateInfo.pBindings = &LayoutBinding;
-		LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-		LayoutCreateInfo.pNext = nullptr;
-
-		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, nullptr, &Storage->MaterialLayout));
+		Storage->MaterialLayout = RenderResources::GetSetLayout("MaterialLayout");
 
 		VkDescriptorSetAllocateInfo allocInfoMat = {};
 		allocInfoMat.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -452,7 +403,6 @@ namespace Render
 
 	static void DeInitMaterialStorage(VkDevice Device, MaterialStorage* Storage)
 	{
-		vkDestroyDescriptorSetLayout(Device, Storage->MaterialLayout, nullptr);
 		vkDestroyBuffer(Device, Storage->MaterialBuffer, nullptr);
 		vkFreeMemory(Device, Storage->MaterialBufferMemory, nullptr);
 		Memory::FreeArray(&Storage->Materials);
@@ -464,49 +414,10 @@ namespace Render
 
 		Storage->Textures = Memory::AllocateArray<MeshTexture2D>(MaxTextures);
 
-		VkSamplerCreateInfo DiffuseSamplerCreateInfo = { };
-		DiffuseSamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		DiffuseSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
-		DiffuseSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
-		DiffuseSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		DiffuseSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		DiffuseSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		DiffuseSamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-		DiffuseSamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
-		DiffuseSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		DiffuseSamplerCreateInfo.mipLodBias = 0.0f;
-		DiffuseSamplerCreateInfo.minLod = 0.0f;
-		DiffuseSamplerCreateInfo.maxLod = 0.0f;
-		DiffuseSamplerCreateInfo.anisotropyEnable = VK_TRUE;
-		DiffuseSamplerCreateInfo.maxAnisotropy = 16;
+		Storage->DiffuseSampler = RenderResources::GetSampler("DiffuseTexture");
+		Storage->SpecularSampler = RenderResources::GetSampler("SpecularTexture");
 
-		VkSamplerCreateInfo SpecularSamplerCreateInfo = DiffuseSamplerCreateInfo;
-		DiffuseSamplerCreateInfo.maxAnisotropy = 1;
-
-		VULKAN_CHECK_RESULT(vkCreateSampler(Device, &DiffuseSamplerCreateInfo, nullptr, &Storage->DiffuseSampler));
-		VULKAN_CHECK_RESULT(vkCreateSampler(Device, &SpecularSamplerCreateInfo, nullptr, &Storage->SpecularSampler));
-
-		const VkShaderStageFlags EntitySamplerInputFlags[2] = { VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
-		const VkDescriptorType EntitySamplerDescriptorType[2] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
-
-		VkDescriptorSetLayoutBinding LayoutBindings[2];
-		for (u32 BindingIndex = 0; BindingIndex < 2; ++BindingIndex)
-		{
-			LayoutBindings[BindingIndex] = { };
-			LayoutBindings[BindingIndex].binding = BindingIndex;
-			LayoutBindings[BindingIndex].descriptorType = EntitySamplerDescriptorType[BindingIndex];
-			LayoutBindings[BindingIndex].descriptorCount = MaxTextures;
-			LayoutBindings[BindingIndex].stageFlags = EntitySamplerInputFlags[BindingIndex];
-			LayoutBindings[BindingIndex].pImmutableSamplers = nullptr;
-		}
-
-		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
-		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = 2;
-		LayoutCreateInfo.pBindings = LayoutBindings;
-		LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-
-		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, nullptr, &Storage->BindlesTexturesLayout));
+		Storage->BindlesTexturesLayout = RenderResources::GetSetLayout("BindlesTexturesLayout");
 
 		VkDescriptorSetAllocateInfo AllocInfoTex = {};
 		AllocInfoTex.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -525,10 +436,6 @@ namespace Render
 			vkFreeMemory(Device, Storage->Textures.Data[i].MeshTexture.Memory, nullptr);
 		}
 
-		vkDestroyDescriptorSetLayout(Device, Storage->BindlesTexturesLayout, nullptr);
-
-		vkDestroySampler(Device, Storage->DiffuseSampler, nullptr);
-		vkDestroySampler(Device, Storage->SpecularSampler, nullptr);
 
 		Memory::FreeArray(&Storage->Textures);
 	}
@@ -891,8 +798,6 @@ namespace Render
 	void Init(GLFWwindow* WindowHandler)
 	{
 		State.RenderResources.DrawEntities = Memory::AllocateArray<DrawEntity>(512);
-
-		VulkanCoreContext::CreateCoreContext(&State.CoreContext, WindowHandler);
 		
 		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
 		VkDevice Device = VulkanInterface::GetDevice();
@@ -912,7 +817,7 @@ namespace Render
 		//TerrainRender::Init();
 		//DynamicMapSystem::Init();
 		InitStaticMeshPipeline(Device, &State.RenderResources, &State.MeshPipeline);
-		InitImGuiPipeline(&State.DebugUiPool, &State.CoreContext, WindowHandler);
+		InitImGuiPipeline(&State.DebugUiPool, RenderResources::GetCoreContext(), WindowHandler);
 
 		std::thread TransferThread(
 			[]()
@@ -946,7 +851,6 @@ namespace Render
 		LightningPass::DeInit();
 		DeferredPass::DeInit();
 		FrameManager::DeInit();
-		VulkanCoreContext::DestroyCoreContext(&State.CoreContext);
 
 		Memory::FreeArray(&State.RenderResources.DrawEntities);
 	}

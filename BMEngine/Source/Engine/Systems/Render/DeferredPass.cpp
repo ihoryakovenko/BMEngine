@@ -3,6 +3,7 @@
 #include "Deprecated/VulkanInterface/VulkanInterface.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
 #include "VulkanCoreContext.h"
+#include "RenderResources.h"
 
 #include "Util/Settings.h"
 #include "Util/Util.h"
@@ -36,51 +37,7 @@ namespace DeferredPass
 		AttachmentData.DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
 		AttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
-		VkSamplerCreateInfo ColorSamplerCreateInfo = { };
-		ColorSamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		ColorSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
-		ColorSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
-		ColorSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		ColorSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		ColorSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		ColorSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		ColorSamplerCreateInfo.minLod = 0.0f;
-		ColorSamplerCreateInfo.maxLod = 0.0f;
-		ColorSamplerCreateInfo.mipLodBias = 0.0f;
-		ColorSamplerCreateInfo.anisotropyEnable = VK_TRUE;
-		ColorSamplerCreateInfo.maxAnisotropy = 16.0f;
-		ColorSamplerCreateInfo.compareEnable = VK_FALSE;
-		ColorSamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-		ColorSamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
-
-		VkSamplerCreateInfo DepthSamplerInfo = ColorSamplerCreateInfo;
-		DepthSamplerInfo.magFilter = VK_FILTER_NEAREST;
-		DepthSamplerInfo.minFilter = VK_FILTER_NEAREST;
-		DepthSamplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-		DepthSamplerInfo.anisotropyEnable = VK_FALSE;
-
-		const VkDescriptorType DeferredInputDescriptorType[2] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
-		const VkShaderStageFlags DeferredInputFlags[2] = { VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
-		
-		VkDescriptorSetLayoutBinding LayoutBindings[2];
-		for (u32 BindingIndex = 0; BindingIndex < 2; ++BindingIndex)
-		{
-			LayoutBindings[BindingIndex] = { };
-			LayoutBindings[BindingIndex].binding = BindingIndex;
-			LayoutBindings[BindingIndex].descriptorType = DeferredInputDescriptorType[BindingIndex];
-			LayoutBindings[BindingIndex].descriptorCount = 1;
-			LayoutBindings[BindingIndex].stageFlags = DeferredInputFlags[BindingIndex];
-			LayoutBindings[BindingIndex].pImmutableSamplers = nullptr;
-		}
-
-		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
-		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = 2;
-		LayoutCreateInfo.pBindings = LayoutBindings;
-		LayoutCreateInfo.flags = 0;
-		LayoutCreateInfo.pNext = nullptr;
-
-		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(VulkanInterface::GetDevice(), &LayoutCreateInfo, nullptr, &DeferredInputLayout));
+		DeferredInputLayout = RenderResources::GetSetLayout("MainPassOutputLayout");
 
 		VkImageCreateInfo DeferredInputDepthUniformCreateInfo = { };
 		DeferredInputDepthUniformCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -102,8 +59,8 @@ namespace DeferredPass
 		DeferredInputColorUniformCreateInfo.format = ColorFormat;
 		DeferredInputColorUniformCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
-		VULKAN_CHECK_RESULT(vkCreateSampler(Device, &ColorSamplerCreateInfo, nullptr, &ColorSampler));
-		VULKAN_CHECK_RESULT(vkCreateSampler(Device, &DepthSamplerInfo, nullptr, &DepthSampler));
+		ColorSampler = RenderResources::GetSampler("ColorAttachment");
+		DepthSampler = RenderResources::GetSampler("DepthAttachment");
 
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
@@ -208,7 +165,7 @@ namespace DeferredPass
 		ResourceInfo.PipelineAttachmentData = AttachmentData;
 
 		VulkanHelper::PipelineSettings PipelineSettings;
-		Util::LoadPipelineSettingsYAML(PipelineSettings, "./Resources/Settings/DeferredPipeline.yaml");
+		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/DeferredPipeline.yaml");
 		PipelineSettings.Extent = MainScreenExtent;
 
 		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, PipelineSettings.Shaders.Data, PipelineSettings.Shaders.Count, nullptr, 0,
@@ -218,9 +175,6 @@ namespace DeferredPass
 	void DeInit()
 	{
 		VkDevice Device = VulkanInterface::GetDevice();
-
-		vkDestroySampler(Device, ColorSampler, nullptr);
-		vkDestroySampler(Device, DepthSampler, nullptr);
 
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
@@ -234,7 +188,6 @@ namespace DeferredPass
 			vkFreeMemory(Device, DeferredInputColorImage[i].Memory, nullptr);
 		}
 
-		vkDestroyDescriptorSetLayout(VulkanInterface::GetDevice(), DeferredInputLayout, nullptr);
 
 		vkDestroyPipeline(Device, Pipeline.Pipeline, nullptr);
 		vkDestroyPipelineLayout(Device, Pipeline.PipelineLayout, nullptr);

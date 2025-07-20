@@ -1,0 +1,128 @@
+samplers:
+  - name: ShadowMap
+    magFilter: LINEAR
+    minFilter: LINEAR
+    addressModeU: CLAMP_TO_BORDER
+    addressModeV: CLAMP_TO_BORDER
+    addressModeW: CLAMP_TO_BORDER
+    borderColor: INT_OPAQUE_BLACK
+    unnormalizedCoordinates: false
+    mipmapMode: LINEAR
+    mipLodBias: 0.0
+    minLod: 0.0
+    maxLod: 0.0
+    anisotropyEnable: true
+    maxAnisotropy: 1
+
+  - name: DiffuseTexture
+    magFilter: LINEAR
+    minFilter: LINEAR
+    addressModeU: CLAMP_TO_EDGE
+    addressModeV: CLAMP_TO_EDGE
+    addressModeW: CLAMP_TO_EDGE
+    borderColor: INT_OPAQUE_BLACK
+    unnormalizedCoordinates: false
+    mipmapMode: LINEAR
+    mipLodBias: 0.0
+    minLod: 0.0
+    maxLod: 0.0
+    anisotropyEnable: true
+    maxAnisotropy: 16
+
+  - name: SpecularTexture
+    magFilter: LINEAR
+    minFilter: LINEAR
+    addressModeU: CLAMP_TO_EDGE
+    addressModeV: CLAMP_TO_EDGE
+    addressModeW: CLAMP_TO_EDGE
+    borderColor: INT_OPAQUE_BLACK
+    unnormalizedCoordinates: false
+    mipmapMode: LINEAR
+    mipLodBias: 0.0
+    minLod: 0.0
+    maxLod: 0.0
+    anisotropyEnable: true
+    maxAnisotropy: 1
+
+  - name: ColorAttachment
+    magFilter: LINEAR
+    minFilter: LINEAR
+    mipmapMode: LINEAR
+    addressModeU: CLAMP_TO_EDGE
+    addressModeV: CLAMP_TO_EDGE
+    addressModeW: CLAMP_TO_EDGE
+    minLod: 0.0
+    maxLod: 0.0
+    mipLodBias: 0.0
+    anisotropyEnable: true
+    maxAnisotropy: 16.0
+    compareEnable: false
+    borderColor: INT_OPAQUE_BLACK
+    unnormalizedCoordinates: false
+
+  - name: DepthAttachment
+    magFilter: NEAREST
+    minFilter: NEAREST
+    mipmapMode: NEAREST
+    addressModeU: CLAMP_TO_EDGE
+    addressModeV: CLAMP_TO_EDGE
+    addressModeW: CLAMP_TO_EDGE
+    minLod: 0.0
+    maxLod: 0.0
+    mipLodBias: 0.0
+    anisotropyEnable: false
+    maxAnisotropy: 16.0
+    compareEnable: false
+    borderColor: INT_OPAQUE_BLACK
+    unnormalizedCoordinates: false
+
+DescriptorSetLayouts:
+  - name: ShadowMapArrayLayout
+    bindings:
+      - binding: 0
+        descriptorType: COMBINED_IMAGE_SAMPLER
+        descriptorCount: 1
+        stageFlags: VERTEX_BIT | FRAGMENT_BIT
+        pImmutableSamplers: null
+
+  - name: MaterialLayout
+    bindings:
+      - binding: 0
+        descriptorType: STORAGE_BUFFER
+        descriptorCount: 1
+        stageFlags: VERTEX_BIT | FRAGMENT_BIT
+        pImmutableSamplers: null
+
+  - name: BindlesTexturesLayout
+    bindings:
+      - binding: 0
+        descriptorType: COMBINED_IMAGE_SAMPLER
+        descriptorCount: 64
+        stageFlags: FRAGMENT_BIT
+        pImmutableSamplers: null
+      - binding: 1
+        descriptorType: COMBINED_IMAGE_SAMPLER
+        descriptorCount: 64
+        stageFlags: FRAGMENT_BIT
+        pImmutableSamplers: null
+
+  - name: MainPassOutputLayout
+    bindings:
+      - binding: 0
+        descriptorType: COMBINED_IMAGE_SAMPLER
+        descriptorCount: 1
+        stageFlags: FRAGMENT_BIT
+        pImmutableSamplers: null
+      - binding: 1
+        descriptorType: COMBINED_IMAGE_SAMPLER
+        descriptorCount: 1
+        stageFlags: FRAGMENT_BIT
+        pImmutableSamplers: null
+
+  - name: LightSpaceMatrixLayout
+    bindings:
+      - binding: 0
+        descriptorType: UNIFORM_BUFFER
+        descriptorCount: 1
+        stageFlags: VERTEX_BIT | FRAGMENT_BIT
+        pImmutableSamplers: null 

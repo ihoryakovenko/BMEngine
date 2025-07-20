@@ -46,41 +46,6 @@ template<> struct std::hash<Render::StaticMeshVertex>
 
 namespace Util
 {
-	static VkShaderStageFlagBits ParseShaderStage(const char* Value, u32 Length)
-	{
-		if ((strncmp(Value, "vertex", Length) == 0) || (strncmp(Value, "VERTEX", Length) == 0))
-			return VK_SHADER_STAGE_VERTEX_BIT;
-		if ((strncmp(Value, "fragment", Length) == 0) || (strncmp(Value, "FRAGMENT", Length) == 0))
-			return VK_SHADER_STAGE_FRAGMENT_BIT;
-		if ((strncmp(Value, "geometry", Length) == 0) || (strncmp(Value, "GEOMETRY", Length) == 0))
-			return VK_SHADER_STAGE_GEOMETRY_BIT;
-		if ((strncmp(Value, "compute", Length) == 0) || (strncmp(Value, "COMPUTE", Length) == 0))
-			return VK_SHADER_STAGE_COMPUTE_BIT;
-		if ((strncmp(Value, "tess_control", Length) == 0) || (strncmp(Value, "TESS_CONTROL", Length) == 0))
-			return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
-		if ((strncmp(Value, "tess_eval", Length) == 0) || (strncmp(Value, "TESS_EVAL", Length) == 0))
-			return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
-		if ((strncmp(Value, "task", Length) == 0) || (strncmp(Value, "TASK", Length) == 0))
-			return VK_SHADER_STAGE_TASK_BIT_EXT;
-		if ((strncmp(Value, "mesh", Length) == 0) || (strncmp(Value, "MESH", Length) == 0))
-			return VK_SHADER_STAGE_MESH_BIT_EXT;
-		if ((strncmp(Value, "raygen", Length) == 0) || (strncmp(Value, "RAYGEN", Length) == 0))
-			return VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-		if ((strncmp(Value, "closest_hit", Length) == 0) || (strncmp(Value, "CLOSEST_HIT", Length) == 0))
-			return VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-		if ((strncmp(Value, "any_hit", Length) == 0) || (strncmp(Value, "ANY_HIT", Length) == 0))
-			return VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-		if ((strncmp(Value, "miss", Length) == 0) || (strncmp(Value, "MISS", Length) == 0))
-			return VK_SHADER_STAGE_MISS_BIT_KHR;
-		if ((strncmp(Value, "intersection", Length) == 0) || (strncmp(Value, "INTERSECTION", Length) == 0))
-			return VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
-		if ((strncmp(Value, "callable", Length) == 0) || (strncmp(Value, "CALLABLE", Length) == 0))
-			return VK_SHADER_STAGE_CALLABLE_BIT_KHR;
-
-		assert(false);
-		return VK_SHADER_STAGE_VERTEX_BIT;
-	}
-
 	bool ReadFileFull(FILE* File, std::vector<char>& OutFileData)
 	{
 		if (fseek(File, 0L, SEEK_END) != 0)
@@ -159,18 +124,20 @@ namespace Util
 		}
 	}
 
-	void LoadPipelineSettingsYAML(VulkanHelper::PipelineSettings& Settings, const char* FilePath)
+	void LoadPipelineSettings(VulkanHelper::PipelineSettings& Settings, const char* FilePath)
 	{
 		const std::string AbsolutePath = std::filesystem::absolute(FilePath).string();
 
 		Yaml::Node Root;
 		Yaml::Parse(Root, AbsolutePath.c_str());
 
+		Yaml::Node& PipelineNode = Root["pipeline"];
+
 		Settings.Shaders = Memory::AllocateArray<VulkanHelper::Shader>(1);
 
-		if (!Root["shaders"].IsNone())
+		if (!PipelineNode["shaders"].IsNone())
 		{
-			Yaml::Node& Shaders = Root["shaders"];
+			Yaml::Node& Shaders = PipelineNode["shaders"];
 			for (auto it = Shaders.Begin(); it != Shaders.End(); it++)
 			{
 				std::cout << (*it).first << ": " << (*it).second.As<std::string>() << std::endl;
@@ -187,7 +154,7 @@ namespace Util
 					Memory::PushBackToArray(&NewShader->ShaderCode, VertexShaderCode.data() + i);
 				}
 
-				NewShader->Stage = ParseShaderStage((*it).first.c_str(), (*it).first.size()); // TODO: TMP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+				NewShader->Stage = VulkanHelper::ParseShaderStage((*it).first.c_str(), (*it).first.size());
 				NewShader->Code = NewShader->ShaderCode.Data; // TODO: TMP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 				NewShader->CodeSize = NewShader->ShaderCode.Count; // TODO: TMP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			}
@@ -196,9 +163,9 @@ namespace Util
 		Settings.RasterizationState = {};
 		Settings.RasterizationState.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 		
-		if (!Root["rasterization"].IsNone())
+		if (!PipelineNode["rasterization"].IsNone())
 		{
-			Yaml::Node& rasterization = Root["rasterization"];
+			Yaml::Node& rasterization = PipelineNode["rasterization"];
 			Settings.RasterizationState.depthClampEnable = rasterization["depthClampEnable"].As<bool>();
 			Settings.RasterizationState.rasterizerDiscardEnable = rasterization["rasterizerDiscardEnable"].As<bool>();
 			std::string polygonModeStr = rasterization["polygonMode"].As<std::string>();
@@ -217,9 +184,9 @@ namespace Util
 		
 		Settings.ColorBlendAttachment = {};
 		
-		if (!Root["colorBlend"].IsNone())
+		if (!PipelineNode["colorBlend"].IsNone())
 		{
-			Yaml::Node& colorBlend = Root["colorBlend"];
+			Yaml::Node& colorBlend = PipelineNode["colorBlend"];
 			Settings.ColorBlendState.logicOpEnable = colorBlend["logicOpEnable"].As<bool>();
 			Settings.ColorBlendState.attachmentCount = colorBlend["attachmentCount"].As<int>();
 			std::string colorWriteMaskStr = colorBlend["colorWriteMask"].As<std::string>();
@@ -242,9 +209,9 @@ namespace Util
 		Settings.DepthStencilState = {};
 		Settings.DepthStencilState.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 		
-		if (!Root["depthStencil"].IsNone())
+		if (!PipelineNode["depthStencil"].IsNone())
 		{
-			Yaml::Node& depthStencil = Root["depthStencil"];
+			Yaml::Node& depthStencil = PipelineNode["depthStencil"];
 			Settings.DepthStencilState.depthTestEnable = depthStencil["depthTestEnable"].As<bool>();
 			Settings.DepthStencilState.depthWriteEnable = depthStencil["depthWriteEnable"].As<bool>();
 			std::string depthCompareOpStr = depthStencil["depthCompareOp"].As<std::string>();
@@ -256,9 +223,9 @@ namespace Util
 		Settings.MultisampleState = {};
 		Settings.MultisampleState.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 		
-		if (!Root["multisample"].IsNone())
+		if (!PipelineNode["multisample"].IsNone())
 		{
-			Yaml::Node& multisample = Root["multisample"];
+			Yaml::Node& multisample = PipelineNode["multisample"];
 			Settings.MultisampleState.sampleShadingEnable = multisample["sampleShadingEnable"].As<bool>();
 			std::string rasterizationSamplesStr = multisample["rasterizationSamples"].As<std::string>();
 			Settings.MultisampleState.rasterizationSamples = VulkanHelper::ParseSampleCount(rasterizationSamplesStr.c_str(), rasterizationSamplesStr.length());
@@ -267,9 +234,9 @@ namespace Util
 		Settings.InputAssemblyState = {};
 		Settings.InputAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 		
-		if (!Root["inputAssembly"].IsNone())
+		if (!PipelineNode["inputAssembly"].IsNone())
 		{
-			Yaml::Node& inputAssembly = Root["inputAssembly"];
+			Yaml::Node& inputAssembly = PipelineNode["inputAssembly"];
 			std::string topologyStr = inputAssembly["topology"].As<std::string>();
 			Settings.InputAssemblyState.topology = VulkanHelper::ParseTopology(topologyStr.c_str(), topologyStr.length());
 			Settings.InputAssemblyState.primitiveRestartEnable = inputAssembly["primitiveRestartEnable"].As<bool>();
@@ -284,9 +251,9 @@ namespace Util
 		Settings.Scissor = {};
 		Settings.Scissor.offset = {};
 		
-		if (!Root["viewport"].IsNone())
+		if (!PipelineNode["viewport"].IsNone())
 		{
-			Yaml::Node& viewport = Root["viewport"];
+			Yaml::Node& viewport = PipelineNode["viewport"];
 			Settings.ViewportState.viewportCount = viewport["viewportCount"].As<int>();
 			Settings.ViewportState.scissorCount = viewport["scissorCount"].As<int>();
 			Settings.Viewport.minDepth = viewport["minDepth"].As<float>();
@@ -479,5 +446,164 @@ namespace Util
 		Model.DiffuseTexturesHashes = (u64*)Data;
 
 		return Model;
+	}
+
+
+
+	void LoadResourcesDescription(RenderResources::ResourcesDescription* resDescription, const char* filePath)
+	{
+		Yaml::Node root;
+		Yaml::Parse(root, filePath);
+
+		if (!root["samplers"].IsNone())
+		{
+			Yaml::Node& samplers = root["samplers"];
+
+			for (auto it = samplers.Begin(); it != samplers.End(); it++)
+			{
+				Yaml::Node& sampler = (*it).second;
+				
+				std::string samplerName = sampler["name"].As<std::string>();
+				VkSamplerCreateInfo samplerInfo = { };
+				
+				samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+				samplerInfo.pNext = nullptr;
+				samplerInfo.flags = 0;
+
+				if (!sampler["magFilter"].IsNone())
+				{
+					std::string value = sampler["magFilter"].As<std::string>();
+					samplerInfo.magFilter = VulkanHelper::ParseFilter(value.c_str(), value.length());
+				}
+				if (!sampler["minFilter"].IsNone())
+				{
+					std::string value = sampler["minFilter"].As<std::string>();
+					samplerInfo.minFilter = VulkanHelper::ParseFilter(value.c_str(), value.length());
+				}
+
+				if (!sampler["addressModeU"].IsNone())
+				{
+					std::string value = sampler["addressModeU"].As<std::string>();
+					samplerInfo.addressModeU = VulkanHelper::ParseAddressMode(value.c_str(), value.length());
+				}
+				if (!sampler["addressModeV"].IsNone())
+				{
+					std::string value = sampler["addressModeV"].As<std::string>();
+					samplerInfo.addressModeV = VulkanHelper::ParseAddressMode(value.c_str(), value.length());
+				}
+				if (!sampler["addressModeW"].IsNone())
+				{
+					std::string value = sampler["addressModeW"].As<std::string>();
+					samplerInfo.addressModeW = VulkanHelper::ParseAddressMode(value.c_str(), value.length());
+				}
+
+				if (!sampler["borderColor"].IsNone())
+				{
+					std::string value = sampler["borderColor"].As<std::string>();
+					samplerInfo.borderColor = VulkanHelper::ParseBorderColor(value.c_str(), value.length());
+				}
+
+				if (!sampler["unnormalizedCoordinates"].IsNone())
+				{
+					samplerInfo.unnormalizedCoordinates = sampler["unnormalizedCoordinates"].As<bool>() ? VK_TRUE : VK_FALSE;
+				}
+				if (!sampler["anisotropyEnable"].IsNone())
+				{
+					samplerInfo.anisotropyEnable = sampler["anisotropyEnable"].As<bool>() ? VK_TRUE : VK_FALSE;
+				}
+				if (!sampler["compareEnable"].IsNone())
+				{
+					samplerInfo.compareEnable = sampler["compareEnable"].As<bool>() ? VK_TRUE : VK_FALSE;
+				}
+
+				if (!sampler["mipmapMode"].IsNone())
+				{
+					std::string value = sampler["mipmapMode"].As<std::string>();
+					samplerInfo.mipmapMode = VulkanHelper::ParseMipmapMode(value.c_str(), value.length());
+				}
+
+				if (!sampler["mipLodBias"].IsNone())
+				{
+					samplerInfo.mipLodBias = sampler["mipLodBias"].As<float>();
+				}
+				if (!sampler["minLod"].IsNone())
+				{
+					samplerInfo.minLod = sampler["minLod"].As<float>();
+				}
+				if (!sampler["maxLod"].IsNone())
+				{
+					samplerInfo.maxLod = sampler["maxLod"].As<float>();
+				}
+				if (!sampler["maxAnisotropy"].IsNone())
+				{
+					samplerInfo.maxAnisotropy = sampler["maxAnisotropy"].As<float>();
+				}
+
+				resDescription->Samplers[samplerName] = samplerInfo;
+			}
+		}
+
+		if (!root["DescriptorSetLayouts"].IsNone())
+		{
+			Yaml::Node& layouts = root["DescriptorSetLayouts"];
+
+			for (auto it = layouts.Begin(); it != layouts.End(); it++)
+			{
+				Yaml::Node& layout = (*it).second;
+				
+				std::string layoutName = layout["name"].As<std::string>();
+				
+
+				if (!layout["bindings"].IsNone())
+				{
+					Memory::DynamicHeapArray<VkDescriptorSetLayoutBinding> bindings = Memory::AllocateArray<VkDescriptorSetLayoutBinding>(1);
+
+					Yaml::Node& bindingsNode = layout["bindings"];
+					
+					for (auto bindingIt = bindingsNode.Begin(); bindingIt != bindingsNode.End(); bindingIt++)
+					{
+						Yaml::Node& binding = (*bindingIt).second;
+						
+						VkDescriptorSetLayoutBinding layoutBinding = { };
+						
+						if (!binding["binding"].IsNone())
+						{
+							layoutBinding.binding = binding["binding"].As<u32>();
+						}
+						
+						if (!binding["descriptorType"].IsNone())
+						{
+							std::string value = binding["descriptorType"].As<std::string>();
+							layoutBinding.descriptorType = VulkanHelper::ParseDescriptorType(value.c_str(), value.length());
+						}
+						
+						if (!binding["descriptorCount"].IsNone())
+						{
+							layoutBinding.descriptorCount = binding["descriptorCount"].As<u32>();
+						}
+						
+						if (!binding["stageFlags"].IsNone())
+						{
+							std::string value = binding["stageFlags"].As<std::string>();
+							layoutBinding.stageFlags = VulkanHelper::ParseShaderStageFlags(value.c_str(), value.length());
+						}
+						
+						layoutBinding.pImmutableSamplers = nullptr;
+
+						Memory::PushBackToArray(&bindings, &layoutBinding);
+					}
+
+					resDescription->LayoutBindings[layoutName] = bindings;
+				}
+			}
+		}
+	}
+
+	void FreeResourcesDescription(RenderResources::ResourcesDescription* ResDescription)
+	{
+		for (auto It = ResDescription->LayoutBindings.begin(); It != ResDescription->LayoutBindings.end(); ++It)
+		{
+			Memory::FreeArray(&It->second);
+		}
 	}
 }

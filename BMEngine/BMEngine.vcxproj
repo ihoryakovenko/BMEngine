@@ -32,6 +32,7 @@
     <ClCompile Include="Source\Engine\Systems\Render\LightningPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\MainPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\RenderResources.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanCoreContext.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\TerrainRender.cpp" />
@@ -45,6 +46,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Engine\Engine.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\RenderResources.h" />
     <ClInclude Include="Source\Engine\Systems\Render\VulkanCoreContext.h" />
     <ClInclude Include="Source\Engine\Systems\UI\UI.h" />
     <ClInclude Include="Source\Util\DefaultTextureData.h" />
@@ -64,8 +66,25 @@
     <ClInclude Include="Source\Util\Util.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\Settings\DeferredPipeline.yaml" />
+    <None Include="Resources\Settings\DepthPipeline.yaml" />
+    <None Include="Resources\Settings\RenderResources.yaml" />
+    <None Include="Resources\Settings\SkyBoxPipeline.yaml" />
+    <None Include="Resources\Settings\StaticMesh.yaml" />
     <None Include="Resources\Shaders\Second.frag" />
     <None Include="Resources\Shaders\Second.vert" />
+    <None Include="Source\Engine\Systems\Render\Shaders\CompileShaders.bat" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Deferred.frag.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Deferred.vert.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Depth.vert.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Entity.frag.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Entity.vert.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\QuadBasedSphere.frag.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\QuadBasedSphere.vert.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\SkyBox.frag.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\SkyBox.vert.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\TerrainGenerator.frag.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\TerrainGenerator.vert.glsl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

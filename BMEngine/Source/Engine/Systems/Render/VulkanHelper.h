@@ -155,7 +155,7 @@ namespace VulkanHelper
 	VkBuffer CreateBuffer(VkDevice Device, u64 Size, BufferUsageFlag Flag);
 	VkPipeline BatchPipelineCreation(VkDevice Device, const Shader* Shaders, u32 ShadersCount,
 		const BMRVertexInputBinding* VertexInputBinding, u32 VertexInputBindingCount,
-		const PipelineSettings* Settings, const PipelineResourceInfo* ResourceInfo);
+		PipelineSettings* Settings, const PipelineResourceInfo* ResourceInfo);
 
 	void UpdateHostCompatibleBufferMemory(VkDevice Device, VkDeviceMemory Memory, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);
 
@@ -177,4 +177,12 @@ namespace VulkanHelper
 	VkCompareOp ParseCompareOp(const char* Value, u32 Length);
 	VkSampleCountFlagBits ParseSampleCount(const char* Value, u32 Length);
 	VkPrimitiveTopology ParseTopology(const char* Value, u32 Length);
+	VkShaderStageFlagBits ParseShaderStage(const char* Value, u32 Length);
+	
+	VkFilter ParseFilter(const char* Value, u32 Length);
+	VkSamplerAddressMode ParseAddressMode(const char* Value, u32 Length);
+	VkBorderColor ParseBorderColor(const char* Value, u32 Length);
+	VkSamplerMipmapMode ParseMipmapMode(const char* Value, u32 Length);
+	VkDescriptorType ParseDescriptorType(const char* Value, u32 Length);
+	VkShaderStageFlags ParseShaderStageFlags(const char* Value, u32 Length);
 }

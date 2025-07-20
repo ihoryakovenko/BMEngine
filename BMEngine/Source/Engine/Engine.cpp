@@ -20,6 +20,7 @@
 #include "Util/Math.h"
 #include "Deprecated/FrameManager.h"
 #include "Util/DefaultTextureData.h"
+#include "Systems/Render/RenderResources.h"
 
 #include <gli/gli.hpp>
 
@@ -299,6 +300,12 @@ namespace Engine
 		Memory::MemoryManagementSystem::Init(FrameAllocSize);
 
 		UI::Init(&GuiData);
+
+		RenderResources::ResourcesDescription ResDescription = { };
+		Util::LoadResourcesDescription(&ResDescription, "./Resources/Settings/RenderResources.yaml");
+		RenderResources::Init(Window, &ResDescription);
+		Util::FreeResourcesDescription(&ResDescription);
+
 		Render::Init(Window);
 		
 		return true;
@@ -307,6 +314,7 @@ namespace Engine
 	void DeInit()
 	{
 		Render::DeInit();
+		RenderResources::DeInit();
 		UI::DeInit();
 
 		glfwDestroyWindow(Window);

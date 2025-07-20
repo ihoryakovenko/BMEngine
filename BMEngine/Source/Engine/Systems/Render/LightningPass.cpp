@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include "RenderResources.h"
 
 #include "Util/Settings.h"
 #include "Util/Util.h"
@@ -31,24 +32,7 @@ namespace LightningPass
 		VkDevice Device = VulkanInterface::GetDevice();
 		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
 
-		VkDescriptorType LightSpaceMatrixDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		VkShaderStageFlags LightSpaceMatrixStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-		
-		VkDescriptorSetLayoutBinding LayoutBinding = { };
-		LayoutBinding.binding = 0;
-		LayoutBinding.descriptorType = LightSpaceMatrixDescriptorType;
-		LayoutBinding.descriptorCount = 1;
-		LayoutBinding.stageFlags = LightSpaceMatrixStageFlags;
-		LayoutBinding.pImmutableSamplers = nullptr;
-
-		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
-		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = 1;
-		LayoutCreateInfo.pBindings = &LayoutBinding;
-		LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-		LayoutCreateInfo.pNext = nullptr;
-
-		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(VulkanInterface::GetDevice(), &LayoutCreateInfo, nullptr, &LightSpaceMatrixLayout));
+		LightSpaceMatrixLayout = RenderResources::GetSetLayout("LightSpaceMatrixLayout");
 
 		VkImageCreateInfo ShadowMapArrayCreateInfo = { };
 		ShadowMapArrayCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -189,7 +173,7 @@ namespace LightningPass
 		VertexInputBinding[1].VertexInputBindingName = "InstanceData";
 
 		VulkanHelper::PipelineSettings PipelineSettings;
-		Util::LoadPipelineSettingsYAML(PipelineSettings, "./Resources/Settings/DepthPipeline.yaml");
+		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/DepthPipeline.yaml");
 		PipelineSettings.Extent = DepthViewportExtent;
 
 		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, PipelineSettings.Shaders.Data, PipelineSettings.Shaders.Count, VertexInputBinding, VertexInputCount, &PipelineSettings, &ResourceInfo);
@@ -211,7 +195,6 @@ namespace LightningPass
 			vkFreeMemory(Device, ShadowMapArray[i].Memory, nullptr);
 		}
 
-		vkDestroyDescriptorSetLayout(Device, LightSpaceMatrixLayout, nullptr);
 
 		vkDestroyPipeline(Device, Pipeline.Pipeline, nullptr);
 		vkDestroyPipelineLayout(Device, Pipeline.PipelineLayout, nullptr);

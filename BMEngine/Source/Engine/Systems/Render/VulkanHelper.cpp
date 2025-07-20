@@ -694,7 +694,7 @@ namespace VulkanHelper
 
 	VkPipeline BatchPipelineCreation(VkDevice Device, const Shader* Shaders, u32 ShadersCount,
 		const BMRVertexInputBinding* VertexInputBinding, u32 VertexInputBindingCount,
-		const PipelineSettings* Settings, const PipelineResourceInfo* ResourceInfo)
+		PipelineSettings* Settings, const PipelineResourceInfo* ResourceInfo)
 	{
 		VkViewport Viewport = Settings->Viewport;
 		Viewport.width = Settings->Extent.width;
@@ -837,7 +837,12 @@ namespace VulkanHelper
 		for (u32 j = 0; j < ShadersCount; ++j)
 		{
 			vkDestroyShaderModule(Device, ShaderStageCreateInfos[j].module, nullptr);
+			// todo: TMP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			Memory::FreeArray(&Settings->Shaders.Data[j].ShaderCode);
 		}
+
+		// todo: TMP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		Memory::FreeArray(&Settings->Shaders);
 
 		return Pipeline;
 	}
@@ -1001,4 +1006,126 @@ namespace VulkanHelper
 		return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	}
 
+	VkShaderStageFlagBits ParseShaderStage(const char* Value, u32 Length)
+	{
+		if ((strncmp(Value, "vertex", Length) == 0) || (strncmp(Value, "VERTEX", Length) == 0))
+			return VK_SHADER_STAGE_VERTEX_BIT;
+		if ((strncmp(Value, "fragment", Length) == 0) || (strncmp(Value, "FRAGMENT", Length) == 0))
+			return VK_SHADER_STAGE_FRAGMENT_BIT;
+		if ((strncmp(Value, "geometry", Length) == 0) || (strncmp(Value, "GEOMETRY", Length) == 0))
+			return VK_SHADER_STAGE_GEOMETRY_BIT;
+		if ((strncmp(Value, "compute", Length) == 0) || (strncmp(Value, "COMPUTE", Length) == 0))
+			return VK_SHADER_STAGE_COMPUTE_BIT;
+		if ((strncmp(Value, "tess_control", Length) == 0) || (strncmp(Value, "TESS_CONTROL", Length) == 0))
+			return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+		if ((strncmp(Value, "tess_eval", Length) == 0) || (strncmp(Value, "TESS_EVAL", Length) == 0))
+			return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+		if ((strncmp(Value, "task", Length) == 0) || (strncmp(Value, "TASK", Length) == 0))
+			return VK_SHADER_STAGE_TASK_BIT_EXT;
+		if ((strncmp(Value, "mesh", Length) == 0) || (strncmp(Value, "MESH", Length) == 0))
+			return VK_SHADER_STAGE_MESH_BIT_EXT;
+		if ((strncmp(Value, "raygen", Length) == 0) || (strncmp(Value, "RAYGEN", Length) == 0))
+			return VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+		if ((strncmp(Value, "closest_hit", Length) == 0) || (strncmp(Value, "CLOSEST_HIT", Length) == 0))
+			return VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+		if ((strncmp(Value, "any_hit", Length) == 0) || (strncmp(Value, "ANY_HIT", Length) == 0))
+			return VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+		if ((strncmp(Value, "miss", Length) == 0) || (strncmp(Value, "MISS", Length) == 0))
+			return VK_SHADER_STAGE_MISS_BIT_KHR;
+		if ((strncmp(Value, "intersection", Length) == 0) || (strncmp(Value, "INTERSECTION", Length) == 0))
+			return VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
+		if ((strncmp(Value, "callable", Length) == 0) || (strncmp(Value, "CALLABLE", Length) == 0))
+			return VK_SHADER_STAGE_CALLABLE_BIT_KHR;
+
+		assert(false);
+		return VK_SHADER_STAGE_VERTEX_BIT;
+	}
+
+	VkFilter ParseFilter(const char* Value, u32 Length)
+	{
+		if (strncmp(Value, "NEAREST", Length) == 0) return VK_FILTER_NEAREST;
+		if (strncmp(Value, "LINEAR", Length) == 0) return VK_FILTER_LINEAR;
+		return VK_FILTER_LINEAR;
+	}
+
+	VkSamplerAddressMode ParseAddressMode(const char* Value, u32 Length)
+	{
+		if (strncmp(Value, "REPEAT", Length) == 0) return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		if (strncmp(Value, "MIRRORED_REPEAT", Length) == 0) return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+		if (strncmp(Value, "CLAMP_TO_EDGE", Length) == 0) return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		if (strncmp(Value, "CLAMP_TO_BORDER", Length) == 0) return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+		if (strncmp(Value, "MIRROR_CLAMP_TO_EDGE", Length) == 0) return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
+		return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	}
+
+	VkBorderColor ParseBorderColor(const char* Value, u32 Length)
+	{
+		if (strncmp(Value, "FLOAT_TRANSPARENT_BLACK", Length) == 0) return VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+		if (strncmp(Value, "INT_TRANSPARENT_BLACK", Length) == 0) return VK_BORDER_COLOR_INT_TRANSPARENT_BLACK;
+		if (strncmp(Value, "FLOAT_OPAQUE_BLACK", Length) == 0) return VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+		if (strncmp(Value, "INT_OPAQUE_BLACK", Length) == 0) return VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+		if (strncmp(Value, "FLOAT_OPAQUE_WHITE", Length) == 0) return VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+		if (strncmp(Value, "INT_OPAQUE_WHITE", Length) == 0) return VK_BORDER_COLOR_INT_OPAQUE_WHITE;
+		return VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	}
+
+	VkSamplerMipmapMode ParseMipmapMode(const char* Value, u32 Length)
+	{
+		if (strncmp(Value, "NEAREST", Length) == 0) return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+		if (strncmp(Value, "LINEAR", Length) == 0) return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	}
+
+	VkDescriptorType ParseDescriptorType(const char* Value, u32 Length)
+	{
+		if (strncmp(Value, "SAMPLER", Length) == 0) return VK_DESCRIPTOR_TYPE_SAMPLER;
+		if (strncmp(Value, "COMBINED_IMAGE_SAMPLER", Length) == 0) return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		if (strncmp(Value, "SAMPLED_IMAGE", Length) == 0) return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+		if (strncmp(Value, "STORAGE_IMAGE", Length) == 0) return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		if (strncmp(Value, "UNIFORM_TEXEL_BUFFER", Length) == 0) return VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+		if (strncmp(Value, "STORAGE_TEXEL_BUFFER", Length) == 0) return VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+		if (strncmp(Value, "UNIFORM_BUFFER", Length) == 0) return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		if (strncmp(Value, "STORAGE_BUFFER", Length) == 0) return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		if (strncmp(Value, "UNIFORM_BUFFER_DYNAMIC", Length) == 0) return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		if (strncmp(Value, "STORAGE_BUFFER_DYNAMIC", Length) == 0) return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+		if (strncmp(Value, "INPUT_ATTACHMENT", Length) == 0) return VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		
+		return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	}
+
+	VkShaderStageFlags ParseShaderStageFlags(const char* Value, u32 Length)
+	{
+		VkShaderStageFlags flags = 0;
+		
+		const char* token = Value;
+		const char* end = Value + Length;
+		
+		while (token < end)
+		{
+			while (token < end && (*token == ' ' || *token == '|' || *token == '\t')) token++;
+			if (token >= end) break;
+			
+			const char* tokenStart = token;
+			while (token < end && *token != ' ' && *token != '|' && *token != '\t') token++;
+			
+			u32 tokenLength = static_cast<u32>(token - tokenStart);
+			
+			if (strncmp(tokenStart, "VERTEX_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_VERTEX_BIT;
+			else if (strncmp(tokenStart, "FRAGMENT_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+			else if (strncmp(tokenStart, "GEOMETRY_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_GEOMETRY_BIT;
+			else if (strncmp(tokenStart, "COMPUTE_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_COMPUTE_BIT;
+			else if (strncmp(tokenStart, "TESSELLATION_CONTROL_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+			else if (strncmp(tokenStart, "TESSELLATION_EVALUATION_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+			else if (strncmp(tokenStart, "TASK_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_TASK_BIT_EXT;
+			else if (strncmp(tokenStart, "MESH_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_MESH_BIT_EXT;
+			else if (strncmp(tokenStart, "RAYGEN_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+			else if (strncmp(tokenStart, "CLOSEST_HIT_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+			else if (strncmp(tokenStart, "ANY_HIT_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+			else if (strncmp(tokenStart, "MISS_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_MISS_BIT_KHR;
+			else if (strncmp(tokenStart, "INTERSECTION_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
+			else if (strncmp(tokenStart, "CALLABLE_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_CALLABLE_BIT_KHR;
+		}
+		
+		return flags;
+	}
 }

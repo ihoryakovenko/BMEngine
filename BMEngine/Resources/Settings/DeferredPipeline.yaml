@@ -1,47 +1,48 @@
-shaders:
-  vertex:   "./Resources/Shaders/Deferred_vert.spv"
-  fragment: "./Resources/Shaders/Deferred_frag.spv"
+pipeline:
+  shaders:
+    vertex:   "./Resources/Shaders/Deferred_vert.spv"
+    fragment: "./Resources/Shaders/Deferred_frag.spv"
 
-rasterization:
-  depthClampEnable: false
-  rasterizerDiscardEnable: false
-  polygonMode: FILL
-  lineWidth: 1
-  cullMode: NONE
-  frontFace: COUNTER_CLOCKWISE
-  depthBiasEnable: false
+  rasterization:
+    depthClampEnable: false
+    rasterizerDiscardEnable: false
+    polygonMode: FILL
+    lineWidth: 1
+    cullMode: NONE
+    frontFace: COUNTER_CLOCKWISE
+    depthBiasEnable: false
 
-colorBlend:
-  logicOpEnable: false
-  attachmentCount: 1
-  colorWriteMask: RGBA
-  blendEnable: false
-  srcColorBlendFactor: SRC_ALPHA
-  dstColorBlendFactor: ONE_MINUS_SRC_ALPHA
-  colorBlendOp: ADD
-  srcAlphaBlendFactor: ONE
-  dstAlphaBlendFactor: ZERO
-  alphaBlendOp: ADD
+  colorBlend:
+    logicOpEnable: false
+    attachmentCount: 1
+    colorWriteMask: RGBA
+    blendEnable: false
+    srcColorBlendFactor: SRC_ALPHA
+    dstColorBlendFactor: ONE_MINUS_SRC_ALPHA
+    colorBlendOp: ADD
+    srcAlphaBlendFactor: ONE
+    dstAlphaBlendFactor: ZERO
+    alphaBlendOp: ADD
 
-depthStencil:
-  depthTestEnable: false
-  depthWriteEnable: false
-  depthCompareOp: LESS
-  depthBoundsTestEnable: false
-  stencilTestEnable: false
+  depthStencil:
+    depthTestEnable: false
+    depthWriteEnable: false
+    depthCompareOp: LESS
+    depthBoundsTestEnable: false
+    stencilTestEnable: false
 
-multisample:
-  sampleShadingEnable: false
-  rasterizationSamples: 1
+  multisample:
+    sampleShadingEnable: false
+    rasterizationSamples: 1
 
-inputAssembly:
-  topology: TRIANGLE_LIST
-  primitiveRestartEnable: false
+  inputAssembly:
+    topology: TRIANGLE_LIST
+    primitiveRestartEnable: false
 
-viewport:
-  viewportCount: 1
-  scissorCount: 1
-  minDepth: 0.0
-  maxDepth: 1.0
-  x: 0.0
-  y: 0.0 
+  viewport:
+    viewportCount: 1
+    scissorCount: 1
+    minDepth: 0.0
+    maxDepth: 1.0
+    x: 0.0
+    y: 0.0 

@@ -246,7 +246,6 @@ namespace Render
 
 	struct RenderState
 	{
-		VulkanCoreContext::VulkanCoreContext CoreContext;
 		ResourceStorage RenderResources;
 		DrawState RenderDrawState;
 		DataTransferState TransferState;

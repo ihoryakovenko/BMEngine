@@ -11,6 +11,7 @@
 
 #include "Deprecated/VulkanInterface/VulkanInterface.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
+#include "Engine/Systems/Render/RenderResources.h"
 
 namespace Util
 {
@@ -67,7 +68,11 @@ namespace Util
 		}
 	};
 
-	void LoadPipelineSettingsYAML(VulkanHelper::PipelineSettings& settings, const char* filePath);
+	void LoadPipelineSettings(VulkanHelper::PipelineSettings& settings, const char* filePath);
+
+
+	void LoadResourcesDescription(RenderResources::ResourcesDescription* resDescription, const char* filePath);
+	void FreeResourcesDescription(RenderResources::ResourcesDescription* ResDescription);
 
 #ifdef NDEBUG
 	static bool EnableValidationLayers = false;
