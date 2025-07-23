@@ -1,7 +1,7 @@
 pipeline:
   shaders:
-    vertex:   "./Resources/Shaders/Deferred_vert.spv"
-    fragment: "./Resources/Shaders/Deferred_frag.spv"
+    vertex:   DeferredVertex
+    fragment: DeferredFragment
 
   rasterization:
     depthClampEnable: false

@@ -82,7 +82,7 @@ namespace MainPass
 		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/SkyBoxPipeline.yaml");
 		PipelineSettings.Extent = MainScreenExtent;
 
-		SkyBoxPipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, PipelineSettings.Shaders.Data, PipelineSettings.Shaders.Count, VertexInputBinding, 1, &PipelineSettings, &ResourceInfo);
+		SkyBoxPipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, VertexInputBinding, 1, &PipelineSettings, &ResourceInfo);
 	}
 
 	void DeInit()

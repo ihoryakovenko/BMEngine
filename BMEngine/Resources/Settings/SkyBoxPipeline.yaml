@@ -1,7 +1,7 @@
 pipeline:
   shaders:
-    vertex:   "./Resources/Shaders/SkyBox_vert.spv"
-    fragment: "./Resources/Shaders/SkyBox_frag.spv"
+    vertex:   SkyBoxVertex
+    fragment: SkyBoxFragment
 
   rasterization:
     depthClampEnable: false

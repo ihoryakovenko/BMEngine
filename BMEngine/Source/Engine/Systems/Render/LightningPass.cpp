@@ -176,7 +176,7 @@ namespace LightningPass
 		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/DepthPipeline.yaml");
 		PipelineSettings.Extent = DepthViewportExtent;
 
-		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, PipelineSettings.Shaders.Data, PipelineSettings.Shaders.Count, VertexInputBinding, VertexInputCount, &PipelineSettings, &ResourceInfo);
+		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, VertexInputBinding, VertexInputCount, &PipelineSettings, &ResourceInfo);
 	}
 
 	void DeInit()

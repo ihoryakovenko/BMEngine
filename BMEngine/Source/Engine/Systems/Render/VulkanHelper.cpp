@@ -8,6 +8,20 @@
 
 namespace VulkanHelper
 {
+	// Helper function to check if a string matches any of the strings in an array
+	template<size_t N>
+	bool StringMatches(const char* Value, u32 Length, const char* const (&Strings)[N])
+	{
+		for (size_t i = 0; i < N; ++i)
+		{
+			if (strncmp(Value, Strings[i], Length) == 0)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 	Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
 	{
 		u32 Count;
@@ -692,7 +706,7 @@ namespace VulkanHelper
 		return VK_FALSE;
 	}
 
-	VkPipeline BatchPipelineCreation(VkDevice Device, const Shader* Shaders, u32 ShadersCount,
+	VkPipeline BatchPipelineCreation(VkDevice Device,
 		const BMRVertexInputBinding* VertexInputBinding, u32 VertexInputBindingCount,
 		PipelineSettings* Settings, const PipelineResourceInfo* ResourceInfo)
 	{
@@ -713,50 +727,6 @@ namespace VulkanHelper
 		ViewportState.pViewports = &Viewport;
 		ViewportState.pScissors = &Scissor;
 
-		Util::RenderLog(Util::BMRVkLogType_Info,
-			"CREATING PIPELINE "
-			"Extent - Width: %d, Height: %d\n"
-			"DepthClampEnable: %d, RasterizerDiscardEnable: %d\n"
-			"PolygonMode: %d, LineWidth: %f, CullMode: %d, FrontFace: %d, DepthBiasEnable: %d\n"
-			"LogicOpEnable: %d, AttachmentCount: %d, ColorWriteMask: %d\n"
-			"BlendEnable: %d, SrcColorBlendFactor: %d, DstColorBlendFactor: %d, ColorBlendOp: %d\n"
-			"SrcAlphaBlendFactor: %d, DstAlphaBlendFactor: %d, AlphaBlendOp: %d\n"
-			"DepthTestEnable: %d, DepthWriteEnable: %d, DepthCompareOp: %d\n"
-			"DepthBoundsTestEnable: %d, StencilTestEnable: %d",
-			Settings->Extent.width, Settings->Extent.height,
-			Settings->RasterizationState.depthClampEnable, Settings->RasterizationState.rasterizerDiscardEnable,
-			Settings->RasterizationState.polygonMode, Settings->RasterizationState.lineWidth, Settings->RasterizationState.cullMode,
-			Settings->RasterizationState.frontFace, Settings->RasterizationState.depthBiasEnable,
-			Settings->ColorBlendState.logicOpEnable, Settings->ColorBlendState.attachmentCount, Settings->ColorBlendAttachment.colorWriteMask,
-			Settings->ColorBlendAttachment.blendEnable, Settings->ColorBlendAttachment.srcColorBlendFactor,
-			Settings->ColorBlendAttachment.dstColorBlendFactor, Settings->ColorBlendAttachment.colorBlendOp,
-			Settings->ColorBlendAttachment.srcAlphaBlendFactor, Settings->ColorBlendAttachment.dstAlphaBlendFactor,
-			Settings->ColorBlendAttachment.alphaBlendOp,
-			Settings->DepthStencilState.depthTestEnable, Settings->DepthStencilState.depthWriteEnable,
-			Settings->DepthStencilState.depthCompareOp, Settings->DepthStencilState.depthBoundsTestEnable,
-			Settings->DepthStencilState.stencilTestEnable
-		);
-
-		Util::RenderLog(Util::BMRVkLogType_Info, "Creating VkPipelineShaderStageCreateInfo, ShadersCount: %u", ShadersCount);
-
-		auto ShaderStageCreateInfos = Memory::MemoryManagementSystem::FrameAlloc<VkPipelineShaderStageCreateInfo>(ShadersCount);
-		for (u32 i = 0; i < ShadersCount; ++i)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Info, "Shader #%d, Stage: %d", i, Shaders[i].Stage);
-
-			VkPipelineShaderStageCreateInfo* ShaderStageCreateInfo = ShaderStageCreateInfos + i;
-			*ShaderStageCreateInfo = { };
-			ShaderStageCreateInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			ShaderStageCreateInfo->stage = Shaders[i].Stage;
-			ShaderStageCreateInfo->pName = "main";
-
-			VkShaderModuleCreateInfo ShaderModuleCreateInfo = { };
-			ShaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-			ShaderModuleCreateInfo.codeSize = Shaders[i].CodeSize;
-			ShaderModuleCreateInfo.pCode = (const u32*)Shaders[i].Code;
-			VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &ShaderModuleCreateInfo, nullptr, &ShaderStageCreateInfo->module));
-		}
-
 		auto VertexInputBindings = Memory::MemoryManagementSystem::FrameAlloc<VkVertexInputBindingDescription>(VertexInputBindingCount);
 		auto VertexInputAttributes = Memory::MemoryManagementSystem::FrameAlloc<VkVertexInputAttributeDescription>(VertexInputBindingCount * MAX_VERTEX_INPUTS_ATTRIBUTES);
 		u32 VertexInputAttributesIndex = 0;
@@ -772,11 +742,6 @@ namespace VulkanHelper
 			VertexInputBinding->inputRate = BMRBinding->InputRate;
 			VertexInputBinding->stride = BMRBinding->Stride;
 
-			Util::RenderLog(Util::BMRVkLogType_Info, "Initialized VkVertexInputBindingDescription, BindingName: %s, "
-				"BindingIndex: %d, VkInputRate: %d, Stride: %d, InputAttributesCount: %d",
-				BMRBinding->VertexInputBindingName, VertexInputBinding->binding, VertexInputBinding->inputRate,
-				VertexInputBinding->stride, BMRBinding->InputAttributesCount);
-
 			for (u32 CurrentAttributeIndex = 0; CurrentAttributeIndex < BMRBinding->InputAttributesCount; ++CurrentAttributeIndex)
 			{
 				const VertexInputAttribute* BMRAttribute = BMRBinding->InputAttributes + CurrentAttributeIndex;
@@ -786,11 +751,6 @@ namespace VulkanHelper
 				VertexInputAttribute->location = VertexInputAttributesIndex;
 				VertexInputAttribute->format = BMRAttribute->Format;
 				VertexInputAttribute->offset = BMRAttribute->AttributeOffset;
-
-				Util::RenderLog(Util::BMRVkLogType_Info, "Initialized VkVertexInputAttributeDescription, "
-					"AttributeName: %s, BindingIndex: %d, Location: %d, VkFormat: %d, Offset: %d, Index in creation array: %d",
-					BMRAttribute->VertexInputAttributeName, BindingIndex, CurrentAttributeIndex,
-					VertexInputAttribute->format, VertexInputAttribute->offset, VertexInputAttributesIndex);
 
 				++VertexInputAttributesIndex;
 			}
@@ -813,8 +773,8 @@ namespace VulkanHelper
 
 		auto PipelineCreateInfo = Memory::MemoryManagementSystem::FrameAlloc<VkGraphicsPipelineCreateInfo>();
 		PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-		PipelineCreateInfo->stageCount = ShadersCount;
-		PipelineCreateInfo->pStages = ShaderStageCreateInfos;
+		PipelineCreateInfo->stageCount = Settings->Shaders.Count;
+		PipelineCreateInfo->pStages = Settings->Shaders.Data;
 		PipelineCreateInfo->pVertexInputState = VertexInputInfo;
 		PipelineCreateInfo->pInputAssemblyState = &Settings->InputAssemblyState;
 		PipelineCreateInfo->pViewportState = &ViewportState;
@@ -833,13 +793,6 @@ namespace VulkanHelper
 
 		VkPipeline Pipeline;
 		VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, 1, PipelineCreateInfo, nullptr, &Pipeline));
-
-		for (u32 j = 0; j < ShadersCount; ++j)
-		{
-			vkDestroyShaderModule(Device, ShaderStageCreateInfos[j].module, nullptr);
-			// todo: TMP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			Memory::FreeArray(&Settings->Shaders.Data[j].ShaderCode);
-		}
 
 		// todo: TMP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		Memory::FreeArray(&Settings->Shaders);
@@ -878,42 +831,35 @@ namespace VulkanHelper
 	{
 		if (Length == 0) return VK_FALSE;
 		
-		if (strncmp(Value, "true", 4) == 0) return VK_TRUE;
-		if (Length == 1 && Value[0] == '1') return VK_TRUE;
-		if (strncmp(Value, "yes", 3) == 0) return VK_TRUE;
-		if (strncmp(Value, "on", 2) == 0) return VK_TRUE;
-		
-		if (strncmp(Value, "false", 5) == 0) return VK_FALSE;
-		if (Length == 1 && Value[0] == '0') return VK_FALSE;
-		if (strncmp(Value, "no", 2) == 0) return VK_FALSE;
-		if (strncmp(Value, "off", 3) == 0) return VK_FALSE;
+		if (StringMatches(Value, Length, ParseStrings::TRUE_STRINGS)) return VK_TRUE;
+		if (StringMatches(Value, Length, ParseStrings::FALSE_STRINGS)) return VK_FALSE;
 		
 		return VK_FALSE;
 	}
 
 	VkPolygonMode ParsePolygonMode(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "fill", 4) == 0 || strncmp(Value, "FILL", 4) == 0) return VK_POLYGON_MODE_FILL;
-		if (strncmp(Value, "line", 4) == 0 || strncmp(Value, "LINE", 4) == 0) return VK_POLYGON_MODE_LINE;
-		if (strncmp(Value, "point", 5) == 0 || strncmp(Value, "POINT", 5) == 0) return VK_POLYGON_MODE_POINT;
+		if (StringMatches(Value, Length, ParseStrings::FILL_STRINGS)) return VK_POLYGON_MODE_FILL;
+		if (StringMatches(Value, Length, ParseStrings::LINE_STRINGS)) return VK_POLYGON_MODE_LINE;
+		if (StringMatches(Value, Length, ParseStrings::POINT_STRINGS)) return VK_POLYGON_MODE_POINT;
 		
 		return VK_POLYGON_MODE_FILL;
 	}
 
 	VkCullModeFlags ParseCullMode(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "none", 4) == 0 || strncmp(Value, "NONE", 4) == 0) return VK_CULL_MODE_NONE;
-		if (strncmp(Value, "back", 4) == 0 || strncmp(Value, "BACK", 4) == 0) return VK_CULL_MODE_BACK_BIT;
-		if (strncmp(Value, "front", 5) == 0 || strncmp(Value, "FRONT", 5) == 0) return VK_CULL_MODE_FRONT_BIT;
-		if (strncmp(Value, "front_back", 9) == 0 || strncmp(Value, "FRONT_BACK", 9) == 0) return VK_CULL_MODE_FRONT_AND_BACK;
+		if (StringMatches(Value, Length, ParseStrings::NONE_STRINGS)) return VK_CULL_MODE_NONE;
+		if (StringMatches(Value, Length, ParseStrings::BACK_STRINGS)) return VK_CULL_MODE_BACK_BIT;
+		if (StringMatches(Value, Length, ParseStrings::FRONT_STRINGS)) return VK_CULL_MODE_FRONT_BIT;
+		if (StringMatches(Value, Length, ParseStrings::FRONT_BACK_STRINGS)) return VK_CULL_MODE_FRONT_AND_BACK;
 		
 		return VK_CULL_MODE_BACK_BIT;
 	}
 
 	VkFrontFace ParseFrontFace(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "counter_clockwise", 15) == 0 || strncmp(Value, "COUNTER_CLOCKWISE", 15) == 0) return VK_FRONT_FACE_COUNTER_CLOCKWISE;
-		if (strncmp(Value, "clockwise", 10) == 0 || strncmp(Value, "CLOCKWISE", 10) == 0) return VK_FRONT_FACE_CLOCKWISE;
+		if (StringMatches(Value, Length, ParseStrings::COUNTER_CLOCKWISE_STRINGS)) return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		if (StringMatches(Value, Length, ParseStrings::CLOCKWISE_STRINGS)) return VK_FRONT_FACE_CLOCKWISE;
 		
 		return VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	}
@@ -937,104 +883,104 @@ namespace VulkanHelper
 
 	VkBlendFactor ParseBlendFactor(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "one_minus_src_alpha", 18) == 0 || strncmp(Value, "ONE_MINUS_SRC_ALPHA", 18) == 0) return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		if (strncmp(Value, "one_minus_dst_alpha", 18) == 0 || strncmp(Value, "ONE_MINUS_DST_ALPHA", 18) == 0) return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
-		if (strncmp(Value, "one_minus_src_color", 17) == 0 || strncmp(Value, "ONE_MINUS_SRC_COLOR", 17) == 0) return VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
-		if (strncmp(Value, "one_minus_dst_color", 17) == 0 || strncmp(Value, "ONE_MINUS_DST_COLOR", 17) == 0) return VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
-		if (strncmp(Value, "src_color", 9) == 0 || strncmp(Value, "SRC_COLOR", 9) == 0) return VK_BLEND_FACTOR_SRC_COLOR;
-		if (strncmp(Value, "dst_color", 9) == 0 || strncmp(Value, "DST_COLOR", 9) == 0) return VK_BLEND_FACTOR_DST_COLOR;
-		if (strncmp(Value, "src_alpha", 9) == 0 || strncmp(Value, "SRC_ALPHA", 9) == 0) return VK_BLEND_FACTOR_SRC_ALPHA;
-		if (strncmp(Value, "dst_alpha", 9) == 0 || strncmp(Value, "DST_ALPHA", 9) == 0) return VK_BLEND_FACTOR_DST_ALPHA;
-		if (strncmp(Value, "zero", 4) == 0 || strncmp(Value, "ZERO", 4) == 0) return VK_BLEND_FACTOR_ZERO;
-		if (strncmp(Value, "one", 3) == 0 || strncmp(Value, "ONE", 3) == 0) return VK_BLEND_FACTOR_ONE;
+		if (StringMatches(Value, Length, ParseStrings::ONE_MINUS_SRC_ALPHA_STRINGS)) return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		if (StringMatches(Value, Length, ParseStrings::ONE_MINUS_DST_ALPHA_STRINGS)) return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+		if (StringMatches(Value, Length, ParseStrings::ONE_MINUS_SRC_COLOR_STRINGS)) return VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+		if (StringMatches(Value, Length, ParseStrings::ONE_MINUS_DST_COLOR_STRINGS)) return VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
+		if (StringMatches(Value, Length, ParseStrings::SRC_COLOR_STRINGS)) return VK_BLEND_FACTOR_SRC_COLOR;
+		if (StringMatches(Value, Length, ParseStrings::DST_COLOR_STRINGS)) return VK_BLEND_FACTOR_DST_COLOR;
+		if (StringMatches(Value, Length, ParseStrings::SRC_ALPHA_STRINGS)) return VK_BLEND_FACTOR_SRC_ALPHA;
+		if (StringMatches(Value, Length, ParseStrings::DST_ALPHA_STRINGS)) return VK_BLEND_FACTOR_DST_ALPHA;
+		if (StringMatches(Value, Length, ParseStrings::ZERO_STRINGS)) return VK_BLEND_FACTOR_ZERO;
+		if (StringMatches(Value, Length, ParseStrings::ONE_STRINGS)) return VK_BLEND_FACTOR_ONE;
 		
 		return VK_BLEND_FACTOR_SRC_ALPHA;
 	}
 
 	VkBlendOp ParseBlendOp(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "reverse_subtract", 15) == 0 || strncmp(Value, "REVERSE_SUBTRACT", 15) == 0) return VK_BLEND_OP_REVERSE_SUBTRACT;
-		if (strncmp(Value, "subtract", 8) == 0 || strncmp(Value, "SUBTRACT", 8) == 0) return VK_BLEND_OP_SUBTRACT;
-		if (strncmp(Value, "add", 3) == 0 || strncmp(Value, "ADD", 3) == 0) return VK_BLEND_OP_ADD;
-		if (strncmp(Value, "min", 3) == 0 || strncmp(Value, "MIN", 3) == 0) return VK_BLEND_OP_MIN;
-		if (strncmp(Value, "max", 3) == 0 || strncmp(Value, "MAX", 3) == 0) return VK_BLEND_OP_MAX;
+		if (StringMatches(Value, Length, ParseStrings::REVERSE_SUBTRACT_STRINGS)) return VK_BLEND_OP_REVERSE_SUBTRACT;
+		if (StringMatches(Value, Length, ParseStrings::SUBTRACT_STRINGS)) return VK_BLEND_OP_SUBTRACT;
+		if (StringMatches(Value, Length, ParseStrings::ADD_STRINGS)) return VK_BLEND_OP_ADD;
+		if (StringMatches(Value, Length, ParseStrings::MIN_STRINGS)) return VK_BLEND_OP_MIN;
+		if (StringMatches(Value, Length, ParseStrings::MAX_STRINGS)) return VK_BLEND_OP_MAX;
 		
 		return VK_BLEND_OP_ADD;
 	}
 
 	VkCompareOp ParseCompareOp(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "never", 5) == 0 || strncmp(Value, "NEVER", 5) == 0) return VK_COMPARE_OP_NEVER;
-		if (strncmp(Value, "less", 4) == 0 || strncmp(Value, "LESS", 4) == 0) return VK_COMPARE_OP_LESS;
-		if (strncmp(Value, "equal", 5) == 0 || strncmp(Value, "EQUAL", 5) == 0) return VK_COMPARE_OP_EQUAL;
-		if (strncmp(Value, "less_or_equal", 12) == 0 || strncmp(Value, "LESS_OR_EQUAL", 12) == 0) return VK_COMPARE_OP_LESS_OR_EQUAL;
-		if (strncmp(Value, "greater", 7) == 0 || strncmp(Value, "GREATER", 7) == 0) return VK_COMPARE_OP_GREATER;
-		if (strncmp(Value, "not_equal", 9) == 0 || strncmp(Value, "NOT_EQUAL", 9) == 0) return VK_COMPARE_OP_NOT_EQUAL;
-		if (strncmp(Value, "greater_or_equal", 15) == 0 || strncmp(Value, "GREATER_OR_EQUAL", 15) == 0) return VK_COMPARE_OP_GREATER_OR_EQUAL;
-		if (strncmp(Value, "always", 6) == 0 || strncmp(Value, "ALWAYS", 6) == 0) return VK_COMPARE_OP_ALWAYS;
+		if (StringMatches(Value, Length, ParseStrings::NEVER_STRINGS)) return VK_COMPARE_OP_NEVER;
+		if (StringMatches(Value, Length, ParseStrings::LESS_STRINGS)) return VK_COMPARE_OP_LESS;
+		if (StringMatches(Value, Length, ParseStrings::EQUAL_STRINGS)) return VK_COMPARE_OP_EQUAL;
+		if (StringMatches(Value, Length, ParseStrings::LESS_OR_EQUAL_STRINGS)) return VK_COMPARE_OP_LESS_OR_EQUAL;
+		if (StringMatches(Value, Length, ParseStrings::GREATER_STRINGS)) return VK_COMPARE_OP_GREATER;
+		if (StringMatches(Value, Length, ParseStrings::NOT_EQUAL_STRINGS)) return VK_COMPARE_OP_NOT_EQUAL;
+		if (StringMatches(Value, Length, ParseStrings::GREATER_OR_EQUAL_STRINGS)) return VK_COMPARE_OP_GREATER_OR_EQUAL;
+		if (StringMatches(Value, Length, ParseStrings::ALWAYS_STRINGS)) return VK_COMPARE_OP_ALWAYS;
 		
 		return VK_COMPARE_OP_LESS;
 	}
 
 	VkSampleCountFlagBits ParseSampleCount(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "1", 1) == 0) return VK_SAMPLE_COUNT_1_BIT;
-		if (strncmp(Value, "2", 1) == 0) return VK_SAMPLE_COUNT_2_BIT;
-		if (strncmp(Value, "4", 1) == 0) return VK_SAMPLE_COUNT_4_BIT;
-		if (strncmp(Value, "8", 1) == 0) return VK_SAMPLE_COUNT_8_BIT;
-		if (strncmp(Value, "16", 2) == 0) return VK_SAMPLE_COUNT_16_BIT;
-		if (strncmp(Value, "32", 2) == 0) return VK_SAMPLE_COUNT_32_BIT;
-		if (strncmp(Value, "64", 2) == 0) return VK_SAMPLE_COUNT_64_BIT;
+		if (StringMatches(Value, Length, ParseStrings::SAMPLE_1_STRINGS)) return VK_SAMPLE_COUNT_1_BIT;
+		if (StringMatches(Value, Length, ParseStrings::SAMPLE_2_STRINGS)) return VK_SAMPLE_COUNT_2_BIT;
+		if (StringMatches(Value, Length, ParseStrings::SAMPLE_4_STRINGS)) return VK_SAMPLE_COUNT_4_BIT;
+		if (StringMatches(Value, Length, ParseStrings::SAMPLE_8_STRINGS)) return VK_SAMPLE_COUNT_8_BIT;
+		if (StringMatches(Value, Length, ParseStrings::SAMPLE_16_STRINGS)) return VK_SAMPLE_COUNT_16_BIT;
+		if (StringMatches(Value, Length, ParseStrings::SAMPLE_32_STRINGS)) return VK_SAMPLE_COUNT_32_BIT;
+		if (StringMatches(Value, Length, ParseStrings::SAMPLE_64_STRINGS)) return VK_SAMPLE_COUNT_64_BIT;
 		
 		return VK_SAMPLE_COUNT_1_BIT;
 	}
 
 	VkPrimitiveTopology ParseTopology(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "point_list", 10) == 0 || strncmp(Value, "POINT_LIST", 10) == 0) return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-		if (strncmp(Value, "line_list", 9) == 0 || strncmp(Value, "LINE_LIST", 9) == 0) return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-		if (strncmp(Value, "line_strip", 10) == 0 || strncmp(Value, "LINE_STRIP", 10) == 0) return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
-		if (strncmp(Value, "triangle_list", 13) == 0 || strncmp(Value, "TRIANGLE_LIST", 13) == 0) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-		if (strncmp(Value, "triangle_strip", 14) == 0 || strncmp(Value, "TRIANGLE_STRIP", 14) == 0) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-		if (strncmp(Value, "triangle_fan", 12) == 0 || strncmp(Value, "TRIANGLE_FAN", 12) == 0) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
-		if (strncmp(Value, "line_list_with_adjacency", 23) == 0 || strncmp(Value, "LINE_LIST_WITH_ADJACENCY", 23) == 0) return VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY;
-		if (strncmp(Value, "line_strip_with_adjacency", 24) == 0 || strncmp(Value, "LINE_STRIP_WITH_ADJACENCY", 24) == 0) return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY;
-		if (strncmp(Value, "triangle_list_with_adjacency", 27) == 0 || strncmp(Value, "TRIANGLE_LIST_WITH_ADJACENCY", 27) == 0) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY;
-		if (strncmp(Value, "triangle_strip_with_adjacency", 28) == 0 || strncmp(Value, "TRIANGLE_STRIP_WITH_ADJACENCY", 28) == 0) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY;
-		if (strncmp(Value, "patch_list", 10) == 0 || strncmp(Value, "PATCH_LIST", 10) == 0) return VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
+		if (StringMatches(Value, Length, ParseStrings::POINT_LIST_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+		if (StringMatches(Value, Length, ParseStrings::LINE_LIST_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+		if (StringMatches(Value, Length, ParseStrings::LINE_STRIP_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+		if (StringMatches(Value, Length, ParseStrings::TRIANGLE_LIST_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		if (StringMatches(Value, Length, ParseStrings::TRIANGLE_STRIP_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+		if (StringMatches(Value, Length, ParseStrings::TRIANGLE_FAN_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
+		if (StringMatches(Value, Length, ParseStrings::LINE_LIST_WITH_ADJACENCY_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY;
+		if (StringMatches(Value, Length, ParseStrings::LINE_STRIP_WITH_ADJACENCY_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY;
+		if (StringMatches(Value, Length, ParseStrings::TRIANGLE_LIST_WITH_ADJACENCY_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY;
+		if (StringMatches(Value, Length, ParseStrings::TRIANGLE_STRIP_WITH_ADJACENCY_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY;
+		if (StringMatches(Value, Length, ParseStrings::PATCH_LIST_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
 		
 		return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	}
 
 	VkShaderStageFlagBits ParseShaderStage(const char* Value, u32 Length)
 	{
-		if ((strncmp(Value, "vertex", Length) == 0) || (strncmp(Value, "VERTEX", Length) == 0))
+		if (StringMatches(Value, Length, ParseStrings::VERTEX_STRINGS))
 			return VK_SHADER_STAGE_VERTEX_BIT;
-		if ((strncmp(Value, "fragment", Length) == 0) || (strncmp(Value, "FRAGMENT", Length) == 0))
+		if (StringMatches(Value, Length, ParseStrings::FRAGMENT_STRINGS))
 			return VK_SHADER_STAGE_FRAGMENT_BIT;
-		if ((strncmp(Value, "geometry", Length) == 0) || (strncmp(Value, "GEOMETRY", Length) == 0))
+		if (StringMatches(Value, Length, ParseStrings::GEOMETRY_STRINGS))
 			return VK_SHADER_STAGE_GEOMETRY_BIT;
-		if ((strncmp(Value, "compute", Length) == 0) || (strncmp(Value, "COMPUTE", Length) == 0))
+		if (StringMatches(Value, Length, ParseStrings::COMPUTE_STRINGS))
 			return VK_SHADER_STAGE_COMPUTE_BIT;
-		if ((strncmp(Value, "tess_control", Length) == 0) || (strncmp(Value, "TESS_CONTROL", Length) == 0))
+		if (StringMatches(Value, Length, ParseStrings::TESS_CONTROL_STRINGS))
 			return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
-		if ((strncmp(Value, "tess_eval", Length) == 0) || (strncmp(Value, "TESS_EVAL", Length) == 0))
+		if (StringMatches(Value, Length, ParseStrings::TESS_EVAL_STRINGS))
 			return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
-		if ((strncmp(Value, "task", Length) == 0) || (strncmp(Value, "TASK", Length) == 0))
+		if (StringMatches(Value, Length, ParseStrings::TASK_STRINGS))
 			return VK_SHADER_STAGE_TASK_BIT_EXT;
-		if ((strncmp(Value, "mesh", Length) == 0) || (strncmp(Value, "MESH", Length) == 0))
+		if (StringMatches(Value, Length, ParseStrings::MESH_STRINGS))
 			return VK_SHADER_STAGE_MESH_BIT_EXT;
-		if ((strncmp(Value, "raygen", Length) == 0) || (strncmp(Value, "RAYGEN", Length) == 0))
+		if (StringMatches(Value, Length, ParseStrings::RAYGEN_STRINGS))
 			return VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-		if ((strncmp(Value, "closest_hit", Length) == 0) || (strncmp(Value, "CLOSEST_HIT", Length) == 0))
+		if (StringMatches(Value, Length, ParseStrings::CLOSEST_HIT_STRINGS))
 			return VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-		if ((strncmp(Value, "any_hit", Length) == 0) || (strncmp(Value, "ANY_HIT", Length) == 0))
+		if (StringMatches(Value, Length, ParseStrings::ANY_HIT_STRINGS))
 			return VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-		if ((strncmp(Value, "miss", Length) == 0) || (strncmp(Value, "MISS", Length) == 0))
+		if (StringMatches(Value, Length, ParseStrings::MISS_STRINGS))
 			return VK_SHADER_STAGE_MISS_BIT_KHR;
-		if ((strncmp(Value, "intersection", Length) == 0) || (strncmp(Value, "INTERSECTION", Length) == 0))
+		if (StringMatches(Value, Length, ParseStrings::INTERSECTION_STRINGS))
 			return VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
-		if ((strncmp(Value, "callable", Length) == 0) || (strncmp(Value, "CALLABLE", Length) == 0))
+		if (StringMatches(Value, Length, ParseStrings::CALLABLE_STRINGS))
 			return VK_SHADER_STAGE_CALLABLE_BIT_KHR;
 
 		assert(false);
@@ -1043,52 +989,52 @@ namespace VulkanHelper
 
 	VkFilter ParseFilter(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "NEAREST", Length) == 0) return VK_FILTER_NEAREST;
-		if (strncmp(Value, "LINEAR", Length) == 0) return VK_FILTER_LINEAR;
+		if (StringMatches(Value, Length, ParseStrings::NEAREST_STRINGS)) return VK_FILTER_NEAREST;
+		if (StringMatches(Value, Length, ParseStrings::LINEAR_STRINGS)) return VK_FILTER_LINEAR;
 		return VK_FILTER_LINEAR;
 	}
 
 	VkSamplerAddressMode ParseAddressMode(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "REPEAT", Length) == 0) return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		if (strncmp(Value, "MIRRORED_REPEAT", Length) == 0) return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-		if (strncmp(Value, "CLAMP_TO_EDGE", Length) == 0) return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		if (strncmp(Value, "CLAMP_TO_BORDER", Length) == 0) return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-		if (strncmp(Value, "MIRROR_CLAMP_TO_EDGE", Length) == 0) return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
+		if (StringMatches(Value, Length, ParseStrings::REPEAT_STRINGS)) return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		if (StringMatches(Value, Length, ParseStrings::MIRRORED_REPEAT_STRINGS)) return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+		if (StringMatches(Value, Length, ParseStrings::CLAMP_TO_EDGE_STRINGS)) return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		if (StringMatches(Value, Length, ParseStrings::CLAMP_TO_BORDER_STRINGS)) return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+		if (StringMatches(Value, Length, ParseStrings::MIRROR_CLAMP_TO_EDGE_STRINGS)) return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
 		return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 	}
 
 	VkBorderColor ParseBorderColor(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "FLOAT_TRANSPARENT_BLACK", Length) == 0) return VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
-		if (strncmp(Value, "INT_TRANSPARENT_BLACK", Length) == 0) return VK_BORDER_COLOR_INT_TRANSPARENT_BLACK;
-		if (strncmp(Value, "FLOAT_OPAQUE_BLACK", Length) == 0) return VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
-		if (strncmp(Value, "INT_OPAQUE_BLACK", Length) == 0) return VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-		if (strncmp(Value, "FLOAT_OPAQUE_WHITE", Length) == 0) return VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		if (strncmp(Value, "INT_OPAQUE_WHITE", Length) == 0) return VK_BORDER_COLOR_INT_OPAQUE_WHITE;
+		if (StringMatches(Value, Length, ParseStrings::FLOAT_TRANSPARENT_BLACK_STRINGS)) return VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+		if (StringMatches(Value, Length, ParseStrings::INT_TRANSPARENT_BLACK_STRINGS)) return VK_BORDER_COLOR_INT_TRANSPARENT_BLACK;
+		if (StringMatches(Value, Length, ParseStrings::FLOAT_OPAQUE_BLACK_STRINGS)) return VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+		if (StringMatches(Value, Length, ParseStrings::INT_OPAQUE_BLACK_STRINGS)) return VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+		if (StringMatches(Value, Length, ParseStrings::FLOAT_OPAQUE_WHITE_STRINGS)) return VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+		if (StringMatches(Value, Length, ParseStrings::INT_OPAQUE_WHITE_STRINGS)) return VK_BORDER_COLOR_INT_OPAQUE_WHITE;
 		return VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 	}
 
 	VkSamplerMipmapMode ParseMipmapMode(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "NEAREST", Length) == 0) return VK_SAMPLER_MIPMAP_MODE_NEAREST;
-		if (strncmp(Value, "LINEAR", Length) == 0) return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		if (StringMatches(Value, Length, ParseStrings::MIPMAP_NEAREST_STRINGS)) return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+		if (StringMatches(Value, Length, ParseStrings::MIPMAP_LINEAR_STRINGS)) return VK_SAMPLER_MIPMAP_MODE_LINEAR;
 		return VK_SAMPLER_MIPMAP_MODE_LINEAR;
 	}
 
 	VkDescriptorType ParseDescriptorType(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "SAMPLER", Length) == 0) return VK_DESCRIPTOR_TYPE_SAMPLER;
-		if (strncmp(Value, "COMBINED_IMAGE_SAMPLER", Length) == 0) return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		if (strncmp(Value, "SAMPLED_IMAGE", Length) == 0) return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-		if (strncmp(Value, "STORAGE_IMAGE", Length) == 0) return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		if (strncmp(Value, "UNIFORM_TEXEL_BUFFER", Length) == 0) return VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
-		if (strncmp(Value, "STORAGE_TEXEL_BUFFER", Length) == 0) return VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
-		if (strncmp(Value, "UNIFORM_BUFFER", Length) == 0) return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		if (strncmp(Value, "STORAGE_BUFFER", Length) == 0) return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		if (strncmp(Value, "UNIFORM_BUFFER_DYNAMIC", Length) == 0) return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		if (strncmp(Value, "STORAGE_BUFFER_DYNAMIC", Length) == 0) return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-		if (strncmp(Value, "INPUT_ATTACHMENT", Length) == 0) return VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		if (StringMatches(Value, Length, ParseStrings::SAMPLER_STRINGS)) return VK_DESCRIPTOR_TYPE_SAMPLER;
+		if (StringMatches(Value, Length, ParseStrings::COMBINED_IMAGE_SAMPLER_STRINGS)) return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		if (StringMatches(Value, Length, ParseStrings::SAMPLED_IMAGE_STRINGS)) return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+		if (StringMatches(Value, Length, ParseStrings::STORAGE_IMAGE_STRINGS)) return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		if (StringMatches(Value, Length, ParseStrings::UNIFORM_TEXEL_BUFFER_STRINGS)) return VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+		if (StringMatches(Value, Length, ParseStrings::STORAGE_TEXEL_BUFFER_STRINGS)) return VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+		if (StringMatches(Value, Length, ParseStrings::UNIFORM_BUFFER_STRINGS)) return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		if (StringMatches(Value, Length, ParseStrings::STORAGE_BUFFER_STRINGS)) return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		if (StringMatches(Value, Length, ParseStrings::UNIFORM_BUFFER_DYNAMIC_STRINGS)) return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		if (StringMatches(Value, Length, ParseStrings::STORAGE_BUFFER_DYNAMIC_STRINGS)) return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+		if (StringMatches(Value, Length, ParseStrings::INPUT_ATTACHMENT_STRINGS)) return VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
 		
 		return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	}
@@ -1110,20 +1056,20 @@ namespace VulkanHelper
 			
 			u32 tokenLength = static_cast<u32>(token - tokenStart);
 			
-			if (strncmp(tokenStart, "VERTEX_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_VERTEX_BIT;
-			else if (strncmp(tokenStart, "FRAGMENT_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
-			else if (strncmp(tokenStart, "GEOMETRY_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_GEOMETRY_BIT;
-			else if (strncmp(tokenStart, "COMPUTE_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_COMPUTE_BIT;
-			else if (strncmp(tokenStart, "TESSELLATION_CONTROL_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
-			else if (strncmp(tokenStart, "TESSELLATION_EVALUATION_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
-			else if (strncmp(tokenStart, "TASK_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_TASK_BIT_EXT;
-			else if (strncmp(tokenStart, "MESH_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_MESH_BIT_EXT;
-			else if (strncmp(tokenStart, "RAYGEN_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-			else if (strncmp(tokenStart, "CLOSEST_HIT_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-			else if (strncmp(tokenStart, "ANY_HIT_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-			else if (strncmp(tokenStart, "MISS_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_MISS_BIT_KHR;
-			else if (strncmp(tokenStart, "INTERSECTION_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
-			else if (strncmp(tokenStart, "CALLABLE_BIT", tokenLength) == 0) flags |= VK_SHADER_STAGE_CALLABLE_BIT_KHR;
+			if (StringMatches(tokenStart, tokenLength, ParseStrings::VERTEX_BIT_STRINGS)) flags |= VK_SHADER_STAGE_VERTEX_BIT;
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::FRAGMENT_BIT_STRINGS)) flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::GEOMETRY_BIT_STRINGS)) flags |= VK_SHADER_STAGE_GEOMETRY_BIT;
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::COMPUTE_BIT_STRINGS)) flags |= VK_SHADER_STAGE_COMPUTE_BIT;
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::TESSELLATION_CONTROL_BIT_STRINGS)) flags |= VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::TESSELLATION_EVALUATION_BIT_STRINGS)) flags |= VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::TASK_BIT_STRINGS)) flags |= VK_SHADER_STAGE_TASK_BIT_EXT;
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::MESH_BIT_STRINGS)) flags |= VK_SHADER_STAGE_MESH_BIT_EXT;
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::RAYGEN_BIT_STRINGS)) flags |= VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::CLOSEST_HIT_BIT_STRINGS)) flags |= VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::ANY_HIT_BIT_STRINGS)) flags |= VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::MISS_BIT_STRINGS)) flags |= VK_SHADER_STAGE_MISS_BIT_KHR;
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::INTERSECTION_BIT_STRINGS)) flags |= VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::CALLABLE_BIT_STRINGS)) flags |= VK_SHADER_STAGE_CALLABLE_BIT_KHR;
 		}
 		
 		return flags;

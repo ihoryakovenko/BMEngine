@@ -1,6 +1,6 @@
 pipeline:
   shaders:
-    vertex:   "./Resources/Shaders/Depth_vert.spv"
+    vertex:   DepthVertex
 
   rasterization:
     depthClampEnable: false

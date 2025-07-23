@@ -74,7 +74,7 @@ namespace Render
 
 	static void InitStaticMeshPipeline(VkDevice Device, const ResourceStorage* Storage, StaticMeshPipeline* MeshPipeline)
 	{
-		MeshPipeline->ShadowMapArraySampler = RenderResources::GetSampler("ShadowMap");
+		VkSampler ShadowMapArraySampler = RenderResources::GetSampler("ShadowMap");
 
 		const VkDeviceSize LightBufferSize = sizeof(Render::LightBuffer);
 		MeshPipeline->StaticMeshLightLayout = FrameManager::CreateCompatibleLayout(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -105,7 +105,7 @@ namespace Render
 
 			VkDescriptorImageInfo ShadowMapArrayImageInfo;
 			ShadowMapArrayImageInfo.imageView = MeshPipeline->ShadowMapArrayImageInterface[i];
-			ShadowMapArrayImageInfo.sampler = MeshPipeline->ShadowMapArraySampler;
+			ShadowMapArrayImageInfo.sampler = ShadowMapArraySampler;
 			ShadowMapArrayImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 			VkDescriptorSetAllocateInfo AllocInfo = {};
@@ -177,7 +177,7 @@ namespace Render
 		ResourceInfo.PipelineLayout = MeshPipeline->Pipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
 
-		MeshPipeline->Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, PipelineSettings.Shaders.Data, PipelineSettings.Shaders.Count, VertexInputBinding, 2,
+		MeshPipeline->Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, VertexInputBinding, 2,
 			&PipelineSettings, &ResourceInfo);
 	}
 

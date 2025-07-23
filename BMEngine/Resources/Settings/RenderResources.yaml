@@ -76,6 +76,19 @@ samplers:
     borderColor: INT_OPAQUE_BLACK
     unnormalizedCoordinates: false
 
+shaders:
+  StaticMeshVertex: "./Resources/Shaders/Entity_vert.spv"
+  StaticMeshFragment: "./Resources/Shaders/Entity_frag.spv"
+  DeferredVertex: "./Resources/Shaders/Deferred_vert.spv"
+  DeferredFragment: "./Resources/Shaders/Deferred_frag.spv"
+  TerrainGeneratorVertex: "./Resources/Shaders/TerrainGenerator_vert.spv"
+  TerrainGeneratorFragment: "./Resources/Shaders/TerrainGenerator_frag.spv"
+  SkyBoxVertex: "./Resources/Shaders/SkyBox_vert.spv"
+  SkyBoxFragment: "./Resources/Shaders/SkyBox_frag.spv"
+  DepthVertex: "./Resources/Shaders/Depth_vert.spv"
+  QuadBasedSphereVertex: "./Resources/Shaders/QuadBasedSphere_vert.spv"
+  QuadBasedSphereFragment: "./Resources/Shaders/QuadBasedSphere_frag.spv"
+
 DescriptorSetLayouts:
   - name: ShadowMapArrayLayout
     bindings:

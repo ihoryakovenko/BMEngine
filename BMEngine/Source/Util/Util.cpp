@@ -7,6 +7,7 @@
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 
 #include "Engine/Systems/Render/Render.h"
+#include "Engine/Systems/Render/RenderResources.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -133,7 +134,7 @@ namespace Util
 
 		Yaml::Node& PipelineNode = Root["pipeline"];
 
-		Settings.Shaders = Memory::AllocateArray<VulkanHelper::Shader>(1);
+		Settings.Shaders = Memory::AllocateArray<VkPipelineShaderStageCreateInfo>(1);
 
 		if (!PipelineNode["shaders"].IsNone())
 		{
@@ -141,22 +142,12 @@ namespace Util
 			for (auto it = Shaders.Begin(); it != Shaders.End(); it++)
 			{
 				std::cout << (*it).first << ": " << (*it).second.As<std::string>() << std::endl;
-				// TODO: TMP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-				std::vector<char> VertexShaderCode;
-				Util::OpenAndReadFileFull((*it).second.As<std::string>().c_str(), VertexShaderCode, "rb");
-
-				VulkanHelper::Shader* NewShader = Memory::ArrayGetNew(&Settings.Shaders);
-
-				// TODO: TMP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-				NewShader->ShaderCode = Memory::AllocateArray<char>(VertexShaderCode.size());
-				for (u32 i = 0; i < VertexShaderCode.size(); ++i)
-				{
-					Memory::PushBackToArray(&NewShader->ShaderCode, VertexShaderCode.data() + i);
-				}
-
-				NewShader->Stage = VulkanHelper::ParseShaderStage((*it).first.c_str(), (*it).first.size());
-				NewShader->Code = NewShader->ShaderCode.Data; // TODO: TMP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-				NewShader->CodeSize = NewShader->ShaderCode.Count; // TODO: TMP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+				VkPipelineShaderStageCreateInfo* NewShaderStage = Memory::ArrayGetNew(&Settings.Shaders);
+				*NewShaderStage = { };
+				NewShaderStage->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+				NewShaderStage->stage = VulkanHelper::ParseShaderStage((*it).first.c_str(), (*it).first.length());
+				NewShaderStage->pName = "main";
+				NewShaderStage->module = RenderResources::GetShader((*it).second.As<std::string>());
 			}
 		}
 
@@ -448,12 +439,23 @@ namespace Util
 		return Model;
 	}
 
-
-
 	void LoadResourcesDescription(RenderResources::ResourcesDescription* resDescription, const char* filePath)
 	{
 		Yaml::Node root;
 		Yaml::Parse(root, filePath);
+
+		if (!root["shaders"].IsNone())
+		{
+			Yaml::Node& shaders = root["shaders"];
+
+			for (auto it = shaders.Begin(); it != shaders.End(); it++)
+			{
+				std::string shaderName = (*it).first;
+				std::string shaderPath = (*it).second.As<std::string>();
+				
+				resDescription->Shaders[shaderName] = shaderPath;
+			}
+		}
 
 		if (!root["samplers"].IsNone())
 		{

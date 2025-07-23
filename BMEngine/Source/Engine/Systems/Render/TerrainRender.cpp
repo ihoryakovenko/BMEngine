@@ -100,7 +100,7 @@ namespace TerrainRender
 		//Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/TerrainPipeline.ini");
 		PipelineSettings.Extent = MainScreenExtent;
 
-		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, VertexInputBinding, VertexInputCount,
+		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, VertexInputBinding, VertexInputCount,
 			&PipelineSettings, &ResourceInfo);
 
 		LoadTerrain();

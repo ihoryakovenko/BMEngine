@@ -168,7 +168,7 @@ namespace DeferredPass
 		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/DeferredPipeline.yaml");
 		PipelineSettings.Extent = MainScreenExtent;
 
-		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, PipelineSettings.Shaders.Data, PipelineSettings.Shaders.Count, nullptr, 0,
+		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, nullptr, 0,
 			&PipelineSettings, &ResourceInfo);
 	}
 

@@ -1,7 +1,7 @@
 pipeline:
   shaders:
-    vertex:   "./Resources/Shaders/Entity_vert.spv"
-    fragment: "./Resources/Shaders/Entity_frag.spv"
+    vertex:   StaticMeshVertex
+    fragment: StaticMeshFragment
 
   rasterization:
     depthClampEnable: false
