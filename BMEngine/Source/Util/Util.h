@@ -85,8 +85,8 @@ namespace Util
 	Yaml::Node& GetVertexBindingNode(Yaml::Node& VertexNode);
 	Yaml::Node& GetVertexAttributesNode(Yaml::Node& VertexNode);
 	Yaml::Node& GetVertexAttributeFormatNode(Yaml::Node& AttributeNode);
-	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, RenderResources::VertexAttribute* OutAttribute);
-	void ParseVertexBindingNode(Yaml::Node& BindingNode, RenderResources::VertexBinding* OutBinding);
+	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, VulkanHelper::VertexAttribute* OutAttribute, std::string* OutAttributeName);
+	void ParseVertexBindingNode(Yaml::Node& BindingNode, VulkanHelper::VertexBinding* OutBinding);
 
 #ifdef NDEBUG
 	static bool EnableValidationLayers = false;

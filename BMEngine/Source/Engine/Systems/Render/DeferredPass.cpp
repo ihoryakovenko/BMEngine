@@ -168,7 +168,14 @@ namespace DeferredPass
 		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/DeferredPipeline.yaml");
 		PipelineSettings.Extent = MainScreenExtent;
 
-		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, nullptr, 0,
+		VkPipelineVertexInputStateCreateInfo VertexInputState = {};
+		VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		VertexInputState.vertexBindingDescriptionCount = 0;
+		VertexInputState.pVertexBindingDescriptions = nullptr;
+		VertexInputState.vertexAttributeDescriptionCount = 0;
+		VertexInputState.pVertexAttributeDescriptions = nullptr;
+
+		Pipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, &VertexInputState,
 			&PipelineSettings, &ResourceInfo);
 	}
 

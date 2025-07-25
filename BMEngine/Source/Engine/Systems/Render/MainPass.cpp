@@ -67,12 +67,25 @@ namespace MainPass
 
 		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &SkyBoxPipeline.PipelineLayout));
 
-		VulkanHelper::BMRVertexInputBinding VertexInputBinding[1];
-		VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(SkyBoxVertex, Position) };
-		VertexInputBinding[0].InputAttributesCount = 1;
-		VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-		VertexInputBinding[0].Stride = sizeof(SkyBoxVertex);
-		VertexInputBinding[0].VertexInputBindingName = "EntityVertex";
+		// Create vertex binding description for SkyBoxVertex
+		VkVertexInputBindingDescription VertexBinding = {};
+		VertexBinding.binding = 0;
+		VertexBinding.stride = sizeof(SkyBoxVertex);
+		VertexBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+		// Create vertex attribute description
+		VkVertexInputAttributeDescription VertexAttribute = {};
+		VertexAttribute.binding = 0;
+		VertexAttribute.location = 0;
+		VertexAttribute.format = VK_FORMAT_R32G32B32_SFLOAT;
+		VertexAttribute.offset = offsetof(SkyBoxVertex, Position);
+
+		VkPipelineVertexInputStateCreateInfo VertexInputState = {};
+		VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		VertexInputState.vertexBindingDescriptionCount = 1;
+		VertexInputState.pVertexBindingDescriptions = &VertexBinding;
+		VertexInputState.vertexAttributeDescriptionCount = 1;
+		VertexInputState.pVertexAttributeDescriptions = &VertexAttribute;
 
 		VulkanHelper::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = SkyBoxPipeline.PipelineLayout;
@@ -82,7 +95,7 @@ namespace MainPass
 		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/SkyBoxPipeline.yaml");
 		PipelineSettings.Extent = MainScreenExtent;
 
-		SkyBoxPipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, VertexInputBinding, 1, &PipelineSettings, &ResourceInfo);
+		SkyBoxPipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, &VertexInputState, &PipelineSettings, &ResourceInfo);
 	}
 
 	void DeInit()

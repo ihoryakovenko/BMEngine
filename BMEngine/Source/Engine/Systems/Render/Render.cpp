@@ -149,25 +149,71 @@ namespace Render
 
 		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &MeshPipeline->Pipeline.PipelineLayout));
 
-		VulkanHelper::BMRVertexInputBinding VertexInputBinding[2];
-		VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshVertex, Position) };
-		VertexInputBinding[0].InputAttributes[1] = { "TextureCoords", VK_FORMAT_R32G32_SFLOAT, offsetof(StaticMeshVertex, TextureCoords) };
-		VertexInputBinding[0].InputAttributes[2] = { "Normal", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshVertex, Normal) };
-		VertexInputBinding[0].InputAttributesCount = 3;
-		VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-		VertexInputBinding[0].Stride = sizeof(StaticMeshVertex);
-		VertexInputBinding[0].VertexInputBindingName = "EntityVertex";
+		// Get vertex bindings from RenderResources
+		VulkanHelper::VertexBinding StaticMeshVertexBinding = RenderResources::GetVertexBinding("StaticMeshVertex");
+		VulkanHelper::VertexBinding StaticMeshInstanceBinding = RenderResources::GetVertexBinding("StaticMeshInstance");
 
-		u32 Offset = 0;
-		VertexInputBinding[1].InputAttributes[0] = { "InstanceModel0", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
-		VertexInputBinding[1].InputAttributes[1] = { "InstanceModel1", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
-		VertexInputBinding[1].InputAttributes[2] = { "InstanceModel2", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
-		VertexInputBinding[1].InputAttributes[3] = { "InstanceModel3", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
-		VertexInputBinding[1].InputAttributes[4] = { "InstanceMaterialIndex", VK_FORMAT_R32_UINT, Offset }; Offset += sizeof(u32);
-		VertexInputBinding[1].InputAttributesCount = 5;
-		VertexInputBinding[1].InputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
-		VertexInputBinding[1].Stride = sizeof(InstanceData);
-		VertexInputBinding[1].VertexInputBindingName = "InstanceData";
+		// Create vertex binding descriptions
+		VkVertexInputBindingDescription VertexBindings[2];
+		VertexBindings[0].binding = 0;
+		VertexBindings[0].stride = StaticMeshVertexBinding.Stride;
+		VertexBindings[0].inputRate = StaticMeshVertexBinding.InputRate;
+
+		VertexBindings[1].binding = 1;
+		VertexBindings[1].stride = StaticMeshInstanceBinding.Stride;
+		VertexBindings[1].inputRate = StaticMeshInstanceBinding.InputRate;
+
+		// Create vertex attribute descriptions with hardcoded locations
+		VkVertexInputAttributeDescription VertexAttributes[8];
+		
+		// StaticMeshVertex attributes
+		VertexAttributes[0].binding = 0;
+		VertexAttributes[0].location = 0;
+		VertexAttributes[0].format = StaticMeshVertexBinding.Attributes["Position"].Format;
+		VertexAttributes[0].offset = StaticMeshVertexBinding.Attributes["Position"].Offset;
+
+		VertexAttributes[1].binding = 0;
+		VertexAttributes[1].location = 1;
+		VertexAttributes[1].format = StaticMeshVertexBinding.Attributes["TextureCoords"].Format;
+		VertexAttributes[1].offset = StaticMeshVertexBinding.Attributes["TextureCoords"].Offset;
+
+		VertexAttributes[2].binding = 0;
+		VertexAttributes[2].location = 2;
+		VertexAttributes[2].format = StaticMeshVertexBinding.Attributes["Normal"].Format;
+		VertexAttributes[2].offset = StaticMeshVertexBinding.Attributes["Normal"].Offset;
+
+		// StaticMeshInstance attributes
+		VertexAttributes[3].binding = 1;
+		VertexAttributes[3].location = 3;
+		VertexAttributes[3].format = StaticMeshInstanceBinding.Attributes["InstanceModel0"].Format;
+		VertexAttributes[3].offset = StaticMeshInstanceBinding.Attributes["InstanceModel0"].Offset;
+
+		VertexAttributes[4].binding = 1;
+		VertexAttributes[4].location = 4;
+		VertexAttributes[4].format = StaticMeshInstanceBinding.Attributes["InstanceModel1"].Format;
+		VertexAttributes[4].offset = StaticMeshInstanceBinding.Attributes["InstanceModel1"].Offset;
+
+		VertexAttributes[5].binding = 1;
+		VertexAttributes[5].location = 5;
+		VertexAttributes[5].format = StaticMeshInstanceBinding.Attributes["InstanceModel2"].Format;
+		VertexAttributes[5].offset = StaticMeshInstanceBinding.Attributes["InstanceModel2"].Offset;
+
+		VertexAttributes[6].binding = 1;
+		VertexAttributes[6].location = 6;
+		VertexAttributes[6].format = StaticMeshInstanceBinding.Attributes["InstanceModel3"].Format;
+		VertexAttributes[6].offset = StaticMeshInstanceBinding.Attributes["InstanceModel3"].Offset;
+
+		VertexAttributes[7].binding = 1;
+		VertexAttributes[7].location = 7;
+		VertexAttributes[7].format = StaticMeshInstanceBinding.Attributes["InstanceMaterialIndex"].Format;
+		VertexAttributes[7].offset = StaticMeshInstanceBinding.Attributes["InstanceMaterialIndex"].Offset;
+
+		VkPipelineVertexInputStateCreateInfo VertexInputState = {};
+		VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		VertexInputState.vertexBindingDescriptionCount = 2;
+		VertexInputState.pVertexBindingDescriptions = VertexBindings;
+		VertexInputState.vertexAttributeDescriptionCount = 8;
+		VertexInputState.pVertexAttributeDescriptions = VertexAttributes;
 
 		VulkanHelper::PipelineSettings PipelineSettings;
 		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMesh.yaml");
@@ -177,7 +223,7 @@ namespace Render
 		ResourceInfo.PipelineLayout = MeshPipeline->Pipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
 
-		MeshPipeline->Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, VertexInputBinding, 2,
+		MeshPipeline->Pipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, &VertexInputState,
 			&PipelineSettings, &ResourceInfo);
 	}
 

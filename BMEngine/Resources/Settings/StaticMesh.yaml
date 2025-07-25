@@ -3,6 +3,20 @@ pipeline:
     vertex:   StaticMeshVertex
     fragment: StaticMeshFragment
 
+  VertexAttributeLayout:
+    - name: StaticMeshVertex
+      attributes:
+        - name: Position
+        - name: TextureCoords
+        - name: Normal
+    - name: StaticMeshInstance
+      attributes:
+        - name: InstanceModel0
+        - name: InstanceModel1
+        - name: InstanceModel2
+        - name: InstanceModel3
+        - name: InstanceMaterialIndex
+
   rasterization:
     depthClampEnable: false
     rasterizerDiscardEnable: false

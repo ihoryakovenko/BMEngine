@@ -644,7 +644,18 @@ namespace Util
 		return Empty;
 	}
 
-	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, RenderResources::VertexAttribute* OutAttribute)
+	Yaml::Node& GetVertexAttributeNameNode(Yaml::Node& AttributeNode)
+	{
+		if (!AttributeNode["name"].IsNone())
+		{
+			return AttributeNode["name"];
+		}
+		assert(false);
+		static Yaml::Node Empty;
+		return Empty;
+	}
+
+	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, VulkanHelper::VertexAttribute* OutAttribute, std::string* OutAttributeName)
 	{
 		*OutAttribute = { };
 
@@ -653,9 +664,14 @@ namespace Util
 			std::string formatStr = AttributeNode["format"].As<std::string>();
 			OutAttribute->Format = VulkanHelper::ParseFormat(formatStr.c_str(), formatStr.length());
 		}
+
+		if (!AttributeNode["name"].IsNone())
+		{
+			*OutAttributeName = AttributeNode["name"].As<std::string>();
+		}
 	}
 
-	void ParseVertexBindingNode(Yaml::Node& BindingNode, RenderResources::VertexBinding* OutBinding)
+	void ParseVertexBindingNode(Yaml::Node& BindingNode, VulkanHelper::VertexBinding* OutBinding)
 	{
 		*OutBinding = { };
 

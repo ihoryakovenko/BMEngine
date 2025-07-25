@@ -13,8 +13,7 @@ namespace RenderResources
 {
 	static VulkanCoreContext::VulkanCoreContext CoreContext;
 
-	static std::unordered_map<std::string, VertexAttribute> VAttributes;
-	static std::unordered_map<std::string, VertexBinding> VBindings;
+	static std::unordered_map<std::string, VulkanHelper::VertexBinding> VBindings;
 	
 	static std::unordered_map<std::string, VkSampler> Samplers;
 	static std::unordered_map<std::string, VkDescriptorSetLayout> DescriptorSetLayouts;
@@ -30,29 +29,32 @@ namespace RenderResources
 		{
 			Yaml::Node& VertexNode = (*VertexIt).second;
 			
-			RenderResources::VertexBinding Binding = { };
+			VulkanHelper::VertexBinding Binding = { };
 			Util::ParseVertexBindingNode(Util::GetVertexBindingNode(VertexNode), &Binding);
 			
 			Yaml::Node& AttributesNode = Util::GetVertexAttributesNode(VertexNode);
 
+			u32 Offset = 0;
 			u32 Stride = 0;
 			for (auto AttributeIt = AttributesNode.Begin(); AttributeIt != AttributesNode.End(); AttributeIt++)
 			{
-				Yaml::Node& AttributeNode = (*AttributeIt).second;
-				Yaml::Node& FormatNode = Util::GetVertexAttributeFormatNode(AttributeNode);
+				VulkanHelper::VertexAttribute Attribute = { };
+				std::string AttributeName;
+				Util::ParseVertexAttributeNode((*AttributeIt).second, &Attribute, &AttributeName);
+
+				Yaml::Node& FormatNode = Util::GetVertexAttributeFormatNode((*AttributeIt).second);
 				std::string FormatStr = FormatNode.As<std::string>();
-				Stride += VulkanHelper::CalculateFormatSizeFromString(FormatStr.c_str(), static_cast<u32>(FormatStr.length()));
+				u32 Size = VulkanHelper::CalculateFormatSizeFromString(FormatStr.c_str(), (u32)FormatStr.length());
+
+				Attribute.Offset = Offset;
+				Offset += Size;
+				Stride += Size;
+
+				Binding.Attributes[AttributeName] = Attribute;
 			}
 
 			Binding.Stride = Stride;
 			VBindings[(*VertexIt).first] = Binding;
-
-			for (auto AttributeIt = AttributesNode.Begin(); AttributeIt != AttributesNode.End(); AttributeIt++)
-			{
-				RenderResources::VertexAttribute Attribute = { };
-				Util::ParseVertexAttributeNode((*AttributeIt).second, &Attribute);
-				VAttributes[(*AttributeIt).first] = Attribute;
-			}
 		}
 
 		Yaml::Node& ShadersNode = Util::GetShaders(Root);
@@ -121,6 +123,64 @@ namespace RenderResources
 		}
 	}
 
+	VkPipeline CreateGraphicsPipeline(VkDevice Device,
+		VkPipelineVertexInputStateCreateInfo* VertexInputState,
+		VulkanHelper::PipelineSettings* Settings, const VulkanHelper::PipelineResourceInfo* ResourceInfo)
+	{
+		VkViewport Viewport = Settings->Viewport;
+		Viewport.width = Settings->Extent.width;
+		Viewport.height = Settings->Extent.height;
+		Viewport.minDepth = 0.0f;
+		Viewport.maxDepth = 1.0f;
+		Viewport.x = 0.0f;
+		Viewport.y = 0.0f;
+
+		VkRect2D Scissor = Settings->Scissor;
+		Scissor.extent.width = Settings->Extent.width;
+		Scissor.extent.height = Settings->Extent.height;
+		Scissor.offset = { };
+
+		VkPipelineViewportStateCreateInfo ViewportState = Settings->ViewportState;
+		ViewportState.pViewports = &Viewport;
+		ViewportState.pScissors = &Scissor;
+
+		VkPipelineRenderingCreateInfo RenderingInfo = { };
+		RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+		RenderingInfo.pNext = nullptr;
+		RenderingInfo.colorAttachmentCount = ResourceInfo->PipelineAttachmentData.ColorAttachmentCount;
+		RenderingInfo.pColorAttachmentFormats = ResourceInfo->PipelineAttachmentData.ColorAttachmentFormats;
+		RenderingInfo.depthAttachmentFormat = ResourceInfo->PipelineAttachmentData.DepthAttachmentFormat;
+		RenderingInfo.stencilAttachmentFormat = ResourceInfo->PipelineAttachmentData.DepthAttachmentFormat;
+
+		auto PipelineCreateInfo = Memory::MemoryManagementSystem::FrameAlloc<VkGraphicsPipelineCreateInfo>();
+		PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		PipelineCreateInfo->stageCount = Settings->Shaders.Count;
+		PipelineCreateInfo->pStages = Settings->Shaders.Data;
+		PipelineCreateInfo->pVertexInputState = VertexInputState;
+		PipelineCreateInfo->pInputAssemblyState = &Settings->InputAssemblyState;
+		PipelineCreateInfo->pViewportState = &ViewportState;
+		PipelineCreateInfo->pDynamicState = nullptr;
+		PipelineCreateInfo->pRasterizationState = &Settings->RasterizationState;
+		PipelineCreateInfo->pMultisampleState = &Settings->MultisampleState;
+		PipelineCreateInfo->pColorBlendState = &Settings->ColorBlendState;
+		PipelineCreateInfo->pDepthStencilState = &Settings->DepthStencilState;
+		PipelineCreateInfo->layout = ResourceInfo->PipelineLayout;
+		PipelineCreateInfo->renderPass = nullptr;
+		PipelineCreateInfo->subpass = 0;
+		PipelineCreateInfo->pNext = &RenderingInfo;
+
+		PipelineCreateInfo->basePipelineHandle = VK_NULL_HANDLE;
+		PipelineCreateInfo->basePipelineIndex = -1;
+
+		VkPipeline Pipeline;
+		VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, 1, PipelineCreateInfo, nullptr, &Pipeline));
+
+		// todo: TMP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		Memory::FreeArray(&Settings->Shaders);
+
+		return Pipeline;
+	}
+
 	void DeInit()
 	{
 		VkDevice Device = CoreContext.LogicalDevice;
@@ -143,6 +203,7 @@ namespace RenderResources
 		Shaders.clear();
 		Samplers.clear();
 		DescriptorSetLayouts.clear();
+		VBindings.clear();
 
 		VulkanCoreContext::DestroyCoreContext(&CoreContext);
 	}
@@ -188,19 +249,7 @@ namespace RenderResources
 		return nullptr;
 	}
 
-	VertexAttribute GetVertexAttribute(const std::string& Id)
-	{
-		auto It = VAttributes.find(Id);
-		if (It != VAttributes.end())
-		{
-			return It->second;
-		}
-
-		assert(false);
-		return { };
-	}
-
-	VertexBinding GetVertexBinding(const std::string& Id)
+	VulkanHelper::VertexBinding GetVertexBinding(const std::string& Id)
 	{
 		auto It = VBindings.find(Id);
 		if (It != VBindings.end())

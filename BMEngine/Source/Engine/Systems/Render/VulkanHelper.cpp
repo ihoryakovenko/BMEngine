@@ -116,6 +116,7 @@ namespace VulkanHelper
 
 		VkBuffer Buffer;
 		VULKAN_CHECK_RESULT(vkCreateBuffer(Device, &BufferInfo, nullptr, &Buffer));
+
 		return Buffer;
 	}
 
@@ -706,100 +707,6 @@ namespace VulkanHelper
 		return VK_FALSE;
 	}
 
-	VkPipeline BatchPipelineCreation(VkDevice Device,
-		const BMRVertexInputBinding* VertexInputBinding, u32 VertexInputBindingCount,
-		PipelineSettings* Settings, const PipelineResourceInfo* ResourceInfo)
-	{
-		VkViewport Viewport = Settings->Viewport;
-		Viewport.width = Settings->Extent.width;
-		Viewport.height = Settings->Extent.height;
-		Viewport.minDepth = 0.0f;
-		Viewport.maxDepth = 1.0f;
-		Viewport.x = 0.0f;
-		Viewport.y = 0.0f;
-
-		VkRect2D Scissor = Settings->Scissor;
-		Scissor.extent.width = Settings->Extent.width;
-		Scissor.extent.height = Settings->Extent.height;
-		Scissor.offset = {};
-
-		VkPipelineViewportStateCreateInfo ViewportState = Settings->ViewportState;
-		ViewportState.pViewports = &Viewport;
-		ViewportState.pScissors = &Scissor;
-
-		auto VertexInputBindings = Memory::MemoryManagementSystem::FrameAlloc<VkVertexInputBindingDescription>(VertexInputBindingCount);
-		auto VertexInputAttributes = Memory::MemoryManagementSystem::FrameAlloc<VkVertexInputAttributeDescription>(VertexInputBindingCount * MAX_VERTEX_INPUTS_ATTRIBUTES);
-		u32 VertexInputAttributesIndex = 0;
-
-		Util::RenderLog(Util::BMRVkLogType_Info, "Creating vertex input, VertexInputBindingCount: %d", VertexInputBindingCount);
-
-		for (u32 BindingIndex = 0; BindingIndex < VertexInputBindingCount; ++BindingIndex)
-		{
-			const BMRVertexInputBinding* BMRBinding = VertexInputBinding + BindingIndex;
-			VkVertexInputBindingDescription* VertexInputBinding = VertexInputBindings + BindingIndex;
-
-			VertexInputBinding->binding = BindingIndex;
-			VertexInputBinding->inputRate = BMRBinding->InputRate;
-			VertexInputBinding->stride = BMRBinding->Stride;
-
-			for (u32 CurrentAttributeIndex = 0; CurrentAttributeIndex < BMRBinding->InputAttributesCount; ++CurrentAttributeIndex)
-			{
-				const VertexInputAttribute* BMRAttribute = BMRBinding->InputAttributes + CurrentAttributeIndex;
-				VkVertexInputAttributeDescription* VertexInputAttribute = VertexInputAttributes + VertexInputAttributesIndex;
-
-				VertexInputAttribute->binding = BindingIndex;
-				VertexInputAttribute->location = VertexInputAttributesIndex;
-				VertexInputAttribute->format = BMRAttribute->Format;
-				VertexInputAttribute->offset = BMRAttribute->AttributeOffset;
-
-				++VertexInputAttributesIndex;
-			}
-		}
-		auto VertexInputInfo = Memory::MemoryManagementSystem::FrameAlloc<VkPipelineVertexInputStateCreateInfo>();
-		*VertexInputInfo = { };
-		VertexInputInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		VertexInputInfo->vertexBindingDescriptionCount = VertexInputBindingCount;
-		VertexInputInfo->pVertexBindingDescriptions = VertexInputBindings;
-		VertexInputInfo->vertexAttributeDescriptionCount = VertexInputAttributesIndex;
-		VertexInputInfo->pVertexAttributeDescriptions = VertexInputAttributes;
-
-		VkPipelineRenderingCreateInfo RenderingInfo = { };
-		RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-		RenderingInfo.pNext = nullptr;
-		RenderingInfo.colorAttachmentCount = ResourceInfo->PipelineAttachmentData.ColorAttachmentCount;
-		RenderingInfo.pColorAttachmentFormats = ResourceInfo->PipelineAttachmentData.ColorAttachmentFormats;
-		RenderingInfo.depthAttachmentFormat = ResourceInfo->PipelineAttachmentData.DepthAttachmentFormat;
-		RenderingInfo.stencilAttachmentFormat = ResourceInfo->PipelineAttachmentData.DepthAttachmentFormat;
-
-		auto PipelineCreateInfo = Memory::MemoryManagementSystem::FrameAlloc<VkGraphicsPipelineCreateInfo>();
-		PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-		PipelineCreateInfo->stageCount = Settings->Shaders.Count;
-		PipelineCreateInfo->pStages = Settings->Shaders.Data;
-		PipelineCreateInfo->pVertexInputState = VertexInputInfo;
-		PipelineCreateInfo->pInputAssemblyState = &Settings->InputAssemblyState;
-		PipelineCreateInfo->pViewportState = &ViewportState;
-		PipelineCreateInfo->pDynamicState = nullptr;
-		PipelineCreateInfo->pRasterizationState = &Settings->RasterizationState;
-		PipelineCreateInfo->pMultisampleState = &Settings->MultisampleState;
-		PipelineCreateInfo->pColorBlendState = &Settings->ColorBlendState;
-		PipelineCreateInfo->pDepthStencilState = &Settings->DepthStencilState;
-		PipelineCreateInfo->layout = ResourceInfo->PipelineLayout;
-		PipelineCreateInfo->renderPass = nullptr;
-		PipelineCreateInfo->subpass = 0;
-		PipelineCreateInfo->pNext = &RenderingInfo;
-
-		PipelineCreateInfo->basePipelineHandle = VK_NULL_HANDLE;
-		PipelineCreateInfo->basePipelineIndex = -1;
-
-		VkPipeline Pipeline;
-		VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, 1, PipelineCreateInfo, nullptr, &Pipeline));
-
-		// todo: TMP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		Memory::FreeArray(&Settings->Shaders);
-
-		return Pipeline;
-	}
-
 	bool CheckFormats(VkPhysicalDevice PhDevice)
 	{
 		const u32 FormatPrioritySize = 3;
@@ -1081,6 +988,7 @@ namespace VulkanHelper
 		if (StringMatches(Value, Length, ParseStrings::R32G32_SFLOAT_STRINGS)) return VK_FORMAT_R32G32_SFLOAT;
 		if (StringMatches(Value, Length, ParseStrings::R32G32B32_SFLOAT_STRINGS)) return VK_FORMAT_R32G32B32_SFLOAT;
 		if (StringMatches(Value, Length, ParseStrings::R32G32B32A32_SFLOAT_STRINGS)) return VK_FORMAT_R32G32B32A32_SFLOAT;
+		if (StringMatches(Value, Length, ParseStrings::R32_UINT_STRINGS)) return VK_FORMAT_R32_UINT;
 		
 		assert(false);
 		return VK_FORMAT_R32_SFLOAT;
@@ -1103,6 +1011,7 @@ namespace VulkanHelper
 			case VK_FORMAT_R32G32_SFLOAT: return 8;
 			case VK_FORMAT_R32G32B32_SFLOAT: return 12;
 			case VK_FORMAT_R32G32B32A32_SFLOAT: return 16;
+			case VK_FORMAT_R32_UINT: return 4;
 			default:
 				assert(false);
 				return 4;

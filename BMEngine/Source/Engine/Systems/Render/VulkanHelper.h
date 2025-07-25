@@ -1,5 +1,8 @@
 #pragma once
 
+#include <unordered_map>
+#include <string>
+
 #include <vulkan/vulkan.h>
 
 #include "Util/EngineTypes.h"
@@ -169,6 +172,7 @@ namespace VulkanHelper
 		inline constexpr const char* R32G32_SFLOAT_STRINGS[] = { "R32G32_SFLOAT" };
 		inline constexpr const char* R32G32B32_SFLOAT_STRINGS[] = { "R32G32B32_SFLOAT" };
 		inline constexpr const char* R32G32B32A32_SFLOAT_STRINGS[] = { "R32G32B32A32_SFLOAT" };
+		inline constexpr const char* R32_UINT_STRINGS[] = { "R32_UINT" };
 
 		// Vertex input rates
 		inline constexpr const char* VERTEX_STRINGS[] = { "VERTEX" };
@@ -216,24 +220,6 @@ namespace VulkanHelper
 		Memory::DynamicHeapArray<char> ShaderCode;
 	};
 
-	struct VertexInputAttribute
-	{
-		const char* VertexInputAttributeName = nullptr;
-		VkFormat Format = VK_FORMAT_UNDEFINED;
-		u32 AttributeOffset = 0;
-	};
-
-	struct BMRVertexInputBinding
-	{
-		const char* VertexInputBindingName = nullptr;
-
-		VertexInputAttribute InputAttributes[MAX_VERTEX_INPUTS_ATTRIBUTES];
-		u32 InputAttributesCount = 0;
-
-		u32 Stride = 0;
-		VkVertexInputRate InputRate = VK_VERTEX_INPUT_RATE_MAX_ENUM;
-	};
-
 	struct PipelineSettings
 	{
 		Memory::DynamicHeapArray<VkPipelineShaderStageCreateInfo> Shaders;
@@ -268,6 +254,19 @@ namespace VulkanHelper
 	{
 		VkPipeline Pipeline;
 		VkPipelineLayout PipelineLayout;
+	};
+
+	struct VertexAttribute
+	{
+		VkFormat Format;
+		u32 Offset;
+	};
+
+	struct VertexBinding
+	{
+		u32 Stride;
+		VkVertexInputRate InputRate;
+		std::unordered_map<std::string, VertexAttribute> Attributes;
 	};
 
 	Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
@@ -305,9 +304,6 @@ namespace VulkanHelper
 	DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkImage Image, MemoryPropertyFlag Properties);
 
 	VkBuffer CreateBuffer(VkDevice Device, u64 Size, BufferUsageFlag Flag);
-	VkPipeline BatchPipelineCreation(VkDevice Device,
-		const BMRVertexInputBinding* VertexInputBinding, u32 VertexInputBindingCount,
-		PipelineSettings* Settings, const PipelineResourceInfo* ResourceInfo);
 
 	void UpdateHostCompatibleBufferMemory(VkDevice Device, VkDeviceMemory Memory, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);
 

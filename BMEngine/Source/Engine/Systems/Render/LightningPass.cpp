@@ -154,29 +154,68 @@ namespace LightningPass
 		ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = DepthFormat;
 		ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
-		const u32 VertexInputCount = 2;
-		VulkanHelper::BMRVertexInputBinding VertexInputBinding[VertexInputCount];
-		VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(Render::StaticMeshVertex, Position) };
-		VertexInputBinding[0].InputAttributesCount = 1;
-		VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-		VertexInputBinding[0].Stride = sizeof(Render::StaticMeshVertex);
-		VertexInputBinding[0].VertexInputBindingName = "MeshVertex";
+		// Create vertex binding descriptions for depth pass (only Position + 4 model matrix components)
+		VkVertexInputBindingDescription VertexBindings[2];
+		VertexBindings[0].binding = 0;
+		VertexBindings[0].stride = sizeof(Render::StaticMeshVertex);
+		VertexBindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
+		VertexBindings[1].binding = 1;
+		VertexBindings[1].stride = sizeof(Render::InstanceData);
+		VertexBindings[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+
+		// Create vertex attribute descriptions
+		VkVertexInputAttributeDescription VertexAttributes[5]; // 1 Position + 4 model matrix components
+		u32 AttributeIndex = 0;
+
+		// Position attribute
+		VertexAttributes[AttributeIndex].binding = 0;
+		VertexAttributes[AttributeIndex].location = AttributeIndex;
+		VertexAttributes[AttributeIndex].format = VK_FORMAT_R32G32B32_SFLOAT;
+		VertexAttributes[AttributeIndex].offset = offsetof(Render::StaticMeshVertex, Position);
+		AttributeIndex++;
+
+		// Instance model matrix components
 		u32 Offset = 0;
-		VertexInputBinding[1].InputAttributes[0] = { "InstanceModel0", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
-		VertexInputBinding[1].InputAttributes[1] = { "InstanceModel1", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
-		VertexInputBinding[1].InputAttributes[2] = { "InstanceModel2", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
-		VertexInputBinding[1].InputAttributes[3] = { "InstanceModel3", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
-		VertexInputBinding[1].InputAttributesCount = 4;
-		VertexInputBinding[1].InputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
-		VertexInputBinding[1].Stride = sizeof(Render::InstanceData);
-		VertexInputBinding[1].VertexInputBindingName = "InstanceData";
+		VertexAttributes[AttributeIndex].binding = 1;
+		VertexAttributes[AttributeIndex].location = AttributeIndex;
+		VertexAttributes[AttributeIndex].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		VertexAttributes[AttributeIndex].offset = Offset;
+		AttributeIndex++;
+		Offset += sizeof(glm::vec4);
+
+		VertexAttributes[AttributeIndex].binding = 1;
+		VertexAttributes[AttributeIndex].location = AttributeIndex;
+		VertexAttributes[AttributeIndex].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		VertexAttributes[AttributeIndex].offset = Offset;
+		AttributeIndex++;
+		Offset += sizeof(glm::vec4);
+
+		VertexAttributes[AttributeIndex].binding = 1;
+		VertexAttributes[AttributeIndex].location = AttributeIndex;
+		VertexAttributes[AttributeIndex].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		VertexAttributes[AttributeIndex].offset = Offset;
+		AttributeIndex++;
+		Offset += sizeof(glm::vec4);
+
+		VertexAttributes[AttributeIndex].binding = 1;
+		VertexAttributes[AttributeIndex].location = AttributeIndex;
+		VertexAttributes[AttributeIndex].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		VertexAttributes[AttributeIndex].offset = Offset;
+		AttributeIndex++;
+
+		VkPipelineVertexInputStateCreateInfo VertexInputState = {};
+		VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		VertexInputState.vertexBindingDescriptionCount = 2;
+		VertexInputState.pVertexBindingDescriptions = VertexBindings;
+		VertexInputState.vertexAttributeDescriptionCount = AttributeIndex;
+		VertexInputState.pVertexAttributeDescriptions = VertexAttributes;
 
 		VulkanHelper::PipelineSettings PipelineSettings;
 		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/DepthPipeline.yaml");
 		PipelineSettings.Extent = DepthViewportExtent;
 
-		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, VertexInputBinding, VertexInputCount, &PipelineSettings, &ResourceInfo);
+		Pipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, &VertexInputState, &PipelineSettings, &ResourceInfo);
 	}
 
 	void DeInit()

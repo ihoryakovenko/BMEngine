@@ -1,3 +1,41 @@
+vertices:
+  StaticMeshVertex:
+    binding:
+      inputRate: VERTEX
+    attributes:
+      - name: Position
+        format: R32G32B32_SFLOAT
+      - name: TextureCoords
+        format: R32G32_SFLOAT
+      - name: Normal
+        format: R32G32B32_SFLOAT
+  StaticMeshInstance:
+    binding:
+      inputRate: INSTANCE
+    attributes:
+      - name: InstanceModel0
+        format: R32G32B32A32_SFLOAT
+      - name: InstanceModel1
+        format: R32G32B32A32_SFLOAT
+      - name: InstanceModel2
+        format: R32G32B32A32_SFLOAT
+      - name: InstanceModel3
+        format: R32G32B32A32_SFLOAT
+      - name: InstanceMaterialIndex
+        format: R32_UINT
+  SkyBoxVertex:
+    binding:
+      inputRate: VERTEX
+    attributes:
+      - name: Position
+        format: R32G32B32_SFLOAT
+  TerrainVertex:
+    binding:
+      inputRate: VERTEX
+    attributes:
+      - name: Altitude
+        format: R32_SFLOAT
+
 samplers:
   ShadowMap:
     magFilter: LINEAR
@@ -75,30 +113,6 @@ samplers:
     compareEnable: false
     borderColor: INT_OPAQUE_BLACK
     unnormalizedCoordinates: false
-
-vertices:
-  StaticMeshVertex:
-    binding:
-      inputRate: VERTEX
-    attributes:
-      Position:
-        format: R32G32B32_SFLOAT
-      TextureCoords:
-        format: R32G32_SFLOAT
-      Normal:
-        format: R32G32B32_SFLOAT
-  SkyBoxVertex:
-    binding:
-      inputRate: VERTEX
-    attributes:
-      Position:
-        format: R32G32B32_SFLOAT
-  TerrainVertex:
-    binding:
-      inputRate: VERTEX
-    attributes:
-      Altitude:
-        format: R32_SFLOAT
 
 shaders:
   StaticMeshVertex: "./Resources/Shaders/Entity_vert.spv"
