@@ -439,173 +439,230 @@ namespace Util
 		return Model;
 	}
 
-	void LoadResourcesDescription(RenderResources::ResourcesDescription* resDescription, const char* filePath)
+	Yaml::Node& GetSamplers(Yaml::Node& Root)
 	{
-		Yaml::Node root;
-		Yaml::Parse(root, filePath);
-
-		if (!root["shaders"].IsNone())
+		if (!Root["samplers"].IsNone())
 		{
-			Yaml::Node& shaders = root["shaders"];
-
-			for (auto it = shaders.Begin(); it != shaders.End(); it++)
-			{
-				std::string shaderName = (*it).first;
-				std::string shaderPath = (*it).second.As<std::string>();
-				
-				resDescription->Shaders[shaderName] = shaderPath;
-			}
+			return Root["samplers"];
 		}
 
-		if (!root["samplers"].IsNone())
+		assert(false);
+		static Yaml::Node Empty;
+		return Empty;
+	}
+
+	void ParseSamplerNode(Yaml::Node& Sampler, VkSamplerCreateInfo* OutSamplerCreateInfo)
+	{
+		*OutSamplerCreateInfo = { };
+		OutSamplerCreateInfo->sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		OutSamplerCreateInfo->pNext = nullptr;
+		OutSamplerCreateInfo->flags = 0;
+
+		std::string Value;
+
+		if (!Sampler["magFilter"].IsNone())
 		{
-			Yaml::Node& samplers = root["samplers"];
-
-			for (auto it = samplers.Begin(); it != samplers.End(); it++)
-			{
-				Yaml::Node& sampler = (*it).second;
-				
-				std::string samplerName = sampler["name"].As<std::string>();
-				VkSamplerCreateInfo samplerInfo = { };
-				
-				samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-				samplerInfo.pNext = nullptr;
-				samplerInfo.flags = 0;
-
-				if (!sampler["magFilter"].IsNone())
-				{
-					std::string value = sampler["magFilter"].As<std::string>();
-					samplerInfo.magFilter = VulkanHelper::ParseFilter(value.c_str(), value.length());
-				}
-				if (!sampler["minFilter"].IsNone())
-				{
-					std::string value = sampler["minFilter"].As<std::string>();
-					samplerInfo.minFilter = VulkanHelper::ParseFilter(value.c_str(), value.length());
-				}
-
-				if (!sampler["addressModeU"].IsNone())
-				{
-					std::string value = sampler["addressModeU"].As<std::string>();
-					samplerInfo.addressModeU = VulkanHelper::ParseAddressMode(value.c_str(), value.length());
-				}
-				if (!sampler["addressModeV"].IsNone())
-				{
-					std::string value = sampler["addressModeV"].As<std::string>();
-					samplerInfo.addressModeV = VulkanHelper::ParseAddressMode(value.c_str(), value.length());
-				}
-				if (!sampler["addressModeW"].IsNone())
-				{
-					std::string value = sampler["addressModeW"].As<std::string>();
-					samplerInfo.addressModeW = VulkanHelper::ParseAddressMode(value.c_str(), value.length());
-				}
-
-				if (!sampler["borderColor"].IsNone())
-				{
-					std::string value = sampler["borderColor"].As<std::string>();
-					samplerInfo.borderColor = VulkanHelper::ParseBorderColor(value.c_str(), value.length());
-				}
-
-				if (!sampler["unnormalizedCoordinates"].IsNone())
-				{
-					samplerInfo.unnormalizedCoordinates = sampler["unnormalizedCoordinates"].As<bool>() ? VK_TRUE : VK_FALSE;
-				}
-				if (!sampler["anisotropyEnable"].IsNone())
-				{
-					samplerInfo.anisotropyEnable = sampler["anisotropyEnable"].As<bool>() ? VK_TRUE : VK_FALSE;
-				}
-				if (!sampler["compareEnable"].IsNone())
-				{
-					samplerInfo.compareEnable = sampler["compareEnable"].As<bool>() ? VK_TRUE : VK_FALSE;
-				}
-
-				if (!sampler["mipmapMode"].IsNone())
-				{
-					std::string value = sampler["mipmapMode"].As<std::string>();
-					samplerInfo.mipmapMode = VulkanHelper::ParseMipmapMode(value.c_str(), value.length());
-				}
-
-				if (!sampler["mipLodBias"].IsNone())
-				{
-					samplerInfo.mipLodBias = sampler["mipLodBias"].As<float>();
-				}
-				if (!sampler["minLod"].IsNone())
-				{
-					samplerInfo.minLod = sampler["minLod"].As<float>();
-				}
-				if (!sampler["maxLod"].IsNone())
-				{
-					samplerInfo.maxLod = sampler["maxLod"].As<float>();
-				}
-				if (!sampler["maxAnisotropy"].IsNone())
-				{
-					samplerInfo.maxAnisotropy = sampler["maxAnisotropy"].As<float>();
-				}
-
-				resDescription->Samplers[samplerName] = samplerInfo;
-			}
+			Value = Sampler["magFilter"].As<std::string>();
+			OutSamplerCreateInfo->magFilter = VulkanHelper::ParseFilter(Value.c_str(), Value.length());
+		}
+		if (!Sampler["minFilter"].IsNone())
+		{
+			Value = Sampler["minFilter"].As<std::string>();
+			OutSamplerCreateInfo->minFilter = VulkanHelper::ParseFilter(Value.c_str(), Value.length());
 		}
 
-		if (!root["DescriptorSetLayouts"].IsNone())
+		if (!Sampler["addressModeU"].IsNone())
 		{
-			Yaml::Node& layouts = root["DescriptorSetLayouts"];
+			Value = Sampler["addressModeU"].As<std::string>();
+			OutSamplerCreateInfo->addressModeU = VulkanHelper::ParseAddressMode(Value.c_str(), Value.length());
+		}
+		if (!Sampler["addressModeV"].IsNone())
+		{
+			Value = Sampler["addressModeV"].As<std::string>();
+			OutSamplerCreateInfo->addressModeV = VulkanHelper::ParseAddressMode(Value.c_str(), Value.length());
+		}
+		if (!Sampler["addressModeW"].IsNone())
+		{
+			Value = Sampler["addressModeW"].As<std::string>();
+			OutSamplerCreateInfo->addressModeW = VulkanHelper::ParseAddressMode(Value.c_str(), Value.length());
+		}
 
-			for (auto it = layouts.Begin(); it != layouts.End(); it++)
-			{
-				Yaml::Node& layout = (*it).second;
-				
-				std::string layoutName = layout["name"].As<std::string>();
-				
+		if (!Sampler["borderColor"].IsNone())
+		{
+			Value = Sampler["borderColor"].As<std::string>();
+			OutSamplerCreateInfo->borderColor = VulkanHelper::ParseBorderColor(Value.c_str(), Value.length());
+		}
 
-				if (!layout["bindings"].IsNone())
-				{
-					Memory::DynamicHeapArray<VkDescriptorSetLayoutBinding> bindings = Memory::AllocateArray<VkDescriptorSetLayoutBinding>(1);
+		if (!Sampler["unnormalizedCoordinates"].IsNone())
+		{
+			OutSamplerCreateInfo->unnormalizedCoordinates = Sampler["unnormalizedCoordinates"].As<bool>() ? VK_TRUE : VK_FALSE;
+		}
+		if (!Sampler["anisotropyEnable"].IsNone())
+		{
+			OutSamplerCreateInfo->anisotropyEnable = Sampler["anisotropyEnable"].As<bool>() ? VK_TRUE : VK_FALSE;
+		}
+		if (!Sampler["compareEnable"].IsNone())
+		{
+			OutSamplerCreateInfo->compareEnable = Sampler["compareEnable"].As<bool>() ? VK_TRUE : VK_FALSE;
+		}
 
-					Yaml::Node& bindingsNode = layout["bindings"];
-					
-					for (auto bindingIt = bindingsNode.Begin(); bindingIt != bindingsNode.End(); bindingIt++)
-					{
-						Yaml::Node& binding = (*bindingIt).second;
-						
-						VkDescriptorSetLayoutBinding layoutBinding = { };
-						
-						if (!binding["binding"].IsNone())
-						{
-							layoutBinding.binding = binding["binding"].As<u32>();
-						}
-						
-						if (!binding["descriptorType"].IsNone())
-						{
-							std::string value = binding["descriptorType"].As<std::string>();
-							layoutBinding.descriptorType = VulkanHelper::ParseDescriptorType(value.c_str(), value.length());
-						}
-						
-						if (!binding["descriptorCount"].IsNone())
-						{
-							layoutBinding.descriptorCount = binding["descriptorCount"].As<u32>();
-						}
-						
-						if (!binding["stageFlags"].IsNone())
-						{
-							std::string value = binding["stageFlags"].As<std::string>();
-							layoutBinding.stageFlags = VulkanHelper::ParseShaderStageFlags(value.c_str(), value.length());
-						}
-						
-						layoutBinding.pImmutableSamplers = nullptr;
+		if (!Sampler["mipmapMode"].IsNone())
+		{
+			Value = Sampler["mipmapMode"].As<std::string>();
+			OutSamplerCreateInfo->mipmapMode = VulkanHelper::ParseMipmapMode(Value.c_str(), Value.length());
+		}
 
-						Memory::PushBackToArray(&bindings, &layoutBinding);
-					}
-
-					resDescription->LayoutBindings[layoutName] = bindings;
-				}
-			}
+		if (!Sampler["mipLodBias"].IsNone())
+		{
+			OutSamplerCreateInfo->mipLodBias = Sampler["mipLodBias"].As<float>();
+		}
+		if (!Sampler["minLod"].IsNone())
+		{
+			OutSamplerCreateInfo->minLod = Sampler["minLod"].As<float>();
+		}
+		if (!Sampler["maxLod"].IsNone())
+		{
+			OutSamplerCreateInfo->maxLod = Sampler["maxLod"].As<float>();
+		}
+		if (!Sampler["maxAnisotropy"].IsNone())
+		{
+			OutSamplerCreateInfo->maxAnisotropy = Sampler["maxAnisotropy"].As<float>();
 		}
 	}
 
-	void FreeResourcesDescription(RenderResources::ResourcesDescription* ResDescription)
+	Yaml::Node& GetShaders(Yaml::Node& Root)
 	{
-		for (auto It = ResDescription->LayoutBindings.begin(); It != ResDescription->LayoutBindings.end(); ++It)
+		if (!Root["shaders"].IsNone())
 		{
-			Memory::FreeArray(&It->second);
+			return Root["shaders"];
+		}
+
+		assert(false);
+		static Yaml::Node Empty;
+		return Empty;
+	}
+
+	void ParseShaderNode(Yaml::Node& ShaderNode, std::string* OutShaderPath)
+	{
+		*OutShaderPath = ShaderNode.As<std::string>();
+	}
+
+	Yaml::Node& GetDescriptorSetLayouts(Yaml::Node& Root)
+	{
+		if (!Root["DescriptorSetLayouts"].IsNone())
+		{
+			return Root["DescriptorSetLayouts"];
+		}
+
+		assert(false);
+		static Yaml::Node Empty;
+		return Empty;
+	}
+
+	Yaml::Node& ParseDescriptorSetLayoutNode(Yaml::Node& Root)
+	{
+		if (!Root["bindings"].IsNone())
+		{
+			return Root["bindings"];
+		}
+
+		assert(false);
+		static Yaml::Node Empty;
+		return Empty;
+	}
+
+	void ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode, VkDescriptorSetLayoutBinding* OutBinding)
+	{
+		*OutBinding = { };
+		OutBinding->pImmutableSamplers = nullptr;
+
+		if (!BindingNode["binding"].IsNone())
+		{
+			OutBinding->binding = BindingNode["binding"].As<u32>();
+		}
+		
+		if (!BindingNode["descriptorType"].IsNone())
+		{
+			std::string value = BindingNode["descriptorType"].As<std::string>();
+			OutBinding->descriptorType = VulkanHelper::ParseDescriptorType(value.c_str(), value.length());
+		}
+		
+		if (!BindingNode["descriptorCount"].IsNone())
+		{
+			OutBinding->descriptorCount = BindingNode["descriptorCount"].As<u32>();
+		}
+		
+		if (!BindingNode["stageFlags"].IsNone())
+		{
+			std::string value = BindingNode["stageFlags"].As<std::string>();
+			OutBinding->stageFlags = VulkanHelper::ParseShaderStageFlags(value.c_str(), value.length());
+		}
+	}
+
+	Yaml::Node& GetVertices(Yaml::Node& Root)
+	{
+		if (!Root["vertices"].IsNone())
+		{
+			return Root["vertices"];
+		}
+
+		assert(false);
+		static Yaml::Node Empty;
+		return Empty;
+	}
+
+	Yaml::Node& GetVertexBindingNode(Yaml::Node& VertexNode)
+	{
+		if (!VertexNode["binding"].IsNone())
+		{
+			return VertexNode["binding"];
+		}
+		assert(false);
+		static Yaml::Node Empty;
+		return Empty;
+	}
+
+	Yaml::Node& GetVertexAttributesNode(Yaml::Node& VertexNode)
+	{
+		if (!VertexNode["attributes"].IsNone())
+		{
+			return VertexNode["attributes"];
+		}
+		assert(false);
+		static Yaml::Node Empty;
+		return Empty;
+	}
+
+	Yaml::Node& GetVertexAttributeFormatNode(Yaml::Node& AttributeNode)
+	{
+		if (!AttributeNode["format"].IsNone())
+		{
+			return AttributeNode["format"];
+		}
+		assert(false);
+		static Yaml::Node Empty;
+		return Empty;
+	}
+
+	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, RenderResources::VertexAttribute* OutAttribute)
+	{
+		*OutAttribute = { };
+
+		if (!AttributeNode["format"].IsNone())
+		{
+			std::string formatStr = AttributeNode["format"].As<std::string>();
+			OutAttribute->Format = VulkanHelper::ParseFormat(formatStr.c_str(), formatStr.length());
+		}
+	}
+
+	void ParseVertexBindingNode(Yaml::Node& BindingNode, RenderResources::VertexBinding* OutBinding)
+	{
+		*OutBinding = { };
+
+		if (!BindingNode["inputRate"].IsNone())
+		{
+			std::string inputRateStr = BindingNode["inputRate"].As<std::string>();
+			OutBinding->InputRate = VulkanHelper::ParseVertexInputRate(inputRateStr.c_str(), inputRateStr.length());
 		}
 	}
 }

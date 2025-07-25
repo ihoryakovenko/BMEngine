@@ -20,34 +20,60 @@ namespace RenderResources
 	static std::unordered_map<std::string, VkDescriptorSetLayout> DescriptorSetLayouts;
 	static std::unordered_map<std::string, VkShaderModule> Shaders;
 
-	void Init(GLFWwindow* WindowHandler, const ResourcesDescription* ResDescription)
+	void Init(GLFWwindow* WindowHandler, Yaml::Node& Root)
 	{
 		VulkanCoreContext::CreateCoreContext(&CoreContext, WindowHandler);
 		VkDevice Device = CoreContext.LogicalDevice;
 
-		VBindings.reserve(1);
-		VBindings[STATIC_MESH_VERTEX] = { sizeof(Render::StaticMeshVertex), VK_VERTEX_INPUT_RATE_VERTEX };
-
-		VAttributes.reserve(3);
-		VAttributes[STATIC_MESH_POSITION] = { VK_FORMAT_R32G32B32_SFLOAT, offsetof(Render::StaticMeshVertex, Position) };
-		VAttributes[STATIC_MESH_TEXTURE_COORDINATE] = { VK_FORMAT_R32G32_SFLOAT, offsetof(Render::StaticMeshVertex, TextureCoords) };
-		VAttributes[STATIC_MESH_NORMAL] = { VK_FORMAT_R32G32B32_SFLOAT, offsetof(Render::StaticMeshVertex, Normal) };
-
-		for (auto it = ResDescription->Shaders.begin(); it != ResDescription->Shaders.end(); ++it)
+		Yaml::Node& VerticesNode = Util::GetVertices(Root);
+		for (auto VertexIt = VerticesNode.Begin(); VertexIt != VerticesNode.End(); VertexIt++)
 		{
-			std::vector<char> shaderCode;
-			if (Util::OpenAndReadFileFull(it->second.c_str(), shaderCode, "rb"))
+			Yaml::Node& VertexNode = (*VertexIt).second;
+			
+			RenderResources::VertexBinding Binding = { };
+			Util::ParseVertexBindingNode(Util::GetVertexBindingNode(VertexNode), &Binding);
+			
+			Yaml::Node& AttributesNode = Util::GetVertexAttributesNode(VertexNode);
+
+			u32 Stride = 0;
+			for (auto AttributeIt = AttributesNode.Begin(); AttributeIt != AttributesNode.End(); AttributeIt++)
+			{
+				Yaml::Node& AttributeNode = (*AttributeIt).second;
+				Yaml::Node& FormatNode = Util::GetVertexAttributeFormatNode(AttributeNode);
+				std::string FormatStr = FormatNode.As<std::string>();
+				Stride += VulkanHelper::CalculateFormatSizeFromString(FormatStr.c_str(), static_cast<u32>(FormatStr.length()));
+			}
+
+			Binding.Stride = Stride;
+			VBindings[(*VertexIt).first] = Binding;
+
+			for (auto AttributeIt = AttributesNode.Begin(); AttributeIt != AttributesNode.End(); AttributeIt++)
+			{
+				RenderResources::VertexAttribute Attribute = { };
+				Util::ParseVertexAttributeNode((*AttributeIt).second, &Attribute);
+				VAttributes[(*AttributeIt).first] = Attribute;
+			}
+		}
+
+		Yaml::Node& ShadersNode = Util::GetShaders(Root);
+		for (auto It = ShadersNode.Begin(); It != ShadersNode.End(); It++)
+		{
+			std::string ShaderPath;
+			Util::ParseShaderNode((*It).second, &ShaderPath);
+			
+			std::vector<char> ShaderCode;
+			if (Util::OpenAndReadFileFull(ShaderPath.c_str(), ShaderCode, "rb"))
 			{
 				VkShaderModuleCreateInfo shaderInfo = { };
 				shaderInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 				shaderInfo.pNext = nullptr;
 				shaderInfo.flags = 0;
-				shaderInfo.codeSize = shaderCode.size();
-				shaderInfo.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data());
+				shaderInfo.codeSize = ShaderCode.size();
+				shaderInfo.pCode = reinterpret_cast<const uint32_t*>(ShaderCode.data());
 				
 				VkShaderModule NewShaderModule;
 				VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &shaderInfo, nullptr, &NewShaderModule));
-				Shaders[it->first] = NewShaderModule;
+				Shaders[(*It).first] = NewShaderModule;
 			}
 			else
 			{
@@ -55,27 +81,43 @@ namespace RenderResources
 			}
 		}
 
-		for (auto it = ResDescription->Samplers.begin(); it != ResDescription->Samplers.end(); ++it)
+		Yaml::Node& SamplersNode = Util::GetSamplers(Root);
+		for (auto It = SamplersNode.Begin(); It != SamplersNode.End(); It++)
 		{
+			VkSamplerCreateInfo CreateInfo = { };
+			Util::ParseSamplerNode((*It).second, &CreateInfo);
+
 			VkSampler NewSampler;
-			VULKAN_CHECK_RESULT(vkCreateSampler(Device, &it->second, nullptr, &NewSampler));
-			Samplers[it->first] = NewSampler;
+			VULKAN_CHECK_RESULT(vkCreateSampler(Device, &CreateInfo, nullptr, &NewSampler));
+			Samplers[(*It).first] = NewSampler;
 		}
 
-		for (auto it = ResDescription->LayoutBindings.begin(); it != ResDescription->LayoutBindings.end(); ++it)
+		Yaml::Node& DescriptorSetLayoutsNode = Util::GetDescriptorSetLayouts(Root);
+		for (auto LayoutIt = DescriptorSetLayoutsNode.Begin(); LayoutIt != DescriptorSetLayoutsNode.End(); LayoutIt++)
 		{
-			const Memory::DynamicHeapArray<VkDescriptorSetLayoutBinding>* Bindings = &it->second;
+			Yaml::Node& BindingsNode = Util::ParseDescriptorSetLayoutNode((*LayoutIt).second);
+
+			Memory::DynamicHeapArray<VkDescriptorSetLayoutBinding> Bindings = Memory::AllocateArray<VkDescriptorSetLayoutBinding>(1);
+			
+			for (auto BindingIt = BindingsNode.Begin(); BindingIt != BindingsNode.End(); BindingIt++)
+			{
+				VkDescriptorSetLayoutBinding Binding = { };
+				Util::ParseDescriptorSetLayoutBindingNode((*BindingIt).second, &Binding);
+				Memory::PushBackToArray(&Bindings, &Binding);
+			}
 
 			VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = {};
 			LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			LayoutCreateInfo.bindingCount = Bindings->Count;
-			LayoutCreateInfo.pBindings = Bindings->Data;
+			LayoutCreateInfo.bindingCount = Bindings.Count;
+			LayoutCreateInfo.pBindings = Bindings.Data;
 			LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
 			LayoutCreateInfo.pNext = nullptr;
 
 			VkDescriptorSetLayout NewLayout;
 			VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, nullptr, &NewLayout));
-			DescriptorSetLayouts[it->first] = NewLayout;
+			DescriptorSetLayouts[(*LayoutIt).first] = NewLayout;
+
+			Memory::FreeArray(&Bindings);
 		}
 	}
 

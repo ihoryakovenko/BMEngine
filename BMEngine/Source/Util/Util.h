@@ -70,9 +70,23 @@ namespace Util
 
 	void LoadPipelineSettings(VulkanHelper::PipelineSettings& settings, const char* filePath);
 
-
-	void LoadResourcesDescription(RenderResources::ResourcesDescription* resDescription, const char* filePath);
-	void FreeResourcesDescription(RenderResources::ResourcesDescription* ResDescription);
+	
+	Yaml::Node& GetSamplers(Yaml::Node& Root);
+	void ParseSamplerNode(Yaml::Node& SamplerNode, VkSamplerCreateInfo* OutSamplerCreateInfo);
+	
+	Yaml::Node& GetShaders(Yaml::Node& Root);
+	void ParseShaderNode(Yaml::Node& ShaderNode, std::string* OutShaderPath);
+	
+	Yaml::Node& GetDescriptorSetLayouts(Yaml::Node& Root);
+	Yaml::Node& ParseDescriptorSetLayoutNode(Yaml::Node& Root);
+	void ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode, VkDescriptorSetLayoutBinding* OutBinding);
+	
+	Yaml::Node& GetVertices(Yaml::Node& Root);
+	Yaml::Node& GetVertexBindingNode(Yaml::Node& VertexNode);
+	Yaml::Node& GetVertexAttributesNode(Yaml::Node& VertexNode);
+	Yaml::Node& GetVertexAttributeFormatNode(Yaml::Node& AttributeNode);
+	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, RenderResources::VertexAttribute* OutAttribute);
+	void ParseVertexBindingNode(Yaml::Node& BindingNode, RenderResources::VertexBinding* OutBinding);
 
 #ifdef NDEBUG
 	static bool EnableValidationLayers = false;

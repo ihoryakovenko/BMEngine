@@ -97,7 +97,7 @@ namespace VulkanHelper
 		inline constexpr const char* PATCH_LIST_STRINGS[] = { "patch_list", "PATCH_LIST" };
 
 		// Shader stages
-		inline constexpr const char* VERTEX_STRINGS[] = { "vertex", "VERTEX" };
+		inline constexpr const char* VERTEX_SHADER_STRINGS[] = { "vertex", "VERTEX" };
 		inline constexpr const char* FRAGMENT_STRINGS[] = { "fragment", "FRAGMENT" };
 		inline constexpr const char* GEOMETRY_STRINGS[] = { "geometry", "GEOMETRY" };
 		inline constexpr const char* COMPUTE_STRINGS[] = { "compute", "COMPUTE" };
@@ -163,6 +163,16 @@ namespace VulkanHelper
 		inline constexpr const char* MISS_BIT_STRINGS[] = { "MISS_BIT" };
 		inline constexpr const char* INTERSECTION_BIT_STRINGS[] = { "INTERSECTION_BIT" };
 		inline constexpr const char* CALLABLE_BIT_STRINGS[] = { "CALLABLE_BIT" };
+
+		// Formats
+		inline constexpr const char* R32_SFLOAT_STRINGS[] = { "R32_SFLOAT" };
+		inline constexpr const char* R32G32_SFLOAT_STRINGS[] = { "R32G32_SFLOAT" };
+		inline constexpr const char* R32G32B32_SFLOAT_STRINGS[] = { "R32G32B32_SFLOAT" };
+		inline constexpr const char* R32G32B32A32_SFLOAT_STRINGS[] = { "R32G32B32A32_SFLOAT" };
+
+		// Vertex input rates
+		inline constexpr const char* VERTEX_STRINGS[] = { "VERTEX" };
+		inline constexpr const char* INSTANCE_STRINGS[] = { "INSTANCE" };
 	}
 
 	enum BufferUsageFlag
@@ -327,4 +337,9 @@ namespace VulkanHelper
 	VkSamplerMipmapMode ParseMipmapMode(const char* Value, u32 Length);
 	VkDescriptorType ParseDescriptorType(const char* Value, u32 Length);
 	VkShaderStageFlags ParseShaderStageFlags(const char* Value, u32 Length);
+	
+	VkFormat ParseFormat(const char* Value, u32 Length);
+	VkVertexInputRate ParseVertexInputRate(const char* Value, u32 Length);
+	u32 CalculateFormatSize(VkFormat Format);
+	u32 CalculateFormatSizeFromString(const char* FormatString, u32 FormatLength);
 }

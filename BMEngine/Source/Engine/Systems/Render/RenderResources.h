@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <string>
 
+#include <mini-yaml/yaml/Yaml.hpp>
+
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 
 struct GLFWwindow;
@@ -16,11 +18,6 @@ namespace VulkanCoreContext
 
 namespace RenderResources
 {
-	inline constexpr const char STATIC_MESH_VERTEX[] = "StaticMeshVertex";
-	inline constexpr const char STATIC_MESH_POSITION[] = "Position";
-	inline constexpr const char STATIC_MESH_TEXTURE_COORDINATE[] = "TextureCoords";
-	inline constexpr const char STATIC_MESH_NORMAL[] = "Normal";
-
 	struct VertexAttribute
 	{
 		VkFormat Format;
@@ -33,14 +30,7 @@ namespace RenderResources
 		VkVertexInputRate InputRate;
 	};
 
-	struct ResourcesDescription
-	{
-		std::unordered_map<std::string, std::string> Shaders;
-		std::unordered_map<std::string, VkSamplerCreateInfo> Samplers;
-		std::unordered_map<std::string, Memory::DynamicHeapArray<VkDescriptorSetLayoutBinding>> LayoutBindings;
-	};
-
-	void Init(GLFWwindow* WindowHandler, const ResourcesDescription* ResDescription);
+	void Init(GLFWwindow* WindowHandler, Yaml::Node& Root);
 	void DeInit();
 
 	VulkanCoreContext::VulkanCoreContext* GetCoreContext();

@@ -954,7 +954,7 @@ namespace VulkanHelper
 
 	VkShaderStageFlagBits ParseShaderStage(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::VERTEX_STRINGS))
+		if (StringMatches(Value, Length, ParseStrings::VERTEX_SHADER_STRINGS))
 			return VK_SHADER_STAGE_VERTEX_BIT;
 		if (StringMatches(Value, Length, ParseStrings::FRAGMENT_STRINGS))
 			return VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -1073,5 +1073,45 @@ namespace VulkanHelper
 		}
 		
 		return flags;
+	}
+
+	VkFormat ParseFormat(const char* Value, u32 Length)
+	{
+		if (StringMatches(Value, Length, ParseStrings::R32_SFLOAT_STRINGS)) return VK_FORMAT_R32_SFLOAT;
+		if (StringMatches(Value, Length, ParseStrings::R32G32_SFLOAT_STRINGS)) return VK_FORMAT_R32G32_SFLOAT;
+		if (StringMatches(Value, Length, ParseStrings::R32G32B32_SFLOAT_STRINGS)) return VK_FORMAT_R32G32B32_SFLOAT;
+		if (StringMatches(Value, Length, ParseStrings::R32G32B32A32_SFLOAT_STRINGS)) return VK_FORMAT_R32G32B32A32_SFLOAT;
+		
+		assert(false);
+		return VK_FORMAT_R32_SFLOAT;
+	}
+
+	VkVertexInputRate ParseVertexInputRate(const char* Value, u32 Length)
+	{
+		if (StringMatches(Value, Length, ParseStrings::VERTEX_STRINGS)) return VK_VERTEX_INPUT_RATE_VERTEX;
+		if (StringMatches(Value, Length, ParseStrings::INSTANCE_STRINGS)) return VK_VERTEX_INPUT_RATE_INSTANCE;
+		
+		assert(false);
+		return VK_VERTEX_INPUT_RATE_VERTEX;
+	}
+
+	u32 CalculateFormatSize(VkFormat Format)
+	{
+		switch (Format)
+		{
+			case VK_FORMAT_R32_SFLOAT: return 4;
+			case VK_FORMAT_R32G32_SFLOAT: return 8;
+			case VK_FORMAT_R32G32B32_SFLOAT: return 12;
+			case VK_FORMAT_R32G32B32A32_SFLOAT: return 16;
+			default:
+				assert(false);
+				return 4;
+		}
+	}
+
+	u32 CalculateFormatSizeFromString(const char* FormatString, u32 FormatLength)
+	{
+		VkFormat Format = ParseFormat(FormatString, FormatLength);
+		return CalculateFormatSize(Format);
 	}
 }

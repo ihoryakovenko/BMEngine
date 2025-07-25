@@ -301,10 +301,10 @@ namespace Engine
 
 		UI::Init(&GuiData);
 
-		RenderResources::ResourcesDescription ResDescription = { };
-		Util::LoadResourcesDescription(&ResDescription, "./Resources/Settings/RenderResources.yaml");
-		RenderResources::Init(Window, &ResDescription);
-		Util::FreeResourcesDescription(&ResDescription);
+		Yaml::Node Root;
+		Yaml::Parse(Root, "./Resources/Settings/RenderResources.yaml");
+
+		RenderResources::Init(Window, Root);
 
 		Render::Init(Window);
 		
