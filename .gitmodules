@@ -4,9 +4,6 @@
 [submodule "External/gli"]
 	path = External/gli
 	url = https://github.com/g-truc/gli
-[submodule "External/SimpleIni"]
-	path = External/SimpleIni
-	url = https://github.com/brofield/simpleini.git
 [submodule "External/mini-yaml"]
 	path = External/mini-yaml
 	url = https://github.com/jimmiebergmann/mini-yaml
