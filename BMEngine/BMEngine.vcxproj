@@ -25,17 +25,20 @@
     <ClCompile Include="..\External\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\External\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="..\External\mini-yaml\yaml\Yaml.cpp" />
     <ClCompile Include="Source\Engine\Engine.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\DebugUI.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\DeferredPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\LightningPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\MainPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\RenderResources.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanCoreContext.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\TerrainRender.cpp" />
     <ClCompile Include="Source\Deprecated\FrameManager.cpp" />
     <ClCompile Include="Source\Deprecated\VulkanInterface\VulkanInterface.cpp" />
+    <ClCompile Include="Source\Engine\Systems\UI\UI.cpp" />
     <ClCompile Include="Source\main.cpp" />
     <ClCompile Include="Source\Util\SavedCode.cpp" />
     <ClCompile Include="Source\Util\Settings.cpp" />
@@ -43,8 +46,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Engine\Engine.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\DebugUI.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\RenderResources.h" />
     <ClInclude Include="Source\Engine\Systems\Render\VulkanCoreContext.h" />
+    <ClInclude Include="Source\Engine\Systems\UI\UI.h" />
     <ClInclude Include="Source\Util\DefaultTextureData.h" />
     <ClInclude Include="Source\Engine\Systems\Render\DeferredPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\LightningPass.h" />
@@ -62,8 +66,25 @@
     <ClInclude Include="Source\Util\Util.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\Settings\DeferredPipeline.yaml" />
+    <None Include="Resources\Settings\DepthPipeline.yaml" />
+    <None Include="Resources\Settings\RenderResources.yaml" />
+    <None Include="Resources\Settings\SkyBoxPipeline.yaml" />
+    <None Include="Resources\Settings\StaticMesh.yaml" />
     <None Include="Resources\Shaders\Second.frag" />
     <None Include="Resources\Shaders\Second.vert" />
+    <None Include="Source\Engine\Systems\Render\Shaders\CompileShaders.bat" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Deferred.frag.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Deferred.vert.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Depth.vert.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Entity.frag.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Entity.vert.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\QuadBasedSphere.frag.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\QuadBasedSphere.vert.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\SkyBox.frag.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\SkyBox.vert.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\TerrainGenerator.frag.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\TerrainGenerator.vert.glsl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -187,7 +208,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;GLM_FORCE_DEPTH_ZERO_TO_ONE;GLM_FORCE_RADIANS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_NONSTDC_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)External\GLFW\include;$(VULKAN_SDK)\Include;$(ProjectDir)Source;$(SolutionDir)External;$(SolutionDir)External\imgui;$(SolutionDir)External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWarningAsError>false</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -219,7 +240,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;GLM_FORCE_DEPTH_ZERO_TO_ONE;GLM_FORCE_RADIANS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_NONSTDC_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)External\GLFW\include;$(VULKAN_SDK)\Include;$(ProjectDir)Source;$(SolutionDir)External;$(SolutionDir)External\imgui;$(SolutionDir)External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWarningAsError>false</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>

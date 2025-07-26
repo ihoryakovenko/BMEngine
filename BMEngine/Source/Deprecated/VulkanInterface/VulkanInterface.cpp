@@ -31,22 +31,23 @@
 
 
 #include "Engine/Systems/Render/Render.h"
+#include "Engine/Systems/Render/RenderResources.h"
 
 namespace VulkanInterface
 {
 	u32 GetImageCount()
 	{
-		return Render::GetRenderState()->CoreContext.ImagesCount;
+		return RenderResources::GetCoreContext()->ImagesCount;
 	}
 
 	VkImageView* GetSwapchainImageViews()
 	{
-		return Render::GetRenderState()->CoreContext.ImageViews;
+		return RenderResources::GetCoreContext()->ImageViews;
 	}
 
 	VkImage* GetSwapchainImages()
 	{
-		return Render::GetRenderState()->CoreContext.Images;
+		return RenderResources::GetCoreContext()->Images;
 	}
 
 	u32 TestGetImageIndex()
@@ -56,17 +57,17 @@ namespace VulkanInterface
 
 	void WaitDevice()
 	{
-		vkDeviceWaitIdle(Render::GetRenderState()->CoreContext.LogicalDevice);
+		vkDeviceWaitIdle(RenderResources::GetCoreContext()->LogicalDevice);
 	}
 
 	VkDevice GetDevice()
 	{
-		return Render::GetRenderState()->CoreContext.LogicalDevice;
+		return RenderResources::GetCoreContext()->LogicalDevice;
 	}
 
 	VkPhysicalDevice GetPhysicalDevice()
 	{
-		return Render::GetRenderState()->CoreContext.PhysicalDevice;
+		return RenderResources::GetCoreContext()->PhysicalDevice;
 	}
 
 	VkCommandBuffer GetCommandBuffer()
@@ -77,22 +78,22 @@ namespace VulkanInterface
 	VkQueue GetTransferQueue()
 	{
 		//return TransferQueue;
-		return Render::GetRenderState()->CoreContext.GraphicsQueue;
+		return RenderResources::GetCoreContext()->GraphicsQueue;
 	}
 
 	VkQueue GetGraphicsQueue()
 	{
-		return Render::GetRenderState()->CoreContext.GraphicsQueue;
+		return RenderResources::GetCoreContext()->GraphicsQueue;
 	}
 
 	VkFormat GetSurfaceFormat()
 	{
-		return Render::GetRenderState()->CoreContext.SurfaceFormat.format;
+		return RenderResources::GetCoreContext()->SurfaceFormat.format;
 	}
 
 	u32 GetQueueGraphicsFamilyIndex()
 	{
-		return Render::GetRenderState()->CoreContext.Indices.GraphicsFamily;
+		return RenderResources::GetCoreContext()->Indices.GraphicsFamily;
 	}
 
 	VkDescriptorPool GetDescriptorPool()
@@ -102,7 +103,7 @@ namespace VulkanInterface
 
 	VkInstance GetInstance()
 	{
-		return Render::GetRenderState()->CoreContext.VulkanInstance;
+		return RenderResources::GetCoreContext()->VulkanInstance;
 	}
 
 	VkCommandPool GetTransferCommandPool()
@@ -112,6 +113,6 @@ namespace VulkanInterface
 
 	VkSwapchainKHR GetSwapchain()
 	{
-		return Render::GetRenderState()->CoreContext.VulkanSwapchain;
+		return RenderResources::GetCoreContext()->VulkanSwapchain;
 	}
 }

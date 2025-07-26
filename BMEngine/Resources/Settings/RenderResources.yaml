@@ -1,0 +1,179 @@
+vertices:
+  StaticMeshVertex:
+    binding:
+      inputRate: VERTEX
+    attributes:
+      - name: Position
+        format: R32G32B32_SFLOAT
+      - name: TextureCoords
+        format: R32G32_SFLOAT
+      - name: Normal
+        format: R32G32B32_SFLOAT
+  StaticMeshInstance:
+    binding:
+      inputRate: INSTANCE
+    attributes:
+      - name: InstanceModel0
+        format: R32G32B32A32_SFLOAT
+      - name: InstanceModel1
+        format: R32G32B32A32_SFLOAT
+      - name: InstanceModel2
+        format: R32G32B32A32_SFLOAT
+      - name: InstanceModel3
+        format: R32G32B32A32_SFLOAT
+      - name: InstanceMaterialIndex
+        format: R32_UINT
+  SkyBoxVertex:
+    binding:
+      inputRate: VERTEX
+    attributes:
+      - name: Position
+        format: R32G32B32_SFLOAT
+  TerrainVertex:
+    binding:
+      inputRate: VERTEX
+    attributes:
+      - name: Altitude
+        format: R32_SFLOAT
+
+samplers:
+  ShadowMap:
+    magFilter: LINEAR
+    minFilter: LINEAR
+    addressModeU: CLAMP_TO_BORDER
+    addressModeV: CLAMP_TO_BORDER
+    addressModeW: CLAMP_TO_BORDER
+    borderColor: INT_OPAQUE_BLACK
+    unnormalizedCoordinates: false
+    mipmapMode: LINEAR
+    mipLodBias: 0.0
+    minLod: 0.0
+    maxLod: 0.0
+    anisotropyEnable: true
+    maxAnisotropy: 1
+
+  DiffuseTexture:
+    magFilter: LINEAR
+    minFilter: LINEAR
+    addressModeU: CLAMP_TO_EDGE
+    addressModeV: CLAMP_TO_EDGE
+    addressModeW: CLAMP_TO_EDGE
+    borderColor: INT_OPAQUE_BLACK
+    unnormalizedCoordinates: false
+    mipmapMode: LINEAR
+    mipLodBias: 0.0
+    minLod: 0.0
+    maxLod: 0.0
+    anisotropyEnable: true
+    maxAnisotropy: 16
+
+  SpecularTexture:
+    magFilter: LINEAR
+    minFilter: LINEAR
+    addressModeU: CLAMP_TO_EDGE
+    addressModeV: CLAMP_TO_EDGE
+    addressModeW: CLAMP_TO_EDGE
+    borderColor: INT_OPAQUE_BLACK
+    unnormalizedCoordinates: false
+    mipmapMode: LINEAR
+    mipLodBias: 0.0
+    minLod: 0.0
+    maxLod: 0.0
+    anisotropyEnable: true
+    maxAnisotropy: 1
+
+  ColorAttachment:
+    magFilter: LINEAR
+    minFilter: LINEAR
+    mipmapMode: LINEAR
+    addressModeU: CLAMP_TO_EDGE
+    addressModeV: CLAMP_TO_EDGE
+    addressModeW: CLAMP_TO_EDGE
+    minLod: 0.0
+    maxLod: 0.0
+    mipLodBias: 0.0
+    anisotropyEnable: true
+    maxAnisotropy: 16.0
+    compareEnable: false
+    borderColor: INT_OPAQUE_BLACK
+    unnormalizedCoordinates: false
+
+  DepthAttachment:
+    magFilter: NEAREST
+    minFilter: NEAREST
+    mipmapMode: NEAREST
+    addressModeU: CLAMP_TO_EDGE
+    addressModeV: CLAMP_TO_EDGE
+    addressModeW: CLAMP_TO_EDGE
+    minLod: 0.0
+    maxLod: 0.0
+    mipLodBias: 0.0
+    anisotropyEnable: false
+    maxAnisotropy: 16.0
+    compareEnable: false
+    borderColor: INT_OPAQUE_BLACK
+    unnormalizedCoordinates: false
+
+shaders:
+  StaticMeshVertex: "./Resources/Shaders/Entity_vert.spv"
+  StaticMeshFragment: "./Resources/Shaders/Entity_frag.spv"
+  DeferredVertex: "./Resources/Shaders/Deferred_vert.spv"
+  DeferredFragment: "./Resources/Shaders/Deferred_frag.spv"
+  TerrainGeneratorVertex: "./Resources/Shaders/TerrainGenerator_vert.spv"
+  TerrainGeneratorFragment: "./Resources/Shaders/TerrainGenerator_frag.spv"
+  SkyBoxVertex: "./Resources/Shaders/SkyBox_vert.spv"
+  SkyBoxFragment: "./Resources/Shaders/SkyBox_frag.spv"
+  DepthVertex: "./Resources/Shaders/Depth_vert.spv"
+  QuadBasedSphereVertex: "./Resources/Shaders/QuadBasedSphere_vert.spv"
+  QuadBasedSphereFragment: "./Resources/Shaders/QuadBasedSphere_frag.spv"
+
+DescriptorSetLayouts:
+  ShadowMapArrayLayout:
+    bindings:
+      - binding: 0
+        descriptorType: COMBINED_IMAGE_SAMPLER
+        descriptorCount: 1
+        stageFlags: VERTEX_BIT | FRAGMENT_BIT
+        pImmutableSamplers: null
+
+  MaterialLayout:
+    bindings:
+      - binding: 0
+        descriptorType: STORAGE_BUFFER
+        descriptorCount: 1
+        stageFlags: VERTEX_BIT | FRAGMENT_BIT
+        pImmutableSamplers: null
+
+  BindlesTexturesLayout:
+    bindings:
+      - binding: 0
+        descriptorType: COMBINED_IMAGE_SAMPLER
+        descriptorCount: 64
+        stageFlags: FRAGMENT_BIT
+        pImmutableSamplers: null
+      - binding: 1
+        descriptorType: COMBINED_IMAGE_SAMPLER
+        descriptorCount: 64
+        stageFlags: FRAGMENT_BIT
+        pImmutableSamplers: null
+
+  MainPassOutputLayout:
+    bindings:
+      - binding: 0
+        descriptorType: COMBINED_IMAGE_SAMPLER
+        descriptorCount: 1
+        stageFlags: FRAGMENT_BIT
+        pImmutableSamplers: null
+      - binding: 1
+        descriptorType: COMBINED_IMAGE_SAMPLER
+        descriptorCount: 1
+        stageFlags: FRAGMENT_BIT
+        pImmutableSamplers: null
+
+  LightSpaceMatrixLayout:
+    bindings:
+      - binding: 0
+        descriptorType: UNIFORM_BUFFER
+        descriptorCount: 1
+        stageFlags: VERTEX_BIT | FRAGMENT_BIT
+        pImmutableSamplers: null 

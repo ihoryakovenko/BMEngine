@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include "RenderResources.h"
 
 #include "Util/Settings.h"
 #include "Util/Util.h"
@@ -31,24 +32,7 @@ namespace LightningPass
 		VkDevice Device = VulkanInterface::GetDevice();
 		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
 
-		VkDescriptorType LightSpaceMatrixDescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		VkShaderStageFlags LightSpaceMatrixStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-		
-		VkDescriptorSetLayoutBinding LayoutBinding = { };
-		LayoutBinding.binding = 0;
-		LayoutBinding.descriptorType = LightSpaceMatrixDescriptorType;
-		LayoutBinding.descriptorCount = 1;
-		LayoutBinding.stageFlags = LightSpaceMatrixStageFlags;
-		LayoutBinding.pImmutableSamplers = nullptr;
-
-		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
-		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = 1;
-		LayoutCreateInfo.pBindings = &LayoutBinding;
-		LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-		LayoutCreateInfo.pNext = nullptr;
-
-		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(VulkanInterface::GetDevice(), &LayoutCreateInfo, nullptr, &LightSpaceMatrixLayout));
+		LightSpaceMatrixLayout = RenderResources::GetSetLayout("LightSpaceMatrixLayout");
 
 		VkImageCreateInfo ShadowMapArrayCreateInfo = { };
 		ShadowMapArrayCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -164,41 +148,16 @@ namespace LightningPass
 
 		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &Pipeline.PipelineLayout));
 
-		std::vector<char> ShaderCode;
-		Util::OpenAndReadFileFull("./Resources/Shaders/Depth_vert.spv", ShaderCode, "rb");
-
-		const u32 ShaderCount = 1;
-		VulkanHelper::Shader Shaders[ShaderCount];
-
-		Shaders[0].Stage = VK_SHADER_STAGE_VERTEX_BIT;
-		Shaders[0].Code = ShaderCode.data();
-		Shaders[0].CodeSize = ShaderCode.size();
-
-		VulkanHelper::PipelineResourceInfo ResourceInfo = { };
+		VulkanHelper::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData.ColorAttachmentCount = 0;
 		ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = DepthFormat;
 		ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
-		const u32 VertexInputCount = 2;
-		VulkanHelper::BMRVertexInputBinding VertexInputBinding[VertexInputCount];
-		VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(Render::StaticMeshVertex, Position) };
-		VertexInputBinding[0].InputAttributesCount = 1;
-		VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-		VertexInputBinding[0].Stride = sizeof(Render::StaticMeshVertex);
-		VertexInputBinding[0].VertexInputBindingName = "MeshVertex";
+		Yaml::Node Root;
+		Yaml::Parse(Root, "./Resources/Settings/DepthPipeline.yaml");
 
-		u32 Offset = 0;
-		VertexInputBinding[1].InputAttributes[0] = { "InstanceModel0", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
-		VertexInputBinding[1].InputAttributes[1] = { "InstanceModel1", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
-		VertexInputBinding[1].InputAttributes[2] = { "InstanceModel2", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
-		VertexInputBinding[1].InputAttributes[3] = { "InstanceModel3", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
-		VertexInputBinding[1].InputAttributesCount = 4;
-		VertexInputBinding[1].InputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
-		VertexInputBinding[1].Stride = sizeof(Render::InstanceData);
-		VertexInputBinding[1].VertexInputBindingName = "InstanceData";
-
-		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, VertexInputBinding, VertexInputCount, &DepthPipelineSettings, &ResourceInfo);
+		Pipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, Root, DepthViewportExtent, Pipeline.PipelineLayout, &ResourceInfo);
 	}
 
 	void DeInit()
@@ -217,7 +176,6 @@ namespace LightningPass
 			vkFreeMemory(Device, ShadowMapArray[i].Memory, nullptr);
 		}
 
-		vkDestroyDescriptorSetLayout(Device, LightSpaceMatrixLayout, nullptr);
 
 		vkDestroyPipeline(Device, Pipeline.Pipeline, nullptr);
 		vkDestroyPipelineLayout(Device, Pipeline.PipelineLayout, nullptr);
@@ -298,8 +256,8 @@ namespace LightningPass
 					continue;
 				}
 
-				Render::StaticMesh* Mesh = Storage->Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
-				Render::InstanceData* Instance = Storage->Meshes.MeshInstances.Data + DrawEntity->InstanceDataIndex;
+				Render::RenderResource<Render::StaticMesh>* MeshResource = Storage->Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
+				Render::StaticMesh* Mesh = &MeshResource->Resource;
 
 				const VkBuffer Buffers[] =
 				{
@@ -310,7 +268,7 @@ namespace LightningPass
 				const u64 Offsets[] =
 				{
 					Mesh->VertexOffset,
-					80 * DrawEntity->InstanceDataIndex
+					sizeof(Render::InstanceData) * DrawEntity->InstanceDataIndex
 				};
 
 				const u32 DescriptorSetGroupCount = 1;

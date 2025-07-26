@@ -88,20 +88,10 @@ namespace TerrainRender
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
 
-		const u32 VertexInputCount = 1;
-		VulkanHelper::BMRVertexInputBinding VertexInputBinding[VertexInputCount];
-		VertexInputBinding[0].InputAttributes[0] = { "Altitude", VK_FORMAT_R32_SFLOAT, offsetof(TerrainVertex, Altitude) };
-		VertexInputBinding[0].InputAttributesCount = 1;
-		VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-		VertexInputBinding[0].Stride = sizeof(TerrainVertex);
-		VertexInputBinding[0].VertexInputBindingName = "TerrainVertex";
+		Yaml::Node Root;
+		Yaml::Parse(Root, "./Resources/Settings/TerrainPipeline.yaml");
 
-		VulkanHelper::PipelineSettings PipelineSettings;
-		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMeshRender.ini");
-		PipelineSettings.Extent = MainScreenExtent;
-
-		Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, VertexInputBinding, VertexInputCount,
-			&PipelineSettings, &ResourceInfo);
+		Pipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, Root, MainScreenExtent, Pipeline.PipelineLayout, &ResourceInfo);
 
 		LoadTerrain();
 	}

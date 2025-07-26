@@ -1,5 +1,8 @@
 #pragma once
 
+#include <unordered_map>
+#include <string>
+
 #include <vulkan/vulkan.h>
 
 #include "Util/EngineTypes.h"
@@ -11,17 +14,17 @@ struct GLFWwindow;
 #define VK_KHR_WIN32_SURFACE_EXTENSION_NAME "VK_KHR_win32_surface"
 
 #define VULKAN_CHECK_RESULT(call) \
-    { \
-        const VkResult result = (call); \
-        if (result != VK_SUCCESS) { \
-            Util::RenderLog(Util::BMRVkLogType_Error, "%s returned %d at %s:%d", #call, result, __FILE__, __LINE__); \
-        } \
-    }
+	{ \
+		const VkResult result = (call); \
+		if (result != VK_SUCCESS) { \
+			Util::RenderLog(Util::BMRVkLogType_Error, "%s returned %d at %s:%d", #call, result, __FILE__, __LINE__); \
+		} \
+	}
 
 namespace VulkanHelper
 {
-	static const u32 MAX_VERTEX_INPUTS_ATTRIBUTES = 16;
-	static const u32 MAX_VERTEX_INPUT_BINDINGS = 16;
+	inline constexpr const u32 MAX_VERTEX_INPUTS_ATTRIBUTES = 16;
+	inline constexpr const u32 MAX_VERTEX_INPUT_BINDINGS = 16;
 
 	enum BufferUsageFlag
 	{
@@ -59,54 +62,9 @@ namespace VulkanHelper
 		VkShaderStageFlagBits Stage;
 		const char* Code;
 		u32 CodeSize;
-	};
 
-	struct VertexInputAttribute
-	{
-		const char* VertexInputAttributeName = nullptr;
-		VkFormat Format = VK_FORMAT_UNDEFINED;
-		u32 AttributeOffset = 0;
-	};
-
-	struct BMRVertexInputBinding
-	{
-		const char* VertexInputBindingName = nullptr;
-
-		VertexInputAttribute InputAttributes[MAX_VERTEX_INPUTS_ATTRIBUTES];
-		u32 InputAttributesCount = 0;
-
-		u32 Stride = 0;
-		VkVertexInputRate InputRate = VK_VERTEX_INPUT_RATE_MAX_ENUM;
-	};
-
-	struct PipelineSettings
-	{
-		VkExtent2D Extent;
-
-		VkBool32 DepthClampEnable = VK_FALSE;
-		VkBool32 RasterizerDiscardEnable = VK_FALSE;
-		VkPolygonMode PolygonMode = VK_POLYGON_MODE_MAX_ENUM;
-		f32 LineWidth = 0.0f;
-		VkCullModeFlags CullMode = VK_CULL_MODE_NONE;
-		VkFrontFace FrontFace = VK_FRONT_FACE_MAX_ENUM;
-		VkBool32 DepthBiasEnable = VK_FALSE;
-
-		VkBool32 LogicOpEnable = VK_FALSE;
-		u32 AttachmentCount = 0;
-		u32 ColorWriteMask = 0;
-		VkBool32 BlendEnable = VK_FALSE;
-		VkBlendFactor SrcColorBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
-		VkBlendFactor DstColorBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
-		VkBlendOp ColorBlendOp = VK_BLEND_OP_MAX_ENUM;
-		VkBlendFactor SrcAlphaBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
-		VkBlendFactor DstAlphaBlendFactor = VK_BLEND_FACTOR_MAX_ENUM;
-		VkBlendOp AlphaBlendOp = VK_BLEND_OP_MAX_ENUM;
-
-		VkBool32 DepthTestEnable = VK_FALSE;
-		VkBool32 DepthWriteEnable = VK_FALSE;
-		VkCompareOp DepthCompareOp = VK_COMPARE_OP_MAX_ENUM;
-		VkBool32 DepthBoundsTestEnable = VK_FALSE;
-		VkBool32 StencilTestEnable = VK_FALSE;
+		// TODO: TMP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		Memory::DynamicHeapArray<char> ShaderCode;
 	};
 
 	struct AttachmentData
@@ -127,6 +85,19 @@ namespace VulkanHelper
 	{
 		VkPipeline Pipeline;
 		VkPipelineLayout PipelineLayout;
+	};
+
+	struct VertexAttribute
+	{
+		VkFormat Format;
+		u32 Offset;
+	};
+
+	struct VertexBinding
+	{
+		u32 Stride;
+		VkVertexInputRate InputRate;
+		std::unordered_map<std::string, VertexAttribute> Attributes;
 	};
 
 	Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
@@ -164,10 +135,6 @@ namespace VulkanHelper
 	DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkImage Image, MemoryPropertyFlag Properties);
 
 	VkBuffer CreateBuffer(VkDevice Device, u64 Size, BufferUsageFlag Flag);
-	VkPipeline BatchPipelineCreation(VkDevice Device, const Shader* Shaders, u32 ShadersCount,
-		const BMRVertexInputBinding* VertexInputBinding, u32 VertexInputBindingCount,
-		const PipelineSettings* Settings, const PipelineResourceInfo* ResourceInfo);
-
 
 	void UpdateHostCompatibleBufferMemory(VkDevice Device, VkDeviceMemory Memory, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);
 

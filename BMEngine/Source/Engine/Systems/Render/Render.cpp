@@ -4,8 +4,12 @@
 #include "Engine/Systems/Render/LightningPass.h"
 #include "Engine/Systems/Render/MainPass.h"
 #include "Engine/Systems/Render/DeferredPass.h"
-#include "Engine/Systems/Render/DebugUI.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
+#include "RenderResources.h"
+
+#include "imgui.h"
+#include "imgui_impl_vulkan.h"
+#include "imgui_impl_glfw.h"
 
 #include "Util/Util.h"
 #include "Util/Settings.h"
@@ -16,51 +20,68 @@ namespace Render
 	{
 		std::unique_lock<std::mutex> PendingLock(Queue->Mutex);
 		Memory::PushToRingBuffer(&Queue->TasksBuffer, Task);
+		Render::NotifyTransfer();
+	}
+
+	static void InitImGuiPipeline(VkDescriptorPool* ImGuiPool, VulkanCoreContext::VulkanCoreContext* CoreContext, GLFWwindow* Wnd)
+	{
+		ImGui_ImplGlfw_InitForVulkan(Wnd, true);
+
+		VkPipelineRenderingCreateInfo RenderingInfo = { };
+		RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+		RenderingInfo.pNext = nullptr;
+		RenderingInfo.colorAttachmentCount = DeferredPass::GetAttachmentData()->ColorAttachmentCount;
+		RenderingInfo.pColorAttachmentFormats = DeferredPass::GetAttachmentData()->ColorAttachmentFormats;
+		RenderingInfo.depthAttachmentFormat = DeferredPass::GetAttachmentData()->DepthAttachmentFormat;
+		RenderingInfo.stencilAttachmentFormat = DeferredPass::GetAttachmentData()->DepthAttachmentFormat;
+
+		VkDescriptorPoolSize PoolSizes[] =
+		{
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 },
+		};
+		VkDescriptorPoolCreateInfo PoolInfo = { };
+		PoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		PoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+		PoolInfo.maxSets = 1;
+		PoolInfo.poolSizeCount = (uint32_t)IM_ARRAYSIZE(PoolSizes);
+		PoolInfo.pPoolSizes = PoolSizes;
+		vkCreateDescriptorPool(CoreContext->LogicalDevice, &PoolInfo, nullptr, ImGuiPool);
+
+		ImGui_ImplVulkan_InitInfo InitInfo = { };
+		InitInfo.Instance = CoreContext->VulkanInstance;
+		InitInfo.PhysicalDevice = CoreContext->PhysicalDevice;
+		InitInfo.Device = CoreContext->LogicalDevice;
+		InitInfo.QueueFamily = CoreContext->Indices.GraphicsFamily;
+		InitInfo.Queue = CoreContext->GraphicsQueue;
+		InitInfo.PipelineCache = nullptr;
+		InitInfo.DescriptorPool = *ImGuiPool;
+		InitInfo.RenderPass = nullptr;
+		InitInfo.UseDynamicRendering = true;
+		InitInfo.MinImageCount = 2;
+		InitInfo.ImageCount = 3;
+		InitInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+		InitInfo.PipelineRenderingCreateInfo = RenderingInfo;
+		ImGui_ImplVulkan_Init(&InitInfo);
+
+		ImGui_ImplVulkan_CreateFontsTexture();
+	}
+
+	static void DeInitImGuiPipeline(VkDevice Device, VkDescriptorPool ImGuiPool)
+	{
+		ImGui_ImplVulkan_Shutdown();
+		vkDestroyDescriptorPool(Device, ImGuiPool, nullptr);
 	}
 
 	static void InitStaticMeshPipeline(VkDevice Device, const ResourceStorage* Storage, StaticMeshPipeline* MeshPipeline)
 	{
-		VkSamplerCreateInfo ShadowMapSamplerCreateInfo = { };
-		ShadowMapSamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		ShadowMapSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;						// How to render when image is magnified on screen
-		ShadowMapSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;						// How to render when image is minified on screen
-		ShadowMapSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;	// How to handle texture wrap in U (x) direction
-		ShadowMapSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;	// How to handle texture wrap in V (y) direction
-		ShadowMapSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;	// How to handle texture wrap in W (z) direction
-		ShadowMapSamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;	// Border beyond texture (only workds for border clamp)
-		ShadowMapSamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;				// Whether coords should be normalized (between 0 and 1)
-		ShadowMapSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;		// Mipmap interpolation mode
-		ShadowMapSamplerCreateInfo.mipLodBias = 0.0f;								// Level of Details bias for mip level
-		ShadowMapSamplerCreateInfo.minLod = 0.0f;									// Minimum Level of Detail to pick mip level
-		ShadowMapSamplerCreateInfo.maxLod = 0.0f;									// Maximum Level of Detail to pick mip level
-		ShadowMapSamplerCreateInfo.anisotropyEnable = VK_TRUE;
-		ShadowMapSamplerCreateInfo.maxAnisotropy = 1; // Todo: support in config
-
-		VULKAN_CHECK_RESULT(vkCreateSampler(Device, &ShadowMapSamplerCreateInfo, nullptr, &MeshPipeline->ShadowMapArraySampler));
+		VkSampler ShadowMapArraySampler = RenderResources::GetSampler("ShadowMap");
 
 		const VkDeviceSize LightBufferSize = sizeof(Render::LightBuffer);
 		MeshPipeline->StaticMeshLightLayout = FrameManager::CreateCompatibleLayout(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 		MeshPipeline->EntityLightBufferHandle = FrameManager::ReserveUniformMemory(LightBufferSize);
 		MeshPipeline->StaticMeshLightSet = FrameManager::CreateAndBindSet(MeshPipeline->EntityLightBufferHandle, LightBufferSize, MeshPipeline->StaticMeshLightLayout);
 
-		const VkDescriptorType ShadowMapArrayDescriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		const VkShaderStageFlags ShadowMapArrayFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		
-		VkDescriptorSetLayoutBinding LayoutBinding = { };
-		LayoutBinding.binding = 0;
-		LayoutBinding.descriptorType = ShadowMapArrayDescriptorType;
-		LayoutBinding.descriptorCount = 1;
-		LayoutBinding.stageFlags = ShadowMapArrayFlags;
-		LayoutBinding.pImmutableSamplers = nullptr;
-
-		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
-		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = 1;
-		LayoutCreateInfo.pBindings = &LayoutBinding;
-		LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-		LayoutCreateInfo.pNext = nullptr;
-
-		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, nullptr, &MeshPipeline->ShadowMapArrayLayout));
+		MeshPipeline->ShadowMapArrayLayout = RenderResources::GetSetLayout("ShadowMapArrayLayout");
 
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
@@ -84,7 +105,7 @@ namespace Render
 
 			VkDescriptorImageInfo ShadowMapArrayImageInfo;
 			ShadowMapArrayImageInfo.imageView = MeshPipeline->ShadowMapArrayImageInterface[i];
-			ShadowMapArrayImageInfo.sampler = MeshPipeline->ShadowMapArraySampler;
+			ShadowMapArrayImageInfo.sampler = ShadowMapArraySampler;
 			ShadowMapArrayImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 			VkDescriptorSetAllocateInfo AllocInfo = {};
@@ -128,52 +149,14 @@ namespace Render
 
 		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &MeshPipeline->Pipeline.PipelineLayout));
 
-		const u32 ShaderCount = 2;
-		VulkanHelper::Shader Shaders[ShaderCount];
+		Yaml::Node Root;
+		Yaml::Parse(Root, "./Resources/Settings/StaticMesh.yaml");
 
-		std::vector<char> VertexShaderCode;
-		Util::OpenAndReadFileFull("./Resources/Shaders/Entity_vert.spv", VertexShaderCode, "rb");
-		std::vector<char> FragmentShaderCode;
-		Util::OpenAndReadFileFull("./Resources/Shaders/Entity_frag.spv", FragmentShaderCode, "rb");
-
-		Shaders[0].Stage = VK_SHADER_STAGE_VERTEX_BIT;
-		Shaders[0].Code = VertexShaderCode.data();
-		Shaders[0].CodeSize = VertexShaderCode.size();
-
-		Shaders[1].Stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		Shaders[1].Code = FragmentShaderCode.data();
-		Shaders[1].CodeSize = FragmentShaderCode.size();
-
-		VulkanHelper::BMRVertexInputBinding VertexInputBinding[2];
-		VertexInputBinding[0].InputAttributes[0] = { "Position", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshVertex, Position) };
-		VertexInputBinding[0].InputAttributes[1] = { "TextureCoords", VK_FORMAT_R32G32_SFLOAT, offsetof(StaticMeshVertex, TextureCoords) };
-		VertexInputBinding[0].InputAttributes[2] = { "Normal", VK_FORMAT_R32G32B32_SFLOAT, offsetof(StaticMeshVertex, Normal) };
-		VertexInputBinding[0].InputAttributesCount = 3;
-		VertexInputBinding[0].InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-		VertexInputBinding[0].Stride = sizeof(StaticMeshVertex);
-		VertexInputBinding[0].VertexInputBindingName = "EntityVertex";
-
-		u32 Offset = 0;
-		VertexInputBinding[1].InputAttributes[0] = { "InstanceModel0", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
-		VertexInputBinding[1].InputAttributes[1] = { "InstanceModel1", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
-		VertexInputBinding[1].InputAttributes[2] = { "InstanceModel2", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
-		VertexInputBinding[1].InputAttributes[3] = { "InstanceModel3", VK_FORMAT_R32G32B32A32_SFLOAT, Offset }; Offset += sizeof(glm::vec4);
-		VertexInputBinding[1].InputAttributes[4] = { "InstanceMaterialIndex", VK_FORMAT_R32_UINT, Offset }; Offset += sizeof(u32);
-		VertexInputBinding[1].InputAttributesCount = 5;
-		VertexInputBinding[1].InputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
-		VertexInputBinding[1].Stride = sizeof(InstanceData);
-		VertexInputBinding[1].VertexInputBindingName = "InstanceData";
-
-		VulkanHelper::PipelineSettings PipelineSettings;
-		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMeshSystem.ini");
-		PipelineSettings.Extent = MainScreenExtent;
-
-		VulkanHelper::PipelineResourceInfo ResourceInfo;
+		VulkanHelper::PipelineResourceInfo ResourceInfo = {};
 		ResourceInfo.PipelineLayout = MeshPipeline->Pipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
 
-		MeshPipeline->Pipeline.Pipeline = VulkanHelper::BatchPipelineCreation(Device, Shaders, ShaderCount, VertexInputBinding, 2,
-			&PipelineSettings, &ResourceInfo);
+		MeshPipeline->Pipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, Root, MainScreenExtent, MeshPipeline->Pipeline.PipelineLayout, &ResourceInfo);
 	}
 
 	static void DeInitStaticMeshPipeline(VkDevice Device, StaticMeshPipeline* MeshPipeline)
@@ -184,12 +167,9 @@ namespace Render
 		}
 
 		vkDestroyDescriptorSetLayout(Device, MeshPipeline->StaticMeshLightLayout, nullptr);
-		vkDestroyDescriptorSetLayout(Device, MeshPipeline->ShadowMapArrayLayout, nullptr);
 
 		vkDestroyPipeline(Device, MeshPipeline->Pipeline.Pipeline, nullptr);
 		vkDestroyPipelineLayout(Device, MeshPipeline->Pipeline.PipelineLayout, nullptr);
-
-		vkDestroySampler(Device, MeshPipeline->ShadowMapArraySampler, nullptr);
 	}
 
 	static void DrawStaticMeshes(VkDevice Device, VkCommandBuffer CmdBuffer, const ResourceStorage* Storage, StaticMeshPipeline* MeshPipeline, const DrawScene* Scene)
@@ -217,8 +197,11 @@ namespace Render
 				continue;
 			}
 
-			StaticMesh* Mesh = Storage->Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
-			InstanceData* Instance = Storage->Meshes.MeshInstances.Data + DrawEntity->InstanceDataIndex;
+			RenderResource<StaticMesh>* MeshResource = Storage->Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
+			StaticMesh* Mesh = &MeshResource->Resource;
+
+			RenderResource<InstanceData>* InstanceResource = Storage->Meshes.MeshInstances.Data + DrawEntity->InstanceDataIndex;
+			InstanceData* Instance = &InstanceResource->Resource;
 
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
@@ -237,7 +220,7 @@ namespace Render
 			const u64 Offsets[] = 
 			{
 				Mesh->VertexOffset,
-				80 * DrawEntity->InstanceDataIndex
+				sizeof(Render::InstanceData)* DrawEntity->InstanceDataIndex
 			};
 
 			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MeshPipeline->Pipeline.PipelineLayout,
@@ -325,8 +308,8 @@ namespace Render
 	static void InitStaticMeshStorage(VkDevice Device, VkPhysicalDevice PhysicalDevice, StaticMeshStorage* Storage, u64 VertexCapacity, u64 InstanceCapacity)
 	{
 		*Storage = { };
-		Storage->StaticMeshes = Memory::AllocateArray<StaticMesh>(512);
-		Storage->MeshInstances = Memory::AllocateArray<InstanceData>(512 * 200);
+		Storage->StaticMeshes = Memory::AllocateArray<RenderResource<StaticMesh>>(512);
+		Storage->MeshInstances = Memory::AllocateArray<RenderResource<InstanceData>>(512);
 
 		Storage->VertexStageData.Buffer = VulkanHelper::CreateBuffer(Device, VertexCapacity, VulkanHelper::BufferUsageFlag::CombinedVertexIndexFlag);
 		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Storage->VertexStageData.Buffer,
@@ -357,7 +340,7 @@ namespace Render
 
 	static void InitMaterialStorage(VkDevice Device, MaterialStorage* Storage)
 	{
-		Storage->Materials = Memory::AllocateArray<Material>(512);
+		Storage->Materials = Memory::AllocateArray<RenderResource<Material>>(512);
 
 		const VkDeviceSize MaterialBufferSize = sizeof(Material) * 512;
 		Storage->MaterialBuffer = VulkanHelper::CreateBuffer(Device, MaterialBufferSize, VulkanHelper::BufferUsageFlag::StorageFlag);
@@ -374,21 +357,7 @@ namespace Render
 		const VkDescriptorType MaterialDescriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		const VkShaderStageFlags MaterialStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		
-		VkDescriptorSetLayoutBinding LayoutBinding = { };
-		LayoutBinding.binding = 0;
-		LayoutBinding.descriptorType = MaterialDescriptorType;
-		LayoutBinding.descriptorCount = 1;
-		LayoutBinding.stageFlags = MaterialStageFlags;
-		LayoutBinding.pImmutableSamplers = nullptr;
-
-		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
-		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = 1;
-		LayoutCreateInfo.pBindings = &LayoutBinding;
-		LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-		LayoutCreateInfo.pNext = nullptr;
-
-		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, nullptr, &Storage->MaterialLayout));
+		Storage->MaterialLayout = RenderResources::GetSetLayout("MaterialLayout");
 
 		VkDescriptorSetAllocateInfo allocInfoMat = {};
 		allocInfoMat.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -412,7 +381,6 @@ namespace Render
 
 	static void DeInitMaterialStorage(VkDevice Device, MaterialStorage* Storage)
 	{
-		vkDestroyDescriptorSetLayout(Device, Storage->MaterialLayout, nullptr);
 		vkDestroyBuffer(Device, Storage->MaterialBuffer, nullptr);
 		vkFreeMemory(Device, Storage->MaterialBufferMemory, nullptr);
 		Memory::FreeArray(&Storage->Materials);
@@ -424,49 +392,10 @@ namespace Render
 
 		Storage->Textures = Memory::AllocateArray<MeshTexture2D>(MaxTextures);
 
-		VkSamplerCreateInfo DiffuseSamplerCreateInfo = { };
-		DiffuseSamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		DiffuseSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
-		DiffuseSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
-		DiffuseSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		DiffuseSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		DiffuseSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		DiffuseSamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-		DiffuseSamplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
-		DiffuseSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		DiffuseSamplerCreateInfo.mipLodBias = 0.0f;
-		DiffuseSamplerCreateInfo.minLod = 0.0f;
-		DiffuseSamplerCreateInfo.maxLod = 0.0f;
-		DiffuseSamplerCreateInfo.anisotropyEnable = VK_TRUE;
-		DiffuseSamplerCreateInfo.maxAnisotropy = 16;
+		Storage->DiffuseSampler = RenderResources::GetSampler("DiffuseTexture");
+		Storage->SpecularSampler = RenderResources::GetSampler("SpecularTexture");
 
-		VkSamplerCreateInfo SpecularSamplerCreateInfo = DiffuseSamplerCreateInfo;
-		DiffuseSamplerCreateInfo.maxAnisotropy = 1;
-
-		VULKAN_CHECK_RESULT(vkCreateSampler(Device, &DiffuseSamplerCreateInfo, nullptr, &Storage->DiffuseSampler));
-		VULKAN_CHECK_RESULT(vkCreateSampler(Device, &SpecularSamplerCreateInfo, nullptr, &Storage->SpecularSampler));
-
-		const VkShaderStageFlags EntitySamplerInputFlags[2] = { VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_FRAGMENT_BIT };
-		const VkDescriptorType EntitySamplerDescriptorType[2] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
-
-		VkDescriptorSetLayoutBinding LayoutBindings[2];
-		for (u32 BindingIndex = 0; BindingIndex < 2; ++BindingIndex)
-		{
-			LayoutBindings[BindingIndex] = { };
-			LayoutBindings[BindingIndex].binding = BindingIndex;
-			LayoutBindings[BindingIndex].descriptorType = EntitySamplerDescriptorType[BindingIndex];
-			LayoutBindings[BindingIndex].descriptorCount = MaxTextures;
-			LayoutBindings[BindingIndex].stageFlags = EntitySamplerInputFlags[BindingIndex];
-			LayoutBindings[BindingIndex].pImmutableSamplers = nullptr;
-		}
-
-		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
-		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = 2;
-		LayoutCreateInfo.pBindings = LayoutBindings;
-		LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-
-		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, nullptr, &Storage->BindlesTexturesLayout));
+		Storage->BindlesTexturesLayout = RenderResources::GetSetLayout("BindlesTexturesLayout");
 
 		VkDescriptorSetAllocateInfo AllocInfoTex = {};
 		AllocInfoTex.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -485,10 +414,6 @@ namespace Render
 			vkFreeMemory(Device, Storage->Textures.Data[i].MeshTexture.Memory, nullptr);
 		}
 
-		vkDestroyDescriptorSetLayout(Device, Storage->BindlesTexturesLayout, nullptr);
-
-		vkDestroySampler(Device, Storage->DiffuseSampler, nullptr);
-		vkDestroySampler(Device, Storage->SpecularSampler, nullptr);
 
 		Memory::FreeArray(&Storage->Textures);
 	}
@@ -810,7 +735,6 @@ namespace Render
 					case TransferTaskType::TransferTaskType_Mesh:
 					{
 						Storage->Meshes.StaticMeshes.Data[Task->ResourceIndex].IsLoaded = true;
-						Memory::RingFree(&TransferState->TransferMemory.ControlBlock, Task->DataSize, 1);
 
 						break;
 					}
@@ -829,12 +753,12 @@ namespace Render
 					case TransferTaskType::TransferTaskType_Texture:
 					{
 						Storage->Textures.Textures.Data[Task->ResourceIndex].IsLoaded = true;
-						Memory::RingFree(&TransferState->TransferMemory.ControlBlock, Task->DataSize, 1);
 
 						break;
 					}
 				}
 
+				Memory::RingFree(&TransferState->TransferMemory.ControlBlock, Task->DataSize, 1);
 				Memory::RingBufferPopFirst(&TransferState->ActiveTransferTasksQueue.TasksBuffer);
 			}
 
@@ -849,11 +773,9 @@ namespace Render
 		return State.TransferState.TransferMemory.DataArray + Memory::RingAlloc(&State.TransferState.TransferMemory.ControlBlock, Size, 1);
 	}
 
-	void Init(GLFWwindow* WindowHandler, DebugUi::GuiData* GuiData)
+	void Init(GLFWwindow* WindowHandler)
 	{
 		State.RenderResources.DrawEntities = Memory::AllocateArray<DrawEntity>(512);
-
-		VulkanCoreContext::CreateCoreContext(&State.CoreContext, WindowHandler);
 		
 		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
 		VkDevice Device = VulkanInterface::GetDevice();
@@ -873,7 +795,7 @@ namespace Render
 		//TerrainRender::Init();
 		//DynamicMapSystem::Init();
 		InitStaticMeshPipeline(Device, &State.RenderResources, &State.MeshPipeline);
-		DebugUi::Init(WindowHandler, GuiData);
+		InitImGuiPipeline(&State.DebugUiPool, RenderResources::GetCoreContext(), WindowHandler);
 
 		std::thread TransferThread(
 			[]()
@@ -893,13 +815,13 @@ namespace Render
 
 		VkDevice Device = VulkanInterface::GetDevice();
 
+		DeInitImGuiPipeline(Device, State.DebugUiPool);
 		DeInitTransferState(Device, &State.TransferState);
 		DeInitTextureStorage(Device, &State.RenderResources.Textures);
 		DeInitMaterialStorage(Device, &State.RenderResources.Materials);
 		DeInitStaticMeshStorage(Device, &State.RenderResources.Meshes);
 		DeInitDrawState(Device, MAX_DRAW_FRAMES, &State.RenderDrawState);
 
-		DebugUi::DeInit();
 		//TerrainRender::DeInit();
 		DeInitStaticMeshPipeline(Device, &State.MeshPipeline);
 
@@ -907,7 +829,6 @@ namespace Render
 		LightningPass::DeInit();
 		DeferredPass::DeInit();
 		FrameManager::DeInit();
-		VulkanCoreContext::DestroyCoreContext(&State.CoreContext);
 
 		Memory::FreeArray(&State.RenderResources.DrawEntities);
 	}
@@ -942,7 +863,9 @@ namespace Render
 		MainPass::EndPass();
 		DeferredPass::BeginPass();
 		DeferredPass::Draw();
-		DebugUi::Draw();
+		ImGui::Render();
+		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), CmdBuffer);
 		DeferredPass::EndPass();
 
 		VULKAN_CHECK_RESULT(vkEndCommandBuffer(DrawCmdBuffer));
@@ -993,20 +916,21 @@ namespace Render
 
 	u32 CreateMaterial(Material* Mat)
 	{
-		Mat->IsLoaded = false;
 		const u64 Index = State.RenderResources.Materials.Materials.Count;
 
-		// TODO: check
-		Material* NewMaterial = State.RenderResources.Materials.Materials.Data + Index;
-		Memory::PushBackToArray(&State.RenderResources.Materials.Materials, Mat);
+		RenderResource<Material>* NewMaterialResource = Memory::ArrayGetNew(&State.RenderResources.Materials.Materials);
+		NewMaterialResource->IsLoaded = false;
+		NewMaterialResource->Resource = *Mat;
+
+		// TODO: TMP solution
+		void* TransferMemory = Render::RequestTransferMemory(sizeof(Material));
+		memcpy(TransferMemory, &NewMaterialResource->Resource, sizeof(Material));
 
 		TransferTask Task = { };
-		//Task.DataSize = sizeof(Material);
-		Task.DataSize = 12;
+		Task.DataSize = sizeof(Material);
 		Task.DataDescr.DstBuffer = State.RenderResources.Materials.MaterialBuffer;
-		//Task.DataDescr.DstOffset = sizeof(Material) * Index;
-		Task.DataDescr.DstOffset = 12 * Index;
-		Task.RawData = NewMaterial;
+		Task.DataDescr.DstOffset = sizeof(Material) * Index;
+		Task.RawData = TransferMemory;
 		Task.ResourceIndex = Index;
 		Task.Type = TransferTaskType::TransferTaskType_Material;
 
@@ -1025,7 +949,8 @@ namespace Render
 		memcpy(TransferMemory, MeshVertexData, DataSize);
 
 		const u64 Index = State.RenderResources.Meshes.StaticMeshes.Count;
-		StaticMesh* Mesh = Memory::ArrayGetNew(&State.RenderResources.Meshes.StaticMeshes);
+		RenderResource<StaticMesh>* Resource = Memory::ArrayGetNew(&State.RenderResources.Meshes.StaticMeshes);
+		StaticMesh* Mesh = &Resource->Resource;
 		*Mesh = { };
 		Mesh->IndicesCount = IndicesCount;
 		Mesh->VertexOffset = State.RenderResources.Meshes.VertexStageData.Offset;
@@ -1150,19 +1075,21 @@ namespace Render
 
 	u32 CreateStaticMeshInstance(InstanceData* Data)
 	{
-		Data->IsLoaded = false;
 		const u64 Index = State.RenderResources.Meshes.MeshInstances.Count;
 
-		// TODO: check
-		InstanceData* NewInstance = State.RenderResources.Meshes.MeshInstances.Data + Index;
-		Memory::PushBackToArray(&State.RenderResources.Meshes.MeshInstances, Data);
+		RenderResource<InstanceData>* NewInstanceResource = Memory::ArrayGetNew(&State.RenderResources.Meshes.MeshInstances);
+		NewInstanceResource->IsLoaded = false;
+		NewInstanceResource->Resource = *Data;
+
+		// TODO: TMP solution
+		void* TransferMemory = Render::RequestTransferMemory(sizeof(InstanceData));
+		memcpy(TransferMemory, &NewInstanceResource->Resource, sizeof(InstanceData));
 
 		TransferTask Task = { };
-		Task.DataSize = sizeof(glm::mat4) + sizeof(u32);
+		Task.DataSize = sizeof(InstanceData);
 		Task.DataDescr.DstBuffer = State.RenderResources.Meshes.GPUInstances.Buffer;
-		//Task.DataDescr.DstOffset = (sizeof(glm::mat4) + sizeof(u32)) * Index;
-		Task.DataDescr.DstOffset = 80 * Index;
-		Task.RawData = NewInstance;
+		Task.DataDescr.DstOffset = sizeof(InstanceData) * Index;
+		Task.RawData = TransferMemory;
 		Task.ResourceIndex = Index;
 		Task.Type = TransferTaskType::TransferTaskType_Instance;
 
@@ -1178,18 +1105,19 @@ namespace Render
 
 	bool IsDrawEntityLoaded(const ResourceStorage* Storage, const DrawEntity* Entity)
 	{
-		StaticMesh* Mesh = Storage->Meshes.StaticMeshes.Data + Entity->StaticMeshIndex;
-		if (!Mesh->IsLoaded) return false;
+		RenderResource<StaticMesh>* MeshResource = Storage->Meshes.StaticMeshes.Data + Entity->StaticMeshIndex;
+		if (!MeshResource->IsLoaded) return false;
 
-		InstanceData* Instance = Storage->Meshes.MeshInstances.Data + Entity->InstanceDataIndex;
+		RenderResource<InstanceData>* InstanceResource = Storage->Meshes.MeshInstances.Data + Entity->InstanceDataIndex;
 		for (u32 i = Entity->InstanceDataIndex; i < Entity->Instances; ++i)
 		{
-			Instance = Storage->Meshes.MeshInstances.Data + i;
-			if (!Instance->IsLoaded) return false;
+			InstanceResource = Storage->Meshes.MeshInstances.Data + i;
+			if (!InstanceResource->IsLoaded) return false;
 		}
 
-		Material* Material = Storage->Materials.Materials.Data + Instance->MaterialIndex;
-		if (!Material->IsLoaded) return false;
+		RenderResource<Material>* MaterialResource = Storage->Materials.Materials.Data + InstanceResource->Resource.MaterialIndex;
+		if (!MaterialResource->IsLoaded) return false;
+		Material* Material = &MaterialResource->Resource;
 		MeshTexture2D* AlbedoTexture = Storage->Textures.Textures.Data + Material->AlbedoTexIndex;
 		if (!AlbedoTexture->IsLoaded) return false;
 		MeshTexture2D* SpecTexture = Storage->Textures.Textures.Data + Material->SpecularTexIndex;

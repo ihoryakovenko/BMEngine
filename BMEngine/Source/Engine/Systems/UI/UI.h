@@ -3,9 +3,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/epsilon.hpp>
 
-struct GLFWwindow;
-
-namespace DebugUi
+namespace UI
 {
 	typedef void (*TestSetDownload)(bool Download);
 
@@ -19,8 +17,7 @@ namespace DebugUi
 		int* Zoom = nullptr;
 	};
 
-	void Init(GLFWwindow* Wnd, GuiData* Data);
+	void Init(GuiData* Data);
 	void DeInit();
-
-	void Draw();
+	void Update();
 }

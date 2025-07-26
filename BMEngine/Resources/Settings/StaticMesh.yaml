@@ -1,0 +1,70 @@
+pipeline:
+  shaders:
+    vertex:   StaticMeshVertex
+    fragment: StaticMeshFragment
+
+  VertexAttributeLayout:
+    - name: StaticMeshVertex
+      attributes:
+        - name: Position
+        - name: TextureCoords
+        - name: Normal
+    - name: StaticMeshInstance
+      attributes:
+        - name: InstanceModel0
+        - name: InstanceModel1
+        - name: InstanceModel2
+        - name: InstanceModel3
+        - name: InstanceMaterialIndex
+
+  rasterization:
+    depthClampEnable: false
+    rasterizerDiscardEnable: false
+    polygonMode: FILL
+    lineWidth: 1
+    cullMode: BACK
+    frontFace: COUNTER_CLOCKWISE
+    depthBiasEnable: false
+
+  colorBlendState:
+    logicOpEnable: false
+    attachmentCount: 1
+
+  colorBlendAttachment:
+    colorWriteMask: RGBA
+    blendEnable: true
+    srcColorBlendFactor: SRC_ALPHA
+    dstColorBlendFactor: ONE_MINUS_SRC_ALPHA
+    colorBlendOp: ADD
+    srcAlphaBlendFactor: ONE
+    dstAlphaBlendFactor: ZERO
+    alphaBlendOp: ADD
+
+  depthStencil:
+    depthTestEnable: true
+    depthWriteEnable: true
+    depthCompareOp: LESS
+    depthBoundsTestEnable: false
+    stencilTestEnable: false
+
+  multisample:
+    sampleShadingEnable: false
+    rasterizationSamples: 1
+
+  inputAssembly:
+    topology: TRIANGLE_LIST
+    primitiveRestartEnable: false
+
+  viewportState:
+    viewportCount: 1
+    scissorCount: 1
+
+  viewport:
+    minDepth: 0.0
+    maxDepth: 1.0
+    x: 0.0
+    y: 0.0
+
+  scissor:
+    offsetX: 0
+    offsetY: 0 
