@@ -164,19 +164,10 @@ namespace DeferredPass
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData = AttachmentData;
 
-		VulkanHelper::PipelineSettings PipelineSettings;
-		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/DeferredPipeline.yaml");
-		PipelineSettings.Extent = MainScreenExtent;
+		Yaml::Node Root;
+		Yaml::Parse(Root, "./Resources/Settings/DeferredPipeline.yaml");
 
-		VkPipelineVertexInputStateCreateInfo VertexInputState = {};
-		VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		VertexInputState.vertexBindingDescriptionCount = 0;
-		VertexInputState.pVertexBindingDescriptions = nullptr;
-		VertexInputState.vertexAttributeDescriptionCount = 0;
-		VertexInputState.pVertexAttributeDescriptions = nullptr;
-
-		Pipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, &VertexInputState,
-			&PipelineSettings, &ResourceInfo);
+		Pipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, Root, MainScreenExtent, Pipeline.PipelineLayout, &ResourceInfo);
 	}
 
 	void DeInit()

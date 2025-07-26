@@ -29,8 +29,7 @@ namespace RenderResources
 		{
 			Yaml::Node& VertexNode = (*VertexIt).second;
 			
-			VulkanHelper::VertexBinding Binding = { };
-			Util::ParseVertexBindingNode(Util::GetVertexBindingNode(VertexNode), &Binding);
+			VulkanHelper::VertexBinding Binding = Util::ParseVertexBindingNode(Util::GetVertexBindingNode(VertexNode));
 			
 			Yaml::Node& AttributesNode = Util::GetVertexAttributesNode(VertexNode);
 
@@ -44,7 +43,7 @@ namespace RenderResources
 
 				Yaml::Node& FormatNode = Util::GetVertexAttributeFormatNode((*AttributeIt).second);
 				std::string FormatStr = FormatNode.As<std::string>();
-				u32 Size = VulkanHelper::CalculateFormatSizeFromString(FormatStr.c_str(), (u32)FormatStr.length());
+				u32 Size = Util::CalculateFormatSizeFromString(FormatStr.c_str(), (u32)FormatStr.length());
 
 				Attribute.Offset = Offset;
 				Offset += Size;
@@ -60,8 +59,7 @@ namespace RenderResources
 		Yaml::Node& ShadersNode = Util::GetShaders(Root);
 		for (auto It = ShadersNode.Begin(); It != ShadersNode.End(); It++)
 		{
-			std::string ShaderPath;
-			Util::ParseShaderNode((*It).second, &ShaderPath);
+			std::string ShaderPath = Util::ParseShaderNode((*It).second);
 			
 			std::vector<char> ShaderCode;
 			if (Util::OpenAndReadFileFull(ShaderPath.c_str(), ShaderCode, "rb"))
@@ -86,8 +84,7 @@ namespace RenderResources
 		Yaml::Node& SamplersNode = Util::GetSamplers(Root);
 		for (auto It = SamplersNode.Begin(); It != SamplersNode.End(); It++)
 		{
-			VkSamplerCreateInfo CreateInfo = { };
-			Util::ParseSamplerNode((*It).second, &CreateInfo);
+			VkSamplerCreateInfo CreateInfo = Util::ParseSamplerNode((*It).second);
 
 			VkSampler NewSampler;
 			VULKAN_CHECK_RESULT(vkCreateSampler(Device, &CreateInfo, nullptr, &NewSampler));
@@ -103,8 +100,7 @@ namespace RenderResources
 			
 			for (auto BindingIt = BindingsNode.Begin(); BindingIt != BindingsNode.End(); BindingIt++)
 			{
-				VkDescriptorSetLayoutBinding Binding = { };
-				Util::ParseDescriptorSetLayoutBindingNode((*BindingIt).second, &Binding);
+				VkDescriptorSetLayoutBinding Binding = Util::ParseDescriptorSetLayoutBindingNode((*BindingIt).second);
 				Memory::PushBackToArray(&Bindings, &Binding);
 			}
 
@@ -123,24 +119,103 @@ namespace RenderResources
 		}
 	}
 
-	VkPipeline CreateGraphicsPipeline(VkDevice Device,
-		VkPipelineVertexInputStateCreateInfo* VertexInputState,
-		VulkanHelper::PipelineSettings* Settings, const VulkanHelper::PipelineResourceInfo* ResourceInfo)
+	VkPipeline CreateGraphicsPipeline(VkDevice Device, Yaml::Node& Root,
+		VkExtent2D Extent, VkPipelineLayout PipelineLayout, const VulkanHelper::PipelineResourceInfo* ResourceInfo)
 	{
-		VkViewport Viewport = Settings->Viewport;
-		Viewport.width = Settings->Extent.width;
-		Viewport.height = Settings->Extent.height;
-		Viewport.minDepth = 0.0f;
-		Viewport.maxDepth = 1.0f;
-		Viewport.x = 0.0f;
-		Viewport.y = 0.0f;
+		Yaml::Node& PipelineNode = Util::GetPipelineNode(Root);
 
-		VkRect2D Scissor = Settings->Scissor;
-		Scissor.extent.width = Settings->Extent.width;
-		Scissor.extent.height = Settings->Extent.height;
-		Scissor.offset = { };
+		Yaml::Node& ShadersNode = Util::GetPipelineShadersNode(PipelineNode);
+		auto Shaders = Memory::AllocateArray<VkPipelineShaderStageCreateInfo>(1);
 
-		VkPipelineViewportStateCreateInfo ViewportState = Settings->ViewportState;
+		for (auto it = ShadersNode.Begin(); it != ShadersNode.End(); it++)
+		{
+			VkPipelineShaderStageCreateInfo* NewShaderStage = Memory::ArrayGetNew(&Shaders);
+			*NewShaderStage = { };
+			NewShaderStage->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			NewShaderStage->stage = Util::ParseShaderStage((*it).first.c_str(), (*it).first.length());
+			NewShaderStage->pName = "main";
+			NewShaderStage->module = RenderResources::GetShader((*it).second.As<std::string>());
+		}
+
+		auto VertexBindings = Memory::AllocateArray<VkVertexInputBindingDescription>(1);
+		auto VertexAttributes = Memory::AllocateArray<VkVertexInputAttributeDescription>(1);
+
+		VkPipelineVertexInputStateCreateInfo VertexInputState = {};
+		VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+		Yaml::Node& VertexAttributeLayoutNode = Util::GetVertexAttributeLayoutNode(PipelineNode);
+		if (!VertexAttributeLayoutNode.IsNone())
+		{
+			u32 currentLocation = 0;
+			u32 bindingIndex = 0;
+
+			for (auto VertexTypeIt = VertexAttributeLayoutNode.Begin(); VertexTypeIt != VertexAttributeLayoutNode.End(); VertexTypeIt++)
+			{
+				Yaml::Node& VertexTypeNode = (*VertexTypeIt).second;
+				std::string VertexTypeName = Util::ParseNameNode(VertexTypeNode);
+
+				VulkanHelper::VertexBinding VertexBinding = RenderResources::GetVertexBinding(VertexTypeName);
+				VkVertexInputBindingDescription* NewBinding = Memory::ArrayGetNew(&VertexBindings);
+				*NewBinding = {};
+				NewBinding->binding = bindingIndex;
+				NewBinding->stride = VertexBinding.Stride;
+				NewBinding->inputRate = VertexBinding.InputRate;
+
+				Yaml::Node& AttributesNode = Util::GetVertexAttributesNode(VertexTypeNode);
+				for (auto AttrIt = AttributesNode.Begin(); AttrIt != AttributesNode.End(); AttrIt++)
+				{
+					Yaml::Node& AttributeNode = (*AttrIt).second;
+					std::string AttributeName = Util::ParseNameNode(AttributeNode);
+
+					auto bindingAttrIt = VertexBinding.Attributes.find(AttributeName);
+					if (bindingAttrIt != VertexBinding.Attributes.end())
+					{
+						VkVertexInputAttributeDescription* NewAttribute = Memory::ArrayGetNew(&VertexAttributes);
+						*NewAttribute = {};
+						NewAttribute->binding = bindingIndex;
+						NewAttribute->location = currentLocation;
+						NewAttribute->format = bindingAttrIt->second.Format;
+						NewAttribute->offset = bindingAttrIt->second.Offset;
+						currentLocation++;
+					}
+				}
+
+				bindingIndex++;
+			}
+
+			VertexInputState.vertexBindingDescriptionCount = VertexBindings.Count;
+			VertexInputState.pVertexBindingDescriptions = VertexBindings.Data;
+			VertexInputState.vertexAttributeDescriptionCount = VertexAttributes.Count;
+			VertexInputState.pVertexAttributeDescriptions = VertexAttributes.Data;
+		}
+
+		Yaml::Node& RasterizationNode = Util::GetPipelineRasterizationNode(PipelineNode);
+		Yaml::Node& ColorBlendStateNode = Util::GetPipelineColorBlendStateNode(PipelineNode);
+		Yaml::Node& ColorBlendAttachmentNode = Util::GetPipelineColorBlendAttachmentNode(PipelineNode);
+		Yaml::Node& DepthStencilNode = Util::GetPipelineDepthStencilNode(PipelineNode);
+		Yaml::Node& MultisampleNode = Util::GetPipelineMultisampleNode(PipelineNode);
+		Yaml::Node& InputAssemblyNode = Util::GetPipelineInputAssemblyNode(PipelineNode);
+		Yaml::Node& ViewportStateNode = Util::GetPipelineViewportStateNode(PipelineNode);
+		Yaml::Node& ViewportNode = Util::GetViewportNode(PipelineNode);
+		Yaml::Node& ScissorNode = Util::GetScissorNode(PipelineNode);
+
+		VkPipelineRasterizationStateCreateInfo RasterizationState = Util::ParsePipelineRasterizationNode(RasterizationNode);
+		VkPipelineColorBlendAttachmentState ColorBlendAttachment = Util::ParsePipelineColorBlendAttachmentNode(ColorBlendAttachmentNode);
+		VkPipelineColorBlendStateCreateInfo ColorBlendState = Util::ParsePipelineColorBlendStateNode(ColorBlendStateNode);
+		ColorBlendState.pAttachments = &ColorBlendAttachment;
+		VkPipelineDepthStencilStateCreateInfo DepthStencilState = Util::ParsePipelineDepthStencilNode(DepthStencilNode);
+		VkPipelineMultisampleStateCreateInfo MultisampleState = Util::ParsePipelineMultisampleNode(MultisampleNode);
+		VkPipelineInputAssemblyStateCreateInfo InputAssemblyState = Util::ParsePipelineInputAssemblyNode(InputAssemblyNode);
+		VkPipelineViewportStateCreateInfo ViewportState = Util::ParsePipelineViewportStateNode(ViewportStateNode);
+
+		VkViewport Viewport = Util::ParseViewportNode(ViewportNode);
+		Viewport.width = Extent.width;
+		Viewport.height = Extent.height;
+
+		VkRect2D Scissor = Util::ParseScissorNode(ScissorNode);
+		Scissor.extent.width = Extent.width;
+		Scissor.extent.height = Extent.height;
+
 		ViewportState.pViewports = &Viewport;
 		ViewportState.pScissors = &Scissor;
 
@@ -154,17 +229,17 @@ namespace RenderResources
 
 		auto PipelineCreateInfo = Memory::MemoryManagementSystem::FrameAlloc<VkGraphicsPipelineCreateInfo>();
 		PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-		PipelineCreateInfo->stageCount = Settings->Shaders.Count;
-		PipelineCreateInfo->pStages = Settings->Shaders.Data;
-		PipelineCreateInfo->pVertexInputState = VertexInputState;
-		PipelineCreateInfo->pInputAssemblyState = &Settings->InputAssemblyState;
+		PipelineCreateInfo->stageCount = Shaders.Count;
+		PipelineCreateInfo->pStages = Shaders.Data;
+		PipelineCreateInfo->pVertexInputState = &VertexInputState;
+		PipelineCreateInfo->pInputAssemblyState = &InputAssemblyState;
 		PipelineCreateInfo->pViewportState = &ViewportState;
 		PipelineCreateInfo->pDynamicState = nullptr;
-		PipelineCreateInfo->pRasterizationState = &Settings->RasterizationState;
-		PipelineCreateInfo->pMultisampleState = &Settings->MultisampleState;
-		PipelineCreateInfo->pColorBlendState = &Settings->ColorBlendState;
-		PipelineCreateInfo->pDepthStencilState = &Settings->DepthStencilState;
-		PipelineCreateInfo->layout = ResourceInfo->PipelineLayout;
+		PipelineCreateInfo->pRasterizationState = &RasterizationState;
+		PipelineCreateInfo->pMultisampleState = &MultisampleState;
+		PipelineCreateInfo->pColorBlendState = &ColorBlendState;
+		PipelineCreateInfo->pDepthStencilState = &DepthStencilState;
+		PipelineCreateInfo->layout = PipelineLayout;
 		PipelineCreateInfo->renderPass = nullptr;
 		PipelineCreateInfo->subpass = 0;
 		PipelineCreateInfo->pNext = &RenderingInfo;
@@ -175,8 +250,9 @@ namespace RenderResources
 		VkPipeline Pipeline;
 		VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, 1, PipelineCreateInfo, nullptr, &Pipeline));
 
-		// todo: TMP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		Memory::FreeArray(&Settings->Shaders);
+		Memory::FreeArray(&Shaders);
+		Memory::FreeArray(&VertexBindings);
+		Memory::FreeArray(&VertexAttributes);
 
 		return Pipeline;
 	}

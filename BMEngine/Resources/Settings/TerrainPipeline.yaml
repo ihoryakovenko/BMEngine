@@ -1,19 +1,19 @@
 pipeline:
   shaders:
-    vertex:   SkyBoxVertex
-    fragment: SkyBoxFragment
+    vertex:   TerrainVertex
+    fragment: TerrainFragment
 
   VertexAttributeLayout:
-    - name: SkyBoxVertex
+    - name: TerrainVertex
       attributes:
-        - name: Position
+        - name: Altitude
 
   rasterization:
     depthClampEnable: false
     rasterizerDiscardEnable: false
     polygonMode: FILL
     lineWidth: 1
-    cullMode: FRONT
+    cullMode: BACK
     frontFace: COUNTER_CLOCKWISE
     depthBiasEnable: false
 
@@ -33,8 +33,8 @@ pipeline:
 
   depthStencil:
     depthTestEnable: true
-    depthWriteEnable: false
-    depthCompareOp: LESS_OR_EQUAL
+    depthWriteEnable: true
+    depthCompareOp: LESS
     depthBoundsTestEnable: false
     stencilTestEnable: false
 
@@ -55,6 +55,8 @@ pipeline:
     maxDepth: 1.0
     x: 0.0
     y: 0.0
+    width: 0.0
+    height: 0.0
 
   scissor:
     offsetX: 0

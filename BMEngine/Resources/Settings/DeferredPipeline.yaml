@@ -12,9 +12,11 @@ pipeline:
     frontFace: COUNTER_CLOCKWISE
     depthBiasEnable: false
 
-  colorBlend:
+  colorBlendState:
     logicOpEnable: false
     attachmentCount: 1
+
+  colorBlendAttachment:
     colorWriteMask: RGBA
     blendEnable: false
     srcColorBlendFactor: SRC_ALPHA
@@ -39,10 +41,16 @@ pipeline:
     topology: TRIANGLE_LIST
     primitiveRestartEnable: false
 
-  viewport:
+  viewportState:
     viewportCount: 1
     scissorCount: 1
+
+  viewport:
     minDepth: 0.0
     maxDepth: 1.0
     x: 0.0
-    y: 0.0 
+    y: 0.0
+
+  scissor:
+    offsetX: 0
+    offsetY: 0 

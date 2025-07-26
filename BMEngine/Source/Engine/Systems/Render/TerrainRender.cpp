@@ -84,36 +84,14 @@ namespace TerrainRender
 
 		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &Pipeline.PipelineLayout));
 
-		VulkanHelper::PipelineResourceInfo ResourceInfo = { };
+		VulkanHelper::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
 
-		// Create vertex binding description for TerrainVertex
-		VkVertexInputBindingDescription VertexBinding = {};
-		VertexBinding.binding = 0;
-		VertexBinding.stride = sizeof(TerrainVertex);
-		VertexBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		Yaml::Node Root;
+		Yaml::Parse(Root, "./Resources/Settings/TerrainPipeline.yaml");
 
-		// Create vertex attribute description
-		VkVertexInputAttributeDescription VertexAttribute = {};
-		VertexAttribute.binding = 0;
-		VertexAttribute.location = 0;
-		VertexAttribute.format = VK_FORMAT_R32_SFLOAT;
-		VertexAttribute.offset = offsetof(TerrainVertex, Altitude);
-
-		VkPipelineVertexInputStateCreateInfo VertexInputState = {};
-		VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		VertexInputState.vertexBindingDescriptionCount = 1;
-		VertexInputState.pVertexBindingDescriptions = &VertexBinding;
-		VertexInputState.vertexAttributeDescriptionCount = 1;
-		VertexInputState.pVertexAttributeDescriptions = &VertexAttribute;
-
-		VulkanHelper::PipelineSettings PipelineSettings;
-		//Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/TerrainPipeline.ini");
-		PipelineSettings.Extent = MainScreenExtent;
-
-		Pipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, &VertexInputState,
-			&PipelineSettings, &ResourceInfo);
+		Pipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, Root, MainScreenExtent, Pipeline.PipelineLayout, &ResourceInfo);
 
 		LoadTerrain();
 	}

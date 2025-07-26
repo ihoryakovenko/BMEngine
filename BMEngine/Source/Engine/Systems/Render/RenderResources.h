@@ -29,7 +29,6 @@ namespace RenderResources
 
 	VulkanHelper::VertexBinding GetVertexBinding(const std::string& Id);
 
-	VkPipeline CreateGraphicsPipeline(VkDevice Device,
-		VkPipelineVertexInputStateCreateInfo* VertexInputState,
-		VulkanHelper::PipelineSettings* Settings, const VulkanHelper::PipelineResourceInfo* ResourceInfo);
+	VkPipeline CreateGraphicsPipeline(VkDevice Device, Yaml::Node& Root,
+		VkExtent2D Extent, VkPipelineLayout PipelineLayout, const VulkanHelper::PipelineResourceInfo* ResourceInfo);
 }

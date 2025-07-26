@@ -149,82 +149,14 @@ namespace Render
 
 		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &MeshPipeline->Pipeline.PipelineLayout));
 
-		// Get vertex bindings from RenderResources
-		VulkanHelper::VertexBinding StaticMeshVertexBinding = RenderResources::GetVertexBinding("StaticMeshVertex");
-		VulkanHelper::VertexBinding StaticMeshInstanceBinding = RenderResources::GetVertexBinding("StaticMeshInstance");
+		Yaml::Node Root;
+		Yaml::Parse(Root, "./Resources/Settings/StaticMesh.yaml");
 
-		// Create vertex binding descriptions
-		VkVertexInputBindingDescription VertexBindings[2];
-		VertexBindings[0].binding = 0;
-		VertexBindings[0].stride = StaticMeshVertexBinding.Stride;
-		VertexBindings[0].inputRate = StaticMeshVertexBinding.InputRate;
-
-		VertexBindings[1].binding = 1;
-		VertexBindings[1].stride = StaticMeshInstanceBinding.Stride;
-		VertexBindings[1].inputRate = StaticMeshInstanceBinding.InputRate;
-
-		// Create vertex attribute descriptions with hardcoded locations
-		VkVertexInputAttributeDescription VertexAttributes[8];
-		
-		// StaticMeshVertex attributes
-		VertexAttributes[0].binding = 0;
-		VertexAttributes[0].location = 0;
-		VertexAttributes[0].format = StaticMeshVertexBinding.Attributes["Position"].Format;
-		VertexAttributes[0].offset = StaticMeshVertexBinding.Attributes["Position"].Offset;
-
-		VertexAttributes[1].binding = 0;
-		VertexAttributes[1].location = 1;
-		VertexAttributes[1].format = StaticMeshVertexBinding.Attributes["TextureCoords"].Format;
-		VertexAttributes[1].offset = StaticMeshVertexBinding.Attributes["TextureCoords"].Offset;
-
-		VertexAttributes[2].binding = 0;
-		VertexAttributes[2].location = 2;
-		VertexAttributes[2].format = StaticMeshVertexBinding.Attributes["Normal"].Format;
-		VertexAttributes[2].offset = StaticMeshVertexBinding.Attributes["Normal"].Offset;
-
-		// StaticMeshInstance attributes
-		VertexAttributes[3].binding = 1;
-		VertexAttributes[3].location = 3;
-		VertexAttributes[3].format = StaticMeshInstanceBinding.Attributes["InstanceModel0"].Format;
-		VertexAttributes[3].offset = StaticMeshInstanceBinding.Attributes["InstanceModel0"].Offset;
-
-		VertexAttributes[4].binding = 1;
-		VertexAttributes[4].location = 4;
-		VertexAttributes[4].format = StaticMeshInstanceBinding.Attributes["InstanceModel1"].Format;
-		VertexAttributes[4].offset = StaticMeshInstanceBinding.Attributes["InstanceModel1"].Offset;
-
-		VertexAttributes[5].binding = 1;
-		VertexAttributes[5].location = 5;
-		VertexAttributes[5].format = StaticMeshInstanceBinding.Attributes["InstanceModel2"].Format;
-		VertexAttributes[5].offset = StaticMeshInstanceBinding.Attributes["InstanceModel2"].Offset;
-
-		VertexAttributes[6].binding = 1;
-		VertexAttributes[6].location = 6;
-		VertexAttributes[6].format = StaticMeshInstanceBinding.Attributes["InstanceModel3"].Format;
-		VertexAttributes[6].offset = StaticMeshInstanceBinding.Attributes["InstanceModel3"].Offset;
-
-		VertexAttributes[7].binding = 1;
-		VertexAttributes[7].location = 7;
-		VertexAttributes[7].format = StaticMeshInstanceBinding.Attributes["InstanceMaterialIndex"].Format;
-		VertexAttributes[7].offset = StaticMeshInstanceBinding.Attributes["InstanceMaterialIndex"].Offset;
-
-		VkPipelineVertexInputStateCreateInfo VertexInputState = {};
-		VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		VertexInputState.vertexBindingDescriptionCount = 2;
-		VertexInputState.pVertexBindingDescriptions = VertexBindings;
-		VertexInputState.vertexAttributeDescriptionCount = 8;
-		VertexInputState.pVertexAttributeDescriptions = VertexAttributes;
-
-		VulkanHelper::PipelineSettings PipelineSettings;
-		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/StaticMesh.yaml");
-		PipelineSettings.Extent = MainScreenExtent;
-
-		VulkanHelper::PipelineResourceInfo ResourceInfo;
+		VulkanHelper::PipelineResourceInfo ResourceInfo = {};
 		ResourceInfo.PipelineLayout = MeshPipeline->Pipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
 
-		MeshPipeline->Pipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, &VertexInputState,
-			&PipelineSettings, &ResourceInfo);
+		MeshPipeline->Pipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, Root, MainScreenExtent, MeshPipeline->Pipeline.PipelineLayout, &ResourceInfo);
 	}
 
 	static void DeInitStaticMeshPipeline(VkDevice Device, StaticMeshPipeline* MeshPipeline)

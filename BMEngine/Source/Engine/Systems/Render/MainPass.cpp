@@ -67,35 +67,14 @@ namespace MainPass
 
 		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &SkyBoxPipeline.PipelineLayout));
 
-		// Create vertex binding description for SkyBoxVertex
-		VkVertexInputBindingDescription VertexBinding = {};
-		VertexBinding.binding = 0;
-		VertexBinding.stride = sizeof(SkyBoxVertex);
-		VertexBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-		// Create vertex attribute description
-		VkVertexInputAttributeDescription VertexAttribute = {};
-		VertexAttribute.binding = 0;
-		VertexAttribute.location = 0;
-		VertexAttribute.format = VK_FORMAT_R32G32B32_SFLOAT;
-		VertexAttribute.offset = offsetof(SkyBoxVertex, Position);
-
-		VkPipelineVertexInputStateCreateInfo VertexInputState = {};
-		VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		VertexInputState.vertexBindingDescriptionCount = 1;
-		VertexInputState.pVertexBindingDescriptions = &VertexBinding;
-		VertexInputState.vertexAttributeDescriptionCount = 1;
-		VertexInputState.pVertexAttributeDescriptions = &VertexAttribute;
-
 		VulkanHelper::PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineLayout = SkyBoxPipeline.PipelineLayout;
 		ResourceInfo.PipelineAttachmentData = AttachmentData;
 
-		VulkanHelper::PipelineSettings PipelineSettings;
-		Util::LoadPipelineSettings(PipelineSettings, "./Resources/Settings/SkyBoxPipeline.yaml");
-		PipelineSettings.Extent = MainScreenExtent;
+		Yaml::Node Root;
+		Yaml::Parse(Root, "./Resources/Settings/SkyBoxPipeline.yaml");
 
-		SkyBoxPipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, &VertexInputState, &PipelineSettings, &ResourceInfo);
+		SkyBoxPipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, Root, MainScreenExtent, SkyBoxPipeline.PipelineLayout, &ResourceInfo);
 	}
 
 	void DeInit()
