@@ -1160,4 +1160,40 @@ namespace Util
 		VkFormat Format = ParseFormat(FormatString, FormatLength);
 		return CalculateFormatSize(Format);
 	}
+
+	Yaml::Node& GetSceneResources(Yaml::Node& Root)
+	{
+		if (!Root["SceneResources"].IsNone())
+		{
+			return Root["SceneResources"];
+		}
+
+		assert(false);
+		static Yaml::Node Empty;
+		return Empty;
+	}
+
+	Yaml::Node& GetTextures(Yaml::Node& Root)
+	{
+		if (!Root["Textures"].IsNone())
+		{
+			return Root["Textures"];
+		}
+
+		assert(false);
+		static Yaml::Node Empty;
+		return Empty;
+	}
+
+	Yaml::Node& GetModels(Yaml::Node& Root)
+	{
+		if (!Root["Models"].IsNone())
+		{
+			return Root["Models"];
+		}
+
+		assert(false);
+		static Yaml::Node Empty;
+		return Empty;
+	}
 }

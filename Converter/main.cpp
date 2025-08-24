@@ -35,7 +35,7 @@ int main(u32 argc, const char* argv[])
 		argc = 3;
 		argv[0] = "-m";
 		argv[1] = "D:\\Code\\BMEngine\\BMEngine\\Resources\\Models/";
-		argv[2] = "D:\\Code\\BMEngine\\BMEngine\\Resources\\Models\\cube.obj";
+		argv[2] = "D:\\Code\\BMEngine\\BMEngine\\Resources\\Models\\uh60.obj";
 	}
 
 	for (u32 i = 0; i < argc; i++)

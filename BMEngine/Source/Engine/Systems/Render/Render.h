@@ -20,12 +20,6 @@
 
 namespace Render
 {
-	enum class RenderPipelines
-	{
-		StaticMeshPipeline = 0,
-		DeferredPipeline
-	};
-
 	struct StaticMeshVertex
 	{
 		glm::vec3 Position;

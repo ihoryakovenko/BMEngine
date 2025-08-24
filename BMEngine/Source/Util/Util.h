@@ -241,6 +241,10 @@ namespace Util
 	Yaml::Node& GetViewportNode(Yaml::Node& PipelineNode);
 	Yaml::Node& GetScissorNode(Yaml::Node& PipelineNode);
 	
+	Yaml::Node& GetSceneResources(Yaml::Node& Root);
+	Yaml::Node& GetTextures(Yaml::Node& Root);
+	Yaml::Node& GetModels(Yaml::Node& Root);
+
 	std::string ParseNameNode(Yaml::Node& Node);
 	std::string ParseShaderNode(Yaml::Node& ShaderNode);
 	VkSamplerCreateInfo ParseSamplerNode(Yaml::Node& SamplerNode);

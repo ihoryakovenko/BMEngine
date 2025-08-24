@@ -31,6 +31,7 @@
     <ClCompile Include="Source\Engine\Systems\UI\UI.cpp" />
     <ClCompile Include="..\External\mini-yaml\yaml\Yaml.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderResources.cpp" />
+    <ClCompile Include="Source\Engine\Systems\EngineResources.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
@@ -52,6 +53,7 @@
     <ClInclude Include="Source\Engine\Systems\Render\VulkanCoreContext.h" />
     <ClInclude Include="Source\Engine\Systems\UI\UI.h" />
     <ClInclude Include="Source\Engine\Systems\Render\RenderResources.h" />
+    <ClInclude Include="Source\Engine\Systems\EngineResources.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />
@@ -73,5 +75,7 @@
     <None Include="Source\Engine\Systems\Render\Shaders\SkyBox.vert.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\TerrainGenerator.frag.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\TerrainGenerator.vert.glsl" />
+    <None Include="Resources\Settings\TerrainPipeline.yaml" />
+    <None Include="Resources\Scenes\TestScene.yaml" />
   </ItemGroup>
 </Project>

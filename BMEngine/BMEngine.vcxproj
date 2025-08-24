@@ -27,6 +27,7 @@
     <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
     <ClCompile Include="..\External\mini-yaml\yaml\Yaml.cpp" />
     <ClCompile Include="Source\Engine\Engine.cpp" />
+    <ClCompile Include="Source\Engine\Systems\EngineResources.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\DebugUI.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\DeferredPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\LightningPass.cpp" />
@@ -46,6 +47,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Engine\Engine.h" />
+    <ClInclude Include="Source\Engine\Systems\EngineResources.h" />
     <ClInclude Include="Source\Engine\Systems\Render\RenderResources.h" />
     <ClInclude Include="Source\Engine\Systems\Render\VulkanCoreContext.h" />
     <ClInclude Include="Source\Engine\Systems\UI\UI.h" />
@@ -66,11 +68,13 @@
     <ClInclude Include="Source\Util\Util.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\Scenes\TestScene.yaml" />
     <None Include="Resources\Settings\DeferredPipeline.yaml" />
     <None Include="Resources\Settings\DepthPipeline.yaml" />
     <None Include="Resources\Settings\RenderResources.yaml" />
     <None Include="Resources\Settings\SkyBoxPipeline.yaml" />
     <None Include="Resources\Settings\StaticMesh.yaml" />
+    <None Include="Resources\Settings\TerrainPipeline.yaml" />
     <None Include="Resources\Shaders\Second.frag" />
     <None Include="Resources\Shaders\Second.vert" />
     <None Include="Source\Engine\Systems\Render\Shaders\CompileShaders.bat" />

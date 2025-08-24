@@ -138,6 +138,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\BMEngine\Source\Util\Util.cpp" />
+    <ClCompile Include="..\External\mini-yaml\yaml\Yaml.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>

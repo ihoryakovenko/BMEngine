@@ -19,8 +19,7 @@
 #include "Util/Util.h"
 #include "Util/Math.h"
 #include "Deprecated/FrameManager.h"
-#include "Util/DefaultTextureData.h"
-#include "Systems/Render/RenderResources.h"
+#include "Engine/Systems/EngineResources.h"
 
 #include <gli/gli.hpp>
 
@@ -36,13 +35,7 @@ namespace Engine
 		glm::vec3 Up;
 	};
 
-	struct TextureAsset
-	{
-		u64 Id;
-		std::string Path;
-		u32 RenderTextureIndex;
-		bool IsRenderResourceCreated;
-	};
+
 
 	static bool Init();
 	static bool InitSystems();
@@ -83,148 +76,11 @@ namespace Engine
 
 	static FrameManager::ViewProjectionBuffer ViewProjection;
 
-	static std::map<u64, TextureAsset> TextureAssets;
+
 
 	static Render::DrawScene Scene;
 
-	static void LoadTestData()
-	{
-		const u64 DefaultTextureDataCount = sizeof(DefaultTextureData) / sizeof(DefaultTextureData[0]);
-		std::hash<std::string> Hasher;
 
-		gli::texture DefaultTexture = gli::load((char const*)DefaultTextureData, DefaultTextureDataCount);
-		if (DefaultTexture.empty())
-		{
-			assert(false);
-		}
-
-		glm::tvec3<u32> Extent = DefaultTexture.extent();
-
-		TextureAsset DefaultTextureAsset;
-		DefaultTextureAsset.Id = Hasher("Default");
-		DefaultTextureAsset.IsRenderResourceCreated = false;
-		DefaultTextureAsset.RenderTextureIndex = Render::CreateTexture2DSRGB(DefaultTextureAsset.Id, DefaultTexture.data(), Extent.x, Extent.y);
-
-		TextureAssets.emplace(DefaultTextureAsset.Id, std::move(DefaultTextureAsset));
-
-		const char* TexturesFolder = ".\\Resources\\Textures";
-
-		namespace fs = std::filesystem;
-
-		if (!fs::exists(TexturesFolder) || !fs::is_directory(TexturesFolder))
-		{
-			assert(false);
-		}
-
-		for (const auto& Entry : fs::recursive_directory_iterator(TexturesFolder))
-		{
-			if (!Entry.is_regular_file())
-				continue;
-
-			const fs::path& FilePath = Entry.path();
-			std::string FileNameNoExt = FilePath.stem().string();
-			std::string FullPath = FilePath.string();
-
-			TextureAsset DefaultTextureAsset;
-			DefaultTextureAsset.Id = Hasher(FileNameNoExt);
-			DefaultTextureAsset.Path = FullPath;
-			DefaultTextureAsset.IsRenderResourceCreated = false;
-			DefaultTextureAsset.RenderTextureIndex = 0;
-
-			TextureAssets.emplace(DefaultTextureAsset.Id, std::move(DefaultTextureAsset));
-		}
-
-		{
-			const char* ModelPath = ".\\Resources\\Models\\uh60.model";
-			Util::Model3DData ModelData = Util::LoadModel3DData(ModelPath);
-			Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
-
-			u64 ModelVertexByteOffset = 0;
-			for (u32 i = 0; i < Uh60Model.MeshCount; i++)
-			{
-				const u64 VerticesCount = Uh60Model.VerticesCounts[i];
-				const u32 IndicesCount = Uh60Model.IndicesCounts[i];
-
-				u32 TextureIndex = 0;
-
-				auto it = TextureAssets.find(Uh60Model.DiffuseTexturesHashes[i]);
-				if (it != TextureAssets.end())
-				{
-					if (it->second.IsRenderResourceCreated)
-					{
-						TextureIndex = it->second.RenderTextureIndex;
-					}
-					else
-					{
-						gli::texture Texture = gli::load(it->second.Path);
-						if (Texture.empty())
-						{
-							assert(false);
-						}
-
-						glm::tvec3<u32> Extent = Texture.extent();
-						TextureIndex = Render::CreateTexture2DSRGB(it->second.Id, Texture.data(), Extent.x, Extent.y);
-
-						it->second.RenderTextureIndex = TextureIndex;
-						it->second.IsRenderResourceCreated = true;
-					}
-				}
-
-				Render::Material Mat;
-				Mat.AlbedoTexIndex = TextureIndex;
-				Mat.SpecularTexIndex = TextureIndex;
-				Mat.Shininess = 32.0f;
-				const u32 MaterialIndex = Render::CreateMaterial(&Mat);
-
-				const u32 GroupWidth = 5;
-				const u32 GroupHeight = 5;
-				const u32 GroupDepth = 4;
-				const f32 Spacing = 15.0f;
-				const f32 StartX = -(f32)(GroupWidth - 1) * Spacing * 0.5f;
-				const f32 StartY = -(f32)(GroupHeight - 1) * Spacing * 0.5f;
-				const f32 StartZ = -(f32)(GroupDepth - 1) * Spacing * 0.5f;
-
-				Render::InstanceData Instance;
-				Instance.MaterialIndex = MaterialIndex;
-
-				Instance.ModelMatrix = glm::mat4(1.0f);
-
-				Render::DrawEntity Entity = { };
-				Entity.StaticMeshIndex = Render::CreateStaticMesh(Uh60Model.VertexData + ModelVertexByteOffset,
-					sizeof(Render::StaticMeshVertex), VerticesCount, IndicesCount);
-				Entity.Instances = 1;
-				Entity.InstanceDataIndex = Render::CreateStaticMeshInstance(&Instance);
-
-				for (u32 z = 0; z < GroupDepth; z++)
-				{
-					for (u32 y = 0; y < GroupHeight; y++)
-					{
-						for (u32 x = 0; x < GroupWidth; x++)
-						{
-							if (x == 0 && y == 0 && z == 0)
-							{
-								continue;
-							}
-
-							const glm::vec3 Position = glm::vec3(StartX + x * Spacing, StartY + y * Spacing,StartZ + z * Spacing);
-
-							Instance.ModelMatrix = glm::translate(glm::mat4(1.0f), Position);
-							Render::CreateStaticMeshInstance(&Instance);
-
-							++Entity.Instances;
-						}
-					}
-				}
-
-				Render::CreateEntity(&Entity);
-
-				ModelVertexByteOffset += VerticesCount * sizeof(Render::StaticMeshVertex) + IndicesCount * sizeof(u32);
-				//Render::NotifyTransfer();
-			}
-
-			Util::ClearModel3DData(ModelData);
-		}
-	}
 
 	void WindowIconifyCallback(GLFWwindow* window, int iconified)
 	{
@@ -287,8 +143,6 @@ namespace Engine
 
 		InitSystems();
 
-		LoadTestData();
-
 		SetUpScene();
 		 
 		return true;
@@ -305,8 +159,11 @@ namespace Engine
 		Yaml::Parse(Root, "./Resources/Settings/RenderResources.yaml");
 
 		RenderResources::Init(Window, Root);
-
 		Render::Init(Window);
+
+		Yaml::Node TestScene;
+		Yaml::Parse(TestScene, "./Resources/Scenes/TestScene.yaml");
+		EngineResources::Init(TestScene);
 		
 		return true;
 	}
@@ -315,6 +172,7 @@ namespace Engine
 	{
 		Render::DeInit();
 		RenderResources::DeInit();
+		EngineResources::DeInit();
 		UI::DeInit();
 
 		glfwDestroyWindow(Window);
