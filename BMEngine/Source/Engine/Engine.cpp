@@ -163,7 +163,13 @@ namespace Engine
 
 		Yaml::Node TestScene;
 		Yaml::Parse(TestScene, "./Resources/Scenes/TestScene.yaml");
-		EngineResources::Init(TestScene);
+		Yaml::Node& SceneResourcesNode = Util::GetSceneResources(TestScene);
+
+		Scene.DrawEntities = Memory::AllocateArray<Render::DrawEntity>(512);
+		Scene.Materials = Memory::AllocateArray<Render::RenderResource<Render::Material>>(512);
+		Scene.StaticMeshes = Memory::AllocateArray<Render::RenderResource<Render::StaticMesh>>(512);
+		Scene.MeshInstances = Memory::AllocateArray<Render::RenderResource<Render::InstanceData>>(512);
+		EngineResources::Init(SceneResourcesNode, &Scene);
 		
 		return true;
 	}
@@ -174,6 +180,11 @@ namespace Engine
 		RenderResources::DeInit();
 		EngineResources::DeInit();
 		UI::DeInit();
+
+		Memory::FreeArray(&Scene.DrawEntities);
+		Memory::FreeArray(&Scene.Materials);
+		Memory::FreeArray(&Scene.StaticMeshes);
+		Memory::FreeArray(&Scene.MeshInstances);
 
 		glfwDestroyWindow(Window);
 

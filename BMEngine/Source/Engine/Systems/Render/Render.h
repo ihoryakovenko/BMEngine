@@ -47,7 +47,6 @@ namespace Render
 	{
 		Texture MeshTexture;
 		VkImageView View;
-		bool IsLoaded;
 	};
 
 	struct Material
@@ -67,7 +66,7 @@ namespace Render
 	struct RenderResource
 	{
 		T Resource;
-		bool IsLoaded;
+		u32 ResourceIndex;
 	};
 
 	struct DrawEntity
@@ -97,15 +96,11 @@ namespace Render
 	{
 		GPUBuffer VertexStageData;
 		GPUBuffer GPUInstances;
-		Memory::DynamicHeapArray<RenderResource<InstanceData>> MeshInstances;
-		Memory::DynamicHeapArray<RenderResource<StaticMesh>> StaticMeshes;
 	};
 
 	struct MaterialStorage
 	{
-		Memory::DynamicHeapArray<RenderResource<Material>> Materials;
-		VkBuffer MaterialBuffer;
-		VkDeviceMemory MaterialBufferMemory;
+		GPUBuffer MaterialBuffer;
 		VkDescriptorSetLayout MaterialLayout;
 		VkDescriptorSet MaterialSet;
 	};
@@ -118,7 +113,7 @@ namespace Render
 		VkDescriptorSetLayout BindlesTexturesLayout;
 		VkDescriptorSet BindlesTexturesSet;
 
-		Memory::DynamicHeapArray<MeshTexture2D> Textures;
+		Memory::DynamicHeapArray<RenderResource<MeshTexture2D>> Textures;
 	};
 
 	enum TransferTaskType
@@ -182,11 +177,10 @@ namespace Render
 
 	struct ResourceStorage
 	{
-
+		Memory::DynamicHeapArray<bool> ResourcesState;
 		StaticMeshStorage Meshes;
 		TextureStorage Textures;
 		MaterialStorage Materials;
-		Memory::DynamicHeapArray<DrawEntity> DrawEntities;
 	};
 
 	struct DrawState
@@ -299,8 +293,6 @@ namespace Render
 	{
 		FrameManager::ViewProjectionBuffer ViewProjection;
 
-		Memory::DynamicHeapArray<DrawEntity> Entities;
-
 		DrawEntity* DrawTransparentEntities = nullptr;
 		u32 DrawTransparentEntitiesCount = 0;
 
@@ -308,20 +300,24 @@ namespace Render
 		bool DrawSkyBox = false;
 
 		LightBuffer* LightEntity = nullptr;
+
+		Memory::DynamicHeapArray<DrawEntity> DrawEntities;
+		Memory::DynamicHeapArray<RenderResource<Material>> Materials;
+		Memory::DynamicHeapArray<RenderResource<InstanceData>> MeshInstances;
+		Memory::DynamicHeapArray<RenderResource<StaticMesh>> StaticMeshes;
 	};
 
 	void Init(GLFWwindow* WindowHandler);
 	void DeInit();
 
-	u64 CreateStaticMesh(void* MeshVertexData, u64 VertexSize, u64 VerticesCount, u64 IndicesCount);
-	u32 CreateMaterial(Material* Mat);
-	u32 CreateEntity(const DrawEntity* Entity);
+	RenderResource<StaticMesh> CreateStaticMesh(void* MeshVertexData, u64 VertexSize, u64 VerticesCount, u64 IndicesCount);
+	RenderResource<Material> CreateMaterial(Material* Mat);
 	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height);
-	u32 CreateStaticMeshInstance(InstanceData* Data);
+	RenderResource<InstanceData> CreateStaticMeshInstance(InstanceData* Data);
 
 	void Draw(const DrawScene* Data);
 	void NotifyTransfer();
 
 	RenderState* GetRenderState();
-	bool IsDrawEntityLoaded(const ResourceStorage* Storage, const DrawEntity* Entity);
+	bool IsDrawEntityLoaded(const ResourceStorage* Storage, const DrawScene* Scene, const DrawEntity* Entity);
 }

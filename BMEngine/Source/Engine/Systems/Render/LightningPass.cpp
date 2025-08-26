@@ -248,15 +248,15 @@ namespace LightningPass
 
 			vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
 
-			for (u32 i = 0; i < State->RenderResources.DrawEntities.Count; ++i)
+			for (u32 i = 0; i < Scene->DrawEntities.Count; ++i)
 			{
-				Render::DrawEntity* DrawEntity = Storage->DrawEntities.Data + i;
-				if (!IsDrawEntityLoaded(Storage, DrawEntity))
+				Render::DrawEntity* DrawEntity = Scene->DrawEntities.Data + i;
+				if (!IsDrawEntityLoaded(Storage, Scene, DrawEntity))
 				{
 					continue;
 				}
 
-				Render::RenderResource<Render::StaticMesh>* MeshResource = Storage->Meshes.StaticMeshes.Data + DrawEntity->StaticMeshIndex;
+				Render::RenderResource<Render::StaticMesh>* MeshResource = Scene->StaticMeshes.Data + DrawEntity->StaticMeshIndex;
 				Render::StaticMesh* Mesh = &MeshResource->Resource;
 
 				const VkBuffer Buffers[] =

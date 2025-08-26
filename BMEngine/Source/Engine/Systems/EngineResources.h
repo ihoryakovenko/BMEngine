@@ -5,15 +5,18 @@
 #include <string>
 #include "Util/EngineTypes.h"
 
+namespace Render
+{
+	struct DrawScene;
+}
+
 namespace EngineResources
 {
 	struct TextureAsset
 	{
-		std::string Path;
 		u32 RenderTextureIndex;
-		bool IsRenderResourceCreated;
 	};
 
-	void Init(Yaml::Node& Root);
+	void Init(Yaml::Node& Root, struct Render::DrawScene* TmpScene);
 	void DeInit();
 }

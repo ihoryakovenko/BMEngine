@@ -9,7 +9,7 @@ namespace EngineResources
 {
 	static std::unordered_map<u64, TextureAsset> TextureAssets;
 
-	void Init(Yaml::Node& Root)
+	void Init(Yaml::Node& SceneResourcesNode, Render::DrawScene* TmpScene)
 	{
 		const u64 DefaultTextureDataCount = sizeof(DefaultTextureData) / sizeof(DefaultTextureData[0]);
 		gli::texture DefaultTexture = gli::load((char const*)DefaultTextureData, DefaultTextureDataCount);
@@ -21,12 +21,9 @@ namespace EngineResources
 		const glm::tvec3<u32> DefaultAssetExtent = DefaultTexture.extent();
 
 		TextureAsset DefaultAsset;
-		DefaultAsset.IsRenderResourceCreated = true;
 		DefaultAsset.RenderTextureIndex = Render::CreateTexture2DSRGB(DefaultAssetId, DefaultTexture.data(), DefaultAssetExtent.x, DefaultAssetExtent.y);
 
 		TextureAssets[DefaultAssetId] = DefaultAsset;
-		
-		Yaml::Node& SceneResourcesNode = Util::GetSceneResources(Root);
 		
 		Yaml::Node& TexturesNode = Util::GetTextures(SceneResourcesNode);
 		for (auto It = TexturesNode.Begin(); It != TexturesNode.End(); It++)
@@ -44,14 +41,11 @@ namespace EngineResources
 			const u64 Id = std::hash<std::string>{ }(TextureName);
 			
 			TextureAsset Asset;
-			Asset.Path = TexturePath;
-			Asset.IsRenderResourceCreated = true;
 			Asset.RenderTextureIndex = Render::CreateTexture2DSRGB(Id, Texture.data(), Extent.x, Extent.y);
 			
 			TextureAssets[Id] = Asset;
 		}
 
-		
 		Yaml::Node& ModelsNode = Util::GetModels(SceneResourcesNode);
 		for (auto It = ModelsNode.Begin(); It != ModelsNode.End(); It++)
 		{
@@ -79,18 +73,30 @@ namespace EngineResources
 				Mat.AlbedoTexIndex = TextureIndex;
 				Mat.SpecularTexIndex = TextureIndex;
 				Mat.Shininess = 32.0f;
-				const u32 MaterialIndex = Render::CreateMaterial(&Mat);
+				Render::RenderResource<Render::Material> MaterialResource = Render::CreateMaterial(&Mat);
+
+				const u32 MaterialIndex = TmpScene->Materials.Count;
+				Memory::PushBackToArray(&TmpScene->Materials, &MaterialResource);
 
 				Render::InstanceData Instance;
 				Instance.MaterialIndex = MaterialIndex;
 				Instance.ModelMatrix = glm::mat4(1.0f);
 
-				Render::DrawEntity Entity = { };
-				Entity.StaticMeshIndex = Render::CreateStaticMesh(Model.VertexData + ModelVertexByteOffset, sizeof(Render::StaticMeshVertex), VerticesCount, IndicesCount);
-				Entity.Instances = 1;
-				Entity.InstanceDataIndex = Render::CreateStaticMeshInstance(&Instance);
+				const u32 StaticMeshIndex = TmpScene->StaticMeshes.Count;
+				Render::RenderResource<Render::StaticMesh> Mesh = Render::CreateStaticMesh(Model.VertexData + ModelVertexByteOffset,
+					sizeof(Render::StaticMeshVertex), VerticesCount, IndicesCount);
+				Memory::PushBackToArray(&TmpScene->StaticMeshes, &Mesh);
 
-				Render::CreateEntity(&Entity);
+				const u32 InstanceDataIndex = TmpScene->MeshInstances.Count;
+				Render::RenderResource<Render::InstanceData> InstanceData = Render::CreateStaticMeshInstance(&Instance);
+				Memory::PushBackToArray(&TmpScene->MeshInstances, &InstanceData);
+
+				Render::DrawEntity Entity = { };
+				Entity.StaticMeshIndex = StaticMeshIndex;
+				Entity.Instances = 1;
+				Entity.InstanceDataIndex = InstanceDataIndex;
+
+				Memory::PushBackToArray(&TmpScene->DrawEntities, &Entity);
 
 				ModelVertexByteOffset += VerticesCount * sizeof(Render::StaticMeshVertex) + IndicesCount * sizeof(u32);
 			}
