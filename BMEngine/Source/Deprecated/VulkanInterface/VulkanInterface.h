@@ -66,7 +66,6 @@ namespace VulkanInterface
 	VkQueue GetGraphicsQueue();
 	VkFormat GetSurfaceFormat();
 	u32 GetQueueGraphicsFamilyIndex();
-	VkDescriptorPool GetDescriptorPool();
 	VkInstance GetInstance();
 	VkCommandPool GetTransferCommandPool();
 	VkSwapchainKHR GetSwapchain();

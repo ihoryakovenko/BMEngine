@@ -96,11 +96,6 @@ namespace VulkanInterface
 		return RenderResources::GetCoreContext()->Indices.GraphicsFamily;
 	}
 
-	VkDescriptorPool GetDescriptorPool()
-	{
-		return Render::GetRenderState()->RenderDrawState.MainPool;
-	}
-
 	VkInstance GetInstance()
 	{
 		return RenderResources::GetCoreContext()->VulkanInstance;

@@ -1,9 +1,5 @@
 #include "Render.h"
 
-#include "Engine/Systems/Render/TerrainRender.h"
-#include "Engine/Systems/Render/LightningPass.h"
-#include "Engine/Systems/Render/MainPass.h"
-#include "Engine/Systems/Render/DeferredPass.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
 #include "RenderResources.h"
 
@@ -14,15 +10,10 @@
 #include "Util/Util.h"
 #include "Util/Settings.h"
 
+#include <random>
+
 namespace Render
 {
-	static void AddTask(TransferTask* Task, TaskQueue* Queue)
-	{
-		std::unique_lock<std::mutex> PendingLock(Queue->Mutex);
-		Memory::PushToRingBuffer(&Queue->TasksBuffer, Task);
-		Render::NotifyTransfer();
-	}
-
 	static void InitImGuiPipeline(VkDescriptorPool* ImGuiPool, VulkanCoreContext::VulkanCoreContext* CoreContext, GLFWwindow* Wnd)
 	{
 		ImGui_ImplGlfw_InitForVulkan(Wnd, true);
@@ -72,7 +63,7 @@ namespace Render
 		vkDestroyDescriptorPool(Device, ImGuiPool, nullptr);
 	}
 
-	static void InitStaticMeshPipeline(VkDevice Device, const ResourceStorage* Storage, StaticMeshPipeline* MeshPipeline)
+	static void InitStaticMeshPipeline(VkDevice Device, StaticMeshPipeline* MeshPipeline)
 	{
 		VkSampler ShadowMapArraySampler = RenderResources::GetSampler("ShadowMap");
 
@@ -110,7 +101,7 @@ namespace Render
 
 			VkDescriptorSetAllocateInfo AllocInfo = {};
 			AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			AllocInfo.descriptorPool = VulkanInterface::GetDescriptorPool();
+			AllocInfo.descriptorPool = RenderResources::GetMainPool();
 			AllocInfo.descriptorSetCount = 1;
 			AllocInfo.pSetLayouts = &MeshPipeline->ShadowMapArrayLayout;
 			
@@ -132,9 +123,9 @@ namespace Render
 		VkDescriptorSetLayout StaticMeshDescriptorLayouts[] =
 		{
 			FrameManager::GetViewProjectionLayout(),
-			Storage->Textures.BindlesTexturesLayout,
+			RenderResources::GetBindlesTexturesLayout(),
 			MeshPipeline->StaticMeshLightLayout,
-			Storage->Materials.MaterialLayout,
+			RenderResources::GetMaterialLayout(),
 			MeshPipeline->ShadowMapArrayLayout
 		};
 
@@ -172,7 +163,7 @@ namespace Render
 		vkDestroyPipelineLayout(Device, MeshPipeline->Pipeline.PipelineLayout, nullptr);
 	}
 
-	static void DrawStaticMeshes(VkDevice Device, VkCommandBuffer CmdBuffer, const ResourceStorage* Storage, StaticMeshPipeline* MeshPipeline, const DrawScene* Scene)
+	static void DrawStaticMeshes(VkDevice Device, VkCommandBuffer CmdBuffer, StaticMeshPipeline* MeshPipeline, const DrawScene* Scene)
 	{
 		FrameManager::UpdateUniformMemory(MeshPipeline->EntityLightBufferHandle, Scene->LightEntity, sizeof(LightBuffer));
 
@@ -183,7 +174,7 @@ namespace Render
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MeshPipeline->Pipeline.PipelineLayout,
 			0, 1, &VpSet, 1, &DynamicOffset);
 
-		VkDescriptorSet BindlesTexturesSet = Storage->Textures.BindlesTexturesSet;
+		VkDescriptorSet BindlesTexturesSet = RenderResources::GetBindlesTexturesSet();
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MeshPipeline->Pipeline.PipelineLayout,
 			1, 1, &BindlesTexturesSet, 0, nullptr);
 
@@ -192,29 +183,26 @@ namespace Render
 		for (u32 i = 0; i < Scene->DrawEntities.Count; ++i)
 		{
 			DrawEntity* DrawEntity = Scene->DrawEntities.Data + i;
-			if (!IsDrawEntityLoaded(Storage, Scene, DrawEntity))
+			if (!RenderResources::IsDrawEntityLoaded(DrawEntity))
 			{
 				continue;
 			}
 
-			RenderResource<StaticMesh>* MeshResource = Scene->StaticMeshes.Data + DrawEntity->StaticMeshIndex;
-			StaticMesh* Mesh = &MeshResource->Resource;
-
-			RenderResource<InstanceData>* InstanceResource = Scene->MeshInstances.Data + DrawEntity->InstanceDataIndex;
-			InstanceData* Instance = &InstanceResource->Resource;
+			StaticMesh* Mesh = RenderResources::GetStaticMesh(DrawEntity->StaticMeshIndex);
+			InstanceData* Instance = RenderResources::GetInstanceData(DrawEntity->InstanceDataIndex);
 
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
 				MeshPipeline->StaticMeshLightSet,
-				Storage->Materials.MaterialSet,
+				RenderResources::GetMaterialSet(),
 				MeshPipeline->ShadowMapArraySet[VulkanInterface::TestGetImageIndex()],
 			};
 			const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
 			const VkBuffer Buffers[] =
 			{
-				Storage->Meshes.VertexStageData.Buffer,
-				Storage->Meshes.GPUInstances.Buffer
+				RenderResources::GetVertexStageBuffer(),
+				RenderResources::GetInstanceBuffer()
 			};
 
 			const u64 Offsets[] = 
@@ -227,7 +215,7 @@ namespace Render
 				2, DescriptorSetGroupCount, DescriptorSetGroup, 1, &LightDynamicOffset);
 
 			vkCmdBindVertexBuffers(CmdBuffer, 0, 2, Buffers, Offsets);
-			vkCmdBindIndexBuffer(CmdBuffer, Storage->Meshes.VertexStageData.Buffer, Mesh->IndexOffset, VK_INDEX_TYPE_UINT32);
+			vkCmdBindIndexBuffer(CmdBuffer, RenderResources::GetVertexStageBuffer(), Mesh->IndexOffset, VK_INDEX_TYPE_UINT32);
 			vkCmdDrawIndexed(CmdBuffer, Mesh->IndicesCount, DrawEntity->Instances, 0, 0, 0);
 		}
 	}
@@ -262,33 +250,6 @@ namespace Render
 			VULKAN_CHECK_RESULT(vkCreateSemaphore(Device, &SemaphoreCreateInfo, nullptr, &State->Frames.ImagesAvailable[i]));
 			VULKAN_CHECK_RESULT(vkCreateSemaphore(Device, &SemaphoreCreateInfo, nullptr, &State->Frames.RenderFinished[i]));
 		}
-
-		const u32 PoolSizeCount = 11;
-		auto TotalPassPoolSizes = Memory::FramePointer<VkDescriptorPoolSize>::Create(PoolSizeCount);
-		u32 TotalDescriptorLayouts = 21;
-		TotalPassPoolSizes[0] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		TotalPassPoolSizes[1] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		TotalPassPoolSizes[2] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		TotalPassPoolSizes[3] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3 };
-		TotalPassPoolSizes[4] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3 };
-		TotalPassPoolSizes[5] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3 };
-		TotalPassPoolSizes[6] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		TotalPassPoolSizes[7] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		TotalPassPoolSizes[8] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		TotalPassPoolSizes[9] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 256 };
-		TotalPassPoolSizes[10] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-
-		u32 TotalDescriptorCount = TotalDescriptorLayouts * 3;
-		TotalDescriptorCount += 256;
-
-		VkDescriptorPoolCreateInfo PoolCreateInfo = { };
-		PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		PoolCreateInfo.maxSets = TotalDescriptorCount;
-		PoolCreateInfo.poolSizeCount = PoolSizeCount;
-		PoolCreateInfo.pPoolSizes = TotalPassPoolSizes.Data;
-		PoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
-
-		VULKAN_CHECK_RESULT(vkCreateDescriptorPool(Device, &PoolCreateInfo, nullptr, &State->MainPool));
 	}
 
 	static void DeInitDrawState(VkDevice Device, u32 MaxDrawFrames, DrawState* State)
@@ -301,458 +262,19 @@ namespace Render
 			vkDestroySemaphore(Device, State->Frames.ImagesAvailable[i], nullptr);
 			vkDestroySemaphore(Device, State->Frames.RenderFinished[i], nullptr);
 		}
-
-		vkDestroyDescriptorPool(Device, State->MainPool, nullptr);
 	}
 
-	static void InitStaticMeshStorage(VkDevice Device, VkPhysicalDevice PhysicalDevice, StaticMeshStorage* Storage, u64 VertexCapacity, u64 InstanceCapacity)
-	{
-		*Storage = { };
 
-		Storage->VertexStageData.Buffer = VulkanHelper::CreateBuffer(Device, VertexCapacity, VulkanHelper::BufferUsageFlag::CombinedVertexIndexFlag);
-		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Storage->VertexStageData.Buffer,
-			VulkanHelper::MemoryPropertyFlag::GPULocal);
-		Storage->VertexStageData.Memory = AllocResult.Memory;
-		Storage->VertexStageData.Alignment = AllocResult.Alignment;
-		Storage->VertexStageData.Capacity = AllocResult.Size;
-		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, Storage->VertexStageData.Buffer, Storage->VertexStageData.Memory, 0));
-
-		Storage->GPUInstances.Buffer = VulkanHelper::CreateBuffer(Device, InstanceCapacity, VulkanHelper::BufferUsageFlag::InstanceFlag);
-		AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Storage->GPUInstances.Buffer,
-			VulkanHelper::MemoryPropertyFlag::GPULocal);
-		Storage->GPUInstances.Memory = AllocResult.Memory;
-		Storage->GPUInstances.Alignment = AllocResult.Alignment;
-		Storage->GPUInstances.Capacity = AllocResult.Size;
-		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, Storage->GPUInstances.Buffer, Storage->GPUInstances.Memory, 0));
-	}
-
-	static void DeInitStaticMeshStorage(VkDevice Device, StaticMeshStorage* Storage)
-	{
-		vkDestroyBuffer(Device, Storage->VertexStageData.Buffer, nullptr);
-		vkFreeMemory(Device, Storage->VertexStageData.Memory, nullptr);
-		vkDestroyBuffer(Device, Storage->GPUInstances.Buffer, nullptr);
-		vkFreeMemory(Device, Storage->GPUInstances.Memory, nullptr);
-	}
-
-	static void InitMaterialStorage(VkDevice Device, MaterialStorage* Storage)
-	{
-		const VkDeviceSize MaterialBufferSize = sizeof(Material) * 512;
-		Storage->MaterialBuffer = { };
-		Storage->MaterialBuffer.Buffer = VulkanHelper::CreateBuffer(Device, MaterialBufferSize, VulkanHelper::BufferUsageFlag::StorageFlag);
-		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(VulkanInterface::GetPhysicalDevice(), Device,
-			Storage->MaterialBuffer.Buffer, VulkanHelper::MemoryPropertyFlag::GPULocal);
-		Storage->MaterialBuffer.Memory = AllocResult.Memory;
-		Storage->MaterialBuffer.Alignment = AllocResult.Alignment;
-		Storage->MaterialBuffer.Capacity = MaterialBufferSize;
-		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, Storage->MaterialBuffer.Buffer, Storage->MaterialBuffer.Memory, 0));
-
-		VkDescriptorBufferInfo MaterialBufferInfo;
-		MaterialBufferInfo.buffer = Storage->MaterialBuffer.Buffer;
-		MaterialBufferInfo.offset = 0;
-		MaterialBufferInfo.range = MaterialBufferSize;
-
-		const VkDescriptorType MaterialDescriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		const VkShaderStageFlags MaterialStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		
-		Storage->MaterialLayout = RenderResources::GetSetLayout("MaterialLayout");
-
-		VkDescriptorSetAllocateInfo allocInfoMat = {};
-		allocInfoMat.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		allocInfoMat.descriptorPool = VulkanInterface::GetDescriptorPool();
-		allocInfoMat.descriptorSetCount = 1;
-		allocInfoMat.pSetLayouts = &Storage->MaterialLayout;
-		VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &allocInfoMat, &Storage->MaterialSet));
-
-		VkWriteDescriptorSet WriteDescriptorSet = {};
-		WriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		WriteDescriptorSet.dstSet = Storage->MaterialSet;
-		WriteDescriptorSet.dstBinding = 0;
-		WriteDescriptorSet.dstArrayElement = 0;
-		WriteDescriptorSet.descriptorType = MaterialDescriptorType;
-		WriteDescriptorSet.descriptorCount = 1;
-		WriteDescriptorSet.pBufferInfo = &MaterialBufferInfo;
-		WriteDescriptorSet.pImageInfo = nullptr;
-
-		vkUpdateDescriptorSets(Device, 1, &WriteDescriptorSet, 0, nullptr);
-	}
-
-	static void DeInitMaterialStorage(VkDevice Device, MaterialStorage* Storage)
-	{
-		vkDestroyBuffer(Device, Storage->MaterialBuffer.Buffer, nullptr);
-		vkFreeMemory(Device, Storage->MaterialBuffer.Memory, nullptr);
-	}
-
-	static void InitTextureStorage(VkDevice Device, VkPhysicalDevice PhysicalDevice, TextureStorage* Storage)
-	{
-		const u32 MaxTextures = 64;
-
-		Storage->Textures = Memory::AllocateArray<RenderResource<MeshTexture2D>>(MaxTextures);
-
-		Storage->DiffuseSampler = RenderResources::GetSampler("DiffuseTexture");
-		Storage->SpecularSampler = RenderResources::GetSampler("SpecularTexture");
-
-		Storage->BindlesTexturesLayout = RenderResources::GetSetLayout("BindlesTexturesLayout");
-
-		VkDescriptorSetAllocateInfo AllocInfoTex = {};
-		AllocInfoTex.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		AllocInfoTex.descriptorPool = VulkanInterface::GetDescriptorPool();
-		AllocInfoTex.descriptorSetCount = 1;
-		AllocInfoTex.pSetLayouts = &Storage->BindlesTexturesLayout;
-		VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfoTex, &Storage->BindlesTexturesSet));
-	}
-
-	static void DeInitTextureStorage(VkDevice Device, TextureStorage* Storage)
-	{
-		for (uint32_t i = 0; i < Storage->Textures.Count; ++i)
-		{
-			vkDestroyImageView(Device, Storage->Textures.Data[i].Resource.View, nullptr);
-			vkDestroyImage(Device, Storage->Textures.Data[i].Resource.MeshTexture.Image, nullptr);
-			vkFreeMemory(Device, Storage->Textures.Data[i].Resource.MeshTexture.Memory, nullptr);
-		}
-
-
-		Memory::FreeArray(&Storage->Textures);
-	}
-
-	static void InitTransferState(VkDevice Device, VkPhysicalDevice PhysicalDevice, DataTransferState* TransferState)
-	{
-		TransferState->CurrentFrame = 0;
-
-		VkCommandPoolCreateInfo PoolInfo = { };
-		PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-		PoolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		PoolInfo.queueFamilyIndex = VulkanInterface::GetQueueGraphicsFamilyIndex();
-
-		VULKAN_CHECK_RESULT(vkCreateCommandPool(Device, &PoolInfo, nullptr, &TransferState->TransferCommandPool));
-
-		VkCommandBufferAllocateInfo TransferCommandBufferAllocateInfo = { };
-		TransferCommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		TransferCommandBufferAllocateInfo.commandPool = TransferState->TransferCommandPool;
-		TransferCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		TransferCommandBufferAllocateInfo.commandBufferCount = VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT;
-
-		VULKAN_CHECK_RESULT(vkAllocateCommandBuffers(Device, &TransferCommandBufferAllocateInfo, TransferState->Frames.CommandBuffers));
-
-		VkFenceCreateInfo FenceCreateInfo = { };
-		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-		FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-		for (u32 i = 0; i < VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT; ++i)
-		{
-			VULKAN_CHECK_RESULT(vkCreateFence(Device, &FenceCreateInfo, nullptr, TransferState->Frames.Fences + i));
-		}
-
-		VkSemaphoreTypeCreateInfo TimelineCreateInfo = { };
-		TimelineCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
-		TimelineCreateInfo.pNext = nullptr;
-		TimelineCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-		TimelineCreateInfo.initialValue = 0;
-
-		VkSemaphoreCreateInfo SemaphoreInfo = { };
-		SemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-		SemaphoreInfo.pNext = &TimelineCreateInfo;
-		SemaphoreInfo.flags = 0;
-
-		VULKAN_CHECK_RESULT(vkCreateSemaphore(Device, &SemaphoreInfo, nullptr, &TransferState->TransferSemaphore));
-		TransferState->CompletedTransfer = 0;
-		TransferState->TasksInFly = 0;
-
-		TransferState->PendingTransferTasksQueue.TasksBuffer = Memory::AllocateRingBuffer<TransferTask>(1024 * 100);
-		TransferState->ActiveTransferTasksQueue.TasksBuffer = Memory::AllocateRingBuffer<TransferTask>(1024 * 100);
-
-		TransferState->TransferStagingPool = { };
-
-		TransferState->TransferStagingPool.Buffer = VulkanHelper::CreateBuffer(Device, MB16, VulkanHelper::StagingFlag);
-		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
-			TransferState->TransferStagingPool.Buffer, VulkanHelper::HostCompatible);
-		TransferState->TransferStagingPool.Memory = AllocResult.Memory;
-		//TransferState->TransferStagingPool.ControlBlock.Alignment = AllocResult.Alignment;
-		TransferState->TransferStagingPool.ControlBlock.Capacity = AllocResult.Size;
-		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, TransferState->TransferStagingPool.Buffer, TransferState->TransferStagingPool.Memory, 0));
-
-		TransferState->TransferMemory = Memory::AllocateRingBuffer<u8>(MB16);
-	}
-
-	static void DeInitTransferState(VkDevice Device, DataTransferState* TransferState)
-	{
-		vkDestroyBuffer(Device, TransferState->TransferStagingPool.Buffer, nullptr);
-		vkFreeMemory(Device, TransferState->TransferStagingPool.Memory, nullptr);
-
-		vkDestroyCommandPool(Device, TransferState->TransferCommandPool, nullptr);
-
-		for (u32 i = 0; i < VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT; ++i)
-		{
-			vkDestroyFence(Device, TransferState->Frames.Fences[i], nullptr);
-		}
-
-		vkDestroySemaphore(Device, TransferState->TransferSemaphore, nullptr);
-
-		Memory::FreeRingBuffer(&TransferState->PendingTransferTasksQueue.TasksBuffer);
-		Memory::FreeRingBuffer(&TransferState->ActiveTransferTasksQueue.TasksBuffer);
-		Memory::FreeRingBuffer(&TransferState->TransferMemory);
-	}
-
-	static void Transfer(DataTransferState* TransferState, std::mutex* QueueSubmitMutex)
-	{
-		u64 FrameTotalTransferSize = 0;
-		const u32 CurrentFrame = TransferState->CurrentFrame;
-		VkDevice Device = VulkanInterface::GetDevice();
-
-		VkFence TransferFence = TransferState->Frames.Fences[CurrentFrame];
-		VkCommandBuffer TransferCommandBuffer = TransferState->Frames.CommandBuffers[CurrentFrame];
-
-		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
-		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-		VULKAN_CHECK_RESULT(vkWaitForFences(Device, 1, &TransferFence, VK_TRUE, UINT64_MAX));
-		VULKAN_CHECK_RESULT(vkResetFences(Device, 1, &TransferFence));
-
-		VULKAN_CHECK_RESULT(vkBeginCommandBuffer(TransferCommandBuffer, &CommandBufferBeginInfo));
-
-		std::unique_lock<std::mutex> PendingLock(TransferState->PendingTransferTasksQueue.Mutex);
-		TransferState->PendingCv.wait(PendingLock, [TransferState]
-		{
-			return !Memory::IsRingBufferEmpty(&TransferState->PendingTransferTasksQueue.TasksBuffer);
-		});
-
-		while (!Memory::IsRingBufferEmpty(&TransferState->PendingTransferTasksQueue.TasksBuffer))
-		{
-			TransferTask* Task = Memory::RingBufferGetFirst(&TransferState->PendingTransferTasksQueue.TasksBuffer);
-
-			switch (Task->Type)
-			{
-				case TransferTaskType::TransferTaskType_Mesh:
-				{
-					const u64 TransferOffset = Memory::RingAlloc(&TransferState->TransferStagingPool.ControlBlock, Task->DataSize, 1);
-					VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState->TransferStagingPool.Memory, Task->DataSize,
-						TransferOffset, Task->RawData);
-
-					VkBufferMemoryBarrier2 Barrier = { };
-					Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-					Barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
-					Barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-					Barrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT;
-					Barrier.dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
-					Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-					Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-					Barrier.buffer = Task->DataDescr.DstBuffer;
-					Barrier.offset = Task->DataDescr.DstOffset;
-					Barrier.size = Task->DataSize;
-
-					VkDependencyInfo DepInfo = { };
-					DepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-					DepInfo.bufferMemoryBarrierCount = 1;
-					DepInfo.pBufferMemoryBarriers = &Barrier;
-
-					VkBufferCopy IndexBufferCopyRegion = { };
-					IndexBufferCopyRegion.srcOffset = TransferOffset;
-					IndexBufferCopyRegion.dstOffset = Task->DataDescr.DstOffset;
-					IndexBufferCopyRegion.size = Task->DataSize;
-
-					vkCmdCopyBuffer(TransferCommandBuffer, TransferState->TransferStagingPool.Buffer, Task->DataDescr.DstBuffer, 1, &IndexBufferCopyRegion);
-					vkCmdPipelineBarrier2(TransferCommandBuffer, &DepInfo);
-
-					break;
-				}
-				case TransferTaskType::TransferTaskType_Material:
-				case TransferTaskType::TransferTaskType_Instance:
-				{
-					const u64 TransferOffset = Memory::RingAlloc(&TransferState->TransferStagingPool.ControlBlock, Task->DataSize, 1);
-					VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState->TransferStagingPool.Memory, Task->DataSize,
-						TransferOffset, Task->RawData);
-
-					VkBufferMemoryBarrier2 Barrier = { };
-					Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-					Barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
-					Barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-					Barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-					Barrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT;
-					Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-					Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-					Barrier.buffer = Task->DataDescr.DstBuffer;
-					Barrier.offset = Task->DataDescr.DstOffset;
-					Barrier.size = Task->DataSize;
-
-					VkDependencyInfo DepInfo = { };
-					DepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-					DepInfo.bufferMemoryBarrierCount = 1;
-					DepInfo.pBufferMemoryBarriers = &Barrier;
-
-					VkBufferCopy IndexBufferCopyRegion = { };
-					IndexBufferCopyRegion.srcOffset = TransferOffset;
-					IndexBufferCopyRegion.dstOffset = Task->DataDescr.DstOffset;
-					IndexBufferCopyRegion.size = Task->DataSize;
-
-					vkCmdCopyBuffer(TransferCommandBuffer, TransferState->TransferStagingPool.Buffer, Task->DataDescr.DstBuffer, 1, &IndexBufferCopyRegion);
-					vkCmdPipelineBarrier2(TransferCommandBuffer, &DepInfo);
-
-					break;
-				}
-				case TransferTaskType::TransferTaskType_Texture:
-				{
-					const u64 TransferOffset = Memory::RingAlloc(&TransferState->TransferStagingPool.ControlBlock, Task->DataSize, 16);
-					VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState->TransferStagingPool.Memory, Task->DataSize,
-						TransferOffset, Task->RawData);
-
-					VkImageMemoryBarrier2 TransferImageBarrier = { };
-					TransferImageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-					TransferImageBarrier.pNext = nullptr;
-					TransferImageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
-					TransferImageBarrier.srcAccessMask = 0;
-					TransferImageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-					TransferImageBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-					TransferImageBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-					TransferImageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-					TransferImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-					TransferImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-					TransferImageBarrier.image = Task->TextureDescr.DstImage;
-					TransferImageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-					TransferImageBarrier.subresourceRange.baseMipLevel = 0;
-					TransferImageBarrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-					TransferImageBarrier.subresourceRange.baseArrayLayer = 0;
-					TransferImageBarrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-
-					VkDependencyInfo TransferDepInfo = { };
-					TransferDepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-					TransferDepInfo.pNext = nullptr;
-					TransferDepInfo.dependencyFlags = 0;
-					TransferDepInfo.imageMemoryBarrierCount = 1;
-					TransferDepInfo.pImageMemoryBarriers = &TransferImageBarrier;
-					TransferDepInfo.memoryBarrierCount = 0;
-					TransferDepInfo.pMemoryBarriers = nullptr;
-					TransferDepInfo.bufferMemoryBarrierCount = 0;
-					TransferDepInfo.pBufferMemoryBarriers = nullptr;
-
-					VkBufferImageCopy ImageRegion = { };
-					ImageRegion.bufferOffset = TransferOffset;
-					ImageRegion.bufferRowLength = 0;
-					ImageRegion.bufferImageHeight = 0;
-					ImageRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-					ImageRegion.imageSubresource.mipLevel = 0;
-					ImageRegion.imageSubresource.baseArrayLayer = 0;
-					ImageRegion.imageSubresource.layerCount = 1;
-					ImageRegion.imageOffset = { 0, 0, 0 };
-					ImageRegion.imageExtent = { Task->TextureDescr.Width, Task->TextureDescr.Height, 1 };
-
-					VkImageMemoryBarrier2 PresentationBarrier = { };
-					PresentationBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-					PresentationBarrier.pNext = nullptr;
-					PresentationBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-					PresentationBarrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-					PresentationBarrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-					PresentationBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
-					PresentationBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-					PresentationBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-					PresentationBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-					PresentationBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-					PresentationBarrier.image = Task->TextureDescr.DstImage;
-					PresentationBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-					PresentationBarrier.subresourceRange.baseMipLevel = 0;
-					PresentationBarrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-					PresentationBarrier.subresourceRange.baseArrayLayer = 0;
-					PresentationBarrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-
-					VkDependencyInfo PresentDepInfo = { };
-					PresentDepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-					PresentDepInfo.pNext = nullptr;
-					PresentDepInfo.dependencyFlags = 0;
-					PresentDepInfo.imageMemoryBarrierCount = 1;
-					PresentDepInfo.pImageMemoryBarriers = &PresentationBarrier;
-					PresentDepInfo.memoryBarrierCount = 0;
-					PresentDepInfo.pMemoryBarriers = nullptr;
-					PresentDepInfo.bufferMemoryBarrierCount = 0;
-					PresentDepInfo.pBufferMemoryBarriers = nullptr;
-
-					vkCmdPipelineBarrier2(TransferCommandBuffer, &TransferDepInfo);
-					vkCmdCopyBufferToImage(TransferCommandBuffer, TransferState->TransferStagingPool.Buffer,
-						Task->TextureDescr.DstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ImageRegion);
-					vkCmdPipelineBarrier2(TransferCommandBuffer, &PresentDepInfo);
-
-					break;
-				}
-			}
-
-			std::unique_lock ActiveTasksLock(TransferState->ActiveTransferTasksQueue.Mutex);
-			Memory::PushToRingBuffer(&TransferState->ActiveTransferTasksQueue.TasksBuffer, Task);
-			++TransferState->TasksInFly;
-			ActiveTasksLock.unlock();
-
-			Memory::RingBufferPopFirst(&TransferState->PendingTransferTasksQueue.TasksBuffer);
-
-			FrameTotalTransferSize += Task->DataSize;
-			if (FrameTotalTransferSize >= TransferState->MaxTransferSizePerFrame)
-			{
-				break;
-			}
-		}
-
-		PendingLock.unlock();
-
-		VULKAN_CHECK_RESULT(vkEndCommandBuffer(TransferCommandBuffer));
-
-		const u64 TasksInFly = TransferState->TasksInFly;
-
-		VkTimelineSemaphoreSubmitInfo TimelineSubmitInfo = { };
-		TimelineSubmitInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-		TimelineSubmitInfo.signalSemaphoreValueCount = 1;
-		TimelineSubmitInfo.pSignalSemaphoreValues = &TasksInFly;
-
-		VkSubmitInfo SubmitInfo = { };
-		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.commandBufferCount = 1;
-		SubmitInfo.pCommandBuffers = &TransferCommandBuffer;
-		SubmitInfo.pNext = &TimelineSubmitInfo;
-		SubmitInfo.signalSemaphoreCount = 1;
-		SubmitInfo.pSignalSemaphores = &TransferState->TransferSemaphore;
-
-		std::unique_lock SubmitLock(*QueueSubmitMutex);
-		vkQueueSubmit(VulkanInterface::GetTransferQueue(), 1, &SubmitInfo, TransferFence);
-		SubmitLock.unlock();
-
-		TransferState->CurrentFrame = (CurrentFrame + 1) % MAX_DRAW_FRAMES;
-	}
-
-	static void ProcessTransferTasks(VkDevice Device, VkCommandBuffer CmdBuffer, DataTransferState* TransferState, const ResourceStorage* Storage)
-	{
-		u64 CompletedCounter = 0;
-		vkGetSemaphoreCounterValue(Device, TransferState->TransferSemaphore, &CompletedCounter);
-
-		u64 Counter = CompletedCounter - TransferState->CompletedTransfer;
-		if (Counter > 0)
-		{
-			std::unique_lock Lock(TransferState->ActiveTransferTasksQueue.Mutex);
-
-			while (Counter--)
-			{
-				TransferTask* Task = Memory::RingBufferGetFirst(&TransferState->ActiveTransferTasksQueue.TasksBuffer);
-				Storage->ResourcesState.Data[Task->ResourceIndex] = true;
-
-				Memory::RingFree(&TransferState->TransferMemory.ControlBlock, Task->DataSize, 1);
-				Memory::RingBufferPopFirst(&TransferState->ActiveTransferTasksQueue.TasksBuffer);
-			}
-
-			TransferState->CompletedTransfer = CompletedCounter;
-		}
-	}
+	
 
 	static RenderState State;
-
-	static void* RequestTransferMemory(u64 Size)
-	{
-		return State.TransferState.TransferMemory.DataArray + Memory::RingAlloc(&State.TransferState.TransferMemory.ControlBlock, Size, 1);
-	}
 
 	void Init(GLFWwindow* WindowHandler)
 	{		
 		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
 		VkDevice Device = VulkanInterface::GetDevice();
 
-		InitDrawState(Device, VulkanInterface::GetQueueGraphicsFamilyIndex(), MAX_DRAW_FRAMES, &State.RenderDrawState);
-		InitTransferState(Device, PhysicalDevice, &State.TransferState);
-		State.RenderResources.ResourcesState = Memory::AllocateArray<bool>(512);
-		InitTextureStorage(Device, PhysicalDevice, &State.RenderResources.Textures);
-		InitMaterialStorage(Device, &State.RenderResources.Materials);
-		InitStaticMeshStorage(Device, PhysicalDevice, &State.RenderResources.Meshes, MB4, MB4);
+		InitDrawState(Device, VulkanInterface::GetQueueGraphicsFamilyIndex(), VulkanHelper::MAX_DRAW_FRAMES, &State.RenderDrawState);
 
 		FrameManager::Init();
 
@@ -762,19 +284,8 @@ namespace Render
 
 		//TerrainRender::Init();
 		//DynamicMapSystem::Init();
-		InitStaticMeshPipeline(Device, &State.RenderResources, &State.MeshPipeline);
+		InitStaticMeshPipeline(Device, &State.MeshPipeline);
 		InitImGuiPipeline(&State.DebugUiPool, RenderResources::GetCoreContext(), WindowHandler);
-
-		std::thread TransferThread(
-			[]()
-			{
-				while (true) // todo use atomic or think about valid break
-				{
-					Transfer(&State.TransferState, &State.QueueSubmitMutex);
-				}
-			});
-
-		TransferThread.detach();
 	}
 
 	void DeInit()
@@ -784,12 +295,7 @@ namespace Render
 		VkDevice Device = VulkanInterface::GetDevice();
 
 		DeInitImGuiPipeline(Device, State.DebugUiPool);
-		DeInitTransferState(Device, &State.TransferState);
-		DeInitTextureStorage(Device, &State.RenderResources.Textures);
-		DeInitMaterialStorage(Device, &State.RenderResources.Materials);
-		DeInitStaticMeshStorage(Device, &State.RenderResources.Meshes);
-		Memory::FreeArray(&State.RenderResources.ResourcesState);
-		DeInitDrawState(Device, MAX_DRAW_FRAMES, &State.RenderDrawState);
+		DeInitDrawState(Device, VulkanHelper::MAX_DRAW_FRAMES, &State.RenderDrawState);
 
 		//TerrainRender::DeInit();
 		DeInitStaticMeshPipeline(Device, &State.MeshPipeline);
@@ -802,6 +308,10 @@ namespace Render
 
 	void Draw(const DrawScene* Scene)
 	{
+		TransferSystem::ProcessTransferTasks();
+
+		VulkanCoreContext::VulkanCoreContext* CoreContext = RenderResources::GetCoreContext();
+
 		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
 		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -821,12 +331,10 @@ namespace Render
 		VkCommandBuffer DrawCmdBuffer = State.RenderDrawState.Frames.CommandBuffers[ImageIndex];
 		VULKAN_CHECK_RESULT(vkBeginCommandBuffer(DrawCmdBuffer, &CommandBufferBeginInfo));
 
-		ProcessTransferTasks(Device, DrawCmdBuffer, &State.TransferState, &State.RenderResources);
-
-		LightningPass::Draw(Scene, &State.RenderResources);
+		LightningPass::Draw(Scene);
 		MainPass::BeginPass();
 		//TerrainRender::Draw();
-		DrawStaticMeshes(Device, DrawCmdBuffer, &State.RenderResources, &State.MeshPipeline, Scene);
+		DrawStaticMeshes(Device, DrawCmdBuffer, &State.MeshPipeline, Scene);
 		MainPass::EndPass();
 		DeferredPass::BeginPass();
 		DeferredPass::Draw();
@@ -862,242 +370,1112 @@ namespace Render
 		PresentInfo.pSwapchains = &Swapchain;
 		PresentInfo.pImageIndices = &ImageIndex;
 
-		std::unique_lock Lock(State.QueueSubmitMutex);
+		std::unique_lock Lock(CoreContext->QueueSubmitMutex);
 		VULKAN_CHECK_RESULT(vkQueueSubmit(VulkanInterface::GetGraphicsQueue(), 1, &SubmitInfo, FrameFence));
 		VULKAN_CHECK_RESULT(vkQueuePresentKHR(VulkanInterface::GetGraphicsQueue(), &PresentInfo));
 		Lock.unlock();
 
-		State.RenderDrawState.CurrentFrame = (CurrentFrame + 1) % MAX_DRAW_FRAMES;
-	}
-
-	void NotifyTransfer()
-	{
-		State.TransferState.PendingCv.notify_one();
-	}
-
-	RenderResource<Material> CreateMaterial(Material* Mat)
-	{
-		RenderResource<Material> NewMaterialResource;
-		NewMaterialResource.ResourceIndex = State.RenderResources.ResourcesState.Count;
-		NewMaterialResource.Resource = *Mat;
-
-		bool ResourceState = false;
-		Memory::PushBackToArray(&State.RenderResources.ResourcesState, &ResourceState);
-
-		// TODO: TMP solution
-		void* TransferMemory = Render::RequestTransferMemory(sizeof(Material));
-		memcpy(TransferMemory, &NewMaterialResource.Resource, sizeof(Material));
-
-		TransferTask Task = { };
-		Task.DataSize = sizeof(Material);
-		Task.DataDescr.DstBuffer = State.RenderResources.Materials.MaterialBuffer.Buffer;
-		Task.DataDescr.DstOffset = State.RenderResources.Materials.MaterialBuffer.Offset;
-		Task.RawData = TransferMemory;
-		Task.ResourceIndex = NewMaterialResource.ResourceIndex;
-		Task.Type = TransferTaskType::TransferTaskType_Material;
-
-		AddTask(&Task, &State.TransferState.PendingTransferTasksQueue);
-
-		State.RenderResources.Materials.MaterialBuffer.Offset += Task.DataSize;
-		return NewMaterialResource;
-	}
-
-	RenderResource<StaticMesh> CreateStaticMesh(void* MeshVertexData, u64 VertexSize, u64 VerticesCount, u64 IndicesCount)
-	{
-		const u64 VerticesSize = VertexSize * VerticesCount;
-		const u64 DataSize = sizeof(u32) * IndicesCount + VerticesSize;
-
-		// TODO: TMP solution
-		void* TransferMemory = Render::RequestTransferMemory(DataSize);
-		memcpy(TransferMemory, MeshVertexData, DataSize);
-
-		RenderResource<StaticMesh> Resource;
-		Resource.ResourceIndex = State.RenderResources.ResourcesState.Count;
-
-		bool ResourceState = false;
-		Memory::PushBackToArray(&State.RenderResources.ResourcesState, &ResourceState);
-
-		StaticMesh* Mesh = &Resource.Resource;
-		*Mesh = { };
-		Mesh->IndicesCount = IndicesCount;
-		Mesh->VertexOffset = State.RenderResources.Meshes.VertexStageData.Offset;
-		Mesh->IndexOffset = State.RenderResources.Meshes.VertexStageData.Offset + VerticesSize;
-		Mesh->VertexDataSize = DataSize;
-
-		TransferTask Task = { };
-		Task.DataSize = DataSize;
-		Task.DataDescr.DstBuffer = State.RenderResources.Meshes.VertexStageData.Buffer;
-		Task.DataDescr.DstOffset = State.RenderResources.Meshes.VertexStageData.Offset;
-		Task.RawData = TransferMemory;
-		Task.ResourceIndex = Resource.ResourceIndex;
-		Task.Type = TransferTaskType::TransferTaskType_Mesh;
-
-		AddTask(&Task, &State.TransferState.PendingTransferTasksQueue);
-
-		State.RenderResources.Meshes.VertexStageData.Offset += DataSize;
-		return Resource;
-	}
-
-	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height)
-	{
-		VkDevice Device = VulkanInterface::GetDevice();
-		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
-		VkQueue TransferQueue = VulkanInterface::GetTransferQueue();
-
-		const u64 Index = State.RenderResources.Textures.Textures.Count;
-		RenderResource<MeshTexture2D>* Resource = Memory::ArrayGetNew(&State.RenderResources.Textures.Textures);
-		Resource->ResourceIndex = State.RenderResources.ResourcesState.Count;
-
-		bool ResourceState = false;
-		Memory::PushBackToArray(&State.RenderResources.ResourcesState, &ResourceState);
-
-		MeshTexture2D* NextTexture = &Resource->Resource;
-
-		VkImageCreateInfo ImageCreateInfo = { };
-		ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-		ImageCreateInfo.extent.width = Width;
-		ImageCreateInfo.extent.height = Height;
-		ImageCreateInfo.extent.depth = 1;
-		ImageCreateInfo.mipLevels = 1;
-		ImageCreateInfo.arrayLayers = 1;
-		ImageCreateInfo.format = VK_FORMAT_BC7_SRGB_BLOCK;
-		ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		ImageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-		ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-		ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		ImageCreateInfo.flags = 0;
-
-		VULKAN_CHECK_RESULT(vkCreateImage(Device, &ImageCreateInfo, nullptr, &NextTexture->MeshTexture.Image));
-
-		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
-			NextTexture->MeshTexture.Image, VulkanHelper::GPULocal);
-		NextTexture->MeshTexture.Memory = AllocResult.Memory;
-		NextTexture->MeshTexture.Alignment = AllocResult.Alignment;
-		NextTexture->MeshTexture.Size = AllocResult.Size;
-		VULKAN_CHECK_RESULT(vkBindImageMemory(Device, NextTexture->MeshTexture.Image, NextTexture->MeshTexture.Memory, 0));
-
-		VkImageViewCreateInfo ViewCreateInfo = { };
-		ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		ViewCreateInfo.flags = 0;
-		ViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		ViewCreateInfo.format = VK_FORMAT_BC7_SRGB_BLOCK;
-		ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-		ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-		ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-		ViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-		ViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		ViewCreateInfo.subresourceRange.baseMipLevel = 0;
-		ViewCreateInfo.subresourceRange.levelCount = 1;
-		ViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-		ViewCreateInfo.subresourceRange.layerCount = 1;
-		ViewCreateInfo.image = NextTexture->MeshTexture.Image;
-
-		VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo, nullptr, &NextTexture->View));
-
-		VkDescriptorImageInfo DiffuseImageInfo = { };
-		DiffuseImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		DiffuseImageInfo.sampler = State.RenderResources.Textures.DiffuseSampler;
-		DiffuseImageInfo.imageView = NextTexture->View;
-
-		VkDescriptorImageInfo SpecularImageInfo = { };
-		SpecularImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		SpecularImageInfo.sampler = State.RenderResources.Textures.SpecularSampler;
-		SpecularImageInfo.imageView = NextTexture->View;
-
-		VkWriteDescriptorSet WriteDiffuse = { };
-		WriteDiffuse.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		WriteDiffuse.dstSet = State.RenderResources.Textures.BindlesTexturesSet;
-		WriteDiffuse.dstBinding = 0;
-		WriteDiffuse.dstArrayElement = Index;
-		WriteDiffuse.descriptorCount = 1;
-		WriteDiffuse.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		WriteDiffuse.pImageInfo = &DiffuseImageInfo;
-
-		VkWriteDescriptorSet WriteSpecular = { };
-		WriteSpecular.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		WriteSpecular.dstSet = State.RenderResources.Textures.BindlesTexturesSet;
-		WriteSpecular.dstBinding = 1;
-		WriteSpecular.dstArrayElement = Index;
-		WriteSpecular.descriptorCount = 1;
-		WriteSpecular.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		WriteSpecular.pImageInfo = &SpecularImageInfo;
-
-		VkWriteDescriptorSet Writes[] = { WriteDiffuse, WriteSpecular };
-		vkUpdateDescriptorSets(VulkanInterface::GetDevice(), 2, Writes, 0, nullptr);
-
-		// TODO: TMP solution
-		void* TransferMemory = Render::RequestTransferMemory(NextTexture->MeshTexture.Size);
-		memcpy(TransferMemory, Data, NextTexture->MeshTexture.Size);
-
-		TransferTask Task = { };
-		Task.DataSize = NextTexture->MeshTexture.Size;
-		Task.TextureDescr.DstImage = NextTexture->MeshTexture.Image;
-		Task.TextureDescr.Width = Width;
-		Task.TextureDescr.Height = Height;
-		Task.RawData = TransferMemory;
-		Task.ResourceIndex = Resource->ResourceIndex;
-		Task.Type = TransferTaskType::TransferTaskType_Texture;
-
-		AddTask(&Task, &State.TransferState.PendingTransferTasksQueue);
-
-		return Index;
-	}
-
-	RenderResource<InstanceData> CreateStaticMeshInstance(InstanceData* Data)
-	{
-		RenderResource<InstanceData> Resource;
-		Resource.ResourceIndex = State.RenderResources.ResourcesState.Count;
-		Resource.Resource = *Data;
-
-		bool ResourceState = false;
-		Memory::PushBackToArray(&State.RenderResources.ResourcesState, &ResourceState);
-
-		// TODO: TMP solution
-		void* TransferMemory = Render::RequestTransferMemory(sizeof(InstanceData));
-		memcpy(TransferMemory, &Resource.Resource, sizeof(InstanceData));
-
-		TransferTask Task = { };
-		Task.DataSize = sizeof(InstanceData);
-		Task.DataDescr.DstBuffer = State.RenderResources.Meshes.GPUInstances.Buffer;
-		Task.DataDescr.DstOffset = State.RenderResources.Meshes.GPUInstances.Offset;
-		Task.RawData = TransferMemory;
-		Task.ResourceIndex = Resource.ResourceIndex;
-		Task.Type = TransferTaskType::TransferTaskType_Instance;
-
-		State.RenderResources.Meshes.GPUInstances.Offset += Task.DataSize;
-		AddTask(&Task, &State.TransferState.PendingTransferTasksQueue);
-
-		return Resource;
+		State.RenderDrawState.CurrentFrame = (CurrentFrame + 1) % VulkanHelper::MAX_DRAW_FRAMES;
 	}
 
 	RenderState* GetRenderState()
 	{
 		return &State;
 	}
+}
 
-	bool IsDrawEntityLoaded(const ResourceStorage* Storage, const DrawScene* Scene, const DrawEntity* Entity)
+
+
+
+
+
+
+
+namespace DeferredPass
+{
+	static VulkanHelper::RenderPipeline Pipeline;
+
+	static VkDescriptorSetLayout DeferredInputLayout;
+
+	static VulkanInterface::UniformImage DeferredInputDepthImage[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VulkanInterface::UniformImage DeferredInputColorImage[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+
+	static VkImageView DeferredInputDepthImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VkImageView DeferredInputColorImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+
+	static VkDescriptorSet DeferredInputSet[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+
+	static VkSampler ColorSampler;
+	static VkSampler DepthSampler;
+
+	static VulkanHelper::AttachmentData AttachmentData;
+
+	void Init()
 	{
-		RenderResource<StaticMesh>* MeshResource = Scene->StaticMeshes.Data + Entity->StaticMeshIndex;
-		if (!Storage->ResourcesState.Data[MeshResource->ResourceIndex]) return false;
+		VkDevice Device = VulkanInterface::GetDevice();
+		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
 
-		RenderResource<InstanceData>* InstanceResource = Scene->MeshInstances.Data + Entity->InstanceDataIndex;
-		for (u32 i = Entity->InstanceDataIndex; i < Entity->Instances; ++i)
+		AttachmentData.ColorAttachmentCount = 1;
+		AttachmentData.ColorAttachmentFormats[0] = VulkanInterface::GetSurfaceFormat();
+		AttachmentData.DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
+		AttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+
+		DeferredInputLayout = RenderResources::GetSetLayout("MainPassOutputLayout");
+
+		VkImageCreateInfo DeferredInputDepthUniformCreateInfo = { };
+		DeferredInputDepthUniformCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		DeferredInputDepthUniformCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+		DeferredInputDepthUniformCreateInfo.extent.depth = 1;
+		DeferredInputDepthUniformCreateInfo.mipLevels = 1;
+		DeferredInputDepthUniformCreateInfo.arrayLayers = 1;
+		DeferredInputDepthUniformCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		DeferredInputDepthUniformCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		DeferredInputDepthUniformCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		DeferredInputDepthUniformCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		DeferredInputDepthUniformCreateInfo.flags = 0;
+		DeferredInputDepthUniformCreateInfo.extent.width = MainScreenExtent.width;
+		DeferredInputDepthUniformCreateInfo.extent.height = MainScreenExtent.height;
+		DeferredInputDepthUniformCreateInfo.format = DepthFormat;
+		DeferredInputDepthUniformCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+		VkImageCreateInfo DeferredInputColorUniformCreateInfo = DeferredInputDepthUniformCreateInfo;
+		DeferredInputColorUniformCreateInfo.format = ColorFormat;
+		DeferredInputColorUniformCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+		ColorSampler = RenderResources::GetSampler("ColorAttachment");
+		DepthSampler = RenderResources::GetSampler("DepthAttachment");
+
+		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
-			InstanceResource = Scene->MeshInstances.Data + i;
-			if (!Storage->ResourcesState.Data[InstanceResource->ResourceIndex]) return false;
+			//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
+
+			vkCreateImage(Device, &DeferredInputDepthUniformCreateInfo, nullptr, &DeferredInputDepthImage[i].Image);
+			VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
+				DeferredInputDepthImage[i].Image, VulkanHelper::GPULocal);
+			DeferredInputDepthImage[i].Memory = AllocResult.Memory;
+			vkBindImageMemory(Device, DeferredInputDepthImage[i].Image, DeferredInputDepthImage[i].Memory, 0);
+
+			vkCreateImage(Device, &DeferredInputColorUniformCreateInfo, nullptr, &DeferredInputColorImage[i].Image);
+			AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, DeferredInputColorImage[i].Image, VulkanHelper::GPULocal);
+			DeferredInputColorImage[i].Memory = AllocResult.Memory;
+			vkBindImageMemory(Device, DeferredInputColorImage[i].Image, DeferredInputColorImage[i].Memory, 0);
+
+			VkImageViewCreateInfo DepthViewCreateInfo = { };
+			DepthViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			DepthViewCreateInfo.image = DeferredInputDepthImage[i].Image;
+			DepthViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			DepthViewCreateInfo.format = DepthFormat;
+			DepthViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+			DepthViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+			DepthViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+			DepthViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+			DepthViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+			DepthViewCreateInfo.subresourceRange.baseMipLevel = 0;
+			DepthViewCreateInfo.subresourceRange.levelCount = 1;
+			DepthViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+			DepthViewCreateInfo.subresourceRange.layerCount = 1;
+			DepthViewCreateInfo.pNext = nullptr;
+
+			VULKAN_CHECK_RESULT(vkCreateImageView(Device, &DepthViewCreateInfo, nullptr, &DeferredInputDepthImageInterface[i]));
+
+			VkImageViewCreateInfo ColorViewCreateInfo = { };
+			ColorViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			ColorViewCreateInfo.image = DeferredInputColorImage[i].Image;
+			ColorViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			ColorViewCreateInfo.format = ColorFormat;
+			ColorViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ColorViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ColorViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ColorViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ColorViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			ColorViewCreateInfo.subresourceRange.baseMipLevel = 0;
+			ColorViewCreateInfo.subresourceRange.levelCount = 1;
+			ColorViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+			ColorViewCreateInfo.subresourceRange.layerCount = 1;
+			ColorViewCreateInfo.pNext = nullptr;
+
+			VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ColorViewCreateInfo, nullptr, &DeferredInputColorImageInterface[i]));
+
+			VkDescriptorSetAllocateInfo AllocInfo = { };
+			AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			AllocInfo.descriptorPool = RenderResources::GetMainPool();
+			AllocInfo.descriptorSetCount = 1;
+			AllocInfo.pSetLayouts = &DeferredInputLayout;
+			VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, DeferredInputSet + i));
+
+			VkDescriptorImageInfo DeferredInputImageInfo[2];
+			DeferredInputImageInfo[0].imageView = DeferredInputColorImageInterface[i];
+			DeferredInputImageInfo[0].sampler = ColorSampler;
+			DeferredInputImageInfo[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+			DeferredInputImageInfo[1].imageView = DeferredInputDepthImageInterface[i];
+			DeferredInputImageInfo[1].sampler = DepthSampler;
+			DeferredInputImageInfo[1].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+			VkWriteDescriptorSet WriteDescriptorSets[2] = { };
+
+			WriteDescriptorSets[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			WriteDescriptorSets[0].dstSet = DeferredInputSet[i];
+			WriteDescriptorSets[0].dstBinding = 0;
+			WriteDescriptorSets[0].dstArrayElement = 0;
+			WriteDescriptorSets[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			WriteDescriptorSets[0].descriptorCount = 1;
+			WriteDescriptorSets[0].pBufferInfo = nullptr;
+			WriteDescriptorSets[0].pImageInfo = &DeferredInputImageInfo[0];
+
+			WriteDescriptorSets[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			WriteDescriptorSets[1].dstSet = DeferredInputSet[i];
+			WriteDescriptorSets[1].dstBinding = 1;
+			WriteDescriptorSets[1].dstArrayElement = 0;
+			WriteDescriptorSets[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			WriteDescriptorSets[1].descriptorCount = 1;
+			WriteDescriptorSets[1].pBufferInfo = nullptr;
+			WriteDescriptorSets[1].pImageInfo = &DeferredInputImageInfo[1];
+
+			vkUpdateDescriptorSets(Device, 2, WriteDescriptorSets, 0, nullptr);
 		}
 
-		RenderResource<Material>* MaterialResource = Scene->Materials.Data + InstanceResource->Resource.MaterialIndex;
-		if (!Storage->ResourcesState.Data[MaterialResource->ResourceIndex]) return false;
 
-		Material* Material = &MaterialResource->Resource;
-		RenderResource<MeshTexture2D>* AlbedoTexture = Storage->Textures.Textures.Data + Material->AlbedoTexIndex;
-		if (!Storage->ResourcesState.Data[AlbedoTexture->ResourceIndex]) return false;
+		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
+		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		PipelineLayoutCreateInfo.setLayoutCount = 1;
+		PipelineLayoutCreateInfo.pSetLayouts = &DeferredInputLayout;
 
-		RenderResource<MeshTexture2D>* SpecTexture = Storage->Textures.Textures.Data + Material->SpecularTexIndex;
-		if (!Storage->ResourcesState.Data[SpecTexture->ResourceIndex]) return false;
-		return true;
+		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &Pipeline.PipelineLayout));
+
+		VulkanHelper::PipelineResourceInfo ResourceInfo;
+		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
+		ResourceInfo.PipelineAttachmentData = AttachmentData;
+
+		Yaml::Node Root;
+		Yaml::Parse(Root, "./Resources/Settings/DeferredPipeline.yaml");
+
+		Pipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, Root, MainScreenExtent, Pipeline.PipelineLayout, &ResourceInfo);
+	}
+
+	void DeInit()
+	{
+		VkDevice Device = VulkanInterface::GetDevice();
+
+		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
+		{
+			vkDestroyImageView(Device, DeferredInputDepthImageInterface[i], nullptr);
+			vkDestroyImageView(Device, DeferredInputColorImageInterface[i], nullptr);
+
+			vkDestroyImage(Device, DeferredInputDepthImage[i].Image, nullptr);
+			vkFreeMemory(Device, DeferredInputDepthImage[i].Memory, nullptr);
+
+			vkDestroyImage(Device, DeferredInputColorImage[i].Image, nullptr);
+			vkFreeMemory(Device, DeferredInputColorImage[i].Memory, nullptr);
+		}
+
+
+		vkDestroyPipeline(Device, Pipeline.Pipeline, nullptr);
+		vkDestroyPipelineLayout(Device, Pipeline.PipelineLayout, nullptr);
+	}
+
+	void Draw()
+	{
+		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+
+		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
+
+		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
+			0, 1, &DeferredInputSet[VulkanInterface::TestGetImageIndex()], 0, nullptr);
+
+		vkCmdDraw(CmdBuffer, 3, 1, 0, 0); // 3 hardcoded vertices
+	}
+
+	void BeginPass()
+	{
+		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+
+		VkRect2D RenderArea;
+		RenderArea.extent = MainScreenExtent;
+		RenderArea.offset = { 0, 0 };
+
+		VkRenderingAttachmentInfo SwapchainColorAttachment = { };
+		SwapchainColorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+		SwapchainColorAttachment.imageView = VulkanInterface::GetSwapchainImageViews()[VulkanInterface::TestGetImageIndex()];
+		SwapchainColorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		SwapchainColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		SwapchainColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		SwapchainColorAttachment.clearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+		VkRenderingInfo RenderingInfo{ };
+		RenderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+		RenderingInfo.renderArea = RenderArea;
+		RenderingInfo.layerCount = 1;
+		RenderingInfo.colorAttachmentCount = 1;
+		RenderingInfo.pColorAttachments = &SwapchainColorAttachment;
+		RenderingInfo.pDepthAttachment = nullptr;
+
+		VkImageMemoryBarrier2 ColorBarrier = { };
+		ColorBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		ColorBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		ColorBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		ColorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		ColorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		ColorBarrier.image = DeferredInputColorImage[VulkanInterface::TestGetImageIndex()].Image;
+		ColorBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		ColorBarrier.subresourceRange.baseMipLevel = 0;
+		ColorBarrier.subresourceRange.levelCount = 1;
+		ColorBarrier.subresourceRange.baseArrayLayer = 0;
+		ColorBarrier.subresourceRange.layerCount = 1;
+		// RELEASE: wait for all color-attachmet writes to finish
+		ColorBarrier.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		ColorBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		// ACQUIRE: make image ready for sampling in the fragment shader
+		ColorBarrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		ColorBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+		VkImageMemoryBarrier2 DepthBarrier = { };
+		DepthBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		DepthBarrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		DepthBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		DepthBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		DepthBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		DepthBarrier.image = DeferredInputDepthImage[VulkanInterface::TestGetImageIndex()].Image;
+		DepthBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+		DepthBarrier.subresourceRange.baseMipLevel = 0;
+		DepthBarrier.subresourceRange.levelCount = 1;
+		DepthBarrier.subresourceRange.baseArrayLayer = 0;
+		DepthBarrier.subresourceRange.layerCount = 1;
+		DepthBarrier.srcStageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+		DepthBarrier.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		DepthBarrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+		DepthBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+
+
+		VkImageMemoryBarrier2 SwapchainAcquireBarrier = { };
+		SwapchainAcquireBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		SwapchainAcquireBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		SwapchainAcquireBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		SwapchainAcquireBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		SwapchainAcquireBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		SwapchainAcquireBarrier.image = VulkanInterface::GetSwapchainImages()[VulkanInterface::TestGetImageIndex()];
+		SwapchainAcquireBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		SwapchainAcquireBarrier.subresourceRange.baseMipLevel = 0;
+		SwapchainAcquireBarrier.subresourceRange.levelCount = 1;
+		SwapchainAcquireBarrier.subresourceRange.baseArrayLayer = 0;
+		SwapchainAcquireBarrier.subresourceRange.layerCount = 1;
+		// RELEASE nothing we don't depend on any earlier writes to the swap image
+		SwapchainAcquireBarrier.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		SwapchainAcquireBarrier.srcAccessMask = 0;
+		// ACQUIRE for our upcoming color-attachment writes
+		SwapchainAcquireBarrier.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		SwapchainAcquireBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+		VkImageMemoryBarrier2 Barriers[] = {
+			ColorBarrier,
+			DepthBarrier,
+			SwapchainAcquireBarrier
+		};
+
+		VkDependencyInfo DepInfo = { };
+		DepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+		DepInfo.imageMemoryBarrierCount = 3;
+		DepInfo.pImageMemoryBarriers = Barriers;
+
+		vkCmdPipelineBarrier2(CmdBuffer, &DepInfo);
+
+		vkCmdBeginRendering(CmdBuffer, &RenderingInfo);
+	}
+
+	void EndPass()
+	{
+		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+		vkCmdEndRendering(CmdBuffer);
+
+		VkImageMemoryBarrier2 SwapchainPresentBarrier = { };
+		SwapchainPresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		SwapchainPresentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		SwapchainPresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		SwapchainPresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		SwapchainPresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		SwapchainPresentBarrier.image = VulkanInterface::GetSwapchainImages()[VulkanInterface::TestGetImageIndex()];
+		SwapchainPresentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		SwapchainPresentBarrier.subresourceRange.baseMipLevel = 0;
+		SwapchainPresentBarrier.subresourceRange.levelCount = 1;
+		SwapchainPresentBarrier.subresourceRange.baseArrayLayer = 0;
+		SwapchainPresentBarrier.subresourceRange.layerCount = 1;
+		SwapchainPresentBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT
+			| VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+		SwapchainPresentBarrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
+			| VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		SwapchainPresentBarrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE_KHR;  // no further memory dep
+		SwapchainPresentBarrier.dstAccessMask = 0;
+
+		VkDependencyInfo PresentDepInfo = { };
+		PresentDepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+		PresentDepInfo.imageMemoryBarrierCount = 1;
+		PresentDepInfo.pImageMemoryBarriers = &SwapchainPresentBarrier;
+
+		vkCmdPipelineBarrier2(CmdBuffer, &PresentDepInfo);
+	}
+
+
+
+
+
+	VkImageView* TestDeferredInputColorImageInterface()
+	{
+		return DeferredInputColorImageInterface;
+	}
+
+	VkImageView* TestDeferredInputDepthImageInterface()
+	{
+		return DeferredInputDepthImageInterface;
+	}
+
+	VulkanInterface::UniformImage* TestDeferredInputColorImage()
+	{
+		return DeferredInputColorImage;
+	}
+
+	VulkanInterface::UniformImage* TestDeferredInputDepthImage()
+	{
+		return DeferredInputDepthImage;
+	}
+
+	VulkanHelper::AttachmentData* GetAttachmentData()
+	{
+		return &AttachmentData;
+	}
+}
+
+namespace LightningPass
+{
+	static VulkanInterface::UniformImage ShadowMapArray[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+
+	static VkDescriptorSetLayout LightSpaceMatrixLayout;
+
+	static VulkanInterface::UniformBuffer LightSpaceMatrixBuffer[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+
+	static VkDescriptorSet LightSpaceMatrixSet[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+
+	static VkImageView ShadowMapElement1ImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static VkImageView ShadowMapElement2ImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+
+	static VkPushConstantRange PushConstants;
+
+	static VulkanHelper::RenderPipeline Pipeline;
+
+	void Init()
+	{
+		VkDevice Device = VulkanInterface::GetDevice();
+		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
+
+		LightSpaceMatrixLayout = RenderResources::GetSetLayout("LightSpaceMatrixLayout");
+
+		VkImageCreateInfo ShadowMapArrayCreateInfo = { };
+		ShadowMapArrayCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		ShadowMapArrayCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+		ShadowMapArrayCreateInfo.extent.depth = 1;
+		ShadowMapArrayCreateInfo.mipLevels = 1;
+		ShadowMapArrayCreateInfo.arrayLayers = 1;
+		ShadowMapArrayCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		ShadowMapArrayCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		ShadowMapArrayCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		ShadowMapArrayCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		ShadowMapArrayCreateInfo.flags = 0;
+		ShadowMapArrayCreateInfo.format = ColorFormat;
+		ShadowMapArrayCreateInfo.extent.width = DepthViewportExtent.width;
+		ShadowMapArrayCreateInfo.extent.height = DepthViewportExtent.height;
+		ShadowMapArrayCreateInfo.format = DepthFormat;
+		ShadowMapArrayCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		ShadowMapArrayCreateInfo.arrayLayers = 2;
+
+		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
+		{
+			vkCreateImage(Device, &ShadowMapArrayCreateInfo, nullptr, &ShadowMapArray[i].Image);
+			VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, ShadowMapArray[i].Image, VulkanHelper::GPULocal);
+			ShadowMapArray[i].Memory = AllocResult.Memory;
+			VULKAN_CHECK_RESULT(vkBindImageMemory(Device, ShadowMapArray[i].Image, ShadowMapArray[i].Memory, 0));
+
+			const VkDeviceSize LightSpaceMatrixSize = sizeof(glm::mat4);
+
+			VkBufferCreateInfo BufferInfo = { };
+			BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+			BufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+			BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			BufferInfo.size = LightSpaceMatrixSize;
+
+			LightSpaceMatrixBuffer[i].Buffer = VulkanHelper::CreateBuffer(Device, LightSpaceMatrixSize, VulkanHelper::BufferUsageFlag::UniformFlag);
+			AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, LightSpaceMatrixBuffer[i].Buffer,
+				VulkanHelper::MemoryPropertyFlag::HostCompatible);
+			LightSpaceMatrixBuffer[i].Memory = AllocResult.Memory;
+			vkBindBufferMemory(Device, LightSpaceMatrixBuffer[i].Buffer, LightSpaceMatrixBuffer[i].Memory, 0);
+
+			VkDescriptorSetAllocateInfo AllocInfo = { };
+			AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			AllocInfo.descriptorPool = RenderResources::GetMainPool();
+			AllocInfo.descriptorSetCount = 1;
+			AllocInfo.pSetLayouts = &LightSpaceMatrixLayout;
+			VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, LightSpaceMatrixSet + i));
+
+			VkImageViewCreateInfo ViewCreateInfo1 = { };
+			ViewCreateInfo1.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			ViewCreateInfo1.image = ShadowMapArray[i].Image;
+			ViewCreateInfo1.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			ViewCreateInfo1.format = DepthFormat;
+			ViewCreateInfo1.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ViewCreateInfo1.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ViewCreateInfo1.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ViewCreateInfo1.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ViewCreateInfo1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+			ViewCreateInfo1.subresourceRange.baseMipLevel = 0;
+			ViewCreateInfo1.subresourceRange.levelCount = 1;
+			ViewCreateInfo1.subresourceRange.baseArrayLayer = 0;
+			ViewCreateInfo1.subresourceRange.layerCount = 1;
+			ViewCreateInfo1.pNext = nullptr;
+
+			VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo1, nullptr, &ShadowMapElement1ImageInterface[i]));
+
+			VkImageViewCreateInfo ViewCreateInfo2 = { };
+			ViewCreateInfo2.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			ViewCreateInfo2.image = ShadowMapArray[i].Image;
+			ViewCreateInfo2.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			ViewCreateInfo2.format = DepthFormat;
+			ViewCreateInfo2.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ViewCreateInfo2.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ViewCreateInfo2.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ViewCreateInfo2.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+			ViewCreateInfo2.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+			ViewCreateInfo2.subresourceRange.baseMipLevel = 0;
+			ViewCreateInfo2.subresourceRange.levelCount = 1;
+			ViewCreateInfo2.subresourceRange.baseArrayLayer = 1;
+			ViewCreateInfo2.subresourceRange.layerCount = 1;
+			ViewCreateInfo2.pNext = nullptr;
+
+			VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo2, nullptr, &ShadowMapElement2ImageInterface[i]));
+
+			VkDescriptorBufferInfo LightSpaceMatrixBufferInfo;
+			LightSpaceMatrixBufferInfo.buffer = LightSpaceMatrixBuffer[i].Buffer;
+			LightSpaceMatrixBufferInfo.offset = 0;
+			LightSpaceMatrixBufferInfo.range = LightSpaceMatrixSize;
+
+			VkWriteDescriptorSet WriteDescriptorSet = { };
+			WriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			WriteDescriptorSet.dstSet = LightSpaceMatrixSet[i];
+			WriteDescriptorSet.dstBinding = 0;
+			WriteDescriptorSet.dstArrayElement = 0;
+			WriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			WriteDescriptorSet.descriptorCount = 1;
+			WriteDescriptorSet.pBufferInfo = &LightSpaceMatrixBufferInfo;
+			WriteDescriptorSet.pImageInfo = nullptr;
+
+			vkUpdateDescriptorSets(Device, 1, &WriteDescriptorSet, 0, nullptr);
+		}
+
+		PushConstants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		PushConstants.offset = 0;
+		// Todo: check constant and model size?
+		PushConstants.size = sizeof(glm::mat4);
+
+		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
+		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		PipelineLayoutCreateInfo.setLayoutCount = 1;
+		PipelineLayoutCreateInfo.pSetLayouts = &LightSpaceMatrixLayout;
+		PipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+		PipelineLayoutCreateInfo.pPushConstantRanges = &PushConstants;
+
+		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &Pipeline.PipelineLayout));
+
+		VulkanHelper::PipelineResourceInfo ResourceInfo;
+		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
+		ResourceInfo.PipelineAttachmentData.ColorAttachmentCount = 0;
+		ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = DepthFormat;
+		ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+
+		Yaml::Node Root;
+		Yaml::Parse(Root, "./Resources/Settings/DepthPipeline.yaml");
+
+		Pipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, Root, DepthViewportExtent, Pipeline.PipelineLayout, &ResourceInfo);
+	}
+
+	void DeInit()
+	{
+		VkDevice Device = VulkanInterface::GetDevice();
+
+		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
+		{
+			vkDestroyBuffer(Device, LightSpaceMatrixBuffer[i].Buffer, nullptr);
+			vkFreeMemory(Device, LightSpaceMatrixBuffer[i].Memory, nullptr);
+
+			vkDestroyImageView(Device, ShadowMapElement1ImageInterface[i], nullptr);
+			vkDestroyImageView(Device, ShadowMapElement2ImageInterface[i], nullptr);
+
+			vkDestroyImage(Device, ShadowMapArray[i].Image, nullptr);
+			vkFreeMemory(Device, ShadowMapArray[i].Memory, nullptr);
+		}
+
+
+		vkDestroyPipeline(Device, Pipeline.Pipeline, nullptr);
+		vkDestroyPipelineLayout(Device, Pipeline.PipelineLayout, nullptr);
+	}
+
+	void Draw(const Render::DrawScene* Scene)
+	{
+		VkDevice Device = VulkanInterface::GetDevice();
+		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+		const Render::RenderState* State = Render::GetRenderState();
+
+		const glm::mat4* LightViews[] =
+		{
+			&Scene->LightEntity->DirectionLight.LightSpaceMatrix,
+			&Scene->LightEntity->SpotLight.LightSpaceMatrix,
+		};
+
+		VkImageView Attachments[2];
+		Attachments[0] = ShadowMapElement1ImageInterface[VulkanInterface::TestGetImageIndex()];
+		Attachments[1] = ShadowMapElement2ImageInterface[VulkanInterface::TestGetImageIndex()];
+
+		for (u32 LightCaster = 0; LightCaster < MAX_LIGHT_SOURCES; ++LightCaster)
+		{
+			VulkanHelper::UpdateHostCompatibleBufferMemory(Device, LightSpaceMatrixBuffer[LightCaster].Memory, sizeof(glm::mat4), 0,
+				LightViews[LightCaster]);
+
+			VkRect2D RenderArea;
+			RenderArea.extent = DepthViewportExtent;
+			RenderArea.offset = { 0, 0 };
+
+			VkRenderingAttachmentInfo DepthAttachment{ };
+			DepthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+			DepthAttachment.imageView = Attachments[LightCaster];
+			DepthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+			DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+			DepthAttachment.clearValue.depthStencil = { 1.0f, 0 };
+
+			VkRenderingInfo RenderingInfo{ };
+			RenderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+			RenderingInfo.renderArea = RenderArea;
+			RenderingInfo.layerCount = 1;
+			RenderingInfo.colorAttachmentCount = 0;
+			RenderingInfo.pColorAttachments = nullptr;
+			RenderingInfo.pDepthAttachment = &DepthAttachment;
+
+			VkImageMemoryBarrier2 DepthAttachmentTransitionBefore = { };
+			DepthAttachmentTransitionBefore.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+			DepthAttachmentTransitionBefore.srcStageMask = VK_PIPELINE_STAGE_2_NONE; // because we're coming from UNDEFINED
+			DepthAttachmentTransitionBefore.srcAccessMask = 0;
+			DepthAttachmentTransitionBefore.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+			DepthAttachmentTransitionBefore.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			DepthAttachmentTransitionBefore.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			DepthAttachmentTransitionBefore.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			DepthAttachmentTransitionBefore.image = ShadowMapArray[VulkanInterface::TestGetImageIndex()].Image;
+			DepthAttachmentTransitionBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+			DepthAttachmentTransitionBefore.subresourceRange.baseMipLevel = 0;
+			DepthAttachmentTransitionBefore.subresourceRange.levelCount = 1;
+			DepthAttachmentTransitionBefore.subresourceRange.baseArrayLayer = LightCaster;
+			DepthAttachmentTransitionBefore.subresourceRange.layerCount = 1;
+
+			VkDependencyInfo DependencyInfoBefore = { };
+			DependencyInfoBefore.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+			DependencyInfoBefore.imageMemoryBarrierCount = 1;
+			DependencyInfoBefore.pImageMemoryBarriers = &DepthAttachmentTransitionBefore,
+
+				vkCmdPipelineBarrier2(CmdBuffer, &DependencyInfoBefore);
+
+			vkCmdBeginRendering(CmdBuffer, &RenderingInfo);
+
+			vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
+
+			for (u32 i = 0; i < Scene->DrawEntities.Count; ++i)
+			{
+				Render::DrawEntity* DrawEntity = Scene->DrawEntities.Data + i;
+				if (!RenderResources::IsDrawEntityLoaded(DrawEntity))
+				{
+					continue;
+				}
+
+				Render::StaticMesh* Mesh = RenderResources::GetStaticMesh(DrawEntity->StaticMeshIndex);
+
+				const VkBuffer Buffers[] =
+				{
+					RenderResources::GetVertexStageBuffer(),
+					RenderResources::GetInstanceBuffer()
+				};
+
+				const u64 Offsets[] =
+				{
+					Mesh->VertexOffset,
+					sizeof(Render::InstanceData) * DrawEntity->InstanceDataIndex
+				};
+
+				const u32 DescriptorSetGroupCount = 1;
+				const VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] =
+				{
+					LightSpaceMatrixSet[LightCaster],
+				};
+
+				const VkPipelineLayout PipelineLayout = Pipeline.PipelineLayout;
+
+				vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
+					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr);
+
+				vkCmdBindVertexBuffers(CmdBuffer, 0, 2, Buffers, Offsets);
+				vkCmdBindIndexBuffer(CmdBuffer, RenderResources::GetVertexStageBuffer(), Mesh->IndexOffset, VK_INDEX_TYPE_UINT32);
+				vkCmdDrawIndexed(CmdBuffer, Mesh->IndicesCount, DrawEntity->Instances, 0, 0, 0);
+			}
+
+			vkCmdEndRendering(CmdBuffer);
+		}
+
+		// TODO: move to Main pass?
+		VkImageMemoryBarrier2 DepthAttachmentTransitionAfter = { };
+		DepthAttachmentTransitionAfter.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+
+		DepthAttachmentTransitionAfter.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		DepthAttachmentTransitionAfter.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		DepthAttachmentTransitionAfter.image = ShadowMapArray[VulkanInterface::TestGetImageIndex()].Image;
+		DepthAttachmentTransitionAfter.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+		DepthAttachmentTransitionAfter.subresourceRange.baseMipLevel = 0;
+		DepthAttachmentTransitionAfter.subresourceRange.levelCount = 1;
+		DepthAttachmentTransitionAfter.subresourceRange.baseArrayLayer = 0;
+		DepthAttachmentTransitionAfter.subresourceRange.layerCount = 2;
+		// RELEASE: all depth writes have finished  
+		DepthAttachmentTransitionAfter.srcStageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+		DepthAttachmentTransitionAfter.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		// ACQUIRE: allow sampling in the fragment shader  
+		DepthAttachmentTransitionAfter.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+		DepthAttachmentTransitionAfter.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+
+		VkDependencyInfo DependencyInfoAfter = { };
+		DependencyInfoAfter.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+		DependencyInfoAfter.imageMemoryBarrierCount = 1;
+		DependencyInfoAfter.pImageMemoryBarriers = &DepthAttachmentTransitionAfter;
+
+		vkCmdPipelineBarrier2(CmdBuffer, &DependencyInfoAfter);
+	}
+
+	VulkanInterface::UniformImage* GetShadowMapArray()
+	{
+		return ShadowMapArray;
+	}
+}
+
+namespace MainPass
+{
+	static VkDescriptorSetLayout SkyBoxLayout;
+
+	static VkDescriptorSet SkyBoxSet;
+
+	static VulkanHelper::RenderPipeline SkyBoxPipeline;
+
+	static VulkanHelper::AttachmentData AttachmentData;
+
+	void Init()
+	{
+		VkDevice Device = VulkanInterface::GetDevice();
+
+		AttachmentData.ColorAttachmentCount = 1;
+		AttachmentData.ColorAttachmentFormats[0] = ColorFormat;
+		AttachmentData.DepthAttachmentFormat = DepthFormat;
+
+
+		const VkDescriptorType Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		const VkShaderStageFlags Flags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		VkDescriptorSetLayoutBinding LayoutBinding = { };
+		LayoutBinding.binding = 0;
+		LayoutBinding.descriptorType = Type;
+		LayoutBinding.descriptorCount = 1;
+		LayoutBinding.stageFlags = Flags;
+		LayoutBinding.pImmutableSamplers = nullptr;
+
+		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
+		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		LayoutCreateInfo.bindingCount = 1;
+		LayoutCreateInfo.pBindings = &LayoutBinding;
+		LayoutCreateInfo.flags = 0;
+		LayoutCreateInfo.pNext = nullptr;
+
+		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(VulkanInterface::GetDevice(), &LayoutCreateInfo, nullptr, &SkyBoxLayout));
+
+		const VkDescriptorSetLayout VpLayout = FrameManager::GetViewProjectionLayout();
+
+		const u32 SkyBoxDescriptorLayoutCount = 2;
+		VkDescriptorSetLayout SkyBoxDescriptorLayouts[SkyBoxDescriptorLayoutCount] =
+		{
+			VpLayout,
+			SkyBoxLayout,
+		};
+
+		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
+		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		PipelineLayoutCreateInfo.setLayoutCount = SkyBoxDescriptorLayoutCount;
+		PipelineLayoutCreateInfo.pSetLayouts = SkyBoxDescriptorLayouts;
+
+		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &SkyBoxPipeline.PipelineLayout));
+
+		VulkanHelper::PipelineResourceInfo ResourceInfo;
+		ResourceInfo.PipelineLayout = SkyBoxPipeline.PipelineLayout;
+		ResourceInfo.PipelineAttachmentData = AttachmentData;
+
+		Yaml::Node Root;
+		Yaml::Parse(Root, "./Resources/Settings/SkyBoxPipeline.yaml");
+
+		SkyBoxPipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, Root, MainScreenExtent, SkyBoxPipeline.PipelineLayout, &ResourceInfo);
+	}
+
+	void DeInit()
+	{
+		VkDevice Device = VulkanInterface::GetDevice();
+
+		vkDestroyDescriptorSetLayout(VulkanInterface::GetDevice(), SkyBoxLayout, nullptr);
+		vkDestroyPipeline(Device, SkyBoxPipeline.Pipeline, nullptr);
+		vkDestroyPipelineLayout(Device, SkyBoxPipeline.PipelineLayout, nullptr);
+	}
+
+	void BeginPass()
+	{
+		//const VkDescriptorSet VpSet = FrameManager::GetViewProjectionSet()[ImageIndex];
+		VkRenderingAttachmentInfo ColorAttachment = { };
+		ColorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+		ColorAttachment.imageView = DeferredPass::TestDeferredInputColorImageInterface()[VulkanInterface::TestGetImageIndex()];
+		ColorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		ColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		ColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		ColorAttachment.clearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+		VkRenderingAttachmentInfo DepthAttachment = { };
+		DepthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+		DepthAttachment.imageView = DeferredPass::TestDeferredInputDepthImageInterface()[VulkanInterface::TestGetImageIndex()];
+		DepthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		DepthAttachment.clearValue.depthStencil.depth = 1.0f;
+
+		VkRect2D RenderArea;
+		RenderArea.extent = MainScreenExtent;
+		RenderArea.offset = { 0, 0 };
+
+		VkRenderingInfo RenderingInfo = { };
+		RenderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+		RenderingInfo.flags = 0;
+		RenderingInfo.renderArea = RenderArea;
+		RenderingInfo.layerCount = 1;
+		RenderingInfo.viewMask = 0;
+		RenderingInfo.colorAttachmentCount = 1;
+		RenderingInfo.pColorAttachments = &ColorAttachment;
+		RenderingInfo.pDepthAttachment = &DepthAttachment;
+		RenderingInfo.pStencilAttachment = nullptr;
+
+		VkImageMemoryBarrier2 ColorBarrierBefore = { };
+		ColorBarrierBefore.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		ColorBarrierBefore.pNext = nullptr;
+		ColorBarrierBefore.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		ColorBarrierBefore.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		ColorBarrierBefore.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		ColorBarrierBefore.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		ColorBarrierBefore.image = DeferredPass::TestDeferredInputColorImage()[VulkanInterface::TestGetImageIndex()].Image;
+		ColorBarrierBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		ColorBarrierBefore.subresourceRange.baseMipLevel = 0;
+		ColorBarrierBefore.subresourceRange.levelCount = 1;
+		ColorBarrierBefore.subresourceRange.baseArrayLayer = 0;
+		ColorBarrierBefore.subresourceRange.layerCount = 1;
+		ColorBarrierBefore.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;        // whatever stage last read it
+		ColorBarrierBefore.srcAccessMask = VK_ACCESS_2_SHADER_READ_BIT;                   // reading it as a sampled image
+		ColorBarrierBefore.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT; // the clear/write stage
+		ColorBarrierBefore.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;         // the clear/write access
+
+		VkImageMemoryBarrier2 DepthBarrierBefore = { };
+		DepthBarrierBefore.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		DepthBarrierBefore.pNext = nullptr;
+		DepthBarrierBefore.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		DepthBarrierBefore.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		DepthBarrierBefore.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		DepthBarrierBefore.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		DepthBarrierBefore.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		DepthBarrierBefore.image = DeferredPass::TestDeferredInputDepthImage()[VulkanInterface::TestGetImageIndex()].Image;
+		DepthBarrierBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+		DepthBarrierBefore.subresourceRange.baseMipLevel = 0;
+		DepthBarrierBefore.subresourceRange.levelCount = 1;
+		DepthBarrierBefore.subresourceRange.baseArrayLayer = 0;
+		DepthBarrierBefore.subresourceRange.layerCount = 1;
+		// RELEASE nothing (it was UNDEFINED)
+		DepthBarrierBefore.srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		DepthBarrierBefore.srcAccessMask = VK_PIPELINE_STAGE_NONE;
+		// ACQUIRE for depth-writes
+		DepthBarrierBefore.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+			| VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+
+		VkImageMemoryBarrier2 BarriersBefore[] = { ColorBarrierBefore, DepthBarrierBefore };
+
+		VkDependencyInfo DepInfoBefore = { };
+		DepInfoBefore.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+		DepInfoBefore.imageMemoryBarrierCount = 2;
+		DepInfoBefore.pImageMemoryBarriers = BarriersBefore;
+
+		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+
+		vkCmdPipelineBarrier2(CmdBuffer, &DepInfoBefore);
+
+		vkCmdBeginRendering(CmdBuffer, &RenderingInfo);
+
+		//
+		//if (Scene->DrawSkyBox)
+		//{
+		//	vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipelines[2].Pipeline);
+
+		//	const u32 SkyBoxDescriptorSetGroupCount = 2;
+		//	const VkDescriptorSet SkyBoxDescriptorSetGroup[SkyBoxDescriptorSetGroupCount] = {
+		//		VpSet,
+		//		Scene->SkyBox.TextureSet,
+		//	};
+
+		//	const VkPipelineLayout PipelineLayout = Pipelines[2].PipelineLayout;
+
+		//	vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
+		//		0, SkyBoxDescriptorSetGroupCount, SkyBoxDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
+
+		//	vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &PassSharedResources.VertexBuffer.Buffer, &Scene->SkyBox.VertexOffset);
+		//	vkCmdBindIndexBuffer(CommandBuffer, PassSharedResources.IndexBuffer.Buffer, Scene->SkyBox.IndexOffset, VK_INDEX_TYPE_UINT32);
+		//	vkCmdDrawIndexed(CommandBuffer, Scene->SkyBox.IndicesCount, 1, 0, 0, 0);
+		//}
+
+		//MainRenderPass::OnDraw();
+	}
+
+	void EndPass()
+	{
+		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+
+		vkCmdEndRendering(CmdBuffer);
+	}
+
+	VulkanHelper::AttachmentData* GetAttachmentData()
+	{
+		return &AttachmentData;
+	}
+}
+
+namespace TerrainRender
+{
+	struct TerrainVertex
+	{
+		f32 Altitude;
+	};
+
+	// TMP
+	struct PushConstantsData
+	{
+		glm::mat4 Model;
+		s32 matIndex;
+	};
+
+	static void LoadTerrain();
+	static void GenerateTerrain(std::vector<u32>& Indices);
+
+	static const u32 NumRows = 600;
+	static const u32 NumCols = 600;
+	static TerrainVertex TerrainVerticesData[NumRows][NumCols];
+	static TerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
+	static u32 IndicesCount;
+
+	static VkDescriptorSet TerrainSet;
+
+	static VulkanHelper::RenderPipeline Pipeline;
+	static Render::DrawEntity TerrainDrawObject;
+
+	static VkPushConstantRange PushConstants;
+
+	void Init()
+	{
+		VkDevice Device = VulkanInterface::GetDevice();
+
+		const u32 ShaderCount = 2;
+		VulkanHelper::Shader Shaders[ShaderCount];
+
+		std::vector<char> VertexShaderCode;
+		Util::OpenAndReadFileFull("./Resources/Shaders/TerrainGenerator_vert.spv", VertexShaderCode, "rb");
+		std::vector<char> FragmentShaderCode;
+		Util::OpenAndReadFileFull("./Resources/Shaders/TerrainGenerator_frag.spv", FragmentShaderCode, "rb");
+
+		Shaders[0].Stage = VK_SHADER_STAGE_VERTEX_BIT;
+		Shaders[0].Code = VertexShaderCode.data();
+		Shaders[0].CodeSize = VertexShaderCode.size();
+
+		Shaders[1].Stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+		Shaders[1].Code = FragmentShaderCode.data();
+		Shaders[1].CodeSize = FragmentShaderCode.size();
+
+		const Render::RenderState* State = Render::GetRenderState();
+
+		VkDescriptorSetLayout TerrainDescriptorLayouts[] =
+		{
+			FrameManager::GetViewProjectionLayout(),
+			RenderResources::GetBindlesTexturesLayout(),
+			RenderResources::GetMaterialLayout(),
+		};
+
+		const u32 LayoutsCount = sizeof(TerrainDescriptorLayouts) / sizeof(TerrainDescriptorLayouts[0]);
+
+		PushConstants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		PushConstants.offset = 0;
+		// Todo: check constant and model size?
+		PushConstants.size = sizeof(PushConstantsData);
+
+		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
+		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		PipelineLayoutCreateInfo.setLayoutCount = LayoutsCount;
+		PipelineLayoutCreateInfo.pSetLayouts = TerrainDescriptorLayouts;
+		PipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+		PipelineLayoutCreateInfo.pPushConstantRanges = &PushConstants;
+
+		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &PipelineLayoutCreateInfo, nullptr, &Pipeline.PipelineLayout));
+
+		VulkanHelper::PipelineResourceInfo ResourceInfo;
+		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
+		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
+
+		Yaml::Node Root;
+		Yaml::Parse(Root, "./Resources/Settings/TerrainPipeline.yaml");
+
+		Pipeline.Pipeline = RenderResources::CreateGraphicsPipeline(Device, Root, MainScreenExtent, Pipeline.PipelineLayout, &ResourceInfo);
+
+		LoadTerrain();
+	}
+
+	void DeInit()
+	{
+		VkDevice Device = VulkanInterface::GetDevice();
+
+		vkDestroyPipeline(Device, Pipeline.Pipeline, nullptr);
+		vkDestroyPipelineLayout(Device, Pipeline.PipelineLayout, nullptr);
+	}
+
+	void Draw()
+	{
+		const Render::RenderState* State = Render::GetRenderState();
+
+		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+
+		const VkDescriptorSet Sets[] = {
+			FrameManager::GetViewProjectionSet(),
+			RenderResources::GetBindlesTexturesSet(),
+			RenderResources::GetMaterialSet(),
+		};
+
+		const u32 TerrainDescriptorSetGroupCount = sizeof(Sets) / sizeof(Sets[0]);
+
+		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
+
+		const u32 DynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(FrameManager::ViewProjectionBuffer);
+		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
+			0, TerrainDescriptorSetGroupCount, Sets, 1, &DynamicOffset);
+
+		PushConstantsData Constants;
+		//Constants.Model = TerrainDrawObject.Model;
+		//Constants.matIndex = TerrainDrawObject.MaterialIndex;
+
+		const VkShaderStageFlags Flags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		vkCmdPushConstants(CmdBuffer, Pipeline.PipelineLayout, Flags, 0, sizeof(PushConstantsData), &Constants);
+
+		//VkBuffer VertexBuffer = RenderResources::GetVertexBuffer().Buffer;
+		//VkBuffer IndexBuffer = RenderResources::GetIndexBuffer().Buffer;
+
+		//u32 Count;
+		//const u64 VertexOffset = TerrainDrawObject.VertexOffset;
+		//const u64 IndexOffset = TerrainDrawObject.IndexOffset;
+
+		//vkCmdBindVertexBuffers(CmdBuffer, 0, 1, &VertexBuffer, &VertexOffset);
+		//vkCmdBindIndexBuffer(CmdBuffer, IndexBuffer, IndexOffset, VK_INDEX_TYPE_UINT32);
+		//vkCmdDrawIndexed(CmdBuffer, IndicesCount, 1, 0, 0, 0);
+	}
+
+	void LoadTerrain()
+	{
+		std::vector<u32> TerrainIndices;
+		GenerateTerrain(TerrainIndices);
+
+		IndicesCount = TerrainIndices.size();
+
+		Render::Material Mat = { };
+		//u32 MaterialIndex = Render::CreateMaterial(&Mat);
+		//TerrainDrawObject = RenderResources::CreateTerrain(&TerrainVerticesData[0][0], sizeof(TerrainVertex), NumRows * NumCols,
+			//TerrainIndices.data(), IndicesCount, MaterialIndex);
+	}
+
+	void GenerateTerrain(std::vector<u32>& Indices)
+	{
+		const f32 MaxAltitude = 0.0f;
+		const f32 MinAltitude = -10.0f;
+		const f32 SmoothMin = 7.0f;
+		const f32 SmoothMax = 3.0f;
+		const f32 SmoothFactor = 0.5f;
+		const f32 ScaleFactor = 0.2f;
+
+		std::mt19937 Gen(1);
+		std::uniform_real_distribution<f32> Dist(MinAltitude, MaxAltitude);
+
+		bool UpFactor = false;
+		bool DownFactor = false;
+
+		for (int i = 0; i < NumRows; ++i)
+		{
+			for (int j = 0; j < NumCols; ++j)
+			{
+				const f32 RandomAltitude = Dist(Gen);
+				const f32 Probability = (RandomAltitude - MinAltitude) / (MaxAltitude - MinAltitude);
+
+				const f32 PreviousCornerAltitude = i > 0 && j > 0 ? TerrainVerticesData[i - 1][j - 1].Altitude : 5.0f;
+				const f32 PreviousIAltitude = i > 0 ? TerrainVerticesData[i - 1][j].Altitude : 5.0f;
+				const f32 PreviousJAltitude = j > 0 ? TerrainVerticesData[i][j - 1].Altitude : 5.0f;
+
+				const f32 PreviousAverageAltitude = (PreviousCornerAltitude + PreviousIAltitude + PreviousJAltitude) / 3.0f;
+
+				f32 NormalizedAltitude = (PreviousAverageAltitude - MinAltitude) / (MaxAltitude - MinAltitude);
+
+				const f32 Smooth = (PreviousAverageAltitude <= SmoothMin || PreviousAverageAltitude >= SmoothMax) ? SmoothFactor : 1.0f;
+
+				if (UpFactor)
+				{
+					NormalizedAltitude *= ScaleFactor;
+				}
+				else if (DownFactor)
+				{
+					NormalizedAltitude /= ScaleFactor;
+				}
+
+				if (NormalizedAltitude > Probability)
+				{
+					TerrainVerticesData[i][j].Altitude = PreviousAverageAltitude - Probability * Smooth;
+					UpFactor = false;
+					DownFactor = true;
+				}
+				else
+				{
+					TerrainVerticesData[i][j].Altitude = PreviousAverageAltitude + Probability * Smooth;
+					UpFactor = true;
+					DownFactor = false;
+				}
+			}
+		}
+
+		Indices.reserve(NumRows * NumCols * 6);
+
+		for (int row = 0; row < NumRows - 1; ++row)
+		{
+			for (int col = 0; col < NumCols - 1; ++col)
+			{
+				u32 topLeft = row * NumCols + col;
+				u32 topRight = topLeft + 1;
+				u32 bottomLeft = (row + 1) * NumCols + col;
+				u32 bottomRight = bottomLeft + 1;
+
+				// First triangle (Top-left, Bottom-left, Bottom-right)
+				Indices.push_back(topLeft);
+				Indices.push_back(bottomLeft);
+				Indices.push_back(bottomRight);
+
+				// Second triangle (Top-left, Bottom-right, Top-right)
+				Indices.push_back(topLeft);
+				Indices.push_back(bottomRight);
+				Indices.push_back(topRight);
+			}
+		}
 	}
 }

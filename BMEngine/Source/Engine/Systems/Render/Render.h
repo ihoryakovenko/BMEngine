@@ -10,6 +10,7 @@
 #include "Deprecated/FrameManager.h"
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 #include "Engine/Systems/Render/VulkanCoreContext.h"
+#include "TransferSystem.h"
 
 #include "Deprecated/FrameManager.h"
 
@@ -62,13 +63,6 @@ namespace Render
 		u32 MaterialIndex;
 	};
 
-	template<typename T>
-	struct RenderResource
-	{
-		T Resource;
-		u32 ResourceIndex;
-	};
-
 	struct DrawEntity
 	{
 		u64 StaticMeshIndex;
@@ -76,142 +70,21 @@ namespace Render
 		u32 Instances;
 	};
 
-	struct GPUBuffer
-	{
-		VkBuffer Buffer;
-		VkDeviceMemory Memory;
-		u64 Capacity;
-		u64 Alignment;
-		u64 Offset;
-	};
-
-	struct StagingPool
-	{
-		VkBuffer Buffer;
-		VkDeviceMemory Memory;
-		Memory::RingBufferControl ControlBlock;
-	};
-
-	struct StaticMeshStorage
-	{
-		GPUBuffer VertexStageData;
-		GPUBuffer GPUInstances;
-	};
-
-	struct MaterialStorage
-	{
-		GPUBuffer MaterialBuffer;
-		VkDescriptorSetLayout MaterialLayout;
-		VkDescriptorSet MaterialSet;
-	};
-
-	struct TextureStorage
-	{
-		VkSampler DiffuseSampler;
-		VkSampler SpecularSampler;
-
-		VkDescriptorSetLayout BindlesTexturesLayout;
-		VkDescriptorSet BindlesTexturesSet;
-
-		Memory::DynamicHeapArray<RenderResource<MeshTexture2D>> Textures;
-	};
-
-	enum TransferTaskType
-	{
-		TransferTaskType_Texture,
-		TransferTaskType_Mesh,
-		TransferTaskType_Material,
-		TransferTaskType_Instance,
-	};
-
-	struct TextureTaskDescription
-	{
-		VkImage DstImage;
-		u32 Width;
-		u32 Height;
-	};
-
-	struct DataTaskDescription
-	{
-		VkBuffer DstBuffer;
-		u64 DstOffset;
-	};
-
-	struct TransferTask
-	{
-		TransferTaskType Type;
-
-		union
-		{
-			TextureTaskDescription TextureDescr;
-			DataTaskDescription DataDescr;
-		};
-
-		void* RawData;
-		u64 DataSize;
-
-		u32 ResourceIndex;
-	};
-
-	struct TaskQueue
-	{
-		Memory::HeapRingBuffer<TransferTask> TasksBuffer;
-		std::mutex Mutex;
-	};
-
-	static const u32 MAX_DRAW_FRAMES = 3;
-
 	struct DrawFrames
 	{
-		VkFence Fences[MAX_DRAW_FRAMES];
-		VkCommandBuffer CommandBuffers[MAX_DRAW_FRAMES];
-		VkSemaphore ImagesAvailable[MAX_DRAW_FRAMES];
-		VkSemaphore RenderFinished[MAX_DRAW_FRAMES];
-	};
-
-	struct TransferFrames
-	{
-		VkFence Fences[MAX_DRAW_FRAMES];
-		VkCommandBuffer CommandBuffers[MAX_DRAW_FRAMES];
-	};
-
-	struct ResourceStorage
-	{
-		Memory::DynamicHeapArray<bool> ResourcesState;
-		StaticMeshStorage Meshes;
-		TextureStorage Textures;
-		MaterialStorage Materials;
+		VkFence Fences[VulkanHelper::MAX_DRAW_FRAMES];
+		VkCommandBuffer CommandBuffers[VulkanHelper::MAX_DRAW_FRAMES];
+		VkSemaphore ImagesAvailable[VulkanHelper::MAX_DRAW_FRAMES];
+		VkSemaphore RenderFinished[VulkanHelper::MAX_DRAW_FRAMES];
 	};
 
 	struct DrawState
 	{
 		VkCommandPool GraphicsCommandPool;
-		VkDescriptorPool MainPool;
 
 		DrawFrames Frames;
 		u32 CurrentFrame;
 		u32 CurrentImageIndex;
-	};
-
-	struct DataTransferState
-	{
-		const u64 MaxTransferSizePerFrame = MB4;
-
-		Memory::HeapRingBuffer<u8> TransferMemory;
-
-		VkCommandPool TransferCommandPool;
-		StagingPool TransferStagingPool;
-
-		VkSemaphore TransferSemaphore;
-		u64 TasksInFly;
-		u64 CompletedTransfer;
-
-		TaskQueue PendingTransferTasksQueue;
-		std::condition_variable PendingCv;
-		TaskQueue ActiveTransferTasksQueue;
-
-		TransferFrames Frames;
-		u32 CurrentFrame;
 	};
 
 	struct StaticMeshPipeline
@@ -233,10 +106,7 @@ namespace Render
 
 	struct RenderState
 	{
-		ResourceStorage RenderResources;
-		DrawState RenderDrawState;
-		DataTransferState TransferState;
-		std::mutex QueueSubmitMutex;	
+		DrawState RenderDrawState;	
 
 		StaticMeshPipeline MeshPipeline;
 
@@ -302,22 +172,60 @@ namespace Render
 		LightBuffer* LightEntity = nullptr;
 
 		Memory::DynamicHeapArray<DrawEntity> DrawEntities;
-		Memory::DynamicHeapArray<RenderResource<Material>> Materials;
-		Memory::DynamicHeapArray<RenderResource<InstanceData>> MeshInstances;
-		Memory::DynamicHeapArray<RenderResource<StaticMesh>> StaticMeshes;
 	};
 
 	void Init(GLFWwindow* WindowHandler);
 	void DeInit();
 
-	RenderResource<StaticMesh> CreateStaticMesh(void* MeshVertexData, u64 VertexSize, u64 VerticesCount, u64 IndicesCount);
-	RenderResource<Material> CreateMaterial(Material* Mat);
-	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height);
-	RenderResource<InstanceData> CreateStaticMeshInstance(InstanceData* Data);
-
 	void Draw(const DrawScene* Data);
-	void NotifyTransfer();
 
 	RenderState* GetRenderState();
-	bool IsDrawEntityLoaded(const ResourceStorage* Storage, const DrawScene* Scene, const DrawEntity* Entity);
+}
+
+namespace DeferredPass
+{
+	void Init();
+	void DeInit();
+
+	void Draw();
+
+	void BeginPass();
+	void EndPass();
+
+	VkImageView* TestDeferredInputColorImageInterface();
+	VkImageView* TestDeferredInputDepthImageInterface();
+
+	VulkanInterface::UniformImage* TestDeferredInputColorImage();
+	VulkanInterface::UniformImage* TestDeferredInputDepthImage();
+
+	VulkanHelper::AttachmentData* GetAttachmentData();
+}
+
+namespace LightningPass
+{
+	void Init();
+	void DeInit();
+
+	void Draw(const Render::DrawScene* Scene);
+
+	VulkanInterface::UniformImage* GetShadowMapArray();
+}
+
+namespace MainPass
+{
+	void Init();
+	void DeInit();
+
+	void BeginPass();
+	void EndPass();
+
+	VulkanHelper::AttachmentData* GetAttachmentData();
+}
+
+namespace TerrainRender
+{
+	void Init();
+	void DeInit();
+
+	void Draw();
 }

@@ -20,6 +20,7 @@
 #include "Util/Math.h"
 #include "Deprecated/FrameManager.h"
 #include "Engine/Systems/EngineResources.h"
+#include "Engine/Systems/Render/TransferSystem.h"
 
 #include <gli/gli.hpp>
 
@@ -158,7 +159,14 @@ namespace Engine
 		Yaml::Node Root;
 		Yaml::Parse(Root, "./Resources/Settings/RenderResources.yaml");
 
-		RenderResources::Init(Window, Root);
+		RenderResources::Init(Window);
+		RenderResources::CreateVertices(Util::GetVertices(Root));
+		RenderResources::CreateShaders(Util::GetShaders(Root));
+		RenderResources::CreateSamplers(Util::GetSamplers(Root));
+		RenderResources::CreateDescriptorLayouts(Util::GetDescriptorSetLayouts(Root));
+		RenderResources::PostCreateInit();
+
+		TransferSystem::Init();
 		Render::Init(Window);
 
 		Yaml::Node TestScene;
@@ -166,9 +174,6 @@ namespace Engine
 		Yaml::Node& SceneResourcesNode = Util::GetSceneResources(TestScene);
 
 		Scene.DrawEntities = Memory::AllocateArray<Render::DrawEntity>(512);
-		Scene.Materials = Memory::AllocateArray<Render::RenderResource<Render::Material>>(512);
-		Scene.StaticMeshes = Memory::AllocateArray<Render::RenderResource<Render::StaticMesh>>(512);
-		Scene.MeshInstances = Memory::AllocateArray<Render::RenderResource<Render::InstanceData>>(512);
 		EngineResources::Init(SceneResourcesNode, &Scene);
 		
 		return true;
@@ -177,14 +182,12 @@ namespace Engine
 	void DeInit()
 	{
 		Render::DeInit();
+		TransferSystem::DeInit();
 		RenderResources::DeInit();
 		EngineResources::DeInit();
 		UI::DeInit();
 
 		Memory::FreeArray(&Scene.DrawEntities);
-		Memory::FreeArray(&Scene.Materials);
-		Memory::FreeArray(&Scene.StaticMeshes);
-		Memory::FreeArray(&Scene.MeshInstances);
 
 		glfwDestroyWindow(Window);
 

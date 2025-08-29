@@ -19,10 +19,6 @@
     <ClCompile Include="Source\Deprecated\VulkanInterface\VulkanInterface.cpp" />
     <ClCompile Include="Source\Engine\Engine.cpp" />
     <ClCompile Include="Source\Deprecated\FrameManager.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\TerrainRender.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\LightningPass.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\MainPass.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\DeferredPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\DebugUI.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
@@ -32,6 +28,7 @@
     <ClCompile Include="..\External\mini-yaml\yaml\Yaml.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderResources.cpp" />
     <ClCompile Include="Source\Engine\Systems\EngineResources.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\TransferSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
@@ -44,16 +41,13 @@
     <ClInclude Include="Source\Engine\Engine.h" />
     <ClInclude Include="Source\Util\Math.h" />
     <ClInclude Include="Source\Deprecated\FrameManager.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\TerrainRender.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\LightningPass.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\MainPass.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\DeferredPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\VulkanHelper.h" />
     <ClInclude Include="Source\Util\DefaultTextureData.h" />
     <ClInclude Include="Source\Engine\Systems\Render\VulkanCoreContext.h" />
     <ClInclude Include="Source\Engine\Systems\UI\UI.h" />
     <ClInclude Include="Source\Engine\Systems\Render\RenderResources.h" />
     <ClInclude Include="Source\Engine\Systems\EngineResources.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\TransferSystem.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />

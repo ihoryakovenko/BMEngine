@@ -9,7 +9,6 @@
 #include <glm/gtc/constants.hpp>
 
 #include "Deprecated/VulkanInterface/VulkanInterface.h"
-#include "Engine/Systems/Render/DeferredPass.h"
 
 namespace DebugUi
 {

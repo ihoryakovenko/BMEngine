@@ -3,6 +3,8 @@
 #include "Util/EngineTypes.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
 
+#include <mutex>
+
 #include <vulkan/vulkan.h>
 
 struct GLFWwindow;
@@ -31,6 +33,7 @@ namespace VulkanCoreContext
 		GLFWwindow* WindowHandler;
 
 		VkQueue GraphicsQueue;
+		std::mutex QueueSubmitMutex;
 	};
 
 	void CreateCoreContext(VulkanCoreContext* Context, GLFWwindow* Window);
