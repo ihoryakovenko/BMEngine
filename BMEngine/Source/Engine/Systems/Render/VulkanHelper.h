@@ -23,8 +23,9 @@ struct GLFWwindow;
 
 namespace VulkanHelper
 {
-	inline constexpr const u32 MAX_VERTEX_INPUTS_ATTRIBUTES = 16;
-	inline constexpr const u32 MAX_VERTEX_INPUT_BINDINGS = 16;
+	inline constexpr u32 MAX_VERTEX_INPUTS_ATTRIBUTES = 16;
+	inline constexpr u32 MAX_VERTEX_INPUT_BINDINGS = 16;
+	inline constexpr u32 MAX_DRAW_FRAMES = 3;
 
 	enum BufferUsageFlag
 	{
@@ -55,6 +56,15 @@ namespace VulkanHelper
 		VkDeviceMemory Memory;
 		u64 Alignment;
 		u64 Size;
+	};
+
+	struct GPUBuffer
+	{
+		VkBuffer Buffer;
+		VkDeviceMemory Memory;
+		u64 Capacity;
+		u64 Alignment;
+		u64 Offset;
 	};
 
 	struct Shader

@@ -27,15 +27,14 @@
     <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
     <ClCompile Include="..\External\mini-yaml\yaml\Yaml.cpp" />
     <ClCompile Include="Source\Engine\Engine.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Concurrency\TaskSystem.cpp" />
+    <ClCompile Include="Source\Engine\Systems\EngineResources.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\DebugUI.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\DeferredPass.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\LightningPass.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\MainPass.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderResources.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\TransferSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanCoreContext.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\TerrainRender.cpp" />
     <ClCompile Include="Source\Deprecated\FrameManager.cpp" />
     <ClCompile Include="Source\Deprecated\VulkanInterface\VulkanInterface.cpp" />
     <ClCompile Include="Source\Engine\Systems\UI\UI.cpp" />
@@ -46,15 +45,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Engine\Engine.h" />
+    <ClInclude Include="Source\Engine\Systems\Concurrency\TaskSystem.h" />
+    <ClInclude Include="Source\Engine\Systems\EngineResources.h" />
     <ClInclude Include="Source\Engine\Systems\Render\RenderResources.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\TransferSystem.h" />
     <ClInclude Include="Source\Engine\Systems\Render\VulkanCoreContext.h" />
     <ClInclude Include="Source\Engine\Systems\UI\UI.h" />
     <ClInclude Include="Source\Util\DefaultTextureData.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\DeferredPass.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\LightningPass.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\MainPass.h" />
     <ClInclude Include="Source\Engine\Systems\Render\VulkanHelper.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\TerrainRender.h" />
     <ClInclude Include="Source\Deprecated\FrameManager.h" />
     <ClInclude Include="Source\Deprecated\VulkanInterface\VulkanInterface.h" />
     <ClInclude Include="Source\Util\Math.h" />
@@ -66,11 +64,13 @@
     <ClInclude Include="Source\Util\Util.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\Scenes\TestScene.yaml" />
     <None Include="Resources\Settings\DeferredPipeline.yaml" />
     <None Include="Resources\Settings\DepthPipeline.yaml" />
     <None Include="Resources\Settings\RenderResources.yaml" />
     <None Include="Resources\Settings\SkyBoxPipeline.yaml" />
     <None Include="Resources\Settings\StaticMesh.yaml" />
+    <None Include="Resources\Settings\TerrainPipeline.yaml" />
     <None Include="Resources\Shaders\Second.frag" />
     <None Include="Resources\Shaders\Second.vert" />
     <None Include="Source\Engine\Systems\Render\Shaders\CompileShaders.bat" />
@@ -112,8 +112,8 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <EnableASAN>false</EnableASAN>
-    <EnableFuzzer>false</EnableFuzzer>
+    <EnableASAN>true</EnableASAN>
+    <EnableFuzzer>true</EnableFuzzer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>

@@ -21,6 +21,7 @@
 
 #include "VulkanInterface/VulkanInterface.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
+#include "Engine/Systems/Render/RenderResources.h"
 
 #include "Util/Util.h"
 
@@ -111,7 +112,7 @@ namespace FrameManager
 		VkDescriptorSet NewSet;
 		VkDescriptorSetAllocateInfo AllocInfo = {};
 		AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		AllocInfo.descriptorPool = VulkanInterface::GetDescriptorPool();
+		AllocInfo.descriptorPool = RenderResources::GetMainPool();
 		AllocInfo.descriptorSetCount = 1;
 		AllocInfo.pSetLayouts = &Layout;
 		VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(VulkanInterface::GetDevice(), &AllocInfo, &NewSet));
