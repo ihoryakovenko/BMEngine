@@ -21,9 +21,9 @@
 #include "Deprecated/FrameManager.h"
 #include "Engine/Systems/EngineResources.h"
 #include "Engine/Systems/Render/TransferSystem.h"
+#include "Engine/Systems/Concurrency/TaskSystem.h"
 
 #include <gli/gli.hpp>
-
 
 namespace Engine
 {
@@ -101,6 +101,8 @@ namespace Engine
 
 		Memory::MemoryManagementSystem::FrameFree();
 
+		TaskSystem::TaskGroup RenderGroup;
+
 		while (!glfwWindowShouldClose(Window) && !Close)
 		{
 			glfwPollEvents();
@@ -113,7 +115,9 @@ namespace Engine
 
 			if (!IsMinimized)
 			{
-				Render::Draw(&Scene);
+				TaskSystem::AddTask(TransferSystem::Transfer, &RenderGroup, 1);
+				TaskSystem::AddTask([] () { Render::Draw(&Scene); }, &RenderGroup, 1);
+				TaskSystem::WaitForTasks(&RenderGroup, 1);
 			}
 
 			Memory::MemoryManagementSystem::FrameFree();
@@ -126,6 +130,8 @@ namespace Engine
 
 	bool Init()
 	{
+		//TestTaskSystem();
+
 		s32 WindowWidth = 1920;
 		s32 WindowHeight = 1080;
 
@@ -154,6 +160,8 @@ namespace Engine
 		const u32 FrameAllocSize = 1024 * 1024;
 		Memory::MemoryManagementSystem::Init(FrameAllocSize);
 
+		TaskSystem::Init();
+
 		UI::Init(&GuiData);
 
 		Yaml::Node Root;
@@ -169,12 +177,17 @@ namespace Engine
 		TransferSystem::Init();
 		Render::Init(Window);
 
-		Yaml::Node TestScene;
-		Yaml::Parse(TestScene, "./Resources/Scenes/TestScene.yaml");
-		Yaml::Node& SceneResourcesNode = Util::GetSceneResources(TestScene);
-
 		Scene.DrawEntities = Memory::AllocateArray<Render::DrawEntity>(512);
-		EngineResources::Init(SceneResourcesNode, &Scene);
+
+		TaskSystem::AddTask([]()
+		{
+			Yaml::Node TestScene;
+			Yaml::Parse(TestScene, "./Resources/Scenes/TestScene.yaml");
+			Yaml::Node& SceneResourcesNode = Util::GetSceneResources(TestScene);
+
+			EngineResources::Init(SceneResourcesNode, &Scene);
+		}, nullptr, 0);
+
 		
 		return true;
 	}
@@ -193,6 +206,7 @@ namespace Engine
 
 		glfwTerminate();
 
+		TaskSystem::DeInit();
 		Memory::MemoryManagementSystem::DeInit();
 	}
 

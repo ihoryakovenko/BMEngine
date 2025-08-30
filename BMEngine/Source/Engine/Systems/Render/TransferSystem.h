@@ -46,8 +46,9 @@ namespace TransferSystem
 	void Init();
 	void DeInit();
 
+	void Transfer();
+
 	void ProcessTransferTasks();
 	void* RequestTransferMemory(u64 Size);
-	void NotifyTransfer();
 	void AddTask(TransferTask* Task);
 }
