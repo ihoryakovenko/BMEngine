@@ -117,7 +117,7 @@ namespace Engine
 			{
 				TaskSystem::AddTask(TransferSystem::Transfer, &RenderGroup, 1);
 				TaskSystem::AddTask([] () { Render::Draw(&Scene); }, &RenderGroup, 1);
-				TaskSystem::WaitForTasks(&RenderGroup, 1);
+				TaskSystem::WaitForGroup(&RenderGroup, 1);
 			}
 
 			Memory::MemoryManagementSystem::FrameFree();
@@ -179,16 +179,12 @@ namespace Engine
 
 		Scene.DrawEntities = Memory::AllocateArray<Render::DrawEntity>(512);
 
-		TaskSystem::AddTask([]()
-		{
-			Yaml::Node TestScene;
-			Yaml::Parse(TestScene, "./Resources/Scenes/TestScene.yaml");
-			Yaml::Node& SceneResourcesNode = Util::GetSceneResources(TestScene);
+		Yaml::Node TestScene;
+		Yaml::Parse(TestScene, "./Resources/Scenes/TestScene.yaml");
+		Yaml::Node& SceneResourcesNode = Util::GetSceneResources(TestScene);
 
-			EngineResources::Init(SceneResourcesNode, &Scene);
-		}, nullptr, 0);
+		EngineResources::Init(SceneResourcesNode, &Scene);
 
-		
 		return true;
 	}
 

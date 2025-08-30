@@ -17,7 +17,9 @@ namespace TaskSystem
 
 	void Init();
 	void DeInit();
+
+	void SetConcurencyEnabled(bool Enabled);
 	
 	void AddTask(TaskFunction Function, TaskGroup* Groups, u32 GroupsCounter);
-	void WaitForTasks(TaskGroup* Groups, u32 GroupsCounter);
+	void WaitForGroup(TaskGroup* Groups, u32 GroupsCounter);
 }

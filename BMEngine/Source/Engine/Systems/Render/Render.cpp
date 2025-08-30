@@ -976,7 +976,7 @@ namespace LightningPass
 			DependencyInfoBefore.imageMemoryBarrierCount = 1;
 			DependencyInfoBefore.pImageMemoryBarriers = &DepthAttachmentTransitionBefore,
 
-				vkCmdPipelineBarrier2(CmdBuffer, &DependencyInfoBefore);
+			vkCmdPipelineBarrier2(CmdBuffer, &DependencyInfoBefore);
 
 			vkCmdBeginRendering(CmdBuffer, &RenderingInfo);
 

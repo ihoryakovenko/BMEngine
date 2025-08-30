@@ -21,7 +21,9 @@ namespace TaskSystem
 	static std::queue<Task> TaskQueue;
 	static std::mutex QueueMutex;
 	static std::condition_variable QueueCondition;
-	static std::atomic<bool> ShutdownFlag(false);
+
+	static std::atomic<bool> ConcurencyEnabled = true;
+	static std::atomic<bool> ShutdownFlag = false;
 	
 	static u32 ThreadPoolSize = 1;
 	
@@ -33,9 +35,9 @@ namespace TaskSystem
 
 			{
 				std::unique_lock<std::mutex> Lock(QueueMutex);
-				QueueCondition.wait(Lock, [] { return !TaskQueue.empty() || ShutdownFlag.load(); });
+				QueueCondition.wait(Lock, [] { return !TaskQueue.empty() || ShutdownFlag; });
 
-				if (ShutdownFlag.load())
+				if (ShutdownFlag)
 				{
 					break;
 				}
@@ -89,9 +91,20 @@ namespace TaskSystem
 			}
 		}
 	}
+
+	void SetConcurencyEnabled(bool Enabled)
+	{
+		ConcurencyEnabled.store(Enabled, std::memory_order_relaxed);
+	}
 	
 	void AddTask(TaskFunction Function, TaskGroup* Groups, u32 GroupsCounter)
 	{
+		if (!ConcurencyEnabled.load(std::memory_order_relaxed))
+		{
+			Function();
+			return;
+		}
+
 		Task NewTask;
 		NewTask.Groups = Groups;
 		NewTask.Function = Function;
@@ -110,7 +123,7 @@ namespace TaskSystem
 		QueueCondition.notify_one();
 	}
 	
-	void WaitForTasks(TaskGroup* Groups, u32 GroupsCounter)
+	void WaitForGroup(TaskGroup* Groups, u32 GroupsCounter)
 	{
 		for (u32 i = 0; i < GroupsCounter; ++i)
 		{
