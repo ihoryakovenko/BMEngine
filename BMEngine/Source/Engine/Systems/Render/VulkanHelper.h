@@ -17,7 +17,7 @@ struct GLFWwindow;
 	{ \
 		const VkResult result = (call); \
 		if (result != VK_SUCCESS) { \
-			Util::RenderLog(Util::BMRVkLogType_Error, "%s returned %d at %s:%d", #call, result, __FILE__, __LINE__); \
+			Util::RenderLog(Util::LogType::Error, "%s returned %d at %s:%d", #call, result, __FILE__, __LINE__); \
 		} \
 	}
 
@@ -27,7 +27,7 @@ namespace VulkanHelper
 	inline constexpr u32 MAX_VERTEX_INPUT_BINDINGS = 16;
 	inline constexpr u32 MAX_DRAW_FRAMES = 3;
 
-	enum BufferUsageFlag
+	enum class BufferUsageFlag
 	{
 		UniformFlag = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		StagingFlag = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -38,7 +38,7 @@ namespace VulkanHelper
 		InstanceFlag = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 	};
 
-	enum MemoryPropertyFlag
+	enum class MemoryPropertyFlag
 	{
 		GPULocal = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		HostCompatible = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,

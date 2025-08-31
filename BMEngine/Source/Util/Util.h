@@ -170,11 +170,11 @@ namespace Util
 	bool ReadFileFull(FILE* File, std::vector<char>& OutFileData);
 	bool OpenAndReadFileFull(const char* FileName, std::vector<char>& OutFileData, const char* Mode);
 
-	enum LogType
+	enum class LogType
 	{
-		BMRVkLogType_Error,
-		BMRVkLogType_Warning,
-		BMRVkLogType_Info
+		Error,
+		Warning,
+		Info
 	};
 
 	void RenderLog(LogType logType, const char* format, ...);
@@ -294,19 +294,30 @@ namespace Util
 
 	typedef u8* Model3DData;
 
+	struct Model3DMaterial
+	{
+		u64 DiffuseTextureHash;
+		u64 SpecularTextureHash;
+	};
+
 	struct Model3DFileHeader
 	{
 		u64 VertexDataSize;
 		u32 MeshCount;
+		u32 MaterialCount;
+		u32 UniqueTextureCount;
 	};
 
 	struct Model3D
 	{
+		Model3DFileHeader Header;
+
 		u8* VertexData;
 		u64* VerticesCounts;
 		u32* IndicesCounts;
-		u64* DiffuseTexturesHashes;
-		u32 MeshCount;
+		u32* MaterialIndices;
+		Model3DMaterial* Materials;
+		u64* UniqueTextureHashes;
 	};
 
 	void ObjToModel3D(const char* FilePath, const char* OutputPath);

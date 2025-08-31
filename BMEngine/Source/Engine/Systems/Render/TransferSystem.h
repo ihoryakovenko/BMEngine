@@ -1,19 +1,12 @@
 #pragma once
 
 #include "Util/EngineTypes.h"
+#include "RenderResources.h"
 
 #include <vulkan/vulkan.h>
 
 namespace TransferSystem
 {
-	enum class TransferTaskType
-	{
-		TransferTaskType_Texture,
-		TransferTaskType_Mesh,
-		TransferTaskType_Material,
-		TransferTaskType_Instance,
-	};
-
 	struct TextureTaskDescription
 	{
 		VkImage DstImage;
@@ -29,7 +22,7 @@ namespace TransferSystem
 
 	struct TransferTask
 	{
-		TransferTaskType Type;
+		RenderResources::ResourceType Type;
 
 		union
 		{
@@ -43,12 +36,22 @@ namespace TransferSystem
 		u32 ResourceIndex;
 	};
 
+	typedef void* TransferMemory;
+
+	struct ResourceTransferMemory
+	{
+		void* Memory;
+		RenderResources::ResourceType Type;
+	};
+
 	void Init();
 	void DeInit();
 
 	void Transfer();
 
+	TransferMemory RequestTransferMemory(u64 Size);
+	ResourceTransferMemory RequestMemoryForResource(RenderResources::ResourceType Type, u32 ResourceCount);
+
 	void ProcessTransferTasks();
-	void* RequestTransferMemory(u64 Size);
 	void AddTask(TransferTask* Task);
 }

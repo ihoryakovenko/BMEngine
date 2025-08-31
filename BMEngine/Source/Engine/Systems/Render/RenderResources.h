@@ -20,11 +20,71 @@ namespace VulkanCoreContext
 
 namespace RenderResources
 {
+	enum class ResourceType
+	{
+		Invalid,
+
+		Texture,
+		Mesh,
+		Material,
+		Instance,
+	};
+
 	template<typename T>
 	struct RenderResource
 	{
 		T Resource;
 		u32 ResourceIndex;
+	};
+
+	struct VertexData
+	{
+		u64 VertexOffset;
+		u32 IndexOffset;
+		u32 IndicesCount;
+		u64 VertexDataSize;
+	};
+
+	struct Texture
+	{
+		VkImage Image;
+		VkDeviceMemory Memory;
+		u64 Size;
+		u64 Alignment;
+	};
+
+	struct MeshTexture2D
+	{
+		Texture MeshTexture;
+		VkImageView View;
+	};
+
+	struct Material
+	{
+		u32 AlbedoTexIndex;
+		u32 SpecularTexIndex;
+		f32 Shininess;
+	};
+
+	struct InstanceData
+	{
+		glm::mat4 ModelMatrix;
+		u32 MaterialIndex;
+	};
+
+	struct MeshDescription
+	{
+		void* MeshVertexData;
+		u64 VertexSize;
+		u64 VerticesCount;
+		u64 IndicesCount;
+	};
+
+	struct TextureDescription
+	{
+		void* Data;
+		u32 Width;
+		u32 Height;
 	};
 
 	void Init(GLFWwindow* WindowHandler);
@@ -47,13 +107,13 @@ namespace RenderResources
 	VkPipeline CreateGraphicsPipeline(VkDevice Device, Yaml::Node& Root,
 		VkExtent2D Extent, VkPipelineLayout PipelineLayout, const VulkanHelper::PipelineResourceInfo* ResourceInfo);
 
-	u32 CreateStaticMesh(void* MeshVertexData, u64 VertexSize, u64 VerticesCount, u64 IndicesCount);
-	u32 CreateMaterial(Render::Material* Mat);
-	u32 CreateTexture2DSRGB(u64 Hash, void* Data, u32 Width, u32 Height);
-	u32 CreateStaticMeshInstance(Render::InstanceData* Data);
+	u32 CreateStaticMesh(MeshDescription* Description);
+	u32 CreateMaterial(Material* Mat);
+	u32 CreateTexture2DSRGB(TextureDescription* Description);
+	u32 CreateStaticMeshInstance(InstanceData* Data);
 
-	Render::StaticMesh* GetStaticMesh(u32 Index);
-	Render::InstanceData* GetInstanceData(u32 Index);
+	VertexData* GetStaticMesh(u32 Index);
+	InstanceData* GetInstanceData(u32 Index);
 
 	void SetResourceReadyToRender(u32 ResourceIndex);
 	VkDescriptorSetLayout GetBindlesTexturesLayout();

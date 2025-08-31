@@ -2,6 +2,7 @@
 
 #include "Engine/Systems/Render/VulkanHelper.h"
 #include "RenderResources.h"
+#include "TransferSystem.h"
 
 #include "imgui.h"
 #include "imgui_impl_vulkan.h"
@@ -188,8 +189,8 @@ namespace Render
 				continue;
 			}
 
-			StaticMesh* Mesh = RenderResources::GetStaticMesh(DrawEntity->StaticMeshIndex);
-			InstanceData* Instance = RenderResources::GetInstanceData(DrawEntity->InstanceDataIndex);
+			RenderResources::VertexData* Mesh = RenderResources::GetStaticMesh(DrawEntity->StaticMeshIndex);
+			RenderResources::InstanceData* Instance = RenderResources::GetInstanceData(DrawEntity->InstanceDataIndex);
 
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
@@ -208,7 +209,7 @@ namespace Render
 			const u64 Offsets[] = 
 			{
 				Mesh->VertexOffset,
-				sizeof(Render::InstanceData)* DrawEntity->InstanceDataIndex
+				sizeof(RenderResources::InstanceData)* DrawEntity->InstanceDataIndex
 			};
 
 			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MeshPipeline->Pipeline.PipelineLayout,
@@ -451,12 +452,12 @@ namespace DeferredPass
 
 			vkCreateImage(Device, &DeferredInputDepthUniformCreateInfo, nullptr, &DeferredInputDepthImage[i].Image);
 			VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
-				DeferredInputDepthImage[i].Image, VulkanHelper::GPULocal);
+				DeferredInputDepthImage[i].Image, VulkanHelper::MemoryPropertyFlag::GPULocal);
 			DeferredInputDepthImage[i].Memory = AllocResult.Memory;
 			vkBindImageMemory(Device, DeferredInputDepthImage[i].Image, DeferredInputDepthImage[i].Memory, 0);
 
 			vkCreateImage(Device, &DeferredInputColorUniformCreateInfo, nullptr, &DeferredInputColorImage[i].Image);
-			AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, DeferredInputColorImage[i].Image, VulkanHelper::GPULocal);
+			AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, DeferredInputColorImage[i].Image, VulkanHelper::MemoryPropertyFlag::GPULocal);
 			DeferredInputColorImage[i].Memory = AllocResult.Memory;
 			vkBindImageMemory(Device, DeferredInputColorImage[i].Image, DeferredInputColorImage[i].Memory, 0);
 
@@ -789,7 +790,7 @@ namespace LightningPass
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
 			vkCreateImage(Device, &ShadowMapArrayCreateInfo, nullptr, &ShadowMapArray[i].Image);
-			VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, ShadowMapArray[i].Image, VulkanHelper::GPULocal);
+			VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, ShadowMapArray[i].Image, VulkanHelper::MemoryPropertyFlag::GPULocal);
 			ShadowMapArray[i].Memory = AllocResult.Memory;
 			VULKAN_CHECK_RESULT(vkBindImageMemory(Device, ShadowMapArray[i].Image, ShadowMapArray[i].Memory, 0));
 
@@ -990,7 +991,7 @@ namespace LightningPass
 					continue;
 				}
 
-				Render::StaticMesh* Mesh = RenderResources::GetStaticMesh(DrawEntity->StaticMeshIndex);
+				RenderResources::VertexData* Mesh = RenderResources::GetStaticMesh(DrawEntity->StaticMeshIndex);
 
 				const VkBuffer Buffers[] =
 				{
@@ -1001,7 +1002,7 @@ namespace LightningPass
 				const u64 Offsets[] =
 				{
 					Mesh->VertexOffset,
-					sizeof(Render::InstanceData) * DrawEntity->InstanceDataIndex
+					sizeof(RenderResources::InstanceData) * DrawEntity->InstanceDataIndex
 				};
 
 				const u32 DescriptorSetGroupCount = 1;
@@ -1393,7 +1394,7 @@ namespace TerrainRender
 
 		IndicesCount = TerrainIndices.size();
 
-		Render::Material Mat = { };
+		RenderResources::Material Mat = { };
 		//u32 MaterialIndex = Render::CreateMaterial(&Mat);
 		//TerrainDrawObject = RenderResources::CreateTerrain(&TerrainVerticesData[0][0], sizeof(TerrainVertex), NumRows * NumCols,
 			//TerrainIndices.data(), IndicesCount, MaterialIndex);

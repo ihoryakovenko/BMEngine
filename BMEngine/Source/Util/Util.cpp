@@ -8,6 +8,7 @@
 
 #include "Engine/Systems/Render/Render.h"
 #include "Engine/Systems/Render/RenderResources.h"
+#include "Engine/Systems/EngineResources.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -20,18 +21,20 @@
 #include <filesystem>
 #include <string>
 #include <cstdarg>
+#include <unordered_set>
+#include <iostream>
 
 struct VertexEqual
 {
-	bool operator()(const Render::StaticMeshVertex& lhs, const Render::StaticMeshVertex& rhs) const
+	bool operator()(const EngineResources::StaticMeshVertex& lhs, const EngineResources::StaticMeshVertex& rhs) const
 	{
 		return lhs.Position == rhs.Position && lhs.TextureCoords == rhs.TextureCoords;
 	}
 };
 
-template<> struct std::hash<Render::StaticMeshVertex>
+template<> struct std::hash<EngineResources::StaticMeshVertex>
 {
-	size_t operator()(Render::StaticMeshVertex const& vertex) const
+	size_t operator()(EngineResources::StaticMeshVertex const& vertex) const
 	{
 		size_t hashPosition = std::hash<glm::vec3>()(vertex.Position);
 		size_t hashTextureCoords = std::hash<glm::vec2>()(vertex.TextureCoords);
@@ -113,7 +116,7 @@ namespace Util
 	{
 		switch (LogType)
 		{
-			case LogType::BMRVkLogType_Error:
+			case LogType::Error:
 			{
 				std::cout << "\033[31;5mError: "; // Set red color
 				vprintf(Format, Args);
@@ -121,14 +124,14 @@ namespace Util
 				assert(false);
 				break;
 			}
-			case LogType::BMRVkLogType_Warning:
+			case LogType::Warning:
 			{
 				std::cout << "\033[33;5mWarning: "; // Set red color
 				vprintf(Format, Args);
 				std::cout << "\n\033[m"; // Reset red color
 				break;
 			}
-			case LogType::BMRVkLogType_Info:
+			case LogType::Info:
 			{
 				std::cout << "Info: ";
 				vprintf(Format, Args);
@@ -167,16 +170,50 @@ namespace Util
 		u64* VerticesCounts = Memory::MemoryManagementSystem::Allocate<u64>(Shapes.size());
 		u32* IndicesCounts = Memory::MemoryManagementSystem::Allocate<u32>(Shapes.size());
 
-		std::unordered_map<Render::StaticMeshVertex, u32,
-			std::hash<Render::StaticMeshVertex>, VertexEqual> uniqueVertices{ };
+		std::unordered_map<EngineResources::StaticMeshVertex, u32,
+			std::hash<EngineResources::StaticMeshVertex>, VertexEqual> uniqueVertices{ };
 
 		std::hash<std::string> Hasher;
 
-		std::vector<u64> TextureHashes(Shapes.size());
-		std::vector<u8> VerticesAndIndices;
 
-		std::vector<Render::StaticMeshVertex> Vertices;
+		std::vector<Model3DMaterial> uniqueMaterials;
+		std::vector<u32> meshMaterialIndices;
+		std::vector<u64> uniqueTextureHashes;
+		std::vector<u8> VerticesAndIndices;
+		std::vector<EngineResources::StaticMeshVertex> Vertices;
 		std::vector<u32> Indices;
+
+		std::unordered_set<u64> textureHashes;
+
+		uniqueMaterials.reserve(Materials.size());
+		uniqueTextureHashes.reserve(Materials.size());
+
+		for (u32 i = 0; i < Materials.size(); i++)
+		{
+			Model3DMaterial NewMaterial;
+			
+			std::string diffuseName = Materials[i].diffuse_texname.empty() ? "" : fs::path(Materials[i].diffuse_texname).stem().string();
+			std::string specularName = Materials[i].specular_texname.empty() ? "" : fs::path(Materials[i].specular_texname).stem().string();
+			
+			NewMaterial.DiffuseTextureHash = diffuseName.empty() ? 0 : Hasher(diffuseName);
+			NewMaterial.SpecularTextureHash = specularName.empty() ? 0 : Hasher(specularName);
+
+			if (textureHashes.find(NewMaterial.DiffuseTextureHash) == textureHashes.end())
+			{
+				textureHashes.insert(NewMaterial.DiffuseTextureHash);
+				uniqueTextureHashes.push_back(NewMaterial.DiffuseTextureHash);
+			}
+			
+			if (textureHashes.find(NewMaterial.SpecularTextureHash) == textureHashes.end())
+			{
+				textureHashes.insert(NewMaterial.SpecularTextureHash);
+				uniqueTextureHashes.push_back(NewMaterial.SpecularTextureHash);
+			}
+
+			uniqueMaterials.push_back(NewMaterial);
+		}
+
+		meshMaterialIndices.reserve(Shapes.size());
 
 		for (u32 i = 0; i < Shapes.size(); i++)
 		{
@@ -189,7 +226,7 @@ namespace Util
 			{
 				tinyobj::index_t Index = Shape->mesh.indices[j];
 
-				Render::StaticMeshVertex vertex = { };
+				EngineResources::StaticMeshVertex vertex = { };
 
 				vertex.Position =
 				{
@@ -223,20 +260,10 @@ namespace Util
 				Indices.push_back(uniqueVertices[vertex]);
 			}
 
-			std::string diffuseTexName;
-			if (!Materials.empty())
-			{
-				diffuseTexName = Materials[Shape->mesh.material_ids[0]].diffuse_texname;
-			}
-
-			fs::path texturePath = diffuseTexName;
-			std::string FileNameNoExt = texturePath.stem().string();
-
-			TextureHashes[i] = Hasher(FileNameNoExt);
 			VerticesCounts[i] = Vertices.size();
 			IndicesCounts[i] = Indices.size();
 
-			u64 VertexBytes = Vertices.size() * sizeof(Render::StaticMeshVertex);
+			u64 VertexBytes = Vertices.size() * sizeof(EngineResources::StaticMeshVertex);
 			u64 IndexBytes = Indices.size() * sizeof(u32);
 
 			u64 CurrentOffset = VerticesAndIndices.size();
@@ -244,6 +271,11 @@ namespace Util
 
 			std::memcpy(VerticesAndIndices.data() + CurrentOffset, Vertices.data(), VertexBytes);
 			std::memcpy(VerticesAndIndices.data() + CurrentOffset + VertexBytes, Indices.data(), IndexBytes);
+
+			if (Shape->mesh.material_ids[0] != -1)
+			{
+				meshMaterialIndices.push_back(Shape->mesh.material_ids[0]);
+			}
 		}
 
 		std::ofstream outFile(newAssetPathStr, std::ios::binary);
@@ -257,12 +289,16 @@ namespace Util
 		Model3DFileHeader Header;
 		Header.MeshCount = Shapes.size();
 		Header.VertexDataSize = VerticesAndIndices.size();
+		Header.MaterialCount = uniqueMaterials.size();
+		Header.UniqueTextureCount = uniqueTextureHashes.size();
 
 		outFile.write(reinterpret_cast<const char*>(&Header), sizeof(Header));
 		outFile.write(reinterpret_cast<const char*>(VerticesAndIndices.data()), Header.VertexDataSize);
 		outFile.write(reinterpret_cast<const char*>(VerticesCounts), Header.MeshCount * sizeof(VerticesCounts[0]));
 		outFile.write(reinterpret_cast<const char*>(IndicesCounts), Header.MeshCount * sizeof(IndicesCounts[0]));
-		outFile.write(reinterpret_cast<const char*>(TextureHashes.data()), Header.MeshCount * sizeof(TextureHashes[0]));
+		outFile.write(reinterpret_cast<const char*>(meshMaterialIndices.data()), meshMaterialIndices.size() * sizeof(meshMaterialIndices[0]));
+		outFile.write(reinterpret_cast<const char*>(uniqueMaterials.data()), Header.MaterialCount * sizeof(Model3DMaterial));
+		outFile.write(reinterpret_cast<const char*>(uniqueTextureHashes.data()), Header.UniqueTextureCount * sizeof(u64));
 
 		Memory::MemoryManagementSystem::Free(VerticesCounts);
 		Memory::MemoryManagementSystem::Free(IndicesCounts);
@@ -303,22 +339,27 @@ namespace Util
 
 	Model3D ParseModel3D(Model3DData Data)
 	{
-		Model3DFileHeader* Header = (Model3DFileHeader*)Data;
+		Model3D Model;
+
+		memcpy(&Model.Header, Data, sizeof(Model3DFileHeader));
 		Data += sizeof(Model3DFileHeader);
 
-		Model3D Model;
-		Model.MeshCount = Header->MeshCount;
-
 		Model.VertexData = Data;
-		Data += Header->VertexDataSize;
+		Data += Model.Header.VertexDataSize;
 
 		Model.VerticesCounts = (u64*)Data;
-		Data += Header->MeshCount * sizeof(u64);
+		Data += Model.Header.MeshCount * sizeof(u64);
 
 		Model.IndicesCounts = (u32*)Data;
-		Data += Header->MeshCount * sizeof(u32);
+		Data += Model.Header.MeshCount * sizeof(u32);
 
-		Model.DiffuseTexturesHashes = (u64*)Data;
+		Model.MaterialIndices = (u32*)Data;
+		Data += Model.Header.MeshCount * sizeof(u32);
+
+		Model.Materials = (Model3DMaterial*)Data;
+		Data += Model.Header.MaterialCount * sizeof(Model3DMaterial);
+
+		Model.UniqueTextureHashes = (u64*)Data;
 
 		return Model;
 	}

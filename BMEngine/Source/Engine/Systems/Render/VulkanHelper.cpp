@@ -97,7 +97,7 @@ namespace VulkanHelper
 		VkBufferCreateInfo BufferInfo = { };
 		BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 		BufferInfo.size = Size;
-		BufferInfo.usage = Flag;
+		BufferInfo.usage = (VkFlags)Flag;
 		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 		VkBuffer Buffer;
@@ -111,7 +111,7 @@ namespace VulkanHelper
 		VkMemoryRequirements MemoryRequirements;
 		vkGetBufferMemoryRequirements(Device, Buffer, &MemoryRequirements);
 
-		const u32 MemoryTypeIndex = VulkanHelper::GetMemoryTypeIndex(PhysicalDevice, MemoryRequirements.memoryTypeBits, Properties);
+		const u32 MemoryTypeIndex = VulkanHelper::GetMemoryTypeIndex(PhysicalDevice, MemoryRequirements.memoryTypeBits, (VkFlags)Properties);
 
 		VkMemoryAllocateInfo MemoryAllocInfo = { };
 		MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -131,7 +131,7 @@ namespace VulkanHelper
 		VkMemoryRequirements MemoryRequirements;
 		vkGetImageMemoryRequirements(Device, Image, &MemoryRequirements);
 
-		const u32 MemoryTypeIndex = VulkanHelper::GetMemoryTypeIndex(PhysicalDevice, MemoryRequirements.memoryTypeBits, Properties);
+		const u32 MemoryTypeIndex = VulkanHelper::GetMemoryTypeIndex(PhysicalDevice, MemoryRequirements.memoryTypeBits, (VkFlags)Properties);
 
 		VkMemoryAllocateInfo MemoryAllocInfo = { };
 		MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -184,13 +184,13 @@ namespace VulkanHelper
 		for (u32 i = 0; i < RequiredExtensionsCount; ++i)
 		{
 			Data[i] = RequiredInstanceExtensions[i];
-			Util::RenderLog(Util::BMRVkLogType_Info, "Requested %s extension", Data[i]);
+			Util::RenderLog(Util::LogType::Info, "Requested %s extension", Data[i]);
 		}
 
 		for (u32 i = 0; i < ValidationExtensionsCount; ++i)
 		{
 			Data[i + RequiredExtensionsCount] = ValidationExtensions[i];
-			Util::RenderLog(Util::BMRVkLogType_Info, "Requested %s extension", Data[i + RequiredExtensionsCount]);
+			Util::RenderLog(Util::LogType::Info, "Requested %s extension", Data[i + RequiredExtensionsCount]);
 		}
 
 		return Data;
@@ -296,7 +296,7 @@ namespace VulkanHelper
 
 	void PrintDeviceData(VkPhysicalDeviceProperties* DeviceProperties, VkPhysicalDeviceFeatures* AvailableFeatures)
 	{
-		Util::RenderLog(Util::BMRVkLogType_Info,
+		Util::RenderLog(Util::LogType::Info,
 			"VkPhysicalDeviceProperties:\n"
 			"  apiVersion: %u\n  driverVersion: %u\n  vendorID: %u\n  deviceID: %u\n"
 			"  deviceType: %u\n  deviceName: %s\n"
@@ -318,7 +318,7 @@ namespace VulkanHelper
 			DeviceProperties->sparseProperties.residencyNonResidentStrict
 		);
 
-		Util::RenderLog(Util::BMRVkLogType_Info,
+		Util::RenderLog(Util::LogType::Info,
 			"VkPhysicalDeviceFeatures:\n  robustBufferAccess: %d\n  fullDrawIndexUint32: %d\n"
 			"  imageCubeArray: %d\n  independentBlend: %d\n  geometryShader: %d\n"
 			"  tessellationShader: %d\n  sampleRateShading: %d\n  dualSrcBlend: %d\n"
@@ -366,7 +366,7 @@ namespace VulkanHelper
 			AvailableFeatures->inheritedQueries
 		);
 
-		Util::RenderLog(Util::BMRVkLogType_Info,
+		Util::RenderLog(Util::LogType::Info,
 			"VkPhysicalDeviceLimits:\n  maxImageDimension1D: %u\n  maxImageDimension2D: %u\n"
 			"  maxImageDimension3D: %u\n  maxImageDimensionCube: %u\n"
 			"  maxImageArrayLayers: %u\n  maxTexelBufferElements: %u\n"
@@ -530,7 +530,7 @@ namespace VulkanHelper
 		// Has to be present by spec
 		if (Mode != VK_PRESENT_MODE_MAILBOX_KHR)
 		{
-			Util::RenderLog(Util::BMRVkLogType_Warning, "Using default VK_PRESENT_MODE_FIFO_KHR");
+			Util::RenderLog(Util::LogType::Warning, "Using default VK_PRESENT_MODE_FIFO_KHR");
 		}
 
 		return Mode;
@@ -547,7 +547,7 @@ namespace VulkanHelper
 
 		for (u32 i = 0; i < Count; ++i)
 		{
-			Util::RenderLog(Util::BMRVkLogType_Info, "Present mode %d is available", Data[i]);
+			Util::RenderLog(Util::LogType::Info, "Present mode %d is available", Data[i]);
 		}
 
 		return Data;
@@ -582,7 +582,7 @@ namespace VulkanHelper
 
 			if (!IsExtensionSupported)
 			{
-				Util::RenderLog(Util::BMRVkLogType_Error, "Extension %s unsupported", RequiredExtensions[i]);
+				Util::RenderLog(Util::LogType::Error, "Extension %s unsupported", RequiredExtensions[i]);
 				return false;
 			}
 		}
@@ -607,7 +607,7 @@ namespace VulkanHelper
 
 			if (!IsLayerAvailable)
 			{
-				Util::RenderLog(Util::BMRVkLogType_Error, "Validation layer %s unsupported", ValidationLayersToCheck[i]);
+				Util::RenderLog(Util::LogType::Error, "Validation layer %s unsupported", ValidationLayersToCheck[i]);
 				return false;
 			}
 		}
@@ -632,7 +632,7 @@ namespace VulkanHelper
 
 			if (!IsDeviceExtensionSupported)
 			{
-				Util::RenderLog(Util::BMRVkLogType_Error, "extension %s unsupported", ExtensionsToCheck[i]);
+				Util::RenderLog(Util::LogType::Error, "extension %s unsupported", ExtensionsToCheck[i]);
 				return false;
 			}
 		}
@@ -650,7 +650,7 @@ namespace VulkanHelper
 		}
 		else
 		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "CreateMessengerFunc is nullptr");
+			Util::RenderLog(Util::LogType::Error, "CreateMessengerFunc is nullptr");
 			return false;
 		}
 
@@ -668,7 +668,7 @@ namespace VulkanHelper
 		}
 		else
 		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "DestroyMessengerFunc is nullptr");
+			Util::RenderLog(Util::LogType::Error, "DestroyMessengerFunc is nullptr");
 			return false;
 		}
 	}
@@ -679,15 +679,15 @@ namespace VulkanHelper
 	{
 		if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
 		{
-			Util::RenderLog(Util::BMRVkLogType_Error, CallbackData->pMessage);
+			Util::RenderLog(Util::LogType::Error, CallbackData->pMessage);
 		}
 		else if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
 		{
-			Util::RenderLog(Util::BMRVkLogType_Warning, CallbackData->pMessage);
+			Util::RenderLog(Util::LogType::Warning, CallbackData->pMessage);
 		}
 		else
 		{
-			Util::RenderLog(Util::BMRVkLogType_Info, CallbackData->pMessage);
+			Util::RenderLog(Util::LogType::Info, CallbackData->pMessage);
 		}
 
 		return VK_FALSE;
@@ -708,12 +708,12 @@ namespace VulkanHelper
 				break;
 			}
 
-			Util::RenderLog(Util::BMRVkLogType_Warning, "Format %d is not supported", FormatToCheck);
+			Util::RenderLog(Util::LogType::Warning, "Format %d is not supported", FormatToCheck);
 		}
 
 		if (!IsSupportedFormatFound)
 		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "No supported format found");
+			Util::RenderLog(Util::LogType::Error, "No supported format found");
 			return false;
 		}
 

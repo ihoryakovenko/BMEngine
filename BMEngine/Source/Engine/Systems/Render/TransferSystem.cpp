@@ -80,7 +80,7 @@ namespace TransferSystem
 
 				switch (Task->Type)
 				{
-					case TransferTaskType::TransferTaskType_Mesh:
+					case RenderResources::ResourceType::Mesh:
 					{
 						const u64 TransferOffset = Memory::RingAlloc(&TransferState.TransferStagingPool.ControlBlock, Task->DataSize, 1);
 						VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState.TransferStagingPool.Memory, Task->DataSize,
@@ -113,8 +113,8 @@ namespace TransferSystem
 
 						break;
 					}
-					case TransferTaskType::TransferTaskType_Material:
-					case TransferTaskType::TransferTaskType_Instance:
+					case RenderResources::ResourceType::Material:
+					case RenderResources::ResourceType::Instance:
 					{
 						const u64 TransferOffset = Memory::RingAlloc(&TransferState.TransferStagingPool.ControlBlock, Task->DataSize, 1);
 						VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState.TransferStagingPool.Memory, Task->DataSize,
@@ -147,7 +147,7 @@ namespace TransferSystem
 
 						break;
 					}
-					case TransferTaskType::TransferTaskType_Texture:
+					case RenderResources::ResourceType::Texture:
 					{
 						const u64 TransferOffset = Memory::RingAlloc(&TransferState.TransferStagingPool.ControlBlock, Task->DataSize, 16);
 						VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState.TransferStagingPool.Memory, Task->DataSize,
@@ -326,9 +326,9 @@ namespace TransferSystem
 
 		TransferState.TransferStagingPool = { };
 
-		TransferState.TransferStagingPool.Buffer = VulkanHelper::CreateBuffer(Device, MB16, VulkanHelper::StagingFlag);
+		TransferState.TransferStagingPool.Buffer = VulkanHelper::CreateBuffer(Device, MB16, VulkanHelper::BufferUsageFlag::StagingFlag);
 		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
-			TransferState.TransferStagingPool.Buffer, VulkanHelper::HostCompatible);
+			TransferState.TransferStagingPool.Buffer, VulkanHelper::MemoryPropertyFlag::HostCompatible);
 		TransferState.TransferStagingPool.Memory = AllocResult.Memory;
 		//TransferState.TransferStagingPool.ControlBlock.Alignment = AllocResult.Alignment;
 		TransferState.TransferStagingPool.ControlBlock.Capacity = AllocResult.Size;
@@ -385,9 +385,32 @@ namespace TransferSystem
 		}
 	}
 
-	void* RequestTransferMemory(u64 Size)
+	TransferMemory RequestTransferMemory(u64 Size)
 	{
 		return TransferState.TransferMemory.DataArray + Memory::RingAlloc(&TransferState.TransferMemory.ControlBlock, Size, 1);
+	}
+
+	ResourceTransferMemory RequestMemoryForResource(RenderResources::ResourceType Type, u32 ResourceCount)
+	{
+		//ResourceTransferMemory Memory;
+		//Memory.Memory = nullptr;
+		//Memory.Type = RenderResources::ResourceType::Invalid;
+
+		//switch (Type)
+		//{
+		//	case RenderResources::ResourceType::Texture:
+		//		break;
+		//	case RenderResources::ResourceType::Mesh:
+		//		break;
+		//	case RenderResources::ResourceType::Material:
+		//		break;
+		//	case RenderResources::ResourceType::Instance:
+		//		break;
+		//}
+		//
+		//assert(Memory.Type != RenderResources::ResourceType::Invalid);
+
+		return ResourceTransferMemory();
 	}
 
 	void AddTask(TransferTask* Task)

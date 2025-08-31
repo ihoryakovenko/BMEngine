@@ -95,25 +95,25 @@ namespace VulkanCoreContext
 
 		if (!VulkanHelper::CheckDeviceExtensionsSupport(ExtensionProperties, ExtensionPropertiesCount, DeviceExtensions, DeviceExtensionsSize))
 		{
-			Util::RenderLog(Util::BMRVkLogType_Warning, "PhysicalDeviceIndices are not initialized");
+			Util::RenderLog(Util::LogType::Warning, "PhysicalDeviceIndices are not initialized");
 			return false;
 		}
 
 		if (Indices.GraphicsFamily < 0 || Indices.PresentationFamily < 0)
 		{
-			Util::RenderLog(Util::BMRVkLogType_Warning, "PhysicalDeviceIndices are not initialized");
+			Util::RenderLog(Util::LogType::Warning, "PhysicalDeviceIndices are not initialized");
 			return false;
 		}
 
 		if (!AvailableFeatures.samplerAnisotropy)
 		{
-			Util::RenderLog(Util::BMRVkLogType_Warning, "Feature samplerAnisotropy is not supported");
+			Util::RenderLog(Util::LogType::Warning, "Feature samplerAnisotropy is not supported");
 			return false;
 		}
 
 		if (!AvailableFeatures.multiViewport)
 		{
-			Util::RenderLog(Util::BMRVkLogType_Warning, "Feature multiViewport is not supported");
+			Util::RenderLog(Util::LogType::Warning, "Feature multiViewport is not supported");
 			return false;
 		}
 
@@ -174,7 +174,7 @@ namespace VulkanCoreContext
 
 		if (!VulkanHelper::CreateDebugUtilsMessengerEXT(Context->VulkanInstance, &MessengerCreateInfo, nullptr, &Context->DebugMessenger))
 		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "Cannot create debug messenger");
+			Util::RenderLog(Util::LogType::Error, "Cannot create debug messenger");
 		}
 
 		VULKAN_CHECK_RESULT(glfwCreateWindowSurface(Context->VulkanInstance, Context->WindowHandler, nullptr, &Context->Surface));
@@ -215,7 +215,7 @@ namespace VulkanCoreContext
 
 		if (!IsDeviceFound)
 		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "Cannot find suitable device");
+			Util::RenderLog(Util::LogType::Error, "Cannot find suitable device");
 		}
 
 		Context->LogicalDevice = CreateLogicalDevice(Context->PhysicalDevice, Context->Indices, DeviceExtensions, DeviceExtensionsSize);

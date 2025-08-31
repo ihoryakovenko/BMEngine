@@ -40,7 +40,7 @@
 //	VkResult Result = vkCreateCommandPool(Device, &PoolInfo, nullptr, &TransferCommandPool.CommandPool);
 //	if (Result != VK_SUCCESS)
 //	{
-//		Util::RenderLog(Util::BMRVkLogType_Error, "vkCreateCommandPool result is %d", Result);
+//		Util::RenderLog(Util::LogType::Error, "vkCreateCommandPool result is %d", Result);
 //	}
 //
 //	VkCommandBufferAllocateInfo TransferCommandBufferAllocateInfo = { };
@@ -53,14 +53,14 @@
 //	{
 //		if (vkCreateFence(Device, &FenceCreateInfo, nullptr, TransferCommandPool.BufferFences + i) != VK_SUCCESS)
 //		{
-//			Util::RenderLog(Util::BMRVkLogType_Error, "TransferFences creation error");
+//			Util::RenderLog(Util::LogType::Error, "TransferFences creation error");
 //			assert(false);
 //		}
 //	}
 //
 //	if (vkAllocateCommandBuffers(Device, &TransferCommandBufferAllocateInfo, TransferCommandPool.Buffers) != VK_SUCCESS)
 //	{
-//		Util::RenderLog(Util::BMRVkLogType_Error, "vkAllocateCommandBuffers error");
+//		Util::RenderLog(Util::LogType::Error, "vkAllocateCommandBuffers error");
 //		assert(false);
 //	}
 //}
@@ -747,135 +747,3 @@
 //	};
 //}
 
-
-
-
-
-
-
-
-
-		//{
-		//	glm::vec3 CubePos(0.0f, -5.0f, 0.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::scale(Model, glm::vec3(20.0f, 1.0f, 20.0f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, WhiteMaterial);
-		//	//LoadModel("./Resources/Models/cube.obj", Model, ResourceManager::FindMaterial("WhiteMaterial"));
-		//}
-
-		//{
-		//	glm::vec3 CubePos(0.0f, 0.0f, 0.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::scale(Model, glm::vec3(0.2f, 5.0f, 0.2f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, TestMaterial);
-		//}
-
-		//{
-		//	glm::vec3 CubePos(0.0f, 0.0f, 8.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::rotate(Model, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		//	Model = glm::scale(Model, glm::vec3(0.5f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, GrassMaterial);
-		//}
-
-		//{
-		//	glm::vec3 LightCubePos(0.0f, 0.0f, 10.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, LightCubePos);
-		//	Model = glm::scale(Model, glm::vec3(0.2f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, WhiteMaterial);
-		//}
-
-		//{
-		//	glm::vec3 CubePos(0.0f, 0.0f, 15.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::scale(Model, glm::vec3(1.0f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, WhiteMaterial);
-		//}
-
-		//{
-		//	glm::vec3 CubePos(5.0f, 0.0f, 10.0f);
-		//	glm::mat4 Model = glm::mat4(1.0f);
-		//	Model = glm::translate(Model, CubePos);
-		//	Model = glm::rotate(Model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		//	Model = glm::scale(Model, glm::vec3(1.0f));
-		//	LoadModel("./Resources/Models/cube.obj", Model, ContainerMaterial);
-		//}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//{
-		//	const char* CubeModelPath = ".\\Resources\\Models\\cube.model";
-		//	Util::Model3DData ModelData = Util::LoadModel3DData(CubeModelPath);
-		//	Util::Model3D Uh60Model = Util::ParseModel3D(ModelData);
-
-		//	u64 ModelVertexByteOffset = 0;
-		//	for (u32 i = 0; i < Uh60Model.MeshCount; i++)
-		//	{
-		//		const u64 VerticesCount = Uh60Model.VerticesCounts[i];
-		//		const u32 IndicesCount = Uh60Model.IndicesCounts[i];
-
-		//		u32 TextureIndex = 0;
-
-		//		auto it = TextureAssets.find(Uh60Model.DiffuseTexturesHashes[i]);
-		//		if (it != TextureAssets.end())
-		//		{
-		//			if (it->second.IsRenderResourceCreated)
-		//			{
-		//				TextureIndex = it->second.RenderTextureIndex;
-		//			}
-		//			else
-		//			{
-		//				gli::texture Texture = gli::load(it->second.Path);
-		//				if (Texture.empty())
-		//				{
-		//					assert(false);
-		//				}
-
-		//				glm::tvec3<u32> Extent = Texture.extent();
-		//				TextureIndex = Render::CreateTexture2DSRGB(it->second.Id, Texture.data(), Extent.x, Extent.y);
-
-		//				it->second.RenderTextureIndex = TextureIndex;
-		//				it->second.IsRenderResourceCreated = true;
-		//			}
-		//		}
-
-		//		Render::Material Mat;
-		//		Mat.AlbedoTexIndex = TextureIndex;
-		//		Mat.SpecularTexIndex = TextureIndex;
-		//		Mat.Shininess = 32.0f;
-		//		const u32 MaterialIndex = Render::CreateMaterial(&Mat);
-
-		//		Render::DrawEntity Entity = { };
-		//		Entity.StaticMeshIndex = Render::CreateStaticMesh(Uh60Model.VertexData + ModelVertexByteOffset,
-		//			sizeof(Render::StaticMeshVertex), VerticesCount, IndicesCount);
-		//		Entity.MaterialIndex = MaterialIndex;
-		//		Entity.Model = glm::mat4(1.0f);
-
-		//		Render::CreateEntity(&Entity);
-
-		//		ModelVertexByteOffset += VerticesCount * sizeof(Render::StaticMeshVertex) + IndicesCount * sizeof(u32);
-		// 
-		// 			Util::ClearModel3DData(ModelData);
-				//Render::NotifyTransfer();
-		//	}
-
-
-
-		//}
