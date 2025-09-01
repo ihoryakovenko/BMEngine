@@ -30,6 +30,7 @@
     <ClCompile Include="Source\Engine\Systems\EngineResources.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\TransferSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\Concurrency\TaskSystem.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />

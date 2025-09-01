@@ -7,14 +7,17 @@
 #include "VulkanHelper.h"
 #include "RenderResources.h"
 #include "VulkanCoreContext.h"
+#include "Util/Math.h"
 
 namespace TransferSystem
 {
-	struct StagingPool
+	const static 
+
+	struct StagingFramePool
 	{
 		VkBuffer Buffer;
 		VkDeviceMemory Memory;
-		Memory::RingBufferControl ControlBlock;
+		u64 AllocatedForFrame[VulkanHelper::MAX_DRAW_FRAMES];
 	};
 
 	struct TaskQueue
@@ -31,12 +34,12 @@ namespace TransferSystem
 
 	struct DataTransferState
 	{
-		const u64 MaxTransferSizePerFrame = MB4;
+		const u64 MaxTransferSizePerFrame = MB2;
 
 		Memory::HeapRingBuffer<u8> TransferMemory;
 
 		VkCommandPool TransferCommandPool;
-		StagingPool TransferStagingPool;
+		StagingFramePool TransferStagingPool;
 
 		VkSemaphore TransferSemaphore;
 		u64 TasksInFly;
@@ -49,6 +52,16 @@ namespace TransferSystem
 		u32 CurrentFrame;
 	};
 
+	static u64 GetTransferOffset(StagingFramePool* Pool, u32 FrameIndex, u64 AllocSize, u64 Alignment, u64 MaxTransferSize)
+	{
+		const u64 AlignedSize = Math::AlignNumber(AllocSize, Alignment);
+		const u64 Head = FrameIndex * MaxTransferSize;
+		const u64 Offset = Head + Pool->AllocatedForFrame[FrameIndex];
+
+		Pool->AllocatedForFrame[FrameIndex] += AlignedSize;
+		return Offset;
+	}
+
 	DataTransferState TransferState;
 
 	void Transfer()
@@ -60,15 +73,17 @@ namespace TransferSystem
 		VkFence TransferFence = TransferState.Frames.Fences[CurrentFrame];
 		VkCommandBuffer TransferCommandBuffer = TransferState.Frames.CommandBuffers[CurrentFrame];
 
+		u64 TasksAdded = 0;
+
 		{
+			VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
+			CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
 			std::unique_lock<std::mutex> PendingLock(TransferState.PendingTransferTasksQueue.Mutex);
 			if (Memory::IsRingBufferEmpty(&TransferState.PendingTransferTasksQueue.TasksBuffer))
 			{
 				return;
 			}
-
-			VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
-			CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
 			VULKAN_CHECK_RESULT(vkWaitForFences(Device, 1, &TransferFence, VK_TRUE, UINT64_MAX));
 			VULKAN_CHECK_RESULT(vkResetFences(Device, 1, &TransferFence));
@@ -78,13 +93,22 @@ namespace TransferSystem
 			{
 				TransferTask* Task = Memory::RingBufferGetFirst(&TransferState.PendingTransferTasksQueue.TasksBuffer);
 
+				FrameTotalTransferSize += Task->DataSize;
+				if (FrameTotalTransferSize >= TransferState.MaxTransferSizePerFrame)
+				{
+					assert(TasksAdded != 0 && "Task->DataSize > then MaxTransferSizePerFrame");
+					break;
+				}
+
 				switch (Task->Type)
 				{
 					case RenderResources::ResourceType::Mesh:
 					{
-						const u64 TransferOffset = Memory::RingAlloc(&TransferState.TransferStagingPool.ControlBlock, Task->DataSize, 1);
-						VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState.TransferStagingPool.Memory, Task->DataSize,
-							TransferOffset, Task->RawData);
+						const u64 TransferOffset = GetTransferOffset(&TransferState.TransferStagingPool,
+							CurrentFrame, Task->DataSize, 1, TransferState.MaxTransferSizePerFrame);
+
+						VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState.TransferStagingPool.Memory,
+							Task->DataSize, TransferOffset, Task->RawData);
 
 						VkBufferMemoryBarrier2 Barrier = { };
 						Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
@@ -116,7 +140,9 @@ namespace TransferSystem
 					case RenderResources::ResourceType::Material:
 					case RenderResources::ResourceType::Instance:
 					{
-						const u64 TransferOffset = Memory::RingAlloc(&TransferState.TransferStagingPool.ControlBlock, Task->DataSize, 1);
+						const u64 TransferOffset = GetTransferOffset(&TransferState.TransferStagingPool,
+							CurrentFrame, Task->DataSize, 1, TransferState.MaxTransferSizePerFrame);
+
 						VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState.TransferStagingPool.Memory, Task->DataSize,
 							TransferOffset, Task->RawData);
 
@@ -149,7 +175,9 @@ namespace TransferSystem
 					}
 					case RenderResources::ResourceType::Texture:
 					{
-						const u64 TransferOffset = Memory::RingAlloc(&TransferState.TransferStagingPool.ControlBlock, Task->DataSize, 16);
+						const u64 TransferOffset = GetTransferOffset(&TransferState.TransferStagingPool,
+							CurrentFrame, Task->DataSize, 16, TransferState.MaxTransferSizePerFrame);
+
 						VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState.TransferStagingPool.Memory, Task->DataSize,
 							TransferOffset, Task->RawData);
 
@@ -234,18 +262,14 @@ namespace TransferSystem
 				{
 					std::unique_lock ActiveTasksLock(TransferState.ActiveTransferTasksQueue.Mutex);
 					Memory::PushToRingBuffer(&TransferState.ActiveTransferTasksQueue.TasksBuffer, Task);
-					++TransferState.TasksInFly;
+					++TasksAdded;
 				}
 
 				Memory::RingBufferPopFirst(&TransferState.PendingTransferTasksQueue.TasksBuffer);
-
-				FrameTotalTransferSize += Task->DataSize;
-				if (FrameTotalTransferSize >= TransferState.MaxTransferSizePerFrame)
-				{
-					break;
-				}
 			}
 		}
+
+		TransferState.TasksInFly += TasksAdded;
 
 		VULKAN_CHECK_RESULT(vkEndCommandBuffer(TransferCommandBuffer));
 
@@ -271,7 +295,9 @@ namespace TransferSystem
 		vkQueueSubmit(VulkanInterface::GetTransferQueue(), 1, &SubmitInfo, TransferFence);
 		SubmitLock.unlock();
 
-		TransferState.CurrentFrame = (CurrentFrame + 1) % VulkanHelper::MAX_DRAW_FRAMES;
+		assert(TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] <= TransferState.MaxTransferSizePerFrame);
+		TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] = 0;
+		TransferState.CurrentFrame = Math::WrapIncrement(CurrentFrame, VulkanHelper::MAX_DRAW_FRAMES);
 	}
 
 	void Init()
@@ -326,12 +352,11 @@ namespace TransferSystem
 
 		TransferState.TransferStagingPool = { };
 
-		TransferState.TransferStagingPool.Buffer = VulkanHelper::CreateBuffer(Device, MB16, VulkanHelper::BufferUsageFlag::StagingFlag);
+		TransferState.TransferStagingPool.Buffer = VulkanHelper::CreateBuffer(Device, TransferState.MaxTransferSizePerFrame * VulkanHelper::MAX_DRAW_FRAMES,
+			VulkanHelper::BufferUsageFlag::StagingFlag);
 		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
 			TransferState.TransferStagingPool.Buffer, VulkanHelper::MemoryPropertyFlag::HostCompatible);
 		TransferState.TransferStagingPool.Memory = AllocResult.Memory;
-		//TransferState.TransferStagingPool.ControlBlock.Alignment = AllocResult.Alignment;
-		TransferState.TransferStagingPool.ControlBlock.Capacity = AllocResult.Size;
 		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, TransferState.TransferStagingPool.Buffer, TransferState.TransferStagingPool.Memory, 0));
 
 		TransferState.TransferMemory = Memory::AllocateRingBuffer<u8>(MB16);

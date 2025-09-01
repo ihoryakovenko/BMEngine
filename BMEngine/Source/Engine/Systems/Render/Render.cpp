@@ -10,6 +10,7 @@
 
 #include "Util/Util.h"
 #include "Util/Settings.h"
+#include "Util/Math.h"
 
 #include <random>
 
@@ -270,6 +271,11 @@ namespace Render
 
 	static RenderState State;
 
+	void TmpInitFrameMemory()
+	{
+		State.FrameMemory = Memory::CreateFrameMemory(1024 * 1024);
+	}
+
 	void Init(GLFWwindow* WindowHandler)
 	{		
 		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
@@ -305,6 +311,13 @@ namespace Render
 		LightningPass::DeInit();
 		DeferredPass::DeInit();
 		FrameManager::DeInit();
+
+		Memory::DestroyFrameMemory(&State.FrameMemory);
+	}
+
+	void* FrameAlloc(u32 Size)
+	{
+		return Memory::FrameAlloc(&State.FrameMemory, Size);
 	}
 
 	void Draw(const DrawScene* Scene)
@@ -376,7 +389,9 @@ namespace Render
 		VULKAN_CHECK_RESULT(vkQueuePresentKHR(VulkanInterface::GetGraphicsQueue(), &PresentInfo));
 		Lock.unlock();
 
-		State.RenderDrawState.CurrentFrame = (CurrentFrame + 1) % VulkanHelper::MAX_DRAW_FRAMES;
+		State.RenderDrawState.CurrentFrame = Math::WrapIncrement(CurrentFrame, VulkanHelper::MAX_DRAW_FRAMES);
+
+		Memory::FrameFree(&State.FrameMemory);
 	}
 
 	RenderState* GetRenderState()

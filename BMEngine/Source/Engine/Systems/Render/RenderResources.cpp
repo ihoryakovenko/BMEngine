@@ -184,7 +184,7 @@ namespace RenderResources
 		VulkanCoreContext::CreateCoreContext(&ResContext.CoreContext, WindowHandler);
 
 		const u32 PoolSizeCount = 11;
-		auto TotalPassPoolSizes = Memory::FramePointer<VkDescriptorPoolSize>::Create(PoolSizeCount);
+		auto TotalPassPoolSizes = (VkDescriptorPoolSize*)Render::FrameAlloc(PoolSizeCount * sizeof(VkDescriptorPoolSize));
 		u32 TotalDescriptorLayouts = 21;
 		TotalPassPoolSizes[0] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
 		TotalPassPoolSizes[1] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
@@ -205,7 +205,7 @@ namespace RenderResources
 		PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		PoolCreateInfo.maxSets = TotalDescriptorCount;
 		PoolCreateInfo.poolSizeCount = PoolSizeCount;
-		PoolCreateInfo.pPoolSizes = TotalPassPoolSizes.Data;
+		PoolCreateInfo.pPoolSizes = TotalPassPoolSizes;
 		PoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
 
 		VULKAN_CHECK_RESULT(vkCreateDescriptorPool(ResContext.CoreContext.LogicalDevice, &PoolCreateInfo, nullptr, &ResContext.MainPool));
@@ -321,7 +321,7 @@ namespace RenderResources
 		RenderingInfo.depthAttachmentFormat = ResourceInfo->PipelineAttachmentData.DepthAttachmentFormat;
 		RenderingInfo.stencilAttachmentFormat = ResourceInfo->PipelineAttachmentData.DepthAttachmentFormat;
 
-		auto PipelineCreateInfo = Memory::MemoryManagementSystem::FrameAlloc<VkGraphicsPipelineCreateInfo>();
+		auto PipelineCreateInfo = (VkGraphicsPipelineCreateInfo*)Render::FrameAlloc(sizeof(VkGraphicsPipelineCreateInfo));
 		PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 		PipelineCreateInfo->stageCount = Shaders.Count;
 		PipelineCreateInfo->pStages = Shaders.Data;

@@ -8,18 +8,26 @@
 #endif
 
 #include "Util/EngineTypes.h"
+#include "Util/Math.h"
 
 namespace Memory
 {
+	struct FrameMemory
+	{
+		u32 AllocatedSpace;
+		u8* Head;
+		u8* Base;
+	};
+
+	FrameMemory CreateFrameMemory(u64 SpaceToallocate);
+	void DestroyFrameMemory(FrameMemory* Memory);
+
+	void* FrameAlloc(FrameMemory* Memory, u64 Size);
+	void FrameFree(FrameMemory* Memory);
+
 	struct MemoryManagementSystem
 	{
 	public:
-		static MemoryManagementSystem* Get()
-		{
-			static MemoryManagementSystem Instance;
-			return &Instance;
-		}
-
 		static inline int AllocateCounter = 0;
 
 		template <typename T>
@@ -52,90 +60,13 @@ namespace Memory
 			free(Ptr);
 		}
 
-		static void Init(u32 InByteCount)
-		{
-			ByteCount = InByteCount;
-			MemoryPool = CAllocate<char>(ByteCount);
-			NextMemory = MemoryPool;
-		}
-
 		static void DeInit()
 		{
-			Free(MemoryPool);
-
 			if (Memory::MemoryManagementSystem::AllocateCounter != 0)
 			{
 				assert(false);
 			}
 		}
-
-		template<typename T>
-		static T* FrameAlloc(u32 Count = 1)
-		{
-			assert(MemoryPool != nullptr);
-			assert(NextMemory + sizeof(T) * Count <= MemoryPool + ByteCount);
-
-			void* ReturnPointer = NextMemory;
-			NextMemory += sizeof(T) * Count;
-			return static_cast<T*>(ReturnPointer);
-		}
-
-		static void FrameFree()
-		{
-			NextMemory = MemoryPool;
-		}
-
-		static inline u32 ByteCount = 0;
-		static inline char* NextMemory = nullptr;
-		static inline char* MemoryPool = nullptr;
-	};
-
-	template <typename T>
-	struct FramePointer
-	{
-		static FramePointer<T> Create(u32 InCount = 1)
-		{
-			FramePointer Pointer;
-			Pointer.Data = MemoryManagementSystem::Get()->FrameAlloc<T>(InCount);
-			return Pointer;
-		}
-
-		T* operator->()
-		{
-			return Data;
-		}
-
-		T& operator*()
-		{
-			return *Data;
-		}
-
-		T& operator[](u64 index)
-		{
-			return Data[index];
-		}
-
-		T* Data;
-	};
-
-	template <typename T>
-	struct FrameArray
-	{
-		static FrameArray<T> Create(u32 InCount = 1)
-		{
-			FrameArray Array;
-			Array.Count = InCount;
-			Array.Pointer.Data = MemoryManagementSystem::Get()->FrameAlloc<T>(InCount);
-			return Array;
-		}
-
-		T& operator[](u64 index)
-		{
-			return Pointer[index];
-		}
-
-		u32 Count;
-		FramePointer<T> Pointer;
 	};
 
 	template <typename T>
@@ -266,7 +197,7 @@ namespace Memory
 		assert(!IsRingBufferFull(Buffer));
 
 		Buffer->DataArray[Buffer->ControlBlock.Head] = *NewItem;
-		Buffer->ControlBlock.Head = (Buffer->ControlBlock.Head + 1) % Buffer->ControlBlock.Capacity;
+		Buffer->ControlBlock.Head = Math::WrapIncrement(Buffer->ControlBlock.Head, Buffer->ControlBlock.Capacity);
 
 		if (Buffer->ControlBlock.Head == 0)
 		{
@@ -288,7 +219,7 @@ namespace Memory
 		assert(Buffer->ControlBlock.Capacity != 0);
 		assert(!IsRingBufferEmpty(Buffer));
 
-		Buffer->ControlBlock.Tail = (Buffer->ControlBlock.Tail + 1) % Buffer->ControlBlock.Capacity;
+		Buffer->ControlBlock.Tail = Math::WrapIncrement(Buffer->ControlBlock.Tail, Buffer->ControlBlock.Capacity);
 
 		if (Buffer->ControlBlock.Tail == Buffer->ControlBlock.Head)
 		{
@@ -329,12 +260,12 @@ namespace Memory
 		return Capacity - Tail + Head;
 	}
 
-	static u64 RingAlloc(RingBufferControl* ControlBlock, u64 Count, u32 HeadAlignment)
+	static u64 RingAlloc(RingBufferControl* ControlBlock, u64 Count, u64 HeadAlignment)
 	{
 		assert(ControlBlock->Capacity != 0);
 		assert(Count != 0);
 
-		const u64 AlignedHead = (ControlBlock->Head + (HeadAlignment - 1)) & ~(HeadAlignment - 1);
+		const u64 AlignedHead = Math::AlignNumber(ControlBlock->Head, HeadAlignment);
 		assert(RingIsFit(ControlBlock->Capacity, AlignedHead, ControlBlock->Tail, ControlBlock->Wrapped, Count));
 
 		if ((!ControlBlock->Wrapped && AlignedHead + Count <= ControlBlock->Capacity) ||
@@ -355,12 +286,12 @@ namespace Memory
 		return 0;
 	}
 
-	static void RingFree(RingBufferControl* ControlBlock, u64 Count, u32 HeadAlignment)
+	static void RingFree(RingBufferControl* ControlBlock, u64 Count, u64 HeadAlignment)
 	{
 		assert(ControlBlock->Capacity != 0);
 		assert(Count != 0);
 
-		const u64 AlignedTail = (ControlBlock->Tail + (HeadAlignment - 1)) & ~(HeadAlignment - 1);
+		const u64 AlignedTail = Math::AlignNumber(ControlBlock->Tail, HeadAlignment);
 		Count += AlignedTail - ControlBlock->Tail;
 
 		assert(Count <= RingUsed(ControlBlock->Capacity, ControlBlock->Head, ControlBlock->Tail, ControlBlock->Wrapped));

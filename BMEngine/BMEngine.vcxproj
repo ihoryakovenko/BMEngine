@@ -29,6 +29,7 @@
     <ClCompile Include="Source\Engine\Engine.cpp" />
     <ClCompile Include="Source\Engine\Systems\Concurrency\TaskSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\EngineResources.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\DebugUI.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderResources.cpp" />
@@ -112,8 +113,8 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <EnableASAN>true</EnableASAN>
-    <EnableFuzzer>true</EnableFuzzer>
+    <EnableASAN>false</EnableASAN>
+    <EnableFuzzer>false</EnableFuzzer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>

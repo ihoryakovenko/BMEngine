@@ -99,8 +99,6 @@ namespace Engine
 	{
 		Init();
 
-		Memory::MemoryManagementSystem::FrameFree();
-
 		TaskSystem::TaskGroup RenderGroup;
 
 		while (!glfwWindowShouldClose(Window) && !Close)
@@ -119,8 +117,6 @@ namespace Engine
 				TaskSystem::AddTask([] () { Render::Draw(&Scene); }, &RenderGroup, 1);
 				TaskSystem::WaitForGroup(&RenderGroup, 1);
 			}
-
-			Memory::MemoryManagementSystem::FrameFree();
 		}
 
 		DeInit();
@@ -130,8 +126,6 @@ namespace Engine
 
 	bool Init()
 	{
-		//TestTaskSystem();
-
 		s32 WindowWidth = 1920;
 		s32 WindowHeight = 1080;
 
@@ -157,8 +151,7 @@ namespace Engine
 
 	bool InitSystems()
 	{
-		const u32 FrameAllocSize = 1024 * 1024;
-		Memory::MemoryManagementSystem::Init(FrameAllocSize);
+		Render::TmpInitFrameMemory();
 
 		TaskSystem::Init();
 

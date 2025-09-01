@@ -20,8 +20,13 @@ namespace EngineResources
 		const u64 DefaultAssetId = std::hash<std::string>{ }("Default");
 		const glm::tvec3<u32> DefaultAssetExtent = DefaultTexture.extent();
 
+		RenderResources::TextureDescription DefaultTextureDescription;
+		DefaultTextureDescription.Data = DefaultTexture.data();
+		DefaultTextureDescription.Width = DefaultAssetExtent.x;
+		DefaultTextureDescription.Height = DefaultAssetExtent.y;
+
 		TextureAsset DefaultAsset;
-		DefaultAsset.RenderTextureIndex = RenderResources::CreateTexture2DSRGB(DefaultTexture.data(), DefaultAssetExtent.x, DefaultAssetExtent.y);
+		DefaultAsset.RenderTextureIndex = RenderResources::CreateTexture2DSRGB(&DefaultTextureDescription);
 
 		TextureAssets[DefaultAssetId] = DefaultAsset;
 		
@@ -39,9 +44,14 @@ namespace EngineResources
 
 			const glm::tvec3<u32> Extent = Texture.extent();
 			const u64 Id = std::hash<std::string>{ }(TextureName);
+
+			RenderResources::TextureDescription TextureDescription;
+			TextureDescription.Data = Texture.data();
+			TextureDescription.Width = Extent.x;
+			TextureDescription.Height = Extent.y;
 			
 			TextureAsset Asset;
-			Asset.RenderTextureIndex = RenderResources::CreateTexture2DSRGB(Texture.data(), Extent.x, Extent.y);
+			Asset.RenderTextureIndex = RenderResources::CreateTexture2DSRGB(&TextureDescription);
 			
 			TextureAssets[Id] = Asset;
 		}

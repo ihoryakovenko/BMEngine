@@ -8,17 +8,6 @@
 
 namespace VulkanHelper
 {
-	Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
-	{
-		u32 Count;
-		VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, Surface, &Count, nullptr));
-
-		auto Data = Memory::FrameArray<VkSurfaceFormatKHR>::Create(Count);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, Surface, &Count, Data.Pointer.Data);
-
-		return Data;
-	}
-
 	VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface, const VkSurfaceFormatKHR* AvailableFormats, u32 Count)
 	{
 		VkSurfaceFormatKHR SurfaceFormat = { VK_FORMAT_UNDEFINED, static_cast<VkColorSpaceKHR>(0) };
@@ -154,79 +143,22 @@ namespace VulkanHelper
 		vkUnmapMemory(Device, Memory);
 	}
 
-	Memory::FrameArray<VkExtensionProperties> GetAvailableExtensionProperties()
+
+
+	void GetRequiredInstanceExtensions(const char** RequiredInstanceExtensions, u32 RequiredExtensionsCount,
+		const char** ValidationExtensions, u32 ValidationExtensionsCount, const char** OutInstanceExtensions)
 	{
-		u32 Count;
-		VULKAN_CHECK_RESULT(vkEnumerateInstanceExtensionProperties(nullptr, &Count, nullptr));
-
-		auto Data = Memory::FrameArray<VkExtensionProperties>::Create(Count);
-		vkEnumerateInstanceExtensionProperties(nullptr, &Count, Data.Pointer.Data);
-
-		return Data;
-	}
-
-	Memory::FrameArray<VkLayerProperties> GetAvailableInstanceLayerProperties()
-	{
-		u32 Count;
-		VULKAN_CHECK_RESULT(vkEnumerateInstanceLayerProperties(&Count, nullptr));
-
-		auto Data = Memory::FrameArray<VkLayerProperties>::Create(Count);
-		vkEnumerateInstanceLayerProperties(&Count, Data.Pointer.Data);
-
-		return Data;
-	}
-
-	Memory::FrameArray<const char*> GetRequiredInstanceExtensions(const char** RequiredInstanceExtensions, u32 RequiredExtensionsCount,
-		const char** ValidationExtensions, u32 ValidationExtensionsCount)
-	{
-		auto Data = Memory::FrameArray<const char*>::Create(RequiredExtensionsCount + ValidationExtensionsCount);
-
 		for (u32 i = 0; i < RequiredExtensionsCount; ++i)
 		{
-			Data[i] = RequiredInstanceExtensions[i];
-			Util::RenderLog(Util::LogType::Info, "Requested %s extension", Data[i]);
+			OutInstanceExtensions[i] = RequiredInstanceExtensions[i];
+			Util::RenderLog(Util::LogType::Info, "Requested %s extension", OutInstanceExtensions[i]);
 		}
 
 		for (u32 i = 0; i < ValidationExtensionsCount; ++i)
 		{
-			Data[i + RequiredExtensionsCount] = ValidationExtensions[i];
-			Util::RenderLog(Util::LogType::Info, "Requested %s extension", Data[i + RequiredExtensionsCount]);
+			OutInstanceExtensions[i + RequiredExtensionsCount] = ValidationExtensions[i];
+			Util::RenderLog(Util::LogType::Info, "Requested %s extension", OutInstanceExtensions[i + RequiredExtensionsCount]);
 		}
-
-		return Data;
-	}
-
-	Memory::FrameArray<VkPhysicalDevice> GetPhysicalDeviceList(VkInstance VulkanInstance)
-	{
-		u32 Count;
-		vkEnumeratePhysicalDevices(VulkanInstance, &Count, nullptr);
-
-		auto Data = Memory::FrameArray<VkPhysicalDevice>::Create(Count);
-		vkEnumeratePhysicalDevices(VulkanInstance, &Count, Data.Pointer.Data);
-
-		return Data;
-	}
-
-	Memory::FrameArray<VkExtensionProperties> GetDeviceExtensionProperties(VkPhysicalDevice PhysicalDevice)
-	{
-		u32 Count;
-		VULKAN_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &Count, nullptr));
-
-		auto Data = Memory::FrameArray<VkExtensionProperties>::Create(Count);
-		vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &Count, Data.Pointer.Data);
-
-		return Data;
-	}
-
-	Memory::FrameArray<VkQueueFamilyProperties> GetQueueFamilyProperties(VkPhysicalDevice PhysicalDevice)
-	{
-		u32 Count;
-		vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &Count, nullptr);
-
-		auto Data = Memory::FrameArray<VkQueueFamilyProperties>::Create(Count);
-		vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &Count, Data.Pointer.Data);
-
-		return Data;
 	}
 
 	PhysicalDeviceIndices GetPhysicalDeviceIndices(VkQueueFamilyProperties* Properties, u32 PropertiesCount,
@@ -516,10 +448,19 @@ namespace VulkanHelper
 
 	VkPresentModeKHR GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
 	{
-		Memory::FrameArray<VkPresentModeKHR> PresentModes = GetAvailablePresentModes(PhysicalDevice, Surface);
+		u32 PresentModeCount;
+		VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &PresentModeCount, nullptr));
+
+		auto PresentModes = (VkPresentModeKHR*)Render::FrameAlloc(PresentModeCount * sizeof(VkPresentModeKHR));
+		vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &PresentModeCount, PresentModes);
+
+		for (u32 i = 0; i < PresentModeCount; ++i)
+		{
+			Util::RenderLog(Util::LogType::Info, "Present mode %d is available", PresentModes[i]);
+		}
 
 		VkPresentModeKHR Mode = VK_PRESENT_MODE_FIFO_KHR;
-		for (u32 i = 0; i < PresentModes.Count; ++i)
+		for (u32 i = 0; i < PresentModeCount; ++i)
 		{
 			if (PresentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR)
 			{
@@ -534,35 +475,6 @@ namespace VulkanHelper
 		}
 
 		return Mode;
-	}
-
-	Memory::FrameArray<VkPresentModeKHR> GetAvailablePresentModes(VkPhysicalDevice PhysicalDevice,
-		VkSurfaceKHR Surface)
-	{
-		u32 Count;
-		VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Count, nullptr));
-
-		auto Data = Memory::FrameArray<VkPresentModeKHR>::Create(Count);
-		vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Count, Data.Pointer.Data);
-
-		for (u32 i = 0; i < Count; ++i)
-		{
-			Util::RenderLog(Util::LogType::Info, "Present mode %d is available", Data[i]);
-		}
-
-		return Data;
-	}
-
-	Memory::FrameArray<VkImage> GetSwapchainImages(VkDevice LogicalDevice,
-		VkSwapchainKHR VulkanSwapchain)
-	{
-		u32 Count;
-		vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &Count, nullptr);
-
-		auto Data = Memory::FrameArray<VkImage>::Create(Count);
-		vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &Count, Data.Pointer.Data);
-
-		return Data;
 	}
 
 	bool CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, u32 AvailableExtensionsCount,

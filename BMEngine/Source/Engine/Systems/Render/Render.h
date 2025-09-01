@@ -64,10 +64,9 @@ namespace Render
 	struct RenderState
 	{
 		DrawState RenderDrawState;	
-
 		StaticMeshPipeline MeshPipeline;
-
 		VkDescriptorPool DebugUiPool; // TODO: ?
+		Memory::FrameMemory FrameMemory;
 	};
 
 	struct PointLight
@@ -131,8 +130,12 @@ namespace Render
 		Memory::DynamicHeapArray<DrawEntity> DrawEntities;
 	};
 
+	void TmpInitFrameMemory();
+
 	void Init(GLFWwindow* WindowHandler);
 	void DeInit();
+
+	void* FrameAlloc(u32 Size);
 
 	void Draw(const DrawScene* Data);
 
