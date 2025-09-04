@@ -13,6 +13,7 @@
 #include "Util/Math.h"
 
 #include <random>
+#include <mutex>
 
 namespace Render
 {
@@ -165,7 +166,7 @@ namespace Render
 		vkDestroyPipelineLayout(Device, MeshPipeline->Pipeline.PipelineLayout, nullptr);
 	}
 
-	static void DrawStaticMeshes(VkDevice Device, VkCommandBuffer CmdBuffer, StaticMeshPipeline* MeshPipeline, const DrawScene* Scene)
+	static void DrawStaticMeshes(VkDevice Device, VkCommandBuffer CmdBuffer, StaticMeshPipeline* MeshPipeline, DrawScene* Scene)
 	{
 		FrameManager::UpdateUniformMemory(MeshPipeline->EntityLightBufferHandle, Scene->LightEntity, sizeof(LightBuffer));
 
@@ -182,6 +183,7 @@ namespace Render
 
 		const u32 LightDynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(LightBuffer);
 
+		std::unique_lock Lock(Scene->TempLock);
 		for (u32 i = 0; i < Scene->DrawEntities.Count; ++i)
 		{
 			DrawEntity* DrawEntity = Scene->DrawEntities.Data + i;
@@ -320,10 +322,8 @@ namespace Render
 		return Memory::FrameAlloc(&State.FrameMemory, Size);
 	}
 
-	void Draw(const DrawScene* Scene)
+	void Draw(DrawScene* Scene)
 	{
-		TransferSystem::ProcessTransferTasks();
-
 		VulkanCoreContext::VulkanCoreContext* CoreContext = RenderResources::GetCoreContext();
 
 		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
@@ -931,7 +931,7 @@ namespace LightningPass
 		vkDestroyPipelineLayout(Device, Pipeline.PipelineLayout, nullptr);
 	}
 
-	void Draw(const Render::DrawScene* Scene)
+	void Draw(Render::DrawScene* Scene)
 	{
 		VkDevice Device = VulkanInterface::GetDevice();
 		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
@@ -998,6 +998,7 @@ namespace LightningPass
 
 			vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
 
+			std::unique_lock Lock(Scene->TempLock);
 			for (u32 i = 0; i < Scene->DrawEntities.Count; ++i)
 			{
 				Render::DrawEntity* DrawEntity = Scene->DrawEntities.Data + i;

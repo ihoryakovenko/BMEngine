@@ -1,6 +1,6 @@
 #include "TransferSystem.h"
 
-#include <mutex>
+#include <atomic>
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 #include "Util/Util.h"
@@ -22,8 +22,11 @@ namespace TransferSystem
 
 	struct TaskQueue
 	{
-		Memory::HeapRingBuffer<TransferTask> TasksBuffer;
-		std::mutex Mutex;
+		TransferTask* Memory;
+		u64 Capacity;
+		std::atomic<u64> Tail;
+		std::atomic<u64> Middle;
+		std::atomic<u64> Head;
 	};
 
 	struct TransferFrames
@@ -34,7 +37,7 @@ namespace TransferSystem
 
 	struct DataTransferState
 	{
-		const u64 MaxTransferSizePerFrame = MB2;
+		const u64 MaxTransferSizePerFrame = MB16;
 
 		Memory::HeapRingBuffer<u8> TransferMemory;
 
@@ -45,12 +48,50 @@ namespace TransferSystem
 		u64 TasksInFly;
 		u64 CompletedTransfer;
 
-		TaskQueue PendingTransferTasksQueue;
-		TaskQueue ActiveTransferTasksQueue;
+		TaskQueue TransferTasksQueue;
 
 		TransferFrames Frames;
 		u32 CurrentFrame;
 	};
+
+	static bool HasPendingTasks(TaskQueue* Queue)
+	{
+		return Queue->Middle.load(std::memory_order_acquire) != Queue->Head.load(std::memory_order_acquire);
+	}
+
+	static bool HasCompletedTasks(TaskQueue* Queue)
+	{
+		return Queue->Tail.load(std::memory_order_acquire) != Queue->Middle.load(std::memory_order_acquire);
+	}
+
+	static void AddPendingTask(TaskQueue* Queue, TransferTask* Task)
+	{
+		u64 CurrentHead = Queue->Head.load(std::memory_order_relaxed);
+		Queue->Memory[CurrentHead] = *Task;
+		Queue->Head.store(Math::WrapIncrement(CurrentHead, Queue->Capacity), std::memory_order_release);
+	}
+
+	static void PopPendingTask(TaskQueue* Queue)
+	{
+		u64 CurrentMiddle = Queue->Middle.load(std::memory_order_relaxed);
+		Queue->Middle.store(Math::WrapIncrement(CurrentMiddle, Queue->Capacity), std::memory_order_release);
+	}
+
+	static TransferTask* GetFirstPendingTask(TaskQueue* Queue)
+	{
+		return Queue->Memory + Queue->Middle.load(std::memory_order_acquire);
+	}
+
+	static void PopCompletedTask(TaskQueue* Queue)
+	{
+		u64 CurrentTail = Queue->Tail.load(std::memory_order_relaxed);
+		Queue->Tail.store(Math::WrapIncrement(CurrentTail, Queue->Capacity), std::memory_order_relaxed);
+	}
+
+	static TransferTask* GetFirstCompletedTask(TaskQueue* Queue)
+	{
+		return Queue->Memory + Queue->Tail.load(std::memory_order_acquire);
+	}
 
 	static u64 GetTransferOffset(StagingFramePool* Pool, u32 FrameIndex, u64 AllocSize, u64 Alignment, u64 MaxTransferSize)
 	{
@@ -74,24 +115,19 @@ namespace TransferSystem
 		VkCommandBuffer TransferCommandBuffer = TransferState.Frames.CommandBuffers[CurrentFrame];
 
 		u64 TasksAdded = 0;
+		
+		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
+		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
+		if (HasPendingTasks(&TransferState.TransferTasksQueue))
 		{
-			VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
-			CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-			std::unique_lock<std::mutex> PendingLock(TransferState.PendingTransferTasksQueue.Mutex);
-			if (Memory::IsRingBufferEmpty(&TransferState.PendingTransferTasksQueue.TasksBuffer))
-			{
-				return;
-			}
-
 			VULKAN_CHECK_RESULT(vkWaitForFences(Device, 1, &TransferFence, VK_TRUE, UINT64_MAX));
 			VULKAN_CHECK_RESULT(vkResetFences(Device, 1, &TransferFence));
 			VULKAN_CHECK_RESULT(vkBeginCommandBuffer(TransferCommandBuffer, &CommandBufferBeginInfo));
 
-			while (!Memory::IsRingBufferEmpty(&TransferState.PendingTransferTasksQueue.TasksBuffer))
+			while (HasPendingTasks(&TransferState.TransferTasksQueue))
 			{
-				TransferTask* Task = Memory::RingBufferGetFirst(&TransferState.PendingTransferTasksQueue.TasksBuffer);
+				TransferTask* Task = GetFirstPendingTask(&TransferState.TransferTasksQueue);
 
 				FrameTotalTransferSize += Task->DataSize;
 				if (FrameTotalTransferSize >= TransferState.MaxTransferSizePerFrame)
@@ -259,45 +295,102 @@ namespace TransferSystem
 					}
 				}
 
-				{
-					std::unique_lock ActiveTasksLock(TransferState.ActiveTransferTasksQueue.Mutex);
-					Memory::PushToRingBuffer(&TransferState.ActiveTransferTasksQueue.TasksBuffer, Task);
-					++TasksAdded;
-				}
-
-				Memory::RingBufferPopFirst(&TransferState.PendingTransferTasksQueue.TasksBuffer);
+				PopPendingTask(&TransferState.TransferTasksQueue);
+				++TasksAdded;
 			}
 		}
 
-		TransferState.TasksInFly += TasksAdded;
+		if (TasksAdded > 0)
+		{
+			TransferState.TasksInFly += TasksAdded;
 
-		VULKAN_CHECK_RESULT(vkEndCommandBuffer(TransferCommandBuffer));
+			VULKAN_CHECK_RESULT(vkEndCommandBuffer(TransferCommandBuffer));
 
-		const u64 TasksInFly = TransferState.TasksInFly;
+			const u64 TasksInFly = TransferState.TasksInFly;
 
-		VkTimelineSemaphoreSubmitInfo TimelineSubmitInfo = { };
-		TimelineSubmitInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-		TimelineSubmitInfo.signalSemaphoreValueCount = 1;
-		TimelineSubmitInfo.pSignalSemaphoreValues = &TasksInFly;
+			VkTimelineSemaphoreSubmitInfo TimelineSubmitInfo = { };
+			TimelineSubmitInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+			TimelineSubmitInfo.signalSemaphoreValueCount = 1;
+			TimelineSubmitInfo.pSignalSemaphoreValues = &TasksInFly;
 
-		VkSubmitInfo SubmitInfo = { };
-		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.commandBufferCount = 1;
-		SubmitInfo.pCommandBuffers = &TransferCommandBuffer;
-		SubmitInfo.pNext = &TimelineSubmitInfo;
-		SubmitInfo.signalSemaphoreCount = 1;
-		SubmitInfo.pSignalSemaphores = &TransferState.TransferSemaphore;
+			VkSubmitInfo SubmitInfo = { };
+			SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			SubmitInfo.commandBufferCount = 1;
+			SubmitInfo.pCommandBuffers = &TransferCommandBuffer;
+			SubmitInfo.pNext = &TimelineSubmitInfo;
+			SubmitInfo.signalSemaphoreCount = 1;
+			SubmitInfo.pSignalSemaphores = &TransferState.TransferSemaphore;
 
-		VulkanCoreContext::VulkanCoreContext* CoreContext = RenderResources::GetCoreContext();
+			VulkanCoreContext::VulkanCoreContext* CoreContext = RenderResources::GetCoreContext();
 
-		// Todo submit using queue system?
-		std::unique_lock SubmitLock(CoreContext->QueueSubmitMutex);
-		vkQueueSubmit(VulkanInterface::GetTransferQueue(), 1, &SubmitInfo, TransferFence);
-		SubmitLock.unlock();
+			// Todo submit using queue system
+			std::unique_lock SubmitLock(CoreContext->QueueSubmitMutex);
+			VULKAN_CHECK_RESULT(vkQueueSubmit(VulkanInterface::GetTransferQueue(), 1, &SubmitInfo, TransferFence));
+			SubmitLock.unlock();
 
-		assert(TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] <= TransferState.MaxTransferSizePerFrame);
-		TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] = 0;
-		TransferState.CurrentFrame = Math::WrapIncrement(CurrentFrame, VulkanHelper::MAX_DRAW_FRAMES);
+			assert(TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] <= TransferState.MaxTransferSizePerFrame);
+			TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] = 0;
+			TransferState.CurrentFrame = Math::WrapIncrement(CurrentFrame, VulkanHelper::MAX_DRAW_FRAMES);
+		}
+
+		u64 CompletedCounter = 0;
+		vkGetSemaphoreCounterValue(Device, TransferState.TransferSemaphore, &CompletedCounter);
+
+		u64 Counter = CompletedCounter - TransferState.CompletedTransfer;
+		if (Counter > 0)
+		{
+			while (Counter--)
+			{
+				assert(HasCompletedTasks(&TransferState.TransferTasksQueue));
+
+				TransferTask* Task = GetFirstCompletedTask(&TransferState.TransferTasksQueue);
+				RenderResources::SetResourceReadyToRender(Task->ResourceIndex);
+
+				Memory::RingFree(&TransferState.TransferMemory.ControlBlock, Task->DataSize, 1);
+				PopCompletedTask(&TransferState.TransferTasksQueue);
+			}
+
+			TransferState.CompletedTransfer = CompletedCounter;
+		}
+	}
+
+	void TransferStaticMesh(u32 Handle, TransferMemory VertexData)
+	{
+		RenderResources::VertexData* Mesh =  RenderResources::GetStaticMesh(Handle);
+
+		TransferSystem::TransferTask Task = { };
+		Task.DataSize = Mesh->VertexDataSize;
+		Task.DataDescr.DstBuffer = RenderResources::GetVertexStageBuffer();
+		Task.DataDescr.DstOffset = Mesh->VertexOffset;
+		Task.RawData = VertexData;
+		Task.ResourceIndex = Handle;
+		Task.Type = RenderResources::ResourceType::Mesh;
+
+		AddTask(&Task);
+	}
+
+	void TransferMaterial(u32 Handle)
+	{
+	}
+
+	void TransferTexture2DSRGB(u32 Handle, TransferMemory TextureData)
+	{
+		RenderResources::MeshTexture2D* Texture = RenderResources::GetTexture(Handle);
+
+		TransferSystem::TransferTask Task = { };
+		Task.DataSize = Texture->MeshTexture.Size;
+		Task.TextureDescr.DstImage = Texture->MeshTexture.Image;
+		Task.TextureDescr.Width = Texture->MeshTexture.Width;
+		Task.TextureDescr.Height = Texture->MeshTexture.Height;
+		Task.RawData = TextureData;
+		Task.ResourceIndex = Handle;
+		Task.Type = RenderResources::ResourceType::Texture;
+
+		AddTask(&Task);
+	}
+
+	void TransferStaticMeshInstance(u32 Handle)
+	{
 	}
 
 	void Init()
@@ -347,8 +440,11 @@ namespace TransferSystem
 		TransferState.CompletedTransfer = 0;
 		TransferState.TasksInFly = 0;
 
-		TransferState.PendingTransferTasksQueue.TasksBuffer = Memory::AllocateRingBuffer<TransferTask>(1024 * 100);
-		TransferState.ActiveTransferTasksQueue.TasksBuffer = Memory::AllocateRingBuffer<TransferTask>(1024 * 100);
+		TransferState.TransferTasksQueue.Capacity = 1024 * 2;
+		TransferState.TransferTasksQueue.Memory = Memory::MemoryManagementSystem::CAllocate<TransferTask>(TransferState.TransferTasksQueue.Capacity);
+		TransferState.TransferTasksQueue.Tail.store(0, std::memory_order_relaxed);
+		TransferState.TransferTasksQueue.Middle.store(0, std::memory_order_relaxed);
+		TransferState.TransferTasksQueue.Head.store(0, std::memory_order_relaxed);
 
 		TransferState.TransferStagingPool = { };
 
@@ -379,35 +475,8 @@ namespace TransferSystem
 
 		vkDestroySemaphore(Device, TransferState.TransferSemaphore, nullptr);
 
-		Memory::FreeRingBuffer(&TransferState.PendingTransferTasksQueue.TasksBuffer);
-		Memory::FreeRingBuffer(&TransferState.ActiveTransferTasksQueue.TasksBuffer);
+		Memory::MemoryManagementSystem::Free(TransferState.TransferTasksQueue.Memory);
 		Memory::FreeRingBuffer(&TransferState.TransferMemory);
-	}
-
-	void ProcessTransferTasks()
-	{
-		VulkanCoreContext::VulkanCoreContext* Context = RenderResources::GetCoreContext();
-		VkDevice Device = Context->LogicalDevice;
-
-		u64 CompletedCounter = 0;
-		vkGetSemaphoreCounterValue(Device, TransferState.TransferSemaphore, &CompletedCounter);
-
-		u64 Counter = CompletedCounter - TransferState.CompletedTransfer;
-		if (Counter > 0)
-		{
-			std::unique_lock Lock(TransferState.ActiveTransferTasksQueue.Mutex);
-
-			while (Counter--)
-			{
-				TransferTask* Task = Memory::RingBufferGetFirst(&TransferState.ActiveTransferTasksQueue.TasksBuffer);
-				RenderResources::SetResourceReadyToRender(Task->ResourceIndex);
-
-				Memory::RingFree(&TransferState.TransferMemory.ControlBlock, Task->DataSize, 1);
-				Memory::RingBufferPopFirst(&TransferState.ActiveTransferTasksQueue.TasksBuffer);
-			}
-
-			TransferState.CompletedTransfer = CompletedCounter;
-		}
 	}
 
 	TransferMemory RequestTransferMemory(u64 Size)
@@ -415,32 +484,8 @@ namespace TransferSystem
 		return TransferState.TransferMemory.DataArray + Memory::RingAlloc(&TransferState.TransferMemory.ControlBlock, Size, 1);
 	}
 
-	ResourceTransferMemory RequestMemoryForResource(RenderResources::ResourceType Type, u32 ResourceCount)
-	{
-		//ResourceTransferMemory Memory;
-		//Memory.Memory = nullptr;
-		//Memory.Type = RenderResources::ResourceType::Invalid;
-
-		//switch (Type)
-		//{
-		//	case RenderResources::ResourceType::Texture:
-		//		break;
-		//	case RenderResources::ResourceType::Mesh:
-		//		break;
-		//	case RenderResources::ResourceType::Material:
-		//		break;
-		//	case RenderResources::ResourceType::Instance:
-		//		break;
-		//}
-		//
-		//assert(Memory.Type != RenderResources::ResourceType::Invalid);
-
-		return ResourceTransferMemory();
-	}
-
 	void AddTask(TransferTask* Task)
 	{
-		std::unique_lock<std::mutex> PendingLock(TransferState.PendingTransferTasksQueue.Mutex);
-		Memory::PushToRingBuffer(&TransferState.PendingTransferTasksQueue.TasksBuffer, Task);
+		AddPendingTask(&TransferState.TransferTasksQueue, Task);
 	}
 }

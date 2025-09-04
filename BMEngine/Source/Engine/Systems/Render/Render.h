@@ -127,6 +127,7 @@ namespace Render
 
 		LightBuffer* LightEntity = nullptr;
 
+		std::mutex TempLock;
 		Memory::DynamicHeapArray<DrawEntity> DrawEntities;
 	};
 
@@ -137,7 +138,7 @@ namespace Render
 
 	void* FrameAlloc(u32 Size);
 
-	void Draw(const DrawScene* Data);
+	void Draw(DrawScene* Data);
 
 	RenderState* GetRenderState();
 }
@@ -166,7 +167,7 @@ namespace LightningPass
 	void Init();
 	void DeInit();
 
-	void Draw(const Render::DrawScene* Scene);
+	void Draw(Render::DrawScene* Scene);
 
 	VulkanInterface::UniformImage* GetShadowMapArray();
 }

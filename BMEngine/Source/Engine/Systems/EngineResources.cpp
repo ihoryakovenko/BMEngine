@@ -2,6 +2,7 @@
 
 #include "Util/Util.h"
 #include "Engine/Systems/Render/Render.h"
+#include "Engine/Systems/Render/TransferSystem.h"
 #include "Util/DefaultTextureData.h"
 #include <gli/gli.hpp>
 
@@ -11,24 +12,25 @@ namespace EngineResources
 
 	void Init(Yaml::Node& SceneResourcesNode, Render::DrawScene* TmpScene)
 	{
-		const u64 DefaultTextureDataCount = sizeof(DefaultTextureData) / sizeof(DefaultTextureData[0]);
-		gli::texture DefaultTexture = gli::load((char const*)DefaultTextureData, DefaultTextureDataCount);
-		if (DefaultTexture.empty())
 		{
-			assert(false);
+			const u64 DefaultTextureDataCount = sizeof(DefaultTextureData) / sizeof(DefaultTextureData[0]);
+			gli::texture DefaultTexture = gli::load((char const*)DefaultTextureData, DefaultTextureDataCount);
+			if (DefaultTexture.empty())
+			{
+				assert(false);
+			}
+			const u64 DefaultAssetId = std::hash<std::string>{ }("Default");
+			const glm::tvec3<u32> DefaultAssetExtent = DefaultTexture.extent();
+
+			RenderResources::TextureDescription DefaultTextureDescription;
+			DefaultTextureDescription.Width = DefaultAssetExtent.x;
+			DefaultTextureDescription.Height = DefaultAssetExtent.y;
+
+			TextureAsset DefaultAsset;
+			DefaultAsset.RenderTextureIndex = RenderResources::CreateTexture2DSRGB(&DefaultTextureDescription, DefaultTexture.data());
+
+			TextureAssets[DefaultAssetId] = DefaultAsset;
 		}
-		const u64 DefaultAssetId = std::hash<std::string>{ }("Default");
-		const glm::tvec3<u32> DefaultAssetExtent = DefaultTexture.extent();
-
-		RenderResources::TextureDescription DefaultTextureDescription;
-		DefaultTextureDescription.Data = DefaultTexture.data();
-		DefaultTextureDescription.Width = DefaultAssetExtent.x;
-		DefaultTextureDescription.Height = DefaultAssetExtent.y;
-
-		TextureAsset DefaultAsset;
-		DefaultAsset.RenderTextureIndex = RenderResources::CreateTexture2DSRGB(&DefaultTextureDescription);
-
-		TextureAssets[DefaultAssetId] = DefaultAsset;
 		
 		Yaml::Node& TexturesNode = Util::GetTextures(SceneResourcesNode);
 		for (auto It = TexturesNode.Begin(); It != TexturesNode.End(); It++)
@@ -46,12 +48,11 @@ namespace EngineResources
 			const u64 Id = std::hash<std::string>{ }(TextureName);
 
 			RenderResources::TextureDescription TextureDescription;
-			TextureDescription.Data = Texture.data();
 			TextureDescription.Width = Extent.x;
 			TextureDescription.Height = Extent.y;
 			
 			TextureAsset Asset;
-			Asset.RenderTextureIndex = RenderResources::CreateTexture2DSRGB(&TextureDescription);
+			Asset.RenderTextureIndex = RenderResources::CreateTexture2DSRGB(&TextureDescription, Texture.data());
 			
 			TextureAssets[Id] = Asset;
 		}
@@ -93,6 +94,8 @@ namespace EngineResources
 					}
 				}
 
+				const u64 VertexDataSize = VerticesCount * sizeof(StaticMeshVertex) + IndicesCount * sizeof(u32);
+
 				RenderResources::Material Mat;
 				Mat.AlbedoTexIndex = AlbedoTextureIndex;
 				Mat.SpecularTexIndex = SpecularTextureIndex;
@@ -104,18 +107,20 @@ namespace EngineResources
 
 				RenderResources::MeshDescription Mesh;
 				Mesh.IndicesCount = IndicesCount;
-				Mesh.MeshVertexData = Model.VertexData + ModelVertexByteOffset;
 				Mesh.VertexSize = sizeof(StaticMeshVertex);
 				Mesh.VerticesCount = VerticesCount;
 
 				Render::DrawEntity Entity = { };
-				Entity.StaticMeshIndex = RenderResources::CreateStaticMesh(&Mesh);
+				Entity.StaticMeshIndex = RenderResources::CreateStaticMesh(&Mesh, Model.VertexData + ModelVertexByteOffset);
 				Entity.Instances = 1;
 				Entity.InstanceDataIndex = RenderResources::CreateStaticMeshInstance(&Instance);
 
+				std::unique_lock Lock(TmpScene->TempLock);
 				Memory::PushBackToArray(&TmpScene->DrawEntities, &Entity);
+				Lock.unlock();
 
-				ModelVertexByteOffset += VerticesCount * sizeof(StaticMeshVertex) + IndicesCount * sizeof(u32);
+				ModelVertexByteOffset += VertexDataSize;
+				//std::this_thread::sleep_for(std::chrono::microseconds(2));
 			}
 
 			Util::ClearModel3DData(ModelData);

@@ -36,8 +36,8 @@ namespace Math
 	}
 
 	template <typename T>
-	static T WrapIncrement(T Number, T Max)
+	static T WrapIncrement(T Number, T Max, T Step = 1)
 	{
-		return (Number + 1) % Max;
+		return (Number + Step) % Max;
 	}
 }

@@ -51,6 +51,8 @@ namespace RenderResources
 		VkDeviceMemory Memory;
 		u64 Size;
 		u64 Alignment;
+		u32 Width;
+		u32 Height;
 	};
 
 	struct MeshTexture2D
@@ -74,7 +76,6 @@ namespace RenderResources
 
 	struct MeshDescription
 	{
-		void* MeshVertexData;
 		u64 VertexSize;
 		u64 VerticesCount;
 		u64 IndicesCount;
@@ -82,13 +83,14 @@ namespace RenderResources
 
 	struct TextureDescription
 	{
-		void* Data;
 		u32 Width;
 		u32 Height;
 	};
 
 	void Init(GLFWwindow* WindowHandler);
 	void DeInit();
+
+	void Update();
 
 	void CreateVertices(Yaml::Node& VerticesNode);
 	void CreateShaders(Yaml::Node& ShadersNode);
@@ -107,13 +109,19 @@ namespace RenderResources
 	VkPipeline CreateGraphicsPipeline(VkDevice Device, Yaml::Node& Root,
 		VkExtent2D Extent, VkPipelineLayout PipelineLayout, const VulkanHelper::PipelineResourceInfo* ResourceInfo);
 
-	u32 CreateStaticMesh(MeshDescription* Description);
+	u32 CreateStaticMesh(MeshDescription* Description, void* Data);
 	u32 CreateMaterial(Material* Mat);
-	u32 CreateTexture2DSRGB(TextureDescription* Description);
+	u32 CreateTexture2DSRGB(TextureDescription* Description, void* Data);
 	u32 CreateStaticMeshInstance(InstanceData* Data);
+
+	void UpdateStaticMesh(MeshDescription* Description);
+	void UpdateMaterial(Material* Mat);
+	void UpdateTexture(TextureDescription* Description);
+	void UpdateInstance(InstanceData* Data);
 
 	VertexData* GetStaticMesh(u32 Index);
 	InstanceData* GetInstanceData(u32 Index);
+	MeshTexture2D* GetTexture(u32 Index);
 
 	void SetResourceReadyToRender(u32 ResourceIndex);
 	VkDescriptorSetLayout GetBindlesTexturesLayout();

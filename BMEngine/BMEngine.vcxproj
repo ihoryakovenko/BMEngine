@@ -157,6 +157,7 @@
     <IncludePath>$(IncludePath)</IncludePath>
     <CustomBuildAfterTargets>PrepareForBuild</CustomBuildAfterTargets>
     <CustomBuildBeforeTargets>PrepareForRun</CustomBuildBeforeTargets>
+    <CodeAnalysisRuleSet>..\Build\BMEngine.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
@@ -164,6 +165,7 @@
     <IncludePath>$(IncludePath)</IncludePath>
     <CustomBuildAfterTargets>PrepareForBuild</CustomBuildAfterTargets>
     <CustomBuildBeforeTargets>PrepareForRun</CustomBuildBeforeTargets>
+    <CodeAnalysisRuleSet>..\Build\BMEngine.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

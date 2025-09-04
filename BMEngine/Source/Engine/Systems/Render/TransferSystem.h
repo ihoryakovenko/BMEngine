@@ -49,9 +49,12 @@ namespace TransferSystem
 
 	void Transfer();
 
-	TransferMemory RequestTransferMemory(u64 Size);
-	ResourceTransferMemory RequestMemoryForResource(RenderResources::ResourceType Type, u32 ResourceCount);
+	void TransferStaticMesh(u32 Handle, TransferMemory VertexData);
+	void TransferMaterial(u32 Handle);
+	void TransferTexture2DSRGB(u32 Handle, TransferMemory TextureData);
+	void TransferStaticMeshInstance(u32 Handle);
 
-	void ProcessTransferTasks();
+	TransferMemory RequestTransferMemory(u64 Size);
+
 	void AddTask(TransferTask* Task);
 }

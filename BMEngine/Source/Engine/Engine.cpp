@@ -172,11 +172,13 @@ namespace Engine
 
 		Scene.DrawEntities = Memory::AllocateArray<Render::DrawEntity>(512);
 
-		Yaml::Node TestScene;
-		Yaml::Parse(TestScene, "./Resources/Scenes/TestScene.yaml");
-		Yaml::Node& SceneResourcesNode = Util::GetSceneResources(TestScene);
-
-		EngineResources::Init(SceneResourcesNode, &Scene);
+		TaskSystem::AddTask([]()
+		{
+			Yaml::Node TestScene;
+			Yaml::Parse(TestScene, "./Resources/Scenes/TestScene.yaml");
+			Yaml::Node& SceneResourcesNode = Util::GetSceneResources(TestScene);
+			EngineResources::Init(SceneResourcesNode, &Scene);
+		}, nullptr, 0);
 
 		return true;
 	}
