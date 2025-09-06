@@ -23,7 +23,9 @@ namespace EngineResources
 
 	struct TextureAsset
 	{
+		std::string TexturePath;
 		u32 RenderTextureIndex;
+		bool IsCreated;
 	};
 
 	void Init(Yaml::Node& Root, struct Render::DrawScene* TmpScene);

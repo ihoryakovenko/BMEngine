@@ -98,9 +98,10 @@ namespace TransferSystem
 		const u64 AlignedSize = Math::AlignNumber(AllocSize, Alignment);
 		const u64 Head = FrameIndex * MaxTransferSize;
 		const u64 Offset = Head + Pool->AllocatedForFrame[FrameIndex];
+		const u64 AlignedOffset = Math::AlignNumber(Offset, Alignment);
 
-		Pool->AllocatedForFrame[FrameIndex] += AlignedSize;
-		return Offset;
+		Pool->AllocatedForFrame[FrameIndex] += AlignedSize + AlignedOffset - Offset;
+		return AlignedOffset;
 	}
 
 	DataTransferState TransferState;
@@ -344,7 +345,7 @@ namespace TransferSystem
 				assert(HasCompletedTasks(&TransferState.TransferTasksQueue));
 
 				TransferTask* Task = GetFirstCompletedTask(&TransferState.TransferTasksQueue);
-				RenderResources::SetResourceReadyToRender(Task->ResourceIndex);
+				RenderResources::SetResourceReadyToRender(Task->ResourceIndex, Task->Type);
 
 				Memory::RingFree(&TransferState.TransferMemory.ControlBlock, Task->DataSize, 1);
 				PopCompletedTask(&TransferState.TransferTasksQueue);

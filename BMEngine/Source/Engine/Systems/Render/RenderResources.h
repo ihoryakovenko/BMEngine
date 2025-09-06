@@ -30,13 +30,6 @@ namespace RenderResources
 		Instance,
 	};
 
-	template<typename T>
-	struct RenderResource
-	{
-		T Resource;
-		u32 ResourceIndex;
-	};
-
 	struct VertexData
 	{
 		u64 VertexOffset;
@@ -123,7 +116,7 @@ namespace RenderResources
 	InstanceData* GetInstanceData(u32 Index);
 	MeshTexture2D* GetTexture(u32 Index);
 
-	void SetResourceReadyToRender(u32 ResourceIndex);
+	void SetResourceReadyToRender(u32 ResourceIndex, ResourceType Type);
 	VkDescriptorSetLayout GetBindlesTexturesLayout();
 	VkDescriptorSetLayout GetMaterialLayout();
 	VkDescriptorSet GetBindlesTexturesSet();

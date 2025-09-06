@@ -10,6 +10,23 @@ namespace EngineResources
 {
 	static std::unordered_map<u64, TextureAsset> TextureAssets;
 
+	static u32 CreateTexture(const std::string& Path)
+	{
+		gli::texture Texture = gli::load(Path);
+		if (Texture.empty())
+		{
+			assert(false);
+		}
+
+		const glm::tvec3<u32> Extent = Texture.extent();
+
+		RenderResources::TextureDescription TextureDescription;
+		TextureDescription.Width = Extent.x;
+		TextureDescription.Height = Extent.y;
+
+		return RenderResources::CreateTexture2DSRGB(&TextureDescription, Texture.data());
+	}
+
 	void Init(Yaml::Node& SceneResourcesNode, Render::DrawScene* TmpScene)
 	{
 		{
@@ -28,6 +45,7 @@ namespace EngineResources
 
 			TextureAsset DefaultAsset;
 			DefaultAsset.RenderTextureIndex = RenderResources::CreateTexture2DSRGB(&DefaultTextureDescription, DefaultTexture.data());
+			DefaultAsset.IsCreated = true;
 
 			TextureAssets[DefaultAssetId] = DefaultAsset;
 		}
@@ -43,18 +61,13 @@ namespace EngineResources
 			{
 				assert(false);
 			}
-
-			const glm::tvec3<u32> Extent = Texture.extent();
-			const u64 Id = std::hash<std::string>{ }(TextureName);
-
-			RenderResources::TextureDescription TextureDescription;
-			TextureDescription.Width = Extent.x;
-			TextureDescription.Height = Extent.y;
 			
 			TextureAsset Asset;
-			Asset.RenderTextureIndex = RenderResources::CreateTexture2DSRGB(&TextureDescription, Texture.data());
+			Asset.TexturePath = TexturePath;
+			Asset.RenderTextureIndex = 0;
+			Asset.IsCreated = false;
 			
-			TextureAssets[Id] = Asset;
+			TextureAssets[std::hash<std::string>{ }(TextureName)] = Asset;
 		}
 
 		Yaml::Node& ModelsNode = Util::GetModels(SceneResourcesNode);
@@ -83,6 +96,12 @@ namespace EngineResources
 					auto it = TextureAssets.find(material.DiffuseTextureHash);
 					if (it != TextureAssets.end())
 					{
+						if (!it->second.IsCreated)
+						{
+							it->second.RenderTextureIndex = CreateTexture(it->second.TexturePath);
+							it->second.IsCreated = true;
+						}
+
 						AlbedoTextureIndex = it->second.RenderTextureIndex;
 						SpecularTextureIndex = AlbedoTextureIndex;
 					}
@@ -90,6 +109,12 @@ namespace EngineResources
 					it = TextureAssets.find(material.SpecularTextureHash);
 					if (it != TextureAssets.end())
 					{
+						if (!it->second.IsCreated)
+						{
+							it->second.RenderTextureIndex = CreateTexture(it->second.TexturePath);
+							it->second.IsCreated = true;
+						}
+
 						SpecularTextureIndex = it->second.RenderTextureIndex;
 					}
 				}
