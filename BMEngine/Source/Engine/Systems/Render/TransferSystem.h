@@ -22,8 +22,6 @@ namespace TransferSystem
 
 	struct TransferTask
 	{
-		RenderResources::ResourceType Type;
-
 		union
 		{
 			TextureTaskDescription TextureDescr;
@@ -32,7 +30,8 @@ namespace TransferSystem
 
 		void* RawData;
 		u64 DataSize;
-
+		u32 Alignment;
+		RenderResources::ResourceType Type;
 		u32 ResourceIndex;
 	};
 
@@ -48,11 +47,6 @@ namespace TransferSystem
 	void DeInit();
 
 	void Transfer();
-
-	void TransferStaticMesh(u32 Handle, TransferMemory VertexData);
-	void TransferMaterial(u32 Handle);
-	void TransferTexture2DSRGB(u32 Handle, TransferMemory TextureData);
-	void TransferStaticMeshInstance(u32 Handle);
 
 	TransferMemory RequestTransferMemory(u64 Size);
 

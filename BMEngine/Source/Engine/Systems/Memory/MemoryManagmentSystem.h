@@ -10,6 +10,9 @@
 #include "Util/EngineTypes.h"
 #include "Util/Math.h"
 
+#define F_MEMORY_DEBUG
+#include "forge.h"
+
 namespace Memory
 {
 	struct FrameMemory
@@ -19,55 +22,17 @@ namespace Memory
 		u8* Base;
 	};
 
+	void Init(bool EnableMemoryDebugging);
+	void DeInit();
+	void Update();
+
+	void AllowMemoryDump(bool Allow);
+
 	FrameMemory CreateFrameMemory(u64 SpaceToallocate);
 	void DestroyFrameMemory(FrameMemory* Memory);
 
 	void* FrameAlloc(FrameMemory* Memory, u64 Size);
 	void FrameFree(FrameMemory* Memory);
-
-	struct MemoryManagementSystem
-	{
-	public:
-		static inline int AllocateCounter = 0;
-
-		template <typename T>
-		static T* Allocate(u64 Count = 1)
-		{
-#ifndef NDEBUG
-			++AllocateCounter;
-#endif
-			return static_cast<T*>(malloc(Count * sizeof(T)));
-		}
-
-		template <typename T>
-		static T* CAllocate(u64 Count = 1)
-		{
-#ifndef NDEBUG
-			++AllocateCounter;
-#endif
-
-			return static_cast<T*>(calloc(Count, sizeof(T)));
-		}
-
-		static void Free(void* Ptr)
-		{
-#ifndef NDEBUG
-			if (Ptr != nullptr)
-			{
-				--AllocateCounter;
-			}
-#endif
-			free(Ptr);
-		}
-
-		static void DeInit()
-		{
-			if (Memory::MemoryManagementSystem::AllocateCounter != 0)
-			{
-				assert(false);
-			}
-		}
-	};
 
 	template <typename T>
 	struct DynamicHeapArray
@@ -94,12 +59,12 @@ namespace Memory
 	};
 
 	template <typename T>
-	static DynamicHeapArray<T> AllocateArray(u64 count)
+	static DynamicHeapArray<T> AllocateArray(u64 Count)
 	{
 		DynamicHeapArray<T> Arr = { };
 		Arr.Count = 0;
-		Arr.Capacity = count;
-		Arr.Data = MemoryManagementSystem::Allocate<T>(count);
+		Arr.Capacity = Count;
+		Arr.Data = (T*)malloc(Count * sizeof(T));
 
 		return Arr;
 	}
@@ -109,7 +74,7 @@ namespace Memory
 	{
 		assert(Array->Capacity != 0);
 
-		MemoryManagementSystem::Free(Array->Data);
+		free(Array->Data);
 		Array->Capacity = 0;
 		Array->Count = 0;
 	}
@@ -162,7 +127,7 @@ namespace Memory
 		assert(Capacity != 0);
 
 		HeapRingBuffer<T> Buffer = { };
-		Buffer.DataArray = MemoryManagementSystem::Allocate<T>(Capacity);
+		Buffer.DataArray = (T*)malloc(Capacity * sizeof(T));
 		Buffer.ControlBlock.Capacity = Capacity;
 		//Buffer.ControlBlock.Alignment = 1;
 		return Buffer;
@@ -172,7 +137,7 @@ namespace Memory
 	static void FreeRingBuffer(HeapRingBuffer<T>* Buffer)
 	{
 		assert(Buffer->ControlBlock.Capacity != 0);
-		MemoryManagementSystem::Free(Buffer->DataArray);
+		free(Buffer->DataArray);
 		*Buffer = { };
 	}
 

@@ -5,6 +5,7 @@
 #include "EngineTypes.h"
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
+#include "Engine/Systems/Memory/forge.h"
 
 #include "Engine/Systems/Render/Render.h"
 #include "Engine/Systems/Render/RenderResources.h"
@@ -167,8 +168,9 @@ namespace Util
 			assert(false);
 		}
 
-		u64* VerticesCounts = Memory::MemoryManagementSystem::Allocate<u64>(Shapes.size());
-		u32* IndicesCounts = Memory::MemoryManagementSystem::Allocate<u32>(Shapes.size());
+		
+		u64* VerticesCounts = (u64*)malloc(Shapes.size() * sizeof(u64));
+		u32* IndicesCounts = (u32*)malloc(Shapes.size() * sizeof(u32));
 
 		std::unordered_map<EngineResources::StaticMeshVertex, u32,
 			std::hash<EngineResources::StaticMeshVertex>, VertexEqual> uniqueVertices{ };
@@ -300,8 +302,8 @@ namespace Util
 		outFile.write(reinterpret_cast<const char*>(uniqueMaterials.data()), Header.MaterialCount * sizeof(Model3DMaterial));
 		outFile.write(reinterpret_cast<const char*>(uniqueTextureHashes.data()), Header.UniqueTextureCount * sizeof(u64));
 
-		Memory::MemoryManagementSystem::Free(VerticesCounts);
-		Memory::MemoryManagementSystem::Free(IndicesCounts);
+		free(VerticesCounts);
+		free(IndicesCounts);
 	}
 
 	Model3DData LoadModel3DData(const char* FilePath)
@@ -322,7 +324,7 @@ namespace Util
 			assert(false);
 		}
 
-		Model3DData Data = Memory::MemoryManagementSystem::Allocate<u8>(fileSize);
+		Model3DData Data = (Model3DData)malloc(fileSize * sizeof(u8));
 		file.read(reinterpret_cast<char*>(Data), fileSize);
 		if (!file)
 		{
@@ -334,7 +336,7 @@ namespace Util
 
 	void ClearModel3DData(Model3DData Data)
 	{
-		Memory::MemoryManagementSystem::Free(Data);
+		free(Data);
 	}
 
 	Model3D ParseModel3D(Model3DData Data)

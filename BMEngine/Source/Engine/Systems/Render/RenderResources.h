@@ -107,11 +107,6 @@ namespace RenderResources
 	u32 CreateTexture2DSRGB(TextureDescription* Description, void* Data);
 	u32 CreateStaticMeshInstance(InstanceData* Data);
 
-	void UpdateStaticMesh(MeshDescription* Description);
-	void UpdateMaterial(Material* Mat);
-	void UpdateTexture(TextureDescription* Description);
-	void UpdateInstance(InstanceData* Data);
-
 	VertexData* GetStaticMesh(u32 Index);
 	InstanceData* GetInstanceData(u32 Index);
 	MeshTexture2D* GetTexture(u32 Index);

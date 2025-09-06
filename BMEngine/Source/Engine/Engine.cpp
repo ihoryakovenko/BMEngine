@@ -151,6 +151,7 @@ namespace Engine
 
 	bool InitSystems()
 	{
+		Memory::Init(true);
 		Render::TmpInitFrameMemory();
 
 		TaskSystem::Init();
@@ -198,11 +199,13 @@ namespace Engine
 		glfwTerminate();
 
 		TaskSystem::DeInit();
-		Memory::MemoryManagementSystem::DeInit();
+		Memory::DeInit();
 	}
 
 	void Update(f64 DeltaTime)
 	{
+		Memory::Update();
+
 		MoveCamera(Window, DeltaTime, MainCamera);
 
 		static f32 Angle = 0.0f;

@@ -218,6 +218,7 @@ namespace RenderResources
 		RenderingInfo.stencilAttachmentFormat = ResourceInfo->PipelineAttachmentData.DepthAttachmentFormat;
 
 		auto PipelineCreateInfo = (VkGraphicsPipelineCreateInfo*)Render::FrameAlloc(sizeof(VkGraphicsPipelineCreateInfo));
+		*PipelineCreateInfo = { };
 		PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 		PipelineCreateInfo->stageCount = Shaders.Count;
 		PipelineCreateInfo->pStages = Shaders.Data;
@@ -525,6 +526,7 @@ namespace RenderResources
 
 		TransferSystem::TransferTask Task = { };
 		Task.DataSize = sizeof(Material);
+		Task.Alignment = 1;
 		Task.DataDescr.DstBuffer = ResContext.MaterialBuffer.Buffer;
 		Task.DataDescr.DstOffset = ResContext.MaterialBuffer.Offset;
 		Task.RawData = TransferMemory;
@@ -557,6 +559,7 @@ namespace RenderResources
 
 		TransferSystem::TransferTask Task = { };
 		Task.DataSize = DataSize;
+		Task.Alignment = 1;
 		Task.DataDescr.DstBuffer = ResContext.VertexStageData.Buffer;
 		Task.DataDescr.DstOffset = ResContext.VertexStageData.Offset;
 		Task.RawData = TransferMemory;
@@ -666,6 +669,7 @@ namespace RenderResources
 
 		TransferSystem::TransferTask Task = { };
 		Task.DataSize = NextTexture->MeshTexture.Size;
+		Task.Alignment = 16;
 		Task.TextureDescr.DstImage = NextTexture->MeshTexture.Image;
 		Task.TextureDescr.Width = Description->Width;
 		Task.TextureDescr.Height = Description->Height;
@@ -689,6 +693,7 @@ namespace RenderResources
 
 		TransferSystem::TransferTask Task = { };
 		Task.DataSize = sizeof(InstanceData);
+		Task.Alignment = 1;
 		Task.DataDescr.DstBuffer = ResContext.GPUInstances.Buffer;
 		Task.DataDescr.DstOffset = ResContext.GPUInstances.Offset;
 		Task.RawData = TransferMemory;
@@ -701,22 +706,6 @@ namespace RenderResources
 		Memory::PushBackToArray(&ResContext.MeshInstances, &Resource);
 
 		return ResContext.MeshInstances.Count - 1;
-	}
-
-	void UpdateStaticMesh(MeshDescription* Description)
-	{
-	}
-
-	void UpdateMaterial(Material* Mat)
-	{
-	}
-
-	void UpdateTexture(TextureDescription* Description)
-	{
-	}
-
-	void UpdateInstance(InstanceData* Data)
-	{
 	}
 
 	VertexData* GetStaticMesh(u32 Index)

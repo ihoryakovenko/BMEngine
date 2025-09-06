@@ -144,7 +144,6 @@ namespace VulkanHelper
 	}
 
 
-
 	void GetRequiredInstanceExtensions(const char** RequiredInstanceExtensions, u32 RequiredExtensionsCount,
 		const char** ValidationExtensions, u32 ValidationExtensionsCount, const char** OutInstanceExtensions)
 	{

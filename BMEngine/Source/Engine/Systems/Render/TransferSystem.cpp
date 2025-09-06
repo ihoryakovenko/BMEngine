@@ -3,6 +3,7 @@
 #include <atomic>
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
+#include "Engine/Systems/Memory/forge.h"
 #include "Util/Util.h"
 #include "VulkanHelper.h"
 #include "RenderResources.h"
@@ -11,13 +12,17 @@
 
 namespace TransferSystem
 {
-	const static 
-
 	struct StagingFramePool
 	{
 		VkBuffer Buffer;
 		VkDeviceMemory Memory;
 		u64 AllocatedForFrame[VulkanHelper::MAX_DRAW_FRAMES];
+	};
+
+	struct TransferMemoryRequest
+	{
+		u64 Offset;
+		u64 RequestSize;
 	};
 
 	struct TaskQueue
@@ -93,15 +98,20 @@ namespace TransferSystem
 		return Queue->Memory + Queue->Tail.load(std::memory_order_acquire);
 	}
 
-	static u64 GetTransferOffset(StagingFramePool* Pool, u32 FrameIndex, u64 AllocSize, u64 Alignment, u64 MaxTransferSize)
+	static TransferMemoryRequest GetTransferRequest(StagingFramePool* Pool, u32 FrameIndex, u64 AllocSize, u64 Alignment, u64 MaxTransferSize)
 	{
 		const u64 AlignedSize = Math::AlignNumber(AllocSize, Alignment);
 		const u64 Head = FrameIndex * MaxTransferSize;
 		const u64 Offset = Head + Pool->AllocatedForFrame[FrameIndex];
 		const u64 AlignedOffset = Math::AlignNumber(Offset, Alignment);
+		const u64 RequestSize = AlignedSize + AlignedOffset - Offset;
 
-		Pool->AllocatedForFrame[FrameIndex] += AlignedSize + AlignedOffset - Offset;
-		return AlignedOffset;
+		TransferMemoryRequest Request;
+		Request.Offset = AlignedOffset;
+		Request.RequestSize = RequestSize;
+
+		Pool->AllocatedForFrame[FrameIndex] += RequestSize;
+		return Request;
 	}
 
 	DataTransferState TransferState;
@@ -130,23 +140,23 @@ namespace TransferSystem
 			{
 				TransferTask* Task = GetFirstPendingTask(&TransferState.TransferTasksQueue);
 
-				FrameTotalTransferSize += Task->DataSize;
+				TransferMemoryRequest TransferRequest = GetTransferRequest(&TransferState.TransferStagingPool,
+					CurrentFrame, Task->DataSize, Task->Alignment, TransferState.MaxTransferSizePerFrame);
+
+				FrameTotalTransferSize += TransferRequest.RequestSize;
 				if (FrameTotalTransferSize >= TransferState.MaxTransferSizePerFrame)
 				{
 					assert(TasksAdded != 0 && "Task->DataSize > then MaxTransferSizePerFrame");
 					break;
 				}
 
+				VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState.TransferStagingPool.Memory,
+					Task->DataSize, TransferRequest.Offset, Task->RawData);
+
 				switch (Task->Type)
 				{
 					case RenderResources::ResourceType::Mesh:
 					{
-						const u64 TransferOffset = GetTransferOffset(&TransferState.TransferStagingPool,
-							CurrentFrame, Task->DataSize, 1, TransferState.MaxTransferSizePerFrame);
-
-						VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState.TransferStagingPool.Memory,
-							Task->DataSize, TransferOffset, Task->RawData);
-
 						VkBufferMemoryBarrier2 Barrier = { };
 						Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
 						Barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
@@ -165,7 +175,7 @@ namespace TransferSystem
 						DepInfo.pBufferMemoryBarriers = &Barrier;
 
 						VkBufferCopy IndexBufferCopyRegion = { };
-						IndexBufferCopyRegion.srcOffset = TransferOffset;
+						IndexBufferCopyRegion.srcOffset = TransferRequest.Offset;
 						IndexBufferCopyRegion.dstOffset = Task->DataDescr.DstOffset;
 						IndexBufferCopyRegion.size = Task->DataSize;
 
@@ -177,12 +187,6 @@ namespace TransferSystem
 					case RenderResources::ResourceType::Material:
 					case RenderResources::ResourceType::Instance:
 					{
-						const u64 TransferOffset = GetTransferOffset(&TransferState.TransferStagingPool,
-							CurrentFrame, Task->DataSize, 1, TransferState.MaxTransferSizePerFrame);
-
-						VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState.TransferStagingPool.Memory, Task->DataSize,
-							TransferOffset, Task->RawData);
-
 						VkBufferMemoryBarrier2 Barrier = { };
 						Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
 						Barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
@@ -201,7 +205,7 @@ namespace TransferSystem
 						DepInfo.pBufferMemoryBarriers = &Barrier;
 
 						VkBufferCopy IndexBufferCopyRegion = { };
-						IndexBufferCopyRegion.srcOffset = TransferOffset;
+						IndexBufferCopyRegion.srcOffset = TransferRequest.Offset;
 						IndexBufferCopyRegion.dstOffset = Task->DataDescr.DstOffset;
 						IndexBufferCopyRegion.size = Task->DataSize;
 
@@ -212,12 +216,6 @@ namespace TransferSystem
 					}
 					case RenderResources::ResourceType::Texture:
 					{
-						const u64 TransferOffset = GetTransferOffset(&TransferState.TransferStagingPool,
-							CurrentFrame, Task->DataSize, 16, TransferState.MaxTransferSizePerFrame);
-
-						VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState.TransferStagingPool.Memory, Task->DataSize,
-							TransferOffset, Task->RawData);
-
 						VkImageMemoryBarrier2 TransferImageBarrier = { };
 						TransferImageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
 						TransferImageBarrier.pNext = nullptr;
@@ -248,7 +246,7 @@ namespace TransferSystem
 						TransferDepInfo.pBufferMemoryBarriers = nullptr;
 
 						VkBufferImageCopy ImageRegion = { };
-						ImageRegion.bufferOffset = TransferOffset;
+						ImageRegion.bufferOffset = TransferRequest.Offset;
 						ImageRegion.bufferRowLength = 0;
 						ImageRegion.bufferImageHeight = 0;
 						ImageRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -355,45 +353,6 @@ namespace TransferSystem
 		}
 	}
 
-	void TransferStaticMesh(u32 Handle, TransferMemory VertexData)
-	{
-		RenderResources::VertexData* Mesh =  RenderResources::GetStaticMesh(Handle);
-
-		TransferSystem::TransferTask Task = { };
-		Task.DataSize = Mesh->VertexDataSize;
-		Task.DataDescr.DstBuffer = RenderResources::GetVertexStageBuffer();
-		Task.DataDescr.DstOffset = Mesh->VertexOffset;
-		Task.RawData = VertexData;
-		Task.ResourceIndex = Handle;
-		Task.Type = RenderResources::ResourceType::Mesh;
-
-		AddTask(&Task);
-	}
-
-	void TransferMaterial(u32 Handle)
-	{
-	}
-
-	void TransferTexture2DSRGB(u32 Handle, TransferMemory TextureData)
-	{
-		RenderResources::MeshTexture2D* Texture = RenderResources::GetTexture(Handle);
-
-		TransferSystem::TransferTask Task = { };
-		Task.DataSize = Texture->MeshTexture.Size;
-		Task.TextureDescr.DstImage = Texture->MeshTexture.Image;
-		Task.TextureDescr.Width = Texture->MeshTexture.Width;
-		Task.TextureDescr.Height = Texture->MeshTexture.Height;
-		Task.RawData = TextureData;
-		Task.ResourceIndex = Handle;
-		Task.Type = RenderResources::ResourceType::Texture;
-
-		AddTask(&Task);
-	}
-
-	void TransferStaticMeshInstance(u32 Handle)
-	{
-	}
-
 	void Init()
 	{
 		VulkanCoreContext::VulkanCoreContext* Context = RenderResources::GetCoreContext();
@@ -442,7 +401,7 @@ namespace TransferSystem
 		TransferState.TasksInFly = 0;
 
 		TransferState.TransferTasksQueue.Capacity = 1024 * 2;
-		TransferState.TransferTasksQueue.Memory = Memory::MemoryManagementSystem::CAllocate<TransferTask>(TransferState.TransferTasksQueue.Capacity);
+		TransferState.TransferTasksQueue.Memory = (TransferTask*)calloc(TransferState.TransferTasksQueue.Capacity, sizeof(TransferTask));
 		TransferState.TransferTasksQueue.Tail.store(0, std::memory_order_relaxed);
 		TransferState.TransferTasksQueue.Middle.store(0, std::memory_order_relaxed);
 		TransferState.TransferTasksQueue.Head.store(0, std::memory_order_relaxed);
@@ -476,7 +435,7 @@ namespace TransferSystem
 
 		vkDestroySemaphore(Device, TransferState.TransferSemaphore, nullptr);
 
-		Memory::MemoryManagementSystem::Free(TransferState.TransferTasksQueue.Memory);
+		free(TransferState.TransferTasksQueue.Memory);
 		Memory::FreeRingBuffer(&TransferState.TransferMemory);
 	}
 
