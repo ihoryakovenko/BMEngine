@@ -4,18 +4,21 @@
 
 namespace Memory
 {
-	static std::mutex MemoryDebugMutex;
+	static std::recursive_mutex MemoryDebugMutex;
 	static bool IsMemoryDebuggingEnabled;
 	static bool IsMemoryDumpAllowed;
+	static bool AreFrameMemoryChecksEnabled;
 
-	static void Lock(std::mutex* Mutex)
+	static int Lock(std::mutex* Mutex)
 	{
 		Mutex->lock();
+		return 0;
 	}
 
-	static void Unlock(std::mutex* Mutex)
+	static int Unlock(std::mutex* Mutex)
 	{
 		Mutex->unlock();
+		return 0;
 	}
 
 	void Init(bool EnableMemoryDebugging)
@@ -24,7 +27,7 @@ namespace Memory
 
 		if (IsMemoryDebuggingEnabled)
 		{
-			f_debug_memory_init((void(*)(void*))Lock, (void(*)(void*))Unlock, &MemoryDebugMutex);
+			f_debug_mem_thread_safe_init((int(*)(void*))Lock, (int(*)(void*))Unlock, &MemoryDebugMutex);
 		}
 	}
 
@@ -33,7 +36,9 @@ namespace Memory
 		if (IsMemoryDebuggingEnabled)
 		{
 			f_debug_mem_print(0);
-			f_debug_memory();
+			f_debug_mem_check_bounds();
+			f_debug_mem_check_stack_reference();
+			f_debug_mem_check_heap_reference(0);
 		}
 	}
 
@@ -46,13 +51,23 @@ namespace Memory
 				f_debug_mem_print(0);
 			}
 
-			f_debug_memory();
+			if (AreFrameMemoryChecksEnabled)
+			{
+				f_debug_mem_check_bounds();
+				f_debug_mem_check_stack_reference();
+				f_debug_mem_check_heap_reference(0);
+			}
 		}
 	}
 
-	void AllowMemoryDump(bool Allow)
+	void AllowFrameMemoryDump(bool Allow)
 	{
 		IsMemoryDumpAllowed = Allow;
+	}
+
+	void AllowFrameMemoryChecks(bool Allow)
+	{
+		AreFrameMemoryChecksEnabled = Allow;
 	}
 
 	FrameMemory CreateFrameMemory(u64 SpaceToAllocate)

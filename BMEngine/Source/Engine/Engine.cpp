@@ -99,7 +99,7 @@ namespace Engine
 	{
 		Init();
 
-		TaskSystem::TaskGroup RenderGroup;
+		TaskSystem::TaskGroup Group;
 
 		while (!glfwWindowShouldClose(Window) && !Close)
 		{
@@ -113,10 +113,11 @@ namespace Engine
 
 			if (!IsMinimized)
 			{
-				TaskSystem::AddTask(TransferSystem::Transfer, &RenderGroup, 1);
-				TaskSystem::AddTask([] () { Render::Draw(&Scene); }, &RenderGroup, 1);
-				TaskSystem::WaitForGroup(&RenderGroup, 1);
+				TaskSystem::AddTask(TransferSystem::Transfer, &Group, 1);
+				Render::Draw(&Scene);
 			}
+
+			TaskSystem::WaitForGroup(&Group, 1);
 		}
 
 		DeInit();
@@ -152,6 +153,7 @@ namespace Engine
 	bool InitSystems()
 	{
 		Memory::Init(true);
+
 		Render::TmpInitFrameMemory();
 
 		TaskSystem::Init();

@@ -10,8 +10,8 @@
 #include "Util/EngineTypes.h"
 #include "Util/Math.h"
 
-#define F_MEMORY_DEBUG
-#include "forge.h"
+#define FORGE_MEMORY_DEBUG
+#include "forge_memory_debugger.h"
 
 namespace Memory
 {
@@ -26,7 +26,8 @@ namespace Memory
 	void DeInit();
 	void Update();
 
-	void AllowMemoryDump(bool Allow);
+	void AllowFrameMemoryDump(bool Allow);
+	void AllowFrameMemoryChecks(bool Allow);
 
 	FrameMemory CreateFrameMemory(u64 SpaceToallocate);
 	void DestroyFrameMemory(FrameMemory* Memory);

@@ -52,7 +52,7 @@
     <ClInclude Include="Source\Engine\Systems\EngineResources.h" />
     <ClInclude Include="Source\Engine\Systems\Render\TransferSystem.h" />
     <ClInclude Include="Source\Engine\Systems\Concurrency\TaskSystem.h" />
-    <ClInclude Include="Source\Engine\Systems\Memory\forge.h" />
+    <ClInclude Include="Source\Engine\Systems\Memory\forge_memory_debugger.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />

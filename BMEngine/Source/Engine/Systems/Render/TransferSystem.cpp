@@ -3,7 +3,8 @@
 #include <atomic>
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
-#include "Engine/Systems/Memory/forge.h"
+FORGE_MEMORY_DEBUG
+#include "Engine/Systems/Memory/forge_memory_debugger.h"
 #include "Util/Util.h"
 #include "VulkanHelper.h"
 #include "RenderResources.h"
@@ -397,6 +398,7 @@ namespace TransferSystem
 		SemaphoreInfo.flags = 0;
 
 		VULKAN_CHECK_RESULT(vkCreateSemaphore(Device, &SemaphoreInfo, nullptr, &TransferState.TransferSemaphore));
+
 		TransferState.CompletedTransfer = 0;
 		TransferState.TasksInFly = 0;
 
@@ -413,6 +415,7 @@ namespace TransferSystem
 		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
 			TransferState.TransferStagingPool.Buffer, VulkanHelper::MemoryPropertyFlag::HostCompatible);
 		TransferState.TransferStagingPool.Memory = AllocResult.Memory;
+
 		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, TransferState.TransferStagingPool.Buffer, TransferState.TransferStagingPool.Memory, 0));
 
 		TransferState.TransferMemory = Memory::AllocateRingBuffer<u8>(MB16);
