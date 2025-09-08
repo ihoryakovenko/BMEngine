@@ -5,6 +5,7 @@
 #include <thread>
 #include <vector>
 #include <queue>
+#include <iostream>
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 
@@ -50,10 +51,7 @@ namespace TaskSystem
 
 			for (u32 i = 0; i < CurrentTask.GroupsCounter; ++i)
 			{
-				if (CurrentTask.Groups[i].Counter.fetch_sub(1, std::memory_order_acq_rel) == 1)
-				{
-					CurrentTask.Groups[i].Semaphore.release();
-				}
+				CurrentTask.Groups[i].Semaphore.release();
 			}
 		}
 	}
@@ -109,11 +107,6 @@ namespace TaskSystem
 		NewTask.Groups = Groups;
 		NewTask.Function = Function;
 		NewTask.GroupsCounter = GroupsCounter;
-
-		for (u32 i = 0; i < NewTask.GroupsCounter; ++i)
-		{
-			NewTask.Groups[i].Counter.fetch_add(1, std::memory_order_relaxed);
-		}
 				
 		{
 			std::lock_guard<std::mutex> Lock(QueueMutex);
@@ -125,12 +118,14 @@ namespace TaskSystem
 	
 	void WaitForGroup(TaskGroup* Groups, u32 GroupsCounter)
 	{
+		if (!ConcurencyEnabled.load(std::memory_order_relaxed))
+		{
+			return;
+		}
+
 		for (u32 i = 0; i < GroupsCounter; ++i)
 		{
-			if (Groups[i].Counter.load(std::memory_order_acquire) > 0)
-			{
-				Groups[i].Semaphore.acquire();
-			}
+			Groups[i].Semaphore.acquire();
 		}
 	}
 }

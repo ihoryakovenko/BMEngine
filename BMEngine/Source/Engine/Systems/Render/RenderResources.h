@@ -83,8 +83,6 @@ namespace RenderResources
 	void Init(GLFWwindow* WindowHandler);
 	void DeInit();
 
-	void Update();
-
 	void CreateVertices(Yaml::Node& VerticesNode);
 	void CreateShaders(Yaml::Node& ShadersNode);
 	void CreateSamplers(Yaml::Node& SamplersNode);

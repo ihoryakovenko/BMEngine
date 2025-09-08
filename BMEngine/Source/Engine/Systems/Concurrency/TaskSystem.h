@@ -11,7 +11,6 @@ namespace TaskSystem
 
 	struct TaskGroup
 	{
-		std::atomic<int> Counter{0};
 		std::counting_semaphore<> Semaphore{0};
 	};
 

@@ -157,6 +157,7 @@ namespace Engine
 		Render::TmpInitFrameMemory();
 
 		TaskSystem::Init();
+		//TaskSystem::SetConcurencyEnabled(false);
 
 		UI::Init(&GuiData);
 

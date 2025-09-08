@@ -20,12 +20,6 @@ namespace TransferSystem
 		u64 AllocatedForFrame[VulkanHelper::MAX_DRAW_FRAMES];
 	};
 
-	struct TransferMemoryRequest
-	{
-		u64 Offset;
-		u64 RequestSize;
-	};
-
 	struct TaskQueue
 	{
 		TransferTask* Memory;
@@ -43,7 +37,7 @@ namespace TransferSystem
 
 	struct DataTransferState
 	{
-		const u64 MaxTransferSizePerFrame = MB16;
+		const u64 MaxTransferSizePerFrame = MB2;
 
 		Memory::HeapRingBuffer<u8> TransferMemory;
 
@@ -99,40 +93,25 @@ namespace TransferSystem
 		return Queue->Memory + Queue->Tail.load(std::memory_order_acquire);
 	}
 
-	static TransferMemoryRequest GetTransferRequest(StagingFramePool* Pool, u32 FrameIndex, u64 AllocSize, u64 Alignment, u64 MaxTransferSize)
-	{
-		const u64 AlignedSize = Math::AlignNumber(AllocSize, Alignment);
-		const u64 Head = FrameIndex * MaxTransferSize;
-		const u64 Offset = Head + Pool->AllocatedForFrame[FrameIndex];
-		const u64 AlignedOffset = Math::AlignNumber(Offset, Alignment);
-		const u64 RequestSize = AlignedSize + AlignedOffset - Offset;
-
-		TransferMemoryRequest Request;
-		Request.Offset = AlignedOffset;
-		Request.RequestSize = RequestSize;
-
-		Pool->AllocatedForFrame[FrameIndex] += RequestSize;
-		return Request;
-	}
-
-	DataTransferState TransferState;
+	static DataTransferState TransferState;
 
 	void Transfer()
 	{
-		u64 FrameTotalTransferSize = 0;
-		const u32 CurrentFrame = TransferState.CurrentFrame;
 		VkDevice Device = VulkanInterface::GetDevice();
-
-		VkFence TransferFence = TransferState.Frames.Fences[CurrentFrame];
-		VkCommandBuffer TransferCommandBuffer = TransferState.Frames.CommandBuffers[CurrentFrame];
-
-		u64 TasksAdded = 0;
-		
-		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
-		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
 		if (HasPendingTasks(&TransferState.TransferTasksQueue))
 		{
+			const u32 CurrentFrame = TransferState.CurrentFrame;
+			std::cout << CurrentFrame << '\n';
+
+			VkFence TransferFence = TransferState.Frames.Fences[CurrentFrame];
+			VkCommandBuffer TransferCommandBuffer = TransferState.Frames.CommandBuffers[CurrentFrame];
+
+			u64 TasksAdded = 0;
+
+			VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
+			CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
 			VULKAN_CHECK_RESULT(vkWaitForFences(Device, 1, &TransferFence, VK_TRUE, UINT64_MAX));
 			VULKAN_CHECK_RESULT(vkResetFences(Device, 1, &TransferFence));
 			VULKAN_CHECK_RESULT(vkBeginCommandBuffer(TransferCommandBuffer, &CommandBufferBeginInfo));
@@ -141,18 +120,24 @@ namespace TransferSystem
 			{
 				TransferTask* Task = GetFirstPendingTask(&TransferState.TransferTasksQueue);
 
-				TransferMemoryRequest TransferRequest = GetTransferRequest(&TransferState.TransferStagingPool,
-					CurrentFrame, Task->DataSize, Task->Alignment, TransferState.MaxTransferSizePerFrame);
+				const u64 AlignedSize = Math::AlignNumber(Task->DataSize, (u64)Task->Alignment);
+				const u64 Head = CurrentFrame * TransferState.MaxTransferSizePerFrame;
+				const u64 Offset = Head + TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame];
+				const u64 AlignedOffset = Math::AlignNumber(Offset, (u64)Task->Alignment);
+				const u64 RequestSize = AlignedSize + AlignedOffset - Offset;
 
-				FrameTotalTransferSize += TransferRequest.RequestSize;
-				if (FrameTotalTransferSize >= TransferState.MaxTransferSizePerFrame)
+				const u64 NewTotal = TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] + RequestSize;
+				if (NewTotal >= TransferState.MaxTransferSizePerFrame)
 				{
+					// TODO: End command buffers? Increase MaxTransferSizePerFrame? Remove current task?
 					assert(TasksAdded != 0 && "Task->DataSize > then MaxTransferSizePerFrame");
 					break;
 				}
 
+				TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] = NewTotal;
+
 				VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState.TransferStagingPool.Memory,
-					Task->DataSize, TransferRequest.Offset, Task->RawData);
+					Task->DataSize, AlignedOffset, Task->RawData);
 
 				switch (Task->Type)
 				{
@@ -176,7 +161,7 @@ namespace TransferSystem
 						DepInfo.pBufferMemoryBarriers = &Barrier;
 
 						VkBufferCopy IndexBufferCopyRegion = { };
-						IndexBufferCopyRegion.srcOffset = TransferRequest.Offset;
+						IndexBufferCopyRegion.srcOffset = AlignedOffset;
 						IndexBufferCopyRegion.dstOffset = Task->DataDescr.DstOffset;
 						IndexBufferCopyRegion.size = Task->DataSize;
 
@@ -206,7 +191,7 @@ namespace TransferSystem
 						DepInfo.pBufferMemoryBarriers = &Barrier;
 
 						VkBufferCopy IndexBufferCopyRegion = { };
-						IndexBufferCopyRegion.srcOffset = TransferRequest.Offset;
+						IndexBufferCopyRegion.srcOffset = AlignedOffset;
 						IndexBufferCopyRegion.dstOffset = Task->DataDescr.DstOffset;
 						IndexBufferCopyRegion.size = Task->DataSize;
 
@@ -247,7 +232,7 @@ namespace TransferSystem
 						TransferDepInfo.pBufferMemoryBarriers = nullptr;
 
 						VkBufferImageCopy ImageRegion = { };
-						ImageRegion.bufferOffset = TransferRequest.Offset;
+						ImageRegion.bufferOffset = AlignedOffset;
 						ImageRegion.bufferRowLength = 0;
 						ImageRegion.bufferImageHeight = 0;
 						ImageRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -298,20 +283,15 @@ namespace TransferSystem
 				PopPendingTask(&TransferState.TransferTasksQueue);
 				++TasksAdded;
 			}
-		}
 
-		if (TasksAdded > 0)
-		{
 			TransferState.TasksInFly += TasksAdded;
 
 			VULKAN_CHECK_RESULT(vkEndCommandBuffer(TransferCommandBuffer));
 
-			const u64 TasksInFly = TransferState.TasksInFly;
-
 			VkTimelineSemaphoreSubmitInfo TimelineSubmitInfo = { };
 			TimelineSubmitInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
 			TimelineSubmitInfo.signalSemaphoreValueCount = 1;
-			TimelineSubmitInfo.pSignalSemaphoreValues = &TasksInFly;
+			TimelineSubmitInfo.pSignalSemaphoreValues = &TransferState.TasksInFly;
 
 			VkSubmitInfo SubmitInfo = { };
 			SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -402,7 +382,7 @@ namespace TransferSystem
 		TransferState.CompletedTransfer = 0;
 		TransferState.TasksInFly = 0;
 
-		TransferState.TransferTasksQueue.Capacity = 1024 * 2;
+		TransferState.TransferTasksQueue.Capacity = 1024 * 2 * 40;
 		TransferState.TransferTasksQueue.Memory = (TransferTask*)calloc(TransferState.TransferTasksQueue.Capacity, sizeof(TransferTask));
 		TransferState.TransferTasksQueue.Tail.store(0, std::memory_order_relaxed);
 		TransferState.TransferTasksQueue.Middle.store(0, std::memory_order_relaxed);
@@ -418,7 +398,7 @@ namespace TransferSystem
 
 		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, TransferState.TransferStagingPool.Buffer, TransferState.TransferStagingPool.Memory, 0));
 
-		TransferState.TransferMemory = Memory::AllocateRingBuffer<u8>(MB16);
+		TransferState.TransferMemory = Memory::AllocateRingBuffer<u8>(MB128);
 	}
 
 	void DeInit()

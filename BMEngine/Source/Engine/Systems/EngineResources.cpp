@@ -70,85 +70,92 @@ namespace EngineResources
 			TextureAssets[std::hash<std::string>{ }(TextureName)] = Asset;
 		}
 
-		Yaml::Node& ModelsNode = Util::GetModels(SceneResourcesNode);
-		for (auto It = ModelsNode.Begin(); It != ModelsNode.End(); It++)
+		glm::mat4 ModelMatrix = glm::mat4(1);
+
+		for (u32 i = 0; i < 50; ++i)
 		{
-			std::string ModelName = (*It).first;
-			std::string ModelPath = (*It).second.As<std::string>();
-			
-			Util::Model3DData ModelData = Util::LoadModel3DData(ModelPath.c_str());
-			Util::Model3D Model = Util::ParseModel3D(ModelData);
-
-			u64 ModelVertexByteOffset = 0;
-			for (u32 i = 0; i < Model.Header.MeshCount; i++)
+			Yaml::Node& ModelsNode = Util::GetModels(SceneResourcesNode);
+			for (auto It = ModelsNode.Begin(); It != ModelsNode.End(); It++)
 			{
-				const u64 VerticesCount = Model.VerticesCounts[i];
-				const u32 IndicesCount = Model.IndicesCounts[i];
+				std::string ModelName = (*It).first;
+				std::string ModelPath = (*It).second.As<std::string>();
 
-				u32 AlbedoTextureIndex = 0;
-				u32 SpecularTextureIndex = 0;
+				Util::Model3DData ModelData = Util::LoadModel3DData(ModelPath.c_str());
+				Util::Model3D Model = Util::ParseModel3D(ModelData);
 
-				if (Model.Header.MaterialCount > 0)
+				u64 ModelVertexByteOffset = 0;
+				for (u32 i = 0; i < Model.Header.MeshCount; i++)
 				{
-					const u32 MaterialIndex = Model.MaterialIndices[i];
-					const Util::Model3DMaterial& material = Model.Materials[MaterialIndex];
+					const u64 VerticesCount = Model.VerticesCounts[i];
+					const u32 IndicesCount = Model.IndicesCounts[i];
 
-					auto it = TextureAssets.find(material.DiffuseTextureHash);
-					if (it != TextureAssets.end())
+					u32 AlbedoTextureIndex = 0;
+					u32 SpecularTextureIndex = 0;
+
+					if (Model.Header.MaterialCount > 0)
 					{
-						if (!it->second.IsCreated)
+						const u32 MaterialIndex = Model.MaterialIndices[i];
+						const Util::Model3DMaterial& material = Model.Materials[MaterialIndex];
+
+						auto it = TextureAssets.find(material.DiffuseTextureHash);
+						if (it != TextureAssets.end())
 						{
-							it->second.RenderTextureIndex = CreateTexture(it->second.TexturePath);
-							it->second.IsCreated = true;
+							if (!it->second.IsCreated)
+							{
+								it->second.RenderTextureIndex = CreateTexture(it->second.TexturePath);
+								it->second.IsCreated = true;
+							}
+
+							AlbedoTextureIndex = it->second.RenderTextureIndex;
+							SpecularTextureIndex = AlbedoTextureIndex;
 						}
 
-						AlbedoTextureIndex = it->second.RenderTextureIndex;
-						SpecularTextureIndex = AlbedoTextureIndex;
-					}
-
-					it = TextureAssets.find(material.SpecularTextureHash);
-					if (it != TextureAssets.end())
-					{
-						if (!it->second.IsCreated)
+						it = TextureAssets.find(material.SpecularTextureHash);
+						if (it != TextureAssets.end())
 						{
-							it->second.RenderTextureIndex = CreateTexture(it->second.TexturePath);
-							it->second.IsCreated = true;
-						}
+							if (!it->second.IsCreated)
+							{
+								it->second.RenderTextureIndex = CreateTexture(it->second.TexturePath);
+								it->second.IsCreated = true;
+							}
 
-						SpecularTextureIndex = it->second.RenderTextureIndex;
+							SpecularTextureIndex = it->second.RenderTextureIndex;
+						}
 					}
+
+					const u64 VertexDataSize = VerticesCount * sizeof(StaticMeshVertex) + IndicesCount * sizeof(u32);
+
+					RenderResources::Material Mat;
+					Mat.AlbedoTexIndex = AlbedoTextureIndex;
+					Mat.SpecularTexIndex = SpecularTextureIndex;
+					Mat.Shininess = 32.0f;
+
+					RenderResources::InstanceData Instance;
+					Instance.MaterialIndex = RenderResources::CreateMaterial(&Mat);
+					Instance.ModelMatrix = ModelMatrix;
+
+					RenderResources::MeshDescription Mesh;
+					Mesh.IndicesCount = IndicesCount;
+					Mesh.VertexSize = sizeof(StaticMeshVertex);
+					Mesh.VerticesCount = VerticesCount;
+
+					Render::DrawEntity Entity = { };
+					Entity.StaticMeshIndex = RenderResources::CreateStaticMesh(&Mesh, Model.VertexData + ModelVertexByteOffset);
+					Entity.Instances = 1;
+					Entity.InstanceDataIndex = RenderResources::CreateStaticMeshInstance(&Instance);
+
+					std::unique_lock Lock(TmpScene->TempLock);
+					Memory::PushBackToArray(&TmpScene->DrawEntities, &Entity);
+					Lock.unlock();
+
+					ModelVertexByteOffset += VertexDataSize;
+					//std::this_thread::sleep_for(std::chrono::microseconds(2));
 				}
 
-				const u64 VertexDataSize = VerticesCount * sizeof(StaticMeshVertex) + IndicesCount * sizeof(u32);
-
-				RenderResources::Material Mat;
-				Mat.AlbedoTexIndex = AlbedoTextureIndex;
-				Mat.SpecularTexIndex = SpecularTextureIndex;
-				Mat.Shininess = 32.0f;
-
-				RenderResources::InstanceData Instance;
-				Instance.MaterialIndex = RenderResources::CreateMaterial(&Mat);
-				Instance.ModelMatrix = glm::mat4(1.0f);
-
-				RenderResources::MeshDescription Mesh;
-				Mesh.IndicesCount = IndicesCount;
-				Mesh.VertexSize = sizeof(StaticMeshVertex);
-				Mesh.VerticesCount = VerticesCount;
-
-				Render::DrawEntity Entity = { };
-				Entity.StaticMeshIndex = RenderResources::CreateStaticMesh(&Mesh, Model.VertexData + ModelVertexByteOffset);
-				Entity.Instances = 1;
-				Entity.InstanceDataIndex = RenderResources::CreateStaticMeshInstance(&Instance);
-
-				std::unique_lock Lock(TmpScene->TempLock);
-				Memory::PushBackToArray(&TmpScene->DrawEntities, &Entity);
-				Lock.unlock();
-
-				ModelVertexByteOffset += VertexDataSize;
-				//std::this_thread::sleep_for(std::chrono::microseconds(2));
+				Util::ClearModel3DData(ModelData);
 			}
 
-			Util::ClearModel3DData(ModelData);
+			ModelMatrix = glm::translate(ModelMatrix, glm::vec3(0, -1, 0));
 		}
 	}
 
