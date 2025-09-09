@@ -27,6 +27,67 @@
 
 namespace Engine
 {
+	static void ParseAndCreateVertices(Yaml::Node& VerticesNode)
+	{
+		for (auto VertexIt = VerticesNode.Begin(); VertexIt != VerticesNode.End(); VertexIt++)
+		{
+			Yaml::Node& VertexNode = (*VertexIt).second;
+
+			VulkanHelper::VertexBinding Binding = Util::ParseVertexBindingNode(Util::GetVertexBindingNode(VertexNode));
+
+			Yaml::Node& AttributesNode = Util::GetVertexAttributesNode(VertexNode);
+
+			u32 Offset = 0;
+			u32 Stride = 0;
+			for (auto AttributeIt = AttributesNode.Begin(); AttributeIt != AttributesNode.End(); AttributeIt++)
+			{
+				VulkanHelper::VertexAttribute Attribute = { };
+				std::string AttributeName;
+				Util::ParseVertexAttributeNode((*AttributeIt).second, &Attribute, &AttributeName);
+
+				Yaml::Node& FormatNode = Util::GetVertexAttributeFormatNode((*AttributeIt).second);
+				std::string FormatStr = FormatNode.As<std::string>();
+				u32 Size = Util::CalculateFormatSizeFromString(FormatStr.c_str(), (u32)FormatStr.length());
+
+				Attribute.Offset = Offset;
+				Offset += Size;
+				Stride += Size;
+
+				Binding.Attributes[AttributeName] = Attribute;
+			}
+
+			Binding.Stride = Stride;
+			RenderResources::CreateVertex((*VertexIt).first, Binding);
+		}
+	}
+
+	static void ParseAndCreateShaders(Yaml::Node& ShadersNode)
+	{
+		for (auto It = ShadersNode.Begin(); It != ShadersNode.End(); It++)
+		{
+			std::string ShaderPath = Util::ParseShaderNode((*It).second);
+
+			std::vector<char> ShaderCode;
+			if (Util::OpenAndReadFileFull(ShaderPath.c_str(), ShaderCode, "rb"))
+			{
+				RenderResources::CreateShader((*It).first, reinterpret_cast<const u32*>(ShaderCode.data()), ShaderCode.size());
+			}
+			else
+			{
+				assert(false);
+			}
+		}
+	}
+
+	static void ParseAndCreateSamplers(Yaml::Node& SamplersNode)
+	{
+		for (auto It = SamplersNode.Begin(); It != SamplersNode.End(); It++)
+		{
+			RenderResources::SamplerDescription Data = Util::ParseSamplerNode((*It).second);
+			RenderResources::CreateSampler((*It).first, Data);
+		}
+	}
+
 	struct Camera
 	{
 		f32 Fov;
@@ -100,6 +161,7 @@ namespace Engine
 		Init();
 
 		TaskSystem::TaskGroup Group;
+		Group.TasksInGroup = 0;
 
 		while (!glfwWindowShouldClose(Window) && !Close)
 		{
@@ -113,11 +175,12 @@ namespace Engine
 
 			if (!IsMinimized)
 			{
-				TaskSystem::AddTask(TransferSystem::Transfer, &Group, 1);
+				TaskSystem::AddTask([] () { EngineResources::Update(&Scene); }, &Group);
+				TaskSystem::AddTask(TransferSystem::Transfer, &Group);
 				Render::Draw(&Scene);
 			}
 
-			TaskSystem::WaitForGroup(&Group, 1);
+			TaskSystem::WaitForGroup(&Group);
 		}
 
 		DeInit();
@@ -165,24 +228,41 @@ namespace Engine
 		Yaml::Parse(Root, "./Resources/Settings/RenderResources.yaml");
 
 		RenderResources::Init(Window);
-		RenderResources::CreateVertices(Util::GetVertices(Root));
-		RenderResources::CreateShaders(Util::GetShaders(Root));
-		RenderResources::CreateSamplers(Util::GetSamplers(Root));
+		ParseAndCreateVertices(Util::GetVertices(Root));
+		ParseAndCreateShaders(Util::GetShaders(Root));
+		ParseAndCreateSamplers(Util::GetSamplers(Root));
 		RenderResources::CreateDescriptorLayouts(Util::GetDescriptorSetLayouts(Root));
 		RenderResources::PostCreateInit();
 
 		TransferSystem::Init();
 		Render::Init(Window);
 
+		EngineResources::Init();
+
 		Scene.DrawEntities = Memory::AllocateArray<Render::DrawEntity>(512);
 
-		TaskSystem::AddTask([]()
+		Yaml::Node TestScene;
+		Yaml::Parse(TestScene, "./Resources/Scenes/TestScene.yaml");
+		Yaml::Node& SceneResourcesNode = Util::GetSceneResources(TestScene);
+
+		Yaml::Node& TexturesNode = Util::GetTextures(SceneResourcesNode);
+		for (auto It = TexturesNode.Begin(); It != TexturesNode.End(); It++)
 		{
-			Yaml::Node TestScene;
-			Yaml::Parse(TestScene, "./Resources/Scenes/TestScene.yaml");
-			Yaml::Node& SceneResourcesNode = Util::GetSceneResources(TestScene);
-			EngineResources::Init(SceneResourcesNode, &Scene);
-		}, nullptr, 0);
+			EngineResources::RegisterTextureAsset((*It).first, (*It).second.As<std::string>());
+		}
+
+		Yaml::Node& ModelsNode = Util::GetModels(SceneResourcesNode);
+		for (auto It = ModelsNode.Begin(); It != ModelsNode.End(); It++)
+		{
+			std::string ModelName = (*It).first;
+			Yaml::Node& ModelNode = (*It).second;
+
+			EngineResources::ModelLoadRequest Request;
+			Request.Path = Util::GetModelPath(ModelNode);
+			Request.Position = Util::GetModelPosition(ModelNode);
+
+			EngineResources::RequestModelLoad(Request);
+		}
 
 		return true;
 	}

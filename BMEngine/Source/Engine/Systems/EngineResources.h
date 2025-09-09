@@ -28,6 +28,17 @@ namespace EngineResources
 		bool IsCreated;
 	};
 
-	void Init(Yaml::Node& Root, struct Render::DrawScene* TmpScene);
+	struct ModelLoadRequest
+	{
+		glm::vec3 Position;
+		std::string Path;
+	};
+
+	void Init();
 	void DeInit();
+
+	void Update(Render::DrawScene* TmpScene);
+
+	void RegisterTextureAsset(const std::string& Name, const std::string& Path);
+	void RequestModelLoad(const ModelLoadRequest& Request);
 }

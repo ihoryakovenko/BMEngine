@@ -319,81 +319,54 @@ namespace RenderResources
 		VulkanCoreContext::DestroyCoreContext(&ResContext.CoreContext);
 	}
 
-	void CreateVertices(Yaml::Node& VerticesNode)
+	void CreateVertex(const std::string& Name, VulkanHelper::VertexBinding& Binding)
 	{
-		for (auto VertexIt = VerticesNode.Begin(); VertexIt != VerticesNode.End(); VertexIt++)
-		{
-			Yaml::Node& VertexNode = (*VertexIt).second;
-
-			VulkanHelper::VertexBinding Binding = Util::ParseVertexBindingNode(Util::GetVertexBindingNode(VertexNode));
-
-			Yaml::Node& AttributesNode = Util::GetVertexAttributesNode(VertexNode);
-
-			u32 Offset = 0;
-			u32 Stride = 0;
-			for (auto AttributeIt = AttributesNode.Begin(); AttributeIt != AttributesNode.End(); AttributeIt++)
-			{
-				VulkanHelper::VertexAttribute Attribute = { };
-				std::string AttributeName;
-				Util::ParseVertexAttributeNode((*AttributeIt).second, &Attribute, &AttributeName);
-
-				Yaml::Node& FormatNode = Util::GetVertexAttributeFormatNode((*AttributeIt).second);
-				std::string FormatStr = FormatNode.As<std::string>();
-				u32 Size = Util::CalculateFormatSizeFromString(FormatStr.c_str(), (u32)FormatStr.length());
-
-				Attribute.Offset = Offset;
-				Offset += Size;
-				Stride += Size;
-
-				Binding.Attributes[AttributeName] = Attribute;
-			}
-
-			Binding.Stride = Stride;
-			ResContext.VBindings[(*VertexIt).first] = Binding;
-		}
+		ResContext.VBindings[Name] = Binding;
 	}
 
-	void CreateShaders(Yaml::Node& ShadersNode)
+	void CreateShader(const std::string& Name, const u32* Code, u64 CodeSize)
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 
-		for (auto It = ShadersNode.Begin(); It != ShadersNode.End(); It++)
-		{
-			std::string ShaderPath = Util::ParseShaderNode((*It).second);
+		VkShaderModuleCreateInfo shaderInfo = { };
+		shaderInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		shaderInfo.pNext = nullptr;
+		shaderInfo.flags = 0;
+		shaderInfo.codeSize = CodeSize;
+		shaderInfo.pCode = Code;
 
-			std::vector<char> ShaderCode;
-			if (Util::OpenAndReadFileFull(ShaderPath.c_str(), ShaderCode, "rb"))
-			{
-				VkShaderModuleCreateInfo shaderInfo = { };
-				shaderInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-				shaderInfo.pNext = nullptr;
-				shaderInfo.flags = 0;
-				shaderInfo.codeSize = ShaderCode.size();
-				shaderInfo.pCode = reinterpret_cast<const uint32_t*>(ShaderCode.data());
-
-				VkShaderModule NewShaderModule;
-				VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &shaderInfo, nullptr, &NewShaderModule));
-				ResContext.Shaders[(*It).first] = NewShaderModule;
-			}
-			else
-			{
-				assert(false);
-			}
-		}
+		VkShaderModule NewShaderModule;
+		VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &shaderInfo, nullptr, &NewShaderModule));
+		ResContext.Shaders[Name] = NewShaderModule;
 	}
 
-	void CreateSamplers(Yaml::Node& SamplersNode)
+	void CreateSampler(const std::string& Name, const SamplerDescription& Data)
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 
-		for (auto It = SamplersNode.Begin(); It != SamplersNode.End(); It++)
-		{
-			VkSamplerCreateInfo CreateInfo = Util::ParseSamplerNode((*It).second);
+		VkSamplerCreateInfo CreateInfo = { };
+		CreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		CreateInfo.pNext = nullptr;
+		CreateInfo.flags = 0;
+		CreateInfo.magFilter = Data.MagFilter;
+		CreateInfo.minFilter = Data.MinFilter;
+		CreateInfo.mipmapMode = Data.MipmapMode;
+		CreateInfo.addressModeU = Data.AddressModeU;
+		CreateInfo.addressModeV = Data.AddressModeV;
+		CreateInfo.addressModeW = Data.AddressModeW;
+		CreateInfo.mipLodBias = Data.MipLodBias;
+		CreateInfo.anisotropyEnable = Data.AnisotropyEnable;
+		CreateInfo.maxAnisotropy = Data.MaxAnisotropy;
+		CreateInfo.compareEnable = Data.CompareEnable;
+		CreateInfo.compareOp = Data.CompareOp;
+		CreateInfo.minLod = Data.MinLod;
+		CreateInfo.maxLod = Data.MaxLod;
+		CreateInfo.borderColor = Data.BorderColor;
+		CreateInfo.unnormalizedCoordinates = Data.UnnormalizedCoordinates;
 
-			VkSampler NewSampler;
-			VULKAN_CHECK_RESULT(vkCreateSampler(Device, &CreateInfo, nullptr, &NewSampler));
-			ResContext.Samplers[(*It).first] = NewSampler;
-		}
+		VkSampler NewSampler;
+		VULKAN_CHECK_RESULT(vkCreateSampler(Device, &CreateInfo, nullptr, &NewSampler));
+		ResContext.Samplers[Name] = NewSampler;
 	}
 
 	void CreateDescriptorLayouts(Yaml::Node& DescriptorSetLayoutsNode)
@@ -591,7 +564,7 @@ namespace RenderResources
 		return ResContext.StaticMeshCount++;
 	}
 
-	u32 CreateTexture2DSRGB(TextureDescription* Description, void* Data)
+	u32 CreateTexture(TextureDescription* Description, void* Data)
 	{
 		assert(ResContext.TextureCount < ResContext.MaxTextures);
 
@@ -616,7 +589,7 @@ namespace RenderResources
 		ImageCreateInfo.extent.depth = 1;
 		ImageCreateInfo.mipLevels = 1;
 		ImageCreateInfo.arrayLayers = 1;
-		ImageCreateInfo.format = VK_FORMAT_BC7_SRGB_BLOCK;
+		ImageCreateInfo.format = Description->Format;
 		ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		ImageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -688,7 +661,7 @@ namespace RenderResources
 
 		TransferSystem::TransferTask Task = { };
 		Task.DataSize = NextTexture->MeshTexture.Size;
-		Task.Alignment = 16;
+		Task.Alignment = VulkanHelper::GetFormatAlignment(ImageCreateInfo.format);
 		Task.TextureDescr.DstImage = NextTexture->MeshTexture.Image;
 		Task.TextureDescr.Width = Description->Width;
 		Task.TextureDescr.Height = Description->Height;

@@ -40,5 +40,64 @@ SceneResources:
     White: "Resources/Textures/White.dds"
     
   Models:
-    uh60: "Resources/Models/uh60.model"
+    uh60_1:
+      path: "Resources/Models/uh60.model"
+      position:
+        x: -7.2
+        y: 3.1
+        z: -8.5
+    uh60_2:
+      path: "Resources/Models/uh60.model"
+      position:
+        x: 2.8
+        y: -4.7
+        z: 6.3
+    uh60_3:
+      path: "Resources/Models/uh60.model"
+      position:
+        x: -9.1
+        y: 8.4
+        z: -2.6
+    uh60_4:
+      path: "Resources/Models/uh60.model"
+      position:
+        x: 4.5
+        y: -6.8
+        z: 9.2
+    uh60_5:
+      path: "Resources/Models/uh60.model"
+      position:
+        x: -1.3
+        y: 7.9
+        z: -5.4
+    uh60_6:
+      path: "Resources/Models/uh60.model"
+      position:
+        x: 8.7
+        y: -2.1
+        z: 3.6
+    uh60_7:
+      path: "Resources/Models/uh60.model"
+      position:
+        x: -5.9
+        y: 1.8
+        z: -9.7
+    uh60_8:
+      path: "Resources/Models/uh60.model"
+      position:
+        x: 6.4
+        y: -8.3
+        z: 0.9
+    uh60_9:
+      path: "Resources/Models/uh60.model"
+      position:
+        x: -3.6
+        y: 5.2
+        z: 7.1
+    uh60_10:
+      path: "Resources/Models/uh60.model"
+      position:
+        x: 9.8
+        y: -1.5
+        z: -4.2
 

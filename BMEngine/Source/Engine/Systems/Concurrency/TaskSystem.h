@@ -12,6 +12,7 @@ namespace TaskSystem
 	struct TaskGroup
 	{
 		std::counting_semaphore<> Semaphore{0};
+		u32 TasksInGroup;
 	};
 
 	void Init();
@@ -19,6 +20,6 @@ namespace TaskSystem
 
 	void SetConcurencyEnabled(bool Enabled);
 	
-	void AddTask(TaskFunction Function, TaskGroup* Groups, u32 GroupsCounter);
-	void WaitForGroup(TaskGroup* Groups, u32 GroupsCounter);
+	void AddTask(TaskFunction Function, TaskGroup* Group);
+	void WaitForGroup(TaskGroup* Group);
 }

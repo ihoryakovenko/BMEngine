@@ -14,8 +14,7 @@ namespace TaskSystem
 	struct Task
 	{
 		TaskFunction Function;
-		TaskGroup* Groups;
-		u32 GroupsCounter;
+		TaskGroup* Group;
 	};
 
 	static std::vector<std::thread> WorkerThreads;
@@ -48,10 +47,9 @@ namespace TaskSystem
 			}
 
 			CurrentTask.Function();
-
-			for (u32 i = 0; i < CurrentTask.GroupsCounter; ++i)
+			if (CurrentTask.Group != nullptr)
 			{
-				CurrentTask.Groups[i].Semaphore.release();
+				CurrentTask.Group->Semaphore.release();
 			}
 		}
 	}
@@ -95,7 +93,7 @@ namespace TaskSystem
 		ConcurencyEnabled.store(Enabled, std::memory_order_relaxed);
 	}
 	
-	void AddTask(TaskFunction Function, TaskGroup* Groups, u32 GroupsCounter)
+	void AddTask(TaskFunction Function, TaskGroup* Group)
 	{
 		if (!ConcurencyEnabled.load(std::memory_order_relaxed))
 		{
@@ -103,10 +101,12 @@ namespace TaskSystem
 			return;
 		}
 
+
+		++Group->TasksInGroup;
+
 		Task NewTask;
-		NewTask.Groups = Groups;
+		NewTask.Group = Group;
 		NewTask.Function = Function;
-		NewTask.GroupsCounter = GroupsCounter;
 				
 		{
 			std::lock_guard<std::mutex> Lock(QueueMutex);
@@ -116,16 +116,18 @@ namespace TaskSystem
 		QueueCondition.notify_one();
 	}
 	
-	void WaitForGroup(TaskGroup* Groups, u32 GroupsCounter)
+	void WaitForGroup(TaskGroup* Group)
 	{
 		if (!ConcurencyEnabled.load(std::memory_order_relaxed))
 		{
 			return;
 		}
 
-		for (u32 i = 0; i < GroupsCounter; ++i)
+		for (u32 i = 0; i < Group->TasksInGroup; ++i)
 		{
-			Groups[i].Semaphore.acquire();
+			Group->Semaphore.acquire();
 		}
+
+		Group->TasksInGroup = 0;
 	}
 }

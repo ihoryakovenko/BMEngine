@@ -102,7 +102,6 @@ namespace TransferSystem
 		if (HasPendingTasks(&TransferState.TransferTasksQueue))
 		{
 			const u32 CurrentFrame = TransferState.CurrentFrame;
-			std::cout << CurrentFrame << '\n';
 
 			VkFence TransferFence = TransferState.Frames.Fences[CurrentFrame];
 			VkCommandBuffer TransferCommandBuffer = TransferState.Frames.CommandBuffers[CurrentFrame];

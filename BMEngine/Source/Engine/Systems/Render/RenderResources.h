@@ -78,14 +78,34 @@ namespace RenderResources
 	{
 		u32 Width;
 		u32 Height;
+		VkFormat Format;
+	};
+
+	struct SamplerDescription
+	{
+		VkFilter MagFilter;
+		VkFilter MinFilter;
+		VkSamplerMipmapMode MipmapMode;
+		VkSamplerAddressMode AddressModeU;
+		VkSamplerAddressMode AddressModeV;
+		VkSamplerAddressMode AddressModeW;
+		f32 MipLodBias;
+		VkBool32 AnisotropyEnable;
+		f32 MaxAnisotropy;
+		VkBool32 CompareEnable;
+		VkCompareOp CompareOp;
+		f32 MinLod;
+		f32 MaxLod;
+		VkBorderColor BorderColor;
+		VkBool32 UnnormalizedCoordinates;
 	};
 
 	void Init(GLFWwindow* WindowHandler);
 	void DeInit();
 
-	void CreateVertices(Yaml::Node& VerticesNode);
-	void CreateShaders(Yaml::Node& ShadersNode);
-	void CreateSamplers(Yaml::Node& SamplersNode);
+	void CreateVertex(const std::string& Name, VulkanHelper::VertexBinding& Binding);
+	void CreateShader(const std::string& Name, const u32* Code, u64 CodeSize);
+	void CreateSampler(const std::string& Name, const SamplerDescription& Data);
 	void CreateDescriptorLayouts(Yaml::Node& DescriptorSetLayoutsNode);
 
 	void PostCreateInit();
@@ -102,7 +122,7 @@ namespace RenderResources
 
 	u32 CreateStaticMesh(MeshDescription* Description, void* Data);
 	u32 CreateMaterial(Material* Mat);
-	u32 CreateTexture2DSRGB(TextureDescription* Description, void* Data);
+	u32 CreateTexture(TextureDescription* Description, void* Data);
 	u32 CreateStaticMeshInstance(InstanceData* Data);
 
 	VertexData* GetStaticMesh(u32 Index);

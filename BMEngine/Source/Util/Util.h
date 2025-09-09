@@ -8,6 +8,9 @@
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+
+#include <gli/gli.hpp>
 
 #include "Deprecated/VulkanInterface/VulkanInterface.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
@@ -244,10 +247,13 @@ namespace Util
 	Yaml::Node& GetSceneResources(Yaml::Node& Root);
 	Yaml::Node& GetTextures(Yaml::Node& Root);
 	Yaml::Node& GetModels(Yaml::Node& Root);
+	
+	std::string GetModelPath(Yaml::Node& ModelNode);
+	glm::vec3 GetModelPosition(Yaml::Node& ModelNode);
 
 	std::string ParseNameNode(Yaml::Node& Node);
 	std::string ParseShaderNode(Yaml::Node& ShaderNode);
-	VkSamplerCreateInfo ParseSamplerNode(Yaml::Node& SamplerNode);
+	RenderResources::SamplerDescription ParseSamplerNode(Yaml::Node& SamplerNode);
 	VkDescriptorSetLayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode);
 	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, VulkanHelper::VertexAttribute* OutAttribute, std::string* OutAttributeName);
 	VulkanHelper::VertexBinding ParseVertexBindingNode(Yaml::Node& BindingNode);
@@ -284,6 +290,8 @@ namespace Util
 	VkVertexInputRate ParseVertexInputRate(const char* Value, u32 Length);
 	u32 CalculateFormatSize(VkFormat Format);
 	u32 CalculateFormatSizeFromString(const char* FormatString, u32 FormatLength);
+	
+	VkFormat GliFormatToVkFormat(gli::format Format);
 
 
 #ifdef NDEBUG
