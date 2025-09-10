@@ -2,6 +2,7 @@
 
 #include "Engine/Systems/Render/VulkanHelper.h"
 #include "RenderResources.h"
+#include "TransferSystem.h"
 
 #include "imgui.h"
 #include "imgui_impl_vulkan.h"
@@ -9,8 +10,10 @@
 
 #include "Util/Util.h"
 #include "Util/Settings.h"
+#include "Util/Math.h"
 
 #include <random>
+#include <mutex>
 
 namespace Render
 {
@@ -163,7 +166,7 @@ namespace Render
 		vkDestroyPipelineLayout(Device, MeshPipeline->Pipeline.PipelineLayout, nullptr);
 	}
 
-	static void DrawStaticMeshes(VkDevice Device, VkCommandBuffer CmdBuffer, StaticMeshPipeline* MeshPipeline, const DrawScene* Scene)
+	static void DrawStaticMeshes(VkDevice Device, VkCommandBuffer CmdBuffer, StaticMeshPipeline* MeshPipeline, DrawScene* Scene)
 	{
 		FrameManager::UpdateUniformMemory(MeshPipeline->EntityLightBufferHandle, Scene->LightEntity, sizeof(LightBuffer));
 
@@ -180,6 +183,7 @@ namespace Render
 
 		const u32 LightDynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(LightBuffer);
 
+		std::unique_lock Lock(Scene->TempLock);
 		for (u32 i = 0; i < Scene->DrawEntities.Count; ++i)
 		{
 			DrawEntity* DrawEntity = Scene->DrawEntities.Data + i;
@@ -188,8 +192,8 @@ namespace Render
 				continue;
 			}
 
-			StaticMesh* Mesh = RenderResources::GetStaticMesh(DrawEntity->StaticMeshIndex);
-			InstanceData* Instance = RenderResources::GetInstanceData(DrawEntity->InstanceDataIndex);
+			RenderResources::VertexData* Mesh = RenderResources::GetStaticMesh(DrawEntity->StaticMeshIndex);
+			RenderResources::InstanceData* Instance = RenderResources::GetInstanceData(DrawEntity->InstanceDataIndex);
 
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
@@ -208,7 +212,7 @@ namespace Render
 			const u64 Offsets[] = 
 			{
 				Mesh->VertexOffset,
-				sizeof(Render::InstanceData)* DrawEntity->InstanceDataIndex
+				sizeof(RenderResources::InstanceData)* DrawEntity->InstanceDataIndex
 			};
 
 			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MeshPipeline->Pipeline.PipelineLayout,
@@ -269,6 +273,11 @@ namespace Render
 
 	static RenderState State;
 
+	void TmpInitFrameMemory()
+	{
+		State.FrameMemory = Memory::CreateFrameMemory(1024 * 1024);
+	}
+
 	void Init(GLFWwindow* WindowHandler)
 	{		
 		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
@@ -304,12 +313,17 @@ namespace Render
 		LightningPass::DeInit();
 		DeferredPass::DeInit();
 		FrameManager::DeInit();
+
+		Memory::DestroyFrameMemory(&State.FrameMemory);
 	}
 
-	void Draw(const DrawScene* Scene)
+	void* FrameAlloc(u32 Size)
 	{
-		TransferSystem::ProcessTransferTasks();
+		return Memory::FrameAlloc(&State.FrameMemory, Size);
+	}
 
+	void Draw(DrawScene* Scene)
+	{
 		VulkanCoreContext::VulkanCoreContext* CoreContext = RenderResources::GetCoreContext();
 
 		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
@@ -375,7 +389,9 @@ namespace Render
 		VULKAN_CHECK_RESULT(vkQueuePresentKHR(VulkanInterface::GetGraphicsQueue(), &PresentInfo));
 		Lock.unlock();
 
-		State.RenderDrawState.CurrentFrame = (CurrentFrame + 1) % VulkanHelper::MAX_DRAW_FRAMES;
+		State.RenderDrawState.CurrentFrame = Math::WrapIncrement(CurrentFrame, VulkanHelper::MAX_DRAW_FRAMES);
+
+		Memory::FrameFree(&State.FrameMemory);
 	}
 
 	RenderState* GetRenderState()
@@ -451,12 +467,12 @@ namespace DeferredPass
 
 			vkCreateImage(Device, &DeferredInputDepthUniformCreateInfo, nullptr, &DeferredInputDepthImage[i].Image);
 			VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
-				DeferredInputDepthImage[i].Image, VulkanHelper::GPULocal);
+				DeferredInputDepthImage[i].Image, VulkanHelper::MemoryPropertyFlag::GPULocal);
 			DeferredInputDepthImage[i].Memory = AllocResult.Memory;
 			vkBindImageMemory(Device, DeferredInputDepthImage[i].Image, DeferredInputDepthImage[i].Memory, 0);
 
 			vkCreateImage(Device, &DeferredInputColorUniformCreateInfo, nullptr, &DeferredInputColorImage[i].Image);
-			AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, DeferredInputColorImage[i].Image, VulkanHelper::GPULocal);
+			AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, DeferredInputColorImage[i].Image, VulkanHelper::MemoryPropertyFlag::GPULocal);
 			DeferredInputColorImage[i].Memory = AllocResult.Memory;
 			vkBindImageMemory(Device, DeferredInputColorImage[i].Image, DeferredInputColorImage[i].Memory, 0);
 
@@ -789,7 +805,7 @@ namespace LightningPass
 		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
 		{
 			vkCreateImage(Device, &ShadowMapArrayCreateInfo, nullptr, &ShadowMapArray[i].Image);
-			VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, ShadowMapArray[i].Image, VulkanHelper::GPULocal);
+			VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, ShadowMapArray[i].Image, VulkanHelper::MemoryPropertyFlag::GPULocal);
 			ShadowMapArray[i].Memory = AllocResult.Memory;
 			VULKAN_CHECK_RESULT(vkBindImageMemory(Device, ShadowMapArray[i].Image, ShadowMapArray[i].Memory, 0));
 
@@ -915,7 +931,7 @@ namespace LightningPass
 		vkDestroyPipelineLayout(Device, Pipeline.PipelineLayout, nullptr);
 	}
 
-	void Draw(const Render::DrawScene* Scene)
+	void Draw(Render::DrawScene* Scene)
 	{
 		VkDevice Device = VulkanInterface::GetDevice();
 		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
@@ -982,6 +998,7 @@ namespace LightningPass
 
 			vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
 
+			std::unique_lock Lock(Scene->TempLock);
 			for (u32 i = 0; i < Scene->DrawEntities.Count; ++i)
 			{
 				Render::DrawEntity* DrawEntity = Scene->DrawEntities.Data + i;
@@ -990,7 +1007,7 @@ namespace LightningPass
 					continue;
 				}
 
-				Render::StaticMesh* Mesh = RenderResources::GetStaticMesh(DrawEntity->StaticMeshIndex);
+				RenderResources::VertexData* Mesh = RenderResources::GetStaticMesh(DrawEntity->StaticMeshIndex);
 
 				const VkBuffer Buffers[] =
 				{
@@ -1001,7 +1018,7 @@ namespace LightningPass
 				const u64 Offsets[] =
 				{
 					Mesh->VertexOffset,
-					sizeof(Render::InstanceData) * DrawEntity->InstanceDataIndex
+					sizeof(RenderResources::InstanceData) * DrawEntity->InstanceDataIndex
 				};
 
 				const u32 DescriptorSetGroupCount = 1;
@@ -1393,7 +1410,7 @@ namespace TerrainRender
 
 		IndicesCount = TerrainIndices.size();
 
-		Render::Material Mat = { };
+		RenderResources::Material Mat = { };
 		//u32 MaterialIndex = Render::CreateMaterial(&Mat);
 		//TerrainDrawObject = RenderResources::CreateTerrain(&TerrainVerticesData[0][0], sizeof(TerrainVertex), NumRows * NumCols,
 			//TerrainIndices.data(), IndicesCount, MaterialIndex);

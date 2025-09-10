@@ -8,6 +8,9 @@
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+
+#include <gli/gli.hpp>
 
 #include "Deprecated/VulkanInterface/VulkanInterface.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
@@ -170,11 +173,11 @@ namespace Util
 	bool ReadFileFull(FILE* File, std::vector<char>& OutFileData);
 	bool OpenAndReadFileFull(const char* FileName, std::vector<char>& OutFileData, const char* Mode);
 
-	enum LogType
+	enum class LogType
 	{
-		BMRVkLogType_Error,
-		BMRVkLogType_Warning,
-		BMRVkLogType_Info
+		Error,
+		Warning,
+		Info
 	};
 
 	void RenderLog(LogType logType, const char* format, ...);
@@ -244,10 +247,13 @@ namespace Util
 	Yaml::Node& GetSceneResources(Yaml::Node& Root);
 	Yaml::Node& GetTextures(Yaml::Node& Root);
 	Yaml::Node& GetModels(Yaml::Node& Root);
+	
+	std::string GetModelPath(Yaml::Node& ModelNode);
+	glm::vec3 GetModelPosition(Yaml::Node& ModelNode);
 
 	std::string ParseNameNode(Yaml::Node& Node);
 	std::string ParseShaderNode(Yaml::Node& ShaderNode);
-	VkSamplerCreateInfo ParseSamplerNode(Yaml::Node& SamplerNode);
+	RenderResources::SamplerDescription ParseSamplerNode(Yaml::Node& SamplerNode);
 	VkDescriptorSetLayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode);
 	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, VulkanHelper::VertexAttribute* OutAttribute, std::string* OutAttributeName);
 	VulkanHelper::VertexBinding ParseVertexBindingNode(Yaml::Node& BindingNode);
@@ -284,6 +290,8 @@ namespace Util
 	VkVertexInputRate ParseVertexInputRate(const char* Value, u32 Length);
 	u32 CalculateFormatSize(VkFormat Format);
 	u32 CalculateFormatSizeFromString(const char* FormatString, u32 FormatLength);
+	
+	VkFormat GliFormatToVkFormat(gli::format Format);
 
 
 #ifdef NDEBUG
@@ -294,19 +302,30 @@ namespace Util
 
 	typedef u8* Model3DData;
 
+	struct Model3DMaterial
+	{
+		u64 DiffuseTextureHash;
+		u64 SpecularTextureHash;
+	};
+
 	struct Model3DFileHeader
 	{
 		u64 VertexDataSize;
 		u32 MeshCount;
+		u32 MaterialCount;
+		u32 UniqueTextureCount;
 	};
 
 	struct Model3D
 	{
+		Model3DFileHeader Header;
+
 		u8* VertexData;
 		u64* VerticesCounts;
 		u32* IndicesCounts;
-		u64* DiffuseTexturesHashes;
-		u32 MeshCount;
+		u32* MaterialIndices;
+		Model3DMaterial* Materials;
+		u64* UniqueTextureHashes;
 	};
 
 	void ObjToModel3D(const char* FilePath, const char* OutputPath);

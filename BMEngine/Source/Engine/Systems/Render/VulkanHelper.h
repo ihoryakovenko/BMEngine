@@ -17,7 +17,7 @@ struct GLFWwindow;
 	{ \
 		const VkResult result = (call); \
 		if (result != VK_SUCCESS) { \
-			Util::RenderLog(Util::BMRVkLogType_Error, "%s returned %d at %s:%d", #call, result, __FILE__, __LINE__); \
+			Util::RenderLog(Util::LogType::Error, "%s returned %d at %s:%d", #call, result, __FILE__, __LINE__); \
 		} \
 	}
 
@@ -27,7 +27,7 @@ namespace VulkanHelper
 	inline constexpr u32 MAX_VERTEX_INPUT_BINDINGS = 16;
 	inline constexpr u32 MAX_DRAW_FRAMES = 3;
 
-	enum BufferUsageFlag
+	enum class BufferUsageFlag
 	{
 		UniformFlag = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		StagingFlag = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -38,7 +38,7 @@ namespace VulkanHelper
 		InstanceFlag = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 	};
 
-	enum MemoryPropertyFlag
+	enum class MemoryPropertyFlag
 	{
 		GPULocal = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		HostCompatible = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -110,22 +110,16 @@ namespace VulkanHelper
 		std::unordered_map<std::string, VertexAttribute> Attributes;
 	};
 
-	Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
 	VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface, const VkSurfaceFormatKHR* AvailableFormats, u32 Count);
-	Memory::FrameArray<VkExtensionProperties> GetAvailableExtensionProperties();
-	Memory::FrameArray<VkLayerProperties> GetAvailableInstanceLayerProperties();
-	Memory::FrameArray<const char*> GetRequiredInstanceExtensions(const char** RequiredInstanceExtensions, u32 RequiredExtensionsCount,
-		const char** ValidationExtensions, u32 ValidationExtensionsCount);
-	Memory::FrameArray<VkPhysicalDevice> GetPhysicalDeviceList(VkInstance VulkanInstance);
-	Memory::FrameArray<VkExtensionProperties> GetDeviceExtensionProperties(VkPhysicalDevice PhysicalDevice);
-	Memory::FrameArray<VkQueueFamilyProperties> GetQueueFamilyProperties(VkPhysicalDevice PhysicalDevice);
+
+	void GetRequiredInstanceExtensions(const char** RequiredInstanceExtensions, u32 RequiredExtensionsCount,
+		const char** ValidationExtensions, u32 ValidationExtensionsCount, const char** OutInstanceExtensions);
+
 	PhysicalDeviceIndices GetPhysicalDeviceIndices(VkQueueFamilyProperties* Properties, u32 PropertiesCount,
 		VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
 	u32 GetMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, u32 AllowedTypes, VkMemoryPropertyFlags Properties);
 	VkExtent2D GetBestSwapExtent(VkPhysicalDevice PhysicalDevice, GLFWwindow* WindowHandler, VkSurfaceKHR Surface);
 	VkPresentModeKHR GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
-	Memory::FrameArray<VkPresentModeKHR> GetAvailablePresentModes(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
-	Memory::FrameArray<VkImage> GetSwapchainImages(VkDevice LogicalDevice, VkSwapchainKHR VulkanSwapchain);
 
 	bool CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, u32 AvailableExtensionsCount,
 		const char** RequiredExtensions, u32 RequiredExtensionsCount);
@@ -147,6 +141,8 @@ namespace VulkanHelper
 	VkBuffer CreateBuffer(VkDevice Device, u64 Size, BufferUsageFlag Flag);
 
 	void UpdateHostCompatibleBufferMemory(VkDevice Device, VkDeviceMemory Memory, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);
+
+	u32 GetFormatAlignment(VkFormat Format);
 
 	bool CreateDebugUtilsMessengerEXT(VkInstance Instance, const VkDebugUtilsMessengerCreateInfoEXT* CreateInfo,
 		const VkAllocationCallbacks* Allocator, VkDebugUtilsMessengerEXT* InDebugMessenger);

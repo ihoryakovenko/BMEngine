@@ -5,6 +5,7 @@
 #include <thread>
 #include <vector>
 #include <queue>
+#include <iostream>
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 
@@ -13,8 +14,7 @@ namespace TaskSystem
 	struct Task
 	{
 		TaskFunction Function;
-		TaskGroup* Groups;
-		u32 GroupsCounter;
+		TaskGroup* Group;
 	};
 
 	static std::vector<std::thread> WorkerThreads;
@@ -47,13 +47,9 @@ namespace TaskSystem
 			}
 
 			CurrentTask.Function();
-
-			for (u32 i = 0; i < CurrentTask.GroupsCounter; ++i)
+			if (CurrentTask.Group != nullptr)
 			{
-				if (CurrentTask.Groups[i].Counter.fetch_sub(1, std::memory_order_acq_rel) == 1)
-				{
-					CurrentTask.Groups[i].Semaphore.release();
-				}
+				CurrentTask.Group->Semaphore.release();
 			}
 		}
 	}
@@ -97,7 +93,7 @@ namespace TaskSystem
 		ConcurencyEnabled.store(Enabled, std::memory_order_relaxed);
 	}
 	
-	void AddTask(TaskFunction Function, TaskGroup* Groups, u32 GroupsCounter)
+	void AddTask(TaskFunction Function, TaskGroup* Group)
 	{
 		if (!ConcurencyEnabled.load(std::memory_order_relaxed))
 		{
@@ -105,15 +101,12 @@ namespace TaskSystem
 			return;
 		}
 
-		Task NewTask;
-		NewTask.Groups = Groups;
-		NewTask.Function = Function;
-		NewTask.GroupsCounter = GroupsCounter;
 
-		for (u32 i = 0; i < NewTask.GroupsCounter; ++i)
-		{
-			NewTask.Groups[i].Counter.fetch_add(1, std::memory_order_relaxed);
-		}
+		++Group->TasksInGroup;
+
+		Task NewTask;
+		NewTask.Group = Group;
+		NewTask.Function = Function;
 				
 		{
 			std::lock_guard<std::mutex> Lock(QueueMutex);
@@ -123,14 +116,18 @@ namespace TaskSystem
 		QueueCondition.notify_one();
 	}
 	
-	void WaitForGroup(TaskGroup* Groups, u32 GroupsCounter)
+	void WaitForGroup(TaskGroup* Group)
 	{
-		for (u32 i = 0; i < GroupsCounter; ++i)
+		if (!ConcurencyEnabled.load(std::memory_order_relaxed))
 		{
-			if (Groups[i].Counter.load(std::memory_order_acquire) > 0)
-			{
-				Groups[i].Semaphore.acquire();
-			}
+			return;
 		}
+
+		for (u32 i = 0; i < Group->TasksInGroup; ++i)
+		{
+			Group->Semaphore.acquire();
+		}
+
+		Group->TasksInGroup = 0;
 	}
 }

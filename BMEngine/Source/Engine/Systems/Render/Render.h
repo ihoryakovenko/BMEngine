@@ -10,7 +10,6 @@
 #include "Deprecated/FrameManager.h"
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 #include "Engine/Systems/Render/VulkanCoreContext.h"
-#include "TransferSystem.h"
 
 #include "Deprecated/FrameManager.h"
 
@@ -21,48 +20,6 @@
 
 namespace Render
 {
-	struct StaticMeshVertex
-	{
-		glm::vec3 Position;
-		glm::vec2 TextureCoords;
-		glm::vec3 Normal;
-	};
-
-	struct StaticMesh
-	{
-		u64 VertexOffset;
-		u32 IndexOffset;
-		u32 IndicesCount;
-		u64 VertexDataSize;
-	};
-
-	struct Texture
-	{
-		VkImage Image;
-		VkDeviceMemory Memory;
-		u64 Size;
-		u64 Alignment;
-	};
-
-	struct MeshTexture2D
-	{
-		Texture MeshTexture;
-		VkImageView View;
-	};
-
-	struct Material
-	{
-		u32 AlbedoTexIndex;
-		u32 SpecularTexIndex;
-		f32 Shininess;
-	};
-
-	struct InstanceData
-	{
-		glm::mat4 ModelMatrix;
-		u32 MaterialIndex;
-	};
-
 	struct DrawEntity
 	{
 		u64 StaticMeshIndex;
@@ -107,10 +64,9 @@ namespace Render
 	struct RenderState
 	{
 		DrawState RenderDrawState;	
-
 		StaticMeshPipeline MeshPipeline;
-
 		VkDescriptorPool DebugUiPool; // TODO: ?
+		Memory::FrameMemory FrameMemory;
 	};
 
 	struct PointLight
@@ -171,13 +127,18 @@ namespace Render
 
 		LightBuffer* LightEntity = nullptr;
 
+		std::mutex TempLock;
 		Memory::DynamicHeapArray<DrawEntity> DrawEntities;
 	};
+
+	void TmpInitFrameMemory();
 
 	void Init(GLFWwindow* WindowHandler);
 	void DeInit();
 
-	void Draw(const DrawScene* Data);
+	void* FrameAlloc(u32 Size);
+
+	void Draw(DrawScene* Data);
 
 	RenderState* GetRenderState();
 }
@@ -206,7 +167,7 @@ namespace LightningPass
 	void Init();
 	void DeInit();
 
-	void Draw(const Render::DrawScene* Scene);
+	void Draw(Render::DrawScene* Scene);
 
 	VulkanInterface::UniformImage* GetShadowMapArray();
 }

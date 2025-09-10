@@ -8,17 +8,6 @@
 
 namespace VulkanHelper
 {
-	Memory::FrameArray<VkSurfaceFormatKHR> GetSurfaceFormats(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
-	{
-		u32 Count;
-		VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, Surface, &Count, nullptr));
-
-		auto Data = Memory::FrameArray<VkSurfaceFormatKHR>::Create(Count);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, Surface, &Count, Data.Pointer.Data);
-
-		return Data;
-	}
-
 	VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface, const VkSurfaceFormatKHR* AvailableFormats, u32 Count)
 	{
 		VkSurfaceFormatKHR SurfaceFormat = { VK_FORMAT_UNDEFINED, static_cast<VkColorSpaceKHR>(0) };
@@ -97,7 +86,7 @@ namespace VulkanHelper
 		VkBufferCreateInfo BufferInfo = { };
 		BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 		BufferInfo.size = Size;
-		BufferInfo.usage = Flag;
+		BufferInfo.usage = (VkFlags)Flag;
 		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 		VkBuffer Buffer;
@@ -111,7 +100,7 @@ namespace VulkanHelper
 		VkMemoryRequirements MemoryRequirements;
 		vkGetBufferMemoryRequirements(Device, Buffer, &MemoryRequirements);
 
-		const u32 MemoryTypeIndex = VulkanHelper::GetMemoryTypeIndex(PhysicalDevice, MemoryRequirements.memoryTypeBits, Properties);
+		const u32 MemoryTypeIndex = VulkanHelper::GetMemoryTypeIndex(PhysicalDevice, MemoryRequirements.memoryTypeBits, (VkFlags)Properties);
 
 		VkMemoryAllocateInfo MemoryAllocInfo = { };
 		MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -131,7 +120,7 @@ namespace VulkanHelper
 		VkMemoryRequirements MemoryRequirements;
 		vkGetImageMemoryRequirements(Device, Image, &MemoryRequirements);
 
-		const u32 MemoryTypeIndex = VulkanHelper::GetMemoryTypeIndex(PhysicalDevice, MemoryRequirements.memoryTypeBits, Properties);
+		const u32 MemoryTypeIndex = VulkanHelper::GetMemoryTypeIndex(PhysicalDevice, MemoryRequirements.memoryTypeBits, (VkFlags)Properties);
 
 		VkMemoryAllocateInfo MemoryAllocInfo = { };
 		MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -154,79 +143,21 @@ namespace VulkanHelper
 		vkUnmapMemory(Device, Memory);
 	}
 
-	Memory::FrameArray<VkExtensionProperties> GetAvailableExtensionProperties()
+
+	void GetRequiredInstanceExtensions(const char** RequiredInstanceExtensions, u32 RequiredExtensionsCount,
+		const char** ValidationExtensions, u32 ValidationExtensionsCount, const char** OutInstanceExtensions)
 	{
-		u32 Count;
-		VULKAN_CHECK_RESULT(vkEnumerateInstanceExtensionProperties(nullptr, &Count, nullptr));
-
-		auto Data = Memory::FrameArray<VkExtensionProperties>::Create(Count);
-		vkEnumerateInstanceExtensionProperties(nullptr, &Count, Data.Pointer.Data);
-
-		return Data;
-	}
-
-	Memory::FrameArray<VkLayerProperties> GetAvailableInstanceLayerProperties()
-	{
-		u32 Count;
-		VULKAN_CHECK_RESULT(vkEnumerateInstanceLayerProperties(&Count, nullptr));
-
-		auto Data = Memory::FrameArray<VkLayerProperties>::Create(Count);
-		vkEnumerateInstanceLayerProperties(&Count, Data.Pointer.Data);
-
-		return Data;
-	}
-
-	Memory::FrameArray<const char*> GetRequiredInstanceExtensions(const char** RequiredInstanceExtensions, u32 RequiredExtensionsCount,
-		const char** ValidationExtensions, u32 ValidationExtensionsCount)
-	{
-		auto Data = Memory::FrameArray<const char*>::Create(RequiredExtensionsCount + ValidationExtensionsCount);
-
 		for (u32 i = 0; i < RequiredExtensionsCount; ++i)
 		{
-			Data[i] = RequiredInstanceExtensions[i];
-			Util::RenderLog(Util::BMRVkLogType_Info, "Requested %s extension", Data[i]);
+			OutInstanceExtensions[i] = RequiredInstanceExtensions[i];
+			Util::RenderLog(Util::LogType::Info, "Requested %s extension", OutInstanceExtensions[i]);
 		}
 
 		for (u32 i = 0; i < ValidationExtensionsCount; ++i)
 		{
-			Data[i + RequiredExtensionsCount] = ValidationExtensions[i];
-			Util::RenderLog(Util::BMRVkLogType_Info, "Requested %s extension", Data[i + RequiredExtensionsCount]);
+			OutInstanceExtensions[i + RequiredExtensionsCount] = ValidationExtensions[i];
+			Util::RenderLog(Util::LogType::Info, "Requested %s extension", OutInstanceExtensions[i + RequiredExtensionsCount]);
 		}
-
-		return Data;
-	}
-
-	Memory::FrameArray<VkPhysicalDevice> GetPhysicalDeviceList(VkInstance VulkanInstance)
-	{
-		u32 Count;
-		vkEnumeratePhysicalDevices(VulkanInstance, &Count, nullptr);
-
-		auto Data = Memory::FrameArray<VkPhysicalDevice>::Create(Count);
-		vkEnumeratePhysicalDevices(VulkanInstance, &Count, Data.Pointer.Data);
-
-		return Data;
-	}
-
-	Memory::FrameArray<VkExtensionProperties> GetDeviceExtensionProperties(VkPhysicalDevice PhysicalDevice)
-	{
-		u32 Count;
-		VULKAN_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &Count, nullptr));
-
-		auto Data = Memory::FrameArray<VkExtensionProperties>::Create(Count);
-		vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &Count, Data.Pointer.Data);
-
-		return Data;
-	}
-
-	Memory::FrameArray<VkQueueFamilyProperties> GetQueueFamilyProperties(VkPhysicalDevice PhysicalDevice)
-	{
-		u32 Count;
-		vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &Count, nullptr);
-
-		auto Data = Memory::FrameArray<VkQueueFamilyProperties>::Create(Count);
-		vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &Count, Data.Pointer.Data);
-
-		return Data;
 	}
 
 	PhysicalDeviceIndices GetPhysicalDeviceIndices(VkQueueFamilyProperties* Properties, u32 PropertiesCount,
@@ -296,7 +227,7 @@ namespace VulkanHelper
 
 	void PrintDeviceData(VkPhysicalDeviceProperties* DeviceProperties, VkPhysicalDeviceFeatures* AvailableFeatures)
 	{
-		Util::RenderLog(Util::BMRVkLogType_Info,
+		Util::RenderLog(Util::LogType::Info,
 			"VkPhysicalDeviceProperties:\n"
 			"  apiVersion: %u\n  driverVersion: %u\n  vendorID: %u\n  deviceID: %u\n"
 			"  deviceType: %u\n  deviceName: %s\n"
@@ -318,7 +249,7 @@ namespace VulkanHelper
 			DeviceProperties->sparseProperties.residencyNonResidentStrict
 		);
 
-		Util::RenderLog(Util::BMRVkLogType_Info,
+		Util::RenderLog(Util::LogType::Info,
 			"VkPhysicalDeviceFeatures:\n  robustBufferAccess: %d\n  fullDrawIndexUint32: %d\n"
 			"  imageCubeArray: %d\n  independentBlend: %d\n  geometryShader: %d\n"
 			"  tessellationShader: %d\n  sampleRateShading: %d\n  dualSrcBlend: %d\n"
@@ -366,7 +297,7 @@ namespace VulkanHelper
 			AvailableFeatures->inheritedQueries
 		);
 
-		Util::RenderLog(Util::BMRVkLogType_Info,
+		Util::RenderLog(Util::LogType::Info,
 			"VkPhysicalDeviceLimits:\n  maxImageDimension1D: %u\n  maxImageDimension2D: %u\n"
 			"  maxImageDimension3D: %u\n  maxImageDimensionCube: %u\n"
 			"  maxImageArrayLayers: %u\n  maxTexelBufferElements: %u\n"
@@ -516,10 +447,19 @@ namespace VulkanHelper
 
 	VkPresentModeKHR GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
 	{
-		Memory::FrameArray<VkPresentModeKHR> PresentModes = GetAvailablePresentModes(PhysicalDevice, Surface);
+		u32 PresentModeCount;
+		VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &PresentModeCount, nullptr));
+
+		auto PresentModes = (VkPresentModeKHR*)Render::FrameAlloc(PresentModeCount * sizeof(VkPresentModeKHR));
+		vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &PresentModeCount, PresentModes);
+
+		for (u32 i = 0; i < PresentModeCount; ++i)
+		{
+			Util::RenderLog(Util::LogType::Info, "Present mode %d is available", PresentModes[i]);
+		}
 
 		VkPresentModeKHR Mode = VK_PRESENT_MODE_FIFO_KHR;
-		for (u32 i = 0; i < PresentModes.Count; ++i)
+		for (u32 i = 0; i < PresentModeCount; ++i)
 		{
 			if (PresentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR)
 			{
@@ -530,39 +470,10 @@ namespace VulkanHelper
 		// Has to be present by spec
 		if (Mode != VK_PRESENT_MODE_MAILBOX_KHR)
 		{
-			Util::RenderLog(Util::BMRVkLogType_Warning, "Using default VK_PRESENT_MODE_FIFO_KHR");
+			Util::RenderLog(Util::LogType::Warning, "Using default VK_PRESENT_MODE_FIFO_KHR");
 		}
 
 		return Mode;
-	}
-
-	Memory::FrameArray<VkPresentModeKHR> GetAvailablePresentModes(VkPhysicalDevice PhysicalDevice,
-		VkSurfaceKHR Surface)
-	{
-		u32 Count;
-		VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Count, nullptr));
-
-		auto Data = Memory::FrameArray<VkPresentModeKHR>::Create(Count);
-		vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &Count, Data.Pointer.Data);
-
-		for (u32 i = 0; i < Count; ++i)
-		{
-			Util::RenderLog(Util::BMRVkLogType_Info, "Present mode %d is available", Data[i]);
-		}
-
-		return Data;
-	}
-
-	Memory::FrameArray<VkImage> GetSwapchainImages(VkDevice LogicalDevice,
-		VkSwapchainKHR VulkanSwapchain)
-	{
-		u32 Count;
-		vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &Count, nullptr);
-
-		auto Data = Memory::FrameArray<VkImage>::Create(Count);
-		vkGetSwapchainImagesKHR(LogicalDevice, VulkanSwapchain, &Count, Data.Pointer.Data);
-
-		return Data;
 	}
 
 	bool CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, u32 AvailableExtensionsCount,
@@ -582,7 +493,7 @@ namespace VulkanHelper
 
 			if (!IsExtensionSupported)
 			{
-				Util::RenderLog(Util::BMRVkLogType_Error, "Extension %s unsupported", RequiredExtensions[i]);
+				Util::RenderLog(Util::LogType::Error, "Extension %s unsupported", RequiredExtensions[i]);
 				return false;
 			}
 		}
@@ -607,7 +518,7 @@ namespace VulkanHelper
 
 			if (!IsLayerAvailable)
 			{
-				Util::RenderLog(Util::BMRVkLogType_Error, "Validation layer %s unsupported", ValidationLayersToCheck[i]);
+				Util::RenderLog(Util::LogType::Error, "Validation layer %s unsupported", ValidationLayersToCheck[i]);
 				return false;
 			}
 		}
@@ -632,7 +543,7 @@ namespace VulkanHelper
 
 			if (!IsDeviceExtensionSupported)
 			{
-				Util::RenderLog(Util::BMRVkLogType_Error, "extension %s unsupported", ExtensionsToCheck[i]);
+				Util::RenderLog(Util::LogType::Error, "extension %s unsupported", ExtensionsToCheck[i]);
 				return false;
 			}
 		}
@@ -650,7 +561,7 @@ namespace VulkanHelper
 		}
 		else
 		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "CreateMessengerFunc is nullptr");
+			Util::RenderLog(Util::LogType::Error, "CreateMessengerFunc is nullptr");
 			return false;
 		}
 
@@ -668,7 +579,7 @@ namespace VulkanHelper
 		}
 		else
 		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "DestroyMessengerFunc is nullptr");
+			Util::RenderLog(Util::LogType::Error, "DestroyMessengerFunc is nullptr");
 			return false;
 		}
 	}
@@ -679,15 +590,15 @@ namespace VulkanHelper
 	{
 		if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
 		{
-			Util::RenderLog(Util::BMRVkLogType_Error, CallbackData->pMessage);
+			Util::RenderLog(Util::LogType::Error, CallbackData->pMessage);
 		}
 		else if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
 		{
-			Util::RenderLog(Util::BMRVkLogType_Warning, CallbackData->pMessage);
+			Util::RenderLog(Util::LogType::Warning, CallbackData->pMessage);
 		}
 		else
 		{
-			Util::RenderLog(Util::BMRVkLogType_Info, CallbackData->pMessage);
+			Util::RenderLog(Util::LogType::Info, CallbackData->pMessage);
 		}
 
 		return VK_FALSE;
@@ -708,15 +619,223 @@ namespace VulkanHelper
 				break;
 			}
 
-			Util::RenderLog(Util::BMRVkLogType_Warning, "Format %d is not supported", FormatToCheck);
+			Util::RenderLog(Util::LogType::Warning, "Format %d is not supported", FormatToCheck);
 		}
 
 		if (!IsSupportedFormatFound)
 		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "No supported format found");
+			Util::RenderLog(Util::LogType::Error, "No supported format found");
 			return false;
 		}
 
 		return true;
+	}
+
+	u32 GetFormatAlignment(VkFormat Format)
+	{
+		switch (Format)
+		{
+			// 8-bit formats - 1 byte alignment
+			case VK_FORMAT_R8_UNORM:
+			case VK_FORMAT_R8_SNORM:
+			case VK_FORMAT_R8_USCALED:
+			case VK_FORMAT_R8_SSCALED:
+			case VK_FORMAT_R8_UINT:
+			case VK_FORMAT_R8_SINT:
+			case VK_FORMAT_R8_SRGB:
+			case VK_FORMAT_S8_UINT:
+				return 1;
+
+				// 16-bit formats - 2 byte alignment
+			case VK_FORMAT_R8G8_UNORM:
+			case VK_FORMAT_R8G8_SNORM:
+			case VK_FORMAT_R8G8_USCALED:
+			case VK_FORMAT_R8G8_SSCALED:
+			case VK_FORMAT_R8G8_UINT:
+			case VK_FORMAT_R8G8_SINT:
+			case VK_FORMAT_R8G8_SRGB:
+			case VK_FORMAT_R16_UNORM:
+			case VK_FORMAT_R16_SNORM:
+			case VK_FORMAT_R16_USCALED:
+			case VK_FORMAT_R16_SSCALED:
+			case VK_FORMAT_R16_UINT:
+			case VK_FORMAT_R16_SINT:
+			case VK_FORMAT_R16_SFLOAT:
+			case VK_FORMAT_D16_UNORM:
+				return 2;
+
+				// 24-bit formats - 4 byte alignment (3 bytes don't align well)
+			case VK_FORMAT_R8G8B8_UNORM:
+			case VK_FORMAT_R8G8B8_SNORM:
+			case VK_FORMAT_R8G8B8_USCALED:
+			case VK_FORMAT_R8G8B8_SSCALED:
+			case VK_FORMAT_R8G8B8_UINT:
+			case VK_FORMAT_R8G8B8_SINT:
+			case VK_FORMAT_R8G8B8_SRGB:
+			case VK_FORMAT_B8G8R8_UNORM:
+			case VK_FORMAT_B8G8R8_SNORM:
+			case VK_FORMAT_B8G8R8_USCALED:
+			case VK_FORMAT_B8G8R8_SSCALED:
+			case VK_FORMAT_B8G8R8_UINT:
+			case VK_FORMAT_B8G8R8_SINT:
+			case VK_FORMAT_B8G8R8_SRGB:
+				return 4;
+
+				// 32-bit formats - 4 byte alignment
+			case VK_FORMAT_R8G8B8A8_UNORM:
+			case VK_FORMAT_R8G8B8A8_SNORM:
+			case VK_FORMAT_R8G8B8A8_USCALED:
+			case VK_FORMAT_R8G8B8A8_SSCALED:
+			case VK_FORMAT_R8G8B8A8_UINT:
+			case VK_FORMAT_R8G8B8A8_SINT:
+			case VK_FORMAT_R8G8B8A8_SRGB:
+			case VK_FORMAT_B8G8R8A8_UNORM:
+			case VK_FORMAT_B8G8R8A8_SNORM:
+			case VK_FORMAT_B8G8R8A8_USCALED:
+			case VK_FORMAT_B8G8R8A8_SSCALED:
+			case VK_FORMAT_B8G8R8A8_UINT:
+			case VK_FORMAT_B8G8R8A8_SINT:
+			case VK_FORMAT_B8G8R8A8_SRGB:
+			case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
+			case VK_FORMAT_A8B8G8R8_SNORM_PACK32:
+			case VK_FORMAT_A8B8G8R8_USCALED_PACK32:
+			case VK_FORMAT_A8B8G8R8_SSCALED_PACK32:
+			case VK_FORMAT_A8B8G8R8_UINT_PACK32:
+			case VK_FORMAT_A8B8G8R8_SINT_PACK32:
+			case VK_FORMAT_A8B8G8R8_SRGB_PACK32:
+			case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+			case VK_FORMAT_A2R10G10B10_SNORM_PACK32:
+			case VK_FORMAT_A2R10G10B10_USCALED_PACK32:
+			case VK_FORMAT_A2R10G10B10_SSCALED_PACK32:
+			case VK_FORMAT_A2R10G10B10_UINT_PACK32:
+			case VK_FORMAT_A2R10G10B10_SINT_PACK32:
+			case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+			case VK_FORMAT_A2B10G10R10_SNORM_PACK32:
+			case VK_FORMAT_A2B10G10R10_USCALED_PACK32:
+			case VK_FORMAT_A2B10G10R10_SSCALED_PACK32:
+			case VK_FORMAT_A2B10G10R10_UINT_PACK32:
+			case VK_FORMAT_A2B10G10R10_SINT_PACK32:
+			case VK_FORMAT_B10G11R11_UFLOAT_PACK32:
+			case VK_FORMAT_E5B9G9R9_UFLOAT_PACK32:
+			case VK_FORMAT_R32_UINT:
+			case VK_FORMAT_R32_SINT:
+			case VK_FORMAT_R32_SFLOAT:
+			case VK_FORMAT_D24_UNORM_S8_UINT:
+			case VK_FORMAT_D32_SFLOAT:
+			case VK_FORMAT_D16_UNORM_S8_UINT:
+				return 4;
+
+				// 64-bit formats - 8 byte alignment
+			case VK_FORMAT_R16G16_UNORM:
+			case VK_FORMAT_R16G16_SNORM:
+			case VK_FORMAT_R16G16_USCALED:
+			case VK_FORMAT_R16G16_SSCALED:
+			case VK_FORMAT_R16G16_UINT:
+			case VK_FORMAT_R16G16_SINT:
+			case VK_FORMAT_R16G16_SFLOAT:
+			case VK_FORMAT_R32G32_UINT:
+			case VK_FORMAT_R32G32_SINT:
+			case VK_FORMAT_R32G32_SFLOAT:
+				return 8;
+
+				// 96-bit formats - 16 byte alignment
+			case VK_FORMAT_R16G16B16_UNORM:
+			case VK_FORMAT_R16G16B16_SNORM:
+			case VK_FORMAT_R16G16B16_USCALED:
+			case VK_FORMAT_R16G16B16_SSCALED:
+			case VK_FORMAT_R16G16B16_UINT:
+			case VK_FORMAT_R16G16B16_SINT:
+			case VK_FORMAT_R16G16B16_SFLOAT:
+			case VK_FORMAT_R32G32B32_UINT:
+			case VK_FORMAT_R32G32B32_SINT:
+			case VK_FORMAT_R32G32B32_SFLOAT:
+				return 16;
+
+				// 128-bit formats - 16 byte alignment
+			case VK_FORMAT_R16G16B16A16_UNORM:
+			case VK_FORMAT_R16G16B16A16_SNORM:
+			case VK_FORMAT_R16G16B16A16_USCALED:
+			case VK_FORMAT_R16G16B16A16_SSCALED:
+			case VK_FORMAT_R16G16B16A16_UINT:
+			case VK_FORMAT_R16G16B16A16_SINT:
+			case VK_FORMAT_R16G16B16A16_SFLOAT:
+			case VK_FORMAT_R32G32B32A32_UINT:
+			case VK_FORMAT_R32G32B32A32_SINT:
+			case VK_FORMAT_R32G32B32A32_SFLOAT:
+			case VK_FORMAT_D32_SFLOAT_S8_UINT:
+				return 16;
+
+				// Compressed formats - Block alignment
+				// BC1/BC2/BC3 - 8 byte blocks
+			case VK_FORMAT_BC1_RGB_UNORM_BLOCK:
+			case VK_FORMAT_BC1_RGB_SRGB_BLOCK:
+			case VK_FORMAT_BC1_RGBA_UNORM_BLOCK:
+			case VK_FORMAT_BC1_RGBA_SRGB_BLOCK:
+			case VK_FORMAT_BC2_UNORM_BLOCK:
+			case VK_FORMAT_BC2_SRGB_BLOCK:
+			case VK_FORMAT_BC3_UNORM_BLOCK:
+			case VK_FORMAT_BC3_SRGB_BLOCK:
+				return 8;
+
+				// BC7 - 16 byte blocks
+			case VK_FORMAT_BC7_UNORM_BLOCK:
+			case VK_FORMAT_BC7_SRGB_BLOCK:
+				return 16;
+
+				// ETC2 - 8 byte blocks
+			case VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK:
+			case VK_FORMAT_ETC2_R8G8B8_SRGB_BLOCK:
+			case VK_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK:
+			case VK_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK:
+			case VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK:
+			case VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK:
+				return 8;
+
+				// ASTC - 16 byte blocks
+			case VK_FORMAT_ASTC_4x4_UNORM_BLOCK:
+			case VK_FORMAT_ASTC_4x4_SRGB_BLOCK:
+			case VK_FORMAT_ASTC_5x4_UNORM_BLOCK:
+			case VK_FORMAT_ASTC_5x4_SRGB_BLOCK:
+			case VK_FORMAT_ASTC_5x5_UNORM_BLOCK:
+			case VK_FORMAT_ASTC_5x5_SRGB_BLOCK:
+			case VK_FORMAT_ASTC_6x5_UNORM_BLOCK:
+			case VK_FORMAT_ASTC_6x5_SRGB_BLOCK:
+			case VK_FORMAT_ASTC_6x6_UNORM_BLOCK:
+			case VK_FORMAT_ASTC_6x6_SRGB_BLOCK:
+			case VK_FORMAT_ASTC_8x5_UNORM_BLOCK:
+			case VK_FORMAT_ASTC_8x5_SRGB_BLOCK:
+			case VK_FORMAT_ASTC_8x6_UNORM_BLOCK:
+			case VK_FORMAT_ASTC_8x6_SRGB_BLOCK:
+			case VK_FORMAT_ASTC_8x8_UNORM_BLOCK:
+			case VK_FORMAT_ASTC_8x8_SRGB_BLOCK:
+			case VK_FORMAT_ASTC_10x5_UNORM_BLOCK:
+			case VK_FORMAT_ASTC_10x5_SRGB_BLOCK:
+			case VK_FORMAT_ASTC_10x6_UNORM_BLOCK:
+			case VK_FORMAT_ASTC_10x6_SRGB_BLOCK:
+			case VK_FORMAT_ASTC_10x8_UNORM_BLOCK:
+			case VK_FORMAT_ASTC_10x8_SRGB_BLOCK:
+			case VK_FORMAT_ASTC_10x10_UNORM_BLOCK:
+			case VK_FORMAT_ASTC_10x10_SRGB_BLOCK:
+			case VK_FORMAT_ASTC_12x10_UNORM_BLOCK:
+			case VK_FORMAT_ASTC_12x10_SRGB_BLOCK:
+			case VK_FORMAT_ASTC_12x12_UNORM_BLOCK:
+			case VK_FORMAT_ASTC_12x12_SRGB_BLOCK:
+				return 16;
+
+				// PVRTC - 32 byte blocks
+			case VK_FORMAT_PVRTC1_4BPP_UNORM_BLOCK_IMG:
+			case VK_FORMAT_PVRTC1_4BPP_SRGB_BLOCK_IMG:
+			case VK_FORMAT_PVRTC1_2BPP_UNORM_BLOCK_IMG:
+			case VK_FORMAT_PVRTC1_2BPP_SRGB_BLOCK_IMG:
+			case VK_FORMAT_PVRTC2_4BPP_UNORM_BLOCK_IMG:
+			case VK_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG:
+			case VK_FORMAT_PVRTC2_2BPP_UNORM_BLOCK_IMG:
+			case VK_FORMAT_PVRTC2_2BPP_SRGB_BLOCK_IMG:
+				return 32;
+
+				// Default case - assume 4 byte alignment for safety
+			default:
+				return 4;
+		}
 	}
 }

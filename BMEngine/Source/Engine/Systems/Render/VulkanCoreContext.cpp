@@ -1,6 +1,7 @@
 #include "VulkanCoreContext.h"
 
 #include "Util/Util.h"
+#include "Render.h"
 
 #include <GLFW/glfw3.h>
 
@@ -95,25 +96,25 @@ namespace VulkanCoreContext
 
 		if (!VulkanHelper::CheckDeviceExtensionsSupport(ExtensionProperties, ExtensionPropertiesCount, DeviceExtensions, DeviceExtensionsSize))
 		{
-			Util::RenderLog(Util::BMRVkLogType_Warning, "PhysicalDeviceIndices are not initialized");
+			Util::RenderLog(Util::LogType::Warning, "PhysicalDeviceIndices are not initialized");
 			return false;
 		}
 
 		if (Indices.GraphicsFamily < 0 || Indices.PresentationFamily < 0)
 		{
-			Util::RenderLog(Util::BMRVkLogType_Warning, "PhysicalDeviceIndices are not initialized");
+			Util::RenderLog(Util::LogType::Warning, "PhysicalDeviceIndices are not initialized");
 			return false;
 		}
 
 		if (!AvailableFeatures.samplerAnisotropy)
 		{
-			Util::RenderLog(Util::BMRVkLogType_Warning, "Feature samplerAnisotropy is not supported");
+			Util::RenderLog(Util::LogType::Warning, "Feature samplerAnisotropy is not supported");
 			return false;
 		}
 
 		if (!AvailableFeatures.multiViewport)
 		{
-			Util::RenderLog(Util::BMRVkLogType_Warning, "Feature multiViewport is not supported");
+			Util::RenderLog(Util::LogType::Warning, "Feature multiViewport is not supported");
 			return false;
 		}
 
@@ -136,14 +137,21 @@ namespace VulkanCoreContext
 			VK_EXT_DEBUG_UTILS_EXTENSION_NAME
 		};
 
-		const u32 ValidationExtensionsSize = sizeof(ValidationExtensions) / sizeof(ValidationExtensions[0]);
+		const u32 ValidationExtensionsCount = sizeof(ValidationExtensions) / sizeof(ValidationExtensions[0]);
 
-		Memory::FrameArray<VkExtensionProperties> AvailableExtensions = VulkanHelper::GetAvailableExtensionProperties();
-		Memory::FrameArray<const char*> RequiredExtensions = VulkanHelper::GetRequiredInstanceExtensions(RequiredInstanceExtensions, RequiredExtensionsCount,
-			ValidationExtensions, ValidationExtensionsSize);
+		u32 ExtensionCount;
+		VULKAN_CHECK_RESULT(vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, nullptr));
 
-		if (!VulkanHelper::CheckRequiredInstanceExtensionsSupport(AvailableExtensions.Pointer.Data, AvailableExtensions.Count,
-			RequiredExtensions.Pointer.Data, RequiredExtensions.Count))
+		auto AvailableExtensions = (VkExtensionProperties*)Render::FrameAlloc(ExtensionCount * sizeof(VkExtensionProperties));
+		vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, AvailableExtensions);
+
+		const u32 ExtensionsCount = RequiredExtensionsCount + ValidationExtensionsCount;
+		auto RequiredExtensions = (const char**)Render::FrameAlloc(RequiredExtensionsCount * sizeof(const char**));
+		VulkanHelper::GetRequiredInstanceExtensions(RequiredInstanceExtensions, RequiredExtensionsCount,
+			ValidationExtensions, ValidationExtensionsCount, RequiredExtensions);
+
+		if (!VulkanHelper::CheckRequiredInstanceExtensionsSupport(AvailableExtensions, ExtensionCount,
+			RequiredExtensions, ExtensionsCount))
 		{
 			assert(false);
 		}
@@ -167,14 +175,14 @@ namespace VulkanCoreContext
 		VkInstanceCreateInfo CreateInfo = { };
 		CreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		CreateInfo.pApplicationInfo = &ApplicationInfo;
-		CreateInfo.enabledExtensionCount = RequiredExtensions.Count;
-		CreateInfo.ppEnabledExtensionNames = RequiredExtensions.Pointer.Data;
+		CreateInfo.enabledExtensionCount = ExtensionsCount;
+		CreateInfo.ppEnabledExtensionNames = RequiredExtensions;
 
 		VULKAN_CHECK_RESULT(vkCreateInstance(&CreateInfo, nullptr, &Context->VulkanInstance));
 
 		if (!VulkanHelper::CreateDebugUtilsMessengerEXT(Context->VulkanInstance, &MessengerCreateInfo, nullptr, &Context->DebugMessenger))
 		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "Cannot create debug messenger");
+			Util::RenderLog(Util::LogType::Error, "Cannot create debug messenger");
 		}
 
 		VULKAN_CHECK_RESULT(glfwCreateWindowSurface(Context->VulkanInstance, Context->WindowHandler, nullptr, &Context->Surface));
@@ -188,23 +196,36 @@ namespace VulkanCoreContext
 
 		const u32 DeviceExtensionsSize = sizeof(DeviceExtensions) / sizeof(DeviceExtensions[0]);
 
-		Memory::FrameArray<VkPhysicalDevice> DeviceList = VulkanHelper::GetPhysicalDeviceList(Context->VulkanInstance);
+		u32 DeviceCount;
+		vkEnumeratePhysicalDevices(Context->VulkanInstance, &DeviceCount, nullptr);
+
+		auto DeviceList = (VkPhysicalDevice*)Render::FrameAlloc(DeviceCount * sizeof(VkPhysicalDevice));
+		vkEnumeratePhysicalDevices(Context->VulkanInstance, &DeviceCount, DeviceList);
 
 		bool IsDeviceFound = false;
-		for (u32 i = 0; i < DeviceList.Count; ++i)
+		for (u32 i = 0; i < DeviceCount; ++i)
 		{
 			Context->PhysicalDevice = DeviceList[i];
 
-			Memory::FrameArray<VkExtensionProperties> DeviceExtensionsData = VulkanHelper::GetDeviceExtensionProperties(Context->PhysicalDevice);
-			Memory::FrameArray<VkQueueFamilyProperties> FamilyPropertiesData = VulkanHelper::GetQueueFamilyProperties(Context->PhysicalDevice);
+			u32 DeviceExtensionCount;
+			VULKAN_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(Context->PhysicalDevice, nullptr, &DeviceExtensionCount, nullptr));
 
-			Context->Indices = VulkanHelper::GetPhysicalDeviceIndices(FamilyPropertiesData.Pointer.Data, FamilyPropertiesData.Count, Context->PhysicalDevice, Context->Surface);
+			auto DeviceExtensionsData = (VkExtensionProperties*)Render::FrameAlloc(DeviceExtensionCount * sizeof(VkExtensionProperties));
+			VULKAN_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(Context->PhysicalDevice, nullptr, &DeviceExtensionCount, DeviceExtensionsData));
+
+			u32 QueueFamilyCount;
+			vkGetPhysicalDeviceQueueFamilyProperties(Context->PhysicalDevice, &QueueFamilyCount, nullptr);
+
+			auto FamilyPropertiesData = (VkQueueFamilyProperties*)Render::FrameAlloc(QueueFamilyCount * sizeof(VkQueueFamilyProperties));
+			vkGetPhysicalDeviceQueueFamilyProperties(Context->PhysicalDevice, &QueueFamilyCount, FamilyPropertiesData);
+
+			Context->Indices = VulkanHelper::GetPhysicalDeviceIndices(FamilyPropertiesData, QueueFamilyCount, Context->PhysicalDevice, Context->Surface);
 
 			VkPhysicalDeviceProperties DeviceProperties;
 			vkGetPhysicalDeviceProperties(Context->PhysicalDevice, &DeviceProperties);
 
 			IsDeviceFound = CheckDeviceSuitability(DeviceExtensions, DeviceExtensionsSize,
-				DeviceExtensionsData.Pointer.Data, DeviceExtensionsData.Count, Context->Indices, Context->PhysicalDevice, &DeviceProperties);
+				DeviceExtensionsData, DeviceExtensionCount, Context->Indices, Context->PhysicalDevice, &DeviceProperties);
 
 			if (IsDeviceFound)
 			{
@@ -215,13 +236,18 @@ namespace VulkanCoreContext
 
 		if (!IsDeviceFound)
 		{
-			Util::RenderLog(Util::BMRVkLogType_Error, "Cannot find suitable device");
+			Util::RenderLog(Util::LogType::Error, "Cannot find suitable device");
 		}
 
 		Context->LogicalDevice = CreateLogicalDevice(Context->PhysicalDevice, Context->Indices, DeviceExtensions, DeviceExtensionsSize);
 
-		Memory::FrameArray<VkSurfaceFormatKHR> AvailableFormats = VulkanHelper::GetSurfaceFormats(Context->PhysicalDevice, Context->Surface);
-		Context->SurfaceFormat = VulkanHelper::GetBestSurfaceFormat(Context->Surface, AvailableFormats.Pointer.Data, AvailableFormats.Count);
+		u32 SurfaceFormatCount;
+		VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfaceFormatsKHR(Context->PhysicalDevice, Context->Surface, &SurfaceFormatCount, nullptr));
+
+		auto AvailableFormats = (VkSurfaceFormatKHR*)Render::FrameAlloc(SurfaceFormatCount * sizeof(SurfaceFormatCount));
+		vkGetPhysicalDeviceSurfaceFormatsKHR(Context->PhysicalDevice, Context->Surface, &SurfaceFormatCount, AvailableFormats);
+
+		Context->SurfaceFormat = VulkanHelper::GetBestSurfaceFormat(Context->Surface, AvailableFormats, SurfaceFormatCount);
 
 		VulkanHelper::CheckFormats(Context->PhysicalDevice);
 		Context->SwapExtent = VulkanHelper::GetBestSwapExtent(Context->PhysicalDevice, Context->WindowHandler, Context->Surface);
@@ -289,9 +315,13 @@ namespace VulkanCoreContext
 
 		VULKAN_CHECK_RESULT(vkCreateSwapchainKHR(Context->LogicalDevice, &SwapchainCreateInfo, nullptr, &Context->VulkanSwapchain));
 
-		Memory::FrameArray<VkImage> Images = VulkanHelper::GetSwapchainImages(Context->LogicalDevice, Context->VulkanSwapchain);
+		u32 SwapchainImageCount;
+		vkGetSwapchainImagesKHR(Context->LogicalDevice, Context->VulkanSwapchain, &SwapchainImageCount, nullptr);
 
-		Context->ImagesCount = Images.Count;
+		auto Images = (VkImage*)Render::FrameAlloc(SwapchainImageCount * sizeof(VkImage));
+		vkGetSwapchainImagesKHR(Context->LogicalDevice, Context->VulkanSwapchain, &SwapchainImageCount, Images);
+
+		Context->ImagesCount = SwapchainImageCount;
 
 		for (u32 i = 0; i < Context->ImagesCount; ++i)
 		{

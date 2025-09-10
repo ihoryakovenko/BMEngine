@@ -29,6 +29,8 @@
     <ClCompile Include="Source\Engine\Engine.cpp" />
     <ClCompile Include="Source\Engine\Systems\Concurrency\TaskSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\EngineResources.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Memory\f_mem_debug.c" />
+    <ClCompile Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\DebugUI.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderResources.cpp" />
@@ -47,6 +49,7 @@
     <ClInclude Include="Source\Engine\Engine.h" />
     <ClInclude Include="Source\Engine\Systems\Concurrency\TaskSystem.h" />
     <ClInclude Include="Source\Engine\Systems\EngineResources.h" />
+    <ClInclude Include="Source\Engine\Systems\Memory\forge_memory_debugger.h" />
     <ClInclude Include="Source\Engine\Systems\Render\RenderResources.h" />
     <ClInclude Include="Source\Engine\Systems\Render\TransferSystem.h" />
     <ClInclude Include="Source\Engine\Systems\Render\VulkanCoreContext.h" />
@@ -112,8 +115,8 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <EnableASAN>true</EnableASAN>
-    <EnableFuzzer>true</EnableFuzzer>
+    <EnableASAN>false</EnableASAN>
+    <EnableFuzzer>false</EnableFuzzer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -156,6 +159,7 @@
     <IncludePath>$(IncludePath)</IncludePath>
     <CustomBuildAfterTargets>PrepareForBuild</CustomBuildAfterTargets>
     <CustomBuildBeforeTargets>PrepareForRun</CustomBuildBeforeTargets>
+    <CodeAnalysisRuleSet>..\Build\BMEngine.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
@@ -163,6 +167,7 @@
     <IncludePath>$(IncludePath)</IncludePath>
     <CustomBuildAfterTargets>PrepareForBuild</CustomBuildAfterTargets>
     <CustomBuildBeforeTargets>PrepareForRun</CustomBuildBeforeTargets>
+    <CodeAnalysisRuleSet>..\Build\BMEngine.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
