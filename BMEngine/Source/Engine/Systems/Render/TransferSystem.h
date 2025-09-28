@@ -7,6 +7,8 @@
 
 namespace TransferSystem
 {
+	typedef void (*OnResourceTransferedCallback)(RenderResources::ResourceHandle Handle);
+
 	struct TextureTaskDescription
 	{
 		VkImage DstImage;
@@ -18,6 +20,7 @@ namespace TransferSystem
 	{
 		VkBuffer DstBuffer;
 		u64 DstOffset;
+		VulkanHelper::StageBarrier StageBarrier;
 	};
 
 	struct TransferTask
@@ -32,6 +35,7 @@ namespace TransferSystem
 		u64 DataSize;
 		u32 Alignment;
 		RenderResources::ResourceHandle Handle;
+		OnResourceTransferedCallback OnTransfered;
 	};
 
 	typedef void* TransferMemory;

@@ -94,14 +94,31 @@ namespace Engine
 		{
 			Yaml::Node& BufferNode = (*It).second;
 			std::string BufferName = Util::GetBufferName(BufferNode);
-			RenderResources::BufferDescription Data = Util::ParseBufferNode(BufferNode);
+			RenderResources::StorageBufferDescription Data = Util::ParseStorageBufferNode(BufferNode);
 			
 			if (BufferName.empty())
 			{
 				BufferName = (*It).first;
 			}
 			
-			RenderResources::CreateGPUBuffer(BufferName, Data);
+			RenderResources::CreateStorageBuffer(BufferName, Data);
+		}
+	}
+
+	static void ParseAndCreateMeshBuffers(Yaml::Node& BuffersNode)
+	{
+		for (auto It = BuffersNode.Begin(); It != BuffersNode.End(); It++)
+		{
+			Yaml::Node& BufferNode = (*It).second;
+			std::string BufferName = Util::GetBufferName(BufferNode);
+			RenderResources::MeshBufferDescription Data = Util::ParseMeshBufferNode(BufferNode);
+			
+			if (BufferName.empty())
+			{
+				BufferName = (*It).first;
+			}
+			
+			RenderResources::CreateMeshBuffer(BufferName, Data);
 		}
 	}
 
@@ -248,7 +265,8 @@ namespace Engine
 		ParseAndCreateVertices(Util::GetVertices(Root));
 		ParseAndCreateShaders(Util::GetShaders(Root));
 		ParseAndCreateSamplers(Util::GetSamplers(Root));
-		ParseAndCreateBuffers(Util::GetBuffers(Root));
+		ParseAndCreateMeshBuffers(Util::GetMeshBuffers(Root));
+		ParseAndCreateBuffers(Util::GetStorageBuffers(Root));
 		RenderResources::CreateDescriptorLayouts(Util::GetDescriptorSetLayouts(Root));
 		RenderResources::PostCreateInit();
 

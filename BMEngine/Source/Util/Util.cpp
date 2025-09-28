@@ -1239,11 +1239,23 @@ namespace Util
 		return Empty;
 	}
 
-	Yaml::Node& GetBuffers(Yaml::Node& Root)
+	Yaml::Node& GetMeshBuffers(Yaml::Node& Root)
 	{
-		if (!Root["buffers"].IsNone())
+		if (!Root["meshBuffers"].IsNone())
 		{
-			return Root["buffers"];
+			return Root["meshBuffers"];
+		}
+
+		assert(false);
+		static Yaml::Node Empty;
+		return Empty;
+	}
+
+	Yaml::Node& GetStorageBuffers(Yaml::Node& Root)
+	{
+		if (!Root["storageBuffers"].IsNone())
+		{
+			return Root["storageBuffers"];
 		}
 
 		assert(false);
@@ -1517,9 +1529,59 @@ namespace Util
 		return VulkanHelper::MemoryPropertyFlag::GPULocal;
 	}
 
-	RenderResources::BufferDescription ParseBufferNode(Yaml::Node& BufferNode)
+	VulkanHelper::StageBarrier ParseStageBarrier(const char* Value, u32 Length)
 	{
-		RenderResources::BufferDescription Data = { };
+		if (strncmp(Value, "Vertex", Length) == 0)
+		{
+			return VulkanHelper::StageBarrier::Vertex;
+		}
+		else if (strncmp(Value, "Fragment", Length) == 0)
+		{
+			return VulkanHelper::StageBarrier::Fragment;
+		}
+
+		assert(false);
+		return VulkanHelper::StageBarrier::Fragment;
+	}
+
+	RenderResources::StorageBufferDescription ParseStorageBufferNode(Yaml::Node& BufferNode)
+	{
+		RenderResources::StorageBufferDescription Data = { };
+
+		if (!BufferNode["bufferUsageFlag"].IsNone())
+		{
+			std::string value = BufferNode["bufferUsageFlag"].As<std::string>();
+			Data.BufferUsageFlag = ParseBufferUsageFlag(value.c_str(), value.length());
+		}
+
+		if (!BufferNode["memoryPropertyFlag"].IsNone())
+		{
+			std::string value = BufferNode["memoryPropertyFlag"].As<std::string>();
+			Data.MemoryPropertyFlag = ParseMemoryPropertyFlag(value.c_str(), value.length());
+		}
+
+		if (!BufferNode["entrySize"].IsNone())
+		{
+			Data.EntrySize = BufferNode["entrySize"].As<u32>();
+		}
+
+		if (!BufferNode["count"].IsNone())
+		{
+			Data.Count = BufferNode["count"].As<u32>();
+		}
+
+		if (!BufferNode["stageBarrier"].IsNone())
+		{
+			std::string value = BufferNode["stageBarrier"].As<std::string>();
+			Data.StageBarrier = ParseStageBarrier(value.c_str(), value.length());
+		}
+
+		return Data;
+	}
+
+	RenderResources::MeshBufferDescription ParseMeshBufferNode(Yaml::Node& BufferNode)
+	{
+		RenderResources::MeshBufferDescription Data = { };
 
 		if (!BufferNode["bufferUsageFlag"].IsNone())
 		{

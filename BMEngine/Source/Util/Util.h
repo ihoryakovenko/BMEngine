@@ -263,7 +263,8 @@ namespace Util
 	Yaml::Node& GetSceneResources(Yaml::Node& Root);
 	Yaml::Node& GetTextures(Yaml::Node& Root);
 	Yaml::Node& GetModels(Yaml::Node& Root);
-	Yaml::Node& GetBuffers(Yaml::Node& Root);
+	Yaml::Node& GetMeshBuffers(Yaml::Node& Root);
+	Yaml::Node& GetStorageBuffers(Yaml::Node& Root);
 	
 	std::string GetModelPath(Yaml::Node& ModelNode);
 	glm::vec3 GetModelPosition(Yaml::Node& ModelNode);
@@ -310,7 +311,9 @@ namespace Util
 
 	VulkanHelper::BufferUsageFlag ParseBufferUsageFlag(const char* Value, u32 Length);
 	VulkanHelper::MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length);
-	RenderResources::BufferDescription ParseBufferNode(Yaml::Node& BufferNode);
+	VulkanHelper::StageBarrier ParseStageBarrier(const char* Value, u32 Length);
+	RenderResources::StorageBufferDescription ParseStorageBufferNode(Yaml::Node& BufferNode);
+	RenderResources::MeshBufferDescription ParseMeshBufferNode(Yaml::Node& BufferNode);
 	std::string GetBufferName(Yaml::Node& BufferNode);
 	
 	VkFormat GliFormatToVkFormat(gli::format Format);

@@ -44,6 +44,12 @@ namespace VulkanHelper
 		HostCompatible = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 	};
 
+	enum class StageBarrier
+	{
+		Vertex,
+		Fragment
+	};
+
 	struct PhysicalDeviceIndices
 	{
 		s32 GraphicsFamily;
@@ -153,4 +159,6 @@ namespace VulkanHelper
 	VKAPI_ATTR VkBool32 VKAPI_CALL MessengerDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
 		VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
 		void* UserData);
+
+	void ApplyStageBarrier(VkBufferMemoryBarrier2* Barrier, StageBarrier Stage);
 }

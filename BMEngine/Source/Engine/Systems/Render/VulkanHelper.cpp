@@ -604,6 +604,28 @@ namespace VulkanHelper
 		return VK_FALSE;
 	}
 
+	void ApplyStageBarrier(VkBufferMemoryBarrier2* Barrier, StageBarrier Stage)
+	{
+		switch (Stage)
+		{
+			case VulkanHelper::StageBarrier::Vertex:
+				Barrier->srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+				Barrier->srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+				Barrier->dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT;
+				Barrier->dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
+				break;
+			case VulkanHelper::StageBarrier::Fragment:
+				Barrier->srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+				Barrier->srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+				Barrier->dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+				Barrier->dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT;
+				break;
+			default:
+				assert(false);
+				break;
+		}
+	}
+
 	bool CheckFormats(VkPhysicalDevice PhDevice)
 	{
 		const u32 FormatPrioritySize = 3;

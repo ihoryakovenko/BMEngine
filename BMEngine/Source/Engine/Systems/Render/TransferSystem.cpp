@@ -141,43 +141,11 @@ namespace TransferSystem
 				switch (RenderResources::GetResourceType(Task->Handle))
 				{
 					case RenderResources::ResourceType::Mesh:
+					case RenderResources::ResourceType::StorageResource:
 					{
 						VkBufferMemoryBarrier2 Barrier = { };
 						Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-						Barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
-						Barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-						Barrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT;
-						Barrier.dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
-						Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-						Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-						Barrier.buffer = Task->DataDescr.DstBuffer;
-						Barrier.offset = Task->DataDescr.DstOffset;
-						Barrier.size = Task->DataSize;
-
-						VkDependencyInfo DepInfo = { };
-						DepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-						DepInfo.bufferMemoryBarrierCount = 1;
-						DepInfo.pBufferMemoryBarriers = &Barrier;
-
-						VkBufferCopy IndexBufferCopyRegion = { };
-						IndexBufferCopyRegion.srcOffset = AlignedOffset;
-						IndexBufferCopyRegion.dstOffset = Task->DataDescr.DstOffset;
-						IndexBufferCopyRegion.size = Task->DataSize;
-
-						vkCmdCopyBuffer(TransferCommandBuffer, TransferState.TransferStagingPool.Buffer, Task->DataDescr.DstBuffer, 1, &IndexBufferCopyRegion);
-						vkCmdPipelineBarrier2(TransferCommandBuffer, &DepInfo);
-
-						break;
-					}
-					case RenderResources::ResourceType::Material:
-					case RenderResources::ResourceType::Instance:
-					{
-						VkBufferMemoryBarrier2 Barrier = { };
-						Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-						Barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
-						Barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-						Barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-						Barrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT;
+						VulkanHelper::ApplyStageBarrier(&Barrier, Task->DataDescr.StageBarrier);
 						Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 						Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 						Barrier.buffer = Task->DataDescr.DstBuffer;
@@ -323,7 +291,7 @@ namespace TransferSystem
 				assert(HasCompletedTasks(&TransferState.TransferTasksQueue));
 
 				TransferTask* Task = GetFirstCompletedTask(&TransferState.TransferTasksQueue);
-				RenderResources::SetResourceReadyToRender(Task->Handle);
+				Task->OnTransfered(Task->Handle);
 
 				Memory::RingFree(&TransferState.TransferMemory.ControlBlock, Task->DataSize, 1);
 				PopCompletedTask(&TransferState.TransferTasksQueue);

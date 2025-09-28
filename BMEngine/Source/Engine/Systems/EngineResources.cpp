@@ -83,8 +83,8 @@ namespace EngineResources
 				const u64 VerticesCount = Model.VerticesCounts[i];
 				const u32 IndicesCount = Model.IndicesCounts[i];
 
-				u32 AlbedoTextureIndex = 0;
-				u32 SpecularTextureIndex = 0;
+				u32 AlbedoTextureHandle = 0;
+				u32 SpecularTextureHandle = 0;
 
 				if (Model.Header.MaterialCount > 0)
 				{
@@ -100,8 +100,8 @@ namespace EngineResources
 							it->second.IsCreated = true;
 						}
 
-						AlbedoTextureIndex = it->second.RenderTextureIndex;
-						SpecularTextureIndex = AlbedoTextureIndex;
+						AlbedoTextureHandle = it->second.RenderTextureIndex;
+						SpecularTextureHandle = AlbedoTextureHandle;
 					}
 
 					it = TextureAssets.find(material.SpecularTextureHash);
@@ -113,7 +113,7 @@ namespace EngineResources
 							it->second.IsCreated = true;
 						}
 
-						SpecularTextureIndex = it->second.RenderTextureIndex;
+						SpecularTextureHandle = it->second.RenderTextureIndex;
 					}
 				}
 
@@ -122,31 +122,31 @@ namespace EngineResources
 				
 
 				Material Mat;
-				Mat.AlbedoTexIndex = AlbedoTextureIndex;
-				Mat.SpecularTexIndex = SpecularTextureIndex;
+				Mat.AlbedoTexIndex = RenderResources::GetResourceGPUIndex(AlbedoTextureHandle);
+				Mat.SpecularTexIndex = RenderResources::GetResourceGPUIndex(SpecularTextureHandle);
 				Mat.Shininess = 32.0f;
 
 				RenderResources::ResourceDependency AlbedoTextureDependency;
-				AlbedoTextureDependency.Handle = RenderResources::PackResourceHandle(RenderResources::ResourceType::Texture, AlbedoTextureIndex);
+				AlbedoTextureDependency.Handle = AlbedoTextureHandle;
 
 				RenderResources::ResourceDependency SpecularTextureDependency;
-				SpecularTextureDependency.Handle = RenderResources::PackResourceHandle(RenderResources::ResourceType::Texture, SpecularTextureIndex);
+				SpecularTextureDependency.Handle = SpecularTextureHandle;
 
-				const RenderResources::ResourceHandle MaterialHandle = RenderResources::CreateMaterial(sizeof(Mat), "MaterialBuffer");
-				RenderResources::AddResourceDependencyToMaterial(MaterialHandle, AlbedoTextureDependency);
-				RenderResources::AddResourceDependencyToMaterial(MaterialHandle, SpecularTextureDependency);
-				RenderResources::UpdateMaterial(MaterialHandle, &Mat, sizeof(Mat), "MaterialBuffer");
+				const RenderResources::ResourceHandle MaterialHandle = RenderResources::CreateStorageBufferResource(sizeof(Mat), "MaterialBuffer");
+				RenderResources::AddResourceDependency(MaterialHandle, AlbedoTextureDependency);
+				RenderResources::AddResourceDependency(MaterialHandle, SpecularTextureDependency);
+				RenderResources::UpdateStorageBufferResource(MaterialHandle, &Mat, sizeof(Mat), "MaterialBuffer");
 
 				InstanceData Instance;
-				Instance.MaterialIndex = MaterialHandle;
+				Instance.MaterialIndex = RenderResources::GetResourceGPUIndex(MaterialHandle);
 				Instance.ModelMatrix = glm::translate(glm::mat4(1), Request.Position);
 
 				RenderResources::ResourceDependency MateriaDependency;
 				MateriaDependency.Handle = MaterialHandle;
 
-				const RenderResources::ResourceHandle InstanceHandle = RenderResources::CreateStaticMeshInstance(sizeof(Instance), "GPUInstances");
-				RenderResources::AddResourceDependencyToInstance(InstanceHandle, MateriaDependency);
-				RenderResources::UpdateInstance(InstanceHandle, &Instance, sizeof(Instance), "GPUInstances");
+				const RenderResources::ResourceHandle InstanceHandle = RenderResources::CreateStorageBufferResource(sizeof(Instance), "GPUInstances");
+				RenderResources::AddResourceDependency(InstanceHandle, MateriaDependency);
+				RenderResources::UpdateStorageBufferResource(InstanceHandle, &Instance, sizeof(Instance), "GPUInstances");
 
 				RenderResources::MeshDescription Mesh;
 				Mesh.IndicesCount = IndicesCount;
@@ -154,7 +154,7 @@ namespace EngineResources
 				Mesh.VerticesCount = VerticesCount;
 
 				Render::DrawEntity Entity = { };
-				Entity.StaticMeshIndex = RenderResources::CreateStaticMesh(&Mesh, Model.VertexData + ModelVertexByteOffset);
+				Entity.StaticMeshIndex = RenderResources::CreateStaticMesh(&Mesh, Model.VertexData + ModelVertexByteOffset, "VertexStageData");
 				Entity.Instances = 1;
 				Entity.InstanceDataIndex = InstanceHandle;
 
