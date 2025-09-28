@@ -14,7 +14,7 @@ namespace EngineResources
 	static std::queue<ModelLoadRequest> ModelLoadRequests;
 	static std::mutex ModelLoadMutex;
 
-	static u32 CreateTexture(const std::string& Path)
+	static RenderResources::ResourceHandle CreateTexture(const std::string& Path)
 	{
 		gli::texture Texture = gli::load(Path);
 		if (Texture.empty())
@@ -127,14 +127,12 @@ namespace EngineResources
 				Mat.Shininess = 32.0f;
 
 				RenderResources::ResourceDependency AlbedoTextureDependency;
-				AlbedoTextureDependency.ResourceIndex = AlbedoTextureIndex;
-				AlbedoTextureDependency.Type = RenderResources::ResourceType::Texture;
+				AlbedoTextureDependency.Handle = RenderResources::PackResourceHandle(RenderResources::ResourceType::Texture, AlbedoTextureIndex);
 
 				RenderResources::ResourceDependency SpecularTextureDependency;
-				SpecularTextureDependency.ResourceIndex = SpecularTextureIndex;
-				SpecularTextureDependency.Type = RenderResources::ResourceType::Texture;
+				SpecularTextureDependency.Handle = RenderResources::PackResourceHandle(RenderResources::ResourceType::Texture, SpecularTextureIndex);
 
-				const u32 MaterialHandle = RenderResources::CreateMaterial(sizeof(Mat), "MaterialBuffer");
+				const RenderResources::ResourceHandle MaterialHandle = RenderResources::CreateMaterial(sizeof(Mat), "MaterialBuffer");
 				RenderResources::AddResourceDependencyToMaterial(MaterialHandle, AlbedoTextureDependency);
 				RenderResources::AddResourceDependencyToMaterial(MaterialHandle, SpecularTextureDependency);
 				RenderResources::UpdateMaterial(MaterialHandle, &Mat, sizeof(Mat), "MaterialBuffer");
@@ -144,10 +142,9 @@ namespace EngineResources
 				Instance.ModelMatrix = glm::translate(glm::mat4(1), Request.Position);
 
 				RenderResources::ResourceDependency MateriaDependency;
-				MateriaDependency.ResourceIndex = MaterialHandle;
-				MateriaDependency.Type = RenderResources::ResourceType::Material;
+				MateriaDependency.Handle = MaterialHandle;
 
-				const u32 InstanceHandle = RenderResources::CreateStaticMeshInstance(sizeof(Instance), "GPUInstances");
+				const RenderResources::ResourceHandle InstanceHandle = RenderResources::CreateStaticMeshInstance(sizeof(Instance), "GPUInstances");
 				RenderResources::AddResourceDependencyToInstance(InstanceHandle, MateriaDependency);
 				RenderResources::UpdateInstance(InstanceHandle, &Instance, sizeof(Instance), "GPUInstances");
 

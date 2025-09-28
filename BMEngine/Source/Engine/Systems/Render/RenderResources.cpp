@@ -13,13 +13,6 @@
 
 namespace RenderResources
 {
-	template<typename T>
-	struct RenderResource
-	{
-		T Resource;
-		std::atomic<bool> IsLoaded;
-	};
-
 	struct ResourceContext
 	{
 		VulkanCoreContext::VulkanCoreContext CoreContext;
@@ -39,9 +32,9 @@ namespace RenderResources
 		u32 StaticMeshCount;
 
 		ResourceRecord* MaterialRecords;
-		RenderResource<MeshTexture2D>* Textures;
+		MeshTexture2D* Textures;
 		ResourceRecord* MeshInstances;
-		RenderResource<VertexData>* StaticMeshes;
+		VertexData* StaticMeshes;
 		
 
 		VkDescriptorSetLayout BindlesTexturesLayout;
@@ -66,32 +59,35 @@ namespace RenderResources
 		for (u32 i = 0; i < Record->Dependencies.Count; ++i)
 		{
 			ResourceDependency* Dependency = Record->Dependencies.Data + i;
-			switch (Dependency->Type)
+			ResourceType Type = GetResourceType(Dependency->Handle);
+			u32 ResourceIndex = GetResourceIndex(Dependency->Handle);
+			
+			switch (Type)
 			{
 				case RenderResources::ResourceType::Texture:
 
-					if (!Context->Textures[Dependency->ResourceIndex].IsLoaded)
+					if (!Context->Textures[ResourceIndex].MeshTexture.IsLoaded)
 					{
 						return false;
 					}
 
 					break;
 				case RenderResources::ResourceType::Mesh:
-					if (!Context->StaticMeshes[Dependency->ResourceIndex].IsLoaded)
+					if (!Context->StaticMeshes[ResourceIndex].IsLoaded)
 					{
 						return false;
 					}
 
 					break;
 				case RenderResources::ResourceType::Instance:
-					if (!CheckRecordAndDependenciesLoadState(Context, Context->MeshInstances + Dependency->ResourceIndex))
+					if (!CheckRecordAndDependenciesLoadState(Context, Context->MeshInstances + ResourceIndex))
 					{
 						return false;
 					}
 
 					break;
 				case RenderResources::ResourceType::Material:
-					if (!CheckRecordAndDependenciesLoadState(Context, Context->MaterialRecords + Dependency->ResourceIndex))
+					if (!CheckRecordAndDependenciesLoadState(Context, Context->MaterialRecords + ResourceIndex))
 					{
 						return false;
 					}
@@ -104,11 +100,6 @@ namespace RenderResources
 
 			return true;
 		}
-	}
-
-	static bool CheckDependency(ResourceDependency Dependency)
-	{
-
 	}
 
 	static ResourceContext ResContext;
@@ -146,7 +137,7 @@ namespace RenderResources
 
 		ResContext.MaxTextures = 64;
 		ResContext.TextureCount = 0;
-		ResContext.Textures = (RenderResource<MeshTexture2D>*)malloc(ResContext.MaxTextures * sizeof(ResContext.Textures[0]));
+		ResContext.Textures = (MeshTexture2D*)malloc(ResContext.MaxTextures * sizeof(ResContext.Textures[0]));
 
 		ResContext.MaterialCount = 0;
 		ResContext.MaxMaterials = 30000;
@@ -154,7 +145,7 @@ namespace RenderResources
 
 		ResContext.MaxStaticMeshes = 30000;
 		ResContext.StaticMeshCount = 0;
-		ResContext.StaticMeshes = (RenderResource<VertexData>*)malloc(ResContext.MaxStaticMeshes * sizeof(ResContext.StaticMeshes[0]));
+		ResContext.StaticMeshes = (VertexData*)malloc(ResContext.MaxStaticMeshes * sizeof(ResContext.StaticMeshes[0]));
 
 		ResContext.MaxMeshInstances = 30000;
 		ResContext.MeshInstanceCount = 0;
@@ -306,9 +297,9 @@ namespace RenderResources
 
 		for (uint32_t i = 0; i < ResContext.TextureCount; ++i)
 		{
-			vkDestroyImageView(Device, ResContext.Textures[i].Resource.View, nullptr);
-			vkDestroyImage(Device, ResContext.Textures[i].Resource.MeshTexture.Image, nullptr);
-			vkFreeMemory(Device, ResContext.Textures[i].Resource.MeshTexture.Memory, nullptr);
+			vkDestroyImageView(Device, ResContext.Textures[i].View, nullptr);
+			vkDestroyImage(Device, ResContext.Textures[i].MeshTexture.Image, nullptr);
+			vkFreeMemory(Device, ResContext.Textures[i].MeshTexture.Memory, nullptr);
 		}
 
 		for (u32 i = 0; i < ResContext.MaterialCount; ++i)
@@ -555,7 +546,7 @@ namespace RenderResources
 		return { };
 	}
 
-	u32 CreateStaticMesh(MeshDescription* Description, void* Data)
+	ResourceHandle CreateStaticMesh(MeshDescription* Description, void* Data)
 	{
 		assert(ResContext.StaticMeshCount < ResContext.MaxStaticMeshes);
 
@@ -566,13 +557,13 @@ namespace RenderResources
 		void* TransferMemory = TransferSystem::RequestTransferMemory(DataSize);
 		memcpy(TransferMemory, Data, DataSize);
 
-		RenderResource<VertexData>* Resource = &ResContext.StaticMeshes[ResContext.StaticMeshCount];
+		VertexData* Resource = &ResContext.StaticMeshes[ResContext.StaticMeshCount];
 		Resource->IsLoaded = false;
-		Resource->Resource.IndicesCount = Description->IndicesCount;
+		Resource->IndicesCount = Description->IndicesCount;
 		VulkanHelper::GPUBuffer* vertexBuffer = GetGPUBuffer("VertexStageData");
-		Resource->Resource.VertexOffset = vertexBuffer->Offset;
-		Resource->Resource.IndexOffset = vertexBuffer->Offset + VerticesSize;
-		Resource->Resource.VertexDataSize = DataSize;
+		Resource->VertexOffset = vertexBuffer->Offset;
+		Resource->IndexOffset = vertexBuffer->Offset + VerticesSize;
+		Resource->VertexDataSize = DataSize;
 
 		TransferSystem::TransferTask Task = { };
 		Task.DataSize = DataSize;
@@ -580,16 +571,16 @@ namespace RenderResources
 		Task.DataDescr.DstBuffer = vertexBuffer->Buffer;
 		Task.DataDescr.DstOffset = vertexBuffer->Offset;
 		Task.RawData = TransferMemory;
-		Task.ResourceIndex = ResContext.StaticMeshCount;
-		Task.Type = ResourceType::Mesh;
+		Task.Handle = PackResourceHandle(ResourceType::Mesh, ResContext.StaticMeshCount);
 
 		AddTask(&Task);
 
 		vertexBuffer->Offset += DataSize;
-		return ResContext.StaticMeshCount++;
+		u32 Index = ResContext.StaticMeshCount++;
+		return PackResourceHandle(ResourceType::Mesh, Index);
 	}
 
-	u32 CreateTexture(TextureDescription* Description, void* Data)
+	ResourceHandle CreateTexture(TextureDescription* Description, void* Data)
 	{
 		assert(ResContext.TextureCount < ResContext.MaxTextures);
 
@@ -598,10 +589,10 @@ namespace RenderResources
 		VkQueue TransferQueue = VulkanInterface::GetTransferQueue();
 
 		const u64 Index = ResContext.TextureCount;
-		RenderResource<MeshTexture2D>* Resource = &ResContext.Textures[ResContext.TextureCount];
-		Resource->IsLoaded = false;
+		MeshTexture2D* Resource = &ResContext.Textures[ResContext.TextureCount];
+		Resource->MeshTexture.IsLoaded = false;
 
-		MeshTexture2D* NextTexture = &Resource->Resource;
+		MeshTexture2D* NextTexture = Resource;
 
 		NextTexture->MeshTexture.Width = Description->Width;
 		NextTexture->MeshTexture.Height = Description->Height;
@@ -691,15 +682,14 @@ namespace RenderResources
 		Task.TextureDescr.Width = Description->Width;
 		Task.TextureDescr.Height = Description->Height;
 		Task.RawData = TransferMemory;
-		Task.ResourceIndex = Index;
-		Task.Type = ResourceType::Texture;
+		Task.Handle = PackResourceHandle(ResourceType::Texture, Index);
 
 		AddTask(&Task);
 		ResContext.TextureCount++;
-		return Index;
+		return PackResourceHandle(ResourceType::Texture, Index);
 	}
 
-	u32 CreateMaterial(u32 DataSize, const std::string& BufferName)
+	ResourceHandle CreateMaterial(u32 DataSize, const std::string& BufferName)
 	{
 		assert(ResContext.MaterialCount < ResContext.MaxMaterials);
 
@@ -711,10 +701,11 @@ namespace RenderResources
 		NewResource->GPUBufferOffset = MaterialBuffer->Offset;
 		
 		MaterialBuffer->Offset += DataSize;
-		return ResContext.MaterialCount++;
+		u32 Index = ResContext.MaterialCount++;
+		return PackResourceHandle(ResourceType::Material, Index);
 	}
 
-	u32 CreateStaticMeshInstance(u32 DataSize, const std::string& BufferName)
+	ResourceHandle CreateStaticMeshInstance(u32 DataSize, const std::string& BufferName)
 	{
 		assert(ResContext.MeshInstanceCount < ResContext.MaxMeshInstances);
 
@@ -726,22 +717,26 @@ namespace RenderResources
 		NewResource->GPUBufferOffset = InstanceBuffer->Offset;
 
 		InstanceBuffer->Offset += DataSize;
-		return ResContext.MeshInstanceCount++;
+		u32 Index = ResContext.MeshInstanceCount++;
+		return PackResourceHandle(ResourceType::Instance, Index);
 	}
 
-	void AddResourceDependencyToMaterial(u32 Handle, ResourceDependency Dependency)
+	void AddResourceDependencyToMaterial(ResourceHandle Handle, ResourceDependency Dependency)
 	{
-		Memory::PushBackToArray(&ResContext.MaterialRecords[Handle].Dependencies, &Dependency);
+		u32 Index = GetResourceIndex(Handle);
+		Memory::PushBackToArray(&ResContext.MaterialRecords[Index].Dependencies, &Dependency);
 	}
 
-	void AddResourceDependencyToInstance(u32 Handle, ResourceDependency Dependency)
+	void AddResourceDependencyToInstance(ResourceHandle Handle, ResourceDependency Dependency)
 	{
-		Memory::PushBackToArray(&ResContext.MeshInstances[Handle].Dependencies, &Dependency);
+		u32 Index = GetResourceIndex(Handle);
+		Memory::PushBackToArray(&ResContext.MeshInstances[Index].Dependencies, &Dependency);
 	}
 
-	void UpdateMaterial(u32 Handle, void* Data, u32 DataSize, const std::string& BufferName)
+	void UpdateMaterial(ResourceHandle Handle, void* Data, u32 DataSize, const std::string& BufferName)
 	{
-		ResourceRecord* MaterialResource = ResContext.MaterialRecords + Handle;
+		u32 Index = GetResourceIndex(Handle);
+		ResourceRecord* MaterialResource = ResContext.MaterialRecords + Index;
 
 		// TODO: TMP solution
 		void* TransferMemory = TransferSystem::RequestTransferMemory(DataSize);
@@ -755,15 +750,15 @@ namespace RenderResources
 		Task.DataDescr.DstBuffer = Buffer->Buffer;
 		Task.DataDescr.DstOffset = MaterialResource->GPUBufferOffset;
 		Task.RawData = TransferMemory;
-		Task.ResourceIndex = ResContext.MaterialCount;
-		Task.Type = ResourceType::Material;
+		Task.Handle = PackResourceHandle(ResourceType::Material, ResContext.MaterialCount);
 
 		TransferSystem::AddTask(&Task);
 	}
 
-	void UpdateInstance(u32 Handle, void* Data, u32 DataSize, const std::string& BufferName)
+	void UpdateInstance(ResourceHandle Handle, void* Data, u32 DataSize, const std::string& BufferName)
 	{
-		ResourceRecord* MaterialResource = ResContext.MeshInstances + Handle;
+		u32 Index = GetResourceIndex(Handle);
+		ResourceRecord* MaterialResource = ResContext.MeshInstances + Index;
 
 		// TODO: TMP solution
 		void* TransferMemory = TransferSystem::RequestTransferMemory(DataSize);
@@ -777,15 +772,14 @@ namespace RenderResources
 		Task.DataDescr.DstBuffer = Buffer->Buffer;
 		Task.DataDescr.DstOffset = MaterialResource->GPUBufferOffset;
 		Task.RawData = TransferMemory;
-		Task.ResourceIndex = ResContext.MaterialCount;
-		Task.Type = ResourceType::Instance;
+		Task.Handle = PackResourceHandle(ResourceType::Instance, ResContext.MaterialCount);
 
 		TransferSystem::AddTask(&Task);
 	}
 
 	VertexData* GetStaticMesh(u32 Index)
 	{
-		return &ResContext.StaticMeshes[Index].Resource;
+		return &ResContext.StaticMeshes[Index];
 	}
 
 	ResourceRecord* GetInstanceData(u32 Index)
@@ -795,24 +789,29 @@ namespace RenderResources
 
 	MeshTexture2D* GetTexture(u32 Index)
 	{
-		return &ResContext.Textures[Index].Resource;
+		return &ResContext.Textures[Index];
 	}
 
 	bool IsDrawEntityLoaded(const Render::DrawEntity* Entity)
 	{
-		RenderResource<VertexData>* MeshResource = ResContext.StaticMeshes + Entity->StaticMeshIndex;
+		u32 MeshIndex = GetResourceIndex(Entity->StaticMeshIndex);
+		VertexData* MeshResource = ResContext.StaticMeshes + MeshIndex;
 		if (!MeshResource->IsLoaded) return false;
 
-		ResourceRecord* InstanceResource = ResContext.MeshInstances + Entity->InstanceDataIndex;
+		u32 InstanceIndex = GetResourceIndex(Entity->InstanceDataIndex);
+		ResourceRecord* InstanceResource = ResContext.MeshInstances + InstanceIndex;
 		return CheckRecordAndDependenciesLoadState(&ResContext, InstanceResource);
 	}
 
-	void SetResourceReadyToRender(u32 ResourceIndex, ResourceType Type)
+	void SetResourceReadyToRender(ResourceHandle Handle)
 	{
+		ResourceType Type = GetResourceType(Handle);
+		u32 ResourceIndex = GetResourceIndex(Handle);
+		
 		switch (Type)
 		{
 			case RenderResources::ResourceType::Texture:
-				ResContext.Textures[ResourceIndex].IsLoaded = true;
+				ResContext.Textures[ResourceIndex].MeshTexture.IsLoaded = true;
 				break;
 			case RenderResources::ResourceType::Mesh:
 				ResContext.StaticMeshes[ResourceIndex].IsLoaded = true;
@@ -849,17 +848,6 @@ namespace RenderResources
 		return ResContext.MaterialSet;
 	}
 
-	VkBuffer GetVertexStageBuffer()
-	{
-		VulkanHelper::GPUBuffer* buffer = GetGPUBuffer("VertexStageData");
-		return buffer->Buffer;
-	}
-
-	VkBuffer GetInstanceBuffer()
-	{
-		VulkanHelper::GPUBuffer* instanceBuffer = GetGPUBuffer("GPUInstances");
-		return instanceBuffer->Buffer;
-	}
 
 	VkDescriptorPool GetMainPool()
 	{

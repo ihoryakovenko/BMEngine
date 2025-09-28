@@ -205,8 +205,8 @@ namespace Render
 
 			const VkBuffer Buffers[] =
 			{
-				RenderResources::GetVertexStageBuffer(),
-				RenderResources::GetInstanceBuffer()
+				RenderResources::GetGPUBuffer("VertexStageData")->Buffer,
+				RenderResources::GetGPUBuffer("GPUInstances")->Buffer
 			};
 
 			const u64 Offsets[] = 
@@ -219,7 +219,7 @@ namespace Render
 				2, DescriptorSetGroupCount, DescriptorSetGroup, 1, &LightDynamicOffset);
 
 			vkCmdBindVertexBuffers(CmdBuffer, 0, 2, Buffers, Offsets);
-			vkCmdBindIndexBuffer(CmdBuffer, RenderResources::GetVertexStageBuffer(), Mesh->IndexOffset, VK_INDEX_TYPE_UINT32);
+			vkCmdBindIndexBuffer(CmdBuffer, RenderResources::GetGPUBuffer("VertexStageData")->Buffer, Mesh->IndexOffset, VK_INDEX_TYPE_UINT32);
 			vkCmdDrawIndexed(CmdBuffer, Mesh->IndicesCount, DrawEntity->Instances, 0, 0, 0);
 		}
 	}
@@ -1012,8 +1012,8 @@ namespace LightningPass
 
 				const VkBuffer Buffers[] =
 				{
-					RenderResources::GetVertexStageBuffer(),
-					RenderResources::GetInstanceBuffer()
+					RenderResources::GetGPUBuffer("VertexStageData")->Buffer,
+					RenderResources::GetGPUBuffer("GPUInstances")->Buffer
 				};
 
 				const u64 Offsets[] =
@@ -1034,7 +1034,7 @@ namespace LightningPass
 					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr);
 
 				vkCmdBindVertexBuffers(CmdBuffer, 0, 2, Buffers, Offsets);
-				vkCmdBindIndexBuffer(CmdBuffer, RenderResources::GetVertexStageBuffer(), Mesh->IndexOffset, VK_INDEX_TYPE_UINT32);
+				vkCmdBindIndexBuffer(CmdBuffer, RenderResources::GetGPUBuffer("VertexStageData")->Buffer, Mesh->IndexOffset, VK_INDEX_TYPE_UINT32);
 				vkCmdDrawIndexed(CmdBuffer, Mesh->IndicesCount, DrawEntity->Instances, 0, 0, 0);
 			}
 

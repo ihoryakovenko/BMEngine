@@ -31,8 +31,7 @@ namespace TransferSystem
 		void* RawData;
 		u64 DataSize;
 		u32 Alignment;
-		RenderResources::ResourceType Type;
-		u32 ResourceIndex;
+		RenderResources::ResourceHandle Handle;
 	};
 
 	typedef void* TransferMemory;

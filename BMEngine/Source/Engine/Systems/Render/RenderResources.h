@@ -20,20 +20,35 @@ namespace VulkanCoreContext
 
 namespace RenderResources
 {
-	enum class ResourceType
-	{
-		Invalid,
+	typedef u64 ResourceHandle;
 
-		Texture,
-		Mesh,
-		Material,
-		Instance,
+	enum class ResourceType : u32
+	{
+		Texture = 0,
+		Mesh = 1,
+		Material = 2,
+		Instance = 3,
 	};
+
+	// Helper functions for ResourceHandle
+	inline ResourceHandle PackResourceHandle(ResourceType Type, u32 Index)
+	{
+		return (static_cast<u64>(Type) << 32) | static_cast<u64>(Index);
+	}
+
+	inline ResourceType GetResourceType(ResourceHandle Handle)
+	{
+		return static_cast<ResourceType>(Handle >> 32);
+	}
+
+	inline u32 GetResourceIndex(ResourceHandle Handle)
+	{
+		return static_cast<u32>(Handle & 0xFFFFFFFF);
+	}
 
 	struct ResourceDependency
 	{
-		ResourceType Type;
-		u32 ResourceIndex;
+		ResourceHandle Handle;
 	};
 
 	struct ResourceRecord
@@ -49,6 +64,7 @@ namespace RenderResources
 		u32 IndexOffset;
 		u32 IndicesCount;
 		u64 VertexDataSize;
+		std::atomic<bool> IsLoaded;
 	};
 
 	struct Texture
@@ -59,6 +75,7 @@ namespace RenderResources
 		u64 Alignment;
 		u32 Width;
 		u32 Height;
+		std::atomic<bool> IsLoaded;
 	};
 
 	struct MeshTexture2D
@@ -128,30 +145,30 @@ namespace RenderResources
 	VkPipeline CreateGraphicsPipeline(VkDevice Device, Yaml::Node& Root,
 		VkExtent2D Extent, VkPipelineLayout PipelineLayout, const VulkanHelper::PipelineResourceInfo* ResourceInfo);
 
-	u32 CreateStaticMesh(MeshDescription* Description, void* Data);
+	ResourceHandle CreateStaticMesh(MeshDescription* Description, void* Data);
 	
-	u32 CreateTexture(TextureDescription* Description, void* Data);
+	ResourceHandle CreateTexture(TextureDescription* Description, void* Data);
 	
-	u32 CreateStaticMeshInstance(u32 DataSize, const std::string& BufferName);
-	u32 CreateMaterial(u32 DataSize, const std::string& BufferName);
+	ResourceHandle CreateStaticMeshInstance(u32 DataSize, const std::string& BufferName);
+	ResourceHandle CreateMaterial(u32 DataSize, const std::string& BufferName);
 
-	void AddResourceDependencyToMaterial(u32 Handle, ResourceDependency Dependency);
-	void AddResourceDependencyToInstance(u32 Handle, ResourceDependency Dependency);
+	void AddResourceDependencyToMaterial(ResourceHandle Handle, ResourceDependency Dependency);
+	void AddResourceDependencyToInstance(ResourceHandle Handle, ResourceDependency Dependency);
 
-	void UpdateMaterial(u32 Handle, void* Data, u32 DataSize, const std::string& BufferName);
-	void UpdateInstance(u32 Handle, void* Data, u32 DataSize, const std::string& BufferName);
+	void UpdateMaterial(ResourceHandle Handle, void* Data, u32 DataSize, const std::string& BufferName);
+	void UpdateInstance(ResourceHandle Handle, void* Data, u32 DataSize, const std::string& BufferName);
+
+	//void UpdateResource(u32 Handle, ResourceType Type, const std::string& BufferName, void* Data, u32 DataSize, u32 Offset);
 
 	VertexData* GetStaticMesh(u32 Index);
 	ResourceRecord* GetInstanceData(u32 Index);
 	MeshTexture2D* GetTexture(u32 Index);
 
-	void SetResourceReadyToRender(u32 ResourceIndex, ResourceType Type);
+	void SetResourceReadyToRender(ResourceHandle Handle);
 	VkDescriptorSetLayout GetBindlesTexturesLayout();
 	VkDescriptorSetLayout GetMaterialLayout();
 	VkDescriptorSet GetBindlesTexturesSet();
 	VkDescriptorSet GetMaterialSet();
-	VkBuffer GetVertexStageBuffer();
-	VkBuffer GetInstanceBuffer();
 	VkDescriptorPool GetMainPool();
 	VulkanHelper::GPUBuffer* GetGPUBuffer(const std::string& Name);
 

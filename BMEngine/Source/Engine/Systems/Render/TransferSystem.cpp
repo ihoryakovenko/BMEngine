@@ -138,7 +138,7 @@ namespace TransferSystem
 				VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState.TransferStagingPool.Memory,
 					Task->DataSize, AlignedOffset, Task->RawData);
 
-				switch (Task->Type)
+				switch (RenderResources::GetResourceType(Task->Handle))
 				{
 					case RenderResources::ResourceType::Mesh:
 					{
@@ -323,7 +323,7 @@ namespace TransferSystem
 				assert(HasCompletedTasks(&TransferState.TransferTasksQueue));
 
 				TransferTask* Task = GetFirstCompletedTask(&TransferState.TransferTasksQueue);
-				RenderResources::SetResourceReadyToRender(Task->ResourceIndex, Task->Type);
+				RenderResources::SetResourceReadyToRender(Task->Handle);
 
 				Memory::RingFree(&TransferState.TransferMemory.ControlBlock, Task->DataSize, 1);
 				PopCompletedTask(&TransferState.TransferTasksQueue);
