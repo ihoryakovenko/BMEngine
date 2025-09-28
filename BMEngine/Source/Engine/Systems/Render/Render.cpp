@@ -193,7 +193,7 @@ namespace Render
 			}
 
 			RenderResources::VertexData* Mesh = RenderResources::GetStaticMesh(DrawEntity->StaticMeshIndex);
-			RenderResources::InstanceData* Instance = RenderResources::GetInstanceData(DrawEntity->InstanceDataIndex);
+			RenderResources::ResourceRecord* Instance = RenderResources::GetInstanceData(DrawEntity->InstanceDataIndex);
 
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
@@ -212,7 +212,7 @@ namespace Render
 			const u64 Offsets[] = 
 			{
 				Mesh->VertexOffset,
-				sizeof(RenderResources::InstanceData)* DrawEntity->InstanceDataIndex
+				Instance->GPUBufferOffset
 			};
 
 			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MeshPipeline->Pipeline.PipelineLayout,
@@ -1008,6 +1008,7 @@ namespace LightningPass
 				}
 
 				RenderResources::VertexData* Mesh = RenderResources::GetStaticMesh(DrawEntity->StaticMeshIndex);
+				RenderResources::ResourceRecord* Instance = RenderResources::GetInstanceData(DrawEntity->InstanceDataIndex);
 
 				const VkBuffer Buffers[] =
 				{
@@ -1018,7 +1019,7 @@ namespace LightningPass
 				const u64 Offsets[] =
 				{
 					Mesh->VertexOffset,
-					sizeof(RenderResources::InstanceData) * DrawEntity->InstanceDataIndex
+					Instance->GPUBufferOffset
 				};
 
 				const u32 DescriptorSetGroupCount = 1;
@@ -1410,7 +1411,7 @@ namespace TerrainRender
 
 		IndicesCount = TerrainIndices.size();
 
-		RenderResources::Material Mat = { };
+		//RenderResources::Material Mat = { };
 		//u32 MaterialIndex = Render::CreateMaterial(&Mat);
 		//TerrainDrawObject = RenderResources::CreateTerrain(&TerrainVerticesData[0][0], sizeof(TerrainVertex), NumRows * NumCols,
 			//TerrainIndices.data(), IndicesCount, MaterialIndex);

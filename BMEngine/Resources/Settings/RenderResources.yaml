@@ -176,4 +176,23 @@ DescriptorSetLayouts:
         descriptorType: UNIFORM_BUFFER
         descriptorCount: 1
         stageFlags: VERTEX_BIT | FRAGMENT_BIT
-        pImmutableSamplers: null 
+        pImmutableSamplers: null
+
+buffers:
+  VertexStageData:
+    name: VertexStageData
+    bufferUsageFlag: CombinedVertexIndexFlag
+    memoryPropertyFlag: GPULocal
+    size: 134217728  # 128MB
+
+  GPUInstances:
+    name: GPUInstances
+    bufferUsageFlag: InstanceFlag
+    memoryPropertyFlag: GPULocal
+    size: 268435456  # 256MB
+
+  MaterialBuffer:
+    name: MaterialBuffer
+    bufferUsageFlag: StorageFlag
+    memoryPropertyFlag: GPULocal
+    size: 20971520   # 20MB

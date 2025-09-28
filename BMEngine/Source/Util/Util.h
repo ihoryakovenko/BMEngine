@@ -168,6 +168,22 @@ namespace Util
 		// Vertex input rates
 		inline constexpr const char* VERTEX_STRINGS[] = { "VERTEX" };
 		inline constexpr const char* INSTANCE_STRINGS[] = { "INSTANCE" };
+
+		// Buffer types
+		inline constexpr const char* GPU_ARENA_STRINGS[] = { "GPUArena", "gpuarena", "GPU_ARENA" };
+		inline constexpr const char* GPU_STRINGS[] = { "GPU", "gpu" };
+
+		// Buffer usage flags
+		inline constexpr const char* COMBINED_VERTEX_INDEX_FLAG_STRINGS[] = { "CombinedVertexIndexFlag", "COMBINED_VERTEX_INDEX_FLAG" };
+		inline constexpr const char* INSTANCE_FLAG_STRINGS[] = { "InstanceFlag", "INSTANCE_FLAG" };
+		inline constexpr const char* STORAGE_FLAG_STRINGS[] = { "StorageFlag", "STORAGE_FLAG" };
+		inline constexpr const char* UNIFORM_FLAG_STRINGS[] = { "UniformFlag", "UNIFORM_FLAG" };
+		inline constexpr const char* VERTEX_FLAG_STRINGS[] = { "VertexFlag", "VERTEX_FLAG" };
+		inline constexpr const char* INDEX_FLAG_STRINGS[] = { "IndexFlag", "INDEX_FLAG" };
+
+		// Memory property flags
+		inline constexpr const char* GPU_LOCAL_STRINGS[] = { "GPULocal", "GPU_LOCAL" };
+		inline constexpr const char* CPU_HOST_COMPATIBLE_STRINGS[] = {"host_compatible" "HOST_COMPATIBLE" };
 	}
 
 	bool ReadFileFull(FILE* File, std::vector<char>& OutFileData);
@@ -247,6 +263,7 @@ namespace Util
 	Yaml::Node& GetSceneResources(Yaml::Node& Root);
 	Yaml::Node& GetTextures(Yaml::Node& Root);
 	Yaml::Node& GetModels(Yaml::Node& Root);
+	Yaml::Node& GetBuffers(Yaml::Node& Root);
 	
 	std::string GetModelPath(Yaml::Node& ModelNode);
 	glm::vec3 GetModelPosition(Yaml::Node& ModelNode);
@@ -290,6 +307,11 @@ namespace Util
 	VkVertexInputRate ParseVertexInputRate(const char* Value, u32 Length);
 	u32 CalculateFormatSize(VkFormat Format);
 	u32 CalculateFormatSizeFromString(const char* FormatString, u32 FormatLength);
+
+	VulkanHelper::BufferUsageFlag ParseBufferUsageFlag(const char* Value, u32 Length);
+	VulkanHelper::MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length);
+	RenderResources::BufferDescription ParseBufferNode(Yaml::Node& BufferNode);
+	std::string GetBufferName(Yaml::Node& BufferNode);
 	
 	VkFormat GliFormatToVkFormat(gli::format Format);
 

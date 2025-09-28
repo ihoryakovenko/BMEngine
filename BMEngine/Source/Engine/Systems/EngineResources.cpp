@@ -119,14 +119,37 @@ namespace EngineResources
 
 				const u64 VertexDataSize = VerticesCount * sizeof(StaticMeshVertex) + IndicesCount * sizeof(u32);
 
-				RenderResources::Material Mat;
+				
+
+				Material Mat;
 				Mat.AlbedoTexIndex = AlbedoTextureIndex;
 				Mat.SpecularTexIndex = SpecularTextureIndex;
 				Mat.Shininess = 32.0f;
 
-				RenderResources::InstanceData Instance;
-				Instance.MaterialIndex = RenderResources::CreateMaterial(&Mat);
+				RenderResources::ResourceDependency AlbedoTextureDependency;
+				AlbedoTextureDependency.ResourceIndex = AlbedoTextureIndex;
+				AlbedoTextureDependency.Type = RenderResources::ResourceType::Texture;
+
+				RenderResources::ResourceDependency SpecularTextureDependency;
+				SpecularTextureDependency.ResourceIndex = SpecularTextureIndex;
+				SpecularTextureDependency.Type = RenderResources::ResourceType::Texture;
+
+				const u32 MaterialHandle = RenderResources::CreateMaterial(sizeof(Mat), "MaterialBuffer");
+				RenderResources::AddResourceDependencyToMaterial(MaterialHandle, AlbedoTextureDependency);
+				RenderResources::AddResourceDependencyToMaterial(MaterialHandle, SpecularTextureDependency);
+				RenderResources::UpdateMaterial(MaterialHandle, &Mat, sizeof(Mat), "MaterialBuffer");
+
+				InstanceData Instance;
+				Instance.MaterialIndex = MaterialHandle;
 				Instance.ModelMatrix = glm::translate(glm::mat4(1), Request.Position);
+
+				RenderResources::ResourceDependency MateriaDependency;
+				MateriaDependency.ResourceIndex = MaterialHandle;
+				MateriaDependency.Type = RenderResources::ResourceType::Material;
+
+				const u32 InstanceHandle = RenderResources::CreateStaticMeshInstance(sizeof(Instance), "GPUInstances");
+				RenderResources::AddResourceDependencyToInstance(InstanceHandle, MateriaDependency);
+				RenderResources::UpdateInstance(InstanceHandle, &Instance, sizeof(Instance), "GPUInstances");
 
 				RenderResources::MeshDescription Mesh;
 				Mesh.IndicesCount = IndicesCount;
@@ -136,7 +159,7 @@ namespace EngineResources
 				Render::DrawEntity Entity = { };
 				Entity.StaticMeshIndex = RenderResources::CreateStaticMesh(&Mesh, Model.VertexData + ModelVertexByteOffset);
 				Entity.Instances = 1;
-				Entity.InstanceDataIndex = RenderResources::CreateStaticMeshInstance(&Instance);
+				Entity.InstanceDataIndex = InstanceHandle;
 
 				std::unique_lock Lock(TmpScene->TempLock);
 				Memory::PushBackToArray(&TmpScene->DrawEntities, &Entity);

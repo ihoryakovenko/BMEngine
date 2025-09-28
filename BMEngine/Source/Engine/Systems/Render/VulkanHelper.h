@@ -65,6 +65,8 @@ namespace VulkanHelper
 		u64 Capacity;
 		u64 Alignment;
 		u64 Offset;
+		BufferUsageFlag UsageFlag;
+		MemoryPropertyFlag PropertyFlag;
 	};
 
 	struct Shader

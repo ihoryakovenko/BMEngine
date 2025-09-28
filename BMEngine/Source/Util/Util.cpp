@@ -1239,6 +1239,18 @@ namespace Util
 		return Empty;
 	}
 
+	Yaml::Node& GetBuffers(Yaml::Node& Root)
+	{
+		if (!Root["buffers"].IsNone())
+		{
+			return Root["buffers"];
+		}
+
+		assert(false);
+		static Yaml::Node Empty;
+		return Empty;
+	}
+
 	std::string GetModelPath(Yaml::Node& ModelNode)
 	{
 		return ModelNode["path"].As<std::string>();
@@ -1477,9 +1489,64 @@ namespace Util
 			case gli::FORMAT_A16_UNORM_PACK16: return VK_FORMAT_R16_UNORM; // Alpha maps to R
 			case gli::FORMAT_LA16_UNORM_PACK16: return VK_FORMAT_R16G16_UNORM; // Luminance+Alpha maps to RG
 
-			// Default case for unsupported formats
-			default:
-				return VK_FORMAT_UNDEFINED;
+		// Default case for unsupported formats
+		default:
+			return VK_FORMAT_UNDEFINED;
+	}
+}
+
+	VulkanHelper::BufferUsageFlag ParseBufferUsageFlag(const char* Value, u32 Length)
+	{
+		if (StringMatches(Value, Length, ParseStrings::COMBINED_VERTEX_INDEX_FLAG_STRINGS)) return VulkanHelper::BufferUsageFlag::CombinedVertexIndexFlag;
+		if (StringMatches(Value, Length, ParseStrings::INSTANCE_FLAG_STRINGS)) return VulkanHelper::BufferUsageFlag::InstanceFlag;
+		if (StringMatches(Value, Length, ParseStrings::STORAGE_FLAG_STRINGS)) return VulkanHelper::BufferUsageFlag::StorageFlag;
+		if (StringMatches(Value, Length, ParseStrings::UNIFORM_FLAG_STRINGS)) return VulkanHelper::BufferUsageFlag::UniformFlag;
+		if (StringMatches(Value, Length, ParseStrings::VERTEX_FLAG_STRINGS)) return VulkanHelper::BufferUsageFlag::VertexFlag;
+		if (StringMatches(Value, Length, ParseStrings::INDEX_FLAG_STRINGS)) return VulkanHelper::BufferUsageFlag::IndexFlag;
+
+		assert(false);
+		return VulkanHelper::BufferUsageFlag::VertexFlag;
+	}
+
+	VulkanHelper::MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length)
+	{
+		if (StringMatches(Value, Length, ParseStrings::GPU_LOCAL_STRINGS)) return VulkanHelper::MemoryPropertyFlag::GPULocal;
+		if (StringMatches(Value, Length, ParseStrings::CPU_HOST_COMPATIBLE_STRINGS)) return VulkanHelper::MemoryPropertyFlag::HostCompatible;
+
+		assert(false);
+		return VulkanHelper::MemoryPropertyFlag::GPULocal;
+	}
+
+	RenderResources::BufferDescription ParseBufferNode(Yaml::Node& BufferNode)
+	{
+		RenderResources::BufferDescription Data = { };
+
+		if (!BufferNode["bufferUsageFlag"].IsNone())
+		{
+			std::string value = BufferNode["bufferUsageFlag"].As<std::string>();
+			Data.BufferUsageFlag = ParseBufferUsageFlag(value.c_str(), value.length());
 		}
+
+		if (!BufferNode["memoryPropertyFlag"].IsNone())
+		{
+			std::string value = BufferNode["memoryPropertyFlag"].As<std::string>();
+			Data.MemoryPropertyFlag = ParseMemoryPropertyFlag(value.c_str(), value.length());
+		}
+
+		if (!BufferNode["size"].IsNone())
+		{
+			Data.Size = BufferNode["size"].As<u64>();
+		}
+
+		return Data;
+	}
+
+	std::string GetBufferName(Yaml::Node& BufferNode)
+	{
+		if (!BufferNode["name"].IsNone())
+		{
+			return BufferNode["name"].As<std::string>();
+		}
+		return {};
 	}
 }
