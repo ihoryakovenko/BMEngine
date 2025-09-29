@@ -7,9 +7,13 @@
 
 namespace TransferSystem
 {
-	typedef void (*OnResourceTransferedCallback)(RenderResources::ResourceHandle Handle);
+	enum class TaskType
+	{
+		Image,
+		Data
+	};
 
-	struct TextureTaskDescription
+	struct ImageTaskDescription
 	{
 		VkImage DstImage;
 		u32 Width;
@@ -27,15 +31,15 @@ namespace TransferSystem
 	{
 		union
 		{
-			TextureTaskDescription TextureDescr;
+			ImageTaskDescription TextureDescr;
 			DataTaskDescription DataDescr;
 		};
 
 		void* RawData;
 		u64 DataSize;
-		u32 Alignment;
 		RenderResources::ResourceHandle Handle;
-		OnResourceTransferedCallback OnTransfered;
+		u32 Alignment;
+		TaskType Type;
 	};
 
 	typedef void* TransferMemory;

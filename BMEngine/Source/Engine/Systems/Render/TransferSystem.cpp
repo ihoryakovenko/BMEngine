@@ -7,7 +7,6 @@ FORGE_MEMORY_DEBUG
 #include "Engine/Systems/Memory/forge_memory_debugger.h"
 #include "Util/Util.h"
 #include "VulkanHelper.h"
-#include "RenderResources.h"
 #include "VulkanCoreContext.h"
 #include "Util/Math.h"
 
@@ -97,7 +96,7 @@ namespace TransferSystem
 
 	void Transfer()
 	{
-		VkDevice Device = VulkanInterface::GetDevice();
+		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
 		if (HasPendingTasks(&TransferState.TransferTasksQueue))
 		{
@@ -138,10 +137,9 @@ namespace TransferSystem
 				VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState.TransferStagingPool.Memory,
 					Task->DataSize, AlignedOffset, Task->RawData);
 
-				switch (RenderResources::GetResourceType(Task->Handle))
+				switch (Task->Type)
 				{
-					case RenderResources::ResourceType::Mesh:
-					case RenderResources::ResourceType::StorageResource:
+					case TaskType::Data:
 					{
 						VkBufferMemoryBarrier2 Barrier = { };
 						Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
@@ -167,7 +165,7 @@ namespace TransferSystem
 
 						break;
 					}
-					case RenderResources::ResourceType::Texture:
+					case TaskType::Image:
 					{
 						VkImageMemoryBarrier2 TransferImageBarrier = { };
 						TransferImageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -272,7 +270,7 @@ namespace TransferSystem
 
 			// Todo submit using queue system
 			std::unique_lock SubmitLock(CoreContext->QueueSubmitMutex);
-			VULKAN_CHECK_RESULT(vkQueueSubmit(VulkanInterface::GetTransferQueue(), 1, &SubmitInfo, TransferFence));
+			VULKAN_CHECK_RESULT(vkQueueSubmit(RenderResources::GetCoreContext()->GraphicsQueue, 1, &SubmitInfo, TransferFence));
 			SubmitLock.unlock();
 
 			assert(TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] <= TransferState.MaxTransferSizePerFrame);
@@ -291,7 +289,7 @@ namespace TransferSystem
 				assert(HasCompletedTasks(&TransferState.TransferTasksQueue));
 
 				TransferTask* Task = GetFirstCompletedTask(&TransferState.TransferTasksQueue);
-				Task->OnTransfered(Task->Handle);
+				RenderResources::OnResourceLoaded(Task->Handle);
 
 				Memory::RingFree(&TransferState.TransferMemory.ControlBlock, Task->DataSize, 1);
 				PopCompletedTask(&TransferState.TransferTasksQueue);

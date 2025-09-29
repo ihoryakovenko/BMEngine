@@ -77,7 +77,7 @@ namespace Render
 
 		MeshPipeline->ShadowMapArrayLayout = RenderResources::GetSetLayout("ShadowMapArrayLayout");
 
-		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
+		for (u32 i = 0; i < RenderResources::GetCoreContext()->ImagesCount; i++)
 		{
 			VkImageViewCreateInfo ViewCreateInfo = {};
 			ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -104,7 +104,7 @@ namespace Render
 
 			VkDescriptorSetAllocateInfo AllocInfo = {};
 			AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			AllocInfo.descriptorPool = RenderResources::GetMainPool();
+			AllocInfo.descriptorPool = RenderResources::GetDescriptorPool("MainPool");
 			AllocInfo.descriptorSetCount = 1;
 			AllocInfo.pSetLayouts = &MeshPipeline->ShadowMapArrayLayout;
 			
@@ -126,9 +126,9 @@ namespace Render
 		VkDescriptorSetLayout StaticMeshDescriptorLayouts[] =
 		{
 			FrameManager::GetViewProjectionLayout(),
-			RenderResources::GetBindlesTexturesLayout(),
+			RenderResources::GetSetLayout("BindlesTexturesLayout"),
 			MeshPipeline->StaticMeshLightLayout,
-			RenderResources::GetMaterialLayout(),
+			RenderResources::GetSetLayout("MaterialLayout"),
 			MeshPipeline->ShadowMapArrayLayout
 		};
 
@@ -155,7 +155,7 @@ namespace Render
 
 	static void DeInitStaticMeshPipeline(VkDevice Device, StaticMeshPipeline* MeshPipeline)
 	{
-		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
+		for (u32 i = 0; i < RenderResources::GetCoreContext()->ImagesCount; i++)
 		{
 			vkDestroyImageView(Device, MeshPipeline->ShadowMapArrayImageInterface[i], nullptr);
 		}
@@ -173,15 +173,15 @@ namespace Render
 		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MeshPipeline->Pipeline.Pipeline);
 
 		const VkDescriptorSet VpSet = FrameManager::GetViewProjectionSet();
-		const u32 DynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(FrameManager::ViewProjectionBuffer);
+		const u32 DynamicOffset = Render::GetRenderState()->RenderDrawState.CurrentImageIndex * sizeof(FrameManager::ViewProjectionBuffer);
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MeshPipeline->Pipeline.PipelineLayout,
 			0, 1, &VpSet, 1, &DynamicOffset);
 
-		VkDescriptorSet BindlesTexturesSet = RenderResources::GetBindlesTexturesSet();
+		VkDescriptorSet BindlesTexturesSet = RenderResources::GetDescriptorSet("BindlesTexturesSet");
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, MeshPipeline->Pipeline.PipelineLayout,
 			1, 1, &BindlesTexturesSet, 0, nullptr);
 
-		const u32 LightDynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(LightBuffer);
+		const u32 LightDynamicOffset = Render::GetRenderState()->RenderDrawState.CurrentImageIndex * sizeof(LightBuffer);
 
 		std::unique_lock Lock(Scene->TempLock);
 		for (u32 i = 0; i < Scene->DrawEntities.Count; ++i)
@@ -192,14 +192,14 @@ namespace Render
 				continue;
 			}
 
-			RenderResources::VertexData* Mesh = RenderResources::GetStaticMesh(DrawEntity->StaticMeshIndex);
-			RenderResources::ResourceRecord* Instance = RenderResources::GetInstanceData(DrawEntity->InstanceDataIndex);
+			RenderResources::VertexData* Mesh = RenderResources::GetStaticMesh(DrawEntity->StaticMeshHandle);
+			RenderResources::ResourceRecord* Instance = RenderResources::GetInstanceData(DrawEntity->InstanceDataHandle);
 
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
 				MeshPipeline->StaticMeshLightSet,
-				RenderResources::GetMaterialSet(),
-				MeshPipeline->ShadowMapArraySet[VulkanInterface::TestGetImageIndex()],
+				RenderResources::GetDescriptorSet("MaterialSet"),
+				MeshPipeline->ShadowMapArraySet[Render::GetRenderState()->RenderDrawState.CurrentImageIndex],
 			};
 			const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
@@ -280,10 +280,10 @@ namespace Render
 
 	void Init(GLFWwindow* WindowHandler)
 	{		
-		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
-		VkDevice Device = VulkanInterface::GetDevice();
+		VkPhysicalDevice PhysicalDevice = RenderResources::GetCoreContext()->PhysicalDevice;
+		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
-		InitDrawState(Device, VulkanInterface::GetQueueGraphicsFamilyIndex(), VulkanHelper::MAX_DRAW_FRAMES, &State.RenderDrawState);
+		InitDrawState(Device, RenderResources::GetCoreContext()->Indices.GraphicsFamily, VulkanHelper::MAX_DRAW_FRAMES, &State.RenderDrawState);
 
 		FrameManager::Init();
 
@@ -299,9 +299,9 @@ namespace Render
 
 	void DeInit()
 	{
-		VulkanInterface::WaitDevice();
+		vkDeviceWaitIdle(RenderResources::GetCoreContext()->LogicalDevice);
 
-		VkDevice Device = VulkanInterface::GetDevice();
+		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
 		DeInitImGuiPipeline(Device, State.DebugUiPool);
 		DeInitDrawState(Device, VulkanHelper::MAX_DRAW_FRAMES, &State.RenderDrawState);
@@ -329,7 +329,7 @@ namespace Render
 		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
 		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-		VkDevice Device = VulkanInterface::GetDevice();
+		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 		const u32 CurrentFrame = State.RenderDrawState.CurrentFrame;
 		u32 ImageIndex;
 		VkFence FrameFence = State.RenderDrawState.Frames.Fences[CurrentFrame];
@@ -337,7 +337,7 @@ namespace Render
 
 		VULKAN_CHECK_RESULT(vkWaitForFences(Device, 1, &FrameFence, VK_TRUE, UINT64_MAX));
 		VULKAN_CHECK_RESULT(vkResetFences(Device, 1, &FrameFence));
-		VULKAN_CHECK_RESULT(vkAcquireNextImageKHR(Device, VulkanInterface::GetSwapchain(), UINT64_MAX, ImagesAvailable, nullptr, &ImageIndex));
+		VULKAN_CHECK_RESULT(vkAcquireNextImageKHR(Device, RenderResources::GetCoreContext()->VulkanSwapchain, UINT64_MAX, ImagesAvailable, nullptr, &ImageIndex));
 		State.RenderDrawState.CurrentImageIndex = ImageIndex;
 
 		FrameManager::UpdateViewProjection(&Scene->ViewProjection);
@@ -353,7 +353,7 @@ namespace Render
 		DeferredPass::BeginPass();
 		DeferredPass::Draw();
 		ImGui::Render();
-		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+		VkCommandBuffer CmdBuffer = Render::GetRenderState()->RenderDrawState.Frames.CommandBuffers[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), CmdBuffer);
 		DeferredPass::EndPass();
 
@@ -364,7 +364,7 @@ namespace Render
 		};
 
 		VkSemaphore RenderFinished = State.RenderDrawState.Frames.RenderFinished[CurrentFrame];
-		VkSwapchainKHR Swapchain = VulkanInterface::GetSwapchain();
+		VkSwapchainKHR Swapchain = RenderResources::GetCoreContext()->VulkanSwapchain;
 
 		VkSubmitInfo SubmitInfo = { };
 		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -385,8 +385,8 @@ namespace Render
 		PresentInfo.pImageIndices = &ImageIndex;
 
 		std::unique_lock Lock(CoreContext->QueueSubmitMutex);
-		VULKAN_CHECK_RESULT(vkQueueSubmit(VulkanInterface::GetGraphicsQueue(), 1, &SubmitInfo, FrameFence));
-		VULKAN_CHECK_RESULT(vkQueuePresentKHR(VulkanInterface::GetGraphicsQueue(), &PresentInfo));
+		VULKAN_CHECK_RESULT(vkQueueSubmit(RenderResources::GetCoreContext()->GraphicsQueue, 1, &SubmitInfo, FrameFence));
+		VULKAN_CHECK_RESULT(vkQueuePresentKHR(RenderResources::GetCoreContext()->GraphicsQueue, &PresentInfo));
 		Lock.unlock();
 
 		State.RenderDrawState.CurrentFrame = Math::WrapIncrement(CurrentFrame, VulkanHelper::MAX_DRAW_FRAMES);
@@ -428,11 +428,11 @@ namespace DeferredPass
 
 	void Init()
 	{
-		VkDevice Device = VulkanInterface::GetDevice();
-		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
+		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+		VkPhysicalDevice PhysicalDevice = RenderResources::GetCoreContext()->PhysicalDevice;
 
 		AttachmentData.ColorAttachmentCount = 1;
-		AttachmentData.ColorAttachmentFormats[0] = VulkanInterface::GetSurfaceFormat();
+		AttachmentData.ColorAttachmentFormats[0] = RenderResources::GetCoreContext()->SurfaceFormat.format;
 		AttachmentData.DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
 		AttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
@@ -461,7 +461,7 @@ namespace DeferredPass
 		ColorSampler = RenderResources::GetSampler("ColorAttachment");
 		DepthSampler = RenderResources::GetSampler("DepthAttachment");
 
-		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
+		for (u32 i = 0; i < RenderResources::GetCoreContext()->ImagesCount; i++)
 		{
 			//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
 
@@ -514,7 +514,7 @@ namespace DeferredPass
 
 			VkDescriptorSetAllocateInfo AllocInfo = { };
 			AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			AllocInfo.descriptorPool = RenderResources::GetMainPool();
+			AllocInfo.descriptorPool = RenderResources::GetDescriptorPool("MainPool");
 			AllocInfo.descriptorSetCount = 1;
 			AllocInfo.pSetLayouts = &DeferredInputLayout;
 			VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, DeferredInputSet + i));
@@ -571,9 +571,9 @@ namespace DeferredPass
 
 	void DeInit()
 	{
-		VkDevice Device = VulkanInterface::GetDevice();
+		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
-		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
+		for (u32 i = 0; i < RenderResources::GetCoreContext()->ImagesCount; i++)
 		{
 			vkDestroyImageView(Device, DeferredInputDepthImageInterface[i], nullptr);
 			vkDestroyImageView(Device, DeferredInputColorImageInterface[i], nullptr);
@@ -592,19 +592,19 @@ namespace DeferredPass
 
 	void Draw()
 	{
-		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+		VkCommandBuffer CmdBuffer = Render::GetRenderState()->RenderDrawState.Frames.CommandBuffers[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 
 		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
 
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
-			0, 1, &DeferredInputSet[VulkanInterface::TestGetImageIndex()], 0, nullptr);
+			0, 1, &DeferredInputSet[Render::GetRenderState()->RenderDrawState.CurrentImageIndex], 0, nullptr);
 
 		vkCmdDraw(CmdBuffer, 3, 1, 0, 0); // 3 hardcoded vertices
 	}
 
 	void BeginPass()
 	{
-		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+		VkCommandBuffer CmdBuffer = Render::GetRenderState()->RenderDrawState.Frames.CommandBuffers[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 
 		VkRect2D RenderArea;
 		RenderArea.extent = MainScreenExtent;
@@ -612,7 +612,7 @@ namespace DeferredPass
 
 		VkRenderingAttachmentInfo SwapchainColorAttachment = { };
 		SwapchainColorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		SwapchainColorAttachment.imageView = VulkanInterface::GetSwapchainImageViews()[VulkanInterface::TestGetImageIndex()];
+		SwapchainColorAttachment.imageView = RenderResources::GetCoreContext()->ImageViews[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 		SwapchainColorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		SwapchainColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		SwapchainColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -632,7 +632,7 @@ namespace DeferredPass
 		ColorBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		ColorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		ColorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		ColorBarrier.image = DeferredInputColorImage[VulkanInterface::TestGetImageIndex()].Image;
+		ColorBarrier.image = DeferredInputColorImage[Render::GetRenderState()->RenderDrawState.CurrentImageIndex].Image;
 		ColorBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		ColorBarrier.subresourceRange.baseMipLevel = 0;
 		ColorBarrier.subresourceRange.levelCount = 1;
@@ -651,7 +651,7 @@ namespace DeferredPass
 		DepthBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		DepthBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		DepthBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		DepthBarrier.image = DeferredInputDepthImage[VulkanInterface::TestGetImageIndex()].Image;
+		DepthBarrier.image = DeferredInputDepthImage[Render::GetRenderState()->RenderDrawState.CurrentImageIndex].Image;
 		DepthBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		DepthBarrier.subresourceRange.baseMipLevel = 0;
 		DepthBarrier.subresourceRange.levelCount = 1;
@@ -669,7 +669,7 @@ namespace DeferredPass
 		SwapchainAcquireBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		SwapchainAcquireBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		SwapchainAcquireBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		SwapchainAcquireBarrier.image = VulkanInterface::GetSwapchainImages()[VulkanInterface::TestGetImageIndex()];
+		SwapchainAcquireBarrier.image = RenderResources::GetCoreContext()->Images[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 		SwapchainAcquireBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		SwapchainAcquireBarrier.subresourceRange.baseMipLevel = 0;
 		SwapchainAcquireBarrier.subresourceRange.levelCount = 1;
@@ -700,7 +700,7 @@ namespace DeferredPass
 
 	void EndPass()
 	{
-		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+		VkCommandBuffer CmdBuffer = Render::GetRenderState()->RenderDrawState.Frames.CommandBuffers[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 		vkCmdEndRendering(CmdBuffer);
 
 		VkImageMemoryBarrier2 SwapchainPresentBarrier = { };
@@ -709,7 +709,7 @@ namespace DeferredPass
 		SwapchainPresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 		SwapchainPresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		SwapchainPresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		SwapchainPresentBarrier.image = VulkanInterface::GetSwapchainImages()[VulkanInterface::TestGetImageIndex()];
+		SwapchainPresentBarrier.image = RenderResources::GetCoreContext()->Images[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 		SwapchainPresentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		SwapchainPresentBarrier.subresourceRange.baseMipLevel = 0;
 		SwapchainPresentBarrier.subresourceRange.levelCount = 1;
@@ -779,8 +779,8 @@ namespace LightningPass
 
 	void Init()
 	{
-		VkDevice Device = VulkanInterface::GetDevice();
-		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
+		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+		VkPhysicalDevice PhysicalDevice = RenderResources::GetCoreContext()->PhysicalDevice;
 
 		LightSpaceMatrixLayout = RenderResources::GetSetLayout("LightSpaceMatrixLayout");
 
@@ -802,7 +802,7 @@ namespace LightningPass
 		ShadowMapArrayCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 		ShadowMapArrayCreateInfo.arrayLayers = 2;
 
-		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
+		for (u32 i = 0; i < RenderResources::GetCoreContext()->ImagesCount; i++)
 		{
 			vkCreateImage(Device, &ShadowMapArrayCreateInfo, nullptr, &ShadowMapArray[i].Image);
 			VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, ShadowMapArray[i].Image, VulkanHelper::MemoryPropertyFlag::GPULocal);
@@ -825,7 +825,7 @@ namespace LightningPass
 
 			VkDescriptorSetAllocateInfo AllocInfo = { };
 			AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			AllocInfo.descriptorPool = RenderResources::GetMainPool();
+			AllocInfo.descriptorPool = RenderResources::GetDescriptorPool("MainPool");
 			AllocInfo.descriptorSetCount = 1;
 			AllocInfo.pSetLayouts = &LightSpaceMatrixLayout;
 			VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, LightSpaceMatrixSet + i));
@@ -912,9 +912,9 @@ namespace LightningPass
 
 	void DeInit()
 	{
-		VkDevice Device = VulkanInterface::GetDevice();
+		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
-		for (u32 i = 0; i < VulkanInterface::GetImageCount(); i++)
+		for (u32 i = 0; i < RenderResources::GetCoreContext()->ImagesCount; i++)
 		{
 			vkDestroyBuffer(Device, LightSpaceMatrixBuffer[i].Buffer, nullptr);
 			vkFreeMemory(Device, LightSpaceMatrixBuffer[i].Memory, nullptr);
@@ -933,8 +933,8 @@ namespace LightningPass
 
 	void Draw(Render::DrawScene* Scene)
 	{
-		VkDevice Device = VulkanInterface::GetDevice();
-		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+		VkCommandBuffer CmdBuffer = Render::GetRenderState()->RenderDrawState.Frames.CommandBuffers[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 		const Render::RenderState* State = Render::GetRenderState();
 
 		const glm::mat4* LightViews[] =
@@ -944,8 +944,8 @@ namespace LightningPass
 		};
 
 		VkImageView Attachments[2];
-		Attachments[0] = ShadowMapElement1ImageInterface[VulkanInterface::TestGetImageIndex()];
-		Attachments[1] = ShadowMapElement2ImageInterface[VulkanInterface::TestGetImageIndex()];
+		Attachments[0] = ShadowMapElement1ImageInterface[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
+		Attachments[1] = ShadowMapElement2ImageInterface[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 
 		for (u32 LightCaster = 0; LightCaster < MAX_LIGHT_SOURCES; ++LightCaster)
 		{
@@ -980,7 +980,7 @@ namespace LightningPass
 			DepthAttachmentTransitionBefore.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			DepthAttachmentTransitionBefore.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			DepthAttachmentTransitionBefore.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-			DepthAttachmentTransitionBefore.image = ShadowMapArray[VulkanInterface::TestGetImageIndex()].Image;
+			DepthAttachmentTransitionBefore.image = ShadowMapArray[Render::GetRenderState()->RenderDrawState.CurrentImageIndex].Image;
 			DepthAttachmentTransitionBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 			DepthAttachmentTransitionBefore.subresourceRange.baseMipLevel = 0;
 			DepthAttachmentTransitionBefore.subresourceRange.levelCount = 1;
@@ -1007,8 +1007,8 @@ namespace LightningPass
 					continue;
 				}
 
-				RenderResources::VertexData* Mesh = RenderResources::GetStaticMesh(DrawEntity->StaticMeshIndex);
-				RenderResources::ResourceRecord* Instance = RenderResources::GetInstanceData(DrawEntity->InstanceDataIndex);
+				RenderResources::VertexData* Mesh = RenderResources::GetStaticMesh(DrawEntity->StaticMeshHandle);
+				RenderResources::ResourceRecord* Instance = RenderResources::GetInstanceData(DrawEntity->InstanceDataHandle);
 
 				const VkBuffer Buffers[] =
 				{
@@ -1047,7 +1047,7 @@ namespace LightningPass
 
 		DepthAttachmentTransitionAfter.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthAttachmentTransitionAfter.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		DepthAttachmentTransitionAfter.image = ShadowMapArray[VulkanInterface::TestGetImageIndex()].Image;
+		DepthAttachmentTransitionAfter.image = ShadowMapArray[Render::GetRenderState()->RenderDrawState.CurrentImageIndex].Image;
 		DepthAttachmentTransitionAfter.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		DepthAttachmentTransitionAfter.subresourceRange.baseMipLevel = 0;
 		DepthAttachmentTransitionAfter.subresourceRange.levelCount = 1;
@@ -1086,7 +1086,7 @@ namespace MainPass
 
 	void Init()
 	{
-		VkDevice Device = VulkanInterface::GetDevice();
+		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
 		AttachmentData.ColorAttachmentCount = 1;
 		AttachmentData.ColorAttachmentFormats[0] = ColorFormat;
@@ -1110,7 +1110,7 @@ namespace MainPass
 		LayoutCreateInfo.flags = 0;
 		LayoutCreateInfo.pNext = nullptr;
 
-		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(VulkanInterface::GetDevice(), &LayoutCreateInfo, nullptr, &SkyBoxLayout));
+		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(RenderResources::GetCoreContext()->LogicalDevice, &LayoutCreateInfo, nullptr, &SkyBoxLayout));
 
 		const VkDescriptorSetLayout VpLayout = FrameManager::GetViewProjectionLayout();
 
@@ -1140,9 +1140,9 @@ namespace MainPass
 
 	void DeInit()
 	{
-		VkDevice Device = VulkanInterface::GetDevice();
+		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
-		vkDestroyDescriptorSetLayout(VulkanInterface::GetDevice(), SkyBoxLayout, nullptr);
+		vkDestroyDescriptorSetLayout(RenderResources::GetCoreContext()->LogicalDevice, SkyBoxLayout, nullptr);
 		vkDestroyPipeline(Device, SkyBoxPipeline.Pipeline, nullptr);
 		vkDestroyPipelineLayout(Device, SkyBoxPipeline.PipelineLayout, nullptr);
 	}
@@ -1152,7 +1152,7 @@ namespace MainPass
 		//const VkDescriptorSet VpSet = FrameManager::GetViewProjectionSet()[ImageIndex];
 		VkRenderingAttachmentInfo ColorAttachment = { };
 		ColorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		ColorAttachment.imageView = DeferredPass::TestDeferredInputColorImageInterface()[VulkanInterface::TestGetImageIndex()];
+		ColorAttachment.imageView = DeferredPass::TestDeferredInputColorImageInterface()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 		ColorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		ColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		ColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1160,7 +1160,7 @@ namespace MainPass
 
 		VkRenderingAttachmentInfo DepthAttachment = { };
 		DepthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		DepthAttachment.imageView = DeferredPass::TestDeferredInputDepthImageInterface()[VulkanInterface::TestGetImageIndex()];
+		DepthAttachment.imageView = DeferredPass::TestDeferredInputDepthImageInterface()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 		DepthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1188,7 +1188,7 @@ namespace MainPass
 		ColorBarrierBefore.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		ColorBarrierBefore.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		ColorBarrierBefore.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		ColorBarrierBefore.image = DeferredPass::TestDeferredInputColorImage()[VulkanInterface::TestGetImageIndex()].Image;
+		ColorBarrierBefore.image = DeferredPass::TestDeferredInputColorImage()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex].Image;
 		ColorBarrierBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		ColorBarrierBefore.subresourceRange.baseMipLevel = 0;
 		ColorBarrierBefore.subresourceRange.levelCount = 1;
@@ -1207,7 +1207,7 @@ namespace MainPass
 		DepthBarrierBefore.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthBarrierBefore.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		DepthBarrierBefore.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		DepthBarrierBefore.image = DeferredPass::TestDeferredInputDepthImage()[VulkanInterface::TestGetImageIndex()].Image;
+		DepthBarrierBefore.image = DeferredPass::TestDeferredInputDepthImage()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex].Image;
 		DepthBarrierBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		DepthBarrierBefore.subresourceRange.baseMipLevel = 0;
 		DepthBarrierBefore.subresourceRange.levelCount = 1;
@@ -1227,7 +1227,7 @@ namespace MainPass
 		DepInfoBefore.imageMemoryBarrierCount = 2;
 		DepInfoBefore.pImageMemoryBarriers = BarriersBefore;
 
-		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+		VkCommandBuffer CmdBuffer = Render::GetRenderState()->RenderDrawState.Frames.CommandBuffers[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 
 		vkCmdPipelineBarrier2(CmdBuffer, &DepInfoBefore);
 
@@ -1259,7 +1259,7 @@ namespace MainPass
 
 	void EndPass()
 	{
-		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+		VkCommandBuffer CmdBuffer = Render::GetRenderState()->RenderDrawState.Frames.CommandBuffers[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 
 		vkCmdEndRendering(CmdBuffer);
 	}
@@ -1302,7 +1302,7 @@ namespace TerrainRender
 
 	void Init()
 	{
-		VkDevice Device = VulkanInterface::GetDevice();
+		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
 		const u32 ShaderCount = 2;
 		VulkanHelper::Shader Shaders[ShaderCount];
@@ -1325,8 +1325,8 @@ namespace TerrainRender
 		VkDescriptorSetLayout TerrainDescriptorLayouts[] =
 		{
 			FrameManager::GetViewProjectionLayout(),
-			RenderResources::GetBindlesTexturesLayout(),
-			RenderResources::GetMaterialLayout(),
+			RenderResources::GetSetLayout("BindlesTexturesLayout"),
+			RenderResources::GetSetLayout("MaterialLayout"),
 		};
 
 		const u32 LayoutsCount = sizeof(TerrainDescriptorLayouts) / sizeof(TerrainDescriptorLayouts[0]);
@@ -1359,7 +1359,7 @@ namespace TerrainRender
 
 	void DeInit()
 	{
-		VkDevice Device = VulkanInterface::GetDevice();
+		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
 		vkDestroyPipeline(Device, Pipeline.Pipeline, nullptr);
 		vkDestroyPipelineLayout(Device, Pipeline.PipelineLayout, nullptr);
@@ -1369,19 +1369,19 @@ namespace TerrainRender
 	{
 		const Render::RenderState* State = Render::GetRenderState();
 
-		VkCommandBuffer CmdBuffer = VulkanInterface::GetCommandBuffer();
+		VkCommandBuffer CmdBuffer = Render::GetRenderState()->RenderDrawState.Frames.CommandBuffers[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 
 		const VkDescriptorSet Sets[] = {
 			FrameManager::GetViewProjectionSet(),
-			RenderResources::GetBindlesTexturesSet(),
-			RenderResources::GetMaterialSet(),
+			RenderResources::GetDescriptorSet("BindlesTexturesSet"),
+			RenderResources::GetDescriptorSet("MaterialSet"),
 		};
 
 		const u32 TerrainDescriptorSetGroupCount = sizeof(Sets) / sizeof(Sets[0]);
 
 		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.Pipeline);
 
-		const u32 DynamicOffset = VulkanInterface::TestGetImageIndex() * sizeof(FrameManager::ViewProjectionBuffer);
+		const u32 DynamicOffset = Render::GetRenderState()->RenderDrawState.CurrentImageIndex * sizeof(FrameManager::ViewProjectionBuffer);
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline.PipelineLayout,
 			0, TerrainDescriptorSetGroupCount, Sets, 1, &DynamicOffset);
 

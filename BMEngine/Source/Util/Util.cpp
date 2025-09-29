@@ -496,6 +496,18 @@ namespace Util
 		return Empty;
 	}
 
+	Yaml::Node& GetDescriptorSets(Yaml::Node& Root)
+	{
+		if (!Root["DescriptorSets"].IsNone())
+		{
+			return Root["DescriptorSets"];
+		}
+
+		assert(false);
+		static Yaml::Node Empty;
+		return Empty;
+	}
+
 	Yaml::Node& ParseDescriptorSetLayoutNode(Yaml::Node& Root)
 	{
 		if (!Root["bindings"].IsNone())

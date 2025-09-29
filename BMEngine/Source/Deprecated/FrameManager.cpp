@@ -43,10 +43,10 @@ namespace FrameManager
 
 	void Init()
 	{
-		VkPhysicalDevice PhysicalDevice = VulkanInterface::GetPhysicalDevice();
-		VkDevice Device = VulkanInterface::GetDevice();
+		VkPhysicalDevice PhysicalDevice = RenderResources::GetCoreContext()->PhysicalDevice;
+		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
-		BufferMultiFrameSize = BufferSingleFrameSize * VulkanInterface::GetImageCount();
+		BufferMultiFrameSize = BufferSingleFrameSize * RenderResources::GetCoreContext()->ImagesCount;
 
 		Buffer.Buffer = VulkanHelper::CreateBuffer(Device, BufferMultiFrameSize, VulkanHelper::BufferUsageFlag::UniformFlag);
 		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Buffer.Buffer,
@@ -74,14 +74,14 @@ namespace FrameManager
 		LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
 		LayoutCreateInfo.pNext = nullptr;
 
-		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(VulkanInterface::GetDevice(), &LayoutCreateInfo, nullptr, &VpLayout));
+		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(RenderResources::GetCoreContext()->LogicalDevice, &LayoutCreateInfo, nullptr, &VpLayout));
 
 		VpSet = CreateAndBindSet(VpHandle, VpBufferSize, VpLayout);
 	}
 
 	void DeInit()
 	{
-		VkDevice Device = VulkanInterface::GetDevice();
+		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
 		vkDestroyDescriptorSetLayout(Device, VpLayout, nullptr);
 
@@ -97,14 +97,14 @@ namespace FrameManager
 	UniformMemoryHnadle ReserveUniformMemory(u64 Size)
 	{
 		const UniformMemoryHnadle Handle = NextUniformMemoryHandle;
-		NextUniformMemoryHandle += Size * VulkanInterface::GetImageCount();
+		NextUniformMemoryHandle += Size * RenderResources::GetCoreContext()->ImagesCount;
 		return Handle;
 	}
 
 	void UpdateUniformMemory(UniformMemoryHnadle Handle, const void* Data, u64 Size)
 	{
-		VulkanHelper::UpdateHostCompatibleBufferMemory(VulkanInterface::GetDevice(), Buffer.Memory, Size,
-			Handle + (Size * VulkanInterface::TestGetImageIndex()), Data);
+		VulkanHelper::UpdateHostCompatibleBufferMemory(RenderResources::GetCoreContext()->LogicalDevice, Buffer.Memory, Size,
+			Handle + (Size * Render::GetRenderState()->RenderDrawState.CurrentImageIndex), Data);
 	}
 
 	VkDescriptorSet CreateAndBindSet(UniformMemoryHnadle Handle, u64 Size, VkDescriptorSetLayout Layout)
@@ -112,10 +112,10 @@ namespace FrameManager
 		VkDescriptorSet NewSet;
 		VkDescriptorSetAllocateInfo AllocInfo = {};
 		AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		AllocInfo.descriptorPool = RenderResources::GetMainPool();
+		AllocInfo.descriptorPool = RenderResources::GetDescriptorPool("MainPool");
 		AllocInfo.descriptorSetCount = 1;
 		AllocInfo.pSetLayouts = &Layout;
-		VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(VulkanInterface::GetDevice(), &AllocInfo, &NewSet));
+		VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(RenderResources::GetCoreContext()->LogicalDevice, &AllocInfo, &NewSet));
 
 		VkDescriptorBufferInfo VpBufferInfo;
 		VpBufferInfo.buffer = Buffer.Buffer;
@@ -132,7 +132,7 @@ namespace FrameManager
 		WriteDescriptorSet.pBufferInfo = &VpBufferInfo;
 		WriteDescriptorSet.pImageInfo = nullptr;
 
-		vkUpdateDescriptorSets(VulkanInterface::GetDevice(), 1, &WriteDescriptorSet, 0, nullptr);
+		vkUpdateDescriptorSets(RenderResources::GetCoreContext()->LogicalDevice, 1, &WriteDescriptorSet, 0, nullptr);
 
 		return NewSet;
 	}
@@ -154,7 +154,7 @@ namespace FrameManager
 		LayoutCreateInfo.pNext = nullptr;
 
 		VkDescriptorSetLayout Layout;
-		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(VulkanInterface::GetDevice(), &LayoutCreateInfo, nullptr, &Layout));
+		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(RenderResources::GetCoreContext()->LogicalDevice, &LayoutCreateInfo, nullptr, &Layout));
 		return Layout;
 	}
 

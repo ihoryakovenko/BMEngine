@@ -119,44 +119,38 @@ namespace EngineResources
 
 				const u64 VertexDataSize = VerticesCount * sizeof(StaticMeshVertex) + IndicesCount * sizeof(u32);
 
-				
+				RenderResources::MeshDescription Mesh;
+				Mesh.IndicesCount = IndicesCount;
+				Mesh.VertexSize = sizeof(StaticMeshVertex);
+				Mesh.VerticesCount = VerticesCount;
+
+				RenderResources::ResourceHandle MeshHandle = RenderResources::CreateStaticMesh(&Mesh, Model.VertexData + ModelVertexByteOffset, "VertexStageData");
 
 				Material Mat;
 				Mat.AlbedoTexIndex = RenderResources::GetResourceGPUIndex(AlbedoTextureHandle);
 				Mat.SpecularTexIndex = RenderResources::GetResourceGPUIndex(SpecularTextureHandle);
 				Mat.Shininess = 32.0f;
 
-				RenderResources::ResourceDependency AlbedoTextureDependency;
-				AlbedoTextureDependency.Handle = AlbedoTextureHandle;
+				RenderResources::ResourceDependency TextureHandles[] = { AlbedoTextureHandle, SpecularTextureHandle };
+				RenderResources::ResourceDependency TextureDep = RenderResources::CreateResourceDependency(TextureHandles, 2);
 
-				RenderResources::ResourceDependency SpecularTextureDependency;
-				SpecularTextureDependency.Handle = SpecularTextureHandle;
-
-				const RenderResources::ResourceHandle MaterialHandle = RenderResources::CreateStorageBufferResource(sizeof(Mat), "MaterialBuffer");
-				RenderResources::AddResourceDependency(MaterialHandle, AlbedoTextureDependency);
-				RenderResources::AddResourceDependency(MaterialHandle, SpecularTextureDependency);
+				const RenderResources::ResourceHandle MaterialHandle = RenderResources::CreateStorageBufferResource(sizeof(Mat), "MaterialBuffer", TextureDep, 2);
 				RenderResources::UpdateStorageBufferResource(MaterialHandle, &Mat, sizeof(Mat), "MaterialBuffer");
 
 				InstanceData Instance;
 				Instance.MaterialIndex = RenderResources::GetResourceGPUIndex(MaterialHandle);
 				Instance.ModelMatrix = glm::translate(glm::mat4(1), Request.Position);
 
-				RenderResources::ResourceDependency MateriaDependency;
-				MateriaDependency.Handle = MaterialHandle;
+				RenderResources::ResourceDependency InstantDepHandles[] = { MeshHandle, MaterialHandle };
+				RenderResources::ResourceDependency InstanceDep = RenderResources::CreateResourceDependency(InstantDepHandles, 2);
 
-				const RenderResources::ResourceHandle InstanceHandle = RenderResources::CreateStorageBufferResource(sizeof(Instance), "GPUInstances");
-				RenderResources::AddResourceDependency(InstanceHandle, MateriaDependency);
+				const RenderResources::ResourceHandle InstanceHandle = RenderResources::CreateStorageBufferResource(sizeof(Instance), "GPUInstances", InstanceDep, 2);
 				RenderResources::UpdateStorageBufferResource(InstanceHandle, &Instance, sizeof(Instance), "GPUInstances");
 
-				RenderResources::MeshDescription Mesh;
-				Mesh.IndicesCount = IndicesCount;
-				Mesh.VertexSize = sizeof(StaticMeshVertex);
-				Mesh.VerticesCount = VerticesCount;
-
 				Render::DrawEntity Entity = { };
-				Entity.StaticMeshIndex = RenderResources::CreateStaticMesh(&Mesh, Model.VertexData + ModelVertexByteOffset, "VertexStageData");
+				Entity.StaticMeshHandle = MeshHandle;
 				Entity.Instances = 1;
-				Entity.InstanceDataIndex = InstanceHandle;
+				Entity.InstanceDataHandle = InstanceHandle;
 
 				std::unique_lock Lock(TmpScene->TempLock);
 				Memory::PushBackToArray(&TmpScene->DrawEntities, &Entity);

@@ -242,6 +242,7 @@ namespace Util
 	Yaml::Node& GetSamplers(Yaml::Node& Root);
 	Yaml::Node& GetShaders(Yaml::Node& Root);
 	Yaml::Node& GetDescriptorSetLayouts(Yaml::Node& Root);
+	Yaml::Node& GetDescriptorSets(Yaml::Node& Root);
 	Yaml::Node& ParseDescriptorSetLayoutNode(Yaml::Node& Root);
 	Yaml::Node& GetVertices(Yaml::Node& Root);
 	Yaml::Node& GetVertexBindingNode(Yaml::Node& VertexNode);

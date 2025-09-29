@@ -46,29 +46,14 @@ namespace VulkanInterface
 	};
 
 	// TO refactor
-	u32 GetImageCount();
-	VkImageView* GetSwapchainImageViews();
-	VkImage* GetSwapchainImages();
+
 	u32 TestGetImageIndex();
 
 	void WaitDevice();
 
-
-
-
 	typedef UniformBuffer IndexBuffer;
 	typedef UniformBuffer VertexBuffer;
 
-	VkDevice GetDevice();
-	VkPhysicalDevice GetPhysicalDevice();
-	VkCommandBuffer GetCommandBuffer();
-	VkQueue GetTransferQueue();
-	VkQueue GetGraphicsQueue();
-	VkFormat GetSurfaceFormat();
-	u32 GetQueueGraphicsFamilyIndex();
-	VkInstance GetInstance();
 	VkCommandPool GetTransferCommandPool();
-	VkSwapchainKHR GetSwapchain();
-
-
+	VkCommandBuffer GetCommandBuffer();
 }

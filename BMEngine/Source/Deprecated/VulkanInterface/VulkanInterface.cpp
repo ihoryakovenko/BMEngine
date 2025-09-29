@@ -35,21 +35,6 @@
 
 namespace VulkanInterface
 {
-	u32 GetImageCount()
-	{
-		return RenderResources::GetCoreContext()->ImagesCount;
-	}
-
-	VkImageView* GetSwapchainImageViews()
-	{
-		return RenderResources::GetCoreContext()->ImageViews;
-	}
-
-	VkImage* GetSwapchainImages()
-	{
-		return RenderResources::GetCoreContext()->Images;
-	}
-
 	u32 TestGetImageIndex()
 	{
 		return Render::GetRenderState()->RenderDrawState.CurrentImageIndex;
@@ -60,45 +45,10 @@ namespace VulkanInterface
 		vkDeviceWaitIdle(RenderResources::GetCoreContext()->LogicalDevice);
 	}
 
-	VkDevice GetDevice()
-	{
-		return RenderResources::GetCoreContext()->LogicalDevice;
-	}
-
-	VkPhysicalDevice GetPhysicalDevice()
-	{
-		return RenderResources::GetCoreContext()->PhysicalDevice;
-	}
 
 	VkCommandBuffer GetCommandBuffer()
 	{
 		return Render::GetRenderState()->RenderDrawState.Frames.CommandBuffers[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
-	}
-
-	VkQueue GetTransferQueue()
-	{
-		//return TransferQueue;
-		return RenderResources::GetCoreContext()->GraphicsQueue;
-	}
-
-	VkQueue GetGraphicsQueue()
-	{
-		return RenderResources::GetCoreContext()->GraphicsQueue;
-	}
-
-	VkFormat GetSurfaceFormat()
-	{
-		return RenderResources::GetCoreContext()->SurfaceFormat.format;
-	}
-
-	u32 GetQueueGraphicsFamilyIndex()
-	{
-		return RenderResources::GetCoreContext()->Indices.GraphicsFamily;
-	}
-
-	VkInstance GetInstance()
-	{
-		return RenderResources::GetCoreContext()->VulkanInstance;
 	}
 
 	VkCommandPool GetTransferCommandPool()
@@ -106,8 +56,4 @@ namespace VulkanInterface
 		return Render::GetRenderState()->RenderDrawState.GraphicsCommandPool;
 	}
 
-	VkSwapchainKHR GetSwapchain()
-	{
-		return RenderResources::GetCoreContext()->VulkanSwapchain;
-	}
 }

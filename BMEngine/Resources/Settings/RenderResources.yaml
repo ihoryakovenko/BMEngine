@@ -178,6 +178,17 @@ DescriptorSetLayouts:
         stageFlags: VERTEX_BIT | FRAGMENT_BIT
         pImmutableSamplers: null
 
+DescriptorSets:
+  BindlesTexturesSet:
+    name: BindlesTexturesSet
+    layout: BindlesTexturesLayout
+    pool: MainPool
+
+  MaterialSet:
+    name: MaterialSet
+    layout: MaterialLayout
+    pool: MainPool
+
 meshBuffers:
   VertexStageData:
     name: VertexStageData

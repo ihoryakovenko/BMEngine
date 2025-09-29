@@ -22,8 +22,8 @@ namespace Render
 {
 	struct DrawEntity
 	{
-		u64 StaticMeshIndex;
-		u32 InstanceDataIndex;
+		u64 StaticMeshHandle;
+		u32 InstanceDataHandle;
 		u32 Instances;
 	};
 

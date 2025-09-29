@@ -122,6 +122,20 @@ namespace Engine
 		}
 	}
 
+	static void ParseAndCreateDescriptorSets(Yaml::Node& DescriptorSetsNode)
+	{
+		for (auto DescriptorSetIt = DescriptorSetsNode.Begin(); DescriptorSetIt != DescriptorSetsNode.End(); DescriptorSetIt++)
+		{
+			Yaml::Node& DescriptorSetNode = (*DescriptorSetIt).second;
+			
+			RenderResources::DescriptorSetDescription Description;
+			Description.Layout = DescriptorSetNode["layout"].As<std::string>();
+			Description.Pool = DescriptorSetNode["pool"].As<std::string>();
+			
+			RenderResources::CreateDescriptorSet((*DescriptorSetIt).first, Description);
+		}
+	}
+
 	struct Camera
 	{
 		f32 Fov;
@@ -268,6 +282,7 @@ namespace Engine
 		ParseAndCreateMeshBuffers(Util::GetMeshBuffers(Root));
 		ParseAndCreateBuffers(Util::GetStorageBuffers(Root));
 		RenderResources::CreateDescriptorLayouts(Util::GetDescriptorSetLayouts(Root));
+		ParseAndCreateDescriptorSets(Util::GetDescriptorSets(Root));
 		RenderResources::PostCreateInit();
 
 		TransferSystem::Init();
