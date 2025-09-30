@@ -1612,6 +1612,17 @@ namespace Util
 			Data.Size = BufferNode["size"].As<u64>();
 		}
 
+		if (!BufferNode["stageBarrier"].IsNone())
+		{
+			std::string value = BufferNode["stageBarrier"].As<std::string>();
+			Data.StageBarrier = ParseStageBarrier(value.c_str(), value.length());
+		}
+		else
+		{
+			// Default to Vertex stage for mesh buffers
+			Data.StageBarrier = VulkanHelper::StageBarrier::Vertex;
+		}
+
 		return Data;
 	}
 
@@ -1622,5 +1633,118 @@ namespace Util
 			return BufferNode["name"].As<std::string>();
 		}
 		return {};
+	}
+
+	RenderResources::DescriptorSetLayoutDescription ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode)
+	{
+		RenderResources::DescriptorSetLayoutDescription Description = {};
+		
+		Yaml::Node& BindingsNode = ParseDescriptorSetLayoutNode(DescriptorSetLayoutNode);
+		
+		for (auto BindingIt = BindingsNode.Begin(); BindingIt != BindingsNode.End(); BindingIt++)
+		{
+			VkDescriptorSetLayoutBinding Binding = ParseDescriptorSetLayoutBindingNode((*BindingIt).second);
+			Description.Bindings.push_back(Binding);
+		}
+		
+		Description.Flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+		Description.Next = nullptr;
+		
+		return Description;
+	}
+
+	RenderResources::PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, VkPipelineLayout PipelineLayout, const VulkanHelper::PipelineResourceInfo& ResourceInfo)
+	{
+		RenderResources::PipelineDescription Description = {};
+		Description.Extent = Extent;
+		Description.PipelineLayout = PipelineLayout;
+		Description.ResourceInfo = ResourceInfo;
+
+		Yaml::Node Root;
+		Yaml::Parse(Root, YamlFilePath.c_str());
+		Yaml::Node& PipelineNode = GetPipelineNode(Root);
+
+		// Parse shader stages
+		Yaml::Node& ShadersNode = GetPipelineShadersNode(PipelineNode);
+		for (auto it = ShadersNode.Begin(); it != ShadersNode.End(); it++)
+		{
+			VkPipelineShaderStageCreateInfo ShaderStage = {};
+			ShaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			ShaderStage.stage = ParseShaderStage((*it).first.c_str(), (*it).first.length());
+			ShaderStage.pName = "main";
+			ShaderStage.module = RenderResources::GetShader((*it).second.As<std::string>());
+			Description.ShaderStages.push_back(ShaderStage);
+		}
+
+		// Parse vertex input
+		Yaml::Node& VertexAttributeLayoutNode = GetVertexAttributeLayoutNode(PipelineNode);
+		if (!VertexAttributeLayoutNode.IsNone())
+		{
+			u32 currentLocation = 0;
+			u32 bindingIndex = 0;
+
+			for (auto VertexTypeIt = VertexAttributeLayoutNode.Begin(); VertexTypeIt != VertexAttributeLayoutNode.End(); VertexTypeIt++)
+			{
+				Yaml::Node& VertexTypeNode = (*VertexTypeIt).second;
+				std::string VertexTypeName = ParseNameNode(VertexTypeNode);
+
+				VulkanHelper::VertexBinding VertexBinding = RenderResources::GetVertexBinding(VertexTypeName);
+				VkVertexInputBindingDescription Binding = {};
+				Binding.binding = bindingIndex;
+				Binding.stride = VertexBinding.Stride;
+				Binding.inputRate = VertexBinding.InputRate;
+				Description.VertexBindings.push_back(Binding);
+
+				Yaml::Node& AttributesNode = GetVertexAttributesNode(VertexTypeNode);
+				for (auto AttrIt = AttributesNode.Begin(); AttrIt != AttributesNode.End(); AttrIt++)
+				{
+					Yaml::Node& AttributeNode = (*AttrIt).second;
+					std::string AttributeName = ParseNameNode(AttributeNode);
+
+					auto bindingAttrIt = VertexBinding.Attributes.find(AttributeName);
+					if (bindingAttrIt != VertexBinding.Attributes.end())
+					{
+						VkVertexInputAttributeDescription Attribute = {};
+						Attribute.binding = bindingIndex;
+						Attribute.location = currentLocation;
+						Attribute.format = bindingAttrIt->second.Format;
+						Attribute.offset = bindingAttrIt->second.Offset;
+						Description.VertexAttributes.push_back(Attribute);
+						currentLocation++;
+					}
+				}
+
+				bindingIndex++;
+			}
+		}
+
+		// Parse pipeline states
+		Yaml::Node& RasterizationNode = GetPipelineRasterizationNode(PipelineNode);
+		Yaml::Node& ColorBlendStateNode = GetPipelineColorBlendStateNode(PipelineNode);
+		Yaml::Node& ColorBlendAttachmentNode = GetPipelineColorBlendAttachmentNode(PipelineNode);
+		Yaml::Node& DepthStencilNode = GetPipelineDepthStencilNode(PipelineNode);
+		Yaml::Node& MultisampleNode = GetPipelineMultisampleNode(PipelineNode);
+		Yaml::Node& InputAssemblyNode = GetPipelineInputAssemblyNode(PipelineNode);
+		Yaml::Node& ViewportStateNode = GetPipelineViewportStateNode(PipelineNode);
+		Yaml::Node& ViewportNode = GetViewportNode(PipelineNode);
+		Yaml::Node& ScissorNode = GetScissorNode(PipelineNode);
+
+		Description.RasterizationState = ParsePipelineRasterizationNode(RasterizationNode);
+		Description.ColorBlendAttachment = ParsePipelineColorBlendAttachmentNode(ColorBlendAttachmentNode);
+		Description.ColorBlendState = ParsePipelineColorBlendStateNode(ColorBlendStateNode);
+		Description.DepthStencilState = ParsePipelineDepthStencilNode(DepthStencilNode);
+		Description.MultisampleState = ParsePipelineMultisampleNode(MultisampleNode);
+		Description.InputAssemblyState = ParsePipelineInputAssemblyNode(InputAssemblyNode);
+		Description.ViewportState = ParsePipelineViewportStateNode(ViewportStateNode);
+
+		Description.Viewport = ParseViewportNode(ViewportNode);
+		Description.Viewport.width = Extent.width;
+		Description.Viewport.height = Extent.height;
+
+		Description.Scissor = ParseScissorNode(ScissorNode);
+		Description.Scissor.extent.width = Extent.width;
+		Description.Scissor.extent.height = Extent.height;
+
+		return Description;
 	}
 }

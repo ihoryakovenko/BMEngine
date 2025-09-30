@@ -12,6 +12,8 @@
 
 #include <gli/gli.hpp>
 
+#include <mini-yaml/yaml/Yaml.hpp>
+
 #include "Deprecated/VulkanInterface/VulkanInterface.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
 #include "Engine/Systems/Render/RenderResources.h"
@@ -317,14 +319,10 @@ namespace Util
 	RenderResources::MeshBufferDescription ParseMeshBufferNode(Yaml::Node& BufferNode);
 	std::string GetBufferName(Yaml::Node& BufferNode);
 	
+	RenderResources::DescriptorSetLayoutDescription ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode);
+	RenderResources::PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, VkPipelineLayout PipelineLayout, const VulkanHelper::PipelineResourceInfo& ResourceInfo);
+	
 	VkFormat GliFormatToVkFormat(gli::format Format);
-
-
-#ifdef NDEBUG
-	static bool EnableValidationLayers = false;
-#else
-	static bool EnableValidationLayers = true;
-#endif
 
 	typedef u8* Model3DData;
 

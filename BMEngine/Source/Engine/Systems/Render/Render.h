@@ -46,8 +46,6 @@ namespace Render
 
 	struct StaticMeshPipeline
 	{
-		VulkanHelper::RenderPipeline Pipeline;
-
 		VkDescriptorSetLayout StaticMeshLightLayout;
 		VkDescriptorSetLayout ShadowMapArrayLayout;
 

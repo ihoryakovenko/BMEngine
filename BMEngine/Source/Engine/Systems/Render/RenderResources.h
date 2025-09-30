@@ -4,8 +4,7 @@
 
 #include <unordered_map>
 #include <string>
-
-#include <mini-yaml/yaml/Yaml.hpp>
+#include <vector>
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
@@ -44,6 +43,7 @@ namespace RenderResources
 		u64 Offset;
 		VulkanHelper::BufferUsageFlag UsageFlag;
 		VulkanHelper::MemoryPropertyFlag PropertyFlag;
+		VulkanHelper::StageBarrier StageBarrier;
 	};
 
 	enum class ResourceType : u32
@@ -135,12 +135,51 @@ namespace RenderResources
 		VulkanHelper::BufferUsageFlag BufferUsageFlag;
 		VulkanHelper::MemoryPropertyFlag MemoryPropertyFlag;
 		u64 Size;
+		VulkanHelper::StageBarrier StageBarrier;
 	};
 
 	struct DescriptorSetDescription
 	{
 		std::string Layout;
 		std::string Pool;
+	};
+
+	struct DescriptorSetLayoutDescription
+	{
+		std::vector<VkDescriptorSetLayoutBinding> Bindings;
+		VkDescriptorSetLayoutCreateFlags Flags;
+		const void* Next;
+	};
+
+	struct PipelineLayoutDescription
+	{
+		u32 SetLayoutCount;
+		const VkDescriptorSetLayout* SetLayouts;
+		u32 PushConstantRangeCount;
+		const VkPushConstantRange* PushConstantRanges;
+		VkPipelineLayoutCreateFlags Flags;
+		const void* Next;
+	};
+
+	struct PipelineDescription
+	{
+		VkExtent2D Extent;
+		VkPipelineLayout PipelineLayout;
+		VulkanHelper::PipelineResourceInfo ResourceInfo;
+		
+		std::vector<VkPipelineShaderStageCreateInfo> ShaderStages;
+		std::vector<VkVertexInputBindingDescription> VertexBindings;
+		std::vector<VkVertexInputAttributeDescription> VertexAttributes;
+		
+		VkPipelineRasterizationStateCreateInfo RasterizationState;
+		VkPipelineColorBlendAttachmentState ColorBlendAttachment;
+		VkPipelineColorBlendStateCreateInfo ColorBlendState;
+		VkPipelineDepthStencilStateCreateInfo DepthStencilState;
+		VkPipelineMultisampleStateCreateInfo MultisampleState;
+		VkPipelineInputAssemblyStateCreateInfo InputAssemblyState;
+		VkPipelineViewportStateCreateInfo ViewportState;
+		VkViewport Viewport;
+		VkRect2D Scissor;
 	};
 
 	void Init(GLFWwindow* WindowHandler);
@@ -151,13 +190,12 @@ namespace RenderResources
 	void CreateSampler(const std::string& Name, const SamplerDescription& Data);
 	void CreateStorageBuffer(const std::string& Name, const StorageBufferDescription& Description);
 	void CreateMeshBuffer(const std::string& Name, const MeshBufferDescription& Description);
-	void CreateDescriptorLayouts(Yaml::Node& DescriptorSetLayoutsNode);
+	void CreateDescriptorSetLayout(const std::string& Name, const DescriptorSetLayoutDescription& Description);
 	void CreateDescriptorSet(const std::string& Name, const DescriptorSetDescription& Description);
+	void CreateGraphicsPipeline(const std::string& Name, const PipelineDescription& Description);
+	void CreatePipelineLayout(const std::string& Name, const PipelineLayoutDescription& Description);
 
 	void PostCreateInit();
-
-	VkPipeline CreateGraphicsPipeline(VkDevice Device, Yaml::Node& Root,
-		VkExtent2D Extent, VkPipelineLayout PipelineLayout, const VulkanHelper::PipelineResourceInfo* ResourceInfo);
 
 	ResourceHandle CreateStaticMesh(MeshDescription* Description, void* Data, const std::string& BufferName);
 	ResourceHandle CreateTexture(TextureDescription* Description, void* Data);
@@ -181,6 +219,8 @@ namespace RenderResources
 	RenderResources::StorageBuffer* GetStorageBuffer(const std::string& Name);
 	RenderResources::MeshBuffer* GetMeshBuffer(const std::string& Name);
 	VulkanHelper::VertexBinding GetVertexBinding(const std::string& Id);
+	VkPipeline GetPipeline(const std::string& Name);
+	VkPipelineLayout GetPipelineLayout(const std::string& Name);
 
 	bool IsDrawEntityLoaded(const Render::DrawEntity* Entity);
 }

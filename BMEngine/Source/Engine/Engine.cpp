@@ -122,6 +122,15 @@ namespace Engine
 		}
 	}
 
+	static void ParseAndCreateDescriptorSetLayouts(Yaml::Node& DescriptorSetLayoutsNode)
+	{
+		for (auto LayoutIt = DescriptorSetLayoutsNode.Begin(); LayoutIt != DescriptorSetLayoutsNode.End(); LayoutIt++)
+		{
+			RenderResources::DescriptorSetLayoutDescription Description = Util::ParseDescriptorSetLayoutFromYaml((*LayoutIt).second);
+			RenderResources::CreateDescriptorSetLayout((*LayoutIt).first, Description);
+		}
+	}
+
 	static void ParseAndCreateDescriptorSets(Yaml::Node& DescriptorSetsNode)
 	{
 		for (auto DescriptorSetIt = DescriptorSetsNode.Begin(); DescriptorSetIt != DescriptorSetsNode.End(); DescriptorSetIt++)
@@ -281,7 +290,7 @@ namespace Engine
 		ParseAndCreateSamplers(Util::GetSamplers(Root));
 		ParseAndCreateMeshBuffers(Util::GetMeshBuffers(Root));
 		ParseAndCreateBuffers(Util::GetStorageBuffers(Root));
-		RenderResources::CreateDescriptorLayouts(Util::GetDescriptorSetLayouts(Root));
+		ParseAndCreateDescriptorSetLayouts(Util::GetDescriptorSetLayouts(Root));
 		ParseAndCreateDescriptorSets(Util::GetDescriptorSets(Root));
 		RenderResources::PostCreateInit();
 

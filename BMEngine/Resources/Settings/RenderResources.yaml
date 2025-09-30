@@ -195,6 +195,7 @@ meshBuffers:
     bufferUsageFlag: CombinedVertexIndexFlag
     memoryPropertyFlag: GPULocal
     size: 134217728  # 128MB
+    stageBarrier: Vertex
 
 storageBuffers:
   GPUInstances:
