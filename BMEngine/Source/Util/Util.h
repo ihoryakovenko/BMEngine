@@ -316,10 +316,10 @@ namespace Util
 	VulkanHelper::MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length);
 	VulkanHelper::StageBarrier ParseStageBarrier(const char* Value, u32 Length);
 	RenderResources::StorageBufferDescription ParseStorageBufferNode(Yaml::Node& BufferNode);
-	RenderResources::MeshBufferDescription ParseMeshBufferNode(Yaml::Node& BufferNode);
 	std::string GetBufferName(Yaml::Node& BufferNode);
 	
 	RenderResources::DescriptorSetLayoutDescription ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode);
+	RenderResources::DescriptorSetDescription ParseDescriptorSetFromYaml(Yaml::Node& DescriptorSetNode);
 	RenderResources::PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, VkPipelineLayout PipelineLayout, const VulkanHelper::PipelineResourceInfo& ResourceInfo);
 	
 	VkFormat GliFormatToVkFormat(gli::format Format);

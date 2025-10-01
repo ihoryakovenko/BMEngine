@@ -188,28 +188,29 @@ DescriptorSets:
     name: MaterialSet
     layout: MaterialLayout
     pool: MainPool
-
-meshBuffers:
-  VertexStageData:
-    name: VertexStageData
-    bufferUsageFlag: CombinedVertexIndexFlag
-    memoryPropertyFlag: GPULocal
-    size: 134217728  # 128MB
-    stageBarrier: Vertex
+    bindings:
+      - buffer: MaterialBuffer
+        binding: 0
+        descriptorType: STORAGE_BUFFER
 
 storageBuffers:
   GPUInstances:
     name: GPUInstances
     bufferUsageFlag: InstanceFlag
     memoryPropertyFlag: GPULocal
-    entrySize: 68
-    count: 1000
+    Capacity: 2097152
     stageBarrier: Fragment
 
   MaterialBuffer:
     name: MaterialBuffer
     bufferUsageFlag: StorageFlag
     memoryPropertyFlag: GPULocal
-    entrySize: 12
-    count: 1000
+    Capacity: 2097152
     stageBarrier: Fragment
+
+  VertexStageData:
+    name: VertexStageData
+    bufferUsageFlag: CombinedVertexIndexFlag
+    memoryPropertyFlag: GPULocal
+    Capacity: 134217728  # 128MB
+    stageBarrier: Vertex

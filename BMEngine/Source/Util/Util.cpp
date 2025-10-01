@@ -1572,55 +1572,15 @@ namespace Util
 			Data.MemoryPropertyFlag = ParseMemoryPropertyFlag(value.c_str(), value.length());
 		}
 
-		if (!BufferNode["entrySize"].IsNone())
+		if (!BufferNode["Capacity"].IsNone())
 		{
-			Data.EntrySize = BufferNode["entrySize"].As<u32>();
-		}
-
-		if (!BufferNode["count"].IsNone())
-		{
-			Data.Count = BufferNode["count"].As<u32>();
+			Data.Capacity = BufferNode["Capacity"].As<u32>();
 		}
 
 		if (!BufferNode["stageBarrier"].IsNone())
 		{
 			std::string value = BufferNode["stageBarrier"].As<std::string>();
 			Data.StageBarrier = ParseStageBarrier(value.c_str(), value.length());
-		}
-
-		return Data;
-	}
-
-	RenderResources::MeshBufferDescription ParseMeshBufferNode(Yaml::Node& BufferNode)
-	{
-		RenderResources::MeshBufferDescription Data = { };
-
-		if (!BufferNode["bufferUsageFlag"].IsNone())
-		{
-			std::string value = BufferNode["bufferUsageFlag"].As<std::string>();
-			Data.BufferUsageFlag = ParseBufferUsageFlag(value.c_str(), value.length());
-		}
-
-		if (!BufferNode["memoryPropertyFlag"].IsNone())
-		{
-			std::string value = BufferNode["memoryPropertyFlag"].As<std::string>();
-			Data.MemoryPropertyFlag = ParseMemoryPropertyFlag(value.c_str(), value.length());
-		}
-
-		if (!BufferNode["size"].IsNone())
-		{
-			Data.Size = BufferNode["size"].As<u64>();
-		}
-
-		if (!BufferNode["stageBarrier"].IsNone())
-		{
-			std::string value = BufferNode["stageBarrier"].As<std::string>();
-			Data.StageBarrier = ParseStageBarrier(value.c_str(), value.length());
-		}
-		else
-		{
-			// Default to Vertex stage for mesh buffers
-			Data.StageBarrier = VulkanHelper::StageBarrier::Vertex;
 		}
 
 		return Data;
@@ -1649,6 +1609,39 @@ namespace Util
 		
 		Description.Flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
 		Description.Next = nullptr;
+		
+		return Description;
+	}
+
+	RenderResources::DescriptorSetDescription ParseDescriptorSetFromYaml(Yaml::Node& DescriptorSetNode)
+	{
+		RenderResources::DescriptorSetDescription Description = {};
+		
+		Description.Layout = DescriptorSetNode["layout"].As<std::string>();
+		Description.Pool = DescriptorSetNode["pool"].As<std::string>();
+		
+		if (!DescriptorSetNode["bindings"].IsNone())
+		{
+			Yaml::Node& BindingsNode = DescriptorSetNode["bindings"];
+			for (auto BindingIt = BindingsNode.Begin(); BindingIt != BindingsNode.End(); BindingIt++)
+			{
+				RenderResources::DescriptorSetBinding Binding = {};
+				Binding.Buffer = (*BindingIt).second["buffer"].As<std::string>();
+				Binding.Binding = (*BindingIt).second["binding"].As<u32>();
+				
+				if (!(*BindingIt).second["descriptorType"].IsNone())
+				{
+					std::string descriptorTypeStr = (*BindingIt).second["descriptorType"].As<std::string>();
+					Binding.DescriptorType = ParseDescriptorType(descriptorTypeStr.c_str(), descriptorTypeStr.length());
+				}
+				else
+				{
+					assert(false);
+				}
+				
+				Description.Bindings.push_back(Binding);
+			}
+		}
 		
 		return Description;
 	}

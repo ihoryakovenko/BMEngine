@@ -18,8 +18,7 @@ namespace RenderResources
 		std::unordered_map<std::string, VkSampler> Samplers;
 		std::unordered_map<std::string, VkDescriptorSetLayout> DescriptorSetLayouts;
 		std::unordered_map<std::string, VkShaderModule> Shaders;
-		std::unordered_map<std::string, RenderResources::StorageBuffer> StorageBuffers;
-		std::unordered_map<std::string, RenderResources::MeshBuffer> MeshBuffers;
+		std::unordered_map<std::string, RenderResources::GPUBuffer> StorageBuffers;
 		std::unordered_map<std::string, VkDescriptorPool> DescriptorPools;
 		std::unordered_map<std::string, VkDescriptorSet> DescriptorSets;
 		std::unordered_map<std::string, VkPipeline> Pipelines;
@@ -31,16 +30,8 @@ namespace RenderResources
 		u32 MaxTextures;
 		u32 TextureCount;
 
-		u32 MaxStaticMeshes;
-		u32 StaticMeshCount;
-
-		ResourceRecord* ResourceRecords;
+		std::atomic<bool>* ResourceRecords;
 		MeshTexture2D* Textures;
-		VertexData* StaticMeshes;
-
-		u32 MaxResourceDependency;
-		u32 CurrentResourceDependencyIndex;
-		ResourceHandle* ResourceDependencyBuffer;
 	};
 
 	static ResourceHandle PackResourceHandle(ResourceType Type, u32 Index)
@@ -58,52 +49,6 @@ namespace RenderResources
 		return (u32)(Handle & 0xFFFFFFFF);
 	}
 
-	static bool CheckRecordAndDependenciesLoadState(const ResourceContext* Context, const ResourceRecord* Record)
-	{
-		if (!Record->IsLoaded)
-		{
-			return false;
-		}
-
-		for (u32 i = 0; i < Record->DependencyCount; ++i)
-		{
-			const ResourceHandle Handle = Context->ResourceDependencyBuffer[Record->Dependency + i];
-			const ResourceType Type = GetResourceType(Handle);
-			u32 ResourceIndex = GetResourceCPUIndex(Handle);
-			
-			switch (Type)
-			{
-				case RenderResources::ResourceType::Texture:
-
-					if (!Context->Textures[ResourceIndex].MeshTexture.IsLoaded)
-					{
-						return false;
-					}
-
-					break;
-				case RenderResources::ResourceType::Mesh:
-					if (!Context->StaticMeshes[ResourceIndex].IsLoaded)
-					{
-						return false;
-					}
-
-					break;
-				case RenderResources::ResourceType::StorageResource:
-					if (!CheckRecordAndDependenciesLoadState(Context, Context->ResourceRecords + ResourceIndex))
-					{
-						return false;
-					}
-
-					break;
-				default:
-					assert(false);
-					break;
-			}
-
-			return true;
-		}
-	}
-
 	static ResourceContext ResContext;
 
 	void OnResourceLoaded(ResourceHandle Handle)
@@ -116,11 +61,8 @@ namespace RenderResources
 			case ResourceType::Texture:
 				ResContext.Textures[ResourceIndex].MeshTexture.IsLoaded = true;
 				break;
-			case ResourceType::Mesh:
-				ResContext.StaticMeshes[ResourceIndex].IsLoaded = true;
-				break;
 			case ResourceType::StorageResource:
-				ResContext.ResourceRecords[ResourceIndex].IsLoaded = true;
+				ResContext.ResourceRecords[ResourceIndex] = true;
 				break;
 			default:
 				assert(false);
@@ -165,17 +107,9 @@ namespace RenderResources
 		ResContext.TextureCount = 0;
 		ResContext.Textures = (MeshTexture2D*)malloc(ResContext.MaxTextures * sizeof(ResContext.Textures[0]));
 
-		ResContext.MaxStaticMeshes = 30000;
-		ResContext.StaticMeshCount = 0;
-		ResContext.StaticMeshes = (VertexData*)malloc(ResContext.MaxStaticMeshes * sizeof(ResContext.StaticMeshes[0]));
-
 		ResContext.MaxResourceRecords = 60000;
 		ResContext.ResourceRecordCount = 0;
-		ResContext.ResourceRecords = (ResourceRecord*)malloc(ResContext.MaxResourceRecords * sizeof(ResContext.ResourceRecords[0]));
-
-		ResContext.MaxResourceDependency = 10000;
-		ResContext.CurrentResourceDependencyIndex = 0;
-		ResContext.ResourceDependencyBuffer = (ResourceHandle*)malloc(ResContext.MaxResourceDependency * sizeof(ResContext.ResourceDependencyBuffer[0]));
+		ResContext.ResourceRecords = (std::atomic<bool>*)malloc(ResContext.MaxResourceRecords * sizeof(ResContext.ResourceRecords[0]));
 	}
 
 	void CreateGraphicsPipeline(const std::string& Name, const PipelineDescription& Description)
@@ -299,12 +233,6 @@ namespace RenderResources
 			vkFreeMemory(Device, It->second.Memory, nullptr);
 		}
 
-		for (auto It = ResContext.MeshBuffers.begin(); It != ResContext.MeshBuffers.end(); ++It)
-		{
-			vkDestroyBuffer(Device, It->second.Buffer, nullptr);
-			vkFreeMemory(Device, It->second.Memory, nullptr);
-		}
-
 		for (auto It = ResContext.Pipelines.begin(); It != ResContext.Pipelines.end(); ++It)
 		{
 			vkDestroyPipeline(Device, It->second, nullptr);
@@ -327,12 +255,9 @@ namespace RenderResources
 		ResContext.DescriptorSetLayouts.clear();
 		ResContext.VBindings.clear();
 		ResContext.StorageBuffers.clear();
-		ResContext.MeshBuffers.clear();
 
 		free(ResContext.Textures);
-		free(ResContext.StaticMeshes);
 		free(ResContext.ResourceRecords);
-		free(ResContext.ResourceDependencyBuffer);
 	}
 
 	void CreateVertex(const std::string& Name, VulkanHelper::VertexBinding& Binding)
@@ -390,16 +315,12 @@ namespace RenderResources
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 		VkPhysicalDevice PhysicalDevice = ResContext.CoreContext.PhysicalDevice;
 
-		RenderResources::StorageBuffer NewBuffer = {};
-		u64 CalculatedSize = Description.EntrySize * Description.Count;
-		NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, CalculatedSize, Description.BufferUsageFlag);
+		RenderResources::GPUBuffer NewBuffer = {};
+		NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, Description.Capacity, Description.BufferUsageFlag);
 		
 		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, NewBuffer.Buffer, Description.MemoryPropertyFlag);
 		NewBuffer.Memory = AllocResult.Memory;
-		NewBuffer.Alignment = AllocResult.Alignment;
-		NewBuffer.RecordSize = Description.EntrySize;
-		NewBuffer.MaxRecords = Description.Count;
-		NewBuffer.Count = 0;
+		NewBuffer.Capacity = AllocResult.Size;
 		NewBuffer.UsageFlag = Description.BufferUsageFlag;
 		NewBuffer.PropertyFlag = Description.MemoryPropertyFlag;
 		NewBuffer.StageBarrier = Description.StageBarrier;
@@ -407,27 +328,6 @@ namespace RenderResources
 		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, NewBuffer.Buffer, NewBuffer.Memory, 0));
 
 		ResContext.StorageBuffers[Name] = NewBuffer;
-	}
-
-	void CreateMeshBuffer(const std::string& Name, const MeshBufferDescription& Description)
-	{
-		VkDevice Device = ResContext.CoreContext.LogicalDevice;
-		VkPhysicalDevice PhysicalDevice = ResContext.CoreContext.PhysicalDevice;
-
-		RenderResources::MeshBuffer NewBuffer = {};
-		NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, Description.Size, Description.BufferUsageFlag);
-		
-		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, NewBuffer.Buffer, Description.MemoryPropertyFlag);
-		NewBuffer.Memory = AllocResult.Memory;
-		NewBuffer.Capacity = AllocResult.Size;
-		NewBuffer.Offset = 0;
-		NewBuffer.UsageFlag = Description.BufferUsageFlag;
-		NewBuffer.PropertyFlag = Description.MemoryPropertyFlag;
-		NewBuffer.StageBarrier = Description.StageBarrier;
-
-		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, NewBuffer.Buffer, NewBuffer.Memory, 0));
-
-		ResContext.MeshBuffers[Name] = NewBuffer;
 	}
 
 	void CreateDescriptorSetLayout(const std::string& Name, const DescriptorSetLayoutDescription& Description)
@@ -462,27 +362,41 @@ namespace RenderResources
 		VkDescriptorSet DescriptorSet;
 		VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, &DescriptorSet));
 		ResContext.DescriptorSets[Name] = DescriptorSet;
-	}
 
-	void PostCreateInit()
-	{
-		VkDescriptorBufferInfo MaterialBufferInfo;
-		RenderResources::StorageBuffer* MaterialBuffer = GetStorageBuffer("MaterialBuffer");
-		MaterialBufferInfo.buffer = MaterialBuffer->Buffer;
-		MaterialBufferInfo.offset = 0;
-		MaterialBufferInfo.range = MaterialBuffer->MaxRecords * MaterialBuffer->RecordSize;
+		if (!Description.Bindings.empty())
+		{
+			std::vector<VkWriteDescriptorSet> WriteDescriptorSets;
+			std::vector<VkDescriptorBufferInfo> BufferInfos;
 
-		VkWriteDescriptorSet WriteDescriptorSet = { };
-		WriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		WriteDescriptorSet.dstSet = ResContext.DescriptorSets["MaterialSet"];
-		WriteDescriptorSet.dstBinding = 0;
-		WriteDescriptorSet.dstArrayElement = 0;
-		WriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		WriteDescriptorSet.descriptorCount = 1;
-		WriteDescriptorSet.pBufferInfo = &MaterialBufferInfo;
-		WriteDescriptorSet.pImageInfo = nullptr;
+			for (const auto& Binding : Description.Bindings)
+			{
+				RenderResources::GPUBuffer* Buffer = GetGPUBuffer(Binding.Buffer);
+				if (Buffer)
+				{
+					VkDescriptorBufferInfo BufferInfo = {};
+					BufferInfo.buffer = Buffer->Buffer;
+					BufferInfo.offset = 0;
+					BufferInfo.range = Buffer->Capacity;
+					BufferInfos.push_back(BufferInfo);
 
-		vkUpdateDescriptorSets(ResContext.CoreContext.LogicalDevice, 1, &WriteDescriptorSet, 0, nullptr);
+					VkWriteDescriptorSet WriteDescriptorSet = {};
+					WriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+					WriteDescriptorSet.dstSet = DescriptorSet;
+					WriteDescriptorSet.dstBinding = Binding.Binding;
+					WriteDescriptorSet.dstArrayElement = 0;
+					WriteDescriptorSet.descriptorType = Binding.DescriptorType;
+					WriteDescriptorSet.descriptorCount = 1;
+					WriteDescriptorSet.pBufferInfo = &BufferInfos.back();
+					WriteDescriptorSet.pImageInfo = nullptr;
+					WriteDescriptorSets.push_back(WriteDescriptorSet);
+				}
+			}
+
+			if (!WriteDescriptorSets.empty())
+			{
+				vkUpdateDescriptorSets(Device, static_cast<u32>(WriteDescriptorSets.size()), WriteDescriptorSets.data(), 0, nullptr);
+			}
+		}
 	}
 
 	VulkanCoreContext::VulkanCoreContext* GetCoreContext()
@@ -560,42 +474,6 @@ namespace RenderResources
 
 		assert(false);
 		return nullptr;
-	}
-
-	ResourceHandle CreateStaticMesh(MeshDescription* Description, void* Data, const std::string& BufferName)
-	{
-		assert(ResContext.StaticMeshCount < ResContext.MaxStaticMeshes);
-
-		const u64 VerticesSize = Description->VertexSize * Description->VerticesCount;
-		const u64 DataSize = sizeof(u32) * Description->IndicesCount + VerticesSize;
-
-		// TODO: TMP solution
-		void* TransferMemory = TransferSystem::RequestTransferMemory(DataSize);
-		memcpy(TransferMemory, Data, DataSize);
-
-		VertexData* Resource = &ResContext.StaticMeshes[ResContext.StaticMeshCount];
-		Resource->IsLoaded = false;
-		Resource->IndicesCount = Description->IndicesCount;
-		RenderResources::MeshBuffer* VertexBuffer = GetMeshBuffer(BufferName);
-		Resource->VertexOffset = VertexBuffer->Offset;
-		Resource->IndexOffset = VertexBuffer->Offset + VerticesSize;
-		Resource->VertexDataSize = DataSize;
-
-		TransferSystem::TransferTask Task = { };
-		Task.DataSize = DataSize;
-		Task.Alignment = 1;
-		Task.DataDescr.DstBuffer = VertexBuffer->Buffer;
-		Task.DataDescr.DstOffset = VertexBuffer->Offset;
-		Task.RawData = TransferMemory;
-		Task.Handle = PackResourceHandle(ResourceType::Mesh, ResContext.StaticMeshCount);
-		Task.DataDescr.StageBarrier = VertexBuffer->StageBarrier;
-		Task.Type = TransferSystem::TaskType::Data;
-
-		AddTask(&Task);
-
-		VertexBuffer->Offset += DataSize;
-		u32 Index = ResContext.StaticMeshCount++;
-		return PackResourceHandle(ResourceType::Mesh, Index);
 	}
 
 	ResourceHandle CreateTexture(TextureDescription* Description, void* Data)
@@ -708,58 +586,30 @@ namespace RenderResources
 		return PackResourceHandle(ResourceType::Texture, Index);
 	}
 
-	ResourceHandle CreateStorageBufferResource(u32 DataSize, const std::string& BufferName, ResourceDependency Dependency, u32 DependencyCount)
+	ResourceHandle CreateStorageBufferResource()
 	{
 		assert(ResContext.ResourceRecordCount < ResContext.MaxResourceRecords);
 
-		RenderResources::StorageBuffer* Buffer = GetStorageBuffer(BufferName);
+		std::atomic<bool>* NewResource = ResContext.ResourceRecords + ResContext.ResourceRecordCount;
+		*NewResource = false;
 
-		ResourceRecord* NewResource = ResContext.ResourceRecords + ResContext.ResourceRecordCount;
-		NewResource->IsLoaded = false;
-		NewResource->Dependency = Dependency;
-		NewResource->DependencyCount = DependencyCount;
-		NewResource->RecordGPUIndex = Buffer->Count;
-		NewResource->RecordSize = Buffer->RecordSize;
-		
-		Buffer->Count++;
 		u32 Index = ResContext.ResourceRecordCount++;
 		return PackResourceHandle(ResourceType::StorageResource, Index);
 	}
 
-	ResourceDependency CreateResourceDependency(ResourceHandle* Handles, u32 HandlesCount)
+	void UpdateGPUBuffer(ResourceHandle Handle, void* Data, u32 DataSize, u64 Offset, const std::string& BufferName)
 	{
-		assert(ResContext.CurrentResourceDependencyIndex + HandlesCount < ResContext.MaxResourceDependency);
-
-		ResourceDependency Dependency = ResContext.CurrentResourceDependencyIndex;
-
-		for (u32 i = 0; i < HandlesCount; ++i)
-		{
-			ResContext.ResourceDependencyBuffer[ResContext.CurrentResourceDependencyIndex++] = Handles[i];	
-		}
-
-		return Dependency;
-	}
-
-	void UpdateStorageBufferResource(ResourceHandle Handle, void* Data, u32 DataSize, const std::string& BufferName)
-	{
-		RenderResources::StorageBuffer* Buffer = GetStorageBuffer(BufferName);
-
-		const u32 Index = GetResourceCPUIndex(Handle);
-		const ResourceRecord* Resource = ResContext.ResourceRecords + Index;
-
-		const u64 DstOffset = Resource->RecordGPUIndex * Resource->RecordSize;
+		RenderResources::GPUBuffer* Buffer = GetGPUBuffer(BufferName);
 
 		if (Buffer->PropertyFlag == VulkanHelper::MemoryPropertyFlag::HostCompatible)
 		{
 			VkDevice Device = ResContext.CoreContext.LogicalDevice;
 			VkPhysicalDevice PhysicalDevice = ResContext.CoreContext.PhysicalDevice;
-			VulkanHelper::UpdateHostCompatibleBufferMemory(Device, Buffer->Memory, DataSize, DstOffset, Data);
+			VulkanHelper::UpdateHostCompatibleBufferMemory(Device, Buffer->Memory, DataSize, Offset, Data);
 			OnResourceLoaded(Handle);
 		}
 		else if (Buffer->PropertyFlag == VulkanHelper::MemoryPropertyFlag::GPULocal)
 		{
-			ResourceType Type = GetResourceType(Handle);
-
 			// TODO: TMP solution
 			void* TransferMemory = TransferSystem::RequestTransferMemory(DataSize);
 			memcpy(TransferMemory, Data, DataSize);
@@ -768,9 +618,9 @@ namespace RenderResources
 			Task.DataSize = DataSize;
 			Task.Alignment = 1;
 			Task.DataDescr.DstBuffer = Buffer->Buffer;
-			Task.DataDescr.DstOffset = DstOffset;
+			Task.DataDescr.DstOffset = Offset;
 			Task.RawData = TransferMemory;
-			Task.Handle = PackResourceHandle(Type, Index);
+			Task.Handle = Handle;
 			Task.DataDescr.StageBarrier = Buffer->StageBarrier;
 			Task.Type = TransferSystem::TaskType::Data;
 
@@ -782,50 +632,41 @@ namespace RenderResources
 		}
 	}
 
-	u32 GetResourceGPUIndex(ResourceHandle Handle)
-	{
-		ResourceType Type = GetResourceType(Handle);
-		u32 CPUIndex = GetResourceCPUIndex(Handle);
-
-		switch (Type)
-		{
-			case RenderResources::ResourceType::Texture:
-			case RenderResources::ResourceType::Mesh:
-				return CPUIndex;
-			case RenderResources::ResourceType::StorageResource:
-				return ResContext.ResourceRecords[CPUIndex].RecordGPUIndex;
-			default:
-				assert(false);
-		}
-	}
-
-	VertexData* GetStaticMesh(u32 Index)
-	{
-		return &ResContext.StaticMeshes[Index];
-	}
-
-	ResourceRecord* GetInstanceData(u32 Index)
-	{
-		return &ResContext.ResourceRecords[Index];
-	}
-
 	MeshTexture2D* GetTexture(u32 Index)
 	{
 		return &ResContext.Textures[Index];
 	}
 
-	bool IsDrawEntityLoaded(const Render::DrawEntity* Entity)
+	bool IsResourceReady(ResourceHandle Handle)
 	{
-		u32 MeshIndex = GetResourceCPUIndex(Entity->StaticMeshHandle);
-		VertexData* MeshResource = ResContext.StaticMeshes + MeshIndex;
-		if (!MeshResource->IsLoaded) return false;
+		const ResourceType Type = GetResourceType(Handle);
+		const u32 Index = GetResourceCPUIndex(Handle);
 
-		u32 InstanceIndex = GetResourceCPUIndex(Entity->InstanceDataHandle);
-		ResourceRecord* InstanceResource = ResContext.ResourceRecords + InstanceIndex;
-		return CheckRecordAndDependenciesLoadState(&ResContext, InstanceResource);
+		switch (Type)
+		{
+			case RenderResources::ResourceType::Texture:
+				if (!ResContext.Textures[Index].MeshTexture.IsLoaded)
+				{
+					return false;
+				}
+
+				break;
+			case RenderResources::ResourceType::StorageResource:
+				if (!ResContext.ResourceRecords[Index])
+				{
+					return false;
+				}
+
+				break;
+			default:
+				assert(false);
+				break;
+		}
+
+		return true;
 	}
 
-	RenderResources::StorageBuffer* GetStorageBuffer(const std::string& Name)
+	RenderResources::GPUBuffer* GetGPUBuffer(const std::string& Name)
 	{
 		auto It = ResContext.StorageBuffers.find(Name);
 		if (It != ResContext.StorageBuffers.end())
@@ -836,17 +677,4 @@ namespace RenderResources
 		assert(false);
 		return nullptr;
 	}
-
-	RenderResources::MeshBuffer* GetMeshBuffer(const std::string& Name)
-	{
-		auto It = ResContext.MeshBuffers.find(Name);
-		if (It != ResContext.MeshBuffers.end())
-		{
-			return &It->second;
-		}
-
-		assert(false);
-		return nullptr;
-	}
-
 }

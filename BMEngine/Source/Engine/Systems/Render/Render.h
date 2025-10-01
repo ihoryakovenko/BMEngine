@@ -17,14 +17,22 @@
 #include <mutex>
 #include <condition_variable>
 #include <unordered_map>
+#include <vector>
 
 namespace Render
 {
 	struct DrawEntity
 	{
+		u64 VertexOffset;
+		u32 IndexOffset;
+		u32 IndicesCount;
+		u64 VertexDataSize;
+
 		u64 StaticMeshHandle;
-		u32 InstanceDataHandle;
+		u64 InstanceOffset;
 		u32 Instances;
+
+		std::vector<u64> Dependency;
 	};
 
 	struct DrawFrames
@@ -126,7 +134,7 @@ namespace Render
 		LightBuffer* LightEntity = nullptr;
 
 		std::mutex TempLock;
-		Memory::DynamicHeapArray<DrawEntity> DrawEntities;
+		std::vector<DrawEntity> DrawEntities;
 	};
 
 	void TmpInitFrameMemory();

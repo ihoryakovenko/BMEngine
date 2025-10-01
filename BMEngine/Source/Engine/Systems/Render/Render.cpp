@@ -190,16 +190,16 @@ namespace Render
 		const u32 LightDynamicOffset = Render::GetRenderState()->RenderDrawState.CurrentImageIndex * sizeof(LightBuffer);
 
 		std::unique_lock Lock(Scene->TempLock);
-		for (u32 i = 0; i < Scene->DrawEntities.Count; ++i)
+		for (u32 i = 0; i < Scene->DrawEntities.size(); ++i)
 		{
-			DrawEntity* DrawEntity = Scene->DrawEntities.Data + i;
-			if (!RenderResources::IsDrawEntityLoaded(DrawEntity))
+			DrawEntity* DrawEntity = Scene->DrawEntities.data() + i;
+			for (u32 i = 0; i < DrawEntity->Dependency.size(); ++i)
 			{
-				continue;
+				if (!RenderResources::IsResourceReady(DrawEntity->Dependency[i]))
+				{
+					continue;
+				}
 			}
-
-			RenderResources::VertexData* Mesh = RenderResources::GetStaticMesh(DrawEntity->StaticMeshHandle);
-			RenderResources::ResourceRecord* Instance = RenderResources::GetInstanceData(DrawEntity->InstanceDataHandle);
 
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
@@ -211,22 +211,22 @@ namespace Render
 
 			const VkBuffer Buffers[] =
 			{
-				RenderResources::GetMeshBuffer("VertexStageData")->Buffer,
-				RenderResources::GetStorageBuffer("GPUInstances")->Buffer
+				RenderResources::GetGPUBuffer("VertexStageData")->Buffer,
+				RenderResources::GetGPUBuffer("GPUInstances")->Buffer
 			};
 
 			const u64 Offsets[] = 
 			{
-				Mesh->VertexOffset,
-				Instance->RecordGPUIndex * Instance->RecordSize
+				DrawEntity->VertexOffset,
+				DrawEntity->InstanceOffset
 			};
 
 			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
 				2, DescriptorSetGroupCount, DescriptorSetGroup, 1, &LightDynamicOffset);
 
 			vkCmdBindVertexBuffers(CmdBuffer, 0, 2, Buffers, Offsets);
-			vkCmdBindIndexBuffer(CmdBuffer, RenderResources::GetMeshBuffer("VertexStageData")->Buffer, Mesh->IndexOffset, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(CmdBuffer, Mesh->IndicesCount, DrawEntity->Instances, 0, 0, 0);
+			vkCmdBindIndexBuffer(CmdBuffer, RenderResources::GetGPUBuffer("VertexStageData")->Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(CmdBuffer, DrawEntity->IndicesCount, DrawEntity->Instances, 0, 0, 0);
 		}
 	}
 
@@ -1012,27 +1012,27 @@ namespace LightningPass
 			vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 
 			std::unique_lock Lock(Scene->TempLock);
-			for (u32 i = 0; i < Scene->DrawEntities.Count; ++i)
+			for (u32 i = 0; i < Scene->DrawEntities.size(); ++i)
 			{
-				Render::DrawEntity* DrawEntity = Scene->DrawEntities.Data + i;
-				if (!RenderResources::IsDrawEntityLoaded(DrawEntity))
+				Render::DrawEntity* DrawEntity = Scene->DrawEntities.data() + i;
+				for (u32 i = 0; i < DrawEntity->Dependency.size(); ++i)
 				{
-					continue;
+					if (!RenderResources::IsResourceReady(DrawEntity->Dependency[i]))
+					{
+						continue;
+					}
 				}
-
-				RenderResources::VertexData* Mesh = RenderResources::GetStaticMesh(DrawEntity->StaticMeshHandle);
-				RenderResources::ResourceRecord* Instance = RenderResources::GetInstanceData(DrawEntity->InstanceDataHandle);
 
 				const VkBuffer Buffers[] =
 				{
-					RenderResources::GetMeshBuffer("VertexStageData")->Buffer,
-					RenderResources::GetStorageBuffer("GPUInstances")->Buffer
+					RenderResources::GetGPUBuffer("VertexStageData")->Buffer,
+					RenderResources::GetGPUBuffer("GPUInstances")->Buffer
 				};
 
 				const u64 Offsets[] =
 				{
-					Mesh->VertexOffset,
-					Instance->RecordGPUIndex * Instance->RecordSize
+					DrawEntity->VertexOffset,
+					DrawEntity->InstanceOffset
 				};
 
 				const u32 DescriptorSetGroupCount = 1;
@@ -1045,8 +1045,8 @@ namespace LightningPass
 					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr);
 
 				vkCmdBindVertexBuffers(CmdBuffer, 0, 2, Buffers, Offsets);
-				vkCmdBindIndexBuffer(CmdBuffer, RenderResources::GetMeshBuffer("VertexStageData")->Buffer, Mesh->IndexOffset, VK_INDEX_TYPE_UINT32);
-				vkCmdDrawIndexed(CmdBuffer, Mesh->IndicesCount, DrawEntity->Instances, 0, 0, 0);
+				vkCmdBindIndexBuffer(CmdBuffer, RenderResources::GetGPUBuffer("VertexStageData")->Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
+				vkCmdDrawIndexed(CmdBuffer, DrawEntity->IndicesCount, DrawEntity->Instances, 0, 0, 0);
 			}
 
 			vkCmdEndRendering(CmdBuffer);

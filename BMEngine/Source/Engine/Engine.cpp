@@ -105,23 +105,6 @@ namespace Engine
 		}
 	}
 
-	static void ParseAndCreateMeshBuffers(Yaml::Node& BuffersNode)
-	{
-		for (auto It = BuffersNode.Begin(); It != BuffersNode.End(); It++)
-		{
-			Yaml::Node& BufferNode = (*It).second;
-			std::string BufferName = Util::GetBufferName(BufferNode);
-			RenderResources::MeshBufferDescription Data = Util::ParseMeshBufferNode(BufferNode);
-			
-			if (BufferName.empty())
-			{
-				BufferName = (*It).first;
-			}
-			
-			RenderResources::CreateMeshBuffer(BufferName, Data);
-		}
-	}
-
 	static void ParseAndCreateDescriptorSetLayouts(Yaml::Node& DescriptorSetLayoutsNode)
 	{
 		for (auto LayoutIt = DescriptorSetLayoutsNode.Begin(); LayoutIt != DescriptorSetLayoutsNode.End(); LayoutIt++)
@@ -137,9 +120,7 @@ namespace Engine
 		{
 			Yaml::Node& DescriptorSetNode = (*DescriptorSetIt).second;
 			
-			RenderResources::DescriptorSetDescription Description;
-			Description.Layout = DescriptorSetNode["layout"].As<std::string>();
-			Description.Pool = DescriptorSetNode["pool"].As<std::string>();
+			RenderResources::DescriptorSetDescription Description = Util::ParseDescriptorSetFromYaml(DescriptorSetNode);
 			
 			RenderResources::CreateDescriptorSet((*DescriptorSetIt).first, Description);
 		}
@@ -288,18 +269,14 @@ namespace Engine
 		ParseAndCreateVertices(Util::GetVertices(Root));
 		ParseAndCreateShaders(Util::GetShaders(Root));
 		ParseAndCreateSamplers(Util::GetSamplers(Root));
-		ParseAndCreateMeshBuffers(Util::GetMeshBuffers(Root));
 		ParseAndCreateBuffers(Util::GetStorageBuffers(Root));
 		ParseAndCreateDescriptorSetLayouts(Util::GetDescriptorSetLayouts(Root));
 		ParseAndCreateDescriptorSets(Util::GetDescriptorSets(Root));
-		RenderResources::PostCreateInit();
 
 		TransferSystem::Init();
 		Render::Init(Window);
 
 		EngineResources::Init();
-
-		Scene.DrawEntities = Memory::AllocateArray<Render::DrawEntity>(512);
 
 		Yaml::Node TestScene;
 		Yaml::Parse(TestScene, "./Resources/Scenes/TestScene.yaml");
@@ -334,8 +311,6 @@ namespace Engine
 		RenderResources::DeInit();
 		EngineResources::DeInit();
 		UI::DeInit();
-
-		Memory::FreeArray(&Scene.DrawEntities);
 
 		glfwDestroyWindow(Window);
 
