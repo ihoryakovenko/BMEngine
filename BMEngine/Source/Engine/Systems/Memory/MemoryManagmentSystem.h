@@ -36,7 +36,7 @@ namespace Memory
 	void FrameFree(FrameMemory* Memory);
 
 	template <typename T>
-	struct DynamicHeapArray
+	struct Array
 	{
 		T* Data;
 		u64 Count;
@@ -60,9 +60,9 @@ namespace Memory
 	};
 
 	template <typename T>
-	static DynamicHeapArray<T> AllocateArray(u64 Count)
+	static Array<T> AllocateArray(u64 Count)
 	{
-		DynamicHeapArray<T> Arr = { };
+		Array<T> Arr = { };
 		Arr.Count = 0;
 		Arr.Capacity = Count;
 		Arr.Data = (T*)malloc(Count * sizeof(T));
@@ -71,7 +71,7 @@ namespace Memory
 	}
 
 	template <typename T>
-	static void FreeArray(DynamicHeapArray<T>* Array)
+	static void FreeArray(Array<T>* Array)
 	{
 		assert(Array->Capacity != 0);
 
@@ -81,13 +81,13 @@ namespace Memory
 	}
 
 	template <typename T>
-	static void ClearArray(DynamicHeapArray<T>* Array)
+	static void ClearArray(Array<T>* Array)
 	{
 		Array->Count = 0;
 	}
 
 	template <typename T>
-	static void ArrayIncreaseCapacity(DynamicHeapArray<T>* Array)
+	static void ArrayIncreaseCapacity(Array<T>* Array)
 	{
 		assert(Array->Capacity != 0);
 
@@ -98,7 +98,7 @@ namespace Memory
 	}
 
 	template <typename T>
-	static void PushBackToArray(DynamicHeapArray<T>* Array, const T* NewElement)
+	static void PushBackToArray(Array<T>* Array, const T* NewElement)
 	{
 		assert(Array->Capacity != 0);
 
@@ -110,7 +110,7 @@ namespace Memory
 	}
 
 	template <typename T>
-	static T* ArrayGetNew(DynamicHeapArray<T>* Array)
+	static T* ArrayGetNew(Array<T>* Array)
 	{
 		assert(Array->Capacity != 0);
 

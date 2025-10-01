@@ -82,7 +82,7 @@ namespace VulkanHelper
 		u32 CodeSize;
 
 		// TODO: TMP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		Memory::DynamicHeapArray<char> ShaderCode;
+		Memory::Array<char> ShaderCode;
 	};
 
 	struct AttachmentData

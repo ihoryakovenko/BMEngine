@@ -20,6 +20,7 @@ namespace VulkanCoreContext
 namespace RenderResources
 {
 	typedef u64 ResourceHandle;
+	typedef VkImageView ImageViewHandle;
 
 	struct GPUBuffer
 	{
@@ -54,7 +55,7 @@ namespace RenderResources
 		VkImageView View;
 	};
 
-	struct TextureDescription
+	struct ImageDescription
 	{
 		u32 Width;
 		u32 Height;
@@ -152,14 +153,17 @@ namespace RenderResources
 	void CreateGraphicsPipeline(const std::string& Name, const PipelineDescription& Description);
 	void CreatePipelineLayout(const std::string& Name, const PipelineLayoutDescription& Description);
 
-	ResourceHandle CreateTexture(TextureDescription* Description, void* Data);
-	ResourceHandle CreateStorageBufferResource();
+	ResourceHandle CreateImageResource(ImageDescription* Description);
+	ImageViewHandle CreateImageView(ResourceHandle Handle, VkFormat Format);
+	ResourceHandle CreateBufferResource();
+
+	void BindImageView(ImageViewHandle Handle, const std::string* Set, u64 ArrayElement);
 
 	void UpdateGPUBuffer(ResourceHandle Handle, void* Data, u32 DataSize, u64 Offset, const std::string& BufferName);
+	void UpdateImageResource(ResourceHandle Handle, ImageDescription* Description, void* Data);
 
 	void OnResourceLoaded(ResourceHandle Handle);
 
-	MeshTexture2D* GetTexture(u32 Index);
 	VulkanCoreContext::VulkanCoreContext* GetCoreContext();
 	VkSampler GetSampler(const std::string& Id);
 	VkDescriptorSetLayout GetSetLayout(const std::string& Id);

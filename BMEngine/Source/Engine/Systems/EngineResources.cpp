@@ -24,12 +24,12 @@ namespace EngineResources
 
 		const glm::tvec3<u32> Extent = Texture.extent();
 
-		RenderResources::TextureDescription TextureDescription;
+		RenderResources::ImageDescription TextureDescription;
 		TextureDescription.Width = Extent.x;
 		TextureDescription.Height = Extent.y;
 		TextureDescription.Format = Util::GliFormatToVkFormat(Texture.format());
 
-		return RenderResources::CreateTexture(&TextureDescription, Texture.data());
+		return RenderResources::CreateImageResource(&TextureDescription, Texture.data());
 	}
 
 	void Init()
@@ -43,13 +43,13 @@ namespace EngineResources
 		const u64 DefaultAssetId = std::hash<std::string>{ }("Default");
 		const glm::tvec3<u32> DefaultAssetExtent = DefaultTexture.extent();
 
-		RenderResources::TextureDescription DefaultTextureDescription;
+		RenderResources::ImageDescription DefaultTextureDescription;
 		DefaultTextureDescription.Width = DefaultAssetExtent.x;
 		DefaultTextureDescription.Height = DefaultAssetExtent.y;
 		DefaultTextureDescription.Format = Util::GliFormatToVkFormat(DefaultTexture.format());
 
 		TextureAsset DefaultAsset;
-		DefaultAsset.RenderTextureIndex = RenderResources::CreateTexture(&DefaultTextureDescription, DefaultTexture.data());
+		DefaultAsset.RenderTextureIndex = RenderResources::CreateImageResource(&DefaultTextureDescription, DefaultTexture.data());
 		DefaultAsset.IsCreated = true;
 
 		TextureAssets[DefaultAssetId] = DefaultAsset;
@@ -121,7 +121,7 @@ namespace EngineResources
 
 				const u64 VertexDataSize = VerticesCount * sizeof(StaticMeshVertex) + IndicesCount * sizeof(u32);
 				
-				RenderResources::ResourceHandle MeshHandle = RenderResources::CreateStorageBufferResource();
+				RenderResources::ResourceHandle MeshHandle = RenderResources::CreateBufferResource();
 				RenderResources::UpdateGPUBuffer(MeshHandle, Model.VertexData + ModelVertexByteOffset, VertexDataSize, ModelVertexByteOffset, "VertexStageData");
 
 				Material Mat;
@@ -129,7 +129,7 @@ namespace EngineResources
 				Mat.SpecularTexIndex = SpecularTextureHandle;
 				Mat.Shininess = 32.0f;
 
-				const RenderResources::ResourceHandle MaterialHandle = RenderResources::CreateStorageBufferResource();
+				const RenderResources::ResourceHandle MaterialHandle = RenderResources::CreateBufferResource();
 				RenderResources::UpdateGPUBuffer(MaterialHandle, &Mat, sizeof(Mat), MateriaIndex * sizeof(Mat), "MaterialBuffer");
 
 				InstanceData Instance;
@@ -139,7 +139,7 @@ namespace EngineResources
 				++MateriaIndex;
 
 				const u64 InstanceOffset = InstanceIndex * sizeof(Instance);
-				const RenderResources::ResourceHandle InstanceHandle = RenderResources::CreateStorageBufferResource();
+				const RenderResources::ResourceHandle InstanceHandle = RenderResources::CreateBufferResource();
 				RenderResources::UpdateGPUBuffer(InstanceHandle, &Instance, sizeof(Instance), InstanceOffset, "GPUInstances");
 
 				++InstanceIndex;

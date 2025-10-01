@@ -11,6 +11,13 @@
 
 namespace RenderResources
 {
+	struct ImageResource
+	{
+		VkImage Image;
+		VkDeviceMemory Memory; 
+		std::atomic<bool> IsLoaded;
+	};
+
 	struct ResourceContext
 	{
 		VulkanCoreContext::VulkanCoreContext CoreContext;
@@ -24,14 +31,9 @@ namespace RenderResources
 		std::unordered_map<std::string, VkPipeline> Pipelines;
 		std::unordered_map<std::string, VkPipelineLayout> PipelineLayouts;
 
-		u32 MaxResourceRecords;
-		u32 ResourceRecordCount;
-
-		u32 MaxTextures;
-		u32 TextureCount;
-
-		std::atomic<bool>* ResourceRecords;
-		MeshTexture2D* Textures;
+		Memory::Array<std::atomic<bool>> ResourceStates;
+		Memory::Array<ImageResource> Images;
+		Memory::Array<VkImageView> ImageViews;
 	};
 
 	static ResourceHandle PackResourceHandle(ResourceType Type, u32 Index)
@@ -59,10 +61,10 @@ namespace RenderResources
 		switch (Type)
 		{
 			case ResourceType::Texture:
-				ResContext.Textures[ResourceIndex].MeshTexture.IsLoaded = true;
+				ResContext.Images.Data[ResourceIndex].IsLoaded = true;
 				break;
 			case ResourceType::StorageResource:
-				ResContext.ResourceRecords[ResourceIndex] = true;
+				ResContext.ResourceStates.Data[ResourceIndex] = true;
 				break;
 			default:
 				assert(false);
@@ -103,13 +105,17 @@ namespace RenderResources
 		VULKAN_CHECK_RESULT(vkCreateDescriptorPool(ResContext.CoreContext.LogicalDevice, &PoolCreateInfo, nullptr, &MainPool));
 		ResContext.DescriptorPools["MainPool"] = MainPool;
 
-		ResContext.MaxTextures = 64;
-		ResContext.TextureCount = 0;
-		ResContext.Textures = (MeshTexture2D*)malloc(ResContext.MaxTextures * sizeof(ResContext.Textures[0]));
+		ResContext.Images.Capacity = 64;
+		ResContext.Images.Count = 0;
+		ResContext.Images.Data = (ImageResource*)malloc(ResContext.Images.Capacity * sizeof(ResContext.Images.Data[0]));
 
-		ResContext.MaxResourceRecords = 60000;
-		ResContext.ResourceRecordCount = 0;
-		ResContext.ResourceRecords = (std::atomic<bool>*)malloc(ResContext.MaxResourceRecords * sizeof(ResContext.ResourceRecords[0]));
+		ResContext.ImageViews.Capacity = 64;
+		ResContext.ImageViews.Count = 0;
+		ResContext.ImageViews.Data = (VkImageView*)malloc(ResContext.Images.Capacity * sizeof(ResContext.Images.Data[0]));
+
+		ResContext.ResourceStates.Capacity = 60000;
+		ResContext.ResourceStates.Count = 0;
+		ResContext.ResourceStates.Data = (std::atomic<bool>*)malloc(ResContext.ResourceStates.Capacity * sizeof(ResContext.ResourceStates.Data[0]));
 	}
 
 	void CreateGraphicsPipeline(const std::string& Name, const PipelineDescription& Description)
@@ -205,11 +211,15 @@ namespace RenderResources
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 
-		for (uint32_t i = 0; i < ResContext.TextureCount; ++i)
+		for (uint32_t i = 0; i < ResContext.ImageViews.Count; ++i)
 		{
-			vkDestroyImageView(Device, ResContext.Textures[i].View, nullptr);
-			vkDestroyImage(Device, ResContext.Textures[i].MeshTexture.Image, nullptr);
-			vkFreeMemory(Device, ResContext.Textures[i].MeshTexture.Memory, nullptr);
+			vkDestroyImageView(Device, ResContext.ImageViews.Data[i], nullptr);
+		}
+
+		for (uint32_t i = 0; i < ResContext.Images.Count; ++i)
+		{
+			vkDestroyImage(Device, ResContext.Images.Data[i].Image, nullptr);
+			vkFreeMemory(Device, ResContext.Images.Data[i].Memory, nullptr);
 		}
 
 		for (auto It = ResContext.Shaders.begin(); It != ResContext.Shaders.end(); ++It)
@@ -256,8 +266,9 @@ namespace RenderResources
 		ResContext.VBindings.clear();
 		ResContext.StorageBuffers.clear();
 
-		free(ResContext.Textures);
-		free(ResContext.ResourceRecords);
+		free(ResContext.ImageViews.Data);
+		free(ResContext.Images.Data);
+		free(ResContext.ResourceStates.Data);
 	}
 
 	void CreateVertex(const std::string& Name, VulkanHelper::VertexBinding& Binding)
@@ -476,22 +487,16 @@ namespace RenderResources
 		return nullptr;
 	}
 
-	ResourceHandle CreateTexture(TextureDescription* Description, void* Data)
+	ResourceHandle CreateImageResource(ImageDescription* Description)
 	{
-		assert(ResContext.TextureCount < ResContext.MaxTextures);
+		assert(ResContext.Images.Count < ResContext.Images.Capacity);
 
 		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 		VkPhysicalDevice PhysicalDevice = RenderResources::GetCoreContext()->PhysicalDevice;
 		VkQueue TransferQueue = RenderResources::GetCoreContext()->GraphicsQueue;
 
-		const u64 Index = ResContext.TextureCount;
-		MeshTexture2D* Resource = &ResContext.Textures[ResContext.TextureCount];
-		Resource->MeshTexture.IsLoaded = false;
-
-		MeshTexture2D* NextTexture = Resource;
-
-		NextTexture->MeshTexture.Width = Description->Width;
-		NextTexture->MeshTexture.Height = Description->Height;
+		ImageResource* Resource = &ResContext.Images.Data[ResContext.Images.Count];
+		Resource->IsLoaded = false;
 
 		VkImageCreateInfo ImageCreateInfo = { };
 		ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -509,20 +514,29 @@ namespace RenderResources
 		ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		ImageCreateInfo.flags = 0;
 
-		VULKAN_CHECK_RESULT(vkCreateImage(Device, &ImageCreateInfo, nullptr, &NextTexture->MeshTexture.Image));
+		VULKAN_CHECK_RESULT(vkCreateImage(Device, &ImageCreateInfo, nullptr, &Resource->Image));
 
 		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
-			NextTexture->MeshTexture.Image, VulkanHelper::MemoryPropertyFlag::GPULocal);
-		NextTexture->MeshTexture.Memory = AllocResult.Memory;
-		NextTexture->MeshTexture.Alignment = AllocResult.Alignment;
-		NextTexture->MeshTexture.Size = AllocResult.Size;
-		VULKAN_CHECK_RESULT(vkBindImageMemory(Device, NextTexture->MeshTexture.Image, NextTexture->MeshTexture.Memory, 0));
+			Resource->Image, VulkanHelper::MemoryPropertyFlag::GPULocal);
+		Resource->Memory = AllocResult.Memory;
+		//Resource->Alignment = AllocResult.Alignment;
+		//NextTexture->MeshTexture.Size = AllocResult.Size;
+		VULKAN_CHECK_RESULT(vkBindImageMemory(Device, Resource->Image, Resource->Memory, 0));
+
+		return PackResourceHandle(ResourceType::Texture, ResContext.Images.Count++);
+	}
+
+	ImageViewHandle CreateImageView(ResourceHandle Handle, VkFormat Format)
+	{
+		const u32 Index = GetResourceCPUIndex(Handle);
+
+		VkImageView* View = ResContext.ImageViews.Data + ResContext.ImageViews.Count;
 
 		VkImageViewCreateInfo ViewCreateInfo = { };
 		ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		ViewCreateInfo.flags = 0;
 		ViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		ViewCreateInfo.format = VK_FORMAT_BC7_SRGB_BLOCK;
+		ViewCreateInfo.format = Format;
 		ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 		ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 		ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -532,25 +546,37 @@ namespace RenderResources
 		ViewCreateInfo.subresourceRange.levelCount = 1;
 		ViewCreateInfo.subresourceRange.baseArrayLayer = 0;
 		ViewCreateInfo.subresourceRange.layerCount = 1;
-		ViewCreateInfo.image = NextTexture->MeshTexture.Image;
+		ViewCreateInfo.image = ResContext.Images.Data[Index].Image;
 
-		VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo, nullptr, &NextTexture->View));
+		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+		VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo, nullptr, View));
+	}
 
+	ResourceHandle CreateBufferResource()
+	{
+		assert(ResContext.ResourceStates.Count < ResContext.ResourceStates.Capacity);
+
+		ResContext.ResourceStates.Data[ResContext.ResourceStates.Count] = false;
+		return PackResourceHandle(ResourceType::StorageResource, ResContext.ResourceStates.Count++);
+	}
+
+	void BindImageView(ImageViewHandle Handle, const std::string* Set, u64 ArrayElement)
+	{
 		VkDescriptorImageInfo DiffuseImageInfo = { };
 		DiffuseImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		DiffuseImageInfo.sampler = RenderResources::GetSampler("DiffuseTexture");
-		DiffuseImageInfo.imageView = NextTexture->View;
+		DiffuseImageInfo.imageView = Handle;
 
 		VkDescriptorImageInfo SpecularImageInfo = { };
 		SpecularImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		SpecularImageInfo.sampler = RenderResources::GetSampler("SpecularTexture");
-		SpecularImageInfo.imageView = NextTexture->View;
+		SpecularImageInfo.imageView = Handle;
 
 		VkWriteDescriptorSet WriteDiffuse = { };
 		WriteDiffuse.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		WriteDiffuse.dstSet = ResContext.DescriptorSets["BindlesTexturesSet"];
 		WriteDiffuse.dstBinding = 0;
-		WriteDiffuse.dstArrayElement = Index;
+		WriteDiffuse.dstArrayElement = ArrayElement;
 		WriteDiffuse.descriptorCount = 1;
 		WriteDiffuse.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		WriteDiffuse.pImageInfo = &DiffuseImageInfo;
@@ -559,42 +585,13 @@ namespace RenderResources
 		WriteSpecular.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		WriteSpecular.dstSet = ResContext.DescriptorSets["BindlesTexturesSet"];
 		WriteSpecular.dstBinding = 1;
-		WriteSpecular.dstArrayElement = Index;
+		WriteSpecular.dstArrayElement = ArrayElement;
 		WriteSpecular.descriptorCount = 1;
 		WriteSpecular.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		WriteSpecular.pImageInfo = &SpecularImageInfo;
 
 		VkWriteDescriptorSet Writes[] = { WriteDiffuse, WriteSpecular };
 		vkUpdateDescriptorSets(RenderResources::GetCoreContext()->LogicalDevice, 2, Writes, 0, nullptr);
-
-		// TODO: TMP solution
-		void* TransferMemory = TransferSystem::RequestTransferMemory(NextTexture->MeshTexture.Size);
-		memcpy(TransferMemory, Data, NextTexture->MeshTexture.Size);
-
-		TransferSystem::TransferTask Task = { };
-		Task.DataSize = NextTexture->MeshTexture.Size;
-		Task.Alignment = VulkanHelper::GetFormatAlignment(ImageCreateInfo.format);
-		Task.TextureDescr.DstImage = NextTexture->MeshTexture.Image;
-		Task.TextureDescr.Width = Description->Width;
-		Task.TextureDescr.Height = Description->Height;
-		Task.RawData = TransferMemory;
-		Task.Handle = PackResourceHandle(ResourceType::Texture, Index);
-		Task.Type = TransferSystem::TaskType::Image;
-
-		AddTask(&Task);
-		ResContext.TextureCount++;
-		return PackResourceHandle(ResourceType::Texture, Index);
-	}
-
-	ResourceHandle CreateStorageBufferResource()
-	{
-		assert(ResContext.ResourceRecordCount < ResContext.MaxResourceRecords);
-
-		std::atomic<bool>* NewResource = ResContext.ResourceRecords + ResContext.ResourceRecordCount;
-		*NewResource = false;
-
-		u32 Index = ResContext.ResourceRecordCount++;
-		return PackResourceHandle(ResourceType::StorageResource, Index);
 	}
 
 	void UpdateGPUBuffer(ResourceHandle Handle, void* Data, u32 DataSize, u64 Offset, const std::string& BufferName)
@@ -632,9 +629,23 @@ namespace RenderResources
 		}
 	}
 
-	MeshTexture2D* GetTexture(u32 Index)
+	void UpdateImageResource(ResourceHandle Handle, ImageDescription* Description, void* Data)
 	{
-		return &ResContext.Textures[Index];
+		// TODO: TMP solution
+		void* TransferMemory = TransferSystem::RequestTransferMemory(NextTexture->MeshTexture.Size);
+		memcpy(TransferMemory, Data, NextTexture->MeshTexture.Size);
+
+		TransferSystem::TransferTask Task = { };
+		Task.DataSize = NextTexture->MeshTexture.Size;
+		Task.Alignment = VulkanHelper::GetFormatAlignment(ImageCreateInfo.format);
+		Task.TextureDescr.DstImage = NextTexture->MeshTexture.Image;
+		Task.TextureDescr.Width = Description->Width;
+		Task.TextureDescr.Height = Description->Height;
+		Task.RawData = TransferMemory;
+		Task.Handle = PackResourceHandle(ResourceType::Texture, ResContext.TextureCount);
+		Task.Type = TransferSystem::TaskType::Image;
+
+		AddTask(&Task);
 	}
 
 	bool IsResourceReady(ResourceHandle Handle)
@@ -652,7 +663,7 @@ namespace RenderResources
 
 				break;
 			case RenderResources::ResourceType::StorageResource:
-				if (!ResContext.ResourceRecords[Index])
+				if (!ResContext.ResourceStates.Data[Index])
 				{
 					return false;
 				}
