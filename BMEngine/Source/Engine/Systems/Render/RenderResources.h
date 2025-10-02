@@ -17,11 +17,11 @@ namespace VulkanCoreContext
 	struct VulkanCoreContext;
 }
 
+typedef u64 BmRender_ResourceHandle;
+typedef u64 BmRender_ImageViewHandle;
+
 namespace RenderResources
 {
-	typedef u64 ResourceHandle;
-	typedef VkImageView ImageViewHandle;
-
 	struct GPUBuffer
 	{
 		VkBuffer Buffer;
@@ -110,6 +110,13 @@ namespace RenderResources
 		const void* Next;
 	};
 
+	struct ImageViewBindingDescription
+	{
+		const char* Sampler;
+		u32 BindingIndex;
+		u64 ArrayElement;
+	};
+
 	struct PipelineLayoutDescription
 	{
 		u32 SetLayoutCount;
@@ -153,16 +160,16 @@ namespace RenderResources
 	void CreateGraphicsPipeline(const std::string& Name, const PipelineDescription& Description);
 	void CreatePipelineLayout(const std::string& Name, const PipelineLayoutDescription& Description);
 
-	ResourceHandle CreateImageResource(ImageDescription* Description);
-	ImageViewHandle CreateImageView(ResourceHandle Handle, VkFormat Format);
-	ResourceHandle CreateBufferResource();
+	BmRender_ResourceHandle CreateImageResource(ImageDescription* Description);
+	BmRender_ImageViewHandle CreateImageView(BmRender_ResourceHandle Handle, VkFormat Format);
+	BmRender_ResourceHandle CreateBufferResource();
 
-	void BindImageView(ImageViewHandle Handle, const std::string* Set, u64 ArrayElement);
+	void BindImageView(BmRender_ImageViewHandle Handle, const std::string& Set, const ImageViewBindingDescription* BindingDescriptions, u32 Count);
 
-	void UpdateGPUBuffer(ResourceHandle Handle, void* Data, u32 DataSize, u64 Offset, const std::string& BufferName);
-	void UpdateImageResource(ResourceHandle Handle, ImageDescription* Description, void* Data);
+	void UpdateGPUBuffer(BmRender_ResourceHandle Handle, void* Data, u32 DataSize, u64 Offset, const std::string& BufferName);
+	void UpdateImageResource(BmRender_ResourceHandle Handle, ImageDescription* Description, void* Data);
 
-	void OnResourceLoaded(ResourceHandle Handle);
+	void OnResourceLoaded(BmRender_ResourceHandle Handle);
 
 	VulkanCoreContext::VulkanCoreContext* GetCoreContext();
 	VkSampler GetSampler(const std::string& Id);
@@ -175,5 +182,5 @@ namespace RenderResources
 	VkPipeline GetPipeline(const std::string& Name);
 	VkPipelineLayout GetPipelineLayout(const std::string& Name);
 
-	bool IsResourceReady(ResourceHandle Handle);
+	bool IsResourceReady(BmRender_ResourceHandle Handle);
 }

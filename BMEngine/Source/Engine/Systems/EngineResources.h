@@ -37,7 +37,9 @@ namespace EngineResources
 	struct TextureAsset
 	{
 		std::string TexturePath;
-		u32 RenderTextureIndex;
+		u64 RenderImageHandle;
+		u64 RenderViewHandle;
+		u32 TextureGPUIndex;
 		bool IsCreated;
 	};
 

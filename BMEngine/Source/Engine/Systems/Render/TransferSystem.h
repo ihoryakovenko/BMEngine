@@ -37,7 +37,7 @@ namespace TransferSystem
 
 		void* RawData;
 		u64 DataSize;
-		RenderResources::ResourceHandle Handle;
+		BmRender_ResourceHandle Handle;
 		u32 Alignment;
 		TaskType Type;
 	};
