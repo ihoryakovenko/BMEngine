@@ -11,6 +11,13 @@
 
 namespace RenderResources
 {
+	struct GPUBufferEntry
+	{
+		std::atomic<bool> IsLoaded;
+		GPUBuffer* GPUBufferHandle; // GPUBuffer* is TMP, use handle
+		u64 BufferOffset;	
+	};
+
 	struct ImageResource
 	{
 		VkImage Image;
@@ -32,7 +39,7 @@ namespace RenderResources
 		std::unordered_map<std::string, VkPipeline> Pipelines;
 		std::unordered_map<std::string, VkPipelineLayout> PipelineLayouts;
 
-		Memory::Array<std::atomic<bool>> ResourceStates;
+		Memory::Array<GPUBufferEntry> ResourceRecords;
 		Memory::Array<ImageResource> Images;
 		Memory::Array<VkImageView> ImageViews;
 	};
@@ -65,7 +72,7 @@ namespace RenderResources
 				ResContext.Images.Data[ResourceIndex].IsLoaded = true;
 				break;
 			case ResourceType::StorageResource:
-				ResContext.ResourceStates.Data[ResourceIndex] = true;
+				ResContext.ResourceRecords.Data[ResourceIndex].IsLoaded = true;
 				break;
 			default:
 				assert(false);
@@ -114,9 +121,9 @@ namespace RenderResources
 		ResContext.ImageViews.Count = 0;
 		ResContext.ImageViews.Data = (VkImageView*)malloc(ResContext.Images.Capacity * sizeof(ResContext.Images.Data[0]));
 
-		ResContext.ResourceStates.Capacity = 60000;
-		ResContext.ResourceStates.Count = 0;
-		ResContext.ResourceStates.Data = (std::atomic<bool>*)malloc(ResContext.ResourceStates.Capacity * sizeof(ResContext.ResourceStates.Data[0]));
+		ResContext.ResourceRecords.Capacity = 60000;
+		ResContext.ResourceRecords.Count = 0;
+		ResContext.ResourceRecords.Data = (GPUBufferEntry*)malloc(ResContext.ResourceRecords.Capacity * sizeof(ResContext.ResourceRecords.Data[0]));
 	}
 
 	void CreateGraphicsPipeline(const std::string& Name, const PipelineDescription& Description)
@@ -269,7 +276,7 @@ namespace RenderResources
 
 		free(ResContext.ImageViews.Data);
 		free(ResContext.Images.Data);
-		free(ResContext.ResourceStates.Data);
+		free(ResContext.ResourceRecords.Data);
 	}
 
 	void CreateVertex(const std::string& Name, VulkanHelper::VertexBinding& Binding)
@@ -350,7 +357,7 @@ namespace RenderResources
 		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		LayoutCreateInfo.bindingCount = static_cast<u32>(Description.Bindings.size());
 		LayoutCreateInfo.pBindings = Description.Bindings.data();
-		LayoutCreateInfo.flags = Description.Flags;
+		LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
 		LayoutCreateInfo.pNext = Description.Next;
 
 		VkDescriptorSetLayout NewLayout;
@@ -387,8 +394,8 @@ namespace RenderResources
 				{
 					VkDescriptorBufferInfo BufferInfo = {};
 					BufferInfo.buffer = Buffer->Buffer;
-					BufferInfo.offset = 0;
-					BufferInfo.range = Buffer->Capacity;
+					BufferInfo.offset = Binding.Offset;
+					BufferInfo.range = Binding.Range;
 					BufferInfos.push_back(BufferInfo);
 
 					VkWriteDescriptorSet WriteDescriptorSet = {};
@@ -554,12 +561,16 @@ namespace RenderResources
 		return ResContext.ImageViews.Count++;
 	}
 
-	BmRender_ResourceHandle CreateBufferResource()
+	BmRender_ResourceHandle CreateBufferResource(u64 BufferOffset, const std::string& BufferName)
 	{
-		assert(ResContext.ResourceStates.Count < ResContext.ResourceStates.Capacity);
+		assert(ResContext.ResourceRecords.Count < ResContext.ResourceRecords.Capacity);
 
-		ResContext.ResourceStates.Data[ResContext.ResourceStates.Count] = false;
-		return PackResourceHandle(ResourceType::StorageResource, ResContext.ResourceStates.Count++);
+		GPUBufferEntry* Entry = ResContext.ResourceRecords.Data + ResContext.ResourceRecords.Count;
+		Entry->IsLoaded = false;
+		Entry->BufferOffset = BufferOffset;
+		Entry->GPUBufferHandle = GetGPUBuffer(BufferName);
+	
+		return PackResourceHandle(ResourceType::StorageResource, ResContext.ResourceRecords.Count++);
 	}
 
 	void BindImageView(BmRender_ImageViewHandle Handle, const std::string& Set, const ImageViewBindingDescription* BindingDescriptions, u32 Count)
@@ -591,9 +602,13 @@ namespace RenderResources
 		vkUpdateDescriptorSets(RenderResources::GetCoreContext()->LogicalDevice, Count, Writes, 0, nullptr);
 	}
 
-	void UpdateGPUBuffer(BmRender_ResourceHandle Handle, void* Data, u32 DataSize, u64 Offset, const std::string& BufferName)
+	void UpdateBufferResource(BmRender_ResourceHandle Handle, u64 ResourceOffset, const void* Data, u32 DataSize)
 	{
-		RenderResources::GPUBuffer* Buffer = GetGPUBuffer(BufferName);
+		const u32 Index = GetResourceCPUIndex(Handle);
+		GPUBufferEntry* Entry = ResContext.ResourceRecords.Data + Index;
+		RenderResources::GPUBuffer* Buffer = Entry->GPUBufferHandle;
+
+		const u64 Offset = Entry->BufferOffset + ResourceOffset;
 
 		if (Buffer->PropertyFlag == VulkanHelper::MemoryPropertyFlag::HostCompatible)
 		{
@@ -663,7 +678,7 @@ namespace RenderResources
 
 				break;
 			case RenderResources::ResourceType::StorageResource:
-				if (!ResContext.ResourceStates.Data[Index])
+				if (!ResContext.ResourceRecords.Data[Index].IsLoaded)
 				{
 					return false;
 				}

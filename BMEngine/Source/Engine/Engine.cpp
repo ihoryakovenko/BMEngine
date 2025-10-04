@@ -18,7 +18,6 @@
 #include "Engine/Systems/Render/Render.h"
 #include "Util/Util.h"
 #include "Util/Math.h"
-#include "Deprecated/FrameManager.h"
 #include "Engine/Systems/EngineResources.h"
 #include "Engine/Systems/Render/TransferSystem.h"
 #include "Engine/Systems/Concurrency/TaskSystem.h"
@@ -174,7 +173,7 @@ namespace Engine
 	static glm::vec3 CameraSphericalPosition = glm::vec3(0.0f, 0.0f, 6371.0f);
 	static s32 Zoom = 4;
 
-	static FrameManager::ViewProjectionBuffer ViewProjection;
+	static Render::ViewProjectionBuffer ViewProjection;
 
 
 

@@ -22,6 +22,12 @@ typedef u64 BmRender_ImageViewHandle;
 
 namespace RenderResources
 {
+	struct DescriptorSet
+	{
+		VkDescriptorSet Set;
+
+	};
+
 	struct GPUBuffer
 	{
 		VkBuffer Buffer;
@@ -94,6 +100,8 @@ namespace RenderResources
 		std::string Buffer;
 		u32 Binding;
 		VkDescriptorType DescriptorType;
+		u64 Offset;
+		u64 Range;
 	};
 
 	struct DescriptorSetDescription
@@ -106,7 +114,6 @@ namespace RenderResources
 	struct DescriptorSetLayoutDescription
 	{
 		std::vector<VkDescriptorSetLayoutBinding> Bindings;
-		VkDescriptorSetLayoutCreateFlags Flags;
 		const void* Next;
 	};
 
@@ -162,11 +169,11 @@ namespace RenderResources
 
 	BmRender_ResourceHandle CreateImageResource(ImageDescription* Description);
 	BmRender_ImageViewHandle CreateImageView(BmRender_ResourceHandle Handle, VkFormat Format);
-	BmRender_ResourceHandle CreateBufferResource();
+	BmRender_ResourceHandle CreateBufferResource(u64 BufferOffset, const std::string& BufferName);
 
 	void BindImageView(BmRender_ImageViewHandle Handle, const std::string& Set, const ImageViewBindingDescription* BindingDescriptions, u32 Count);
 
-	void UpdateGPUBuffer(BmRender_ResourceHandle Handle, void* Data, u32 DataSize, u64 Offset, const std::string& BufferName);
+	void UpdateBufferResource(BmRender_ResourceHandle Handle, u64 ResourceOffset, const void* Data, u32 DataSize);
 	void UpdateImageResource(BmRender_ResourceHandle Handle, ImageDescription* Description, void* Data);
 
 	void OnResourceLoaded(BmRender_ResourceHandle Handle);

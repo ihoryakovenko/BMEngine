@@ -37,8 +37,6 @@
     <ClCompile Include="Source\Engine\Systems\Render\TransferSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanCoreContext.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
-    <ClCompile Include="Source\Deprecated\FrameManager.cpp" />
-    <ClCompile Include="Source\Deprecated\VulkanInterface\VulkanInterface.cpp" />
     <ClCompile Include="Source\Engine\Systems\UI\UI.cpp" />
     <ClCompile Include="Source\main.cpp" />
     <ClCompile Include="Source\Util\SavedCode.cpp" />
@@ -56,7 +54,6 @@
     <ClInclude Include="Source\Engine\Systems\UI\UI.h" />
     <ClInclude Include="Source\Util\DefaultTextureData.h" />
     <ClInclude Include="Source\Engine\Systems\Render\VulkanHelper.h" />
-    <ClInclude Include="Source\Deprecated\FrameManager.h" />
     <ClInclude Include="Source\Deprecated\VulkanInterface\VulkanInterface.h" />
     <ClInclude Include="Source\Util\Math.h" />
     <ClInclude Include="Source\Util\Settings.h" />

@@ -71,9 +71,7 @@ namespace Render
 		VkSampler ShadowMapArraySampler = RenderResources::GetSampler("ShadowMap");
 
 		const VkDeviceSize LightBufferSize = sizeof(Render::LightBuffer);
-		MeshPipeline->StaticMeshLightLayout = FrameManager::CreateCompatibleLayout(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-		MeshPipeline->EntityLightBufferHandle = FrameManager::ReserveUniformMemory(LightBufferSize);
-		MeshPipeline->StaticMeshLightSet = FrameManager::CreateAndBindSet(MeshPipeline->EntityLightBufferHandle, LightBufferSize, MeshPipeline->StaticMeshLightLayout);
+		MeshPipeline->EntityLightBufferHandle = RenderResources::CreateBufferResource(384, "FrameData");
 
 		MeshPipeline->ShadowMapArrayLayout = RenderResources::GetSetLayout("ShadowMapArrayLayout");
 
@@ -125,9 +123,9 @@ namespace Render
 
 		VkDescriptorSetLayout StaticMeshDescriptorLayouts[] =
 		{
-			FrameManager::GetViewProjectionLayout(),
+			RenderResources::GetSetLayout("FrameDataLayout"),
 			RenderResources::GetSetLayout("BindlesTexturesLayout"),
-			MeshPipeline->StaticMeshLightLayout,
+			RenderResources::GetSetLayout("FrameDataLayout"),
 			RenderResources::GetSetLayout("MaterialLayout"),
 			MeshPipeline->ShadowMapArrayLayout
 		};
@@ -165,21 +163,20 @@ namespace Render
 		{
 			vkDestroyImageView(Device, MeshPipeline->ShadowMapArrayImageInterface[i], nullptr);
 		}
-
-		vkDestroyDescriptorSetLayout(Device, MeshPipeline->StaticMeshLightLayout, nullptr);
 	}
 
 	static void DrawStaticMeshes(VkDevice Device, VkCommandBuffer CmdBuffer, StaticMeshPipeline* MeshPipeline, DrawScene* Scene)
 	{
-		FrameManager::UpdateUniformMemory(MeshPipeline->EntityLightBufferHandle, Scene->LightEntity, sizeof(LightBuffer));
+		RenderResources::UpdateBufferResource(MeshPipeline->EntityLightBufferHandle, sizeof(LightBuffer) * Render::GetRenderState()->RenderDrawState.CurrentImageIndex,
+			Scene->LightEntity, sizeof(LightBuffer));
 
 		VkPipeline Pipeline = RenderResources::GetPipeline("StaticMesh");
 		VkPipelineLayout PipelineLayout = RenderResources::GetPipelineLayout("StaticMesh");
 
 		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 
-		const VkDescriptorSet VpSet = FrameManager::GetViewProjectionSet();
-		const u32 DynamicOffset = Render::GetRenderState()->RenderDrawState.CurrentImageIndex * sizeof(FrameManager::ViewProjectionBuffer);
+		const VkDescriptorSet VpSet = RenderResources::GetDescriptorSet("VpSet");
+		const u32 DynamicOffset = Render::GetRenderState()->RenderDrawState.CurrentImageIndex * sizeof(ViewProjectionBuffer);
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
 			0, 1, &VpSet, 1, &DynamicOffset);
 
@@ -203,7 +200,7 @@ namespace Render
 
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
-				MeshPipeline->StaticMeshLightSet,
+				RenderResources::GetDescriptorSet("StaticMeshLightSet"),
 				RenderResources::GetDescriptorSet("MaterialSet"),
 				MeshPipeline->ShadowMapArraySet[Render::GetRenderState()->RenderDrawState.CurrentImageIndex],
 			};
@@ -289,9 +286,9 @@ namespace Render
 		VkPhysicalDevice PhysicalDevice = RenderResources::GetCoreContext()->PhysicalDevice;
 		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
-		InitDrawState(Device, RenderResources::GetCoreContext()->Indices.GraphicsFamily, VulkanHelper::MAX_DRAW_FRAMES, &State.RenderDrawState);
+		State.VpHandle = RenderResources::CreateBufferResource(0, "FrameData");
 
-		FrameManager::Init();
+		InitDrawState(Device, RenderResources::GetCoreContext()->Indices.GraphicsFamily, VulkanHelper::MAX_DRAW_FRAMES, &State.RenderDrawState);
 
 		DeferredPass::Init();
 		MainPass::Init();
@@ -318,7 +315,6 @@ namespace Render
 		MainPass::DeInit();
 		LightningPass::DeInit();
 		DeferredPass::DeInit();
-		FrameManager::DeInit();
 
 		Memory::DestroyFrameMemory(&State.FrameMemory);
 	}
@@ -346,7 +342,8 @@ namespace Render
 		VULKAN_CHECK_RESULT(vkAcquireNextImageKHR(Device, RenderResources::GetCoreContext()->VulkanSwapchain, UINT64_MAX, ImagesAvailable, nullptr, &ImageIndex));
 		State.RenderDrawState.CurrentImageIndex = ImageIndex;
 
-		FrameManager::UpdateViewProjection(&Scene->ViewProjection);
+		RenderResources::UpdateBufferResource(State.VpHandle, sizeof(ViewProjectionBuffer) * Render::GetRenderState()->RenderDrawState.CurrentImageIndex,
+			&Scene->ViewProjection, sizeof(ViewProjectionBuffer));
 
 		VkCommandBuffer DrawCmdBuffer = State.RenderDrawState.Frames.CommandBuffers[ImageIndex];
 		VULKAN_CHECK_RESULT(vkBeginCommandBuffer(DrawCmdBuffer, &CommandBufferBeginInfo));
@@ -1121,12 +1118,10 @@ namespace MainPass
 
 		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(RenderResources::GetCoreContext()->LogicalDevice, &LayoutCreateInfo, nullptr, &SkyBoxLayout));
 
-		const VkDescriptorSetLayout VpLayout = FrameManager::GetViewProjectionLayout();
-
 		const u32 SkyBoxDescriptorLayoutCount = 2;
 		VkDescriptorSetLayout SkyBoxDescriptorLayouts[SkyBoxDescriptorLayoutCount] =
 		{
-			VpLayout,
+			RenderResources::GetSetLayout("FrameDataLayout"),
 			SkyBoxLayout,
 		};
 
@@ -1336,7 +1331,7 @@ namespace TerrainRender
 
 		VkDescriptorSetLayout TerrainDescriptorLayouts[] =
 		{
-			FrameManager::GetViewProjectionLayout(),
+			RenderResources::GetSetLayout("FrameDataLayout"),
 			RenderResources::GetSetLayout("BindlesTexturesLayout"),
 			RenderResources::GetSetLayout("MaterialLayout"),
 		};
@@ -1387,7 +1382,7 @@ namespace TerrainRender
 		VkCommandBuffer CmdBuffer = Render::GetRenderState()->RenderDrawState.Frames.CommandBuffers[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 
 		const VkDescriptorSet Sets[] = {
-			FrameManager::GetViewProjectionSet(),
+			RenderResources::GetDescriptorSet("VpSet"),
 			RenderResources::GetDescriptorSet("BindlesTexturesSet"),
 			RenderResources::GetDescriptorSet("MaterialSet"),
 		};
@@ -1399,7 +1394,7 @@ namespace TerrainRender
 
 		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 
-		const u32 DynamicOffset = Render::GetRenderState()->RenderDrawState.CurrentImageIndex * sizeof(FrameManager::ViewProjectionBuffer);
+		const u32 DynamicOffset = Render::GetRenderState()->RenderDrawState.CurrentImageIndex * sizeof(Render::ViewProjectionBuffer);
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
 			0, TerrainDescriptorSetGroupCount, Sets, 1, &DynamicOffset);
 

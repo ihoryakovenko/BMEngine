@@ -9,6 +9,7 @@ vertices:
         format: R32G32_SFLOAT
       - name: Normal
         format: R32G32B32_SFLOAT
+
   StaticMeshInstance:
     binding:
       inputRate: INSTANCE
@@ -23,12 +24,14 @@ vertices:
         format: R32G32B32A32_SFLOAT
       - name: InstanceMaterialIndex
         format: R32_UINT
+
   SkyBoxVertex:
     binding:
       inputRate: VERTEX
     attributes:
       - name: Position
         format: R32G32B32_SFLOAT
+
   TerrainVertex:
     binding:
       inputRate: VERTEX
@@ -127,73 +130,13 @@ shaders:
   QuadBasedSphereVertex: "./Resources/Shaders/QuadBasedSphere_vert.spv"
   QuadBasedSphereFragment: "./Resources/Shaders/QuadBasedSphere_frag.spv"
 
-DescriptorSetLayouts:
-  ShadowMapArrayLayout:
-    bindings:
-      - binding: 0
-        descriptorType: COMBINED_IMAGE_SAMPLER
-        descriptorCount: 1
-        stageFlags: VERTEX_BIT | FRAGMENT_BIT
-        pImmutableSamplers: null
-
-  MaterialLayout:
-    bindings:
-      - binding: 0
-        descriptorType: STORAGE_BUFFER
-        descriptorCount: 1
-        stageFlags: VERTEX_BIT | FRAGMENT_BIT
-        pImmutableSamplers: null
-
-  BindlesTexturesLayout:
-    bindings:
-      - binding: 0
-        descriptorType: COMBINED_IMAGE_SAMPLER
-        descriptorCount: 64
-        stageFlags: FRAGMENT_BIT
-        pImmutableSamplers: null
-      - binding: 1
-        descriptorType: COMBINED_IMAGE_SAMPLER
-        descriptorCount: 64
-        stageFlags: FRAGMENT_BIT
-        pImmutableSamplers: null
-
-  MainPassOutputLayout:
-    bindings:
-      - binding: 0
-        descriptorType: COMBINED_IMAGE_SAMPLER
-        descriptorCount: 1
-        stageFlags: FRAGMENT_BIT
-        pImmutableSamplers: null
-      - binding: 1
-        descriptorType: COMBINED_IMAGE_SAMPLER
-        descriptorCount: 1
-        stageFlags: FRAGMENT_BIT
-        pImmutableSamplers: null
-
-  LightSpaceMatrixLayout:
-    bindings:
-      - binding: 0
-        descriptorType: UNIFORM_BUFFER
-        descriptorCount: 1
-        stageFlags: VERTEX_BIT | FRAGMENT_BIT
-        pImmutableSamplers: null
-
-DescriptorSets:
-  BindlesTexturesSet:
-    name: BindlesTexturesSet
-    layout: BindlesTexturesLayout
-    pool: MainPool
-
-  MaterialSet:
-    name: MaterialSet
-    layout: MaterialLayout
-    pool: MainPool
-    bindings:
-      - buffer: MaterialBuffer
-        binding: 0
-        descriptorType: STORAGE_BUFFER
-
 storageBuffers:
+  FrameData:
+    name: FrameData
+    bufferUsageFlag: UniformFlag
+    Capacity: 10485760
+    memoryPropertyFlag: host_compatible
+
   GPUInstances:
     name: GPUInstances
     bufferUsageFlag: InstanceFlag
@@ -214,3 +157,93 @@ storageBuffers:
     memoryPropertyFlag: GPULocal
     Capacity: 134217728  # 128MB
     stageBarrier: Vertex
+
+DescriptorSetLayouts:
+  FrameDataLayout:
+    bindings:
+      - binding: 0
+        descriptorType: UNIFORM_BUFFER_DYNAMIC
+        descriptorCount: 1
+        stageFlags: VERTEX_BIT | FRAGMENT_BIT
+
+  ShadowMapArrayLayout:
+    bindings:
+      - binding: 0
+        descriptorType: COMBINED_IMAGE_SAMPLER
+        descriptorCount: 1
+        stageFlags: VERTEX_BIT | FRAGMENT_BIT
+
+  MaterialLayout:
+    bindings:
+      - binding: 0
+        descriptorType: STORAGE_BUFFER
+        descriptorCount: 1
+        stageFlags: VERTEX_BIT | FRAGMENT_BIT
+
+  BindlesTexturesLayout:
+    bindings:
+      - binding: 0
+        descriptorType: COMBINED_IMAGE_SAMPLER
+        descriptorCount: 64
+        stageFlags: FRAGMENT_BIT
+      - binding: 1
+        descriptorType: COMBINED_IMAGE_SAMPLER
+        descriptorCount: 64
+        stageFlags: FRAGMENT_BIT
+
+  MainPassOutputLayout:
+    bindings:
+      - binding: 0
+        descriptorType: COMBINED_IMAGE_SAMPLER
+        descriptorCount: 1
+        stageFlags: FRAGMENT_BIT
+      - binding: 1
+        descriptorType: COMBINED_IMAGE_SAMPLER
+        descriptorCount: 1
+        stageFlags: FRAGMENT_BIT
+
+  LightSpaceMatrixLayout:
+    bindings:
+      - binding: 0
+        descriptorType: UNIFORM_BUFFER
+        descriptorCount: 1
+        stageFlags: VERTEX_BIT | FRAGMENT_BIT
+
+DescriptorSets:
+  VpSet:
+    name: VpSet
+    layout: FrameDataLayout
+    pool: MainPool
+    bindings:
+      - buffer: FrameData
+        binding: 0
+        descriptorType: UNIFORM_BUFFER_DYNAMIC
+        offset: 0
+        range: 384
+
+  StaticMeshLightSet:
+    name: StaticMeshLightSet
+    layout: FrameDataLayout
+    pool: MainPool
+    bindings:
+      - buffer: FrameData
+        binding: 0
+        descriptorType: UNIFORM_BUFFER_DYNAMIC
+        offset: 384
+        range: 1152
+
+  BindlesTexturesSet:
+    name: BindlesTexturesSet
+    layout: BindlesTexturesLayout
+    pool: MainPool
+
+  MaterialSet:
+    name: MaterialSet
+    layout: MaterialLayout
+    pool: MainPool
+    bindings:
+      - buffer: MaterialBuffer
+        binding: 0
+        descriptorType: STORAGE_BUFFER
+        offset: 0
+        range: VK_WHOLE_SIZE

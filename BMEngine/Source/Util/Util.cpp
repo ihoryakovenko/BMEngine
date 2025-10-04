@@ -1607,7 +1607,6 @@ namespace Util
 			Description.Bindings.push_back(Binding);
 		}
 		
-		Description.Flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
 		Description.Next = nullptr;
 		
 		return Description;
@@ -1637,6 +1636,32 @@ namespace Util
 				else
 				{
 					assert(false);
+				}
+				
+				if (!(*BindingIt).second["offset"].IsNone())
+				{
+					Binding.Offset = (*BindingIt).second["offset"].As<u64>();
+				}
+				else
+				{
+					Binding.Offset = 0;
+				}
+				
+				if (!(*BindingIt).second["range"].IsNone())
+				{
+					std::string rangeStr = (*BindingIt).second["range"].As<std::string>();
+					if (rangeStr == "VK_WHOLE_SIZE")
+					{
+						Binding.Range = VK_WHOLE_SIZE;
+					}
+					else
+					{
+						Binding.Range = (*BindingIt).second["range"].As<u64>();
+					}
+				}
+				else
+				{
+					Binding.Range = VK_WHOLE_SIZE;
 				}
 				
 				Description.Bindings.push_back(Binding);

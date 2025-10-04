@@ -166,16 +166,16 @@ namespace EngineResources
 
 				const u64 VertexDataSize = VerticesCount * sizeof(StaticMeshVertex) + IndicesCount * sizeof(u32);
 				
-				BmRender_ResourceHandle MeshHandle = RenderResources::CreateBufferResource();
-				RenderResources::UpdateGPUBuffer(MeshHandle, Model.VertexData + ModelVertexByteOffset, VertexDataSize, ModelVertexByteOffset, "VertexStageData");
+				BmRender_ResourceHandle MeshHandle = RenderResources::CreateBufferResource(ModelVertexByteOffset, "VertexStageData");
+				RenderResources::UpdateBufferResource(MeshHandle, 0, Model.VertexData + ModelVertexByteOffset, VertexDataSize);
 
 				Material Mat;
 				Mat.AlbedoTexIndex = TextureGPUIndex;
 				Mat.SpecularTexIndex = TextureGPUIndex;
 				Mat.Shininess = 32.0f;
 
-				const BmRender_ResourceHandle MaterialHandle = RenderResources::CreateBufferResource();
-				RenderResources::UpdateGPUBuffer(MaterialHandle, &Mat, sizeof(Mat), MateriaIndex * sizeof(Mat), "MaterialBuffer");
+				const BmRender_ResourceHandle MaterialHandle = RenderResources::CreateBufferResource(MateriaIndex * sizeof(Mat), "MaterialBuffer");
+				RenderResources::UpdateBufferResource(MaterialHandle, 0, &Mat, sizeof(Mat));
 
 				InstanceData Instance;
 				Instance.MaterialIndex = MateriaIndex;
@@ -184,8 +184,8 @@ namespace EngineResources
 				++MateriaIndex;
 
 				const u64 InstanceOffset = InstanceIndex * sizeof(Instance);
-				const BmRender_ResourceHandle InstanceHandle = RenderResources::CreateBufferResource();
-				RenderResources::UpdateGPUBuffer(InstanceHandle, &Instance, sizeof(Instance), InstanceOffset, "GPUInstances");
+				const BmRender_ResourceHandle InstanceHandle = RenderResources::CreateBufferResource(InstanceOffset, "GPUInstances");
+				RenderResources::UpdateBufferResource(InstanceHandle, 0, &Instance, sizeof(Instance));
 
 				++InstanceIndex;
 

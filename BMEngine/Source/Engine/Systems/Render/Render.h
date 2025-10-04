@@ -7,11 +7,8 @@
 #include "Engine/Systems/Render/VulkanHelper.h"
 
 #include "Util/EngineTypes.h"
-#include "Deprecated/FrameManager.h"
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 #include "Engine/Systems/Render/VulkanCoreContext.h"
-
-#include "Deprecated/FrameManager.h"
 
 #include <atomic>
 #include <mutex>
@@ -21,6 +18,12 @@
 
 namespace Render
 {
+	struct ViewProjectionBuffer
+	{
+		glm::mat4 View;
+		glm::mat4 Projection;
+	};
+
 	struct DrawEntity
 	{
 		u64 VertexOffset;
@@ -54,16 +57,14 @@ namespace Render
 
 	struct StaticMeshPipeline
 	{
-		VkDescriptorSetLayout StaticMeshLightLayout;
 		VkDescriptorSetLayout ShadowMapArrayLayout;
 
-		FrameManager::UniformMemoryHnadle EntityLightBufferHandle;
+		u64 EntityLightBufferHandle;
 
 		VkImageView ShadowMapArrayImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		VkPushConstantRange PushConstants;
 
-		VkDescriptorSet StaticMeshLightSet;
 		VkDescriptorSet ShadowMapArraySet[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 	};
 
@@ -73,6 +74,7 @@ namespace Render
 		StaticMeshPipeline MeshPipeline;
 		VkDescriptorPool DebugUiPool; // TODO: ?
 		Memory::FrameMemory FrameMemory;
+		u64 VpHandle;
 	};
 
 	struct PointLight
@@ -123,7 +125,7 @@ namespace Render
 
 	struct DrawScene
 	{
-		FrameManager::ViewProjectionBuffer ViewProjection;
+		ViewProjectionBuffer ViewProjection;
 
 		DrawEntity* DrawTransparentEntities = nullptr;
 		u32 DrawTransparentEntitiesCount = 0;
