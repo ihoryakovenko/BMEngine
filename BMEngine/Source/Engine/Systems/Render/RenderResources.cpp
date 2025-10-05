@@ -44,40 +44,16 @@ namespace RenderResources
 		Memory::Array<VkImageView> ImageViews;
 	};
 
-	static BmRender_ResourceHandle PackResourceHandle(ResourceType Type, u32 Index)
-	{
-		return ((u64)(Type) << 32) | (u64)(Index);
-	}
-
-	static ResourceType GetResourceType(BmRender_ResourceHandle Handle)
-	{
-		return (ResourceType)(Handle >> 32);
-	}
-
-	static u32 GetResourceCPUIndex(BmRender_ResourceHandle Handle)
-	{
-		return (u32)(Handle & 0xFFFFFFFF);
-	}
-
 	static ResourceContext ResContext;
 
-	void OnResourceLoaded(BmRender_ResourceHandle Handle)
+	void OnBufferResourceLoaded(BmRender_BufferRegion Handle)
 	{
-		ResourceType Type = GetResourceType(Handle);
-		u32 ResourceIndex = GetResourceCPUIndex(Handle);
+		ResContext.ResourceRecords.Data[(u64)Handle].IsLoaded = true;
+	}
 
-		switch (Type)
-		{
-			case ResourceType::Texture:
-				ResContext.Images.Data[ResourceIndex].IsLoaded = true;
-				break;
-			case ResourceType::StorageResource:
-				ResContext.ResourceRecords.Data[ResourceIndex].IsLoaded = true;
-				break;
-			default:
-				assert(false);
-				break;
-		}
+	void OnImageResourceLoaded(BmRender_ImageResource Handle)
+	{
+		ResContext.Images.Data[(u64)Handle].IsLoaded = true;
 	}
 
 	void Init(GLFWwindow* WindowHandler)
@@ -126,7 +102,7 @@ namespace RenderResources
 		ResContext.ResourceRecords.Data = (GPUBufferEntry*)malloc(ResContext.ResourceRecords.Capacity * sizeof(ResContext.ResourceRecords.Data[0]));
 	}
 
-	void CreateGraphicsPipeline(const std::string& Name, const PipelineDescription& Description)
+	void CreateGraphicsPipeline(const std::string& Name, const BmRender_PipelineDescription& Description)
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 		VkPipelineVertexInputStateCreateInfo VertexInputState = {};
@@ -178,7 +154,7 @@ namespace RenderResources
 		ResContext.Pipelines[Name] = Pipeline;
 	}
 
-	void CreatePipelineLayout(const std::string& Name, const PipelineLayoutDescription& Description)
+	void CreatePipelineLayout(const std::string& Name, const BmRender_PipelineLayoutDescription& Description)
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 		VkPipelineLayoutCreateInfo CreateInfo = {};
@@ -193,6 +169,26 @@ namespace RenderResources
 		VkPipelineLayout PipelineLayout;
 		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &CreateInfo, nullptr, &PipelineLayout));
 		ResContext.PipelineLayouts[Name] = PipelineLayout;
+	}
+
+	void CreateBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, BufferUsageFlag Flag, std::string& Name)
+	{
+		VkDevice Device = ResContext.CoreContext.LogicalDevice;
+		VkPhysicalDevice PhDevice = ResContext.CoreContext.PhysicalDevice;
+
+		GPUBuffer NewBuffer = { };
+
+		NewBuffer.Capacity = Capacity;
+		NewBuffer.PropertyFlag = UpdateFrequency == BufferUpdateFrequency::Static ? MemoryPropertyFlag::GPULocal : MemoryPropertyFlag::HostCompatible;
+		NewBuffer.BufferStage = BufferStage;
+		NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, Capacity, Flag);
+
+		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhDevice, Device, NewBuffer.Buffer, NewBuffer.PropertyFlag);
+		NewBuffer.Memory = AllocResult.Memory;
+
+		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, NewBuffer.Buffer, NewBuffer.Memory, 0));
+
+		ResContext.StorageBuffers[Name] = NewBuffer;
 	}
 
 	VkPipeline GetPipeline(const std::string& Name)
@@ -272,7 +268,6 @@ namespace RenderResources
 		ResContext.Samplers.clear();
 		ResContext.DescriptorSetLayouts.clear();
 		ResContext.VBindings.clear();
-		ResContext.StorageBuffers.clear();
 
 		free(ResContext.ImageViews.Data);
 		free(ResContext.Images.Data);
@@ -300,7 +295,7 @@ namespace RenderResources
 		ResContext.Shaders[Name] = NewShaderModule;
 	}
 
-	void CreateSampler(const std::string& Name, const SamplerDescription& Data)
+	void CreateSampler(const std::string& Name, const BmRender_SamplerDescription& Data)
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 
@@ -329,34 +324,62 @@ namespace RenderResources
 		ResContext.Samplers[Name] = NewSampler;
 	}
 
-	void CreateStorageBuffer(const std::string& Name, const StorageBufferDescription& Description)
+	void CreateGeometryBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, std::string& Name)
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
-		VkPhysicalDevice PhysicalDevice = ResContext.CoreContext.PhysicalDevice;
+		VkPhysicalDevice PhDevice = ResContext.CoreContext.PhysicalDevice;
 
-		RenderResources::GPUBuffer NewBuffer = {};
-		NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, Description.Capacity, Description.BufferUsageFlag);
-		
-		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, NewBuffer.Buffer, Description.MemoryPropertyFlag);
+		VkPhysicalDeviceProperties DeviceProperties;
+		vkGetPhysicalDeviceProperties(PhDevice, &DeviceProperties);
+
+		GPUBuffer NewBuffer = { };
+
+		NewBuffer.Capacity = Capacity;
+		NewBuffer.PropertyFlag = UpdateFrequency == BufferUpdateFrequency::Static ? MemoryPropertyFlag::GPULocal : MemoryPropertyFlag::HostCompatible;
+		NewBuffer.BufferStage = StageBarier::Vertex;
+		NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, Capacity, BufferUsageFlag::CombinedVertexIndexFlag);
+
+		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhDevice, Device, NewBuffer.Buffer, NewBuffer.PropertyFlag);
 		NewBuffer.Memory = AllocResult.Memory;
-		NewBuffer.Capacity = AllocResult.Size;
-		NewBuffer.UsageFlag = Description.BufferUsageFlag;
-		NewBuffer.PropertyFlag = Description.MemoryPropertyFlag;
-		NewBuffer.StageBarrier = Description.StageBarrier;
 
 		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, NewBuffer.Buffer, NewBuffer.Memory, 0));
 
 		ResContext.StorageBuffers[Name] = NewBuffer;
 	}
 
-	void CreateDescriptorSetLayout(const std::string& Name, const DescriptorSetLayoutDescription& Description)
+	void CreateShaderBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, std::string& Name)
+	{
+		VkDevice Device = ResContext.CoreContext.LogicalDevice;
+		VkPhysicalDevice PhDevice = ResContext.CoreContext.PhysicalDevice;
+
+		VkPhysicalDeviceProperties DeviceProperties;
+		vkGetPhysicalDeviceProperties(PhDevice, &DeviceProperties);
+
+		const BufferUsageFlag UsageFlag = Capacity <= DeviceProperties.limits.maxUniformBufferRange ? BufferUsageFlag::UniformFlag : BufferUsageFlag::StorageFlag;
+
+		GPUBuffer NewBuffer = { };
+
+		NewBuffer.Capacity = Capacity;
+		NewBuffer.PropertyFlag = UpdateFrequency == BufferUpdateFrequency::Static ? MemoryPropertyFlag::GPULocal : MemoryPropertyFlag::HostCompatible;
+		NewBuffer.BufferStage = BufferStage;
+		NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, Capacity, UsageFlag);
+
+		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhDevice, Device, NewBuffer.Buffer, NewBuffer.PropertyFlag);
+		NewBuffer.Memory = AllocResult.Memory;
+
+		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, NewBuffer.Buffer, NewBuffer.Memory, 0));
+
+		ResContext.StorageBuffers[Name] = NewBuffer;
+	}
+
+	void CreateDescriptorSetLayout(const std::string& Name, const BmRender_DescriptorSetLayoutDescription& Description)
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 
 		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
 		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = static_cast<u32>(Description.Bindings.size());
-		LayoutCreateInfo.pBindings = Description.Bindings.data();
+		LayoutCreateInfo.bindingCount = Description.BindingsCount;
+		LayoutCreateInfo.pBindings = Description.Bindings;
 		LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
 		LayoutCreateInfo.pNext = Description.Next;
 
@@ -365,7 +388,7 @@ namespace RenderResources
 		ResContext.DescriptorSetLayouts[Name] = NewLayout;
 	}
 
-	void CreateDescriptorSet(const std::string& Name, const DescriptorSetDescription& Description)
+	void CreateDescriptorSet(const std::string& Name, const BmRender_DescriptorSetDescription& Description)
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 		
@@ -382,13 +405,14 @@ namespace RenderResources
 		VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, &DescriptorSet));
 		ResContext.DescriptorSets[Name] = DescriptorSet;
 
-		if (!Description.Bindings.empty())
+		if (Description.BindingsCount > 0)
 		{
 			std::vector<VkWriteDescriptorSet> WriteDescriptorSets;
 			std::vector<VkDescriptorBufferInfo> BufferInfos;
 
-			for (const auto& Binding : Description.Bindings)
+			for (u32 i = 0; i < Description.BindingsCount; i++)
 			{
+				const BmRender_DescriptorSetBinding& Binding = Description.Bindings[i];
 				RenderResources::GPUBuffer* Buffer = GetGPUBuffer(Binding.Buffer);
 				if (Buffer)
 				{
@@ -495,7 +519,7 @@ namespace RenderResources
 		return nullptr;
 	}
 
-	BmRender_ResourceHandle CreateImageResource(ImageDescription* Description)
+	BmRender_ImageResource CreateImageResource(BmRender_ImageDescription* Description)
 	{
 		assert(ResContext.Images.Count < ResContext.Images.Capacity);
 
@@ -525,17 +549,17 @@ namespace RenderResources
 		VULKAN_CHECK_RESULT(vkCreateImage(Device, &ImageCreateInfo, nullptr, &Resource->Image));
 
 		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
-			Resource->Image, VulkanHelper::MemoryPropertyFlag::GPULocal);
+			Resource->Image, MemoryPropertyFlag::GPULocal);
 		Resource->Memory = AllocResult.Memory;
 		Resource->Size = AllocResult.Size;
 		VULKAN_CHECK_RESULT(vkBindImageMemory(Device, Resource->Image, Resource->Memory, 0));
 
-		return PackResourceHandle(ResourceType::Texture, ResContext.Images.Count++);
+		return (BmRender_ImageResource)ResContext.Images.Count++;
 	}
 
-	BmRender_ImageViewHandle CreateImageView(BmRender_ResourceHandle Handle, VkFormat Format)
+	BmRender_ImageViewResource CreateImageView(BmRender_ImageResource Handle, VkFormat Format)
 	{
-		const u32 Index = GetResourceCPUIndex(Handle);
+		const u32 Index = (u64)Handle;
 
 		VkImageView* View = ResContext.ImageViews.Data + ResContext.ImageViews.Count;
 
@@ -558,10 +582,10 @@ namespace RenderResources
 		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 		VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo, nullptr, View));
 
-		return ResContext.ImageViews.Count++;
+		return (BmRender_ImageViewResource)ResContext.ImageViews.Count++;
 	}
 
-	BmRender_ResourceHandle CreateBufferResource(u64 BufferOffset, const std::string& BufferName)
+	BmRender_BufferRegion CreateBufferRegion(u64 BufferOffset, const std::string& BufferName)
 	{
 		assert(ResContext.ResourceRecords.Count < ResContext.ResourceRecords.Capacity);
 
@@ -570,10 +594,10 @@ namespace RenderResources
 		Entry->BufferOffset = BufferOffset;
 		Entry->GPUBufferHandle = GetGPUBuffer(BufferName);
 	
-		return PackResourceHandle(ResourceType::StorageResource, ResContext.ResourceRecords.Count++);
+		return (BmRender_BufferRegion)ResContext.ResourceRecords.Count++;
 	}
 
-	void BindImageView(BmRender_ImageViewHandle Handle, const std::string& Set, const ImageViewBindingDescription* BindingDescriptions, u32 Count)
+	void BindImageView(BmRender_ImageViewResource Handle, const std::string& Set, const BmRender_ImageViewBindingDescription* BindingDescriptions, u32 Count)
 	{
 		if (Count == 0) return;
 
@@ -582,12 +606,12 @@ namespace RenderResources
 
 		for (u32 i = 0; i < Count; ++i)
 		{
-			const ImageViewBindingDescription* Binding = BindingDescriptions + i;
+			const BmRender_ImageViewBindingDescription* Binding = BindingDescriptions + i;
 			
 			ImageInfos[i] = { };
 			ImageInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			ImageInfos[i].sampler = RenderResources::GetSampler(Binding->Sampler);
-			ImageInfos[i].imageView = ResContext.ImageViews.Data[Handle];
+			ImageInfos[i].imageView = ResContext.ImageViews.Data[(u64)Handle];
 
 			Writes[i] = { };
 			Writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -602,22 +626,22 @@ namespace RenderResources
 		vkUpdateDescriptorSets(RenderResources::GetCoreContext()->LogicalDevice, Count, Writes, 0, nullptr);
 	}
 
-	void UpdateBufferResource(BmRender_ResourceHandle Handle, u64 ResourceOffset, const void* Data, u32 DataSize)
+	void UpdateBufferRegion(BmRender_BufferRegion Handle, u64 ResourceOffset, const void* Data, u32 DataSize)
 	{
-		const u32 Index = GetResourceCPUIndex(Handle);
+		const u32 Index = (u64)Handle;
 		GPUBufferEntry* Entry = ResContext.ResourceRecords.Data + Index;
 		RenderResources::GPUBuffer* Buffer = Entry->GPUBufferHandle;
 
 		const u64 Offset = Entry->BufferOffset + ResourceOffset;
 
-		if (Buffer->PropertyFlag == VulkanHelper::MemoryPropertyFlag::HostCompatible)
+		if (Buffer->PropertyFlag == MemoryPropertyFlag::HostCompatible)
 		{
 			VkDevice Device = ResContext.CoreContext.LogicalDevice;
 			VkPhysicalDevice PhysicalDevice = ResContext.CoreContext.PhysicalDevice;
 			VulkanHelper::UpdateHostCompatibleBufferMemory(Device, Buffer->Memory, DataSize, Offset, Data);
-			OnResourceLoaded(Handle);
+			OnBufferResourceLoaded(Handle);
 		}
-		else if (Buffer->PropertyFlag == VulkanHelper::MemoryPropertyFlag::GPULocal)
+		else if (Buffer->PropertyFlag == MemoryPropertyFlag::GPULocal)
 		{
 			// TODO: TMP solution
 			void* TransferMemory = TransferSystem::RequestTransferMemory(DataSize);
@@ -629,8 +653,8 @@ namespace RenderResources
 			Task.DataDescr.DstBuffer = Buffer->Buffer;
 			Task.DataDescr.DstOffset = Offset;
 			Task.RawData = TransferMemory;
-			Task.Handle = Handle;
-			Task.DataDescr.StageBarrier = Buffer->StageBarrier;
+			Task.DataDescr.Handle = Handle;
+			Task.DataDescr.StageBarrier = Buffer->BufferStage;
 			Task.Type = TransferSystem::TaskType::Data;
 
 			TransferSystem::AddTask(&Task);
@@ -641,9 +665,9 @@ namespace RenderResources
 		}
 	}
 
-	void UpdateImageResource(BmRender_ResourceHandle Handle, ImageDescription* Description, void* Data)
+	void UpdateImageResource(BmRender_ImageResource Handle, BmRender_ImageDescription* Description, void* Data)
 	{
-		const u32 Index = GetResourceCPUIndex(Handle);
+		const u32 Index = (u64)Handle;
 		ImageResource* Image = ResContext.Images.Data + Index;
 
 		// TODO: TMP solution
@@ -657,39 +681,20 @@ namespace RenderResources
 		Task.TextureDescr.Width = Description->Width;
 		Task.TextureDescr.Height = Description->Height;
 		Task.RawData = TransferMemory;
-		Task.Handle = Handle;
+		Task.TextureDescr.Handle = Handle;
 		Task.Type = TransferSystem::TaskType::Image;
 
 		AddTask(&Task);
 	}
 
-	bool IsResourceReady(BmRender_ResourceHandle Handle)
+	bool IsBufferResourceReady(BmRender_BufferRegion Handle)
 	{
-		const ResourceType Type = GetResourceType(Handle);
-		const u32 Index = GetResourceCPUIndex(Handle);
+		return ResContext.ResourceRecords.Data[(u64)Handle].IsLoaded;
+	}
 
-		switch (Type)
-		{
-			case RenderResources::ResourceType::Texture:
-				if (!ResContext.Images.Data[Index].IsLoaded)
-				{
-					return false;
-				}
-
-				break;
-			case RenderResources::ResourceType::StorageResource:
-				if (!ResContext.ResourceRecords.Data[Index].IsLoaded)
-				{
-					return false;
-				}
-
-				break;
-			default:
-				assert(false);
-				break;
-		}
-
-		return true;
+	bool IsImageResourceReady(BmRender_ImageResource Handle)
+	{
+		return ResContext.Images.Data[(u64)Handle].IsLoaded;
 	}
 
 	RenderResources::GPUBuffer* GetGPUBuffer(const std::string& Name)

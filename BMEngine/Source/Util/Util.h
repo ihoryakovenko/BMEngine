@@ -267,14 +267,20 @@ namespace Util
 	Yaml::Node& GetTextures(Yaml::Node& Root);
 	Yaml::Node& GetModels(Yaml::Node& Root);
 	Yaml::Node& GetMeshBuffers(Yaml::Node& Root);
+	Yaml::Node& GetVertexStageBuffers(Yaml::Node& Root);
+	Yaml::Node& GetInstanceBuffers(Yaml::Node& Root);
+	Yaml::Node& GetUniformBuffers(Yaml::Node& Root);
 	Yaml::Node& GetStorageBuffers(Yaml::Node& Root);
+
+	void ParseShaderBufferFromYaml(Yaml::Node& BufferNode, u64& Capacity, BufferUpdateFrequency& UpdateFrequency, StageBarier& StageBarrier, std::string& OutName);
+	void ParseGeometryBufferFromYaml(Yaml::Node& BufferNode, u64& Capacity, BufferUpdateFrequency& UpdateFrequency, std::string& OutName);
 	
 	std::string GetModelPath(Yaml::Node& ModelNode);
 	glm::vec3 GetModelPosition(Yaml::Node& ModelNode);
 
 	std::string ParseNameNode(Yaml::Node& Node);
 	std::string ParseShaderNode(Yaml::Node& ShaderNode);
-	RenderResources::SamplerDescription ParseSamplerNode(Yaml::Node& SamplerNode);
+	BmRender_SamplerDescription ParseSamplerNode(Yaml::Node& SamplerNode);
 	VkDescriptorSetLayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode);
 	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, VulkanHelper::VertexAttribute* OutAttribute, std::string* OutAttributeName);
 	VulkanHelper::VertexBinding ParseVertexBindingNode(Yaml::Node& BindingNode);
@@ -312,15 +318,15 @@ namespace Util
 	u32 CalculateFormatSize(VkFormat Format);
 	u32 CalculateFormatSizeFromString(const char* FormatString, u32 FormatLength);
 
-	VulkanHelper::BufferUsageFlag ParseBufferUsageFlag(const char* Value, u32 Length);
-	VulkanHelper::MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length);
-	VulkanHelper::StageBarrier ParseStageBarrier(const char* Value, u32 Length);
-	RenderResources::StorageBufferDescription ParseStorageBufferNode(Yaml::Node& BufferNode);
+	BufferUsageFlag ParseBufferUsageFlag(const char* Value, u32 Length);
+	MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length);
+	StageBarier ParseStageBarrier(const char* Value, u32 Length);
+	BufferUpdateFrequency ParseUpdateFrequency(const char* Value, u32 Length);
 	std::string GetBufferName(Yaml::Node& BufferNode);
 	
-	RenderResources::DescriptorSetLayoutDescription ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode);
-	RenderResources::DescriptorSetDescription ParseDescriptorSetFromYaml(Yaml::Node& DescriptorSetNode);
-	RenderResources::PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, VkPipelineLayout PipelineLayout, const VulkanHelper::PipelineResourceInfo& ResourceInfo);
+	void ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode, BmRender_DescriptorSetLayoutDescription& Description, std::vector<VkDescriptorSetLayoutBinding>& Bindings);
+	void ParseDescriptorSetFromYaml(Yaml::Node& DescriptorSetNode, BmRender_DescriptorSetDescription& Description, std::vector<BmRender_DescriptorSetBinding>& Bindings);
+	RenderResources::BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, VkPipelineLayout PipelineLayout, const VulkanHelper::PipelineResourceInfo& ResourceInfo);
 	
 	VkFormat GliFormatToVkFormat(gli::format Format);
 

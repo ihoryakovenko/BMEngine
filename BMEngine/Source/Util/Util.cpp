@@ -1,6 +1,7 @@
 #include "Util.h"
 
 #include <mini-yaml/yaml/Yaml.hpp>
+#include <vector>
 
 #include "EngineTypes.h"
 
@@ -389,9 +390,9 @@ namespace Util
 		return {};
 	}
 
-	RenderResources::SamplerDescription ParseSamplerNode(Yaml::Node& Sampler)
+	BmRender_SamplerDescription ParseSamplerNode(Yaml::Node& Sampler)
 	{
-		RenderResources::SamplerDescription Data = { };
+		BmRender_SamplerDescription Data = { };
 
 		std::string Value;
 
@@ -1263,17 +1264,49 @@ namespace Util
 		return Empty;
 	}
 
-	Yaml::Node& GetStorageBuffers(Yaml::Node& Root)
+	Yaml::Node& GetVertexStageBuffers(Yaml::Node& Root)
 	{
-		if (!Root["storageBuffers"].IsNone())
+		if (!Root["VertexStageBuffers"].IsNone())
 		{
-			return Root["storageBuffers"];
+			return Root["VertexStageBuffers"];
 		}
 
-		assert(false);
 		static Yaml::Node Empty;
 		return Empty;
 	}
+
+	Yaml::Node& GetInstanceBuffers(Yaml::Node& Root)
+	{
+		if (!Root["InstanceBuffers"].IsNone())
+		{
+			return Root["InstanceBuffers"];
+		}
+
+		static Yaml::Node Empty;
+		return Empty;
+	}
+
+    Yaml::Node& GetUniformBuffers(Yaml::Node& Root)
+    {
+        if (!Root["UniformBuffers"].IsNone())
+        {
+            return Root["UniformBuffers"];
+        }
+
+        static Yaml::Node Empty;
+        return Empty;
+    }
+
+    Yaml::Node& GetStorageBuffers(Yaml::Node& Root)
+    {
+        if (!Root["StorageBuffers"].IsNone())
+        {
+            return Root["StorageBuffers"];
+        }
+
+        static Yaml::Node Empty;
+        return Empty;
+    }
 
 	std::string GetModelPath(Yaml::Node& ModelNode)
 	{
@@ -1519,72 +1552,87 @@ namespace Util
 	}
 }
 
-	VulkanHelper::BufferUsageFlag ParseBufferUsageFlag(const char* Value, u32 Length)
+	BufferUsageFlag ParseBufferUsageFlag(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::COMBINED_VERTEX_INDEX_FLAG_STRINGS)) return VulkanHelper::BufferUsageFlag::CombinedVertexIndexFlag;
-		if (StringMatches(Value, Length, ParseStrings::INSTANCE_FLAG_STRINGS)) return VulkanHelper::BufferUsageFlag::InstanceFlag;
-		if (StringMatches(Value, Length, ParseStrings::STORAGE_FLAG_STRINGS)) return VulkanHelper::BufferUsageFlag::StorageFlag;
-		if (StringMatches(Value, Length, ParseStrings::UNIFORM_FLAG_STRINGS)) return VulkanHelper::BufferUsageFlag::UniformFlag;
-		if (StringMatches(Value, Length, ParseStrings::VERTEX_FLAG_STRINGS)) return VulkanHelper::BufferUsageFlag::VertexFlag;
-		if (StringMatches(Value, Length, ParseStrings::INDEX_FLAG_STRINGS)) return VulkanHelper::BufferUsageFlag::IndexFlag;
+		if (StringMatches(Value, Length, ParseStrings::COMBINED_VERTEX_INDEX_FLAG_STRINGS)) return BufferUsageFlag::CombinedVertexIndexFlag;
+		if (StringMatches(Value, Length, ParseStrings::INSTANCE_FLAG_STRINGS)) return BufferUsageFlag::InstanceFlag;
+		if (StringMatches(Value, Length, ParseStrings::STORAGE_FLAG_STRINGS)) return BufferUsageFlag::StorageFlag;
+		if (StringMatches(Value, Length, ParseStrings::UNIFORM_FLAG_STRINGS)) return BufferUsageFlag::UniformFlag;
+		if (StringMatches(Value, Length, ParseStrings::VERTEX_FLAG_STRINGS)) return BufferUsageFlag::VertexFlag;
+		if (StringMatches(Value, Length, ParseStrings::INDEX_FLAG_STRINGS)) return BufferUsageFlag::IndexFlag;
 
 		assert(false);
-		return VulkanHelper::BufferUsageFlag::VertexFlag;
+		return BufferUsageFlag::VertexFlag;
 	}
 
-	VulkanHelper::MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length)
+	MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::GPU_LOCAL_STRINGS)) return VulkanHelper::MemoryPropertyFlag::GPULocal;
-		if (StringMatches(Value, Length, ParseStrings::CPU_HOST_COMPATIBLE_STRINGS)) return VulkanHelper::MemoryPropertyFlag::HostCompatible;
+		if (StringMatches(Value, Length, ParseStrings::GPU_LOCAL_STRINGS)) return MemoryPropertyFlag::GPULocal;
+		if (StringMatches(Value, Length, ParseStrings::CPU_HOST_COMPATIBLE_STRINGS)) return MemoryPropertyFlag::HostCompatible;
 
 		assert(false);
-		return VulkanHelper::MemoryPropertyFlag::GPULocal;
+		return MemoryPropertyFlag::GPULocal;
 	}
 
-	VulkanHelper::StageBarrier ParseStageBarrier(const char* Value, u32 Length)
+	StageBarier ParseStageBarrier(const char* Value, u32 Length)
 	{
 		if (strncmp(Value, "Vertex", Length) == 0)
 		{
-			return VulkanHelper::StageBarrier::Vertex;
+			return StageBarier::Vertex;
 		}
 		else if (strncmp(Value, "Fragment", Length) == 0)
 		{
-			return VulkanHelper::StageBarrier::Fragment;
+			return StageBarier::Fragment;
 		}
 
 		assert(false);
-		return VulkanHelper::StageBarrier::Fragment;
+		return StageBarier::Fragment;
 	}
 
-	RenderResources::StorageBufferDescription ParseStorageBufferNode(Yaml::Node& BufferNode)
+	BufferUpdateFrequency ParseUpdateFrequency(const char* Value, u32 Length)
 	{
-		RenderResources::StorageBufferDescription Data = { };
-
-		if (!BufferNode["bufferUsageFlag"].IsNone())
+		if (strncmp(Value, "Static", Length) == 0)
 		{
-			std::string value = BufferNode["bufferUsageFlag"].As<std::string>();
-			Data.BufferUsageFlag = ParseBufferUsageFlag(value.c_str(), value.length());
+			return BufferUpdateFrequency::Static;
+		}
+		else if (strncmp(Value, "Dynamic", Length) == 0)
+		{
+			return BufferUpdateFrequency::Dynamic;
 		}
 
-		if (!BufferNode["memoryPropertyFlag"].IsNone())
-		{
-			std::string value = BufferNode["memoryPropertyFlag"].As<std::string>();
-			Data.MemoryPropertyFlag = ParseMemoryPropertyFlag(value.c_str(), value.length());
-		}
-
-		if (!BufferNode["Capacity"].IsNone())
-		{
-			Data.Capacity = BufferNode["Capacity"].As<u32>();
-		}
-
-		if (!BufferNode["stageBarrier"].IsNone())
-		{
-			std::string value = BufferNode["stageBarrier"].As<std::string>();
-			Data.StageBarrier = ParseStageBarrier(value.c_str(), value.length());
-		}
-
-		return Data;
+		return BufferUpdateFrequency::Static;
 	}
+
+	void ParseShaderBufferFromYaml(Yaml::Node& BufferNode, u64& Capacity, BufferUpdateFrequency& UpdateFrequency, StageBarier& StageBarrier, std::string& OutName)
+	{
+		OutName = GetBufferName(BufferNode);
+		if (!BufferNode["Capacity"].IsNone())
+			Capacity = BufferNode["Capacity"].As<u64>();
+		if (!BufferNode["UpdateFrequency"].IsNone())
+		{
+			std::string v = BufferNode["UpdateFrequency"].As<std::string>();
+			UpdateFrequency = ParseUpdateFrequency(v.c_str(), (u32)v.length());
+		}
+		if (!BufferNode["StageBarier"].IsNone())
+		{
+			std::string v = BufferNode["StageBarier"].As<std::string>();
+			StageBarrier = ParseStageBarrier(v.c_str(), (u32)v.length());
+		}
+	}
+
+	void ParseGeometryBufferFromYaml(Yaml::Node& BufferNode, u64& Capacity, BufferUpdateFrequency& UpdateFrequency, std::string& OutName)
+	{
+		OutName = GetBufferName(BufferNode);
+		if (!BufferNode["Capacity"].IsNone())
+			Capacity = BufferNode["Capacity"].As<u64>();
+		if (!BufferNode["UpdateFrequency"].IsNone())
+		{
+			std::string v = BufferNode["UpdateFrequency"].As<std::string>();
+			UpdateFrequency = ParseUpdateFrequency(v.c_str(), (u32)v.length());
+		}
+	}
+
+// Deprecated ParseStorageBufferNode removed
 
 	std::string GetBufferName(Yaml::Node& BufferNode)
 	{
@@ -1595,36 +1643,34 @@ namespace Util
 		return {};
 	}
 
-	RenderResources::DescriptorSetLayoutDescription ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode)
+	void ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode, BmRender_DescriptorSetLayoutDescription& Description, std::vector<VkDescriptorSetLayoutBinding>& Bindings)
 	{
-		RenderResources::DescriptorSetLayoutDescription Description = {};
-		
 		Yaml::Node& BindingsNode = ParseDescriptorSetLayoutNode(DescriptorSetLayoutNode);
 		
+		Bindings.clear();
 		for (auto BindingIt = BindingsNode.Begin(); BindingIt != BindingsNode.End(); BindingIt++)
 		{
 			VkDescriptorSetLayoutBinding Binding = ParseDescriptorSetLayoutBindingNode((*BindingIt).second);
-			Description.Bindings.push_back(Binding);
+			Bindings.push_back(Binding);
 		}
 		
+		Description.Bindings = Bindings.data();
+		Description.BindingsCount = static_cast<u32>(Bindings.size());
 		Description.Next = nullptr;
-		
-		return Description;
 	}
 
-	RenderResources::DescriptorSetDescription ParseDescriptorSetFromYaml(Yaml::Node& DescriptorSetNode)
+	void ParseDescriptorSetFromYaml(Yaml::Node& DescriptorSetNode, BmRender_DescriptorSetDescription& Description, std::vector<BmRender_DescriptorSetBinding>& Bindings)
 	{
-		RenderResources::DescriptorSetDescription Description = {};
-		
 		Description.Layout = DescriptorSetNode["layout"].As<std::string>();
 		Description.Pool = DescriptorSetNode["pool"].As<std::string>();
 		
+		Bindings.clear();
 		if (!DescriptorSetNode["bindings"].IsNone())
 		{
 			Yaml::Node& BindingsNode = DescriptorSetNode["bindings"];
 			for (auto BindingIt = BindingsNode.Begin(); BindingIt != BindingsNode.End(); BindingIt++)
 			{
-				RenderResources::DescriptorSetBinding Binding = {};
+				BmRender_DescriptorSetBinding Binding = {};
 				Binding.Buffer = (*BindingIt).second["buffer"].As<std::string>();
 				Binding.Binding = (*BindingIt).second["binding"].As<u32>();
 				
@@ -1664,16 +1710,17 @@ namespace Util
 					Binding.Range = VK_WHOLE_SIZE;
 				}
 				
-				Description.Bindings.push_back(Binding);
+				Bindings.push_back(Binding);
 			}
 		}
 		
-		return Description;
+		Description.Bindings = Bindings.data();
+		Description.BindingsCount = static_cast<u32>(Bindings.size());
 	}
 
-	RenderResources::PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, VkPipelineLayout PipelineLayout, const VulkanHelper::PipelineResourceInfo& ResourceInfo)
+	RenderResources::BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, VkPipelineLayout PipelineLayout, const VulkanHelper::PipelineResourceInfo& ResourceInfo)
 	{
-		RenderResources::PipelineDescription Description = {};
+		RenderResources::BmRender_PipelineDescription Description = {};
 		Description.Extent = Extent;
 		Description.PipelineLayout = PipelineLayout;
 		Description.ResourceInfo = ResourceInfo;

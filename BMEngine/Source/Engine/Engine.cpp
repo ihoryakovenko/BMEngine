@@ -82,25 +82,8 @@ namespace Engine
 	{
 		for (auto It = SamplersNode.Begin(); It != SamplersNode.End(); It++)
 		{
-			RenderResources::SamplerDescription Data = Util::ParseSamplerNode((*It).second);
+			BmRender_SamplerDescription Data = Util::ParseSamplerNode((*It).second);
 			RenderResources::CreateSampler((*It).first, Data);
-		}
-	}
-
-	static void ParseAndCreateBuffers(Yaml::Node& BuffersNode)
-	{
-		for (auto It = BuffersNode.Begin(); It != BuffersNode.End(); It++)
-		{
-			Yaml::Node& BufferNode = (*It).second;
-			std::string BufferName = Util::GetBufferName(BufferNode);
-			RenderResources::StorageBufferDescription Data = Util::ParseStorageBufferNode(BufferNode);
-			
-			if (BufferName.empty())
-			{
-				BufferName = (*It).first;
-			}
-			
-			RenderResources::CreateStorageBuffer(BufferName, Data);
 		}
 	}
 
@@ -108,7 +91,10 @@ namespace Engine
 	{
 		for (auto LayoutIt = DescriptorSetLayoutsNode.Begin(); LayoutIt != DescriptorSetLayoutsNode.End(); LayoutIt++)
 		{
-			RenderResources::DescriptorSetLayoutDescription Description = Util::ParseDescriptorSetLayoutFromYaml((*LayoutIt).second);
+			BmRender_DescriptorSetLayoutDescription Description = {};
+			std::vector<VkDescriptorSetLayoutBinding> Bindings;
+			
+			Util::ParseDescriptorSetLayoutFromYaml((*LayoutIt).second, Description, Bindings);
 			RenderResources::CreateDescriptorSetLayout((*LayoutIt).first, Description);
 		}
 	}
@@ -119,8 +105,10 @@ namespace Engine
 		{
 			Yaml::Node& DescriptorSetNode = (*DescriptorSetIt).second;
 			
-			RenderResources::DescriptorSetDescription Description = Util::ParseDescriptorSetFromYaml(DescriptorSetNode);
+			BmRender_DescriptorSetDescription Description = {};
+			std::vector<BmRender_DescriptorSetBinding> Bindings;
 			
+			Util::ParseDescriptorSetFromYaml(DescriptorSetNode, Description, Bindings);
 			RenderResources::CreateDescriptorSet((*DescriptorSetIt).first, Description);
 		}
 	}
@@ -268,7 +256,67 @@ namespace Engine
 		ParseAndCreateVertices(Util::GetVertices(Root));
 		ParseAndCreateShaders(Util::GetShaders(Root));
 		ParseAndCreateSamplers(Util::GetSamplers(Root));
-		ParseAndCreateBuffers(Util::GetStorageBuffers(Root));
+		// Parse uniform buffers
+		{
+			Yaml::Node& UniformBuffersNode = Util::GetUniformBuffers(Root);
+			for (auto It = UniformBuffersNode.Begin(); It != UniformBuffersNode.End(); It++)
+			{
+				u64 Capacity = 0;
+				BufferUpdateFrequency UpdateFrequency = BufferUpdateFrequency::Static;
+				StageBarier StageBarrier = StageBarier::Fragment;
+				std::string BufferName = (*It).first;
+
+				Util::ParseShaderBufferFromYaml((*It).second, Capacity, UpdateFrequency, StageBarrier, BufferName);
+				if (BufferName.empty()) BufferName = (*It).first;
+				BmRender_CreateUniformBuffer(Capacity, UpdateFrequency, StageBarrier, BufferName);
+			}
+		}
+
+		// Parse storage buffers
+		{
+			Yaml::Node& StorageBuffersNode = Util::GetStorageBuffers(Root);
+			for (auto It = StorageBuffersNode.Begin(); It != StorageBuffersNode.End(); It++)
+			{
+				u64 Capacity = 0;
+				BufferUpdateFrequency UpdateFrequency = BufferUpdateFrequency::Static;
+				StageBarier StageBarrier = StageBarier::Fragment;
+				std::string BufferName = (*It).first;
+
+				Util::ParseShaderBufferFromYaml((*It).second, Capacity, UpdateFrequency, StageBarrier, BufferName);
+				if (BufferName.empty()) BufferName = (*It).first;
+				BmRender_CreateStorageBuffer(Capacity, UpdateFrequency, StageBarrier, BufferName);
+			}
+		}
+
+		// Parse vertex stage buffers
+		{
+			Yaml::Node& VertexStageBuffersNode = Util::GetVertexStageBuffers(Root);
+			for (auto It = VertexStageBuffersNode.Begin(); It != VertexStageBuffersNode.End(); It++)
+			{
+				u64 Capacity = 0;
+				BufferUpdateFrequency UpdateFrequency = BufferUpdateFrequency::Static;
+				std::string BufferName = (*It).first;
+
+				Util::ParseGeometryBufferFromYaml((*It).second, Capacity, UpdateFrequency, BufferName);
+				if (BufferName.empty()) BufferName = (*It).first;
+				BmRender_CreateVertexStageBuffer(Capacity, UpdateFrequency, BufferName);
+			}
+		}
+
+		// Parse instance buffers
+		{
+			Yaml::Node& InstanceBuffersNode = Util::GetInstanceBuffers(Root);
+			for (auto It = InstanceBuffersNode.Begin(); It != InstanceBuffersNode.End(); It++)
+			{
+				u64 Capacity = 0;
+				BufferUpdateFrequency UpdateFrequency = BufferUpdateFrequency::Static;
+				std::string BufferName = (*It).first;
+
+				Util::ParseGeometryBufferFromYaml((*It).second, Capacity, UpdateFrequency, BufferName);
+				if (BufferName.empty()) BufferName = (*It).first;
+				BmRender_CreateInstanceBuffer(Capacity, UpdateFrequency, BufferName);
+			}
+		}
 		ParseAndCreateDescriptorSetLayouts(Util::GetDescriptorSetLayouts(Root));
 		ParseAndCreateDescriptorSets(Util::GetDescriptorSets(Root));
 

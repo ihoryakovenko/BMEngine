@@ -289,7 +289,20 @@ namespace TransferSystem
 				assert(HasCompletedTasks(&TransferState.TransferTasksQueue));
 
 				TransferTask* Task = GetFirstCompletedTask(&TransferState.TransferTasksQueue);
-				RenderResources::OnResourceLoaded(Task->Handle);
+				switch (Task->Type)
+				{
+					case TaskType::Image:
+						RenderResources::OnImageResourceLoaded(Task->TextureDescr.Handle);
+						break;
+
+					case TaskType::Data:
+						RenderResources::OnBufferResourceLoaded(Task->DataDescr.Handle);
+						break;
+
+					default:
+						assert(false);
+						break;
+				}
 
 				Memory::RingFree(&TransferState.TransferMemory.ControlBlock, Task->DataSize, 1);
 				PopCompletedTask(&TransferState.TransferTasksQueue);
@@ -356,9 +369,9 @@ namespace TransferSystem
 		TransferState.TransferStagingPool = { };
 
 		TransferState.TransferStagingPool.Buffer = VulkanHelper::CreateBuffer(Device, TransferState.MaxTransferSizePerFrame * VulkanHelper::MAX_DRAW_FRAMES,
-			VulkanHelper::BufferUsageFlag::StagingFlag);
+			BufferUsageFlag::StagingFlag);
 		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
-			TransferState.TransferStagingPool.Buffer, VulkanHelper::MemoryPropertyFlag::HostCompatible);
+			TransferState.TransferStagingPool.Buffer, MemoryPropertyFlag::HostCompatible);
 		TransferState.TransferStagingPool.Memory = AllocResult.Memory;
 
 		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, TransferState.TransferStagingPool.Buffer, TransferState.TransferStagingPool.Memory, 0));

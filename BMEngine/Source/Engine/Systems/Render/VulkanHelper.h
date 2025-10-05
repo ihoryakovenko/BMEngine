@@ -9,6 +9,8 @@
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 
+#include "RenderInterface.h"
+
 struct GLFWwindow;
 
 #define VK_KHR_WIN32_SURFACE_EXTENSION_NAME "VK_KHR_win32_surface"
@@ -26,29 +28,6 @@ namespace VulkanHelper
 	inline constexpr u32 MAX_VERTEX_INPUTS_ATTRIBUTES = 16;
 	inline constexpr u32 MAX_VERTEX_INPUT_BINDINGS = 16;
 	inline constexpr u32 MAX_DRAW_FRAMES = 3;
-
-	enum class BufferUsageFlag
-	{
-		UniformFlag = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		StagingFlag = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		StorageFlag = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VertexFlag = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		IndexFlag = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-		CombinedVertexIndexFlag = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-		InstanceFlag = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-	};
-
-	enum class MemoryPropertyFlag
-	{
-		GPULocal = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		HostCompatible = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-	};
-
-	enum class StageBarrier
-	{
-		Vertex,
-		Fragment
-	};
 
 	struct PhysicalDeviceIndices
 	{
@@ -160,5 +139,5 @@ namespace VulkanHelper
 		VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
 		void* UserData);
 
-	void ApplyStageBarrier(VkBufferMemoryBarrier2* Barrier, StageBarrier Stage);
+	void ApplyStageBarrier(VkBufferMemoryBarrier2* Barrier, StageBarier Stage);
 }

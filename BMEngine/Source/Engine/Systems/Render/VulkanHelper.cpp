@@ -604,17 +604,17 @@ namespace VulkanHelper
 		return VK_FALSE;
 	}
 
-	void ApplyStageBarrier(VkBufferMemoryBarrier2* Barrier, StageBarrier Stage)
+	void ApplyStageBarrier(VkBufferMemoryBarrier2* Barrier, StageBarier Stage)
 	{
 		switch (Stage)
 		{
-			case VulkanHelper::StageBarrier::Vertex:
+			case StageBarier::Vertex:
 				Barrier->srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
 				Barrier->srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
 				Barrier->dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT;
 				Barrier->dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
 				break;
-			case VulkanHelper::StageBarrier::Fragment:
+			case StageBarier::Fragment:
 				Barrier->srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
 				Barrier->srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
 				Barrier->dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;

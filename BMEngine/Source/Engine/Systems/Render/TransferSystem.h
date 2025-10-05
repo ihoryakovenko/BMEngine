@@ -16,6 +16,7 @@ namespace TransferSystem
 	struct ImageTaskDescription
 	{
 		VkImage DstImage;
+		BmRender_ImageResource Handle;
 		u32 Width;
 		u32 Height;
 	};
@@ -24,7 +25,8 @@ namespace TransferSystem
 	{
 		VkBuffer DstBuffer;
 		u64 DstOffset;
-		VulkanHelper::StageBarrier StageBarrier;
+		BmRender_BufferRegion Handle;
+		StageBarier StageBarrier;
 	};
 
 	struct TransferTask
@@ -37,18 +39,11 @@ namespace TransferSystem
 
 		void* RawData;
 		u64 DataSize;
-		BmRender_ResourceHandle Handle;
 		u32 Alignment;
 		TaskType Type;
 	};
 
 	typedef void* TransferMemory;
-
-	struct ResourceTransferMemory
-	{
-		void* Memory;
-		RenderResources::ResourceType Type;
-	};
 
 	void Init();
 	void DeInit();

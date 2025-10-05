@@ -130,33 +130,27 @@ shaders:
   QuadBasedSphereVertex: "./Resources/Shaders/QuadBasedSphere_vert.spv"
   QuadBasedSphereFragment: "./Resources/Shaders/QuadBasedSphere_frag.spv"
 
-storageBuffers:
-  FrameData:
-    name: FrameData
-    bufferUsageFlag: UniformFlag
-    Capacity: 10485760
-    memoryPropertyFlag: host_compatible
-
-  GPUInstances:
-    name: GPUInstances
-    bufferUsageFlag: InstanceFlag
-    memoryPropertyFlag: GPULocal
-    Capacity: 2097152
-    stageBarrier: Fragment
-
-  MaterialBuffer:
-    name: MaterialBuffer
-    bufferUsageFlag: StorageFlag
-    memoryPropertyFlag: GPULocal
-    Capacity: 2097152
-    stageBarrier: Fragment
-
+VertexStageBuffers:
   VertexStageData:
-    name: VertexStageData
-    bufferUsageFlag: CombinedVertexIndexFlag
-    memoryPropertyFlag: GPULocal
     Capacity: 134217728  # 128MB
-    stageBarrier: Vertex
+    UpdateFrequency: Static
+
+InstanceBuffers:
+  GPUInstances:
+    Capacity: 2097152
+    UpdateFrequency: Static
+
+UniformBuffers:
+  FrameData:
+    Capacity: 10485760
+    UpdateFrequency: Dynamic
+    StageBarier: Fragment
+
+StorageBuffers:
+  MaterialBuffer:
+    Capacity: 2097152
+    UpdateFrequency: Static
+    StageBarier: Fragment
 
 DescriptorSetLayouts:
   FrameDataLayout:

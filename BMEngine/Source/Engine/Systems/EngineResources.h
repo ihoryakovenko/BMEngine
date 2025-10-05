@@ -7,6 +7,8 @@
 #include <string>
 #include "Util/EngineTypes.h"
 
+#include "Engine/Systems/Render/RenderInterface.h"
+
 namespace Render
 {
 	struct DrawScene;
@@ -37,8 +39,8 @@ namespace EngineResources
 	struct TextureAsset
 	{
 		std::string TexturePath;
-		u64 RenderImageHandle;
-		u64 RenderViewHandle;
+		BmRender_ImageResource RenderImageHandle;
+		BmRender_ImageViewResource RenderViewHandle;
 		u32 TextureGPUIndex;
 		bool IsCreated;
 	};

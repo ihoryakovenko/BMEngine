@@ -16,6 +16,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "RenderInterface.h"
+
 namespace Render
 {
 	struct ViewProjectionBuffer
@@ -31,11 +33,12 @@ namespace Render
 		u32 IndicesCount;
 		u64 VertexDataSize;
 
-		u64 StaticMeshHandle;
+		BmRender_BufferRegion StaticMeshHandle;
 		u64 InstanceOffset;
 		u32 Instances;
 
-		std::vector<u64> Dependency;
+		std::vector<BmRender_BufferRegion> ResourceDependency;
+		std::vector<BmRender_ImageResource> ImageDependency;
 	};
 
 	struct DrawFrames
@@ -57,9 +60,7 @@ namespace Render
 
 	struct StaticMeshPipeline
 	{
-		VkDescriptorSetLayout ShadowMapArrayLayout;
-
-		u64 EntityLightBufferHandle;
+		BmRender_BufferRegion EntityLightBufferHandle;
 
 		VkImageView ShadowMapArrayImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
@@ -74,7 +75,7 @@ namespace Render
 		StaticMeshPipeline MeshPipeline;
 		VkDescriptorPool DebugUiPool; // TODO: ?
 		Memory::FrameMemory FrameMemory;
-		u64 VpHandle;
+		BmRender_BufferRegion VpHandle;
 	};
 
 	struct PointLight

@@ -22,7 +22,7 @@ namespace EngineResources
 
 		const glm::tvec3<u32> Extent = Texture.extent();
 
-		RenderResources::ImageDescription TextureDescription;
+		BmRender_ImageDescription TextureDescription;
 		TextureDescription.Width = Extent.x;
 		TextureDescription.Height = Extent.y;
 		TextureDescription.Format = Util::GliFormatToVkFormat(Texture.format());
@@ -43,7 +43,7 @@ namespace EngineResources
 		const u64 DefaultAssetId = std::hash<std::string>{ }("Default");
 		const glm::tvec3<u32> DefaultAssetExtent = DefaultTexture.extent();
 
-		RenderResources::ImageDescription DefaultTextureDescription;
+		BmRender_ImageDescription DefaultTextureDescription;
 		DefaultTextureDescription.Width = DefaultAssetExtent.x;
 		DefaultTextureDescription.Height = DefaultAssetExtent.y;
 		DefaultTextureDescription.Format = Util::GliFormatToVkFormat(DefaultTexture.format());
@@ -55,17 +55,17 @@ namespace EngineResources
 		RenderResources::UpdateImageResource(DefaultAsset.RenderImageHandle, &DefaultTextureDescription, DefaultTexture.data());
 		DefaultAsset.RenderViewHandle = RenderResources::CreateImageView(DefaultAsset.RenderImageHandle, DefaultTextureDescription.Format);
 
-		RenderResources::ImageViewBindingDescription DiffuseDescription;
+		BmRender_ImageViewBindingDescription DiffuseDescription;
 		DiffuseDescription.Sampler = "DiffuseTexture";
 		DiffuseDescription.ArrayElement = 0;
 		DiffuseDescription.BindingIndex = 0;
 
-		RenderResources::ImageViewBindingDescription SpecularDescription;
+		BmRender_ImageViewBindingDescription SpecularDescription;
 		SpecularDescription.Sampler = "SpecularTexture";
 		SpecularDescription.ArrayElement = 0;
 		SpecularDescription.BindingIndex = 1;
 
-		RenderResources::ImageViewBindingDescription Descriptions[] = { DiffuseDescription, SpecularDescription };
+		BmRender_ImageViewBindingDescription Descriptions[] = { DiffuseDescription, SpecularDescription };
 
 		RenderResources::BindImageView(DefaultAsset.RenderViewHandle, "BindlesTexturesSet", Descriptions, 2);
 
@@ -105,8 +105,8 @@ namespace EngineResources
 				const u64 VerticesCount = Model.VerticesCounts[i];
 				const u32 IndicesCount = Model.IndicesCounts[i];
 
-				BmRender_ResourceHandle AlbedoTextureHandle = 0;
-				BmRender_ResourceHandle SpecularTextureHandle = 0;
+				BmRender_ImageResource AlbedoTextureHandle = 0;
+				BmRender_ImageResource SpecularTextureHandle = 0;
 				u32 TextureGPUIndex = 0;
 
 				if (Model.Header.MaterialCount > 0)
@@ -128,17 +128,17 @@ namespace EngineResources
 							AlbedoTextureHandle = it->second.RenderImageHandle;
 							SpecularTextureHandle = AlbedoTextureHandle;
 
-							RenderResources::ImageViewBindingDescription DiffuseDescription;
+							BmRender_ImageViewBindingDescription DiffuseDescription;
 							DiffuseDescription.Sampler = "DiffuseTexture";
 							DiffuseDescription.ArrayElement = TexturesGPUIndexCounter;
 							DiffuseDescription.BindingIndex = 0;
 
-							RenderResources::ImageViewBindingDescription SpecularDescription;
+							BmRender_ImageViewBindingDescription SpecularDescription;
 							SpecularDescription.Sampler = "SpecularTexture";
 							SpecularDescription.ArrayElement = TexturesGPUIndexCounter;
 							SpecularDescription.BindingIndex = 1;
 
-							RenderResources::ImageViewBindingDescription Descriptions[] = { DiffuseDescription, SpecularDescription };
+							BmRender_ImageViewBindingDescription Descriptions[] = { DiffuseDescription, SpecularDescription };
 
 							RenderResources::BindImageView(it->second.RenderViewHandle, "BindlesTexturesSet", Descriptions, 2);
 
@@ -166,16 +166,16 @@ namespace EngineResources
 
 				const u64 VertexDataSize = VerticesCount * sizeof(StaticMeshVertex) + IndicesCount * sizeof(u32);
 				
-				BmRender_ResourceHandle MeshHandle = RenderResources::CreateBufferResource(ModelVertexByteOffset, "VertexStageData");
-				RenderResources::UpdateBufferResource(MeshHandle, 0, Model.VertexData + ModelVertexByteOffset, VertexDataSize);
+				BmRender_BufferRegion MeshHandle = RenderResources::CreateBufferRegion(ModelVertexByteOffset, "VertexStageData");
+				RenderResources::UpdateBufferRegion(MeshHandle, 0, Model.VertexData + ModelVertexByteOffset, VertexDataSize);
 
 				Material Mat;
 				Mat.AlbedoTexIndex = TextureGPUIndex;
 				Mat.SpecularTexIndex = TextureGPUIndex;
 				Mat.Shininess = 32.0f;
 
-				const BmRender_ResourceHandle MaterialHandle = RenderResources::CreateBufferResource(MateriaIndex * sizeof(Mat), "MaterialBuffer");
-				RenderResources::UpdateBufferResource(MaterialHandle, 0, &Mat, sizeof(Mat));
+				const BmRender_BufferRegion MaterialHandle = RenderResources::CreateBufferRegion(MateriaIndex * sizeof(Mat), "MaterialBuffer");
+				RenderResources::UpdateBufferRegion(MaterialHandle, 0, &Mat, sizeof(Mat));
 
 				InstanceData Instance;
 				Instance.MaterialIndex = MateriaIndex;
@@ -184,8 +184,8 @@ namespace EngineResources
 				++MateriaIndex;
 
 				const u64 InstanceOffset = InstanceIndex * sizeof(Instance);
-				const BmRender_ResourceHandle InstanceHandle = RenderResources::CreateBufferResource(InstanceOffset, "GPUInstances");
-				RenderResources::UpdateBufferResource(InstanceHandle, 0, &Instance, sizeof(Instance));
+				const BmRender_BufferRegion InstanceHandle = RenderResources::CreateBufferRegion(InstanceOffset, "GPUInstances");
+				RenderResources::UpdateBufferRegion(InstanceHandle, 0, &Instance, sizeof(Instance));
 
 				++InstanceIndex;
 
@@ -199,10 +199,10 @@ namespace EngineResources
 				Entity.StaticMeshHandle = MeshHandle;
 				Entity.Instances = 1;
 				Entity.InstanceOffset = InstanceOffset;
-				Entity.Dependency.push_back(AlbedoTextureHandle);
-				Entity.Dependency.push_back(SpecularTextureHandle);
-				Entity.Dependency.push_back(MaterialHandle);
-				Entity.Dependency.push_back(InstanceHandle);
+				Entity.ImageDependency.push_back(AlbedoTextureHandle);
+				Entity.ImageDependency.push_back(SpecularTextureHandle);
+				Entity.ResourceDependency.push_back(MaterialHandle);
+				Entity.ResourceDependency.push_back(InstanceHandle);
 
 				std::unique_lock Lock(TmpScene->TempLock);
 				TmpScene->DrawEntities.push_back(Entity);
