@@ -8,7 +8,7 @@
 enum class BufferUpdateFrequency
 {
 	Static,
-	Dynamic
+	PerFrame
 };
 
 typedef struct BmRender_BufferRegion_T* BmRender_BufferRegion;
@@ -39,6 +39,12 @@ enum class StageBarier
 	Fragment = 2,
 };
 
+enum class ImageType
+{
+	TransferSampled,
+	DepthSamplad,
+};
+
 struct BmRender_SamplerDescription
 {
 	VkFilter MagFilter;
@@ -63,6 +69,8 @@ struct BmRender_ImageDescription
 	u32 Width;
 	u32 Height;
 	VkFormat Format;
+	u32 ArrayLayers;
+	ImageType Type;
 };
 
 struct BmRender_DescriptorSetBinding
@@ -96,7 +104,10 @@ struct BmRender_ImageViewBindingDescription
 	u64 ArrayElement;
 };
 
-void BmRender_CreateVertexStageBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, std::string& Name);
-void BmRender_CreateInstanceBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, std::string& Name);
-void BmRender_CreateUniformBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, std::string& Name);
-void BmRender_CreateStorageBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, std::string& Name);
+void BmRender_CreateVertexStageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, const std::string& Name);
+void BmRender_CreateInstanceBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, const std::string& Name);
+void BmRender_CreateUniformBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, const std::string& Name);
+void BmRender_CreateStorageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, const std::string& Name);
+
+//BmRender_ImageResource BmRender_CreateSampler2DArray(u32 Width, u32 Height, VkFormat Format, u32 ArrayLayers);
+BmRender_ImageResource BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Format, ImageType Type, u32 ArrayLayers);

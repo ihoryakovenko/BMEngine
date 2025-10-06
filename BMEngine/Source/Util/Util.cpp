@@ -521,15 +521,11 @@ namespace Util
 		return Empty;
 	}
 
-	VkDescriptorSetLayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode)
+	VkDescriptorSetLayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode, u32 BindingIndex)
 	{
 		VkDescriptorSetLayoutBinding OutBinding = { };
 		OutBinding.pImmutableSamplers = nullptr;
-
-		if (!BindingNode["binding"].IsNone())
-		{
-			OutBinding.binding = BindingNode["binding"].As<u32>();
-		}
+		OutBinding.binding = BindingIndex; // Assign binding index automatically
 		
 		if (!BindingNode["descriptorType"].IsNone())
 		{
@@ -585,11 +581,11 @@ namespace Util
 		return Empty;
 	}
 
-	Yaml::Node& GetVertexAttributeFormatNode(Yaml::Node& AttributeNode)
+	Yaml::Node& GetVertexAttributeTypeNode(Yaml::Node& AttributeNode)
 	{
-		if (!AttributeNode["format"].IsNone())
+		if (!AttributeNode["type"].IsNone())
 		{
-			return AttributeNode["format"];
+			return AttributeNode["type"];
 		}
 		assert(false);
 		static Yaml::Node Empty;
@@ -600,13 +596,29 @@ namespace Util
 	{
 		*OutAttribute = { };
 
-		if (!AttributeNode["format"].IsNone())
+		if (!AttributeNode["type"].IsNone())
 		{
-			std::string formatStr = AttributeNode["format"].As<std::string>();
-			OutAttribute->Format = ParseFormat(formatStr.c_str(), formatStr.length());
+			std::string typeStr = AttributeNode["type"].As<std::string>();
+			OutAttribute->Format = ParseShaderTypeToVkFormat(typeStr.c_str(), typeStr.length());
 		}
 
 		*OutAttributeName = ParseNameNode(AttributeNode);
+	}
+
+	void ParseMat4AttributeNode(Yaml::Node& AttributeNode, std::vector<VulkanHelper::VertexAttribute>& OutAttributes, std::vector<std::string>& OutAttributeNames, u32 BaseOffset)
+	{
+		std::string baseName = ParseNameNode(AttributeNode);
+		
+		// Create 4 vec4 attributes for mat4
+		for (u32 i = 0; i < 4; ++i)
+		{
+			VulkanHelper::VertexAttribute attribute = {};
+			attribute.Format = VK_FORMAT_R32G32B32A32_SFLOAT;
+			attribute.Offset = BaseOffset + (i * 16); // Each vec4 is 16 bytes
+			
+			OutAttributes.push_back(attribute);
+			OutAttributeNames.push_back(baseName + std::to_string(i));
+		}
 	}
 
 	VulkanHelper::VertexBinding ParseVertexBindingNode(Yaml::Node& BindingNode)
@@ -1174,13 +1186,16 @@ namespace Util
 		return flags;
 	}
 
-	VkFormat ParseFormat(const char* Value, u32 Length)
+	VkFormat ParseShaderTypeToVkFormat(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::R32_SFLOAT_STRINGS)) return VK_FORMAT_R32_SFLOAT;
-		if (StringMatches(Value, Length, ParseStrings::R32G32_SFLOAT_STRINGS)) return VK_FORMAT_R32G32_SFLOAT;
-		if (StringMatches(Value, Length, ParseStrings::R32G32B32_SFLOAT_STRINGS)) return VK_FORMAT_R32G32B32_SFLOAT;
-		if (StringMatches(Value, Length, ParseStrings::R32G32B32A32_SFLOAT_STRINGS)) return VK_FORMAT_R32G32B32A32_SFLOAT;
-		if (StringMatches(Value, Length, ParseStrings::R32_UINT_STRINGS)) return VK_FORMAT_R32_UINT;
+		if (strncmp(Value, "vec2", Length) == 0) return VK_FORMAT_R32G32_SFLOAT;
+		if (strncmp(Value, "vec3", Length) == 0) return VK_FORMAT_R32G32B32_SFLOAT;
+		if (strncmp(Value, "vec4", Length) == 0) return VK_FORMAT_R32G32B32A32_SFLOAT;
+		if (strncmp(Value, "mat4", Length) == 0) return VK_FORMAT_R32G32B32A32_SFLOAT;
+		if (strncmp(Value, "uint", Length) == 0) return VK_FORMAT_R32_UINT;
+		if (strncmp(Value, "int", Length) == 0) return VK_FORMAT_R32_SINT;
+		if (strncmp(Value, "float", Length) == 0) return VK_FORMAT_R32_SFLOAT;
+		if (strncmp(Value, "double", Length) == 0) return VK_FORMAT_R64_SFLOAT;
 
 		assert(false);
 		return VK_FORMAT_R32_SFLOAT;
@@ -1208,12 +1223,6 @@ namespace Util
 				assert(false);
 				return 4;
 		}
-	}
-
-	u32 CalculateFormatSizeFromString(const char* FormatString, u32 FormatLength)
-	{
-		VkFormat Format = ParseFormat(FormatString, FormatLength);
-		return CalculateFormatSize(Format);
 	}
 
 	Yaml::Node& GetSceneResources(Yaml::Node& Root)
@@ -1252,61 +1261,6 @@ namespace Util
 		return Empty;
 	}
 
-	Yaml::Node& GetMeshBuffers(Yaml::Node& Root)
-	{
-		if (!Root["meshBuffers"].IsNone())
-		{
-			return Root["meshBuffers"];
-		}
-
-		assert(false);
-		static Yaml::Node Empty;
-		return Empty;
-	}
-
-	Yaml::Node& GetVertexStageBuffers(Yaml::Node& Root)
-	{
-		if (!Root["VertexStageBuffers"].IsNone())
-		{
-			return Root["VertexStageBuffers"];
-		}
-
-		static Yaml::Node Empty;
-		return Empty;
-	}
-
-	Yaml::Node& GetInstanceBuffers(Yaml::Node& Root)
-	{
-		if (!Root["InstanceBuffers"].IsNone())
-		{
-			return Root["InstanceBuffers"];
-		}
-
-		static Yaml::Node Empty;
-		return Empty;
-	}
-
-    Yaml::Node& GetUniformBuffers(Yaml::Node& Root)
-    {
-        if (!Root["UniformBuffers"].IsNone())
-        {
-            return Root["UniformBuffers"];
-        }
-
-        static Yaml::Node Empty;
-        return Empty;
-    }
-
-    Yaml::Node& GetStorageBuffers(Yaml::Node& Root)
-    {
-        if (!Root["StorageBuffers"].IsNone())
-        {
-            return Root["StorageBuffers"];
-        }
-
-        static Yaml::Node Empty;
-        return Empty;
-    }
 
 	std::string GetModelPath(Yaml::Node& ModelNode)
 	{
@@ -1595,12 +1549,89 @@ namespace Util
 		{
 			return BufferUpdateFrequency::Static;
 		}
-		else if (strncmp(Value, "Dynamic", Length) == 0)
+		else if (strncmp(Value, "PerFrame", Length) == 0)
 		{
-			return BufferUpdateFrequency::Dynamic;
+			return BufferUpdateFrequency::PerFrame;
 		}
 
 		return BufferUpdateFrequency::Static;
+	}
+
+	ShaderType ParseShaderType(const char* Value, u32 Length)
+	{
+		if (strncmp(Value, "uniform", Length) == 0)
+		{
+			return ShaderType::Uniform;
+		}
+		else if (strncmp(Value, "buffer", Length) == 0)
+		{
+			return ShaderType::Buffer;
+		}
+		else if (strncmp(Value, "sampler2d", Length) == 0 || strncmp(Value, "sampler2D", Length) == 0)
+		{
+			return ShaderType::Sampler2D;
+		}
+		else if (strncmp(Value, "sampler2dArray", Length) == 0 || strncmp(Value, "sampler2DArray", Length) == 0)
+		{
+			return ShaderType::Sampler2DArray;
+		}
+
+		return ShaderType::Sampler2D; // Default fallback
+	}
+
+	std::vector<DescriptorSetLayout> ParseDescriptorSetLayouts(Yaml::Node& DescriptorSetLayoutsNode)
+	{
+		std::vector<DescriptorSetLayout> Layouts;
+		
+		for (auto LayoutIt = DescriptorSetLayoutsNode.Begin(); LayoutIt != DescriptorSetLayoutsNode.End(); LayoutIt++)
+		{
+			DescriptorSetLayout Layout;
+			Layout.Name = (*LayoutIt).first;
+			
+			Yaml::Node& LayoutNode = (*LayoutIt).second;
+			Yaml::Node& BindingsNode = ParseDescriptorSetLayoutNode(LayoutNode);
+			
+			for (auto BindingIt = BindingsNode.Begin(); BindingIt != BindingsNode.End(); BindingIt++)
+			{
+				DescriptorBinding Binding = {};
+				
+				// Parse shader type
+				if (!(*BindingIt).second["type"].IsNone())
+				{
+					std::string typeStr = (*BindingIt).second["type"].As<std::string>();
+					Binding.Type = ParseShaderType(typeStr.c_str(), typeStr.length());
+				}
+				
+				// Parse update frequency
+				if (!(*BindingIt).second["updateFrequency"].IsNone())
+				{
+					std::string freqStr = (*BindingIt).second["updateFrequency"].As<std::string>();
+					Binding.UpdateFrequency = ParseUpdateFrequency(freqStr.c_str(), freqStr.length());
+				}
+				else
+				{
+					Binding.UpdateFrequency = BufferUpdateFrequency::Static;
+				}
+				
+				// Parse stage flags
+				if (!(*BindingIt).second["stages"].IsNone())
+				{
+					std::string value = (*BindingIt).second["stages"].As<std::string>();
+					Binding.StageFlags = ParseShaderStageFlags(value.c_str(), value.length());
+				}
+				else if (!(*BindingIt).second["stageFlags"].IsNone())
+				{
+					std::string value = (*BindingIt).second["stageFlags"].As<std::string>();
+					Binding.StageFlags = ParseShaderStageFlags(value.c_str(), value.length());
+				}
+				
+				Layout.Bindings.push_back(Binding);
+			}
+			
+			Layouts.push_back(Layout);
+		}
+		
+		return Layouts;
 	}
 
 	void ParseShaderBufferFromYaml(Yaml::Node& BufferNode, u64& Capacity, BufferUpdateFrequency& UpdateFrequency, StageBarier& StageBarrier, std::string& OutName)
@@ -1648,10 +1679,12 @@ namespace Util
 		Yaml::Node& BindingsNode = ParseDescriptorSetLayoutNode(DescriptorSetLayoutNode);
 		
 		Bindings.clear();
+		u32 bindingIndex = 0;
 		for (auto BindingIt = BindingsNode.Begin(); BindingIt != BindingsNode.End(); BindingIt++)
 		{
-			VkDescriptorSetLayoutBinding Binding = ParseDescriptorSetLayoutBindingNode((*BindingIt).second);
+			VkDescriptorSetLayoutBinding Binding = ParseDescriptorSetLayoutBindingNode((*BindingIt).second, bindingIndex);
 			Bindings.push_back(Binding);
+			bindingIndex++;
 		}
 		
 		Description.Bindings = Bindings.data();

@@ -63,6 +63,7 @@ namespace RenderResources
 		u64 Capacity;
 		MemoryPropertyFlag PropertyFlag;
 		StageBarier BufferStage;
+		BufferUpdateFrequency UpdateFrequency;
 	};
 
 	void Init(GLFWwindow* WindowHandler);
@@ -72,13 +73,12 @@ namespace RenderResources
 	void CreateShader(const std::string& Name, const u32* Code, u64 CodeSize);
 	void CreateSampler(const std::string& Name, const BmRender_SamplerDescription& Data);
 	void CreateGeometryBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, std::string& Name);
-	void CreateShaderBuffer(u64 Capacity, BufferUpdateFrequency Usage, StageBarier BufferStage, std::string& Name);
 	void CreateDescriptorSetLayout(const std::string& Name, const BmRender_DescriptorSetLayoutDescription& Description);
 	void CreateDescriptorSet(const std::string& Name, const BmRender_DescriptorSetDescription& Description);
 	void CreateGraphicsPipeline(const std::string& Name, const BmRender_PipelineDescription& Description);
 	void CreatePipelineLayout(const std::string& Name, const BmRender_PipelineLayoutDescription& Description);
 
-	void CreateBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, BufferUsageFlag Flag, std::string& Name);
+	void CreateBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, BufferUsageFlag Flag, const std::string& Name);
 
 	BmRender_ImageResource CreateImageResource(BmRender_ImageDescription* Description);
 	BmRender_ImageViewResource CreateImageView(BmRender_ImageResource Handle, VkFormat Format);
@@ -102,6 +102,7 @@ namespace RenderResources
 	VulkanHelper::VertexBinding GetVertexBinding(const std::string& Id);
 	VkPipeline GetPipeline(const std::string& Name);
 	VkPipelineLayout GetPipelineLayout(const std::string& Name);
+	VkImage GetImage(BmRender_ImageResource Handle);
 
 	bool IsBufferResourceReady(BmRender_BufferRegion Handle);
 	bool IsImageResourceReady(BmRender_ImageResource Handle);

@@ -15,6 +15,8 @@
 #include <random>
 #include <mutex>
 
+static BmRender_ImageResource ShadowMapArray;
+
 namespace Render
 {
 	static void InitImGuiPipeline(VkDescriptorPool* ImGuiPool, VulkanCoreContext::VulkanCoreContext* CoreContext, GLFWwindow* Wnd)
@@ -79,7 +81,7 @@ namespace Render
 		{
 			VkImageViewCreateInfo ViewCreateInfo = {};
 			ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-			ViewCreateInfo.image = LightningPass::GetShadowMapArray()[i].Image;
+			ViewCreateInfo.image = RenderResources::GetImage(ShadowMapArray);
 			ViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
 			ViewCreateInfo.format = DepthFormat;
 			ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -89,7 +91,7 @@ namespace Render
 			ViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 			ViewCreateInfo.subresourceRange.baseMipLevel = 0;
 			ViewCreateInfo.subresourceRange.levelCount = 1;
-			ViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+			ViewCreateInfo.subresourceRange.baseArrayLayer = MAX_LIGHT_SOURCES * i;
 			ViewCreateInfo.subresourceRange.layerCount = 2;
 			ViewCreateInfo.pNext = nullptr;
 
@@ -777,8 +779,6 @@ namespace DeferredPass
 
 namespace LightningPass
 {
-	static VulkanInterface::UniformImage ShadowMapArray[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
-
 	static VkDescriptorSetLayout LightSpaceMatrixLayout;
 
 	static VulkanInterface::UniformBuffer LightSpaceMatrixBuffer[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
@@ -797,31 +797,11 @@ namespace LightningPass
 
 		LightSpaceMatrixLayout = RenderResources::GetSetLayout("LightSpaceMatrixLayout");
 
-		VkImageCreateInfo ShadowMapArrayCreateInfo = { };
-		ShadowMapArrayCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		ShadowMapArrayCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-		ShadowMapArrayCreateInfo.extent.depth = 1;
-		ShadowMapArrayCreateInfo.mipLevels = 1;
-		ShadowMapArrayCreateInfo.arrayLayers = 1;
-		ShadowMapArrayCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		ShadowMapArrayCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		ShadowMapArrayCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-		ShadowMapArrayCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		ShadowMapArrayCreateInfo.flags = 0;
-		ShadowMapArrayCreateInfo.format = ColorFormat;
-		ShadowMapArrayCreateInfo.extent.width = DepthViewportExtent.width;
-		ShadowMapArrayCreateInfo.extent.height = DepthViewportExtent.height;
-		ShadowMapArrayCreateInfo.format = DepthFormat;
-		ShadowMapArrayCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-		ShadowMapArrayCreateInfo.arrayLayers = 2;
+		ShadowMapArray = BmRender_CreateImage2DArray(DepthViewportExtent.width, DepthViewportExtent.height, DepthFormat,
+			ImageType::DepthSamplad, MAX_LIGHT_SOURCES * RenderResources::GetCoreContext()->ImagesCount);
 
 		for (u32 i = 0; i < RenderResources::GetCoreContext()->ImagesCount; i++)
 		{
-			vkCreateImage(Device, &ShadowMapArrayCreateInfo, nullptr, &ShadowMapArray[i].Image);
-			VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, ShadowMapArray[i].Image, MemoryPropertyFlag::GPULocal);
-			ShadowMapArray[i].Memory = AllocResult.Memory;
-			VULKAN_CHECK_RESULT(vkBindImageMemory(Device, ShadowMapArray[i].Image, ShadowMapArray[i].Memory, 0));
-
 			const VkDeviceSize LightSpaceMatrixSize = sizeof(glm::mat4);
 
 			VkBufferCreateInfo BufferInfo = { };
@@ -831,7 +811,7 @@ namespace LightningPass
 			BufferInfo.size = LightSpaceMatrixSize;
 
 			LightSpaceMatrixBuffer[i].Buffer = VulkanHelper::CreateBuffer(Device, LightSpaceMatrixSize, BufferUsageFlag::UniformFlag);
-			AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, LightSpaceMatrixBuffer[i].Buffer,
+			VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, LightSpaceMatrixBuffer[i].Buffer,
 				MemoryPropertyFlag::HostCompatible);
 			LightSpaceMatrixBuffer[i].Memory = AllocResult.Memory;
 			vkBindBufferMemory(Device, LightSpaceMatrixBuffer[i].Buffer, LightSpaceMatrixBuffer[i].Memory, 0);
@@ -845,7 +825,7 @@ namespace LightningPass
 
 			VkImageViewCreateInfo ViewCreateInfo1 = { };
 			ViewCreateInfo1.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-			ViewCreateInfo1.image = ShadowMapArray[i].Image;
+			ViewCreateInfo1.image = RenderResources::GetImage(ShadowMapArray);
 			ViewCreateInfo1.viewType = VK_IMAGE_VIEW_TYPE_2D;
 			ViewCreateInfo1.format = DepthFormat;
 			ViewCreateInfo1.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -855,7 +835,7 @@ namespace LightningPass
 			ViewCreateInfo1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 			ViewCreateInfo1.subresourceRange.baseMipLevel = 0;
 			ViewCreateInfo1.subresourceRange.levelCount = 1;
-			ViewCreateInfo1.subresourceRange.baseArrayLayer = 0;
+			ViewCreateInfo1.subresourceRange.baseArrayLayer = MAX_LIGHT_SOURCES * i;
 			ViewCreateInfo1.subresourceRange.layerCount = 1;
 			ViewCreateInfo1.pNext = nullptr;
 
@@ -863,7 +843,7 @@ namespace LightningPass
 
 			VkImageViewCreateInfo ViewCreateInfo2 = { };
 			ViewCreateInfo2.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-			ViewCreateInfo2.image = ShadowMapArray[i].Image;
+			ViewCreateInfo2.image = RenderResources::GetImage(ShadowMapArray);
 			ViewCreateInfo2.viewType = VK_IMAGE_VIEW_TYPE_2D;
 			ViewCreateInfo2.format = DepthFormat;
 			ViewCreateInfo2.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -873,7 +853,7 @@ namespace LightningPass
 			ViewCreateInfo2.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 			ViewCreateInfo2.subresourceRange.baseMipLevel = 0;
 			ViewCreateInfo2.subresourceRange.levelCount = 1;
-			ViewCreateInfo2.subresourceRange.baseArrayLayer = 1;
+			ViewCreateInfo2.subresourceRange.baseArrayLayer = MAX_LIGHT_SOURCES * i + 1;
 			ViewCreateInfo2.subresourceRange.layerCount = 1;
 			ViewCreateInfo2.pNext = nullptr;
 
@@ -940,9 +920,6 @@ namespace LightningPass
 
 			vkDestroyImageView(Device, ShadowMapElement1ImageInterface[i], nullptr);
 			vkDestroyImageView(Device, ShadowMapElement2ImageInterface[i], nullptr);
-
-			vkDestroyImage(Device, ShadowMapArray[i].Image, nullptr);
-			vkFreeMemory(Device, ShadowMapArray[i].Memory, nullptr);
 		}
 	}
 
@@ -961,6 +938,28 @@ namespace LightningPass
 		VkImageView Attachments[2];
 		Attachments[0] = ShadowMapElement1ImageInterface[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 		Attachments[1] = ShadowMapElement2ImageInterface[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
+
+		VkImageMemoryBarrier2 DepthAttachmentTransitionBefore = { };
+		DepthAttachmentTransitionBefore.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		DepthAttachmentTransitionBefore.srcStageMask = VK_PIPELINE_STAGE_2_NONE; // because we're coming from UNDEFINED
+		DepthAttachmentTransitionBefore.srcAccessMask = 0;
+		DepthAttachmentTransitionBefore.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+		DepthAttachmentTransitionBefore.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		DepthAttachmentTransitionBefore.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		DepthAttachmentTransitionBefore.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		DepthAttachmentTransitionBefore.image = RenderResources::GetImage(ShadowMapArray);
+		DepthAttachmentTransitionBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+		DepthAttachmentTransitionBefore.subresourceRange.baseMipLevel = 0;
+		DepthAttachmentTransitionBefore.subresourceRange.levelCount = 1;
+		DepthAttachmentTransitionBefore.subresourceRange.baseArrayLayer = MAX_LIGHT_SOURCES * Render::GetRenderState()->RenderDrawState.CurrentImageIndex;
+		DepthAttachmentTransitionBefore.subresourceRange.layerCount = MAX_LIGHT_SOURCES;
+
+		VkDependencyInfo DependencyInfoBefore = { };
+		DependencyInfoBefore.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+		DependencyInfoBefore.imageMemoryBarrierCount = 1;
+		DependencyInfoBefore.pImageMemoryBarriers = &DepthAttachmentTransitionBefore,
+
+		vkCmdPipelineBarrier2(CmdBuffer, &DependencyInfoBefore);
 
 		for (u32 LightCaster = 0; LightCaster < MAX_LIGHT_SOURCES; ++LightCaster)
 		{
@@ -986,28 +985,6 @@ namespace LightningPass
 			RenderingInfo.colorAttachmentCount = 0;
 			RenderingInfo.pColorAttachments = nullptr;
 			RenderingInfo.pDepthAttachment = &DepthAttachment;
-
-			VkImageMemoryBarrier2 DepthAttachmentTransitionBefore = { };
-			DepthAttachmentTransitionBefore.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-			DepthAttachmentTransitionBefore.srcStageMask = VK_PIPELINE_STAGE_2_NONE; // because we're coming from UNDEFINED
-			DepthAttachmentTransitionBefore.srcAccessMask = 0;
-			DepthAttachmentTransitionBefore.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
-			DepthAttachmentTransitionBefore.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-			DepthAttachmentTransitionBefore.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			DepthAttachmentTransitionBefore.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-			DepthAttachmentTransitionBefore.image = ShadowMapArray[Render::GetRenderState()->RenderDrawState.CurrentImageIndex].Image;
-			DepthAttachmentTransitionBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-			DepthAttachmentTransitionBefore.subresourceRange.baseMipLevel = 0;
-			DepthAttachmentTransitionBefore.subresourceRange.levelCount = 1;
-			DepthAttachmentTransitionBefore.subresourceRange.baseArrayLayer = LightCaster;
-			DepthAttachmentTransitionBefore.subresourceRange.layerCount = 1;
-
-			VkDependencyInfo DependencyInfoBefore = { };
-			DependencyInfoBefore.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-			DependencyInfoBefore.imageMemoryBarrierCount = 1;
-			DependencyInfoBefore.pImageMemoryBarriers = &DepthAttachmentTransitionBefore,
-
-			vkCmdPipelineBarrier2(CmdBuffer, &DependencyInfoBefore);
 
 			vkCmdBeginRendering(CmdBuffer, &RenderingInfo);
 
@@ -1071,12 +1048,12 @@ namespace LightningPass
 
 		DepthAttachmentTransitionAfter.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthAttachmentTransitionAfter.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		DepthAttachmentTransitionAfter.image = ShadowMapArray[Render::GetRenderState()->RenderDrawState.CurrentImageIndex].Image;
+		DepthAttachmentTransitionAfter.image = RenderResources::GetImage(ShadowMapArray);
 		DepthAttachmentTransitionAfter.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		DepthAttachmentTransitionAfter.subresourceRange.baseMipLevel = 0;
 		DepthAttachmentTransitionAfter.subresourceRange.levelCount = 1;
-		DepthAttachmentTransitionAfter.subresourceRange.baseArrayLayer = 0;
-		DepthAttachmentTransitionAfter.subresourceRange.layerCount = 2;
+		DepthAttachmentTransitionAfter.subresourceRange.baseArrayLayer = MAX_LIGHT_SOURCES * Render::GetRenderState()->RenderDrawState.CurrentImageIndex;
+		DepthAttachmentTransitionAfter.subresourceRange.layerCount = MAX_LIGHT_SOURCES;
 		// RELEASE: all depth writes have finished  
 		DepthAttachmentTransitionAfter.srcStageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
 		DepthAttachmentTransitionAfter.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
@@ -1090,11 +1067,6 @@ namespace LightningPass
 		DependencyInfoAfter.pImageMemoryBarriers = &DepthAttachmentTransitionAfter;
 
 		vkCmdPipelineBarrier2(CmdBuffer, &DependencyInfoAfter);
-	}
-
-	VulkanInterface::UniformImage* GetShadowMapArray()
-	{
-		return ShadowMapArray;
 	}
 }
 

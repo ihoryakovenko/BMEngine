@@ -20,6 +20,27 @@
 
 namespace Util
 {
+	enum class ShaderType
+	{
+		Uniform,
+		Buffer,
+		Sampler2D,
+		Sampler2DArray
+	};
+
+	struct DescriptorBinding
+	{
+		ShaderType Type;
+		BufferUpdateFrequency UpdateFrequency;
+		VkShaderStageFlags StageFlags;
+	};
+
+	struct DescriptorSetLayout
+	{
+		std::string Name;
+		std::vector<DescriptorBinding> Bindings;
+	};
+
 	namespace ParseStrings
 	{
 		// Boolean values
@@ -249,7 +270,7 @@ namespace Util
 	Yaml::Node& GetVertices(Yaml::Node& Root);
 	Yaml::Node& GetVertexBindingNode(Yaml::Node& VertexNode);
 	Yaml::Node& GetVertexAttributesNode(Yaml::Node& VertexNode);
-	Yaml::Node& GetVertexAttributeFormatNode(Yaml::Node& AttributeNode);
+	Yaml::Node& GetVertexAttributeTypeNode(Yaml::Node& AttributeNode);
 	Yaml::Node& GetPipelineNode(Yaml::Node& Root);
 	Yaml::Node& GetPipelineShadersNode(Yaml::Node& PipelineNode);
 	Yaml::Node& GetPipelineRasterizationNode(Yaml::Node& PipelineNode);
@@ -266,11 +287,6 @@ namespace Util
 	Yaml::Node& GetSceneResources(Yaml::Node& Root);
 	Yaml::Node& GetTextures(Yaml::Node& Root);
 	Yaml::Node& GetModels(Yaml::Node& Root);
-	Yaml::Node& GetMeshBuffers(Yaml::Node& Root);
-	Yaml::Node& GetVertexStageBuffers(Yaml::Node& Root);
-	Yaml::Node& GetInstanceBuffers(Yaml::Node& Root);
-	Yaml::Node& GetUniformBuffers(Yaml::Node& Root);
-	Yaml::Node& GetStorageBuffers(Yaml::Node& Root);
 
 	void ParseShaderBufferFromYaml(Yaml::Node& BufferNode, u64& Capacity, BufferUpdateFrequency& UpdateFrequency, StageBarier& StageBarrier, std::string& OutName);
 	void ParseGeometryBufferFromYaml(Yaml::Node& BufferNode, u64& Capacity, BufferUpdateFrequency& UpdateFrequency, std::string& OutName);
@@ -281,8 +297,9 @@ namespace Util
 	std::string ParseNameNode(Yaml::Node& Node);
 	std::string ParseShaderNode(Yaml::Node& ShaderNode);
 	BmRender_SamplerDescription ParseSamplerNode(Yaml::Node& SamplerNode);
-	VkDescriptorSetLayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode);
+	VkDescriptorSetLayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode, u32 BindingIndex);
 	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, VulkanHelper::VertexAttribute* OutAttribute, std::string* OutAttributeName);
+	void ParseMat4AttributeNode(Yaml::Node& AttributeNode, std::vector<VulkanHelper::VertexAttribute>& OutAttributes, std::vector<std::string>& OutAttributeNames, u32 BaseOffset);
 	VulkanHelper::VertexBinding ParseVertexBindingNode(Yaml::Node& BindingNode);
 	VkPipelineRasterizationStateCreateInfo ParsePipelineRasterizationNode(Yaml::Node& RasterizationNode);
 	VkPipelineColorBlendStateCreateInfo ParsePipelineColorBlendStateNode(Yaml::Node& ColorBlendStateNode);
@@ -313,16 +330,18 @@ namespace Util
 	VkDescriptorType ParseDescriptorType(const char* Value, u32 Length);
 	VkShaderStageFlags ParseShaderStageFlags(const char* Value, u32 Length);
 
-	VkFormat ParseFormat(const char* Value, u32 Length);
+	VkFormat ParseShaderTypeToVkFormat(const char* Value, u32 Length);
 	VkVertexInputRate ParseVertexInputRate(const char* Value, u32 Length);
 	u32 CalculateFormatSize(VkFormat Format);
-	u32 CalculateFormatSizeFromString(const char* FormatString, u32 FormatLength);
 
 	BufferUsageFlag ParseBufferUsageFlag(const char* Value, u32 Length);
 	MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length);
 	StageBarier ParseStageBarrier(const char* Value, u32 Length);
 	BufferUpdateFrequency ParseUpdateFrequency(const char* Value, u32 Length);
 	std::string GetBufferName(Yaml::Node& BufferNode);
+	
+	ShaderType ParseShaderType(const char* Value, u32 Length);
+	std::vector<DescriptorSetLayout> ParseDescriptorSetLayouts(Yaml::Node& DescriptorSetLayoutsNode);
 	
 	void ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode, BmRender_DescriptorSetLayoutDescription& Description, std::vector<VkDescriptorSetLayoutBinding>& Bindings);
 	void ParseDescriptorSetFromYaml(Yaml::Node& DescriptorSetNode, BmRender_DescriptorSetDescription& Description, std::vector<BmRender_DescriptorSetBinding>& Bindings);

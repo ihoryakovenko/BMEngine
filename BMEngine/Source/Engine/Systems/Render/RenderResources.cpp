@@ -171,15 +171,34 @@ namespace RenderResources
 		ResContext.PipelineLayouts[Name] = PipelineLayout;
 	}
 
-	void CreateBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, BufferUsageFlag Flag, std::string& Name)
+	void CreateBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, BufferUsageFlag Flag, const std::string& Name)
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 		VkPhysicalDevice PhDevice = ResContext.CoreContext.PhysicalDevice;
 
+		MemoryPropertyFlag MemoryFlag = MemoryPropertyFlag::GPULocal;
+
+		if (UpdateFrequency == BufferUpdateFrequency::PerFrame)
+		{
+			MemoryFlag = MemoryPropertyFlag::HostCompatible;
+		}
+
+		if (Flag == BufferUsageFlag::UniformFlag)
+		{
+			VkPhysicalDeviceProperties DeviceProperties;
+			vkGetPhysicalDeviceProperties(PhDevice, &DeviceProperties);
+
+			if (Capacity > DeviceProperties.limits.maxUniformBufferRange)
+			{
+				assert(false);
+			}
+		}
+
 		GPUBuffer NewBuffer = { };
 
 		NewBuffer.Capacity = Capacity;
-		NewBuffer.PropertyFlag = UpdateFrequency == BufferUpdateFrequency::Static ? MemoryPropertyFlag::GPULocal : MemoryPropertyFlag::HostCompatible;
+		NewBuffer.UpdateFrequency = UpdateFrequency;
+		NewBuffer.PropertyFlag = MemoryFlag;
 		NewBuffer.BufferStage = BufferStage;
 		NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, Capacity, Flag);
 
@@ -209,6 +228,11 @@ namespace RenderResources
 			return it->second;
 		}
 		return VK_NULL_HANDLE;
+	}
+
+	VkImage GetImage(BmRender_ImageResource Handle)
+	{
+		return ResContext.Images.Data[(u64)Handle].Image;
 	}
 
 	void DeInit()
@@ -338,31 +362,6 @@ namespace RenderResources
 		NewBuffer.PropertyFlag = UpdateFrequency == BufferUpdateFrequency::Static ? MemoryPropertyFlag::GPULocal : MemoryPropertyFlag::HostCompatible;
 		NewBuffer.BufferStage = StageBarier::Vertex;
 		NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, Capacity, BufferUsageFlag::CombinedVertexIndexFlag);
-
-		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhDevice, Device, NewBuffer.Buffer, NewBuffer.PropertyFlag);
-		NewBuffer.Memory = AllocResult.Memory;
-
-		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, NewBuffer.Buffer, NewBuffer.Memory, 0));
-
-		ResContext.StorageBuffers[Name] = NewBuffer;
-	}
-
-	void CreateShaderBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, std::string& Name)
-	{
-		VkDevice Device = ResContext.CoreContext.LogicalDevice;
-		VkPhysicalDevice PhDevice = ResContext.CoreContext.PhysicalDevice;
-
-		VkPhysicalDeviceProperties DeviceProperties;
-		vkGetPhysicalDeviceProperties(PhDevice, &DeviceProperties);
-
-		const BufferUsageFlag UsageFlag = Capacity <= DeviceProperties.limits.maxUniformBufferRange ? BufferUsageFlag::UniformFlag : BufferUsageFlag::StorageFlag;
-
-		GPUBuffer NewBuffer = { };
-
-		NewBuffer.Capacity = Capacity;
-		NewBuffer.PropertyFlag = UpdateFrequency == BufferUpdateFrequency::Static ? MemoryPropertyFlag::GPULocal : MemoryPropertyFlag::HostCompatible;
-		NewBuffer.BufferStage = BufferStage;
-		NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, Capacity, UsageFlag);
 
 		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhDevice, Device, NewBuffer.Buffer, NewBuffer.PropertyFlag);
 		NewBuffer.Memory = AllocResult.Memory;
@@ -530,6 +529,23 @@ namespace RenderResources
 		ImageResource* Resource = &ResContext.Images.Data[ResContext.Images.Count];
 		Resource->IsLoaded = false;
 
+		VkImageUsageFlags Usage;
+
+		switch (Description->Type)
+		{
+			case ImageType::TransferSampled:
+				Usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+				break;
+
+			case ImageType::DepthSamplad:
+				Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+				break;
+
+			default:
+				assert(false);
+				break;
+		}
+
 		VkImageCreateInfo ImageCreateInfo = { };
 		ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -537,11 +553,11 @@ namespace RenderResources
 		ImageCreateInfo.extent.height = Description->Height;
 		ImageCreateInfo.extent.depth = 1;
 		ImageCreateInfo.mipLevels = 1;
-		ImageCreateInfo.arrayLayers = 1;
+		ImageCreateInfo.arrayLayers = Description->ArrayLayers;
 		ImageCreateInfo.format = Description->Format;
 		ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		ImageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		ImageCreateInfo.usage = Usage;
 		ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 		ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		ImageCreateInfo.flags = 0;

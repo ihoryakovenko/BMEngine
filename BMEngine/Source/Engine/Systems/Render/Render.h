@@ -177,8 +177,6 @@ namespace LightningPass
 	void DeInit();
 
 	void Draw(Render::DrawScene* Scene);
-
-	VulkanInterface::UniformImage* GetShadowMapArray();
 }
 
 namespace MainPass

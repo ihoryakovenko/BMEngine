@@ -4,40 +4,34 @@ vertices:
       inputRate: VERTEX
     attributes:
       - name: Position
-        format: R32G32B32_SFLOAT
+        type: vec3
       - name: TextureCoords
-        format: R32G32_SFLOAT
+        type: vec2
       - name: Normal
-        format: R32G32B32_SFLOAT
+        type: vec3
 
   StaticMeshInstance:
     binding:
       inputRate: INSTANCE
     attributes:
-      - name: InstanceModel0
-        format: R32G32B32A32_SFLOAT
-      - name: InstanceModel1
-        format: R32G32B32A32_SFLOAT
-      - name: InstanceModel2
-        format: R32G32B32A32_SFLOAT
-      - name: InstanceModel3
-        format: R32G32B32A32_SFLOAT
+      - name: InstanceModel
+        type: mat4
       - name: InstanceMaterialIndex
-        format: R32_UINT
+        type: uint
 
   SkyBoxVertex:
     binding:
       inputRate: VERTEX
     attributes:
       - name: Position
-        format: R32G32B32_SFLOAT
+        type: vec3
 
   TerrainVertex:
     binding:
       inputRate: VERTEX
     attributes:
       - name: Altitude
-        format: R32_SFLOAT
+        type: float
 
 samplers:
   ShadowMap:
@@ -130,78 +124,48 @@ shaders:
   QuadBasedSphereVertex: "./Resources/Shaders/QuadBasedSphere_vert.spv"
   QuadBasedSphereFragment: "./Resources/Shaders/QuadBasedSphere_frag.spv"
 
-VertexStageBuffers:
-  VertexStageData:
-    Capacity: 134217728  # 128MB
-    UpdateFrequency: Static
-
-InstanceBuffers:
-  GPUInstances:
-    Capacity: 2097152
-    UpdateFrequency: Static
-
-UniformBuffers:
-  FrameData:
-    Capacity: 10485760
-    UpdateFrequency: Dynamic
-    StageBarier: Fragment
-
-StorageBuffers:
-  MaterialBuffer:
-    Capacity: 2097152
-    UpdateFrequency: Static
-    StageBarier: Fragment
-
 DescriptorSetLayouts:
   FrameDataLayout:
     bindings:
-      - binding: 0
-        descriptorType: UNIFORM_BUFFER_DYNAMIC
-        descriptorCount: 1
-        stageFlags: VERTEX_BIT | FRAGMENT_BIT
+      - type: uniform
+        updateFrequency: PerFrame
+        stages: VERTEX | FRAGMENT
 
   ShadowMapArrayLayout:
     bindings:
-      - binding: 0
-        descriptorType: COMBINED_IMAGE_SAMPLER
-        descriptorCount: 1
-        stageFlags: VERTEX_BIT | FRAGMENT_BIT
+      - type: sampler2d
+        updateFrequency: Static
+        stages: VERTEX | FRAGMENT
 
   MaterialLayout:
     bindings:
-      - binding: 0
-        descriptorType: STORAGE_BUFFER
-        descriptorCount: 1
-        stageFlags: VERTEX_BIT | FRAGMENT_BIT
+      - type: buffer
+        updateFrequency: Static
+        stages: VERTEX | FRAGMENT
 
   BindlesTexturesLayout:
     bindings:
-      - binding: 0
-        descriptorType: COMBINED_IMAGE_SAMPLER
-        descriptorCount: 64
-        stageFlags: FRAGMENT_BIT
-      - binding: 1
-        descriptorType: COMBINED_IMAGE_SAMPLER
-        descriptorCount: 64
-        stageFlags: FRAGMENT_BIT
+      - type: sampler2DArray
+        updateFrequency: Static
+        stages: FRAGMENT
+      - type: sampler2DArray
+        updateFrequency: Static
+        stages: FRAGMENT
 
   MainPassOutputLayout:
     bindings:
-      - binding: 0
-        descriptorType: COMBINED_IMAGE_SAMPLER
-        descriptorCount: 1
-        stageFlags: FRAGMENT_BIT
-      - binding: 1
-        descriptorType: COMBINED_IMAGE_SAMPLER
-        descriptorCount: 1
-        stageFlags: FRAGMENT_BIT
+      - type: sampler2d
+        updateFrequency: Static
+        stages: FRAGMENT
+      - type: sampler2d
+        updateFrequency: Static
+        stages: FRAGMENT
 
   LightSpaceMatrixLayout:
     bindings:
-      - binding: 0
-        descriptorType: UNIFORM_BUFFER
-        descriptorCount: 1
-        stageFlags: VERTEX_BIT | FRAGMENT_BIT
+      - type: uniform
+        updateFrequency: Static
+        stages: VERTEX | FRAGMENT
 
 DescriptorSets:
   VpSet:

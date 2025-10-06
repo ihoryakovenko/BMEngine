@@ -26,6 +26,8 @@ namespace EngineResources
 		TextureDescription.Width = Extent.x;
 		TextureDescription.Height = Extent.y;
 		TextureDescription.Format = Util::GliFormatToVkFormat(Texture.format());
+		TextureDescription.ArrayLayers = 1;
+		TextureDescription.Type = ImageType::TransferSampled;
 
 		Asset.RenderImageHandle =  RenderResources::CreateImageResource(&TextureDescription);
 		RenderResources::UpdateImageResource(Asset.RenderImageHandle, &TextureDescription, Texture.data());
@@ -47,6 +49,8 @@ namespace EngineResources
 		DefaultTextureDescription.Width = DefaultAssetExtent.x;
 		DefaultTextureDescription.Height = DefaultAssetExtent.y;
 		DefaultTextureDescription.Format = Util::GliFormatToVkFormat(DefaultTexture.format());
+		DefaultTextureDescription.ArrayLayers = 1;
+		DefaultTextureDescription.Type = ImageType::TransferSampled;
 
 		TextureAsset DefaultAsset;
 		DefaultAsset.RenderImageHandle = RenderResources::CreateImageResource(&DefaultTextureDescription);
