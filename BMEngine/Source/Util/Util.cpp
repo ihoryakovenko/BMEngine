@@ -521,27 +521,24 @@ namespace Util
 		return Empty;
 	}
 
-	VkDescriptorSetLayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode, u32 BindingIndex)
+	BmRender_LayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode)
 	{
-		VkDescriptorSetLayoutBinding OutBinding = { };
-		OutBinding.pImmutableSamplers = nullptr;
-		OutBinding.binding = BindingIndex; // Assign binding index automatically
-		
+		BmRender_LayoutBinding OutBinding = { };		
 		if (!BindingNode["descriptorType"].IsNone())
 		{
 			std::string value = BindingNode["descriptorType"].As<std::string>();
-			OutBinding.descriptorType = ParseDescriptorType(value.c_str(), value.length());
+			OutBinding.DescriptorType = ParseDescriptorType(value.c_str(), value.length());
 		}
 		
 		if (!BindingNode["descriptorCount"].IsNone())
 		{
-			OutBinding.descriptorCount = BindingNode["descriptorCount"].As<u32>();
+			OutBinding.DescriptorCount = BindingNode["descriptorCount"].As<u32>();
 		}
 		
 		if (!BindingNode["stageFlags"].IsNone())
 		{
 			std::string value = BindingNode["stageFlags"].As<std::string>();
-			OutBinding.stageFlags = ParseShaderStageFlags(value.c_str(), value.length());
+			OutBinding.StageFlags = ParseShaderStageFlags(value.c_str(), value.length());
 		}
 		
 		return OutBinding;
@@ -1674,22 +1671,19 @@ namespace Util
 		return {};
 	}
 
-	void ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode, BmRender_DescriptorSetLayoutDescription& Description, std::vector<VkDescriptorSetLayoutBinding>& Bindings)
+	void ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode, BmRender_DescriptorSetLayoutDescription& Description, std::vector<BmRender_LayoutBinding>& Bindings)
 	{
 		Yaml::Node& BindingsNode = ParseDescriptorSetLayoutNode(DescriptorSetLayoutNode);
 		
 		Bindings.clear();
-		u32 bindingIndex = 0;
 		for (auto BindingIt = BindingsNode.Begin(); BindingIt != BindingsNode.End(); BindingIt++)
 		{
-			VkDescriptorSetLayoutBinding Binding = ParseDescriptorSetLayoutBindingNode((*BindingIt).second, bindingIndex);
+			BmRender_LayoutBinding Binding = ParseDescriptorSetLayoutBindingNode((*BindingIt).second);
 			Bindings.push_back(Binding);
-			bindingIndex++;
 		}
 		
 		Description.Bindings = Bindings.data();
 		Description.BindingsCount = static_cast<u32>(Bindings.size());
-		Description.Next = nullptr;
 	}
 
 	void ParseDescriptorSetFromYaml(Yaml::Node& DescriptorSetNode, BmRender_DescriptorSetDescription& Description, std::vector<BmRender_DescriptorSetBinding>& Bindings)
@@ -1706,17 +1700,7 @@ namespace Util
 				BmRender_DescriptorSetBinding Binding = {};
 				Binding.Buffer = (*BindingIt).second["buffer"].As<std::string>();
 				Binding.Binding = (*BindingIt).second["binding"].As<u32>();
-				
-				if (!(*BindingIt).second["descriptorType"].IsNone())
-				{
-					std::string descriptorTypeStr = (*BindingIt).second["descriptorType"].As<std::string>();
-					Binding.DescriptorType = ParseDescriptorType(descriptorTypeStr.c_str(), descriptorTypeStr.length());
-				}
-				else
-				{
-					assert(false);
-				}
-				
+								
 				if (!(*BindingIt).second["offset"].IsNone())
 				{
 					Binding.Offset = (*BindingIt).second["offset"].As<u64>();

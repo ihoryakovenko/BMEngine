@@ -27,6 +27,28 @@ void BmRender_CreateStorageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequenc
 	RenderResources::CreateBuffer(Size, UpdateFrequency, BufferStage, BufferUsageFlag::StorageFlag, Name);
 }
 
+BmRender_ImageViewResource BmRender_CreateImageView2D(BmRender_ImageResource Handle, VkImageAspectFlags AspectFlags)
+{
+	return RenderResources::CreateImageView(Handle, 0, 1, VK_IMAGE_VIEW_TYPE_2D, AspectFlags);
+}
+
+BmRender_ImageViewResource BmRender_CreateImageView2DArray(BmRender_ImageResource Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags)
+{
+	return RenderResources::CreateImageView(Handle, BaseLayer, LayerCount, VK_IMAGE_VIEW_TYPE_2D_ARRAY, AspectFlags);
+}
+
+BmRender_ImageResource BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, ImageType Type)
+{
+	BmRender_ImageDescription Descr;
+	Descr.ArrayLayers = 1;
+	Descr.Format = Format;
+	Descr.Width = Width;
+	Descr.Height = Height;
+	Descr.Type = Type;
+
+	return RenderResources::CreateImageResource(&Descr);
+}
+
 BmRender_ImageResource BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Format, ImageType Type, u32 ArrayLayers)
 {
 	BmRender_ImageDescription Descr;
@@ -39,14 +61,3 @@ BmRender_ImageResource BmRender_CreateImage2DArray(u32 Width, u32 Height, VkForm
 	return RenderResources::CreateImageResource(&Descr);
 }
 
-//BmRender_ImageResource BmRender_CreateSampler2DArray(u32 Width, u32 Height, VkFormat Format, u32 ArrayLayers)
-//{
-//	BmRender_ImageDescription Descr;
-//	Descr.ArrayLayers = ArrayLayers;
-//	Descr.Format = Format;
-//	Descr.Width = Width;
-//	Descr.Height = Height;
-// VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
-//
-//	return RenderResources::CreateImageResource(&Descr);
-//}

@@ -20,6 +20,13 @@ namespace VulkanCoreContext
 
 namespace RenderResources
 {
+	struct DescriptorSetLayout
+	{
+		VkDescriptorSetLayout Layout;
+		u32 BindingsIndex;
+		u32 BindingsCount;
+	};
+
 	struct BmRender_PipelineLayoutDescription
 	{
 		u32 SetLayoutCount;
@@ -81,7 +88,7 @@ namespace RenderResources
 	void CreateBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, BufferUsageFlag Flag, const std::string& Name);
 
 	BmRender_ImageResource CreateImageResource(BmRender_ImageDescription* Description);
-	BmRender_ImageViewResource CreateImageView(BmRender_ImageResource Handle, VkFormat Format);
+	BmRender_ImageViewResource CreateImageView(BmRender_ImageResource Handle, u32 BaseArrayLayer, u32 LayerCount, VkImageViewType ViewType, VkImageAspectFlags AspectFlags);
 	BmRender_BufferRegion CreateBufferRegion(u64 BufferOffset, const std::string& BufferName);
 
 	void BindImageView(BmRender_ImageViewResource Handle, const std::string& Set, const BmRender_ImageViewBindingDescription* BindingDescriptions, u32 Count);
@@ -94,7 +101,7 @@ namespace RenderResources
 
 	VulkanCoreContext::VulkanCoreContext* GetCoreContext();
 	VkSampler GetSampler(const std::string& Id);
-	VkDescriptorSetLayout GetSetLayout(const std::string& Id);
+	DescriptorSetLayout* GetSetLayout(const std::string& Id);
 	VkShaderModule GetShader(const std::string& Id);
 	VkDescriptorPool GetDescriptorPool(const std::string& Id);
 	VkDescriptorSet GetDescriptorSet(const std::string& Id);
@@ -103,6 +110,7 @@ namespace RenderResources
 	VkPipeline GetPipeline(const std::string& Name);
 	VkPipelineLayout GetPipelineLayout(const std::string& Name);
 	VkImage GetImage(BmRender_ImageResource Handle);
+	VkImageView GetImageView(BmRender_ImageViewResource Handle);
 
 	bool IsBufferResourceReady(BmRender_BufferRegion Handle);
 	bool IsImageResourceReady(BmRender_ImageResource Handle);

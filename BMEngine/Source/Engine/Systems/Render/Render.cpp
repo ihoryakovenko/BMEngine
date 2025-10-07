@@ -75,30 +75,14 @@ namespace Render
 		const VkDeviceSize LightBufferSize = sizeof(Render::LightBuffer);
 		MeshPipeline->EntityLightBufferHandle = RenderResources::CreateBufferRegion(384, "FrameData");
 
-		VkDescriptorSetLayout Layout = RenderResources::GetSetLayout("ShadowMapArrayLayout");
+		VkDescriptorSetLayout Layout = RenderResources::GetSetLayout("ShadowMapArrayLayout")->Layout;
 
 		for (u32 i = 0; i < RenderResources::GetCoreContext()->ImagesCount; i++)
 		{
-			VkImageViewCreateInfo ViewCreateInfo = {};
-			ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-			ViewCreateInfo.image = RenderResources::GetImage(ShadowMapArray);
-			ViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-			ViewCreateInfo.format = DepthFormat;
-			ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-			ViewCreateInfo.subresourceRange.baseMipLevel = 0;
-			ViewCreateInfo.subresourceRange.levelCount = 1;
-			ViewCreateInfo.subresourceRange.baseArrayLayer = MAX_LIGHT_SOURCES * i;
-			ViewCreateInfo.subresourceRange.layerCount = 2;
-			ViewCreateInfo.pNext = nullptr;
-
-			VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo, nullptr, &MeshPipeline->ShadowMapArrayImageInterface[i]));
-
+			MeshPipeline->ShadowMapArrayImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_LIGHT_SOURCES * i, MAX_LIGHT_SOURCES, VK_IMAGE_ASPECT_DEPTH_BIT);
+			
 			VkDescriptorImageInfo ShadowMapArrayImageInfo;
-			ShadowMapArrayImageInfo.imageView = MeshPipeline->ShadowMapArrayImageInterface[i];
+			ShadowMapArrayImageInfo.imageView = RenderResources::GetImageView(MeshPipeline->ShadowMapArrayImageInterface[i]);
 			ShadowMapArrayImageInfo.sampler = ShadowMapArraySampler;
 			ShadowMapArrayImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
@@ -125,11 +109,11 @@ namespace Render
 
 		VkDescriptorSetLayout StaticMeshDescriptorLayouts[] =
 		{
-			RenderResources::GetSetLayout("FrameDataLayout"),
-			RenderResources::GetSetLayout("BindlesTexturesLayout"),
-			RenderResources::GetSetLayout("FrameDataLayout"),
-			RenderResources::GetSetLayout("MaterialLayout"),
-			RenderResources::GetSetLayout("ShadowMapArrayLayout")
+			RenderResources::GetSetLayout("FrameDataLayout")->Layout,
+			RenderResources::GetSetLayout("BindlesTexturesLayout")->Layout,
+			RenderResources::GetSetLayout("FrameDataLayout")->Layout,
+			RenderResources::GetSetLayout("MaterialLayout")->Layout,
+			RenderResources::GetSetLayout("ShadowMapArrayLayout")->Layout
 		};
 
 		const u32 StaticMeshDescriptorLayoutCount = sizeof(StaticMeshDescriptorLayouts) / sizeof(StaticMeshDescriptorLayouts[0]);
@@ -161,10 +145,6 @@ namespace Render
 
 	static void DeInitStaticMeshPipeline(VkDevice Device, StaticMeshPipeline* MeshPipeline)
 	{
-		for (u32 i = 0; i < RenderResources::GetCoreContext()->ImagesCount; i++)
-		{
-			vkDestroyImageView(Device, MeshPipeline->ShadowMapArrayImageInterface[i], nullptr);
-		}
 	}
 
 	static void DrawStaticMeshes(VkDevice Device, VkCommandBuffer CmdBuffer, StaticMeshPipeline* MeshPipeline, DrawScene* Scene)
@@ -448,7 +428,7 @@ namespace DeferredPass
 		AttachmentData.DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
 		AttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
-		DeferredInputLayout = RenderResources::GetSetLayout("MainPassOutputLayout");
+		DeferredInputLayout = RenderResources::GetSetLayout("MainPassOutputLayout")->Layout;
 
 		VkImageCreateInfo DeferredInputDepthUniformCreateInfo = { };
 		DeferredInputDepthUniformCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -795,7 +775,7 @@ namespace LightningPass
 		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 		VkPhysicalDevice PhysicalDevice = RenderResources::GetCoreContext()->PhysicalDevice;
 
-		LightSpaceMatrixLayout = RenderResources::GetSetLayout("LightSpaceMatrixLayout");
+		LightSpaceMatrixLayout = RenderResources::GetSetLayout("LightSpaceMatrixLayout")->Layout;
 
 		ShadowMapArray = BmRender_CreateImage2DArray(DepthViewportExtent.width, DepthViewportExtent.height, DepthFormat,
 			ImageType::DepthSamplad, MAX_LIGHT_SOURCES * RenderResources::GetCoreContext()->ImagesCount);
@@ -832,7 +812,7 @@ namespace LightningPass
 			ViewCreateInfo1.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 			ViewCreateInfo1.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
 			ViewCreateInfo1.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ViewCreateInfo1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+			ViewCreateInfo1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 			ViewCreateInfo1.subresourceRange.baseMipLevel = 0;
 			ViewCreateInfo1.subresourceRange.levelCount = 1;
 			ViewCreateInfo1.subresourceRange.baseArrayLayer = MAX_LIGHT_SOURCES * i;
@@ -850,7 +830,7 @@ namespace LightningPass
 			ViewCreateInfo2.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 			ViewCreateInfo2.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
 			ViewCreateInfo2.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ViewCreateInfo2.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+			ViewCreateInfo2.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 			ViewCreateInfo2.subresourceRange.baseMipLevel = 0;
 			ViewCreateInfo2.subresourceRange.levelCount = 1;
 			ViewCreateInfo2.subresourceRange.baseArrayLayer = MAX_LIGHT_SOURCES * i + 1;
@@ -1109,7 +1089,7 @@ namespace MainPass
 		const u32 SkyBoxDescriptorLayoutCount = 2;
 		VkDescriptorSetLayout SkyBoxDescriptorLayouts[SkyBoxDescriptorLayoutCount] =
 		{
-			RenderResources::GetSetLayout("FrameDataLayout"),
+			RenderResources::GetSetLayout("FrameDataLayout")->Layout,
 			SkyBoxLayout,
 		};
 
@@ -1319,9 +1299,9 @@ namespace TerrainRender
 
 		VkDescriptorSetLayout TerrainDescriptorLayouts[] =
 		{
-			RenderResources::GetSetLayout("FrameDataLayout"),
-			RenderResources::GetSetLayout("BindlesTexturesLayout"),
-			RenderResources::GetSetLayout("MaterialLayout"),
+			RenderResources::GetSetLayout("FrameDataLayout")->Layout,
+			RenderResources::GetSetLayout("BindlesTexturesLayout")->Layout,
+			RenderResources::GetSetLayout("MaterialLayout")->Layout,
 		};
 
 		const u32 LayoutsCount = sizeof(TerrainDescriptorLayouts) / sizeof(TerrainDescriptorLayouts[0]);

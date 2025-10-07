@@ -62,7 +62,7 @@ namespace Render
 	{
 		BmRender_BufferRegion EntityLightBufferHandle;
 
-		VkImageView ShadowMapArrayImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+		BmRender_ImageViewResource ShadowMapArrayImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		VkPushConstantRange PushConstants;
 

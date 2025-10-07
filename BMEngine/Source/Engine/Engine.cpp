@@ -113,45 +113,43 @@ namespace Engine
 		for (const auto& Layout : Layouts)
 		{
 			BmRender_DescriptorSetLayoutDescription Description = {};
-			std::vector<VkDescriptorSetLayoutBinding> Bindings;
+			std::vector<BmRender_LayoutBinding> Bindings;
 			
 			// Convert our simple structs to Vulkan structures
 			for (u32 i = 0; i < Layout.Bindings.size(); ++i)
 			{
 				const auto& Binding = Layout.Bindings[i];
 				
-				VkDescriptorSetLayoutBinding VkBinding = {};
-				VkBinding.binding = i;
-				VkBinding.pImmutableSamplers = nullptr;
-				VkBinding.stageFlags = Binding.StageFlags;
+				BmRender_LayoutBinding VkBinding = {};
+				VkBinding.StageFlags = Binding.StageFlags;
 				
 				// Map shader types to Vulkan descriptor types
 				switch (Binding.Type)
 				{
 					case Util::ShaderType::Uniform:
-						VkBinding.descriptorType = (Binding.UpdateFrequency == BufferUpdateFrequency::PerFrame) 
+						VkBinding.DescriptorType = (Binding.UpdateFrequency == BufferUpdateFrequency::PerFrame) 
 							? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC 
 							: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 
-						VkBinding.descriptorCount = 1;
+						VkBinding.DescriptorCount = 1;
 
 						break;
 					case Util::ShaderType::Buffer:
-						VkBinding.descriptorType = (Binding.UpdateFrequency == BufferUpdateFrequency::PerFrame)
+						VkBinding.DescriptorType = (Binding.UpdateFrequency == BufferUpdateFrequency::PerFrame)
 							? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC
 							: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 
-						VkBinding.descriptorCount = 1;
+						VkBinding.DescriptorCount = 1;
 
 						break;
 					case Util::ShaderType::Sampler2D:
-						VkBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-						VkBinding.descriptorCount = 1;
+						VkBinding.DescriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+						VkBinding.DescriptorCount = 1;
 
 						break;
 					case Util::ShaderType::Sampler2DArray:
-						VkBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-						VkBinding.descriptorCount = 64;
+						VkBinding.DescriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+						VkBinding.DescriptorCount = 64;
 
 						break;
 				}
@@ -161,7 +159,6 @@ namespace Engine
 			
 			Description.Bindings = Bindings.data();
 			Description.BindingsCount = static_cast<u32>(Bindings.size());
-			Description.Next = nullptr;
 			
 			RenderResources::CreateDescriptorSetLayout(Layout.Name, Description);
 		}

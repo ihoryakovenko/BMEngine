@@ -297,7 +297,7 @@ namespace Util
 	std::string ParseNameNode(Yaml::Node& Node);
 	std::string ParseShaderNode(Yaml::Node& ShaderNode);
 	BmRender_SamplerDescription ParseSamplerNode(Yaml::Node& SamplerNode);
-	VkDescriptorSetLayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode, u32 BindingIndex);
+	BmRender_LayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode);
 	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, VulkanHelper::VertexAttribute* OutAttribute, std::string* OutAttributeName);
 	void ParseMat4AttributeNode(Yaml::Node& AttributeNode, std::vector<VulkanHelper::VertexAttribute>& OutAttributes, std::vector<std::string>& OutAttributeNames, u32 BaseOffset);
 	VulkanHelper::VertexBinding ParseVertexBindingNode(Yaml::Node& BindingNode);
@@ -343,7 +343,7 @@ namespace Util
 	ShaderType ParseShaderType(const char* Value, u32 Length);
 	std::vector<DescriptorSetLayout> ParseDescriptorSetLayouts(Yaml::Node& DescriptorSetLayoutsNode);
 	
-	void ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode, BmRender_DescriptorSetLayoutDescription& Description, std::vector<VkDescriptorSetLayoutBinding>& Bindings);
+	void ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode, BmRender_DescriptorSetLayoutDescription& Description, std::vector<BmRender_LayoutBinding>& Bindings);
 	void ParseDescriptorSetFromYaml(Yaml::Node& DescriptorSetNode, BmRender_DescriptorSetDescription& Description, std::vector<BmRender_DescriptorSetBinding>& Bindings);
 	RenderResources::BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, VkPipelineLayout PipelineLayout, const VulkanHelper::PipelineResourceInfo& ResourceInfo);
 	

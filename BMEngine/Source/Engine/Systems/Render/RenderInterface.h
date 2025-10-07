@@ -73,11 +73,17 @@ struct BmRender_ImageDescription
 	ImageType Type;
 };
 
+struct BmRender_LayoutBinding
+{
+	VkDescriptorType DescriptorType;
+	u32 DescriptorCount;
+	VkShaderStageFlags StageFlags;
+};
+
 struct BmRender_DescriptorSetBinding
 {
 	std::string Buffer;
 	u32 Binding;
-	VkDescriptorType DescriptorType;
 	u64 Offset;
 	u64 Range;
 };
@@ -92,9 +98,8 @@ struct BmRender_DescriptorSetDescription
 
 struct BmRender_DescriptorSetLayoutDescription
 {
-	const VkDescriptorSetLayoutBinding* Bindings;
+	const BmRender_LayoutBinding* Bindings;
 	u64 BindingsCount;
-	const void* Next;
 };
 
 struct BmRender_ImageViewBindingDescription
@@ -109,5 +114,8 @@ void BmRender_CreateInstanceBuffer(u64 Size, BufferUpdateFrequency UpdateFrequen
 void BmRender_CreateUniformBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, const std::string& Name);
 void BmRender_CreateStorageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, const std::string& Name);
 
-//BmRender_ImageResource BmRender_CreateSampler2DArray(u32 Width, u32 Height, VkFormat Format, u32 ArrayLayers);
+BmRender_ImageResource BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, ImageType Type);
 BmRender_ImageResource BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Format, ImageType Type, u32 ArrayLayers);
+
+BmRender_ImageViewResource BmRender_CreateImageView2D(BmRender_ImageResource Handle, VkImageAspectFlags AspectFlags);
+BmRender_ImageViewResource BmRender_CreateImageView2DArray(BmRender_ImageResource Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags);

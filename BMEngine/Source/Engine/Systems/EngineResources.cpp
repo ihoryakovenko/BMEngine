@@ -29,9 +29,9 @@ namespace EngineResources
 		TextureDescription.ArrayLayers = 1;
 		TextureDescription.Type = ImageType::TransferSampled;
 
-		Asset.RenderImageHandle =  RenderResources::CreateImageResource(&TextureDescription);
+		Asset.RenderImageHandle = BmRender_CreateImage2D(Extent.x, Extent.y, Util::GliFormatToVkFormat(Texture.format()), ImageType::TransferSampled);
 		RenderResources::UpdateImageResource(Asset.RenderImageHandle, &TextureDescription, Texture.data());
-		Asset.RenderViewHandle = RenderResources::CreateImageView(Asset.RenderImageHandle, TextureDescription.Format);
+		Asset.RenderViewHandle = BmRender_CreateImageView2D(Asset.RenderImageHandle, VK_IMAGE_ASPECT_COLOR_BIT);
 	}
 
 	void Init()
@@ -53,11 +53,11 @@ namespace EngineResources
 		DefaultTextureDescription.Type = ImageType::TransferSampled;
 
 		TextureAsset DefaultAsset;
-		DefaultAsset.RenderImageHandle = RenderResources::CreateImageResource(&DefaultTextureDescription);
+		DefaultAsset.RenderImageHandle = BmRender_CreateImage2D(DefaultAssetExtent.x, DefaultAssetExtent.y, Util::GliFormatToVkFormat(DefaultTexture.format()), ImageType::TransferSampled);
 		DefaultAsset.IsCreated = true;
 
 		RenderResources::UpdateImageResource(DefaultAsset.RenderImageHandle, &DefaultTextureDescription, DefaultTexture.data());
-		DefaultAsset.RenderViewHandle = RenderResources::CreateImageView(DefaultAsset.RenderImageHandle, DefaultTextureDescription.Format);
+		DefaultAsset.RenderViewHandle = BmRender_CreateImageView2D(DefaultAsset.RenderImageHandle, VK_IMAGE_ASPECT_COLOR_BIT);
 
 		BmRender_ImageViewBindingDescription DiffuseDescription;
 		DiffuseDescription.Sampler = "DiffuseTexture";

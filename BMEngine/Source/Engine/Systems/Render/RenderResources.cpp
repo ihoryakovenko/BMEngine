@@ -11,6 +11,11 @@
 
 namespace RenderResources
 {
+	struct DescriptorSetLayoutBinding
+	{
+		VkDescriptorType DescriptorType;
+	};
+
 	struct GPUBufferEntry
 	{
 		std::atomic<bool> IsLoaded;
@@ -24,6 +29,7 @@ namespace RenderResources
 		VkDeviceMemory Memory;
 		u64 Size;
 		std::atomic<bool> IsLoaded;
+		VkFormat Format;
 	};
 
 	struct ResourceContext
@@ -31,7 +37,7 @@ namespace RenderResources
 		VulkanCoreContext::VulkanCoreContext CoreContext;
 		std::unordered_map<std::string, VulkanHelper::VertexBinding> VBindings;
 		std::unordered_map<std::string, VkSampler> Samplers;
-		std::unordered_map<std::string, VkDescriptorSetLayout> DescriptorSetLayouts;
+		std::unordered_map<std::string, DescriptorSetLayout> DescriptorSetLayouts;
 		std::unordered_map<std::string, VkShaderModule> Shaders;
 		std::unordered_map<std::string, RenderResources::GPUBuffer> StorageBuffers;
 		std::unordered_map<std::string, VkDescriptorPool> DescriptorPools;
@@ -39,6 +45,7 @@ namespace RenderResources
 		std::unordered_map<std::string, VkPipeline> Pipelines;
 		std::unordered_map<std::string, VkPipelineLayout> PipelineLayouts;
 
+		Memory::Array<DescriptorSetLayoutBinding> LayoutBindings;
 		Memory::Array<GPUBufferEntry> ResourceRecords;
 		Memory::Array<ImageResource> Images;
 		Memory::Array<VkImageView> ImageViews;
@@ -100,6 +107,10 @@ namespace RenderResources
 		ResContext.ResourceRecords.Capacity = 60000;
 		ResContext.ResourceRecords.Count = 0;
 		ResContext.ResourceRecords.Data = (GPUBufferEntry*)malloc(ResContext.ResourceRecords.Capacity * sizeof(ResContext.ResourceRecords.Data[0]));
+
+		ResContext.LayoutBindings.Capacity = 20;
+		ResContext.LayoutBindings.Count = 0;
+		ResContext.LayoutBindings.Data = (DescriptorSetLayoutBinding*)malloc(ResContext.ResourceRecords.Capacity * sizeof(ResContext.ResourceRecords.Data[0]));
 	}
 
 	void CreateGraphicsPipeline(const std::string& Name, const BmRender_PipelineDescription& Description)
@@ -235,6 +246,11 @@ namespace RenderResources
 		return ResContext.Images.Data[(u64)Handle].Image;
 	}
 
+	VkImageView GetImageView(BmRender_ImageViewResource Handle)
+	{
+		return ResContext.ImageViews.Data[(u64)Handle];
+	}
+
 	void DeInit()
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
@@ -262,7 +278,7 @@ namespace RenderResources
 
 		for (auto It = ResContext.DescriptorSetLayouts.begin(); It != ResContext.DescriptorSetLayouts.end(); ++It)
 		{
-			vkDestroyDescriptorSetLayout(Device, It->second, nullptr);
+			vkDestroyDescriptorSetLayout(Device, It->second.Layout, nullptr);
 		}
 
 		for (auto It = ResContext.StorageBuffers.begin(); It != ResContext.StorageBuffers.end(); ++It)
@@ -296,6 +312,7 @@ namespace RenderResources
 		free(ResContext.ImageViews.Data);
 		free(ResContext.Images.Data);
 		free(ResContext.ResourceRecords.Data);
+		free(ResContext.LayoutBindings.Data);
 	}
 
 	void CreateVertex(const std::string& Name, VulkanHelper::VertexBinding& Binding)
@@ -375,30 +392,47 @@ namespace RenderResources
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 
+		DescriptorSetLayout Layout = { };
+		Layout.BindingsCount = Description.BindingsCount;
+		Layout.BindingsIndex = ResContext.LayoutBindings.Count;
+
+		VkDescriptorSetLayoutBinding* LayoutBindings = (VkDescriptorSetLayoutBinding*)Render::FrameAlloc(sizeof(VkDescriptorSetLayoutBinding) * Description.BindingsCount);
+		for (u32 i = 0; i < Description.BindingsCount; ++i)
+		{
+			LayoutBindings[i].binding = i;
+			LayoutBindings[i].descriptorCount = Description.Bindings[i].DescriptorCount;
+			LayoutBindings[i].descriptorType = Description.Bindings[i].DescriptorType;
+			LayoutBindings[i].stageFlags = Description.Bindings[i].StageFlags;
+			LayoutBindings[i].pImmutableSamplers = nullptr;
+
+			assert(ResContext.LayoutBindings.Count < ResContext.LayoutBindings.Capacity);
+			DescriptorSetLayoutBinding* Binding = ResContext.LayoutBindings.Data + ResContext.LayoutBindings.Count++;
+			Binding->DescriptorType = LayoutBindings[i].descriptorType;
+		}
+
 		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
 		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		LayoutCreateInfo.bindingCount = Description.BindingsCount;
-		LayoutCreateInfo.pBindings = Description.Bindings;
+		LayoutCreateInfo.pBindings = LayoutBindings;
 		LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-		LayoutCreateInfo.pNext = Description.Next;
+		LayoutCreateInfo.pNext = nullptr;
 
-		VkDescriptorSetLayout NewLayout;
-		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, nullptr, &NewLayout));
-		ResContext.DescriptorSetLayouts[Name] = NewLayout;
+		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, nullptr, &Layout.Layout));
+		ResContext.DescriptorSetLayouts[Name] = Layout;
 	}
 
 	void CreateDescriptorSet(const std::string& Name, const BmRender_DescriptorSetDescription& Description)
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 		
-		VkDescriptorSetLayout Layout = GetSetLayout(Description.Layout);
+		DescriptorSetLayout* Layout = GetSetLayout(Description.Layout);
 		VkDescriptorPool Pool = GetDescriptorPool(Description.Pool);
 		
 		VkDescriptorSetAllocateInfo AllocInfo = { };
 		AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		AllocInfo.descriptorPool = Pool;
 		AllocInfo.descriptorSetCount = 1;
-		AllocInfo.pSetLayouts = &Layout;
+		AllocInfo.pSetLayouts = &Layout->Layout;
 		
 		VkDescriptorSet DescriptorSet;
 		VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, &DescriptorSet));
@@ -413,25 +447,23 @@ namespace RenderResources
 			{
 				const BmRender_DescriptorSetBinding& Binding = Description.Bindings[i];
 				RenderResources::GPUBuffer* Buffer = GetGPUBuffer(Binding.Buffer);
-				if (Buffer)
-				{
-					VkDescriptorBufferInfo BufferInfo = {};
-					BufferInfo.buffer = Buffer->Buffer;
-					BufferInfo.offset = Binding.Offset;
-					BufferInfo.range = Binding.Range;
-					BufferInfos.push_back(BufferInfo);
 
-					VkWriteDescriptorSet WriteDescriptorSet = {};
-					WriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-					WriteDescriptorSet.dstSet = DescriptorSet;
-					WriteDescriptorSet.dstBinding = Binding.Binding;
-					WriteDescriptorSet.dstArrayElement = 0;
-					WriteDescriptorSet.descriptorType = Binding.DescriptorType;
-					WriteDescriptorSet.descriptorCount = 1;
-					WriteDescriptorSet.pBufferInfo = &BufferInfos.back();
-					WriteDescriptorSet.pImageInfo = nullptr;
-					WriteDescriptorSets.push_back(WriteDescriptorSet);
-				}
+				VkDescriptorBufferInfo BufferInfo = {};
+				BufferInfo.buffer = Buffer->Buffer;
+				BufferInfo.offset = Binding.Offset;
+				BufferInfo.range = Binding.Range;
+				BufferInfos.push_back(BufferInfo);
+
+				VkWriteDescriptorSet WriteDescriptorSet = {};
+				WriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				WriteDescriptorSet.dstSet = DescriptorSet;
+				WriteDescriptorSet.dstBinding = Binding.Binding;
+				WriteDescriptorSet.dstArrayElement = 0;
+				WriteDescriptorSet.descriptorType = ResContext.LayoutBindings.Data[Layout->BindingsIndex + i].DescriptorType;
+				WriteDescriptorSet.descriptorCount = 1;
+				WriteDescriptorSet.pBufferInfo = &BufferInfos.back();
+				WriteDescriptorSet.pImageInfo = nullptr;
+				WriteDescriptorSets.push_back(WriteDescriptorSet);
 			}
 
 			if (!WriteDescriptorSets.empty())
@@ -458,12 +490,12 @@ namespace RenderResources
 		return nullptr;
 	}
 
-	VkDescriptorSetLayout GetSetLayout(const std::string& Id)
+	DescriptorSetLayout* GetSetLayout(const std::string& Id)
 	{
 		auto It = ResContext.DescriptorSetLayouts.find(Id);
 		if (It != ResContext.DescriptorSetLayouts.end())
 		{
-			return It->second;
+			return &It->second;
 		}
 
 		assert(false);
@@ -528,6 +560,7 @@ namespace RenderResources
 
 		ImageResource* Resource = &ResContext.Images.Data[ResContext.Images.Count];
 		Resource->IsLoaded = false;
+		Resource->Format = Description->Format;
 
 		VkImageUsageFlags Usage;
 
@@ -554,7 +587,7 @@ namespace RenderResources
 		ImageCreateInfo.extent.depth = 1;
 		ImageCreateInfo.mipLevels = 1;
 		ImageCreateInfo.arrayLayers = Description->ArrayLayers;
-		ImageCreateInfo.format = Description->Format;
+		ImageCreateInfo.format = Resource->Format;
 		ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		ImageCreateInfo.usage = Usage;
@@ -568,32 +601,34 @@ namespace RenderResources
 			Resource->Image, MemoryPropertyFlag::GPULocal);
 		Resource->Memory = AllocResult.Memory;
 		Resource->Size = AllocResult.Size;
+
 		VULKAN_CHECK_RESULT(vkBindImageMemory(Device, Resource->Image, Resource->Memory, 0));
 
 		return (BmRender_ImageResource)ResContext.Images.Count++;
 	}
 
-	BmRender_ImageViewResource CreateImageView(BmRender_ImageResource Handle, VkFormat Format)
+	BmRender_ImageViewResource CreateImageView(BmRender_ImageResource Handle, u32 BaseArrayLayer, u32 LayerCount, VkImageViewType ViewType, VkImageAspectFlags AspectFlags)
 	{
 		const u32 Index = (u64)Handle;
 
+		ImageResource* Resource = ResContext.Images.Data + Index;
 		VkImageView* View = ResContext.ImageViews.Data + ResContext.ImageViews.Count;
 
 		VkImageViewCreateInfo ViewCreateInfo = { };
 		ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		ViewCreateInfo.flags = 0;
-		ViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		ViewCreateInfo.format = Format;
+		ViewCreateInfo.viewType = ViewType;
+		ViewCreateInfo.format = Resource->Format;
 		ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 		ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 		ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
 		ViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-		ViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		ViewCreateInfo.subresourceRange.aspectMask = AspectFlags;
 		ViewCreateInfo.subresourceRange.baseMipLevel = 0;
 		ViewCreateInfo.subresourceRange.levelCount = 1;
-		ViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-		ViewCreateInfo.subresourceRange.layerCount = 1;
-		ViewCreateInfo.image = ResContext.Images.Data[Index].Image;
+		ViewCreateInfo.subresourceRange.baseArrayLayer = BaseArrayLayer;
+		ViewCreateInfo.subresourceRange.layerCount = LayerCount;
+		ViewCreateInfo.image = Resource->Image;
 
 		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 		VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo, nullptr, View));
