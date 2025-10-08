@@ -61,6 +61,7 @@ namespace RenderResources
 	struct DescriptorSet
 	{
 		VkDescriptorSet Set;
+		std::string Layout;
 	};
 
 	struct GPUBuffer
@@ -81,7 +82,8 @@ namespace RenderResources
 	void CreateSampler(const std::string& Name, const BmRender_SamplerDescription& Data);
 	void CreateGeometryBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, std::string& Name);
 	void CreateDescriptorSetLayout(const std::string& Name, const BmRender_DescriptorSetLayoutDescription& Description);
-	void CreateDescriptorSet(const std::string& Name, const BmRender_DescriptorSetDescription& Description);
+	void BindDescriptorSet(std::string DescriptorSet, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount);
+	void CreateDescriptorSet(const std::string& Name, const std::string& LayoutName, const std::string& PoolName);
 	void CreateGraphicsPipeline(const std::string& Name, const BmRender_PipelineDescription& Description);
 	void CreatePipelineLayout(const std::string& Name, const BmRender_PipelineLayoutDescription& Description);
 
@@ -90,8 +92,6 @@ namespace RenderResources
 	BmRender_ImageResource CreateImageResource(BmRender_ImageDescription* Description);
 	BmRender_ImageViewResource CreateImageView(BmRender_ImageResource Handle, u32 BaseArrayLayer, u32 LayerCount, VkImageViewType ViewType, VkImageAspectFlags AspectFlags);
 	BmRender_BufferRegion CreateBufferRegion(u64 BufferOffset, const std::string& BufferName);
-
-	void BindImageView(BmRender_ImageViewResource Handle, const std::string& Set, const BmRender_ImageViewBindingDescription* BindingDescriptions, u32 Count);
 
 	void UpdateBufferRegion(BmRender_BufferRegion Handle, u64 ResourceOffset, const void* Data, u32 DataSize);
 	void UpdateImageResource(BmRender_ImageResource Handle, BmRender_ImageDescription* Description, void* Data);
@@ -104,7 +104,7 @@ namespace RenderResources
 	DescriptorSetLayout* GetSetLayout(const std::string& Id);
 	VkShaderModule GetShader(const std::string& Id);
 	VkDescriptorPool GetDescriptorPool(const std::string& Id);
-	VkDescriptorSet GetDescriptorSet(const std::string& Id);
+	DescriptorSet* GetDescriptorSet(const std::string& Id);
 	RenderResources::GPUBuffer* GetGPUBuffer(const std::string& Name);
 	VulkanHelper::VertexBinding GetVertexBinding(const std::string& Id);
 	VkPipeline GetPipeline(const std::string& Name);

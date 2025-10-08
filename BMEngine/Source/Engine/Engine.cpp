@@ -164,20 +164,6 @@ namespace Engine
 		}
 	}
 
-	static void ParseAndCreateDescriptorSets(Yaml::Node& DescriptorSetsNode)
-	{
-		for (auto DescriptorSetIt = DescriptorSetsNode.Begin(); DescriptorSetIt != DescriptorSetsNode.End(); DescriptorSetIt++)
-		{
-			Yaml::Node& DescriptorSetNode = (*DescriptorSetIt).second;
-			
-			BmRender_DescriptorSetDescription Description = {};
-			std::vector<BmRender_DescriptorSetBinding> Bindings;
-			
-			Util::ParseDescriptorSetFromYaml(DescriptorSetNode, Description, Bindings);
-			RenderResources::CreateDescriptorSet((*DescriptorSetIt).first, Description);
-		}
-	}
-
 	struct Camera
 	{
 		f32 Fov;
@@ -327,7 +313,43 @@ namespace Engine
 		ParseAndCreateShaders(Util::GetShaders(Root));
 		ParseAndCreateSamplers(Util::GetSamplers(Root));
 		ParseAndCreateDescriptorSetLayouts(Util::GetDescriptorSetLayouts(Root));
-		ParseAndCreateDescriptorSets(Util::GetDescriptorSets(Root));
+
+		{
+			BmRender_DescriptorSetBinding Binding;
+			Binding.BufferBinding.Buffer = "FrameData";
+			Binding.BufferBinding.Offset = 0;
+			Binding.BufferBinding.Range = 384;
+			Binding.DstArrayElement = 0;
+
+			BmRender_CreateDescriptorSet("VpSet", "FrameDataLayout", "MainPool");
+			BmRender_BindDescriptorSet("VpSet", &Binding, 1);
+		}
+
+		{
+			BmRender_DescriptorSetBinding Binding;
+			Binding.BufferBinding.Buffer = "FrameData";
+			Binding.BufferBinding.Offset = 384;
+			Binding.BufferBinding.Range = 1152;
+			Binding.DstArrayElement = 0;
+
+			BmRender_CreateDescriptorSet("StaticMeshLightSet", "FrameDataLayout", "MainPool");
+			BmRender_BindDescriptorSet("StaticMeshLightSet", &Binding, 1);
+		}
+
+		{
+			BmRender_DescriptorSetBinding Binding;
+			Binding.BufferBinding.Buffer = "MaterialBuffer";
+			Binding.BufferBinding.Offset = 0;
+			Binding.BufferBinding.Range = VK_WHOLE_SIZE;
+			Binding.DstArrayElement = 0;
+
+			BmRender_CreateDescriptorSet("MaterialSet", "MaterialLayout", "MainPool");
+			BmRender_BindDescriptorSet("MaterialSet", &Binding, 1);
+		}
+
+		{
+			BmRender_CreateDescriptorSet("BindlesTexturesSet", "BindlesTexturesLayout", "MainPool");
+		}
 
 		TransferSystem::Init();
 		Render::Init(Window);

@@ -59,19 +59,21 @@ namespace EngineResources
 		RenderResources::UpdateImageResource(DefaultAsset.RenderImageHandle, &DefaultTextureDescription, DefaultTexture.data());
 		DefaultAsset.RenderViewHandle = BmRender_CreateImageView2D(DefaultAsset.RenderImageHandle, VK_IMAGE_ASPECT_COLOR_BIT);
 
-		BmRender_ImageViewBindingDescription DiffuseDescription;
-		DiffuseDescription.Sampler = "DiffuseTexture";
-		DiffuseDescription.ArrayElement = 0;
-		DiffuseDescription.BindingIndex = 0;
+		BmRender_DescriptorSetBinding DiffuseBinding;
+		DiffuseBinding.ImageBinding.Sampler = "DiffuseTexture";
+		DiffuseBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		DiffuseBinding.ImageBinding.ImageView = DefaultAsset.RenderViewHandle;
+		DiffuseBinding.DstArrayElement = 0;
 
-		BmRender_ImageViewBindingDescription SpecularDescription;
-		SpecularDescription.Sampler = "SpecularTexture";
-		SpecularDescription.ArrayElement = 0;
-		SpecularDescription.BindingIndex = 1;
+		BmRender_DescriptorSetBinding SpecularBinding;
+		SpecularBinding.ImageBinding.Sampler = "SpecularTexture";
+		SpecularBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		SpecularBinding.ImageBinding.ImageView = DefaultAsset.RenderViewHandle;
+		SpecularBinding.DstArrayElement = 0;
 
-		BmRender_ImageViewBindingDescription Descriptions[] = { DiffuseDescription, SpecularDescription };
+		BmRender_DescriptorSetBinding Bindings[] = { DiffuseBinding, SpecularBinding };
 
-		RenderResources::BindImageView(DefaultAsset.RenderViewHandle, "BindlesTexturesSet", Descriptions, 2);
+		BmRender_BindDescriptorSet("BindlesTexturesSet", Bindings, 2);
 
 		TextureAssets[DefaultAssetId] = DefaultAsset;
 	}
@@ -132,19 +134,21 @@ namespace EngineResources
 							AlbedoTextureHandle = it->second.RenderImageHandle;
 							SpecularTextureHandle = AlbedoTextureHandle;
 
-							BmRender_ImageViewBindingDescription DiffuseDescription;
-							DiffuseDescription.Sampler = "DiffuseTexture";
-							DiffuseDescription.ArrayElement = TexturesGPUIndexCounter;
-							DiffuseDescription.BindingIndex = 0;
+							BmRender_DescriptorSetBinding DiffuseBinding;
+							DiffuseBinding.ImageBinding.Sampler = "DiffuseTexture";
+							DiffuseBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+							DiffuseBinding.ImageBinding.ImageView = it->second.RenderViewHandle;
+							DiffuseBinding.DstArrayElement = TexturesGPUIndexCounter;
 
-							BmRender_ImageViewBindingDescription SpecularDescription;
-							SpecularDescription.Sampler = "SpecularTexture";
-							SpecularDescription.ArrayElement = TexturesGPUIndexCounter;
-							SpecularDescription.BindingIndex = 1;
+							BmRender_DescriptorSetBinding SpecularBinding;
+							SpecularBinding.ImageBinding.Sampler = "SpecularTexture";
+							SpecularBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+							SpecularBinding.ImageBinding.ImageView = it->second.RenderViewHandle;
+							SpecularBinding.DstArrayElement = TexturesGPUIndexCounter;
 
-							BmRender_ImageViewBindingDescription Descriptions[] = { DiffuseDescription, SpecularDescription };
+							BmRender_DescriptorSetBinding Bindings[] = { DiffuseBinding, SpecularBinding };
 
-							RenderResources::BindImageView(it->second.RenderViewHandle, "BindlesTexturesSet", Descriptions, 2);
+							BmRender_BindDescriptorSet("BindlesTexturesSet", Bindings, 2);
 
 							++TexturesGPUIndexCounter;
 						}

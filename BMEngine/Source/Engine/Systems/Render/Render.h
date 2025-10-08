@@ -162,11 +162,11 @@ namespace DeferredPass
 	void BeginPass();
 	void EndPass();
 
-	VkImageView* TestDeferredInputColorImageInterface();
-	VkImageView* TestDeferredInputDepthImageInterface();
+	BmRender_ImageViewResource* TestDeferredInputColorImageInterface();
+	BmRender_ImageViewResource* TestDeferredInputDepthImageInterface();
 
-	VulkanInterface::UniformImage* TestDeferredInputColorImage();
-	VulkanInterface::UniformImage* TestDeferredInputDepthImage();
+	BmRender_ImageResource* TestDeferredInputColorImage();
+	BmRender_ImageResource* TestDeferredInputDepthImage();
 
 	VulkanHelper::AttachmentData* GetAttachmentData();
 }

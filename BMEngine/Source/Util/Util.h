@@ -265,7 +265,6 @@ namespace Util
 	Yaml::Node& GetSamplers(Yaml::Node& Root);
 	Yaml::Node& GetShaders(Yaml::Node& Root);
 	Yaml::Node& GetDescriptorSetLayouts(Yaml::Node& Root);
-	Yaml::Node& GetDescriptorSets(Yaml::Node& Root);
 	Yaml::Node& ParseDescriptorSetLayoutNode(Yaml::Node& Root);
 	Yaml::Node& GetVertices(Yaml::Node& Root);
 	Yaml::Node& GetVertexBindingNode(Yaml::Node& VertexNode);
@@ -344,7 +343,6 @@ namespace Util
 	std::vector<DescriptorSetLayout> ParseDescriptorSetLayouts(Yaml::Node& DescriptorSetLayoutsNode);
 	
 	void ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode, BmRender_DescriptorSetLayoutDescription& Description, std::vector<BmRender_LayoutBinding>& Bindings);
-	void ParseDescriptorSetFromYaml(Yaml::Node& DescriptorSetNode, BmRender_DescriptorSetDescription& Description, std::vector<BmRender_DescriptorSetBinding>& Bindings);
 	RenderResources::BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, VkPipelineLayout PipelineLayout, const VulkanHelper::PipelineResourceInfo& ResourceInfo);
 	
 	VkFormat GliFormatToVkFormat(gli::format Format);

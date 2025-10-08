@@ -497,18 +497,6 @@ namespace Util
 		return Empty;
 	}
 
-	Yaml::Node& GetDescriptorSets(Yaml::Node& Root)
-	{
-		if (!Root["DescriptorSets"].IsNone())
-		{
-			return Root["DescriptorSets"];
-		}
-
-		assert(false);
-		static Yaml::Node Empty;
-		return Empty;
-	}
-
 	Yaml::Node& ParseDescriptorSetLayoutNode(Yaml::Node& Root)
 	{
 		if (!Root["bindings"].IsNone())
@@ -1680,55 +1668,6 @@ namespace Util
 		{
 			BmRender_LayoutBinding Binding = ParseDescriptorSetLayoutBindingNode((*BindingIt).second);
 			Bindings.push_back(Binding);
-		}
-		
-		Description.Bindings = Bindings.data();
-		Description.BindingsCount = static_cast<u32>(Bindings.size());
-	}
-
-	void ParseDescriptorSetFromYaml(Yaml::Node& DescriptorSetNode, BmRender_DescriptorSetDescription& Description, std::vector<BmRender_DescriptorSetBinding>& Bindings)
-	{
-		Description.Layout = DescriptorSetNode["layout"].As<std::string>();
-		Description.Pool = DescriptorSetNode["pool"].As<std::string>();
-		
-		Bindings.clear();
-		if (!DescriptorSetNode["bindings"].IsNone())
-		{
-			Yaml::Node& BindingsNode = DescriptorSetNode["bindings"];
-			for (auto BindingIt = BindingsNode.Begin(); BindingIt != BindingsNode.End(); BindingIt++)
-			{
-				BmRender_DescriptorSetBinding Binding = {};
-				Binding.Buffer = (*BindingIt).second["buffer"].As<std::string>();
-				Binding.Binding = (*BindingIt).second["binding"].As<u32>();
-								
-				if (!(*BindingIt).second["offset"].IsNone())
-				{
-					Binding.Offset = (*BindingIt).second["offset"].As<u64>();
-				}
-				else
-				{
-					Binding.Offset = 0;
-				}
-				
-				if (!(*BindingIt).second["range"].IsNone())
-				{
-					std::string rangeStr = (*BindingIt).second["range"].As<std::string>();
-					if (rangeStr == "VK_WHOLE_SIZE")
-					{
-						Binding.Range = VK_WHOLE_SIZE;
-					}
-					else
-					{
-						Binding.Range = (*BindingIt).second["range"].As<u64>();
-					}
-				}
-				else
-				{
-					Binding.Range = VK_WHOLE_SIZE;
-				}
-				
-				Bindings.push_back(Binding);
-			}
 		}
 		
 		Description.Bindings = Bindings.data();

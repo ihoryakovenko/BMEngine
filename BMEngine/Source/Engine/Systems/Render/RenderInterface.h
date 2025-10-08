@@ -43,6 +43,7 @@ enum class ImageType
 {
 	TransferSampled,
 	DepthSamplad,
+	ColorAttachmentSampled,
 };
 
 struct BmRender_SamplerDescription
@@ -80,12 +81,46 @@ struct BmRender_LayoutBinding
 	VkShaderStageFlags StageFlags;
 };
 
-struct BmRender_DescriptorSetBinding
+struct BmRender_BufferBinding
 {
 	std::string Buffer;
-	u32 Binding;
 	u64 Offset;
 	u64 Range;
+};
+
+struct BmRender_ImageBinding
+{
+	std::string Sampler;
+	VkImageLayout ImageLayout; // Check if can store layout with Image resource as target layout and use instead this
+	BmRender_ImageViewResource ImageView;
+};
+
+struct BmRender_DescriptorSetBinding
+{
+	union
+	{
+		BmRender_BufferBinding BufferBinding;
+		BmRender_ImageBinding ImageBinding;
+	};
+	u32 DstArrayElement;
+
+	///////////////// REPLACE FUCKING STRINGSSSSSSSS!!!!!!!!!!!!!!!!!!!!!!!!
+	BmRender_DescriptorSetBinding() : BufferBinding{}, DstArrayElement(0) {}
+
+	///////////////// REPLACE FUCKING STRINGSSSSSSSS!!!!!!!!!!!!!!!!!!!!!!!!
+	~BmRender_DescriptorSetBinding() {}
+
+	///////////////// REPLACE FUCKING STRINGSSSSSSSS!!!!!!!!!!!!!!!!!!!!!!!!
+	BmRender_DescriptorSetBinding(const BmRender_DescriptorSetBinding& other) : BufferBinding{other.BufferBinding}, DstArrayElement(other.DstArrayElement) {}
+
+	///////////////// REPLACE FUCKING STRINGSSSSSSSS!!!!!!!!!!!!!!!!!!!!!!!!
+	BmRender_DescriptorSetBinding& operator=(const BmRender_DescriptorSetBinding& other) {
+		if (this != &other) {
+			BufferBinding = other.BufferBinding;
+			DstArrayElement = other.DstArrayElement;
+		}
+		return *this;
+	}
 };
 
 struct BmRender_DescriptorSetDescription
@@ -119,3 +154,6 @@ BmRender_ImageResource BmRender_CreateImage2DArray(u32 Width, u32 Height, VkForm
 
 BmRender_ImageViewResource BmRender_CreateImageView2D(BmRender_ImageResource Handle, VkImageAspectFlags AspectFlags);
 BmRender_ImageViewResource BmRender_CreateImageView2DArray(BmRender_ImageResource Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags);
+
+void BmRender_CreateDescriptorSet(const std::string& Name, const std::string& LayoutName, const std::string& PoolName);
+void BmRender_BindDescriptorSet(const std::string& DescriptorSetName, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount);

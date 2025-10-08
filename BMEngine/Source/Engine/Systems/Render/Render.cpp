@@ -70,8 +70,6 @@ namespace Render
 
 	static void InitStaticMeshPipeline(VkDevice Device, StaticMeshPipeline* MeshPipeline)
 	{
-		VkSampler ShadowMapArraySampler = RenderResources::GetSampler("ShadowMap");
-
 		const VkDeviceSize LightBufferSize = sizeof(Render::LightBuffer);
 		MeshPipeline->EntityLightBufferHandle = RenderResources::CreateBufferRegion(384, "FrameData");
 
@@ -81,30 +79,17 @@ namespace Render
 		{
 			MeshPipeline->ShadowMapArrayImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_LIGHT_SOURCES * i, MAX_LIGHT_SOURCES, VK_IMAGE_ASPECT_DEPTH_BIT);
 			
-			VkDescriptorImageInfo ShadowMapArrayImageInfo;
-			ShadowMapArrayImageInfo.imageView = RenderResources::GetImageView(MeshPipeline->ShadowMapArrayImageInterface[i]);
-			ShadowMapArrayImageInfo.sampler = ShadowMapArraySampler;
-			ShadowMapArrayImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			BmRender_DescriptorSetBinding ShadowMapBinding;
+			ShadowMapBinding.ImageBinding.Sampler = "ShadowMap";
+			ShadowMapBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			ShadowMapBinding.ImageBinding.ImageView = MeshPipeline->ShadowMapArrayImageInterface[i];
+			ShadowMapBinding.DstArrayElement = 0;
 
-			VkDescriptorSetAllocateInfo AllocInfo = {};
-			AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			AllocInfo.descriptorPool = RenderResources::GetDescriptorPool("MainPool");
-			AllocInfo.descriptorSetCount = 1;
-			AllocInfo.pSetLayouts = &Layout;
+			std::string ShadowMapSetName = "ShadowMapArraySet" + std::to_string(i);
+			BmRender_CreateDescriptorSet(ShadowMapSetName, "ShadowMapArrayLayout", "MainPool");
+			BmRender_BindDescriptorSet(ShadowMapSetName, &ShadowMapBinding, 1);
 			
-			VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, MeshPipeline->ShadowMapArraySet + i));
-
-			VkWriteDescriptorSet WriteDescriptorSet = {};
-			WriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			WriteDescriptorSet.dstSet = MeshPipeline->ShadowMapArraySet[i];
-			WriteDescriptorSet.dstBinding = 0;
-			WriteDescriptorSet.dstArrayElement = 0;
-			WriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			WriteDescriptorSet.descriptorCount = 1;
-			WriteDescriptorSet.pBufferInfo = nullptr;
-			WriteDescriptorSet.pImageInfo = &ShadowMapArrayImageInfo;
-
-			vkUpdateDescriptorSets(Device, 1, &WriteDescriptorSet, 0, nullptr);
+			MeshPipeline->ShadowMapArraySet[i] = RenderResources::GetDescriptorSet(ShadowMapSetName)->Set;
 		}
 
 		VkDescriptorSetLayout StaticMeshDescriptorLayouts[] =
@@ -157,12 +142,12 @@ namespace Render
 
 		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 
-		const VkDescriptorSet VpSet = RenderResources::GetDescriptorSet("VpSet");
+		const VkDescriptorSet VpSet = RenderResources::GetDescriptorSet("VpSet")->Set;
 		const u32 DynamicOffset = Render::GetRenderState()->RenderDrawState.CurrentImageIndex * sizeof(ViewProjectionBuffer);
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
 			0, 1, &VpSet, 1, &DynamicOffset);
 
-		VkDescriptorSet BindlesTexturesSet = RenderResources::GetDescriptorSet("BindlesTexturesSet");
+		VkDescriptorSet BindlesTexturesSet = RenderResources::GetDescriptorSet("BindlesTexturesSet")->Set;
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
 			1, 1, &BindlesTexturesSet, 0, nullptr);
 
@@ -190,8 +175,8 @@ namespace Render
 
 			const VkDescriptorSet DescriptorSetGroup[] =
 			{
-				RenderResources::GetDescriptorSet("StaticMeshLightSet"),
-				RenderResources::GetDescriptorSet("MaterialSet"),
+				RenderResources::GetDescriptorSet("StaticMeshLightSet")->Set,
+				RenderResources::GetDescriptorSet("MaterialSet")->Set,
 				MeshPipeline->ShadowMapArraySet[Render::GetRenderState()->RenderDrawState.CurrentImageIndex],
 			};
 			const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
@@ -405,11 +390,11 @@ namespace DeferredPass
 
 	static VkDescriptorSetLayout DeferredInputLayout;
 
-	static VulkanInterface::UniformImage DeferredInputDepthImage[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
-	static VulkanInterface::UniformImage DeferredInputColorImage[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static BmRender_ImageResource DeferredInputDepthImage[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static BmRender_ImageResource DeferredInputColorImage[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
-	static VkImageView DeferredInputDepthImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
-	static VkImageView DeferredInputColorImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static BmRender_ImageViewResource DeferredInputDepthImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static BmRender_ImageViewResource DeferredInputColorImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 	static VkDescriptorSet DeferredInputSet[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
@@ -430,117 +415,35 @@ namespace DeferredPass
 
 		DeferredInputLayout = RenderResources::GetSetLayout("MainPassOutputLayout")->Layout;
 
-		VkImageCreateInfo DeferredInputDepthUniformCreateInfo = { };
-		DeferredInputDepthUniformCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		DeferredInputDepthUniformCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-		DeferredInputDepthUniformCreateInfo.extent.depth = 1;
-		DeferredInputDepthUniformCreateInfo.mipLevels = 1;
-		DeferredInputDepthUniformCreateInfo.arrayLayers = 1;
-		DeferredInputDepthUniformCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		DeferredInputDepthUniformCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		DeferredInputDepthUniformCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-		DeferredInputDepthUniformCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		DeferredInputDepthUniformCreateInfo.flags = 0;
-		DeferredInputDepthUniformCreateInfo.extent.width = MainScreenExtent.width;
-		DeferredInputDepthUniformCreateInfo.extent.height = MainScreenExtent.height;
-		DeferredInputDepthUniformCreateInfo.format = DepthFormat;
-		DeferredInputDepthUniformCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-
-		VkImageCreateInfo DeferredInputColorUniformCreateInfo = DeferredInputDepthUniformCreateInfo;
-		DeferredInputColorUniformCreateInfo.format = ColorFormat;
-		DeferredInputColorUniformCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-
-		ColorSampler = RenderResources::GetSampler("ColorAttachment");
-		DepthSampler = RenderResources::GetSampler("DepthAttachment");
-
 		for (u32 i = 0; i < RenderResources::GetCoreContext()->ImagesCount; i++)
 		{
 			//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
 
-			vkCreateImage(Device, &DeferredInputDepthUniformCreateInfo, nullptr, &DeferredInputDepthImage[i].Image);
-			VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
-				DeferredInputDepthImage[i].Image, MemoryPropertyFlag::GPULocal);
-			DeferredInputDepthImage[i].Memory = AllocResult.Memory;
-			vkBindImageMemory(Device, DeferredInputDepthImage[i].Image, DeferredInputDepthImage[i].Memory, 0);
+			DeferredInputColorImage[i] = BmRender_CreateImage2D(MainScreenExtent.width, MainScreenExtent.height, ColorFormat, ImageType::ColorAttachmentSampled);
+			DeferredInputDepthImage[i] = BmRender_CreateImage2D(MainScreenExtent.width, MainScreenExtent.height, DepthFormat, ImageType::DepthSamplad);
+			
+			DeferredInputColorImageInterface[i] = BmRender_CreateImageView2D(DeferredInputColorImage[i], VK_IMAGE_ASPECT_COLOR_BIT);
+			DeferredInputDepthImageInterface[i] = BmRender_CreateImageView2D(DeferredInputDepthImage[i], VK_IMAGE_ASPECT_DEPTH_BIT);
+			
+			BmRender_DescriptorSetBinding ColorBinding;
+			ColorBinding.ImageBinding.Sampler = "ColorAttachment";
+			ColorBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			ColorBinding.ImageBinding.ImageView = DeferredInputColorImageInterface[i];
+			ColorBinding.DstArrayElement = 0;
 
-			vkCreateImage(Device, &DeferredInputColorUniformCreateInfo, nullptr, &DeferredInputColorImage[i].Image);
-			AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, DeferredInputColorImage[i].Image, MemoryPropertyFlag::GPULocal);
-			DeferredInputColorImage[i].Memory = AllocResult.Memory;
-			vkBindImageMemory(Device, DeferredInputColorImage[i].Image, DeferredInputColorImage[i].Memory, 0);
+			BmRender_DescriptorSetBinding DepthBinding;
+			DepthBinding.ImageBinding.Sampler = "DepthAttachment";
+			DepthBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			DepthBinding.ImageBinding.ImageView = DeferredInputDepthImageInterface[i];
+			DepthBinding.DstArrayElement = 0;
 
-			VkImageViewCreateInfo DepthViewCreateInfo = { };
-			DepthViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-			DepthViewCreateInfo.image = DeferredInputDepthImage[i].Image;
-			DepthViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-			DepthViewCreateInfo.format = DepthFormat;
-			DepthViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-			DepthViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-			DepthViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-			DepthViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-			DepthViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-			DepthViewCreateInfo.subresourceRange.baseMipLevel = 0;
-			DepthViewCreateInfo.subresourceRange.levelCount = 1;
-			DepthViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-			DepthViewCreateInfo.subresourceRange.layerCount = 1;
-			DepthViewCreateInfo.pNext = nullptr;
+			BmRender_DescriptorSetBinding Bindings[] = { ColorBinding, DepthBinding };
 
-			VULKAN_CHECK_RESULT(vkCreateImageView(Device, &DepthViewCreateInfo, nullptr, &DeferredInputDepthImageInterface[i]));
-
-			VkImageViewCreateInfo ColorViewCreateInfo = { };
-			ColorViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-			ColorViewCreateInfo.image = DeferredInputColorImage[i].Image;
-			ColorViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-			ColorViewCreateInfo.format = ColorFormat;
-			ColorViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ColorViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ColorViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ColorViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ColorViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			ColorViewCreateInfo.subresourceRange.baseMipLevel = 0;
-			ColorViewCreateInfo.subresourceRange.levelCount = 1;
-			ColorViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-			ColorViewCreateInfo.subresourceRange.layerCount = 1;
-			ColorViewCreateInfo.pNext = nullptr;
-
-			VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ColorViewCreateInfo, nullptr, &DeferredInputColorImageInterface[i]));
-
-			VkDescriptorSetAllocateInfo AllocInfo = { };
-			AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			AllocInfo.descriptorPool = RenderResources::GetDescriptorPool("MainPool");
-			AllocInfo.descriptorSetCount = 1;
-			AllocInfo.pSetLayouts = &DeferredInputLayout;
-			VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, DeferredInputSet + i));
-
-			VkDescriptorImageInfo DeferredInputImageInfo[2];
-			DeferredInputImageInfo[0].imageView = DeferredInputColorImageInterface[i];
-			DeferredInputImageInfo[0].sampler = ColorSampler;
-			DeferredInputImageInfo[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-			DeferredInputImageInfo[1].imageView = DeferredInputDepthImageInterface[i];
-			DeferredInputImageInfo[1].sampler = DepthSampler;
-			DeferredInputImageInfo[1].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-			VkWriteDescriptorSet WriteDescriptorSets[2] = { };
-
-			WriteDescriptorSets[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			WriteDescriptorSets[0].dstSet = DeferredInputSet[i];
-			WriteDescriptorSets[0].dstBinding = 0;
-			WriteDescriptorSets[0].dstArrayElement = 0;
-			WriteDescriptorSets[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			WriteDescriptorSets[0].descriptorCount = 1;
-			WriteDescriptorSets[0].pBufferInfo = nullptr;
-			WriteDescriptorSets[0].pImageInfo = &DeferredInputImageInfo[0];
-
-			WriteDescriptorSets[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			WriteDescriptorSets[1].dstSet = DeferredInputSet[i];
-			WriteDescriptorSets[1].dstBinding = 1;
-			WriteDescriptorSets[1].dstArrayElement = 0;
-			WriteDescriptorSets[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			WriteDescriptorSets[1].descriptorCount = 1;
-			WriteDescriptorSets[1].pBufferInfo = nullptr;
-			WriteDescriptorSets[1].pImageInfo = &DeferredInputImageInfo[1];
-
-			vkUpdateDescriptorSets(Device, 2, WriteDescriptorSets, 0, nullptr);
+			std::string DeferredInputSetName = "DeferredInputSet" + std::to_string(i);
+			BmRender_CreateDescriptorSet(DeferredInputSetName, "MainPassOutputLayout", "MainPool");
+			BmRender_BindDescriptorSet(DeferredInputSetName, Bindings, 2);
+			
+			DeferredInputSet[i] = RenderResources::GetDescriptorSet(DeferredInputSetName)->Set;
 		}
 
 
@@ -571,17 +474,7 @@ namespace DeferredPass
 	{
 		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
-		for (u32 i = 0; i < RenderResources::GetCoreContext()->ImagesCount; i++)
-		{
-			vkDestroyImageView(Device, DeferredInputDepthImageInterface[i], nullptr);
-			vkDestroyImageView(Device, DeferredInputColorImageInterface[i], nullptr);
 
-			vkDestroyImage(Device, DeferredInputDepthImage[i].Image, nullptr);
-			vkFreeMemory(Device, DeferredInputDepthImage[i].Memory, nullptr);
-
-			vkDestroyImage(Device, DeferredInputColorImage[i].Image, nullptr);
-			vkFreeMemory(Device, DeferredInputColorImage[i].Memory, nullptr);
-		}
 	}
 
 	void Draw()
@@ -629,7 +522,7 @@ namespace DeferredPass
 		ColorBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		ColorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		ColorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		ColorBarrier.image = DeferredInputColorImage[Render::GetRenderState()->RenderDrawState.CurrentImageIndex].Image;
+		ColorBarrier.image = RenderResources::GetImage(DeferredInputColorImage[Render::GetRenderState()->RenderDrawState.CurrentImageIndex]);
 		ColorBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		ColorBarrier.subresourceRange.baseMipLevel = 0;
 		ColorBarrier.subresourceRange.levelCount = 1;
@@ -648,7 +541,7 @@ namespace DeferredPass
 		DepthBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		DepthBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		DepthBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		DepthBarrier.image = DeferredInputDepthImage[Render::GetRenderState()->RenderDrawState.CurrentImageIndex].Image;
+		DepthBarrier.image = RenderResources::GetImage(DeferredInputDepthImage[Render::GetRenderState()->RenderDrawState.CurrentImageIndex]);
 		DepthBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		DepthBarrier.subresourceRange.baseMipLevel = 0;
 		DepthBarrier.subresourceRange.levelCount = 1;
@@ -731,22 +624,22 @@ namespace DeferredPass
 
 
 
-	VkImageView* TestDeferredInputColorImageInterface()
+	BmRender_ImageViewResource* TestDeferredInputColorImageInterface()
 	{
 		return DeferredInputColorImageInterface;
 	}
 
-	VkImageView* TestDeferredInputDepthImageInterface()
+	BmRender_ImageViewResource* TestDeferredInputDepthImageInterface()
 	{
 		return DeferredInputDepthImageInterface;
 	}
 
-	VulkanInterface::UniformImage* TestDeferredInputColorImage()
+	BmRender_ImageResource* TestDeferredInputColorImage()
 	{
 		return DeferredInputColorImage;
 	}
 
-	VulkanInterface::UniformImage* TestDeferredInputDepthImage()
+	BmRender_ImageResource* TestDeferredInputDepthImage()
 	{
 		return DeferredInputDepthImage;
 	}
@@ -1128,7 +1021,7 @@ namespace MainPass
 		//const VkDescriptorSet VpSet = FrameManager::GetViewProjectionSet()[ImageIndex];
 		VkRenderingAttachmentInfo ColorAttachment = { };
 		ColorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		ColorAttachment.imageView = DeferredPass::TestDeferredInputColorImageInterface()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
+		ColorAttachment.imageView = RenderResources::GetImageView(DeferredPass::TestDeferredInputColorImageInterface()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex]);
 		ColorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		ColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		ColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1136,7 +1029,7 @@ namespace MainPass
 
 		VkRenderingAttachmentInfo DepthAttachment = { };
 		DepthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		DepthAttachment.imageView = DeferredPass::TestDeferredInputDepthImageInterface()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
+		DepthAttachment.imageView = RenderResources::GetImageView(DeferredPass::TestDeferredInputDepthImageInterface()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex]);
 		DepthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1164,7 +1057,7 @@ namespace MainPass
 		ColorBarrierBefore.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		ColorBarrierBefore.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		ColorBarrierBefore.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		ColorBarrierBefore.image = DeferredPass::TestDeferredInputColorImage()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex].Image;
+		ColorBarrierBefore.image = RenderResources::GetImage(DeferredPass::TestDeferredInputColorImage()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex]);
 		ColorBarrierBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		ColorBarrierBefore.subresourceRange.baseMipLevel = 0;
 		ColorBarrierBefore.subresourceRange.levelCount = 1;
@@ -1183,7 +1076,7 @@ namespace MainPass
 		DepthBarrierBefore.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthBarrierBefore.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		DepthBarrierBefore.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		DepthBarrierBefore.image = DeferredPass::TestDeferredInputDepthImage()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex].Image;
+		DepthBarrierBefore.image = RenderResources::GetImage(DeferredPass::TestDeferredInputDepthImage()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex]);
 		DepthBarrierBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		DepthBarrierBefore.subresourceRange.baseMipLevel = 0;
 		DepthBarrierBefore.subresourceRange.levelCount = 1;
@@ -1350,9 +1243,9 @@ namespace TerrainRender
 		VkCommandBuffer CmdBuffer = Render::GetRenderState()->RenderDrawState.Frames.CommandBuffers[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 
 		const VkDescriptorSet Sets[] = {
-			RenderResources::GetDescriptorSet("VpSet"),
-			RenderResources::GetDescriptorSet("BindlesTexturesSet"),
-			RenderResources::GetDescriptorSet("MaterialSet"),
+			RenderResources::GetDescriptorSet("VpSet")->Set,
+			RenderResources::GetDescriptorSet("BindlesTexturesSet")->Set,
+			RenderResources::GetDescriptorSet("MaterialSet")->Set,
 		};
 
 		const u32 TerrainDescriptorSetGroupCount = sizeof(Sets) / sizeof(Sets[0]);

@@ -37,6 +37,16 @@ BmRender_ImageViewResource BmRender_CreateImageView2DArray(BmRender_ImageResourc
 	return RenderResources::CreateImageView(Handle, BaseLayer, LayerCount, VK_IMAGE_VIEW_TYPE_2D_ARRAY, AspectFlags);
 }
 
+void BmRender_CreateDescriptorSet(const std::string& Name, const std::string& LayoutName, const std::string& PoolName)
+{
+	RenderResources::CreateDescriptorSet(Name, LayoutName, PoolName);
+}
+
+void BmRender_BindDescriptorSet(const std::string& DescriptorSetName, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount)
+{
+	RenderResources::BindDescriptorSet(DescriptorSetName, Bindings, BindingsCount);
+}
+
 BmRender_ImageResource BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, ImageType Type)
 {
 	BmRender_ImageDescription Descr;

@@ -41,7 +41,7 @@ namespace RenderResources
 		std::unordered_map<std::string, VkShaderModule> Shaders;
 		std::unordered_map<std::string, RenderResources::GPUBuffer> StorageBuffers;
 		std::unordered_map<std::string, VkDescriptorPool> DescriptorPools;
-		std::unordered_map<std::string, VkDescriptorSet> DescriptorSets;
+		std::unordered_map<std::string, DescriptorSet> DescriptorSets;
 		std::unordered_map<std::string, VkPipeline> Pipelines;
 		std::unordered_map<std::string, VkPipelineLayout> PipelineLayouts;
 
@@ -421,12 +421,68 @@ namespace RenderResources
 		ResContext.DescriptorSetLayouts[Name] = Layout;
 	}
 
-	void CreateDescriptorSet(const std::string& Name, const BmRender_DescriptorSetDescription& Description)
+	void BindDescriptorSet(std::string DescriptorSetName, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount)
+	{
+		VkDevice Device = ResContext.CoreContext.LogicalDevice;
+
+		DescriptorSet* Set = GetDescriptorSet(DescriptorSetName);
+		DescriptorSetLayout* Layout = GetSetLayout(Set->Layout);
+
+		std::vector<VkWriteDescriptorSet> WriteDescriptorSets;
+
+		for (u32 i = 0; i < BindingsCount; i++)
+		{
+			const BmRender_DescriptorSetBinding& Binding = Bindings[i];
+
+			VkDescriptorType DescriptorType = ResContext.LayoutBindings.Data[Layout->BindingsIndex + i].DescriptorType;
+
+			VkWriteDescriptorSet WriteDescriptorSet = { };
+			WriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			WriteDescriptorSet.dstSet = Set->Set;
+			WriteDescriptorSet.dstBinding = i;
+			WriteDescriptorSet.dstArrayElement = Binding.DstArrayElement;
+			WriteDescriptorSet.descriptorType = DescriptorType;
+			WriteDescriptorSet.descriptorCount = 1;
+			
+			if (DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC ||
+				DescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER || DescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC)
+			{
+				RenderResources::GPUBuffer* Buffer = GetGPUBuffer(Binding.BufferBinding.Buffer);
+				VkDescriptorBufferInfo* BufferInfo = (VkDescriptorBufferInfo*)Render::FrameAlloc(sizeof(VkDescriptorBufferInfo));
+				BufferInfo->buffer = Buffer->Buffer;
+				BufferInfo->offset = Binding.BufferBinding.Offset;
+				BufferInfo->range = Binding.BufferBinding.Range;
+				WriteDescriptorSet.pBufferInfo = BufferInfo;
+			}
+			else if (VK_DESCRIPTOR_TYPE_SAMPLER || VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+			{
+				VkDescriptorImageInfo* ImageInfo = (VkDescriptorImageInfo*)Render::FrameAlloc(sizeof(VkDescriptorImageInfo));
+				ImageInfo->imageLayout = Binding.ImageBinding.ImageLayout;
+				ImageInfo->imageView = GetImageView(Binding.ImageBinding.ImageView);
+				ImageInfo->sampler = GetSampler(Binding.ImageBinding.Sampler);
+
+				WriteDescriptorSet.pImageInfo = ImageInfo;
+			}
+			else
+			{
+				assert(false || "Unimplemented");
+			}
+			
+			WriteDescriptorSets.push_back(WriteDescriptorSet);
+		}
+
+		vkUpdateDescriptorSets(Device, static_cast<u32>(WriteDescriptorSets.size()), WriteDescriptorSets.data(), 0, nullptr);
+	}
+
+	void CreateDescriptorSet(const std::string& Name, const std::string& LayoutName, const std::string& PoolName)
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 		
-		DescriptorSetLayout* Layout = GetSetLayout(Description.Layout);
-		VkDescriptorPool Pool = GetDescriptorPool(Description.Pool);
+		DescriptorSet NewSet;
+		NewSet.Layout = LayoutName;
+
+		DescriptorSetLayout* Layout = GetSetLayout(LayoutName);
+		VkDescriptorPool Pool = GetDescriptorPool(PoolName);
 		
 		VkDescriptorSetAllocateInfo AllocInfo = { };
 		AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -434,43 +490,8 @@ namespace RenderResources
 		AllocInfo.descriptorSetCount = 1;
 		AllocInfo.pSetLayouts = &Layout->Layout;
 		
-		VkDescriptorSet DescriptorSet;
-		VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, &DescriptorSet));
-		ResContext.DescriptorSets[Name] = DescriptorSet;
-
-		if (Description.BindingsCount > 0)
-		{
-			std::vector<VkWriteDescriptorSet> WriteDescriptorSets;
-			std::vector<VkDescriptorBufferInfo> BufferInfos;
-
-			for (u32 i = 0; i < Description.BindingsCount; i++)
-			{
-				const BmRender_DescriptorSetBinding& Binding = Description.Bindings[i];
-				RenderResources::GPUBuffer* Buffer = GetGPUBuffer(Binding.Buffer);
-
-				VkDescriptorBufferInfo BufferInfo = {};
-				BufferInfo.buffer = Buffer->Buffer;
-				BufferInfo.offset = Binding.Offset;
-				BufferInfo.range = Binding.Range;
-				BufferInfos.push_back(BufferInfo);
-
-				VkWriteDescriptorSet WriteDescriptorSet = {};
-				WriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				WriteDescriptorSet.dstSet = DescriptorSet;
-				WriteDescriptorSet.dstBinding = Binding.Binding;
-				WriteDescriptorSet.dstArrayElement = 0;
-				WriteDescriptorSet.descriptorType = ResContext.LayoutBindings.Data[Layout->BindingsIndex + i].DescriptorType;
-				WriteDescriptorSet.descriptorCount = 1;
-				WriteDescriptorSet.pBufferInfo = &BufferInfos.back();
-				WriteDescriptorSet.pImageInfo = nullptr;
-				WriteDescriptorSets.push_back(WriteDescriptorSet);
-			}
-
-			if (!WriteDescriptorSets.empty())
-			{
-				vkUpdateDescriptorSets(Device, static_cast<u32>(WriteDescriptorSets.size()), WriteDescriptorSets.data(), 0, nullptr);
-			}
-		}
+		VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, &NewSet.Set));
+		ResContext.DescriptorSets[Name] = NewSet;
 	}
 
 	VulkanCoreContext::VulkanCoreContext* GetCoreContext()
@@ -538,12 +559,12 @@ namespace RenderResources
 		return nullptr;
 	}
 
-	VkDescriptorSet GetDescriptorSet(const std::string& Id)
+	DescriptorSet* GetDescriptorSet(const std::string& Id)
 	{
 		auto It = ResContext.DescriptorSets.find(Id);
 		if (It != ResContext.DescriptorSets.end())
 		{
-			return It->second;
+			return &It->second;
 		}
 
 		assert(false);
@@ -572,6 +593,10 @@ namespace RenderResources
 
 			case ImageType::DepthSamplad:
 				Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+				break;
+
+			case ImageType::ColorAttachmentSampled:
+				Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 				break;
 
 			default:
@@ -646,35 +671,6 @@ namespace RenderResources
 		Entry->GPUBufferHandle = GetGPUBuffer(BufferName);
 	
 		return (BmRender_BufferRegion)ResContext.ResourceRecords.Count++;
-	}
-
-	void BindImageView(BmRender_ImageViewResource Handle, const std::string& Set, const BmRender_ImageViewBindingDescription* BindingDescriptions, u32 Count)
-	{
-		if (Count == 0) return;
-
-		VkDescriptorImageInfo* ImageInfos = (VkDescriptorImageInfo*)Render::FrameAlloc(Count * sizeof(VkDescriptorImageInfo));
-		VkWriteDescriptorSet* Writes = (VkWriteDescriptorSet*)Render::FrameAlloc(Count * sizeof(VkWriteDescriptorSet));
-
-		for (u32 i = 0; i < Count; ++i)
-		{
-			const BmRender_ImageViewBindingDescription* Binding = BindingDescriptions + i;
-			
-			ImageInfos[i] = { };
-			ImageInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			ImageInfos[i].sampler = RenderResources::GetSampler(Binding->Sampler);
-			ImageInfos[i].imageView = ResContext.ImageViews.Data[(u64)Handle];
-
-			Writes[i] = { };
-			Writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			Writes[i].dstSet = ResContext.DescriptorSets[Set];
-			Writes[i].dstBinding = Binding->BindingIndex;
-			Writes[i].dstArrayElement = Binding->ArrayElement;
-			Writes[i].descriptorCount = 1;
-			Writes[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			Writes[i].pImageInfo = &ImageInfos[i];
-		}
-
-		vkUpdateDescriptorSets(RenderResources::GetCoreContext()->LogicalDevice, Count, Writes, 0, nullptr);
 	}
 
 	void UpdateBufferRegion(BmRender_BufferRegion Handle, u64 ResourceOffset, const void* Data, u32 DataSize)
