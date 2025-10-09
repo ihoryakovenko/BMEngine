@@ -3,6 +3,13 @@ pipeline:
     vertex:   StaticMeshVertex
     fragment: StaticMeshFragment
 
+  PipelineLayout:
+    - FrameDataLayout
+    - BindlesTexturesLayout
+    - FrameDataLayout
+    - MaterialLayout
+    - ShadowMapArrayLayout
+
   VertexAttributeLayout:
     - name: StaticMeshVertex
       attributes:

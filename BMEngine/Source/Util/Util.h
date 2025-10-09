@@ -280,6 +280,7 @@ namespace Util
 	Yaml::Node& GetPipelineInputAssemblyNode(Yaml::Node& PipelineNode);
 	Yaml::Node& GetVertexAttributeLayoutNode(Yaml::Node& PipelineNode);
 	Yaml::Node& GetPipelineViewportStateNode(Yaml::Node& PipelineNode);
+	Yaml::Node& GetPipelineLayoutNode(Yaml::Node& PipelineNode);
 	Yaml::Node& GetViewportNode(Yaml::Node& PipelineNode);
 	Yaml::Node& GetScissorNode(Yaml::Node& PipelineNode);
 	
@@ -343,7 +344,7 @@ namespace Util
 	std::vector<DescriptorSetLayout> ParseDescriptorSetLayouts(Yaml::Node& DescriptorSetLayoutsNode);
 	
 	void ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode, BmRender_DescriptorSetLayoutDescription& Description, std::vector<BmRender_LayoutBinding>& Bindings);
-	RenderResources::BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, VkPipelineLayout PipelineLayout, const VulkanHelper::PipelineResourceInfo& ResourceInfo);
+	RenderResources::BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, const VulkanHelper::PipelineResourceInfo& ResourceInfo);
 	
 	VkFormat GliFormatToVkFormat(gli::format Format);
 

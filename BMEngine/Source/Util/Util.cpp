@@ -719,6 +719,17 @@ namespace Util
 		return Empty;
 	}
 
+	Yaml::Node& GetPipelineLayoutNode(Yaml::Node& PipelineNode)
+	{
+		if (!PipelineNode["PipelineLayout"].IsNone())
+		{
+			return PipelineNode["PipelineLayout"];
+		}
+		assert(false);
+		static Yaml::Node Empty;
+		return Empty;
+	}
+
 	VkPipelineRasterizationStateCreateInfo ParsePipelineRasterizationNode(Yaml::Node& RasterizationNode)
 	{
 		VkPipelineRasterizationStateCreateInfo OutRasterizationState = {};
@@ -1674,16 +1685,24 @@ namespace Util
 		Description.BindingsCount = static_cast<u32>(Bindings.size());
 	}
 
-	RenderResources::BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, VkPipelineLayout PipelineLayout, const VulkanHelper::PipelineResourceInfo& ResourceInfo)
+	RenderResources::BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, const VulkanHelper::PipelineResourceInfo& ResourceInfo)
 	{
 		RenderResources::BmRender_PipelineDescription Description = {};
 		Description.Extent = Extent;
-		Description.PipelineLayout = PipelineLayout;
 		Description.ResourceInfo = ResourceInfo;
 
 		Yaml::Node Root;
 		Yaml::Parse(Root, YamlFilePath.c_str());
 		Yaml::Node& PipelineNode = GetPipelineNode(Root);
+
+		// Parse pipeline layout
+		Yaml::Node& PipelineLayoutNode = GetPipelineLayoutNode(PipelineNode);
+		for (auto it = PipelineLayoutNode.Begin(); it != PipelineLayoutNode.End(); it++)
+		{
+			std::string LayoutName = (*it).second.As<std::string>();
+			VkDescriptorSetLayout Layout = RenderResources::GetSetLayout(LayoutName)->Layout;
+			Description.DescriptorSetLayouts.push_back(Layout);
+		}
 
 		// Parse shader stages
 		Yaml::Node& ShadersNode = GetPipelineShadersNode(PipelineNode);

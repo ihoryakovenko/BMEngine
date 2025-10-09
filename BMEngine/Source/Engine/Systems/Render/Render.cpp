@@ -92,44 +92,25 @@ namespace Render
 			MeshPipeline->ShadowMapArraySet[i] = RenderResources::GetDescriptorSet(ShadowMapSetName)->Set;
 		}
 
-		VkDescriptorSetLayout StaticMeshDescriptorLayouts[] =
-		{
-			RenderResources::GetSetLayout("FrameDataLayout")->Layout,
-			RenderResources::GetSetLayout("BindlesTexturesLayout")->Layout,
-			RenderResources::GetSetLayout("FrameDataLayout")->Layout,
-			RenderResources::GetSetLayout("MaterialLayout")->Layout,
-			RenderResources::GetSetLayout("ShadowMapArrayLayout")->Layout
-		};
+		VulkanHelper::PipelineResourceInfo ResourceInfo = {};
+		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
 
-		const u32 StaticMeshDescriptorLayoutCount = sizeof(StaticMeshDescriptorLayouts) / sizeof(StaticMeshDescriptorLayouts[0]);
+		RenderResources::BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/StaticMesh.yaml", MainScreenExtent, ResourceInfo);
 
-		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
-		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		PipelineLayoutCreateInfo.setLayoutCount = StaticMeshDescriptorLayoutCount;
-		PipelineLayoutCreateInfo.pSetLayouts = StaticMeshDescriptorLayouts;
-		PipelineLayoutCreateInfo.pushConstantRangeCount = 0;
-		PipelineLayoutCreateInfo.pPushConstantRanges = &MeshPipeline->PushConstants;
-
+		// Create pipeline layout from parsed descriptor set layouts
 		RenderResources::BmRender_PipelineLayoutDescription LayoutDesc = {};
-		LayoutDesc.SetLayoutCount = StaticMeshDescriptorLayoutCount;
-		LayoutDesc.SetLayouts = StaticMeshDescriptorLayouts;
+		LayoutDesc.SetLayoutCount = static_cast<u32>(PipelineDesc.DescriptorSetLayouts.size());
+		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts.data();
 		LayoutDesc.PushConstantRangeCount = 0;
 		LayoutDesc.PushConstantRanges = &MeshPipeline->PushConstants;
 		LayoutDesc.Flags = 0;
 		LayoutDesc.Next = nullptr;
 
 		RenderResources::CreatePipelineLayout("StaticMesh", LayoutDesc);
+		PipelineDesc.PipelineLayout = RenderResources::GetPipelineLayout("StaticMesh");
+		ResourceInfo.PipelineLayout = PipelineDesc.PipelineLayout;
 
-		VulkanHelper::PipelineResourceInfo ResourceInfo = {};
-		ResourceInfo.PipelineLayout = RenderResources::GetPipelineLayout("StaticMesh");
-		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
-
-		RenderResources::BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/StaticMesh.yaml", MainScreenExtent, RenderResources::GetPipelineLayout("StaticMesh"), ResourceInfo);
 		RenderResources::CreateGraphicsPipeline("StaticMesh", PipelineDesc);
-	}
-
-	static void DeInitStaticMeshPipeline(VkDevice Device, StaticMeshPipeline* MeshPipeline)
-	{
 	}
 
 	static void DrawStaticMeshes(VkDevice Device, VkCommandBuffer CmdBuffer, StaticMeshPipeline* MeshPipeline, DrawScene* Scene)
@@ -285,7 +266,6 @@ namespace Render
 		DeInitDrawState(Device, VulkanHelper::MAX_DRAW_FRAMES, &State.RenderDrawState);
 
 		//TerrainRender::DeInit();
-		DeInitStaticMeshPipeline(Device, &State.MeshPipeline);
 
 		MainPass::DeInit();
 		LightningPass::DeInit();
@@ -447,34 +427,25 @@ namespace DeferredPass
 		}
 
 
-		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
-		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		PipelineLayoutCreateInfo.setLayoutCount = 1;
-		PipelineLayoutCreateInfo.pSetLayouts = &DeferredInputLayout;
+		VulkanHelper::PipelineResourceInfo ResourceInfo;
+		ResourceInfo.PipelineAttachmentData = AttachmentData;
 
+		RenderResources::BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/DeferredPipeline.yaml", MainScreenExtent, ResourceInfo);
+
+		// Create pipeline layout from parsed descriptor set layouts
 		RenderResources::BmRender_PipelineLayoutDescription LayoutDesc = {};
-		LayoutDesc.SetLayoutCount = 1;
-		LayoutDesc.SetLayouts = &DeferredInputLayout;
+		LayoutDesc.SetLayoutCount = static_cast<u32>(PipelineDesc.DescriptorSetLayouts.size());
+		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts.data();
 		LayoutDesc.PushConstantRangeCount = 0;
 		LayoutDesc.PushConstantRanges = nullptr;
 		LayoutDesc.Flags = 0;
 		LayoutDesc.Next = nullptr;
 
 		RenderResources::CreatePipelineLayout("Deferred", LayoutDesc);
+		PipelineDesc.PipelineLayout = RenderResources::GetPipelineLayout("Deferred");
+		ResourceInfo.PipelineLayout = PipelineDesc.PipelineLayout;
 
-		VulkanHelper::PipelineResourceInfo ResourceInfo;
-		ResourceInfo.PipelineLayout = RenderResources::GetPipelineLayout("Deferred");
-		ResourceInfo.PipelineAttachmentData = AttachmentData;
-
-		RenderResources::BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/DeferredPipeline.yaml", MainScreenExtent, RenderResources::GetPipelineLayout("Deferred"), ResourceInfo);
 		RenderResources::CreateGraphicsPipeline("Deferred", PipelineDesc);
-	}
-
-	void DeInit()
-	{
-		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-
-
 	}
 
 	void Draw()
@@ -654,12 +625,12 @@ namespace LightningPass
 {
 	static VkDescriptorSetLayout LightSpaceMatrixLayout;
 
-	static VulkanInterface::UniformBuffer LightSpaceMatrixBuffer[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
-
 	static VkDescriptorSet LightSpaceMatrixSet[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
-	static VkImageView ShadowMapElement1ImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
-	static VkImageView ShadowMapElement2ImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static BmRender_BufferRegion LightSpaceMatrixBufferRegion[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+
+	static BmRender_ImageViewResource ShadowMapElement1ImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static BmRender_ImageViewResource ShadowMapElement2ImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 	static VkPushConstantRange PushConstants;
 
@@ -677,77 +648,24 @@ namespace LightningPass
 		{
 			const VkDeviceSize LightSpaceMatrixSize = sizeof(glm::mat4);
 
-			VkBufferCreateInfo BufferInfo = { };
-			BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-			BufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-			BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-			BufferInfo.size = LightSpaceMatrixSize;
+			std::string BufferName = "LightSpaceMatrixBuffer" + std::to_string(i);
+			BmRender_CreateUniformBuffer(LightSpaceMatrixSize, BufferUpdateFrequency::PerFrame, StageBarier::Vertex, BufferName);
+			LightSpaceMatrixBufferRegion[i] = RenderResources::CreateBufferRegion(0, BufferName);
 
-			LightSpaceMatrixBuffer[i].Buffer = VulkanHelper::CreateBuffer(Device, LightSpaceMatrixSize, BufferUsageFlag::UniformFlag);
-			VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, LightSpaceMatrixBuffer[i].Buffer,
-				MemoryPropertyFlag::HostCompatible);
-			LightSpaceMatrixBuffer[i].Memory = AllocResult.Memory;
-			vkBindBufferMemory(Device, LightSpaceMatrixBuffer[i].Buffer, LightSpaceMatrixBuffer[i].Memory, 0);
+			std::string DescriptorSetName = "LightSpaceMatrixSet" + std::to_string(i);
+			BmRender_CreateDescriptorSet(DescriptorSetName, "LightSpaceMatrixLayout", "MainPool");
 
-			VkDescriptorSetAllocateInfo AllocInfo = { };
-			AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			AllocInfo.descriptorPool = RenderResources::GetDescriptorPool("MainPool");
-			AllocInfo.descriptorSetCount = 1;
-			AllocInfo.pSetLayouts = &LightSpaceMatrixLayout;
-			VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, LightSpaceMatrixSet + i));
+			BmRender_DescriptorSetBinding LightSpaceMatrixBinding;
+			LightSpaceMatrixBinding.BufferBinding.Buffer = BufferName;
+			LightSpaceMatrixBinding.BufferBinding.Offset = 0;
+			LightSpaceMatrixBinding.BufferBinding.Range = LightSpaceMatrixSize;
+			LightSpaceMatrixBinding.DstArrayElement = 0;
 
-			VkImageViewCreateInfo ViewCreateInfo1 = { };
-			ViewCreateInfo1.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-			ViewCreateInfo1.image = RenderResources::GetImage(ShadowMapArray);
-			ViewCreateInfo1.viewType = VK_IMAGE_VIEW_TYPE_2D;
-			ViewCreateInfo1.format = DepthFormat;
-			ViewCreateInfo1.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ViewCreateInfo1.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ViewCreateInfo1.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ViewCreateInfo1.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ViewCreateInfo1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-			ViewCreateInfo1.subresourceRange.baseMipLevel = 0;
-			ViewCreateInfo1.subresourceRange.levelCount = 1;
-			ViewCreateInfo1.subresourceRange.baseArrayLayer = MAX_LIGHT_SOURCES * i;
-			ViewCreateInfo1.subresourceRange.layerCount = 1;
-			ViewCreateInfo1.pNext = nullptr;
+			BmRender_BindDescriptorSet(DescriptorSetName, &LightSpaceMatrixBinding, 1);
+			LightSpaceMatrixSet[i] = RenderResources::GetDescriptorSet(DescriptorSetName)->Set;
 
-			VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo1, nullptr, &ShadowMapElement1ImageInterface[i]));
-
-			VkImageViewCreateInfo ViewCreateInfo2 = { };
-			ViewCreateInfo2.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-			ViewCreateInfo2.image = RenderResources::GetImage(ShadowMapArray);
-			ViewCreateInfo2.viewType = VK_IMAGE_VIEW_TYPE_2D;
-			ViewCreateInfo2.format = DepthFormat;
-			ViewCreateInfo2.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ViewCreateInfo2.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ViewCreateInfo2.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ViewCreateInfo2.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ViewCreateInfo2.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-			ViewCreateInfo2.subresourceRange.baseMipLevel = 0;
-			ViewCreateInfo2.subresourceRange.levelCount = 1;
-			ViewCreateInfo2.subresourceRange.baseArrayLayer = MAX_LIGHT_SOURCES * i + 1;
-			ViewCreateInfo2.subresourceRange.layerCount = 1;
-			ViewCreateInfo2.pNext = nullptr;
-
-			VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo2, nullptr, &ShadowMapElement2ImageInterface[i]));
-
-			VkDescriptorBufferInfo LightSpaceMatrixBufferInfo;
-			LightSpaceMatrixBufferInfo.buffer = LightSpaceMatrixBuffer[i].Buffer;
-			LightSpaceMatrixBufferInfo.offset = 0;
-			LightSpaceMatrixBufferInfo.range = LightSpaceMatrixSize;
-
-			VkWriteDescriptorSet WriteDescriptorSet = { };
-			WriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			WriteDescriptorSet.dstSet = LightSpaceMatrixSet[i];
-			WriteDescriptorSet.dstBinding = 0;
-			WriteDescriptorSet.dstArrayElement = 0;
-			WriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			WriteDescriptorSet.descriptorCount = 1;
-			WriteDescriptorSet.pBufferInfo = &LightSpaceMatrixBufferInfo;
-			WriteDescriptorSet.pImageInfo = nullptr;
-
-			vkUpdateDescriptorSets(Device, 1, &WriteDescriptorSet, 0, nullptr);
+			ShadowMapElement1ImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_LIGHT_SOURCES * i, 1, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+			ShadowMapElement2ImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_LIGHT_SOURCES * i + 1, 1, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
 		}
 
 		PushConstants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
@@ -755,45 +673,27 @@ namespace LightningPass
 		// Todo: check constant and model size?
 		PushConstants.size = sizeof(glm::mat4);
 
-		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
-		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		PipelineLayoutCreateInfo.setLayoutCount = 1;
-		PipelineLayoutCreateInfo.pSetLayouts = &LightSpaceMatrixLayout;
-		PipelineLayoutCreateInfo.pushConstantRangeCount = 1;
-		PipelineLayoutCreateInfo.pPushConstantRanges = &PushConstants;
+		VulkanHelper::PipelineResourceInfo ResourceInfo;
+		ResourceInfo.PipelineAttachmentData.ColorAttachmentCount = 0;
+		ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = DepthFormat;
+		ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
+		RenderResources::BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/DepthPipeline.yaml", DepthViewportExtent, ResourceInfo);
+
+		// Create pipeline layout from parsed descriptor set layouts
 		RenderResources::BmRender_PipelineLayoutDescription LayoutDesc = {};
-		LayoutDesc.SetLayoutCount = 1;
-		LayoutDesc.SetLayouts = &LightSpaceMatrixLayout;
+		LayoutDesc.SetLayoutCount = static_cast<u32>(PipelineDesc.DescriptorSetLayouts.size());
+		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts.data();
 		LayoutDesc.PushConstantRangeCount = 1;
 		LayoutDesc.PushConstantRanges = &PushConstants;
 		LayoutDesc.Flags = 0;
 		LayoutDesc.Next = nullptr;
 
 		RenderResources::CreatePipelineLayout("Depth", LayoutDesc);
+		PipelineDesc.PipelineLayout = RenderResources::GetPipelineLayout("Depth");
+		ResourceInfo.PipelineLayout = PipelineDesc.PipelineLayout;
 
-		VulkanHelper::PipelineResourceInfo ResourceInfo;
-		ResourceInfo.PipelineLayout = RenderResources::GetPipelineLayout("Depth");
-		ResourceInfo.PipelineAttachmentData.ColorAttachmentCount = 0;
-		ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = DepthFormat;
-		ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
-
-		RenderResources::BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/DepthPipeline.yaml", DepthViewportExtent, RenderResources::GetPipelineLayout("Depth"), ResourceInfo);
 		RenderResources::CreateGraphicsPipeline("Depth", PipelineDesc);
-	}
-
-	void DeInit()
-	{
-		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-
-		for (u32 i = 0; i < RenderResources::GetCoreContext()->ImagesCount; i++)
-		{
-			vkDestroyBuffer(Device, LightSpaceMatrixBuffer[i].Buffer, nullptr);
-			vkFreeMemory(Device, LightSpaceMatrixBuffer[i].Memory, nullptr);
-
-			vkDestroyImageView(Device, ShadowMapElement1ImageInterface[i], nullptr);
-			vkDestroyImageView(Device, ShadowMapElement2ImageInterface[i], nullptr);
-		}
 	}
 
 	void Draw(Render::DrawScene* Scene)
@@ -809,8 +709,8 @@ namespace LightningPass
 		};
 
 		VkImageView Attachments[2];
-		Attachments[0] = ShadowMapElement1ImageInterface[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
-		Attachments[1] = ShadowMapElement2ImageInterface[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
+		Attachments[0] = RenderResources::GetImageView(ShadowMapElement1ImageInterface[Render::GetRenderState()->RenderDrawState.CurrentImageIndex]);
+		Attachments[1] = RenderResources::GetImageView(ShadowMapElement2ImageInterface[Render::GetRenderState()->RenderDrawState.CurrentImageIndex]);
 
 		VkImageMemoryBarrier2 DepthAttachmentTransitionBefore = { };
 		DepthAttachmentTransitionBefore.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -836,8 +736,7 @@ namespace LightningPass
 
 		for (u32 LightCaster = 0; LightCaster < MAX_LIGHT_SOURCES; ++LightCaster)
 		{
-			VulkanHelper::UpdateHostCompatibleBufferMemory(Device, LightSpaceMatrixBuffer[LightCaster].Memory, sizeof(glm::mat4), 0,
-				LightViews[LightCaster]);
+			RenderResources::UpdateBufferRegion(LightSpaceMatrixBufferRegion[LightCaster], 0, LightViews[LightCaster], sizeof(glm::mat4));
 
 			VkRect2D RenderArea;
 			RenderArea.extent = DepthViewportExtent;
@@ -977,43 +876,27 @@ namespace MainPass
 		LayoutCreateInfo.flags = 0;
 		LayoutCreateInfo.pNext = nullptr;
 
-		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(RenderResources::GetCoreContext()->LogicalDevice, &LayoutCreateInfo, nullptr, &SkyBoxLayout));
-
-		const u32 SkyBoxDescriptorLayoutCount = 2;
-		VkDescriptorSetLayout SkyBoxDescriptorLayouts[SkyBoxDescriptorLayoutCount] =
-		{
-			RenderResources::GetSetLayout("FrameDataLayout")->Layout,
-			SkyBoxLayout,
-		};
-
-		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
-		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		PipelineLayoutCreateInfo.setLayoutCount = SkyBoxDescriptorLayoutCount;
-		PipelineLayoutCreateInfo.pSetLayouts = SkyBoxDescriptorLayouts;
-
-		RenderResources::BmRender_PipelineLayoutDescription LayoutDesc = {};
-		LayoutDesc.SetLayoutCount = SkyBoxDescriptorLayoutCount;
-		LayoutDesc.SetLayouts = SkyBoxDescriptorLayouts;
-		LayoutDesc.PushConstantRangeCount = 0;
-		LayoutDesc.PushConstantRanges = nullptr;
-		LayoutDesc.Flags = 0;
-		LayoutDesc.Next = nullptr;
-
-		RenderResources::CreatePipelineLayout("SkyBox", LayoutDesc);
+		//VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(RenderResources::GetCoreContext()->LogicalDevice, &LayoutCreateInfo, nullptr, &SkyBoxLayout));
 
 		VulkanHelper::PipelineResourceInfo ResourceInfo;
-		ResourceInfo.PipelineLayout = RenderResources::GetPipelineLayout("SkyBox");
 		ResourceInfo.PipelineAttachmentData = AttachmentData;
 
-		RenderResources::BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/SkyBoxPipeline.yaml", MainScreenExtent, RenderResources::GetPipelineLayout("SkyBox"), ResourceInfo);
-		RenderResources::CreateGraphicsPipeline("SkyBox", PipelineDesc);
-	}
+		//RenderResources::BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/SkyBoxPipeline.yaml", MainScreenExtent, ResourceInfo);
 
-	void DeInit()
-	{
-		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+		//// Create pipeline layout from parsed descriptor set layouts
+		//RenderResources::BmRender_PipelineLayoutDescription LayoutDesc = {};
+		//LayoutDesc.SetLayoutCount = static_cast<u32>(PipelineDesc.DescriptorSetLayouts.size());
+		//LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts.data();
+		//LayoutDesc.PushConstantRangeCount = 0;
+		//LayoutDesc.PushConstantRanges = nullptr;
+		//LayoutDesc.Flags = 0;
+		//LayoutDesc.Next = nullptr;
 
-		vkDestroyDescriptorSetLayout(RenderResources::GetCoreContext()->LogicalDevice, SkyBoxLayout, nullptr);
+		//RenderResources::CreatePipelineLayout("SkyBox", LayoutDesc);
+		//PipelineDesc.PipelineLayout = RenderResources::GetPipelineLayout("SkyBox");
+		//ResourceInfo.PipelineLayout = PipelineDesc.PipelineLayout;
+
+		//RenderResources::CreateGraphicsPipeline("SkyBox", PipelineDesc);
 	}
 
 	void BeginPass()
@@ -1190,50 +1073,32 @@ namespace TerrainRender
 
 		const Render::RenderState* State = Render::GetRenderState();
 
-		VkDescriptorSetLayout TerrainDescriptorLayouts[] =
-		{
-			RenderResources::GetSetLayout("FrameDataLayout")->Layout,
-			RenderResources::GetSetLayout("BindlesTexturesLayout")->Layout,
-			RenderResources::GetSetLayout("MaterialLayout")->Layout,
-		};
-
-		const u32 LayoutsCount = sizeof(TerrainDescriptorLayouts) / sizeof(TerrainDescriptorLayouts[0]);
-
 		PushConstants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 		PushConstants.offset = 0;
 		// Todo: check constant and model size?
 		PushConstants.size = sizeof(PushConstantsData);
 
-		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = { };
-		PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		PipelineLayoutCreateInfo.setLayoutCount = LayoutsCount;
-		PipelineLayoutCreateInfo.pSetLayouts = TerrainDescriptorLayouts;
-		PipelineLayoutCreateInfo.pushConstantRangeCount = 1;
-		PipelineLayoutCreateInfo.pPushConstantRanges = &PushConstants;
+		VulkanHelper::PipelineResourceInfo ResourceInfo;
+		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
 
+		RenderResources::BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/TerrainPipeline.yaml", MainScreenExtent, ResourceInfo);
+
+		// Create pipeline layout from parsed descriptor set layouts
 		RenderResources::BmRender_PipelineLayoutDescription LayoutDesc = {};
-		LayoutDesc.SetLayoutCount = LayoutsCount;
-		LayoutDesc.SetLayouts = TerrainDescriptorLayouts;
+		LayoutDesc.SetLayoutCount = static_cast<u32>(PipelineDesc.DescriptorSetLayouts.size());
+		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts.data();
 		LayoutDesc.PushConstantRangeCount = 1;
 		LayoutDesc.PushConstantRanges = &PushConstants;
 		LayoutDesc.Flags = 0;
 		LayoutDesc.Next = nullptr;
 
 		RenderResources::CreatePipelineLayout("Terrain", LayoutDesc);
+		PipelineDesc.PipelineLayout = RenderResources::GetPipelineLayout("Terrain");
+		ResourceInfo.PipelineLayout = PipelineDesc.PipelineLayout;
 
-		VulkanHelper::PipelineResourceInfo ResourceInfo;
-		ResourceInfo.PipelineLayout = RenderResources::GetPipelineLayout("Terrain");
-		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
-
-		RenderResources::BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/TerrainPipeline.yaml", MainScreenExtent, RenderResources::GetPipelineLayout("Terrain"), ResourceInfo);
 		RenderResources::CreateGraphicsPipeline("Terrain", PipelineDesc);
 
 		LoadTerrain();
-	}
-
-	void DeInit()
-	{
-		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 	}
 
 	void Draw()

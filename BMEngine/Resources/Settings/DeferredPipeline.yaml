@@ -3,6 +3,9 @@ pipeline:
     vertex:   DeferredVertex
     fragment: DeferredFragment
 
+  PipelineLayout:
+    - MainPassOutputLayout
+
   rasterization:
     depthClampEnable: false
     rasterizerDiscardEnable: false

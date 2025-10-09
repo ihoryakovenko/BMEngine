@@ -3,6 +3,10 @@ pipeline:
     vertex:   SkyBoxVertex
     fragment: SkyBoxFragment
 
+  PipelineLayout:
+    - FrameDataLayout
+    - SkyBoxLayout
+
   VertexAttributeLayout:
     - name: SkyBoxVertex
       attributes:

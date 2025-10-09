@@ -47,6 +47,11 @@ namespace RenderResources
 		std::vector<VkVertexInputBindingDescription> VertexBindings;
 		std::vector<VkVertexInputAttributeDescription> VertexAttributes;
 
+		// Pipeline layout information
+		std::vector<VkDescriptorSetLayout> DescriptorSetLayouts;
+		std::vector<VkPushConstantRange> PushConstantRanges;
+		VkPipelineLayoutCreateFlags PipelineLayoutFlags;
+
 		VkPipelineRasterizationStateCreateInfo RasterizationState;
 		VkPipelineColorBlendAttachmentState ColorBlendAttachment;
 		VkPipelineColorBlendStateCreateInfo ColorBlendState;
