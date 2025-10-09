@@ -45,6 +45,7 @@ namespace RenderResources
 		std::unordered_map<std::string, VkPipeline> Pipelines;
 		std::unordered_map<std::string, VkPipelineLayout> PipelineLayouts;
 
+		Memory::Array<VkPushConstantRange> PushConstants;
 		Memory::Array<DescriptorSetLayoutBinding> LayoutBindings;
 		Memory::Array<GPUBufferEntry> ResourceRecords;
 		Memory::Array<ImageResource> Images;
@@ -111,6 +112,10 @@ namespace RenderResources
 		ResContext.LayoutBindings.Capacity = 20;
 		ResContext.LayoutBindings.Count = 0;
 		ResContext.LayoutBindings.Data = (DescriptorSetLayoutBinding*)malloc(ResContext.ResourceRecords.Capacity * sizeof(ResContext.ResourceRecords.Data[0]));
+
+		ResContext.PushConstants.Capacity = 10;
+		ResContext.PushConstants.Count = 0;
+		ResContext.PushConstants.Data = (VkPushConstantRange*)malloc(ResContext.ResourceRecords.Capacity * sizeof(ResContext.ResourceRecords.Data[0]));
 	}
 
 	void CreateGraphicsPipeline(const std::string& Name, const BmRender_PipelineDescription& Description)
@@ -182,7 +187,7 @@ namespace RenderResources
 		ResContext.PipelineLayouts[Name] = PipelineLayout;
 	}
 
-	void CreateBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, BufferUsageFlag Flag, const std::string& Name)
+	void CreateBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, BufferUsageFlag Flag, const std::string& Name)
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 		VkPhysicalDevice PhDevice = ResContext.CoreContext.PhysicalDevice;
@@ -251,6 +256,11 @@ namespace RenderResources
 		return ResContext.ImageViews.Data[(u64)Handle];
 	}
 
+	VkPushConstantRange GetPushConstant(BmRender_PushConstant Handle)
+	{
+		return ResContext.PushConstants.Data[(u64)Handle];
+	}
+
 	void DeInit()
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
@@ -313,6 +323,7 @@ namespace RenderResources
 		free(ResContext.Images.Data);
 		free(ResContext.ResourceRecords.Data);
 		free(ResContext.LayoutBindings.Data);
+		free(ResContext.PushConstants.Data);
 	}
 
 	void CreateVertex(const std::string& Name, VulkanHelper::VertexBinding& Binding)
@@ -377,7 +388,7 @@ namespace RenderResources
 
 		NewBuffer.Capacity = Capacity;
 		NewBuffer.PropertyFlag = UpdateFrequency == BufferUpdateFrequency::Static ? MemoryPropertyFlag::GPULocal : MemoryPropertyFlag::HostCompatible;
-		NewBuffer.BufferStage = StageBarier::Vertex;
+		NewBuffer.BufferStage = PipelineStage::Vertex;
 		NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, Capacity, BufferUsageFlag::CombinedVertexIndexFlag);
 
 		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhDevice, Device, NewBuffer.Buffer, NewBuffer.PropertyFlag);
@@ -421,7 +432,7 @@ namespace RenderResources
 		ResContext.DescriptorSetLayouts[Name] = Layout;
 	}
 
-	void BindDescriptorSet(std::string DescriptorSetName, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount)
+	void UpdateDescriptorSet(std::string DescriptorSetName, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount)
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 
@@ -671,6 +682,18 @@ namespace RenderResources
 		Entry->GPUBufferHandle = GetGPUBuffer(BufferName);
 	
 		return (BmRender_BufferRegion)ResContext.ResourceRecords.Count++;
+	}
+
+	BmRender_PushConstant CreatePushConstant(PipelineStage Stage, u32 Offset, u32 Size)
+	{
+		assert(ResContext.PushConstants.Count < ResContext.PushConstants.Capacity);
+
+		VkPushConstantRange* Constant = ResContext.PushConstants.Data + ResContext.PushConstants.Count;
+		Constant->offset = Offset;
+		Constant->size = Size;
+		Constant->stageFlags = (VkPipelineStageFlagBits)Stage;
+
+		return (BmRender_PushConstant)ResContext.PushConstants.Count;
 	}
 
 	void UpdateBufferRegion(BmRender_BufferRegion Handle, u64 ResourceOffset, const void* Data, u32 DataSize)

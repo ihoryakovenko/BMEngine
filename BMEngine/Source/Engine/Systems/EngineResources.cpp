@@ -73,7 +73,7 @@ namespace EngineResources
 
 		BmRender_DescriptorSetBinding Bindings[] = { DiffuseBinding, SpecularBinding };
 
-		BmRender_BindDescriptorSet("BindlesTexturesSet", Bindings, 2);
+		BmRender_UpdateDescriptorSet("BindlesTexturesSet", Bindings, 2);
 
 		TextureAssets[DefaultAssetId] = DefaultAsset;
 	}
@@ -148,7 +148,7 @@ namespace EngineResources
 
 							BmRender_DescriptorSetBinding Bindings[] = { DiffuseBinding, SpecularBinding };
 
-							BmRender_BindDescriptorSet("BindlesTexturesSet", Bindings, 2);
+							BmRender_UpdateDescriptorSet("BindlesTexturesSet", Bindings, 2);
 
 							++TexturesGPUIndexCounter;
 						}

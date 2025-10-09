@@ -75,7 +75,7 @@ namespace RenderResources
 		VkDeviceMemory Memory;
 		u64 Capacity;
 		MemoryPropertyFlag PropertyFlag;
-		StageBarier BufferStage;
+		PipelineStage BufferStage;
 		BufferUpdateFrequency UpdateFrequency;
 	};
 
@@ -87,16 +87,17 @@ namespace RenderResources
 	void CreateSampler(const std::string& Name, const BmRender_SamplerDescription& Data);
 	void CreateGeometryBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, std::string& Name);
 	void CreateDescriptorSetLayout(const std::string& Name, const BmRender_DescriptorSetLayoutDescription& Description);
-	void BindDescriptorSet(std::string DescriptorSet, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount);
+	void UpdateDescriptorSet(std::string DescriptorSet, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount);
 	void CreateDescriptorSet(const std::string& Name, const std::string& LayoutName, const std::string& PoolName);
 	void CreateGraphicsPipeline(const std::string& Name, const BmRender_PipelineDescription& Description);
 	void CreatePipelineLayout(const std::string& Name, const BmRender_PipelineLayoutDescription& Description);
 
-	void CreateBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, BufferUsageFlag Flag, const std::string& Name);
+	void CreateBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, BufferUsageFlag Flag, const std::string& Name);
 
 	BmRender_ImageResource CreateImageResource(BmRender_ImageDescription* Description);
 	BmRender_ImageViewResource CreateImageView(BmRender_ImageResource Handle, u32 BaseArrayLayer, u32 LayerCount, VkImageViewType ViewType, VkImageAspectFlags AspectFlags);
 	BmRender_BufferRegion CreateBufferRegion(u64 BufferOffset, const std::string& BufferName);
+	BmRender_PushConstant CreatePushConstant(PipelineStage Stage, u32 Offset, u32 Size);
 
 	void UpdateBufferRegion(BmRender_BufferRegion Handle, u64 ResourceOffset, const void* Data, u32 DataSize);
 	void UpdateImageResource(BmRender_ImageResource Handle, BmRender_ImageDescription* Description, void* Data);
@@ -116,6 +117,7 @@ namespace RenderResources
 	VkPipelineLayout GetPipelineLayout(const std::string& Name);
 	VkImage GetImage(BmRender_ImageResource Handle);
 	VkImageView GetImageView(BmRender_ImageViewResource Handle);
+	VkPushConstantRange GetPushConstant(BmRender_PushConstant Handle);
 
 	bool IsBufferResourceReady(BmRender_BufferRegion Handle);
 	bool IsImageResourceReady(BmRender_ImageResource Handle);

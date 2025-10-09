@@ -10,6 +10,8 @@ pipeline:
     - MaterialLayout
     - ShadowMapArrayLayout
 
+  PushConstant: MainConstant
+
   VertexAttributeLayout:
     - name: StaticMeshVertex
       attributes:

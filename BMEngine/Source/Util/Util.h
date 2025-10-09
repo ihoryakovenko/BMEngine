@@ -281,6 +281,12 @@ namespace Util
 	Yaml::Node& GetVertexAttributeLayoutNode(Yaml::Node& PipelineNode);
 	Yaml::Node& GetPipelineViewportStateNode(Yaml::Node& PipelineNode);
 	Yaml::Node& GetPipelineLayoutNode(Yaml::Node& PipelineNode);
+	Yaml::Node& GetPushConstantNode(Yaml::Node& PipelineNode);
+	Yaml::Node& GetPushConstantsFromResources(Yaml::Node& Root);
+	
+	// Push constant management
+	extern std::unordered_map<std::string, BmRender_PushConstant> PushConstants;
+	void ParseAndCreatePushConstants(Yaml::Node& PushConstantsNode);
 	Yaml::Node& GetViewportNode(Yaml::Node& PipelineNode);
 	Yaml::Node& GetScissorNode(Yaml::Node& PipelineNode);
 	
@@ -288,7 +294,7 @@ namespace Util
 	Yaml::Node& GetTextures(Yaml::Node& Root);
 	Yaml::Node& GetModels(Yaml::Node& Root);
 
-	void ParseShaderBufferFromYaml(Yaml::Node& BufferNode, u64& Capacity, BufferUpdateFrequency& UpdateFrequency, StageBarier& StageBarrier, std::string& OutName);
+	void ParseShaderBufferFromYaml(Yaml::Node& BufferNode, u64& Capacity, BufferUpdateFrequency& UpdateFrequency, PipelineStage& StageBarrier, std::string& OutName);
 	void ParseGeometryBufferFromYaml(Yaml::Node& BufferNode, u64& Capacity, BufferUpdateFrequency& UpdateFrequency, std::string& OutName);
 	
 	std::string GetModelPath(Yaml::Node& ModelNode);
@@ -336,7 +342,7 @@ namespace Util
 
 	BufferUsageFlag ParseBufferUsageFlag(const char* Value, u32 Length);
 	MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length);
-	StageBarier ParseStageBarrier(const char* Value, u32 Length);
+	PipelineStage ParseStageBarrier(const char* Value, u32 Length);
 	BufferUpdateFrequency ParseUpdateFrequency(const char* Value, u32 Length);
 	std::string GetBufferName(Yaml::Node& BufferNode);
 	
@@ -344,6 +350,7 @@ namespace Util
 	std::vector<DescriptorSetLayout> ParseDescriptorSetLayouts(Yaml::Node& DescriptorSetLayoutsNode);
 	
 	void ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode, BmRender_DescriptorSetLayoutDescription& Description, std::vector<BmRender_LayoutBinding>& Bindings);
+	void ParsePushConstantsFromYaml(Yaml::Node& PushConstantsNode, std::vector<VkPushConstantRange>& PushConstantRanges);
 	RenderResources::BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, const VulkanHelper::PipelineResourceInfo& ResourceInfo);
 	
 	VkFormat GliFormatToVkFormat(gli::format Format);

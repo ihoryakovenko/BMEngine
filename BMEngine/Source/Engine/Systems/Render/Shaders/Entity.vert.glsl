@@ -12,6 +12,10 @@ layout(set = 0, binding = 0) uniform UboViewProjection
 	mat4 Projection;
 } ViewProjection;
 
+layout(push_constant) uniform PushConstants {
+	uint FrameIndex;
+} Constants;
+
 layout(location = 0) out vec2 FragmentTexture;
 layout(location = 1) out vec3 FragmentNormal;
 layout(location = 2) out vec4 WorldFragPos;

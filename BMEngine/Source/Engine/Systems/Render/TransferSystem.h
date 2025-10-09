@@ -26,7 +26,7 @@ namespace TransferSystem
 		VkBuffer DstBuffer;
 		u64 DstOffset;
 		BmRender_BufferRegion Handle;
-		StageBarier StageBarrier;
+		PipelineStage StageBarrier;
 	};
 
 	struct TransferTask

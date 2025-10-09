@@ -54,6 +54,8 @@ template<> struct std::hash<EngineResources::StaticMeshVertex>
 
 namespace Util
 {
+	// Global push constants map
+	std::unordered_map<std::string, BmRender_PushConstant> PushConstants;
 	template<size_t N>
 	bool StringMatches(const char* Value, u32 Length, const char* const (&Strings)[N])
 	{
@@ -1524,19 +1526,19 @@ namespace Util
 		return MemoryPropertyFlag::GPULocal;
 	}
 
-	StageBarier ParseStageBarrier(const char* Value, u32 Length)
+	PipelineStage ParseStageBarrier(const char* Value, u32 Length)
 	{
 		if (strncmp(Value, "Vertex", Length) == 0)
 		{
-			return StageBarier::Vertex;
+			return PipelineStage::Vertex;
 		}
 		else if (strncmp(Value, "Fragment", Length) == 0)
 		{
-			return StageBarier::Fragment;
+			return PipelineStage::Fragment;
 		}
 
 		assert(false);
-		return StageBarier::Fragment;
+		return PipelineStage::Fragment;
 	}
 
 	BufferUpdateFrequency ParseUpdateFrequency(const char* Value, u32 Length)
@@ -1630,7 +1632,7 @@ namespace Util
 		return Layouts;
 	}
 
-	void ParseShaderBufferFromYaml(Yaml::Node& BufferNode, u64& Capacity, BufferUpdateFrequency& UpdateFrequency, StageBarier& StageBarrier, std::string& OutName)
+	void ParseShaderBufferFromYaml(Yaml::Node& BufferNode, u64& Capacity, BufferUpdateFrequency& UpdateFrequency, PipelineStage& StageBarrier, std::string& OutName)
 	{
 		OutName = GetBufferName(BufferNode);
 		if (!BufferNode["Capacity"].IsNone())
@@ -1685,6 +1687,163 @@ namespace Util
 		Description.BindingsCount = static_cast<u32>(Bindings.size());
 	}
 
+	Yaml::Node& GetPushConstantNode(Yaml::Node& PipelineNode)
+	{
+		if (!PipelineNode["PushConstant"].IsNone())
+		{
+			return PipelineNode["PushConstant"];
+		}
+		static Yaml::Node Empty;
+		return Empty;
+	}
+
+	Yaml::Node& GetPushConstantsFromResources(Yaml::Node& Root)
+	{
+		if (!Root["PushConstants"].IsNone())
+		{
+			return Root["PushConstants"];
+		}
+		static Yaml::Node Empty;
+		return Empty;
+	}
+
+	void ParseAndCreatePushConstants(Yaml::Node& PushConstantsNode)
+	{
+		for (auto it = PushConstantsNode.Begin(); it != PushConstantsNode.End(); it++)
+		{
+			std::string ConstantName = (*it).first;
+			Yaml::Node& ConstantNode = (*it).second;
+			
+			u32 totalSize = 0;
+			VkShaderStageFlags combinedStageFlags = 0;
+			
+			// Calculate total size and combine stage flags
+			for (auto TypeIt = ConstantNode.Begin(); TypeIt != ConstantNode.End(); TypeIt++)
+			{
+				Yaml::Node& TypeNode = (*TypeIt).second;
+				std::string TypeName = TypeNode["type"].As<std::string>();
+				
+				u32 Size = 0;
+				VkShaderStageFlags StageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+				
+				// Calculate size based on type
+				if (TypeName == "uint" || TypeName == "int")
+				{
+					Size = sizeof(u32);
+				}
+				else if (TypeName == "float")
+				{
+					Size = sizeof(float);
+				}
+				else if (TypeName == "vec2")
+				{
+					Size = sizeof(float) * 2;
+				}
+				else if (TypeName == "vec3")
+				{
+					Size = sizeof(float) * 3;
+				}
+				else if (TypeName == "vec4")
+				{
+					Size = sizeof(float) * 4;
+				}
+				else if (TypeName == "mat4")
+				{
+					Size = sizeof(float) * 16;
+				}
+				else
+				{
+					assert(false && "Unsupported push constant type");
+				}
+				
+				// Parse stages if specified
+				if (!TypeNode["stages"].IsNone())
+				{
+					std::string StagesStr = TypeNode["stages"].As<std::string>();
+					StageFlags = ParseShaderStageFlags(StagesStr.c_str(), StagesStr.length());
+				}
+				
+				totalSize += Size;
+				combinedStageFlags |= StageFlags;
+			}
+			
+			// Create a single push constant handle for the entire definition
+			BmRender_PushConstant PushConstantHandle = RenderResources::CreatePushConstant(
+				static_cast<PipelineStage>(combinedStageFlags), 
+				0, // offset starts at 0 for the entire push constant
+				totalSize
+			);
+			
+			// Store the single handle
+			PushConstants[ConstantName] = PushConstantHandle;
+		}
+	}
+
+	void ParsePushConstantsFromYaml(Yaml::Node& PushConstantsNode, std::vector<VkPushConstantRange>& PushConstantRanges)
+	{
+		u32 currentOffset = 0;
+		
+		for (auto it = PushConstantsNode.Begin(); it != PushConstantsNode.End(); it++)
+		{
+			std::string ConstantName = (*it).first;
+			Yaml::Node& ConstantNode = (*it).second;
+			
+			// Parse each constant type in the array
+			for (auto TypeIt = ConstantNode.Begin(); TypeIt != ConstantNode.End(); TypeIt++)
+			{
+				Yaml::Node& TypeNode = (*TypeIt).second;
+				std::string TypeName = TypeNode["type"].As<std::string>();
+				
+				VkPushConstantRange Range = {};
+				Range.offset = currentOffset;
+				
+				// Calculate size based on type
+				if (TypeName == "uint" || TypeName == "int")
+				{
+					Range.size = sizeof(u32);
+				}
+				else if (TypeName == "float")
+				{
+					Range.size = sizeof(float);
+				}
+				else if (TypeName == "vec2")
+				{
+					Range.size = sizeof(float) * 2;
+				}
+				else if (TypeName == "vec3")
+				{
+					Range.size = sizeof(float) * 3;
+				}
+				else if (TypeName == "vec4")
+				{
+					Range.size = sizeof(float) * 4;
+				}
+				else if (TypeName == "mat4")
+				{
+					Range.size = sizeof(float) * 16;
+				}
+				else
+				{
+					assert(false && "Unsupported push constant type");
+				}
+				
+				// Parse stages if specified, otherwise default to vertex and fragment stages
+				if (!TypeNode["stages"].IsNone())
+				{
+					std::string StagesStr = TypeNode["stages"].As<std::string>();
+					Range.stageFlags = ParseShaderStageFlags(StagesStr.c_str(), StagesStr.length());
+				}
+				else
+				{
+					Range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+				}
+				
+				PushConstantRanges.push_back(Range);
+				currentOffset += Range.size;
+			}
+		}
+	}
+
 	RenderResources::BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, const VulkanHelper::PipelineResourceInfo& ResourceInfo)
 	{
 		RenderResources::BmRender_PipelineDescription Description = {};
@@ -1702,6 +1861,22 @@ namespace Util
 			std::string LayoutName = (*it).second.As<std::string>();
 			VkDescriptorSetLayout Layout = RenderResources::GetSetLayout(LayoutName)->Layout;
 			Description.DescriptorSetLayouts.push_back(Layout);
+		}
+
+		// Parse push constants
+		Yaml::Node& PushConstantNode = GetPushConstantNode(PipelineNode);
+		if (!PushConstantNode.IsNone())
+		{
+			std::string PushConstantName = PushConstantNode.As<std::string>();
+			
+			// Look up the push constant handle in the global map
+			auto it = PushConstants.find(PushConstantName);
+			if (it != PushConstants.end())
+			{
+				// Convert handle to range using GetPushConstant
+				VkPushConstantRange range = RenderResources::GetPushConstant(it->second);
+				Description.PushConstantRanges.push_back(range);
+			}
 		}
 
 		// Parse shader stages

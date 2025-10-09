@@ -87,7 +87,7 @@ namespace Render
 
 			std::string ShadowMapSetName = "ShadowMapArraySet" + std::to_string(i);
 			BmRender_CreateDescriptorSet(ShadowMapSetName, "ShadowMapArrayLayout", "MainPool");
-			BmRender_BindDescriptorSet(ShadowMapSetName, &ShadowMapBinding, 1);
+			BmRender_UpdateDescriptorSet(ShadowMapSetName, &ShadowMapBinding, 1);
 			
 			MeshPipeline->ShadowMapArraySet[i] = RenderResources::GetDescriptorSet(ShadowMapSetName)->Set;
 		}
@@ -101,8 +101,8 @@ namespace Render
 		RenderResources::BmRender_PipelineLayoutDescription LayoutDesc = {};
 		LayoutDesc.SetLayoutCount = static_cast<u32>(PipelineDesc.DescriptorSetLayouts.size());
 		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts.data();
-		LayoutDesc.PushConstantRangeCount = 0;
-		LayoutDesc.PushConstantRanges = &MeshPipeline->PushConstants;
+		LayoutDesc.PushConstantRangeCount = static_cast<u32>(PipelineDesc.PushConstantRanges.size());
+		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges.data();
 		LayoutDesc.Flags = 0;
 		LayoutDesc.Next = nullptr;
 
@@ -131,6 +131,8 @@ namespace Render
 		VkDescriptorSet BindlesTexturesSet = RenderResources::GetDescriptorSet("BindlesTexturesSet")->Set;
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
 			1, 1, &BindlesTexturesSet, 0, nullptr);
+
+		vkCmdPushConstants(CmdBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(u32), &Render::GetRenderState()->RenderDrawState.CurrentImageIndex);
 
 		const u32 LightDynamicOffset = Render::GetRenderState()->RenderDrawState.CurrentImageIndex * sizeof(LightBuffer);
 
@@ -266,10 +268,6 @@ namespace Render
 		DeInitDrawState(Device, VulkanHelper::MAX_DRAW_FRAMES, &State.RenderDrawState);
 
 		//TerrainRender::DeInit();
-
-		MainPass::DeInit();
-		LightningPass::DeInit();
-		DeferredPass::DeInit();
 
 		Memory::DestroyFrameMemory(&State.FrameMemory);
 	}
@@ -421,7 +419,7 @@ namespace DeferredPass
 
 			std::string DeferredInputSetName = "DeferredInputSet" + std::to_string(i);
 			BmRender_CreateDescriptorSet(DeferredInputSetName, "MainPassOutputLayout", "MainPool");
-			BmRender_BindDescriptorSet(DeferredInputSetName, Bindings, 2);
+			BmRender_UpdateDescriptorSet(DeferredInputSetName, Bindings, 2);
 			
 			DeferredInputSet[i] = RenderResources::GetDescriptorSet(DeferredInputSetName)->Set;
 		}
@@ -436,8 +434,8 @@ namespace DeferredPass
 		RenderResources::BmRender_PipelineLayoutDescription LayoutDesc = {};
 		LayoutDesc.SetLayoutCount = static_cast<u32>(PipelineDesc.DescriptorSetLayouts.size());
 		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts.data();
-		LayoutDesc.PushConstantRangeCount = 0;
-		LayoutDesc.PushConstantRanges = nullptr;
+		LayoutDesc.PushConstantRangeCount = static_cast<u32>(PipelineDesc.PushConstantRanges.size());
+		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges.data();
 		LayoutDesc.Flags = 0;
 		LayoutDesc.Next = nullptr;
 
@@ -649,7 +647,7 @@ namespace LightningPass
 			const VkDeviceSize LightSpaceMatrixSize = sizeof(glm::mat4);
 
 			std::string BufferName = "LightSpaceMatrixBuffer" + std::to_string(i);
-			BmRender_CreateUniformBuffer(LightSpaceMatrixSize, BufferUpdateFrequency::PerFrame, StageBarier::Vertex, BufferName);
+			BmRender_CreateUniformBuffer(LightSpaceMatrixSize, BufferUpdateFrequency::PerFrame, PipelineStage::Vertex, BufferName);
 			LightSpaceMatrixBufferRegion[i] = RenderResources::CreateBufferRegion(0, BufferName);
 
 			std::string DescriptorSetName = "LightSpaceMatrixSet" + std::to_string(i);
@@ -661,7 +659,7 @@ namespace LightningPass
 			LightSpaceMatrixBinding.BufferBinding.Range = LightSpaceMatrixSize;
 			LightSpaceMatrixBinding.DstArrayElement = 0;
 
-			BmRender_BindDescriptorSet(DescriptorSetName, &LightSpaceMatrixBinding, 1);
+			BmRender_UpdateDescriptorSet(DescriptorSetName, &LightSpaceMatrixBinding, 1);
 			LightSpaceMatrixSet[i] = RenderResources::GetDescriptorSet(DescriptorSetName)->Set;
 
 			ShadowMapElement1ImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_LIGHT_SOURCES * i, 1, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
@@ -684,8 +682,8 @@ namespace LightningPass
 		RenderResources::BmRender_PipelineLayoutDescription LayoutDesc = {};
 		LayoutDesc.SetLayoutCount = static_cast<u32>(PipelineDesc.DescriptorSetLayouts.size());
 		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts.data();
-		LayoutDesc.PushConstantRangeCount = 1;
-		LayoutDesc.PushConstantRanges = &PushConstants;
+		LayoutDesc.PushConstantRangeCount = static_cast<u32>(PipelineDesc.PushConstantRanges.size());
+		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges.data();
 		LayoutDesc.Flags = 0;
 		LayoutDesc.Next = nullptr;
 
@@ -1087,8 +1085,8 @@ namespace TerrainRender
 		RenderResources::BmRender_PipelineLayoutDescription LayoutDesc = {};
 		LayoutDesc.SetLayoutCount = static_cast<u32>(PipelineDesc.DescriptorSetLayouts.size());
 		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts.data();
-		LayoutDesc.PushConstantRangeCount = 1;
-		LayoutDesc.PushConstantRanges = &PushConstants;
+		LayoutDesc.PushConstantRangeCount = static_cast<u32>(PipelineDesc.PushConstantRanges.size());
+		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges.data();
 		LayoutDesc.Flags = 0;
 		LayoutDesc.Next = nullptr;
 

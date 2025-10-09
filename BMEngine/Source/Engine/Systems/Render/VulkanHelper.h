@@ -139,5 +139,5 @@ namespace VulkanHelper
 		VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
 		void* UserData);
 
-	void ApplyStageBarrier(VkBufferMemoryBarrier2* Barrier, StageBarier Stage);
+	void ApplyStageBarrier(VkBufferMemoryBarrier2* Barrier, PipelineStage Stage);
 }

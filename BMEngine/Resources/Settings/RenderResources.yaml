@@ -166,3 +166,8 @@ DescriptorSetLayouts:
       - type: uniform
         updateFrequency: Static
         stages: VERTEX | FRAGMENT
+
+PushConstants:
+  MainConstant:
+    - type: uint
+      stages: VERTEX | FRAGMENT

@@ -306,13 +306,14 @@ namespace Engine
 		RenderResources::Init(Window);
 		BmRender_CreateVertexStageBuffer(MB4, BufferUpdateFrequency::Static, "VertexStageData");
 		BmRender_CreateInstanceBuffer(MB4, BufferUpdateFrequency::Static, "GPUInstances");
-		BmRender_CreateUniformBuffer(MB4, BufferUpdateFrequency::PerFrame, StageBarier::Fragment, "FrameData");
-		BmRender_CreateStorageBuffer(MB4, BufferUpdateFrequency::Static, StageBarier::Fragment, "MaterialBuffer");
+		BmRender_CreateUniformBuffer(MB4, BufferUpdateFrequency::PerFrame, PipelineStage::Fragment, "FrameData");
+		BmRender_CreateStorageBuffer(MB4, BufferUpdateFrequency::Static, PipelineStage::Fragment, "MaterialBuffer");
 
 		ParseAndCreateVertices(Util::GetVertices(Root));
 		ParseAndCreateShaders(Util::GetShaders(Root));
 		ParseAndCreateSamplers(Util::GetSamplers(Root));
 		ParseAndCreateDescriptorSetLayouts(Util::GetDescriptorSetLayouts(Root));
+		Util::ParseAndCreatePushConstants(Util::GetPushConstantsFromResources(Root));
 
 		{
 			BmRender_DescriptorSetBinding Binding;
@@ -322,7 +323,7 @@ namespace Engine
 			Binding.DstArrayElement = 0;
 
 			BmRender_CreateDescriptorSet("VpSet", "FrameDataLayout", "MainPool");
-			BmRender_BindDescriptorSet("VpSet", &Binding, 1);
+			BmRender_UpdateDescriptorSet("VpSet", &Binding, 1);
 		}
 
 		{
@@ -333,7 +334,7 @@ namespace Engine
 			Binding.DstArrayElement = 0;
 
 			BmRender_CreateDescriptorSet("StaticMeshLightSet", "FrameDataLayout", "MainPool");
-			BmRender_BindDescriptorSet("StaticMeshLightSet", &Binding, 1);
+			BmRender_UpdateDescriptorSet("StaticMeshLightSet", &Binding, 1);
 		}
 
 		{
@@ -344,7 +345,7 @@ namespace Engine
 			Binding.DstArrayElement = 0;
 
 			BmRender_CreateDescriptorSet("MaterialSet", "MaterialLayout", "MainPool");
-			BmRender_BindDescriptorSet("MaterialSet", &Binding, 1);
+			BmRender_UpdateDescriptorSet("MaterialSet", &Binding, 1);
 		}
 
 		{

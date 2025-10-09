@@ -15,6 +15,7 @@ typedef struct BmRender_BufferRegion_T* BmRender_BufferRegion;
 typedef struct BmRender_BufferArrayRegion_T* BmRender_BufferArrayRegion;
 typedef struct BmRender_ImageResource_T* BmRender_ImageResource;
 typedef struct BmRender_ImageViewResource_T* BmRender_ImageViewResource;
+typedef struct BmRender_PushConstant_T* BmRender_PushConstant;
 
 enum class BufferUsageFlag
 {
@@ -33,10 +34,10 @@ enum class MemoryPropertyFlag
 	HostCompatible = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 };
 
-enum class StageBarier
+enum class PipelineStage
 {
-	Vertex = 1,
-	Fragment = 2,
+	Vertex = 0x00000001,
+	Fragment = 0x00000080,
 };
 
 enum class ImageType
@@ -146,8 +147,8 @@ struct BmRender_ImageViewBindingDescription
 
 void BmRender_CreateVertexStageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, const std::string& Name);
 void BmRender_CreateInstanceBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, const std::string& Name);
-void BmRender_CreateUniformBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, const std::string& Name);
-void BmRender_CreateStorageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, const std::string& Name);
+void BmRender_CreateUniformBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, const std::string& Name);
+void BmRender_CreateStorageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, const std::string& Name);
 
 BmRender_ImageResource BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, ImageType Type);
 BmRender_ImageResource BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Format, ImageType Type, u32 ArrayLayers);
@@ -156,4 +157,6 @@ BmRender_ImageViewResource BmRender_CreateImageView2D(BmRender_ImageResource Han
 BmRender_ImageViewResource BmRender_CreateImageView2DArray(BmRender_ImageResource Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags);
 
 void BmRender_CreateDescriptorSet(const std::string& Name, const std::string& LayoutName, const std::string& PoolName);
-void BmRender_BindDescriptorSet(const std::string& DescriptorSetName, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount);
+void BmRender_UpdateDescriptorSet(const std::string& DescriptorSetName, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount);
+
+BmRender_PushConstant CreatePushConstant(PipelineStage Stage, u32 Offset, u32 Size);

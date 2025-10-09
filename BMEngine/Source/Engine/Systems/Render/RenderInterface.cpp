@@ -6,23 +6,24 @@ struct BmRender_BufferRegion_T { u64 Index; };
 struct BmRender_BufferArrayRegion_T { u64 Index; };
 struct BmRender_ImageResource_T { u64 Index; };
 struct BmRender_ImageViewResource_T { u64 Index; };
+struct BmRender_PushConstant_T { u64 Index; };
 
 void BmRender_CreateVertexStageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, const std::string& Name)
 {
-	RenderResources::CreateBuffer(Size, UpdateFrequency, StageBarier::Vertex, BufferUsageFlag::CombinedVertexIndexFlag, Name);
+	RenderResources::CreateBuffer(Size, UpdateFrequency, PipelineStage::Vertex, BufferUsageFlag::CombinedVertexIndexFlag, Name);
 }
 
 void BmRender_CreateInstanceBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, const std::string& Name)
 {
-	RenderResources::CreateBuffer(Size, UpdateFrequency, StageBarier::Vertex, BufferUsageFlag::InstanceFlag, Name);
+	RenderResources::CreateBuffer(Size, UpdateFrequency, PipelineStage::Vertex, BufferUsageFlag::InstanceFlag, Name);
 }
 
-void BmRender_CreateUniformBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, const std::string& Name)
+void BmRender_CreateUniformBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, const std::string& Name)
 {
 	RenderResources::CreateBuffer(Size, UpdateFrequency, BufferStage, BufferUsageFlag::UniformFlag, Name);
 }
 
-void BmRender_CreateStorageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, StageBarier BufferStage, const std::string& Name)
+void BmRender_CreateStorageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, const std::string& Name)
 {
 	RenderResources::CreateBuffer(Size, UpdateFrequency, BufferStage, BufferUsageFlag::StorageFlag, Name);
 }
@@ -42,9 +43,14 @@ void BmRender_CreateDescriptorSet(const std::string& Name, const std::string& La
 	RenderResources::CreateDescriptorSet(Name, LayoutName, PoolName);
 }
 
-void BmRender_BindDescriptorSet(const std::string& DescriptorSetName, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount)
+void BmRender_UpdateDescriptorSet(const std::string& DescriptorSetName, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount)
 {
-	RenderResources::BindDescriptorSet(DescriptorSetName, Bindings, BindingsCount);
+	RenderResources::UpdateDescriptorSet(DescriptorSetName, Bindings, BindingsCount);
+}
+
+BmRender_PushConstant CreatePushConstant(PipelineStage Stage, u32 Offset, u32 Size)
+{
+	return BmRender_PushConstant();
 }
 
 BmRender_ImageResource BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, ImageType Type)

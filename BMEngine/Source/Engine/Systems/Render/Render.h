@@ -155,8 +155,6 @@ namespace Render
 namespace DeferredPass
 {
 	void Init();
-	void DeInit();
-
 	void Draw();
 
 	void BeginPass();
@@ -174,7 +172,6 @@ namespace DeferredPass
 namespace LightningPass
 {
 	void Init();
-	void DeInit();
 
 	void Draw(Render::DrawScene* Scene);
 }
@@ -182,7 +179,6 @@ namespace LightningPass
 namespace MainPass
 {
 	void Init();
-	void DeInit();
 
 	void BeginPass();
 	void EndPass();
@@ -193,7 +189,6 @@ namespace MainPass
 namespace TerrainRender
 {
 	void Init();
-	void DeInit();
 
 	void Draw();
 }
