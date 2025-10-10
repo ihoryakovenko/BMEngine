@@ -127,19 +127,13 @@ namespace Engine
 				switch (Binding.Type)
 				{
 					case Util::ShaderType::Uniform:
-						VkBinding.DescriptorType = (Binding.UpdateFrequency == BufferUpdateFrequency::PerFrame) 
-							? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC 
-							: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-
-						VkBinding.DescriptorCount = 1;
+						VkBinding.DescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+						VkBinding.DescriptorCount = (Binding.UpdateFrequency == BufferUpdateFrequency::PerFrame) ? 3 : 1; // todo use frames in fly instead of 3
 
 						break;
 					case Util::ShaderType::Buffer:
-						VkBinding.DescriptorType = (Binding.UpdateFrequency == BufferUpdateFrequency::PerFrame)
-							? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC
-							: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-
-						VkBinding.DescriptorCount = 1;
+						VkBinding.DescriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+						VkBinding.DescriptorCount = (Binding.UpdateFrequency == BufferUpdateFrequency::PerFrame) ? 3 : 1; // todo use frames in fly instead of 3;
 
 						break;
 					case Util::ShaderType::Sampler2D:
@@ -218,7 +212,8 @@ namespace Engine
 
 	static Render::DrawScene Scene;
 
-
+	BmRender_BufferRegion VpRegion[3];
+	BmRender_BufferRegion EntityLightRegion[3];
 
 	void WindowIconifyCallback(GLFWwindow* window, int iconified)
 	{
@@ -309,6 +304,14 @@ namespace Engine
 		BmRender_CreateUniformBuffer(MB4, BufferUpdateFrequency::PerFrame, PipelineStage::Fragment, "FrameData");
 		BmRender_CreateStorageBuffer(MB4, BufferUpdateFrequency::Static, PipelineStage::Fragment, "MaterialBuffer");
 
+		VpRegion[0] = RenderResources::CreateBufferRegion(0, 128, "FrameData");
+		VpRegion[1] = RenderResources::CreateBufferRegion(128, 128, "FrameData");
+		VpRegion[2] = RenderResources::CreateBufferRegion(128 * 2, 128, "FrameData");
+
+		EntityLightRegion[0] = RenderResources::CreateBufferRegion(384, 384, "FrameData");
+		EntityLightRegion[1] = RenderResources::CreateBufferRegion(384 + 384, 384, "FrameData");
+		EntityLightRegion[2] = RenderResources::CreateBufferRegion(384 + 384 * 2, 384, "FrameData");
+
 		ParseAndCreateVertices(Util::GetVertices(Root));
 		ParseAndCreateShaders(Util::GetShaders(Root));
 		ParseAndCreateSamplers(Util::GetSamplers(Root));
@@ -317,9 +320,8 @@ namespace Engine
 
 		{
 			BmRender_DescriptorSetBinding Binding;
-			Binding.BufferBinding.Buffer = "FrameData";
-			Binding.BufferBinding.Offset = 0;
-			Binding.BufferBinding.Range = 384;
+			Binding.BufferRegions = VpRegion;
+			Binding.BindingCount = 3;
 			Binding.DstArrayElement = 0;
 
 			BmRender_CreateDescriptorSet("VpSet", "FrameDataLayout", "MainPool");
@@ -328,9 +330,8 @@ namespace Engine
 
 		{
 			BmRender_DescriptorSetBinding Binding;
-			Binding.BufferBinding.Buffer = "FrameData";
-			Binding.BufferBinding.Offset = 384;
-			Binding.BufferBinding.Range = 1152;
+			Binding.BufferRegions = EntityLightRegion;
+			Binding.BindingCount = 3;
 			Binding.DstArrayElement = 0;
 
 			BmRender_CreateDescriptorSet("StaticMeshLightSet", "FrameDataLayout", "MainPool");
@@ -338,10 +339,11 @@ namespace Engine
 		}
 
 		{
+			BmRender_BufferRegion MaterialBufferRegion = RenderResources::CreateBufferRegion(0, VK_WHOLE_SIZE, "MaterialBuffer");
+
 			BmRender_DescriptorSetBinding Binding;
-			Binding.BufferBinding.Buffer = "MaterialBuffer";
-			Binding.BufferBinding.Offset = 0;
-			Binding.BufferBinding.Range = VK_WHOLE_SIZE;
+			Binding.BufferRegions = &MaterialBufferRegion;
+			Binding.BindingCount = 1;
 			Binding.DstArrayElement = 0;
 
 			BmRender_CreateDescriptorSet("MaterialSet", "MaterialLayout", "MainPool");
@@ -353,7 +355,7 @@ namespace Engine
 		}
 
 		TransferSystem::Init();
-		Render::Init(Window);
+		Render::Init(Window, VpRegion, EntityLightRegion);
 
 		EngineResources::Init();
 

@@ -64,12 +64,14 @@ namespace EngineResources
 		DiffuseBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		DiffuseBinding.ImageBinding.ImageView = DefaultAsset.RenderViewHandle;
 		DiffuseBinding.DstArrayElement = 0;
+		DiffuseBinding.BindingCount = 1;
 
 		BmRender_DescriptorSetBinding SpecularBinding;
 		SpecularBinding.ImageBinding.Sampler = "SpecularTexture";
 		SpecularBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		SpecularBinding.ImageBinding.ImageView = DefaultAsset.RenderViewHandle;
 		SpecularBinding.DstArrayElement = 0;
+		SpecularBinding.BindingCount = 1;
 
 		BmRender_DescriptorSetBinding Bindings[] = { DiffuseBinding, SpecularBinding };
 
@@ -139,12 +141,14 @@ namespace EngineResources
 							DiffuseBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 							DiffuseBinding.ImageBinding.ImageView = it->second.RenderViewHandle;
 							DiffuseBinding.DstArrayElement = TexturesGPUIndexCounter;
+							DiffuseBinding.BindingCount = 1;
 
 							BmRender_DescriptorSetBinding SpecularBinding;
 							SpecularBinding.ImageBinding.Sampler = "SpecularTexture";
 							SpecularBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 							SpecularBinding.ImageBinding.ImageView = it->second.RenderViewHandle;
 							SpecularBinding.DstArrayElement = TexturesGPUIndexCounter;
+							SpecularBinding.BindingCount = 1;
 
 							BmRender_DescriptorSetBinding Bindings[] = { DiffuseBinding, SpecularBinding };
 
@@ -174,7 +178,7 @@ namespace EngineResources
 
 				const u64 VertexDataSize = VerticesCount * sizeof(StaticMeshVertex) + IndicesCount * sizeof(u32);
 				
-				BmRender_BufferRegion MeshHandle = RenderResources::CreateBufferRegion(ModelVertexByteOffset, "VertexStageData");
+				BmRender_BufferRegion MeshHandle = RenderResources::CreateBufferRegion(ModelVertexByteOffset, VertexDataSize, "VertexStageData");
 				RenderResources::UpdateBufferRegion(MeshHandle, 0, Model.VertexData + ModelVertexByteOffset, VertexDataSize);
 
 				Material Mat;
@@ -182,7 +186,7 @@ namespace EngineResources
 				Mat.SpecularTexIndex = TextureGPUIndex;
 				Mat.Shininess = 32.0f;
 
-				const BmRender_BufferRegion MaterialHandle = RenderResources::CreateBufferRegion(MateriaIndex * sizeof(Mat), "MaterialBuffer");
+				const BmRender_BufferRegion MaterialHandle = RenderResources::CreateBufferRegion(MateriaIndex * sizeof(Mat), sizeof(Mat), "MaterialBuffer");
 				RenderResources::UpdateBufferRegion(MaterialHandle, 0, &Mat, sizeof(Mat));
 
 				InstanceData Instance;
@@ -192,7 +196,7 @@ namespace EngineResources
 				++MateriaIndex;
 
 				const u64 InstanceOffset = InstanceIndex * sizeof(Instance);
-				const BmRender_BufferRegion InstanceHandle = RenderResources::CreateBufferRegion(InstanceOffset, "GPUInstances");
+				const BmRender_BufferRegion InstanceHandle = RenderResources::CreateBufferRegion(InstanceOffset, sizeof(Instance), "GPUInstances");
 				RenderResources::UpdateBufferRegion(InstanceHandle, 0, &Instance, sizeof(Instance));
 
 				++InstanceIndex;

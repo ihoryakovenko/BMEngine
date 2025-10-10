@@ -82,46 +82,20 @@ struct BmRender_LayoutBinding
 	VkShaderStageFlags StageFlags;
 };
 
-struct BmRender_BufferBinding
-{
-	std::string Buffer;
-	u64 Offset;
-	u64 Range;
-};
-
 struct BmRender_ImageBinding
 {
-	std::string Sampler;
+	const char* Sampler;
 	VkImageLayout ImageLayout; // Check if can store layout with Image resource as target layout and use instead this
 	BmRender_ImageViewResource ImageView;
 };
 
 struct BmRender_DescriptorSetBinding
 {
-	union
-	{
-		BmRender_BufferBinding BufferBinding;
-		BmRender_ImageBinding ImageBinding;
-	};
+	BmRender_BufferRegion* BufferRegions;
+	BmRender_ImageBinding ImageBinding;
+
+	u32 BindingCount;
 	u32 DstArrayElement;
-
-	///////////////// REPLACE FUCKING STRINGSSSSSSSS!!!!!!!!!!!!!!!!!!!!!!!!
-	BmRender_DescriptorSetBinding() : BufferBinding{}, DstArrayElement(0) {}
-
-	///////////////// REPLACE FUCKING STRINGSSSSSSSS!!!!!!!!!!!!!!!!!!!!!!!!
-	~BmRender_DescriptorSetBinding() {}
-
-	///////////////// REPLACE FUCKING STRINGSSSSSSSS!!!!!!!!!!!!!!!!!!!!!!!!
-	BmRender_DescriptorSetBinding(const BmRender_DescriptorSetBinding& other) : BufferBinding{other.BufferBinding}, DstArrayElement(other.DstArrayElement) {}
-
-	///////////////// REPLACE FUCKING STRINGSSSSSSSS!!!!!!!!!!!!!!!!!!!!!!!!
-	BmRender_DescriptorSetBinding& operator=(const BmRender_DescriptorSetBinding& other) {
-		if (this != &other) {
-			BufferBinding = other.BufferBinding;
-			DstArrayElement = other.DstArrayElement;
-		}
-		return *this;
-	}
 };
 
 struct BmRender_DescriptorSetDescription

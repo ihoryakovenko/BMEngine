@@ -68,10 +68,10 @@ namespace Render
 		vkDestroyDescriptorPool(Device, ImGuiPool, nullptr);
 	}
 
-	static void InitStaticMeshPipeline(VkDevice Device, StaticMeshPipeline* MeshPipeline)
+	static void InitStaticMeshPipeline(VkDevice Device, StaticMeshPipeline* MeshPipeline, BmRender_BufferRegion* EntityLightRegion)
 	{
 		const VkDeviceSize LightBufferSize = sizeof(Render::LightBuffer);
-		MeshPipeline->EntityLightBufferHandle = RenderResources::CreateBufferRegion(384, "FrameData");
+		MeshPipeline->EntityLightBufferHandle = EntityLightRegion;
 
 		VkDescriptorSetLayout Layout = RenderResources::GetSetLayout("ShadowMapArrayLayout")->Layout;
 
@@ -83,6 +83,7 @@ namespace Render
 			ShadowMapBinding.ImageBinding.Sampler = "ShadowMap";
 			ShadowMapBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			ShadowMapBinding.ImageBinding.ImageView = MeshPipeline->ShadowMapArrayImageInterface[i];
+			ShadowMapBinding.BindingCount = 1;
 			ShadowMapBinding.DstArrayElement = 0;
 
 			std::string ShadowMapSetName = "ShadowMapArraySet" + std::to_string(i);
@@ -115,7 +116,8 @@ namespace Render
 
 	static void DrawStaticMeshes(VkDevice Device, VkCommandBuffer CmdBuffer, StaticMeshPipeline* MeshPipeline, DrawScene* Scene)
 	{
-		RenderResources::UpdateBufferRegion(MeshPipeline->EntityLightBufferHandle, sizeof(LightBuffer) * Render::GetRenderState()->RenderDrawState.CurrentImageIndex,
+		u32 CurrentImageIndex = Render::GetRenderState()->RenderDrawState.CurrentImageIndex;
+		RenderResources::UpdateBufferRegion(MeshPipeline->EntityLightBufferHandle[CurrentImageIndex], 0,
 			Scene->LightEntity, sizeof(LightBuffer));
 
 		VkPipeline Pipeline = RenderResources::GetPipeline("StaticMesh");
@@ -124,17 +126,14 @@ namespace Render
 		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 
 		const VkDescriptorSet VpSet = RenderResources::GetDescriptorSet("VpSet")->Set;
-		const u32 DynamicOffset = Render::GetRenderState()->RenderDrawState.CurrentImageIndex * sizeof(ViewProjectionBuffer);
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-			0, 1, &VpSet, 1, &DynamicOffset);
+			0, 1, &VpSet, 0, nullptr);
 
 		VkDescriptorSet BindlesTexturesSet = RenderResources::GetDescriptorSet("BindlesTexturesSet")->Set;
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
 			1, 1, &BindlesTexturesSet, 0, nullptr);
 
 		vkCmdPushConstants(CmdBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(u32), &Render::GetRenderState()->RenderDrawState.CurrentImageIndex);
-
-		const u32 LightDynamicOffset = Render::GetRenderState()->RenderDrawState.CurrentImageIndex * sizeof(LightBuffer);
 
 		std::unique_lock Lock(Scene->TempLock);
 		for (u32 i = 0; i < Scene->DrawEntities.size(); ++i)
@@ -177,7 +176,7 @@ namespace Render
 			};
 
 			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-				2, DescriptorSetGroupCount, DescriptorSetGroup, 1, &LightDynamicOffset);
+				2, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr);
 
 			vkCmdBindVertexBuffers(CmdBuffer, 0, 2, Buffers, Offsets);
 			vkCmdBindIndexBuffer(CmdBuffer, RenderResources::GetGPUBuffer("VertexStageData")->Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
@@ -239,12 +238,12 @@ namespace Render
 		State.FrameMemory = Memory::CreateFrameMemory(1024 * 1024);
 	}
 
-	void Init(GLFWwindow* WindowHandler)
+	void Init(GLFWwindow* WindowHandler, BmRender_BufferRegion* VpRegion, BmRender_BufferRegion* EntityLightRegion)
 	{		
 		VkPhysicalDevice PhysicalDevice = RenderResources::GetCoreContext()->PhysicalDevice;
 		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
-		State.VpHandle = RenderResources::CreateBufferRegion(0, "FrameData");
+		State.VpHandle = VpRegion;
 
 		InitDrawState(Device, RenderResources::GetCoreContext()->Indices.GraphicsFamily, VulkanHelper::MAX_DRAW_FRAMES, &State.RenderDrawState);
 
@@ -254,7 +253,7 @@ namespace Render
 
 		//TerrainRender::Init();
 		//DynamicMapSystem::Init();
-		InitStaticMeshPipeline(Device, &State.MeshPipeline);
+		InitStaticMeshPipeline(Device, &State.MeshPipeline, EntityLightRegion);
 		InitImGuiPipeline(&State.DebugUiPool, RenderResources::GetCoreContext(), WindowHandler);
 	}
 
@@ -295,8 +294,7 @@ namespace Render
 		VULKAN_CHECK_RESULT(vkAcquireNextImageKHR(Device, RenderResources::GetCoreContext()->VulkanSwapchain, UINT64_MAX, ImagesAvailable, nullptr, &ImageIndex));
 		State.RenderDrawState.CurrentImageIndex = ImageIndex;
 
-		RenderResources::UpdateBufferRegion(State.VpHandle, sizeof(ViewProjectionBuffer) * Render::GetRenderState()->RenderDrawState.CurrentImageIndex,
-			&Scene->ViewProjection, sizeof(ViewProjectionBuffer));
+		RenderResources::UpdateBufferRegion(State.VpHandle[Render::GetRenderState()->RenderDrawState.CurrentImageIndex], 0, &Scene->ViewProjection, sizeof(ViewProjectionBuffer));
 
 		VkCommandBuffer DrawCmdBuffer = State.RenderDrawState.Frames.CommandBuffers[ImageIndex];
 		VULKAN_CHECK_RESULT(vkBeginCommandBuffer(DrawCmdBuffer, &CommandBufferBeginInfo));
@@ -407,12 +405,14 @@ namespace DeferredPass
 			ColorBinding.ImageBinding.Sampler = "ColorAttachment";
 			ColorBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			ColorBinding.ImageBinding.ImageView = DeferredInputColorImageInterface[i];
+			ColorBinding.BindingCount = 1;
 			ColorBinding.DstArrayElement = 0;
 
 			BmRender_DescriptorSetBinding DepthBinding;
 			DepthBinding.ImageBinding.Sampler = "DepthAttachment";
 			DepthBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			DepthBinding.ImageBinding.ImageView = DeferredInputDepthImageInterface[i];
+			DepthBinding.BindingCount = 1;
 			DepthBinding.DstArrayElement = 0;
 
 			BmRender_DescriptorSetBinding Bindings[] = { ColorBinding, DepthBinding };
@@ -648,15 +648,14 @@ namespace LightningPass
 
 			std::string BufferName = "LightSpaceMatrixBuffer" + std::to_string(i);
 			BmRender_CreateUniformBuffer(LightSpaceMatrixSize, BufferUpdateFrequency::PerFrame, PipelineStage::Vertex, BufferName);
-			LightSpaceMatrixBufferRegion[i] = RenderResources::CreateBufferRegion(0, BufferName);
+			LightSpaceMatrixBufferRegion[i] = RenderResources::CreateBufferRegion(0, LightSpaceMatrixSize, BufferName);
 
 			std::string DescriptorSetName = "LightSpaceMatrixSet" + std::to_string(i);
 			BmRender_CreateDescriptorSet(DescriptorSetName, "LightSpaceMatrixLayout", "MainPool");
 
 			BmRender_DescriptorSetBinding LightSpaceMatrixBinding;
-			LightSpaceMatrixBinding.BufferBinding.Buffer = BufferName;
-			LightSpaceMatrixBinding.BufferBinding.Offset = 0;
-			LightSpaceMatrixBinding.BufferBinding.Range = LightSpaceMatrixSize;
+			LightSpaceMatrixBinding.BufferRegions = &LightSpaceMatrixBufferRegion[i];
+			LightSpaceMatrixBinding.BindingCount = 1;
 			LightSpaceMatrixBinding.DstArrayElement = 0;
 
 			BmRender_UpdateDescriptorSet(DescriptorSetName, &LightSpaceMatrixBinding, 1);

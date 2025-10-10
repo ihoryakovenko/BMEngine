@@ -56,6 +56,7 @@ namespace VulkanCoreContext
 		IndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
 		IndexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
 		IndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+		IndexingFeatures.shaderUniformBufferArrayNonUniformIndexing = VK_TRUE;
 
 		VkPhysicalDeviceTimelineSemaphoreFeatures TimelineSemaphoreFeatures = { };
 		TimelineSemaphoreFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;

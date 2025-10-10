@@ -60,7 +60,7 @@ namespace Render
 
 	struct StaticMeshPipeline
 	{
-		BmRender_BufferRegion EntityLightBufferHandle;
+		BmRender_BufferRegion* EntityLightBufferHandle;
 
 		BmRender_ImageViewResource ShadowMapArrayImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
@@ -75,7 +75,7 @@ namespace Render
 		StaticMeshPipeline MeshPipeline;
 		VkDescriptorPool DebugUiPool; // TODO: ?
 		Memory::FrameMemory FrameMemory;
-		BmRender_BufferRegion VpHandle;
+		BmRender_BufferRegion* VpHandle;
 	};
 
 	struct PointLight
@@ -142,7 +142,7 @@ namespace Render
 
 	void TmpInitFrameMemory();
 
-	void Init(GLFWwindow* WindowHandler);
+	void Init(GLFWwindow* WindowHandler, BmRender_BufferRegion* VpRegion, BmRender_BufferRegion* EntityLightRegion);
 	void DeInit();
 
 	void* FrameAlloc(u32 Size);

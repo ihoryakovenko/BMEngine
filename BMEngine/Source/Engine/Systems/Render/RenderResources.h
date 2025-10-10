@@ -96,7 +96,7 @@ namespace RenderResources
 
 	BmRender_ImageResource CreateImageResource(BmRender_ImageDescription* Description);
 	BmRender_ImageViewResource CreateImageView(BmRender_ImageResource Handle, u32 BaseArrayLayer, u32 LayerCount, VkImageViewType ViewType, VkImageAspectFlags AspectFlags);
-	BmRender_BufferRegion CreateBufferRegion(u64 BufferOffset, const std::string& BufferName);
+	BmRender_BufferRegion CreateBufferRegion(u64 BufferOffset, u64 RegionSize, const std::string& BufferName);
 	BmRender_PushConstant CreatePushConstant(PipelineStage Stage, u32 Offset, u32 Size);
 
 	void UpdateBufferRegion(BmRender_BufferRegion Handle, u64 ResourceOffset, const void* Data, u32 DataSize);

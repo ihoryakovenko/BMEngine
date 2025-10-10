@@ -20,7 +20,8 @@ namespace RenderResources
 	{
 		std::atomic<bool> IsLoaded;
 		GPUBuffer* GPUBufferHandle; // GPUBuffer* is TMP, use handle
-		u64 BufferOffset;	
+		u64 BufferOffset;
+		u64 Size;
 	};
 
 	struct ImageResource
@@ -439,7 +440,7 @@ namespace RenderResources
 		DescriptorSet* Set = GetDescriptorSet(DescriptorSetName);
 		DescriptorSetLayout* Layout = GetSetLayout(Set->Layout);
 
-		std::vector<VkWriteDescriptorSet> WriteDescriptorSets;
+		VkWriteDescriptorSet* WriteDescriptorSets = (VkWriteDescriptorSet*)Render::FrameAlloc(sizeof(VkWriteDescriptorSet) * BindingsCount);
 
 		for (u32 i = 0; i < BindingsCount; i++)
 		{
@@ -447,23 +448,28 @@ namespace RenderResources
 
 			VkDescriptorType DescriptorType = ResContext.LayoutBindings.Data[Layout->BindingsIndex + i].DescriptorType;
 
-			VkWriteDescriptorSet WriteDescriptorSet = { };
-			WriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			WriteDescriptorSet.dstSet = Set->Set;
-			WriteDescriptorSet.dstBinding = i;
-			WriteDescriptorSet.dstArrayElement = Binding.DstArrayElement;
-			WriteDescriptorSet.descriptorType = DescriptorType;
-			WriteDescriptorSet.descriptorCount = 1;
+			WriteDescriptorSets[i] = { };
+			WriteDescriptorSets[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			WriteDescriptorSets[i].dstSet = Set->Set;
+			WriteDescriptorSets[i].dstBinding = i;
+			WriteDescriptorSets[i].dstArrayElement = Binding.DstArrayElement;
+			WriteDescriptorSets[i].descriptorType = DescriptorType;
+			WriteDescriptorSets[i].descriptorCount = Binding.BindingCount;
 			
 			if (DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC ||
 				DescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER || DescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC)
 			{
-				RenderResources::GPUBuffer* Buffer = GetGPUBuffer(Binding.BufferBinding.Buffer);
-				VkDescriptorBufferInfo* BufferInfo = (VkDescriptorBufferInfo*)Render::FrameAlloc(sizeof(VkDescriptorBufferInfo));
-				BufferInfo->buffer = Buffer->Buffer;
-				BufferInfo->offset = Binding.BufferBinding.Offset;
-				BufferInfo->range = Binding.BufferBinding.Range;
-				WriteDescriptorSet.pBufferInfo = BufferInfo;
+				VkDescriptorBufferInfo* BufferInfo = (VkDescriptorBufferInfo*)Render::FrameAlloc(sizeof(VkDescriptorBufferInfo) * Binding.BindingCount);
+				for (u32 j = 0; j < Binding.BindingCount; ++j)
+				{
+					GPUBufferEntry* Entry = ResContext.ResourceRecords.Data + (u64)Binding.BufferRegions[j];
+
+					BufferInfo[j].buffer = Entry->GPUBufferHandle->Buffer;
+					BufferInfo[j].offset = Entry->BufferOffset;
+					BufferInfo[j].range = Entry->Size;
+				}
+
+				WriteDescriptorSets[i].pBufferInfo = BufferInfo;
 			}
 			else if (VK_DESCRIPTOR_TYPE_SAMPLER || VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
 			{
@@ -472,17 +478,15 @@ namespace RenderResources
 				ImageInfo->imageView = GetImageView(Binding.ImageBinding.ImageView);
 				ImageInfo->sampler = GetSampler(Binding.ImageBinding.Sampler);
 
-				WriteDescriptorSet.pImageInfo = ImageInfo;
+				WriteDescriptorSets[i].pImageInfo = ImageInfo;
 			}
 			else
 			{
 				assert(false || "Unimplemented");
 			}
-			
-			WriteDescriptorSets.push_back(WriteDescriptorSet);
 		}
 
-		vkUpdateDescriptorSets(Device, static_cast<u32>(WriteDescriptorSets.size()), WriteDescriptorSets.data(), 0, nullptr);
+		vkUpdateDescriptorSets(Device, BindingsCount, WriteDescriptorSets, 0, nullptr);
 	}
 
 	void CreateDescriptorSet(const std::string& Name, const std::string& LayoutName, const std::string& PoolName)
@@ -672,13 +676,14 @@ namespace RenderResources
 		return (BmRender_ImageViewResource)ResContext.ImageViews.Count++;
 	}
 
-	BmRender_BufferRegion CreateBufferRegion(u64 BufferOffset, const std::string& BufferName)
+	BmRender_BufferRegion CreateBufferRegion(u64 BufferOffset, u64 RegionSize, const std::string& BufferName)
 	{
 		assert(ResContext.ResourceRecords.Count < ResContext.ResourceRecords.Capacity);
 
 		GPUBufferEntry* Entry = ResContext.ResourceRecords.Data + ResContext.ResourceRecords.Count;
 		Entry->IsLoaded = false;
 		Entry->BufferOffset = BufferOffset;
+		Entry->Size = RegionSize;
 		Entry->GPUBufferHandle = GetGPUBuffer(BufferName);
 	
 		return (BmRender_BufferRegion)ResContext.ResourceRecords.Count++;
