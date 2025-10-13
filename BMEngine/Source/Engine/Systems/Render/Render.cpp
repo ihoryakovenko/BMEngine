@@ -125,13 +125,24 @@ namespace Render
 
 		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 
-		const VkDescriptorSet VpSet = RenderResources::GetDescriptorSet("VpSet")->Set;
-		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-			0, 1, &VpSet, 0, nullptr);
+		const VkDescriptorSet DescriptorSetGroup[] =
+		{
+			RenderResources::GetDescriptorSet("VpSet")->Set,
+			RenderResources::GetDescriptorSet("BindlesTexturesSet")->Set,
+			RenderResources::GetDescriptorSet("StaticMeshLightSet")->Set,
+			RenderResources::GetDescriptorSet("MaterialSet")->Set,
+			MeshPipeline->ShadowMapArraySet[Render::GetRenderState()->RenderDrawState.CurrentImageIndex],
+		};
 
-		VkDescriptorSet BindlesTexturesSet = RenderResources::GetDescriptorSet("BindlesTexturesSet")->Set;
+		const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
+
+		const u32 VpDynamicOffset = Render::GetRenderState()->RenderDrawState.CurrentImageIndex * sizeof(ViewProjectionBuffer);
+		const u32 LightDynamicOffset = Render::GetRenderState()->RenderDrawState.CurrentImageIndex * sizeof(LightBuffer);
+		const u32 DynamicOffsets[] = { VpDynamicOffset, LightDynamicOffset };
+		const u32 DynamicOffsetCounts[] = { 1, 0, 0, 0, 1 };
+
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-			1, 1, &BindlesTexturesSet, 0, nullptr);
+			0, DescriptorSetGroupCount, DescriptorSetGroup, DynamicOffsetCounts[0] + DynamicOffsetCounts[1] + DynamicOffsetCounts[2] + DynamicOffsetCounts[3] + DynamicOffsetCounts[4], DynamicOffsets);
 
 		vkCmdPushConstants(CmdBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(u32), &Render::GetRenderState()->RenderDrawState.CurrentImageIndex);
 
@@ -155,14 +166,6 @@ namespace Render
 				}
 			}
 
-			const VkDescriptorSet DescriptorSetGroup[] =
-			{
-				RenderResources::GetDescriptorSet("StaticMeshLightSet")->Set,
-				RenderResources::GetDescriptorSet("MaterialSet")->Set,
-				MeshPipeline->ShadowMapArraySet[Render::GetRenderState()->RenderDrawState.CurrentImageIndex],
-			};
-			const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
-
 			const VkBuffer Buffers[] =
 			{
 				RenderResources::GetGPUBuffer("VertexStageData")->Buffer,
@@ -174,9 +177,6 @@ namespace Render
 				DrawEntity->VertexOffset,
 				DrawEntity->InstanceOffset
 			};
-
-			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-				2, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr);
 
 			vkCmdBindVertexBuffers(CmdBuffer, 0, 2, Buffers, Offsets);
 			vkCmdBindIndexBuffer(CmdBuffer, RenderResources::GetGPUBuffer("VertexStageData")->Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
@@ -276,7 +276,7 @@ namespace Render
 		return Memory::FrameAlloc(&State.FrameMemory, Size);
 	}
 
-	void Draw(DrawScene* Scene)
+	void Draw(DrawScene* Scene, u64 WaitSemaphoreValue)
 	{
 		VulkanCoreContext::VulkanCoreContext* CoreContext = RenderResources::GetCoreContext();
 
@@ -294,7 +294,7 @@ namespace Render
 		VULKAN_CHECK_RESULT(vkAcquireNextImageKHR(Device, RenderResources::GetCoreContext()->VulkanSwapchain, UINT64_MAX, ImagesAvailable, nullptr, &ImageIndex));
 		State.RenderDrawState.CurrentImageIndex = ImageIndex;
 
-		RenderResources::UpdateBufferRegion(State.VpHandle[Render::GetRenderState()->RenderDrawState.CurrentImageIndex], 0, &Scene->ViewProjection, sizeof(ViewProjectionBuffer));
+		RenderResources::UpdateBufferRegion(State.VpHandle[ImageIndex], 0, &Scene->ViewProjection, sizeof(ViewProjectionBuffer));
 
 		VkCommandBuffer DrawCmdBuffer = State.RenderDrawState.Frames.CommandBuffers[ImageIndex];
 		VULKAN_CHECK_RESULT(vkBeginCommandBuffer(DrawCmdBuffer, &CommandBufferBeginInfo));
@@ -317,6 +317,18 @@ namespace Render
 			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 		};
 
+		VkTimelineSemaphoreSubmitInfo* TimelineInfo = nullptr;
+
+		if (WaitSemaphoreValue > 0)
+		{
+			State.RenderDrawState.WaitSemaphoreValueCount += WaitSemaphoreValue;
+
+			VkTimelineSemaphoreSubmitInfo FrameTimelineInfo;
+			FrameTimelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+			FrameTimelineInfo.waitSemaphoreValueCount = 1;
+			FrameTimelineInfo.pWaitSemaphoreValues = &State.RenderDrawState.WaitSemaphoreValueCount;
+		}
+
 		VkSemaphore RenderFinished = State.RenderDrawState.Frames.RenderFinished[CurrentFrame];
 		VkSwapchainKHR Swapchain = RenderResources::GetCoreContext()->VulkanSwapchain;
 
@@ -329,6 +341,7 @@ namespace Render
 		SubmitInfo.pCommandBuffers = &DrawCmdBuffer;
 		SubmitInfo.signalSemaphoreCount = 1;
 		SubmitInfo.pSignalSemaphores = &RenderFinished;
+		SubmitInfo.pNext = TimelineInfo;
 
 		VkPresentInfoKHR PresentInfo = { };
 		PresentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;

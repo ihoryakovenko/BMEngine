@@ -207,8 +207,6 @@ namespace EngineResources
 				Entity.VertexOffset = ModelVertexByteOffset;
 				Entity.IndexOffset = ModelVertexByteOffset + VerticesSize;
 				Entity.IndicesCount = IndicesCount;
-				Entity.VertexDataSize = VertexDataSize;
-				Entity.StaticMeshHandle = MeshHandle;
 				Entity.Instances = 1;
 				Entity.InstanceOffset = InstanceOffset;
 				Entity.ImageDependency.push_back(AlbedoTextureHandle);

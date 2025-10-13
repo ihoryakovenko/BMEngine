@@ -29,16 +29,13 @@ namespace Render
 	struct DrawEntity
 	{
 		u64 VertexOffset;
+		u64 InstanceOffset;
 		u32 IndexOffset;
 		u32 IndicesCount;
-		u64 VertexDataSize;
-
-		BmRender_BufferRegion StaticMeshHandle;
-		u64 InstanceOffset;
 		u32 Instances;
-
-		std::vector<BmRender_BufferRegion> ResourceDependency;
+		
 		std::vector<BmRender_ImageResource> ImageDependency;
+		std::vector<BmRender_BufferRegion> ResourceDependency;
 	};
 
 	struct DrawFrames
@@ -56,6 +53,8 @@ namespace Render
 		DrawFrames Frames;
 		u32 CurrentFrame;
 		u32 CurrentImageIndex;
+
+		u64 WaitSemaphoreValueCount;
 	};
 
 	struct StaticMeshPipeline
@@ -147,7 +146,7 @@ namespace Render
 
 	void* FrameAlloc(u32 Size);
 
-	void Draw(DrawScene* Data);
+	void Draw(DrawScene* Data, u64 WaitSemaphoreValue);
 
 	RenderState* GetRenderState();
 }

@@ -48,7 +48,7 @@ namespace TransferSystem
 	void Init();
 	void DeInit();
 
-	void Transfer();
+	u64 Transfer();
 
 	TransferMemory RequestTransferMemory(u64 Size);
 

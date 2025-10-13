@@ -61,7 +61,7 @@ layout(set = 0, binding = 0) uniform UboViewProjection
 {
 	mat4 View;
 	mat4 Projection;
-} ViewProjection[];
+} ViewProjection;
 
 layout(set = 1, binding = 0) uniform sampler2D DiffuseTexture[];
 layout(set = 1, binding = 1) uniform sampler2D SpecularTexture[];
@@ -73,7 +73,7 @@ layout(set = 2, binding = 0) uniform LightCasters
 	DirectionLight directionLight;
 	SpotLight spotlight;
 }
-lightCasters[];
+lightCasters;
 
 layout(std430, set = 3, binding = 0) readonly buffer MaterialsBuffer {
 	Material materials[];
@@ -203,15 +203,15 @@ void main()
 {
 	int idx = int(Constants.FrameIndex);
 
-	vec3 FragmentPosition = vec3(ViewProjection[nonuniformEXT(idx)].View * WorldFragPos);
+	vec3 FragmentPosition = vec3(ViewProjection.View * WorldFragPos);
 
 	Material Mat = Materials.materials[FragmentMaterialIndex];
 	vec4 DiffuseTexture = texture(DiffuseTexture[nonuniformEXT(Mat.AlbedoTexIndex)], FragmentTexture);
 	vec3 SpecularTexture = vec3(texture(SpecularTexture[nonuniformEXT(Mat.SpecularTexIndex)], FragmentTexture));
 
 	vec3 ResultLightColor = vec3(0.0);
-	ResultLightColor += CastDirectionLight(ViewProjection[nonuniformEXT(idx)].View, lightCasters[nonuniformEXT(idx)].directionLight, FragmentPosition, vec3(DiffuseTexture), SpecularTexture, Mat.Shininess);
-	ResultLightColor += CastPointLight(ViewProjection[nonuniformEXT(idx)].View, lightCasters[nonuniformEXT(idx)].pointlight, FragmentPosition, vec3(DiffuseTexture), SpecularTexture, Mat.Shininess);
-	ResultLightColor += CastSpotLigh(ViewProjection[nonuniformEXT(idx)].View, lightCasters[nonuniformEXT(idx)].spotlight, FragmentPosition, vec3(DiffuseTexture), SpecularTexture, Mat.Shininess);
+	ResultLightColor += CastDirectionLight(ViewProjection.View, lightCasters.directionLight, FragmentPosition, vec3(DiffuseTexture), SpecularTexture, Mat.Shininess);
+	ResultLightColor += CastPointLight(ViewProjection.View, lightCasters.pointlight, FragmentPosition, vec3(DiffuseTexture), SpecularTexture, Mat.Shininess);
+	ResultLightColor += CastSpotLigh(ViewProjection.View, lightCasters.spotlight, FragmentPosition, vec3(DiffuseTexture), SpecularTexture, Mat.Shininess);
 	OutColor = vec4(ResultLightColor, DiffuseTexture.a);
 }

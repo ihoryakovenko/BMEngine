@@ -127,13 +127,15 @@ namespace Engine
 				switch (Binding.Type)
 				{
 					case Util::ShaderType::Uniform:
-						VkBinding.DescriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-						VkBinding.DescriptorCount = (Binding.UpdateFrequency == BufferUpdateFrequency::PerFrame) ? 3 : 1; // todo use frames in fly instead of 3
+						VkBinding.DescriptorType = (Binding.UpdateFrequency == BufferUpdateFrequency::PerFrame) ?
+							VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+						VkBinding.DescriptorCount = 1;
 
 						break;
 					case Util::ShaderType::Buffer:
-						VkBinding.DescriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-						VkBinding.DescriptorCount = (Binding.UpdateFrequency == BufferUpdateFrequency::PerFrame) ? 3 : 1; // todo use frames in fly instead of 3;
+						VkBinding.DescriptorType = (Binding.UpdateFrequency == BufferUpdateFrequency::PerFrame) ?
+							VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+						VkBinding.DescriptorCount = 1;
 
 						break;
 					case Util::ShaderType::Sampler2D:
@@ -234,6 +236,8 @@ namespace Engine
 		TaskSystem::TaskGroup Group;
 		Group.TasksInGroup = 0;
 
+		u32 LastTransfer = 0;
+
 		while (!glfwWindowShouldClose(Window) && !Close)
 		{
 			glfwPollEvents();
@@ -246,12 +250,21 @@ namespace Engine
 
 			if (!IsMinimized)
 			{
-				TaskSystem::AddTask([] () { EngineResources::Update(&Scene); }, &Group);
-				TaskSystem::AddTask(TransferSystem::Transfer, &Group);
-				Render::Draw(&Scene);
-			}
+				//TaskSystem::AddTask([] () { EngineResources::Update(&Scene); }, &Group);
+				//TaskSystem::AddTask(TransferSystem::Transfer, &Group);
+				//Render::Draw(&Scene);
 
-			TaskSystem::WaitForGroup(&Group);
+				u32 Transferred = 0;
+				
+				EngineResources::Update(&Scene);
+
+				TaskSystem::TaskLambda Task = [&]() { Transferred = TransferSystem::Transfer(); };
+				TaskSystem::AddTask(&Task, &Group);
+				Render::Draw(&Scene, LastTransfer);
+
+				TaskSystem::WaitForGroup(&Group);
+				LastTransfer = Transferred;
+			}
 		}
 
 		DeInit();
@@ -321,7 +334,7 @@ namespace Engine
 		{
 			BmRender_DescriptorSetBinding Binding;
 			Binding.BufferRegions = VpRegion;
-			Binding.BindingCount = 3;
+			Binding.BindingCount = 1;
 			Binding.DstArrayElement = 0;
 
 			BmRender_CreateDescriptorSet("VpSet", "FrameDataLayout", "MainPool");
@@ -331,7 +344,7 @@ namespace Engine
 		{
 			BmRender_DescriptorSetBinding Binding;
 			Binding.BufferRegions = EntityLightRegion;
-			Binding.BindingCount = 3;
+			Binding.BindingCount = 1;
 			Binding.DstArrayElement = 0;
 
 			BmRender_CreateDescriptorSet("StaticMeshLightSet", "FrameDataLayout", "MainPool");

@@ -1,7 +1,5 @@
 #version 450
 
-#extension GL_EXT_nonuniform_qualifier : enable
-
 layout(location = 0) in vec3 Position;
 layout(location = 1) in vec2 TextureCoords;
 layout(location = 2) in vec3 Normal;
@@ -16,7 +14,7 @@ layout(set = 0, binding = 0) uniform UboViewProjection
 {
 	mat4 View;
 	mat4 Projection;
-} ViewProjection[];
+} ViewProjection;
 
 layout(location = 0) out vec2 FragmentTexture;
 layout(location = 1) out vec3 FragmentNormal;
@@ -26,11 +24,12 @@ layout(location = 3) out flat uint FragmentMaterialIndex;
 void main()
 {
 	int idx = int(Constants.FrameIndex);
+	int prev = (idx + 3 - 1) % 3;
 
 	FragmentTexture = TextureCoords;
 	WorldFragPos = ModelMatrix * vec4(Position, 1.0);
-	FragmentNormal = normalize(mat3(transpose(inverse(ViewProjection[nonuniformEXT(idx)].View * ModelMatrix))) * Normal);
+	FragmentNormal = normalize(mat3(transpose(inverse(ViewProjection.View * ModelMatrix))) * Normal);
 	FragmentMaterialIndex = MaterialIndex;
 
-	gl_Position = ViewProjection[nonuniformEXT(idx)].Projection * ViewProjection[nonuniformEXT(idx)].View * ModelMatrix * vec4(Position, 1.0);
+	gl_Position = ViewProjection.Projection * ViewProjection.View * ModelMatrix * vec4(Position, 1.0);
 }
