@@ -5,6 +5,8 @@
 
 #include "Util/EngineTypes.h"
 
+#include "RenderTypes.h"
+
 enum class BufferUpdateFrequency
 {
 	Static,
@@ -47,7 +49,7 @@ enum class ImageType
 	ColorAttachmentSampled,
 };
 
-struct BmRender_SamplerDescription
+struct BmRHI_SamplerDescription
 {
 	VkFilter MagFilter;
 	VkFilter MinFilter;
@@ -118,6 +120,13 @@ struct BmRender_ImageViewBindingDescription
 	u32 BindingIndex;
 	u64 ArrayElement;
 };
+
+void BmRHI_Initialize();
+void BmRHI_Shutdown();
+
+BmRHI_Sampler BmRHI_CreateSampler(BmRHI_SamplerDescription* Description);
+void BmRHI_DestroySampler(BmRHI_Sampler Handle);
+VkSampler BmRHI_GetVulkanSampler(BmRHI_Sampler Handle);
 
 void BmRender_CreateVertexStageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, const std::string& Name);
 void BmRender_CreateInstanceBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, const std::string& Name);

@@ -84,7 +84,7 @@ namespace RenderResources
 
 	void CreateVertex(const std::string& Name, VulkanHelper::VertexBinding& Binding);
 	void CreateShader(const std::string& Name, const u32* Code, u64 CodeSize);
-	void CreateSampler(const std::string& Name, const BmRender_SamplerDescription& Data);
+	void CreateSampler(const std::string& Name, const BmRHI_SamplerDescription& Data);
 	void CreateGeometryBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, std::string& Name);
 	void CreateDescriptorSetLayout(const std::string& Name, const BmRender_DescriptorSetLayoutDescription& Description);
 	void UpdateDescriptorSet(std::string DescriptorSet, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount);

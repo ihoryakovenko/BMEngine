@@ -348,7 +348,7 @@ namespace RenderResources
 		ResContext.Shaders[Name] = NewShaderModule;
 	}
 
-	void CreateSampler(const std::string& Name, const BmRender_SamplerDescription& Data)
+	void CreateSampler(const std::string& Name, const BmRHI_SamplerDescription& Data)
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 

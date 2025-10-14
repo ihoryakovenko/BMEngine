@@ -101,7 +101,7 @@ namespace Engine
 	{
 		for (auto It = SamplersNode.Begin(); It != SamplersNode.End(); It++)
 		{
-			BmRender_SamplerDescription Data = Util::ParseSamplerNode((*It).second);
+			BmRHI_SamplerDescription Data = Util::ParseSamplerNode((*It).second);
 			RenderResources::CreateSampler((*It).first, Data);
 		}
 	}

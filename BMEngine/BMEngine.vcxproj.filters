@@ -31,6 +31,7 @@
     <ClCompile Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\Memory\f_mem_debug.c" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderInterface.cpp" />
+    <ClCompile Include="Source\Engine\Systems\HandleManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
@@ -52,6 +53,8 @@
     <ClInclude Include="Source\Engine\Systems\Concurrency\TaskSystem.h" />
     <ClInclude Include="Source\Engine\Systems\Memory\forge_memory_debugger.h" />
     <ClInclude Include="Source\Engine\Systems\Render\RenderInterface.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\RenderTypes.h" />
+    <ClInclude Include="Source\Engine\Systems\HandleManager.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />

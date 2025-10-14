@@ -392,9 +392,9 @@ namespace Util
 		return {};
 	}
 
-	BmRender_SamplerDescription ParseSamplerNode(Yaml::Node& Sampler)
+	BmRHI_SamplerDescription ParseSamplerNode(Yaml::Node& Sampler)
 	{
-		BmRender_SamplerDescription Data = { };
+		BmRHI_SamplerDescription Data = { };
 
 		std::string Value;
 

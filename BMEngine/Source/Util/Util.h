@@ -302,7 +302,7 @@ namespace Util
 
 	std::string ParseNameNode(Yaml::Node& Node);
 	std::string ParseShaderNode(Yaml::Node& ShaderNode);
-	BmRender_SamplerDescription ParseSamplerNode(Yaml::Node& SamplerNode);
+	BmRHI_SamplerDescription ParseSamplerNode(Yaml::Node& SamplerNode);
 	BmRender_LayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode);
 	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, VulkanHelper::VertexAttribute* OutAttribute, std::string* OutAttributeName);
 	void ParseMat4AttributeNode(Yaml::Node& AttributeNode, std::vector<VulkanHelper::VertexAttribute>& OutAttributes, std::vector<std::string>& OutAttributeNames, u32 BaseOffset);
