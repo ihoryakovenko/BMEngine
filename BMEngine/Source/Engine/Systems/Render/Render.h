@@ -9,6 +9,7 @@
 #include "Util/EngineTypes.h"
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 #include "Engine/Systems/Render/VulkanCoreContext.h"
+#include "RenderInterface.h"
 
 #include <atomic>
 #include <mutex>
@@ -165,7 +166,7 @@ namespace DeferredPass
 	BmRender_ImageResource* TestDeferredInputColorImage();
 	BmRender_ImageResource* TestDeferredInputDepthImage();
 
-	VulkanHelper::AttachmentData* GetAttachmentData();
+	AttachmentData* GetAttachmentData();
 }
 
 namespace LightningPass
@@ -182,7 +183,7 @@ namespace MainPass
 	void BeginPass();
 	void EndPass();
 
-	VulkanHelper::AttachmentData* GetAttachmentData();
+	AttachmentData* GetAttachmentData();
 }
 
 namespace TerrainRender

@@ -1844,9 +1844,9 @@ namespace Util
 		}
 	}
 
-	RenderResources::BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, const VulkanHelper::PipelineResourceInfo& ResourceInfo)
+	BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, const PipelineResourceInfo& ResourceInfo)
 	{
-		RenderResources::BmRender_PipelineDescription Description = {};
+		BmRender_PipelineDescription Description = {};
 		Description.Extent = Extent;
 		Description.ResourceInfo = ResourceInfo;
 

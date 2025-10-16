@@ -5,6 +5,7 @@
 
 #include "VulkanCoreContext.h"
 #include "TransferSystem.h"
+#include "RenderInterface.h"
 
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -37,14 +38,14 @@ namespace RenderResources
 	{
 		VulkanCoreContext::VulkanCoreContext CoreContext;
 		std::unordered_map<std::string, VulkanHelper::VertexBinding> VBindings;
-		std::unordered_map<std::string, VkSampler> Samplers;
+		std::unordered_map<std::string, BmRender_Sampler> Samplers;
 		std::unordered_map<std::string, DescriptorSetLayout> DescriptorSetLayouts;
-		std::unordered_map<std::string, VkShaderModule> Shaders;
+		std::unordered_map<std::string, BmRender_Shader> Shaders;
 		std::unordered_map<std::string, RenderResources::GPUBuffer> StorageBuffers;
-		std::unordered_map<std::string, VkDescriptorPool> DescriptorPools;
+		std::unordered_map<std::string, BmRender_DescriptorPool> DescriptorPools;
 		std::unordered_map<std::string, DescriptorSet> DescriptorSets;
-		std::unordered_map<std::string, VkPipeline> Pipelines;
-		std::unordered_map<std::string, VkPipelineLayout> PipelineLayouts;
+		std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
+		std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
 
 		Memory::Array<VkPushConstantRange> PushConstants;
 		Memory::Array<DescriptorSetLayoutBinding> LayoutBindings;
@@ -87,16 +88,15 @@ namespace RenderResources
 		u32 TotalDescriptorCount = TotalDescriptorLayouts * 3;
 		TotalDescriptorCount += 256;
 
-		VkDescriptorPoolCreateInfo PoolCreateInfo = { };
-		PoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		PoolCreateInfo.maxSets = TotalDescriptorCount;
-		PoolCreateInfo.poolSizeCount = PoolSizeCount;
-		PoolCreateInfo.pPoolSizes = TotalPassPoolSizes;
-		PoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
+		BmRender_DescriptorPoolDescription PoolDesc = {};
+		PoolDesc.MaxSets = TotalDescriptorCount;
+		PoolDesc.PoolSizeCount = PoolSizeCount;
+		PoolDesc.PoolSizes = TotalPassPoolSizes;
+		PoolDesc.Flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
+		PoolDesc.Next = nullptr;
 
-		VkDescriptorPool MainPool;
-		VULKAN_CHECK_RESULT(vkCreateDescriptorPool(ResContext.CoreContext.LogicalDevice, &PoolCreateInfo, nullptr, &MainPool));
-		ResContext.DescriptorPools["MainPool"] = MainPool;
+		BmRender_DescriptorPool MainPoolHandle = BmRender_CreateDescriptorPool(&PoolDesc);
+		ResContext.DescriptorPools["MainPool"] = MainPoolHandle;
 
 		ResContext.Images.Capacity = 64;
 		ResContext.Images.Count = 0;
@@ -121,71 +121,20 @@ namespace RenderResources
 
 	void CreateGraphicsPipeline(const std::string& Name, const BmRender_PipelineDescription& Description)
 	{
-		VkDevice Device = ResContext.CoreContext.LogicalDevice;
-		VkPipelineVertexInputStateCreateInfo VertexInputState = {};
-		VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		VertexInputState.vertexBindingDescriptionCount = static_cast<u32>(Description.VertexBindings.size());
-		VertexInputState.pVertexBindingDescriptions = Description.VertexBindings.empty() ? nullptr : Description.VertexBindings.data();
-		VertexInputState.vertexAttributeDescriptionCount = static_cast<u32>(Description.VertexAttributes.size());
-		VertexInputState.pVertexAttributeDescriptions = Description.VertexAttributes.empty() ? nullptr : Description.VertexAttributes.data();
-
-		VkPipelineRenderingCreateInfo RenderingInfo = { };
-		RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-		RenderingInfo.pNext = nullptr;
-		RenderingInfo.colorAttachmentCount = Description.ResourceInfo.PipelineAttachmentData.ColorAttachmentCount;
-		RenderingInfo.pColorAttachmentFormats = Description.ResourceInfo.PipelineAttachmentData.ColorAttachmentFormats;
-		RenderingInfo.depthAttachmentFormat = Description.ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat;
-		RenderingInfo.stencilAttachmentFormat = Description.ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat;
-
-		VkPipelineColorBlendStateCreateInfo ColorBlendState = Description.ColorBlendState;
-		ColorBlendState.pAttachments = &Description.ColorBlendAttachment;
-
-		VkPipelineViewportStateCreateInfo ViewportState = Description.ViewportState;
-		ViewportState.pViewports = &Description.Viewport;
-		ViewportState.pScissors = &Description.Scissor;
-
-		auto PipelineCreateInfo = (VkGraphicsPipelineCreateInfo*)Render::FrameAlloc(sizeof(VkGraphicsPipelineCreateInfo));
-		*PipelineCreateInfo = { };
-		PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-		PipelineCreateInfo->stageCount = static_cast<u32>(Description.ShaderStages.size());
-		PipelineCreateInfo->pStages = Description.ShaderStages.data();
-		PipelineCreateInfo->pVertexInputState = &VertexInputState;
-		PipelineCreateInfo->pInputAssemblyState = &Description.InputAssemblyState;
-		PipelineCreateInfo->pViewportState = &ViewportState;
-		PipelineCreateInfo->pDynamicState = nullptr;
-		PipelineCreateInfo->pRasterizationState = &Description.RasterizationState;
-		PipelineCreateInfo->pMultisampleState = &Description.MultisampleState;
-		PipelineCreateInfo->pColorBlendState = &ColorBlendState;
-		PipelineCreateInfo->pDepthStencilState = &Description.DepthStencilState;
-		PipelineCreateInfo->layout = Description.PipelineLayout;
-		PipelineCreateInfo->renderPass = nullptr;
-		PipelineCreateInfo->subpass = 0;
-		PipelineCreateInfo->pNext = &RenderingInfo;
-
-		PipelineCreateInfo->basePipelineHandle = VK_NULL_HANDLE;
-		PipelineCreateInfo->basePipelineIndex = -1;
-
-		VkPipeline Pipeline;
-		VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, 1, PipelineCreateInfo, nullptr, &Pipeline));
-
-		ResContext.Pipelines[Name] = Pipeline;
+		// Use the new interface function to create the pipeline
+		BmRender_Pipeline PipelineHandle = BmRender_CreatePipeline(&Description);
+		
+		// Store the pipeline handle in the map
+		ResContext.Pipelines[Name] = PipelineHandle;
 	}
 
 	void CreatePipelineLayout(const std::string& Name, const BmRender_PipelineLayoutDescription& Description)
 	{
-		VkDevice Device = ResContext.CoreContext.LogicalDevice;
-		VkPipelineLayoutCreateInfo CreateInfo = {};
-		CreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		CreateInfo.setLayoutCount = Description.SetLayoutCount;
-		CreateInfo.pSetLayouts = Description.SetLayouts;
-		CreateInfo.pushConstantRangeCount = Description.PushConstantRangeCount;
-		CreateInfo.pPushConstantRanges = Description.PushConstantRanges;
-		CreateInfo.flags = Description.Flags;
-		CreateInfo.pNext = Description.Next;
-
-		VkPipelineLayout PipelineLayout;
-		VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &CreateInfo, nullptr, &PipelineLayout));
-		ResContext.PipelineLayouts[Name] = PipelineLayout;
+		// Use the new interface function to create the pipeline layout
+		BmRender_PipelineLayout PipelineLayoutHandle = BmRender_CreatePipelineLayout(&Description);
+		
+		// Store the pipeline layout handle in the map
+		ResContext.PipelineLayouts[Name] = PipelineLayoutHandle;
 	}
 
 	void CreateBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, BufferUsageFlag Flag, const std::string& Name)
@@ -232,7 +181,7 @@ namespace RenderResources
 		auto it = ResContext.Pipelines.find(Name);
 		if (it != ResContext.Pipelines.end())
 		{
-			return it->second;
+			return BmRender_GetPipelineData(it->second)->VulkanPipeline;
 		}
 		return VK_NULL_HANDLE;
 	}
@@ -242,7 +191,7 @@ namespace RenderResources
 		auto it = ResContext.PipelineLayouts.find(Name);
 		if (it != ResContext.PipelineLayouts.end())
 		{
-			return it->second;
+			return BmRender_GetPipelineLayoutData(it->second)->VulkanPipelineLayout;
 		}
 		return VK_NULL_HANDLE;
 	}
@@ -279,12 +228,13 @@ namespace RenderResources
 
 		for (auto It = ResContext.Shaders.begin(); It != ResContext.Shaders.end(); ++It)
 		{
-			vkDestroyShaderModule(Device, It->second, nullptr);
+			BmRender_DestroyShader(It->second);
 		}
 
 		for (auto It = ResContext.Samplers.begin(); It != ResContext.Samplers.end(); ++It)
 		{
-			vkDestroySampler(Device, It->second, nullptr);
+			BmRender_DestroySampler(It->second);
+			//vkDestroySampler(Device, It->second, nullptr);
 		}
 
 		for (auto It = ResContext.DescriptorSetLayouts.begin(); It != ResContext.DescriptorSetLayouts.end(); ++It)
@@ -300,17 +250,17 @@ namespace RenderResources
 
 		for (auto It = ResContext.Pipelines.begin(); It != ResContext.Pipelines.end(); ++It)
 		{
-			vkDestroyPipeline(Device, It->second, nullptr);
+			BmRender_DestroyPipeline(It->second);
 		}
 
 		for (auto It = ResContext.PipelineLayouts.begin(); It != ResContext.PipelineLayouts.end(); ++It)
 		{
-			vkDestroyPipelineLayout(Device, It->second, nullptr);
+			BmRender_DestroyPipelineLayout(It->second);
 		}
 
 		for (auto It = ResContext.DescriptorPools.begin(); It != ResContext.DescriptorPools.end(); ++It)
 		{
-			vkDestroyDescriptorPool(Device, It->second, nullptr);
+			BmRender_DestroyDescriptorPool(It->second);
 		}
 
 		VulkanCoreContext::DestroyCoreContext(&ResContext.CoreContext);
@@ -334,47 +284,17 @@ namespace RenderResources
 
 	void CreateShader(const std::string& Name, const u32* Code, u64 CodeSize)
 	{
-		VkDevice Device = ResContext.CoreContext.LogicalDevice;
-
-		VkShaderModuleCreateInfo shaderInfo = { };
-		shaderInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-		shaderInfo.pNext = nullptr;
-		shaderInfo.flags = 0;
-		shaderInfo.codeSize = CodeSize;
-		shaderInfo.pCode = Code;
-
-		VkShaderModule NewShaderModule;
-		VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &shaderInfo, nullptr, &NewShaderModule));
-		ResContext.Shaders[Name] = NewShaderModule;
+		BmRender_ShaderDescription ShaderDesc = {};
+		ShaderDesc.Code = Code;
+		ShaderDesc.CodeSize = CodeSize;
+		
+		BmRender_Shader ShaderHandle = BmRender_CreateShader(&ShaderDesc);
+		ResContext.Shaders[Name] = ShaderHandle;
 	}
 
 	void CreateSampler(const std::string& Name, const BmRHI_SamplerDescription& Data)
 	{
-		VkDevice Device = ResContext.CoreContext.LogicalDevice;
-
-		VkSamplerCreateInfo CreateInfo = { };
-		CreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		CreateInfo.pNext = nullptr;
-		CreateInfo.flags = 0;
-		CreateInfo.magFilter = Data.MagFilter;
-		CreateInfo.minFilter = Data.MinFilter;
-		CreateInfo.mipmapMode = Data.MipmapMode;
-		CreateInfo.addressModeU = Data.AddressModeU;
-		CreateInfo.addressModeV = Data.AddressModeV;
-		CreateInfo.addressModeW = Data.AddressModeW;
-		CreateInfo.mipLodBias = Data.MipLodBias;
-		CreateInfo.anisotropyEnable = Data.AnisotropyEnable;
-		CreateInfo.maxAnisotropy = Data.MaxAnisotropy;
-		CreateInfo.compareEnable = Data.CompareEnable;
-		CreateInfo.compareOp = Data.CompareOp;
-		CreateInfo.minLod = Data.MinLod;
-		CreateInfo.maxLod = Data.MaxLod;
-		CreateInfo.borderColor = Data.BorderColor;
-		CreateInfo.unnormalizedCoordinates = Data.UnnormalizedCoordinates;
-
-		VkSampler NewSampler;
-		VULKAN_CHECK_RESULT(vkCreateSampler(Device, &CreateInfo, nullptr, &NewSampler));
-		ResContext.Samplers[Name] = NewSampler;
+		ResContext.Samplers[Name] = BmRender_CreateSampler(&Data);
 	}
 
 	void CreateGeometryBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, std::string& Name)
@@ -519,7 +439,7 @@ namespace RenderResources
 		auto It = ResContext.Samplers.find(Id);
 		if (It != ResContext.Samplers.end())
 		{
-			return It->second;
+			return BmRender_GetSamplerData(It->second)->VulkanSampler;
 		}
 
 		assert(false);
@@ -543,11 +463,11 @@ namespace RenderResources
 		auto It = ResContext.Shaders.find(Id);
 		if (It != ResContext.Shaders.end())
 		{
-			return It->second;
+			return BmRender_GetShaderData(It->second)->VulkanShaderModule;
 		}
 
 		assert(false);
-		return nullptr;
+		return VK_NULL_HANDLE;
 	}
 
 	VulkanHelper::VertexBinding GetVertexBinding(const std::string& Id)
@@ -567,11 +487,11 @@ namespace RenderResources
 		auto It = ResContext.DescriptorPools.find(Id);
 		if (It != ResContext.DescriptorPools.end())
 		{
-			return It->second;
+			return BmRender_GetDescriptorPoolData(It->second)->VulkanDescriptorPool;
 		}
 
 		assert(false);
-		return nullptr;
+		return VK_NULL_HANDLE;
 	}
 
 	DescriptorSet* GetDescriptorSet(const std::string& Id)

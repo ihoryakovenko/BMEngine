@@ -27,41 +27,7 @@ namespace RenderResources
 		u32 BindingsCount;
 	};
 
-	struct BmRender_PipelineLayoutDescription
-	{
-		u32 SetLayoutCount;
-		const VkDescriptorSetLayout* SetLayouts;
-		u32 PushConstantRangeCount;
-		const VkPushConstantRange* PushConstantRanges;
-		VkPipelineLayoutCreateFlags Flags;
-		const void* Next;
-	};
 
-	struct BmRender_PipelineDescription
-	{
-		VkExtent2D Extent;
-		VkPipelineLayout PipelineLayout;
-		VulkanHelper::PipelineResourceInfo ResourceInfo;
-
-		std::vector<VkPipelineShaderStageCreateInfo> ShaderStages;
-		std::vector<VkVertexInputBindingDescription> VertexBindings;
-		std::vector<VkVertexInputAttributeDescription> VertexAttributes;
-
-		// Pipeline layout information
-		std::vector<VkDescriptorSetLayout> DescriptorSetLayouts;
-		std::vector<VkPushConstantRange> PushConstantRanges;
-		VkPipelineLayoutCreateFlags PipelineLayoutFlags;
-
-		VkPipelineRasterizationStateCreateInfo RasterizationState;
-		VkPipelineColorBlendAttachmentState ColorBlendAttachment;
-		VkPipelineColorBlendStateCreateInfo ColorBlendState;
-		VkPipelineDepthStencilStateCreateInfo DepthStencilState;
-		VkPipelineMultisampleStateCreateInfo MultisampleState;
-		VkPipelineInputAssemblyStateCreateInfo InputAssemblyState;
-		VkPipelineViewportStateCreateInfo ViewportState;
-		VkViewport Viewport;
-		VkRect2D Scissor;
-	};
 
 	struct DescriptorSet
 	{

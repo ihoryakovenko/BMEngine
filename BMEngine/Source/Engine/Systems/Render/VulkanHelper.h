@@ -64,20 +64,6 @@ namespace VulkanHelper
 		Memory::Array<char> ShaderCode;
 	};
 
-	struct AttachmentData
-	{
-		u32 ColorAttachmentCount;
-		VkFormat ColorAttachmentFormats[16]; // get max attachments from device
-		VkFormat DepthAttachmentFormat;
-		VkFormat StencilAttachmentFormat;
-	};
-
-	struct PipelineResourceInfo
-	{
-		AttachmentData PipelineAttachmentData;
-		VkPipelineLayout PipelineLayout = nullptr;
-	};
-
 	struct RenderPipeline
 	{
 		VkPipeline Pipeline;

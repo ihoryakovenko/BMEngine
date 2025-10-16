@@ -93,13 +93,13 @@ namespace Render
 			MeshPipeline->ShadowMapArraySet[i] = RenderResources::GetDescriptorSet(ShadowMapSetName)->Set;
 		}
 
-		VulkanHelper::PipelineResourceInfo ResourceInfo = {};
+		PipelineResourceInfo ResourceInfo = {};
 		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
 
-		RenderResources::BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/StaticMesh.yaml", MainScreenExtent, ResourceInfo);
+		BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/StaticMesh.yaml", MainScreenExtent, ResourceInfo);
 
 		// Create pipeline layout from parsed descriptor set layouts
-		RenderResources::BmRender_PipelineLayoutDescription LayoutDesc = {};
+		BmRender_PipelineLayoutDescription LayoutDesc = {};
 		LayoutDesc.SetLayoutCount = static_cast<u32>(PipelineDesc.DescriptorSetLayouts.size());
 		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts.data();
 		LayoutDesc.PushConstantRangeCount = static_cast<u32>(PipelineDesc.PushConstantRanges.size());
@@ -390,17 +390,17 @@ namespace DeferredPass
 	static VkSampler ColorSampler;
 	static VkSampler DepthSampler;
 
-	static VulkanHelper::AttachmentData AttachmentData;
+	static AttachmentData PipelineAttachmentData;
 
 	void Init()
 	{
 		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 		VkPhysicalDevice PhysicalDevice = RenderResources::GetCoreContext()->PhysicalDevice;
 
-		AttachmentData.ColorAttachmentCount = 1;
-		AttachmentData.ColorAttachmentFormats[0] = RenderResources::GetCoreContext()->SurfaceFormat.format;
-		AttachmentData.DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
-		AttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+		PipelineAttachmentData.ColorAttachmentCount = 1;
+		PipelineAttachmentData.ColorAttachmentFormats[0] = RenderResources::GetCoreContext()->SurfaceFormat.format;
+		PipelineAttachmentData.DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
+		PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
 		DeferredInputLayout = RenderResources::GetSetLayout("MainPassOutputLayout")->Layout;
 
@@ -438,13 +438,13 @@ namespace DeferredPass
 		}
 
 
-		VulkanHelper::PipelineResourceInfo ResourceInfo;
-		ResourceInfo.PipelineAttachmentData = AttachmentData;
+		PipelineResourceInfo ResourceInfo;
+		ResourceInfo.PipelineAttachmentData = PipelineAttachmentData;
 
-		RenderResources::BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/DeferredPipeline.yaml", MainScreenExtent, ResourceInfo);
+		BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/DeferredPipeline.yaml", MainScreenExtent, ResourceInfo);
 
 		// Create pipeline layout from parsed descriptor set layouts
-		RenderResources::BmRender_PipelineLayoutDescription LayoutDesc = {};
+		BmRender_PipelineLayoutDescription LayoutDesc = {};
 		LayoutDesc.SetLayoutCount = static_cast<u32>(PipelineDesc.DescriptorSetLayouts.size());
 		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts.data();
 		LayoutDesc.PushConstantRangeCount = static_cast<u32>(PipelineDesc.PushConstantRanges.size());
@@ -626,9 +626,9 @@ namespace DeferredPass
 		return DeferredInputDepthImage;
 	}
 
-	VulkanHelper::AttachmentData* GetAttachmentData()
+	AttachmentData* GetAttachmentData()
 	{
-		return &AttachmentData;
+		return &PipelineAttachmentData;
 	}
 }
 
@@ -683,15 +683,15 @@ namespace LightningPass
 		// Todo: check constant and model size?
 		PushConstants.size = sizeof(glm::mat4);
 
-		VulkanHelper::PipelineResourceInfo ResourceInfo;
+		PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineAttachmentData.ColorAttachmentCount = 0;
 		ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = DepthFormat;
 		ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
-		RenderResources::BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/DepthPipeline.yaml", DepthViewportExtent, ResourceInfo);
+		BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/DepthPipeline.yaml", DepthViewportExtent, ResourceInfo);
 
 		// Create pipeline layout from parsed descriptor set layouts
-		RenderResources::BmRender_PipelineLayoutDescription LayoutDesc = {};
+		BmRender_PipelineLayoutDescription LayoutDesc = {};
 		LayoutDesc.SetLayoutCount = static_cast<u32>(PipelineDesc.DescriptorSetLayouts.size());
 		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts.data();
 		LayoutDesc.PushConstantRangeCount = static_cast<u32>(PipelineDesc.PushConstantRanges.size());
@@ -858,15 +858,15 @@ namespace MainPass
 
 	static VkDescriptorSet SkyBoxSet;
 
-	static VulkanHelper::AttachmentData AttachmentData;
+	static AttachmentData PipelineAttachmentData;
 
 	void Init()
 	{
 		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
-		AttachmentData.ColorAttachmentCount = 1;
-		AttachmentData.ColorAttachmentFormats[0] = ColorFormat;
-		AttachmentData.DepthAttachmentFormat = DepthFormat;
+		PipelineAttachmentData.ColorAttachmentCount = 1;
+		PipelineAttachmentData.ColorAttachmentFormats[0] = ColorFormat;
+		PipelineAttachmentData.DepthAttachmentFormat = DepthFormat;
 
 
 		const VkDescriptorType Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -888,8 +888,8 @@ namespace MainPass
 
 		//VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(RenderResources::GetCoreContext()->LogicalDevice, &LayoutCreateInfo, nullptr, &SkyBoxLayout));
 
-		VulkanHelper::PipelineResourceInfo ResourceInfo;
-		ResourceInfo.PipelineAttachmentData = AttachmentData;
+		PipelineResourceInfo ResourceInfo;
+		ResourceInfo.PipelineAttachmentData = PipelineAttachmentData;
 
 		//RenderResources::BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/SkyBoxPipeline.yaml", MainScreenExtent, ResourceInfo);
 
@@ -1026,9 +1026,9 @@ namespace MainPass
 		vkCmdEndRendering(CmdBuffer);
 	}
 
-	VulkanHelper::AttachmentData* GetAttachmentData()
+	AttachmentData* GetAttachmentData()
 	{
-		return &AttachmentData;
+		return &PipelineAttachmentData;
 	}
 }
 
@@ -1088,13 +1088,13 @@ namespace TerrainRender
 		// Todo: check constant and model size?
 		PushConstants.size = sizeof(PushConstantsData);
 
-		VulkanHelper::PipelineResourceInfo ResourceInfo;
+		PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
 
-		RenderResources::BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/TerrainPipeline.yaml", MainScreenExtent, ResourceInfo);
+		BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/TerrainPipeline.yaml", MainScreenExtent, ResourceInfo);
 
 		// Create pipeline layout from parsed descriptor set layouts
-		RenderResources::BmRender_PipelineLayoutDescription LayoutDesc = {};
+		BmRender_PipelineLayoutDescription LayoutDesc = {};
 		LayoutDesc.SetLayoutCount = static_cast<u32>(PipelineDesc.DescriptorSetLayouts.size());
 		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts.data();
 		LayoutDesc.PushConstantRangeCount = static_cast<u32>(PipelineDesc.PushConstantRanges.size());

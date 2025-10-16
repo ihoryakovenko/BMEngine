@@ -2,10 +2,11 @@
 
 #include "RenderResources.h"
 #include "VulkanHelper.h"
+#include "Render.h"
 
 #include "Util/Util.h"
 
-//#include "Engine/Systems/HandleManager.h"
+#include "Engine/Systems/HandleManager.h"
 
 struct BmRender_BufferRegion_T { u64 Index; };
 struct BmRender_BufferArrayRegion_T { u64 Index; };
@@ -13,7 +14,52 @@ struct BmRender_ImageResource_T { u64 Index; };
 struct BmRender_ImageViewResource_T { u64 Index; };
 struct BmRender_PushConstant_T { u64 Index; };
 
-//static HandleManager::HandleManagerData<SamplerData> SamplerManager;
+enum class HandleType : u32
+{
+	Sampler,
+	Pipeline,
+	PipelineLayout,
+	DescriptorSetLayout,
+	DescriptorPool,
+	Shader,
+
+	MAX
+};
+
+static System_HandleManager HandleManagers[(u32)HandleType::MAX];
+
+void BmRender_Init()
+{
+	const u32 SamplerID = (u16)HandleType::Sampler;
+	HandleManagers[SamplerID] = System_HandleManager_InitData(32, sizeof(SamplerData), SamplerID);
+	
+	const u32 PipelineID = (u16)HandleType::Pipeline;
+	HandleManagers[PipelineID] = System_HandleManager_InitData(32, sizeof(PipelineData), PipelineID);
+	
+	const u32 PipelineLayoutID = (u16)HandleType::PipelineLayout;
+	HandleManagers[PipelineLayoutID] = System_HandleManager_InitData(32, sizeof(PipelineLayoutData), PipelineLayoutID);
+	
+	const u32 DescriptorSetLayoutID = (u16)HandleType::DescriptorSetLayout;
+	HandleManagers[DescriptorSetLayoutID] = System_HandleManager_InitData(32, sizeof(DescriptorSetLayoutData), DescriptorSetLayoutID);
+	
+	const u32 DescriptorPoolID = (u16)HandleType::DescriptorPool;
+	HandleManagers[DescriptorPoolID] = System_HandleManager_InitData(32, sizeof(DescriptorPoolData), DescriptorPoolID);
+	
+	const u32 ShaderID = (u16)HandleType::Shader;
+	HandleManagers[ShaderID] = System_HandleManager_InitData(32, sizeof(ShaderData), ShaderID);
+}
+
+void BmRender_DeInit()
+{
+	for (u16 i = 0; i < (u16)HandleType::MAX; ++i)
+	{
+		System_HandleManager Manager = HandleManagers[i];
+		if (Manager != nullptr)
+		{
+			System_HandleManager_ClearData(Manager);
+		}
+	}
+}
 
 void BmRender_CreateVertexStageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, const std::string& Name)
 {
@@ -84,24 +130,8 @@ BmRender_ImageResource BmRender_CreateImage2DArray(u32 Width, u32 Height, VkForm
 	return RenderResources::CreateImageResource(&Descr);
 }
 
-void BmRHI_Initialize()
+BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description)
 {
-	//SamplerManager = HandleManager::InitHandleManagerData<SamplerData>(1024);
-}
-
-void BmRHI_Shutdown()
-{
-	//HandleManager::DestroyHandle<SamplerData>(SamplerManager);
-	//SamplerManager = nullptr;
-}
-
-BmRHI_Sampler BmRHI_CreateSampler(BmRHI_SamplerDescription* Description)
-{
-	//if (!SamplerManager || !Description)
-	{
-		//return HandleManager::CreateHandle<SamplerData>(0, 0);
-	}
-
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
 	VkSamplerCreateInfo CreateInfo = { };
@@ -130,27 +160,204 @@ BmRHI_Sampler BmRHI_CreateSampler(BmRHI_SamplerDescription* Description)
 	SamplerData Data;
 	Data.VulkanSampler = VulkanSampler;
 
-	//return HandleManager::CreateHandle<SamplerData>(SamplerManager, Data);
-	return 1;
+	return (BmRender_Sampler)System_HandleManager_CreateHandle(HandleManagers[(u16)HandleType::Sampler], &Data);
 }
 
-void BmRHI_DestroySampler(BmRHI_Sampler Handle)
+void BmRender_DestroySampler(BmRender_Sampler Handle)
 {
-	//if (!SamplerManager) return;
+	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
-	//SamplerData* Data = HandleManager::GetHandleData(SamplerManager, Handle);
-	//if (Data)
-	//{
-	//	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	//	vkDestroySampler(Device, Data->VulkanSampler, nullptr);
-	//}
+	System_HandleManager Manager = HandleManagers[(u16)HandleType::Sampler];
+	auto Data = (SamplerData*)System_HandleManager_GetHandleData(Manager, Handle.Private);
 
-	//HandleManager::DestroyHandle<SamplerData>(SamplerManager, Handle);
+	vkDestroySampler(Device, Data->VulkanSampler, nullptr);
+	System_HandleManager_DestroyHandle(Manager, Handle.Private);
 }
 
-VkSampler BmRHI_GetVulkanSampler(BmRHI_Sampler Handle)
+SamplerData* BmRender_GetSamplerData(BmRender_Sampler Handle)
 {
-	//SamplerData* Data = HandleManager::GetHandleData(SamplerManager, Handle);
-	//return Data ? Data->VulkanSampler : VK_NULL_HANDLE;
-	return VkSampler();
+	return (SamplerData*)System_HandleManager_GetHandleData(HandleManagers[(u16)HandleType::Sampler], Handle.Private);
+}
+
+BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* Description)
+{
+	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+	
+	VkPipelineVertexInputStateCreateInfo VertexInputState = {};
+	VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	VertexInputState.vertexBindingDescriptionCount = static_cast<u32>(Description->VertexBindings.size());
+	VertexInputState.pVertexBindingDescriptions = Description->VertexBindings.empty() ? nullptr : Description->VertexBindings.data();
+	VertexInputState.vertexAttributeDescriptionCount = static_cast<u32>(Description->VertexAttributes.size());
+	VertexInputState.pVertexAttributeDescriptions = Description->VertexAttributes.empty() ? nullptr : Description->VertexAttributes.data();
+
+	VkPipelineRenderingCreateInfo RenderingInfo = { };
+	RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+	RenderingInfo.pNext = nullptr;
+	RenderingInfo.colorAttachmentCount = Description->ResourceInfo.PipelineAttachmentData.ColorAttachmentCount;
+	RenderingInfo.pColorAttachmentFormats = Description->ResourceInfo.PipelineAttachmentData.ColorAttachmentFormats;
+	RenderingInfo.depthAttachmentFormat = Description->ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat;
+	RenderingInfo.stencilAttachmentFormat = Description->ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat;
+
+	VkPipelineColorBlendStateCreateInfo ColorBlendState = Description->ColorBlendState;
+	ColorBlendState.pAttachments = &Description->ColorBlendAttachment;
+
+	VkPipelineViewportStateCreateInfo ViewportState = Description->ViewportState;
+	ViewportState.pViewports = &Description->Viewport;
+	ViewportState.pScissors = &Description->Scissor;
+
+	auto PipelineCreateInfo = (VkGraphicsPipelineCreateInfo*)Render::FrameAlloc(sizeof(VkGraphicsPipelineCreateInfo));
+	*PipelineCreateInfo = { };
+	PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	PipelineCreateInfo->stageCount = static_cast<u32>(Description->ShaderStages.size());
+	PipelineCreateInfo->pStages = Description->ShaderStages.data();
+	PipelineCreateInfo->pVertexInputState = &VertexInputState;
+	PipelineCreateInfo->pInputAssemblyState = &Description->InputAssemblyState;
+	PipelineCreateInfo->pViewportState = &ViewportState;
+	PipelineCreateInfo->pDynamicState = nullptr;
+	PipelineCreateInfo->pRasterizationState = &Description->RasterizationState;
+	PipelineCreateInfo->pMultisampleState = &Description->MultisampleState;
+	PipelineCreateInfo->pColorBlendState = &ColorBlendState;
+	PipelineCreateInfo->pDepthStencilState = &Description->DepthStencilState;
+	PipelineCreateInfo->layout = Description->PipelineLayout;
+	PipelineCreateInfo->renderPass = nullptr;
+	PipelineCreateInfo->subpass = 0;
+	PipelineCreateInfo->pNext = &RenderingInfo;
+
+	PipelineCreateInfo->basePipelineHandle = VK_NULL_HANDLE;
+	PipelineCreateInfo->basePipelineIndex = -1;
+
+	VkPipeline Pipeline;
+	VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, 1, PipelineCreateInfo, nullptr, &Pipeline));
+
+	PipelineData Data;
+	Data.VulkanPipeline = Pipeline;
+
+	return (BmRender_Pipeline)System_HandleManager_CreateHandle(HandleManagers[(u16)HandleType::Pipeline], &Data);
+}
+
+void BmRender_DestroyPipeline(BmRender_Pipeline Handle)
+{
+	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+
+	System_HandleManager Manager = HandleManagers[(u16)HandleType::Pipeline];
+	auto Data = (PipelineData*)System_HandleManager_GetHandleData(Manager, Handle.Private);
+
+	vkDestroyPipeline(Device, Data->VulkanPipeline, nullptr);
+	System_HandleManager_DestroyHandle(Manager, Handle.Private);
+}
+
+PipelineData* BmRender_GetPipelineData(BmRender_Pipeline Handle)
+{
+	return (PipelineData*)System_HandleManager_GetHandleData(HandleManagers[(u16)HandleType::Pipeline], Handle.Private);
+}
+
+BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description)
+{
+	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+	
+	VkPipelineLayoutCreateInfo CreateInfo = {};
+	CreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	CreateInfo.setLayoutCount = Description->SetLayoutCount;
+	CreateInfo.pSetLayouts = Description->SetLayouts;
+	CreateInfo.pushConstantRangeCount = Description->PushConstantRangeCount;
+	CreateInfo.pPushConstantRanges = Description->PushConstantRanges;
+	CreateInfo.flags = Description->Flags;
+	CreateInfo.pNext = Description->Next;
+
+	VkPipelineLayout PipelineLayout;
+	VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &CreateInfo, nullptr, &PipelineLayout));
+
+	PipelineLayoutData Data;
+	Data.VulkanPipelineLayout = PipelineLayout;
+
+	return (BmRender_PipelineLayout)System_HandleManager_CreateHandle(HandleManagers[(u16)HandleType::PipelineLayout], &Data);
+}
+
+void BmRender_DestroyPipelineLayout(BmRender_PipelineLayout Handle)
+{
+	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+
+	System_HandleManager Manager = HandleManagers[(u16)HandleType::PipelineLayout];
+	auto Data = (PipelineLayoutData*)System_HandleManager_GetHandleData(Manager, Handle.Private);
+
+	vkDestroyPipelineLayout(Device, Data->VulkanPipelineLayout, nullptr);
+	System_HandleManager_DestroyHandle(Manager, Handle.Private);
+}
+
+PipelineLayoutData* BmRender_GetPipelineLayoutData(BmRender_PipelineLayout Handle)
+{
+	return (PipelineLayoutData*)System_HandleManager_GetHandleData(HandleManagers[(u16)HandleType::PipelineLayout], Handle.Private);
+}
+
+BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolDescription* Description)
+{
+	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+	
+	VkDescriptorPoolCreateInfo CreateInfo = {};
+	CreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	CreateInfo.maxSets = Description->MaxSets;
+	CreateInfo.poolSizeCount = Description->PoolSizeCount;
+	CreateInfo.pPoolSizes = Description->PoolSizes;
+	CreateInfo.flags = Description->Flags;
+	CreateInfo.pNext = Description->Next;
+	
+	VkDescriptorPool DescriptorPool;
+	VULKAN_CHECK_RESULT(vkCreateDescriptorPool(Device, &CreateInfo, nullptr, &DescriptorPool));
+	
+	DescriptorPoolData Data;
+	Data.VulkanDescriptorPool = DescriptorPool;
+	
+	return (BmRender_DescriptorPool)System_HandleManager_CreateHandle(HandleManagers[(u16)HandleType::DescriptorPool], &Data);
+}
+
+void BmRender_DestroyDescriptorPool(BmRender_DescriptorPool Handle)
+{
+	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+	
+	System_HandleManager Manager = HandleManagers[(u16)HandleType::DescriptorPool];
+	auto Data = (DescriptorPoolData*)System_HandleManager_GetHandleData(Manager, Handle.Private);
+	
+	vkDestroyDescriptorPool(Device, Data->VulkanDescriptorPool, nullptr);
+	System_HandleManager_DestroyHandle(Manager, Handle.Private);
+}
+
+DescriptorPoolData* BmRender_GetDescriptorPoolData(BmRender_DescriptorPool Handle)
+{
+	return (DescriptorPoolData*)System_HandleManager_GetHandleData(HandleManagers[(u16)HandleType::DescriptorPool], Handle.Private);
+}
+
+BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description)
+{
+	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+	
+	VkShaderModuleCreateInfo CreateInfo = {};
+	CreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	CreateInfo.pNext = nullptr;
+	CreateInfo.flags = 0;
+	CreateInfo.codeSize = Description->CodeSize;
+	CreateInfo.pCode = Description->Code;
+	
+	VkShaderModule ShaderModule;
+	VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &CreateInfo, nullptr, &ShaderModule));
+	
+	ShaderData Data;
+	Data.VulkanShaderModule = ShaderModule;
+	
+	return (BmRender_Shader)System_HandleManager_CreateHandle(HandleManagers[(u16)HandleType::Shader], &Data);
+}
+
+void BmRender_DestroyShader(BmRender_Shader Handle)
+{
+	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+	
+	System_HandleManager Manager = HandleManagers[(u16)HandleType::Shader];
+	auto Data = (ShaderData*)System_HandleManager_GetHandleData(Manager, Handle.Private);
+	
+	vkDestroyShaderModule(Device, Data->VulkanShaderModule, nullptr);
+	System_HandleManager_DestroyHandle(Manager, Handle.Private);
+}
+
+ShaderData* BmRender_GetShaderData(BmRender_Shader Handle)
+{
+	return (ShaderData*)System_HandleManager_GetHandleData(HandleManagers[(u16)HandleType::Shader], Handle.Private);
 }

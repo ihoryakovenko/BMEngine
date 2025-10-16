@@ -311,6 +311,8 @@ namespace Engine
 		Yaml::Node Root;
 		Yaml::Parse(Root, "./Resources/Settings/RenderResources.yaml");
 
+		BmRender_Init();
+
 		RenderResources::Init(Window);
 		BmRender_CreateVertexStageBuffer(MB4, BufferUpdateFrequency::Static, "VertexStageData");
 		BmRender_CreateInstanceBuffer(MB4, BufferUpdateFrequency::Static, "GPUInstances");
@@ -405,6 +407,8 @@ namespace Engine
 		RenderResources::DeInit();
 		EngineResources::DeInit();
 		UI::DeInit();
+
+		BmRender_DeInit();
 
 		glfwDestroyWindow(Window);
 

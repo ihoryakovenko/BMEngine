@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vulkan/vulkan.h>
+#include <vector>
 
 #include "Util/EngineTypes.h"
 
@@ -47,6 +48,20 @@ enum class ImageType
 	TransferSampled,
 	DepthSamplad,
 	ColorAttachmentSampled,
+};
+
+struct AttachmentData
+{
+	u32 ColorAttachmentCount;
+	VkFormat ColorAttachmentFormats[16]; // get max attachments from device
+	VkFormat DepthAttachmentFormat;
+	VkFormat StencilAttachmentFormat;
+};
+
+struct PipelineResourceInfo
+{
+	AttachmentData PipelineAttachmentData;
+	VkPipelineLayout PipelineLayout = nullptr;
 };
 
 struct BmRHI_SamplerDescription
@@ -121,12 +136,41 @@ struct BmRender_ImageViewBindingDescription
 	u64 ArrayElement;
 };
 
-void BmRHI_Initialize();
-void BmRHI_Shutdown();
+struct BmRender_PipelineDescription
+{
+	VkExtent2D Extent;
+	VkPipelineLayout PipelineLayout;
+	PipelineResourceInfo ResourceInfo;
 
-BmRHI_Sampler BmRHI_CreateSampler(BmRHI_SamplerDescription* Description);
-void BmRHI_DestroySampler(BmRHI_Sampler Handle);
-VkSampler BmRHI_GetVulkanSampler(BmRHI_Sampler Handle);
+	std::vector<VkPipelineShaderStageCreateInfo> ShaderStages;
+	std::vector<VkVertexInputBindingDescription> VertexBindings;
+	std::vector<VkVertexInputAttributeDescription> VertexAttributes;
+
+	// Pipeline layout information
+	std::vector<VkDescriptorSetLayout> DescriptorSetLayouts;
+	std::vector<VkPushConstantRange> PushConstantRanges;
+	VkPipelineLayoutCreateFlags PipelineLayoutFlags;
+
+	VkPipelineRasterizationStateCreateInfo RasterizationState;
+	VkPipelineColorBlendAttachmentState ColorBlendAttachment;
+	VkPipelineColorBlendStateCreateInfo ColorBlendState;
+	VkPipelineDepthStencilStateCreateInfo DepthStencilState;
+	VkPipelineMultisampleStateCreateInfo MultisampleState;
+	VkPipelineInputAssemblyStateCreateInfo InputAssemblyState;
+	VkPipelineViewportStateCreateInfo ViewportState;
+	VkViewport Viewport;
+	VkRect2D Scissor;
+};
+
+struct BmRender_PipelineLayoutDescription
+{
+	u32 SetLayoutCount;
+	const VkDescriptorSetLayout* SetLayouts;
+	u32 PushConstantRangeCount;
+	const VkPushConstantRange* PushConstantRanges;
+	VkPipelineLayoutCreateFlags Flags;
+	const void* Next;
+};
 
 void BmRender_CreateVertexStageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, const std::string& Name);
 void BmRender_CreateInstanceBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, const std::string& Name);
@@ -143,3 +187,48 @@ void BmRender_CreateDescriptorSet(const std::string& Name, const std::string& La
 void BmRender_UpdateDescriptorSet(const std::string& DescriptorSetName, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount);
 
 BmRender_PushConstant CreatePushConstant(PipelineStage Stage, u32 Offset, u32 Size);
+
+
+
+struct BmRender_DescriptorPoolDescription
+{
+	u32 MaxSets;
+	u32 PoolSizeCount;
+	const VkDescriptorPoolSize* PoolSizes;
+	VkDescriptorPoolCreateFlags Flags;
+	const void* Next;
+};
+
+
+void BmRender_Init();
+void BmRender_DeInit();
+
+BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description);
+void BmRender_DestroySampler(BmRender_Sampler Handle);
+SamplerData* BmRender_GetSamplerData(BmRender_Sampler Handle);
+
+BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* Description);
+void BmRender_DestroyPipeline(BmRender_Pipeline Handle);
+PipelineData* BmRender_GetPipelineData(BmRender_Pipeline Handle);
+
+BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description);
+void BmRender_DestroyPipelineLayout(BmRender_PipelineLayout Handle);
+PipelineLayoutData* BmRender_GetPipelineLayoutData(BmRender_PipelineLayout Handle);
+
+BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutDescription* Description);
+void BmRender_DestroyDescriptorSetLayout(BmRender_DescriptorSetLayout Handle);
+DescriptorSetLayoutData* BmRender_GetDescriptorSetLayoutData(BmRender_DescriptorSetLayout Handle);
+
+BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolDescription* Description);
+void BmRender_DestroyDescriptorPool(BmRender_DescriptorPool Handle);
+DescriptorPoolData* BmRender_GetDescriptorPoolData(BmRender_DescriptorPool Handle);
+
+struct BmRender_ShaderDescription
+{
+	const u32* Code;
+	u64 CodeSize;
+};
+
+BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description);
+void BmRender_DestroyShader(BmRender_Shader Handle);
+ShaderData* BmRender_GetShaderData(BmRender_Shader Handle);

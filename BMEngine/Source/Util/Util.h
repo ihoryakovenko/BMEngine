@@ -351,7 +351,7 @@ namespace Util
 	
 	void ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode, BmRender_DescriptorSetLayoutDescription& Description, std::vector<BmRender_LayoutBinding>& Bindings);
 	void ParsePushConstantsFromYaml(Yaml::Node& PushConstantsNode, std::vector<VkPushConstantRange>& PushConstantRanges);
-	RenderResources::BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, const VulkanHelper::PipelineResourceInfo& ResourceInfo);
+	BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, const PipelineResourceInfo& ResourceInfo);
 	
 	VkFormat GliFormatToVkFormat(gli::format Format);
 

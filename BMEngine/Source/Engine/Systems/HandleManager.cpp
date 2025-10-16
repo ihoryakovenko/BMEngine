@@ -4,16 +4,51 @@
 
 #include <Engine/Systems/Memory/forge_memory_debugger.h>
 
-bool Systems_HandleManager_CompareHandles(Systems_HandleManager_Handle a, Systems_HandleManager_Handle b)
-{
-	return a.Type == b.Type && a.Index == b.Index && a.Generation == b.Generation;
+static u16 GetType(u64 Handle) { 
+	return (Handle >> 48) & 0xFFFF; 
 }
 
-void Systems_HandleManager_InitData(Systems_HandleManager_Data* Manager, u32 InitialCapacity, u32 DataSize, u32 HandleType)
+static u32 GetIndex(u64 Handle) { 
+	return (Handle >> 16) & 0xFFFFFFFF; 
+}
+
+static u16 GetGeneration(u64 Handle) { 
+	return Handle & 0xFFFF; 
+}
+
+static u64 Create(u16 Type, u32 Index, u16 Generation) {
+	return ((u64)Type << 48) | ((u64)Index << 16) | (u64)Generation;
+}
+
+struct System_HandleManager_Entry
 {
-	assert(Manager);
-	
-	Manager->Entries = (Systems_HandleManager_Entry*)(calloc(InitialCapacity, sizeof(Systems_HandleManager_Entry)));
+	u32 IsUsed : 1;
+	u32 Generation : 16;
+};
+
+struct System_HandleManager_T
+{
+	System_HandleManager_Entry* Entries;
+	void* StorageData;
+	u32* FreeIndices;
+	u32 StorageCapacity;
+	u32 FreeIndicesCapacity;
+	u32 StorageCount;
+	u32 FreeIndicesCount;
+	u32 DataSize;
+	u16 HandleType;
+};
+
+bool System_HandleManager_CompareHandles(System_HandleManager_Handle a, System_HandleManager_Handle b)
+{
+	return a == b;
+}
+
+System_HandleManager System_HandleManager_InitData(u32 InitialCapacity, u32 DataSize, u16 HandleType)
+{
+	auto Manager = (System_HandleManager)malloc(sizeof(System_HandleManager_T));
+
+	Manager->Entries = (System_HandleManager_Entry*)(calloc(InitialCapacity, sizeof(System_HandleManager_Entry)));
 	Manager->StorageData = malloc(InitialCapacity * DataSize);
 	Manager->FreeIndices = (u32*)(malloc(InitialCapacity * sizeof(u32)));
 
@@ -23,23 +58,20 @@ void Systems_HandleManager_InitData(Systems_HandleManager_Data* Manager, u32 Ini
 	Manager->FreeIndicesCount = 0;
 	Manager->DataSize = DataSize;
 	Manager->HandleType = HandleType;
-	
-	for (u32 i = 0; i < InitialCapacity; i++)
-	{
-		Manager->Entries[i].IsUsed = false;
-		Manager->Entries[i].Generation = 0;
-	}
+
+	return Manager;
 }
 
-void Systems_HandleManager_ClearData(Systems_HandleManager_Data* Manager)
+void System_HandleManager_ClearData(System_HandleManager Manager)
 {
 	assert(Manager);
 	free(Manager->Entries);
 	free(Manager->StorageData);
 	free(Manager->FreeIndices);
+	free(Manager);
 }
 
-Systems_HandleManager_Handle Systems_HandleManager_CreateHandle(Systems_HandleManager_Data* Manager, const void* Data)
+System_HandleManager_Handle System_HandleManager_CreateHandle(System_HandleManager Manager, const void* Data)
 {        
 	assert(Manager);
 
@@ -61,9 +93,9 @@ Systems_HandleManager_Handle Systems_HandleManager_CreateHandle(Systems_HandleMa
 		if (Manager->StorageCount >= Manager->StorageCapacity)
 		{
 			const u32 NewCapacity = Manager->StorageCapacity * 2;
-			Systems_HandleManager_Entry* NewEntries = (Systems_HandleManager_Entry*)(calloc(NewCapacity, sizeof(Systems_HandleManager_Entry)));
+			System_HandleManager_Entry* NewEntries = (System_HandleManager_Entry*)(calloc(NewCapacity, sizeof(System_HandleManager_Entry)));
 
-			memcpy(NewEntries, Manager->Entries, Manager->StorageCapacity * sizeof(Systems_HandleManager_Entry));
+			memcpy(NewEntries, Manager->Entries, Manager->StorageCapacity * sizeof(System_HandleManager_Entry));
 			free(Manager->Entries);
 
 			Manager->Entries = NewEntries;
@@ -80,20 +112,19 @@ Systems_HandleManager_Handle Systems_HandleManager_CreateHandle(Systems_HandleMa
 		++Manager->StorageCount;
 	}
 
-	Systems_HandleManager_Handle DataHandle;
-	DataHandle.Index = Index;
-	DataHandle.Generation = Manager->Entries[Index].Generation;
-	DataHandle.Type = Manager->HandleType;
-	return DataHandle;
+	System_HandleManager_Handle DataHandle = Create(Manager->HandleType, Index, Manager->Entries[Index].Generation);
 
 	return DataHandle;
 }
 
-void Systems_HandleManager_DestroyHandle(Systems_HandleManager_Data* Manager, Systems_HandleManager_Handle DataHandle)
+void System_HandleManager_DestroyHandle(System_HandleManager Manager, System_HandleManager_Handle DataHandle)
 {
-	assert(DataHandle.Index < Manager->StorageCount);
-	assert(Manager->Entries[DataHandle.Index].IsUsed);
-	assert(Manager->Entries[DataHandle.Index].Generation == DataHandle.Generation);
+	const u32 Index = GetIndex(DataHandle);
+	const u16 Generation = GetGeneration(DataHandle);
+
+	assert(Index < Manager->StorageCount);
+	assert(Manager->Entries[Index].IsUsed);
+	assert(Manager->Entries[Index].Generation == Generation);
 
 	if (Manager->FreeIndicesCount >= Manager->FreeIndicesCapacity)
 	{
@@ -101,24 +132,31 @@ void Systems_HandleManager_DestroyHandle(Systems_HandleManager_Data* Manager, Sy
 		Manager->FreeIndices = (u32*)(realloc(Manager->FreeIndices, Manager->FreeIndicesCapacity * sizeof(u32)));
 	}
 
-	Manager->Entries[DataHandle.Index].IsUsed = false;
-	Manager->FreeIndices[Manager->FreeIndicesCount] = DataHandle.Index;
+	Manager->Entries[Index].IsUsed = false;
+	Manager->FreeIndices[Manager->FreeIndicesCount] = Index;
 	++Manager->FreeIndicesCount;
 }
 
-void* Systems_HandleManager_GetHandleData(Systems_HandleManager_Data* Manager, Systems_HandleManager_Handle DataHandle)
+void* System_HandleManager_GetHandleData(System_HandleManager Manager, System_HandleManager_Handle DataHandle)
 {
-	assert(DataHandle.Index < Manager->StorageCount);
-	assert(Manager->Entries[DataHandle.Index].IsUsed);
-	assert(Manager->Entries[DataHandle.Index].Generation == DataHandle.Generation);
+	const u32 Index = GetIndex(DataHandle);
+	const u16 Generation = GetGeneration(DataHandle);
 
-	return (u8*)(Manager->StorageData) + (DataHandle.Index * Manager->DataSize);
+	assert(Index < Manager->StorageCount);
+	assert(Manager->Entries[Index].IsUsed);
+	assert(Manager->Entries[Index].Generation == Generation);
+
+	return (u8*)(Manager->StorageData) + (Index * Manager->DataSize);
 }
 
-bool Systems_HandleManager_IsHandleValid(Systems_HandleManager_Data* Manager, Systems_HandleManager_Handle DataHandle)
+bool System_HandleManager_IsHandleValid(System_HandleManager Manager, System_HandleManager_Handle DataHandle)
 {
-	assert(DataHandle.Index < Manager->StorageCount);
-	assert(DataHandle.Type == Manager->HandleType);
+	const u32 Index = GetIndex(DataHandle);
+	const u16 Type = GetType(DataHandle);
+	const u16 Generation = GetGeneration(DataHandle);
+
+	assert(Index < Manager->StorageCount);
+	assert(Type == Manager->HandleType);
 	
-	return Manager->Entries[DataHandle.Index].IsUsed && Manager->Entries[DataHandle.Index].Generation == DataHandle.Generation;
+	return Manager->Entries[Index].IsUsed && Manager->Entries[Index].Generation == Generation;
 }
