@@ -57,6 +57,7 @@ namespace Render
 		InitInfo.ImageCount = 3;
 		InitInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 		InitInfo.PipelineRenderingCreateInfo = RenderingInfo;
+		InitInfo.Allocator = BmRender_GetVulkanAllocator();
 		ImGui_ImplVulkan_Init(&InitInfo);
 
 		ImGui_ImplVulkan_CreateFontsTexture();
@@ -87,7 +88,7 @@ namespace Render
 			ShadowMapBinding.DstArrayElement = 0;
 
 			std::string ShadowMapSetName = "ShadowMapArraySet" + std::to_string(i);
-			BmRender_CreateDescriptorSet(ShadowMapSetName, "ShadowMapArrayLayout", "MainPool");
+			BmRender_CreateDescriptorSet(ShadowMapSetName, RenderResources::GetDescriptorSetLayoutHandle("ShadowMapArrayLayout"), "MainPool");
 			BmRender_UpdateDescriptorSet(ShadowMapSetName, &ShadowMapBinding, 1);
 			
 			MeshPipeline->ShadowMapArraySet[i] = RenderResources::GetDescriptorSet(ShadowMapSetName)->Set;
@@ -384,8 +385,8 @@ namespace DeferredPass
 	static BmRender_Image DeferredInputDepthImage[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 	static BmRender_Image DeferredInputColorImage[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
-	static BmRender_ImageViewResource DeferredInputDepthImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
-	static BmRender_ImageViewResource DeferredInputColorImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static BmRender_ImageView DeferredInputDepthImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static BmRender_ImageView DeferredInputColorImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 	static VkDescriptorSet DeferredInputSet[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
@@ -433,7 +434,7 @@ namespace DeferredPass
 			BmRender_DescriptorSetBinding Bindings[] = { ColorBinding, DepthBinding };
 
 			std::string DeferredInputSetName = "DeferredInputSet" + std::to_string(i);
-			BmRender_CreateDescriptorSet(DeferredInputSetName, "MainPassOutputLayout", "MainPool");
+			BmRender_CreateDescriptorSet(DeferredInputSetName, RenderResources::GetDescriptorSetLayoutHandle("MainPassOutputLayout"), "MainPool");
 			BmRender_UpdateDescriptorSet(DeferredInputSetName, Bindings, 2);
 			
 			DeferredInputSet[i] = RenderResources::GetDescriptorSet(DeferredInputSetName)->Set;
@@ -608,12 +609,12 @@ namespace DeferredPass
 
 
 
-	BmRender_ImageViewResource* TestDeferredInputColorImageInterface()
+	BmRender_ImageView* TestDeferredInputColorImageInterface()
 	{
 		return DeferredInputColorImageInterface;
 	}
 
-	BmRender_ImageViewResource* TestDeferredInputDepthImageInterface()
+	BmRender_ImageView* TestDeferredInputDepthImageInterface()
 	{
 		return DeferredInputDepthImageInterface;
 	}
@@ -642,8 +643,8 @@ namespace LightningPass
 
 	static BmRender_BufferRegion LightSpaceMatrixBufferRegion[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
-	static BmRender_ImageViewResource ShadowMapElement1ImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
-	static BmRender_ImageViewResource ShadowMapElement2ImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static BmRender_ImageView ShadowMapElement1ImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static BmRender_ImageView ShadowMapElement2ImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 	static VkPushConstantRange PushConstants;
 
@@ -666,7 +667,7 @@ namespace LightningPass
 			LightSpaceMatrixBufferRegion[i] = RenderResources::CreateBufferRegion(0, LightSpaceMatrixSize, BufferName);
 
 			std::string DescriptorSetName = "LightSpaceMatrixSet" + std::to_string(i);
-			BmRender_CreateDescriptorSet(DescriptorSetName, "LightSpaceMatrixLayout", "MainPool");
+			BmRender_CreateDescriptorSet(DescriptorSetName, RenderResources::GetDescriptorSetLayoutHandle("LightSpaceMatrixLayout"), "MainPool");
 
 			BmRender_DescriptorSetBinding LightSpaceMatrixBinding;
 			LightSpaceMatrixBinding.BufferRegions = &LightSpaceMatrixBufferRegion[i];

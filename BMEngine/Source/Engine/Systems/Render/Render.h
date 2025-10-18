@@ -3,7 +3,6 @@
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 
-#include "Deprecated/VulkanInterface/VulkanInterface.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
 
 #include "Util/EngineTypes.h"
@@ -62,7 +61,7 @@ namespace Render
 	{
 		BmRender_BufferRegion* EntityLightBufferHandle;
 
-		BmRender_ImageViewResource ShadowMapArrayImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+		BmRender_ImageView ShadowMapArrayImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		VkPushConstantRange PushConstants;
 
@@ -160,8 +159,8 @@ namespace DeferredPass
 	void BeginPass();
 	void EndPass();
 
-	BmRender_ImageViewResource* TestDeferredInputColorImageInterface();
-	BmRender_ImageViewResource* TestDeferredInputDepthImageInterface();
+	BmRender_ImageView* TestDeferredInputColorImageInterface();
+	BmRender_ImageView* TestDeferredInputDepthImageInterface();
 
 	BmRender_Image* TestDeferredInputColorImage();
 	BmRender_Image* TestDeferredInputDepthImage();

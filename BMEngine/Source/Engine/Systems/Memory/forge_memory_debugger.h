@@ -57,6 +57,10 @@ extern boolean	f_debug_mem_comment(void *buf, char *comment); /* add a comment t
 extern void		f_debug_mem_print(unsigned int min_allocs); /* Prints out a list of Iall allocations made, their location, how much memory each has allocated, freed, and how many allocations have been made. The min_allocs parameter can be set to avoid printing any allocations that have been made fewer times then min_allocs */
 extern size_t	f_debug_mem_consumption(void); /* add up all memory consumed by mallocs and reallocs coverd by the memory debugger .*/
 
+/* total memory tracking utilities */
+extern size_t	f_debug_mem_get_total_heap_memory_allocated(void); /* Returns the total amount of heap memory currently allocated */
+extern size_t	f_debug_mem_get_total_allocation_count(void); /* Returns the total number of allocations made */
+
 /* query pointers */
 
 extern void		*f_debug_mem_query_allocation(void *pointer, unsigned int *line, char **file, size_t *size); /* query the size and place of allocation of a pointer, and returns the base pointer of the allocation. */

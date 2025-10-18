@@ -14,7 +14,6 @@
 
 #include <mini-yaml/yaml/Yaml.hpp>
 
-#include "Deprecated/VulkanInterface/VulkanInterface.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
 #include "Engine/Systems/Render/RenderResources.h"
 

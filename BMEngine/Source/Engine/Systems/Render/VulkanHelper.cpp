@@ -81,7 +81,7 @@ namespace VulkanHelper
 		return ImageSize + Padding;
 	}
 
-	VkBuffer CreateBuffer(VkDevice Device, u64 Size, BufferUsageFlag Flag)
+	VkBuffer CreateBuffer(VkDevice Device, u64 Size, BufferUsageFlag Flag, const VkAllocationCallbacks* Allocator)
 	{
 		VkBufferCreateInfo BufferInfo = { };
 		BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -90,12 +90,12 @@ namespace VulkanHelper
 		BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 		VkBuffer Buffer;
-		VULKAN_CHECK_RESULT(vkCreateBuffer(Device, &BufferInfo, nullptr, &Buffer));
+		VULKAN_CHECK_RESULT(vkCreateBuffer(Device, &BufferInfo, Allocator, &Buffer));
 
 		return Buffer;
 	}
 
-	DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer, MemoryPropertyFlag Properties)
+	DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer, MemoryPropertyFlag Properties, const VkAllocationCallbacks* Allocator)
 	{
 		VkMemoryRequirements MemoryRequirements;
 		vkGetBufferMemoryRequirements(Device, Buffer, &MemoryRequirements);
@@ -108,14 +108,14 @@ namespace VulkanHelper
 		MemoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;
 
 		DeviceMemoryAllocResult Result;
-		VULKAN_CHECK_RESULT(vkAllocateMemory(Device, &MemoryAllocInfo, nullptr, &Result.Memory));
+		VULKAN_CHECK_RESULT(vkAllocateMemory(Device, &MemoryAllocInfo, Allocator, &Result.Memory));
 		Result.Alignment = MemoryRequirements.alignment;
 		Result.Size = MemoryRequirements.size;
 
 		return Result;
 	}
 
-	DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkImage Image, MemoryPropertyFlag Properties)
+	DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkImage Image, MemoryPropertyFlag Properties, const VkAllocationCallbacks* Allocator)
 	{
 		VkMemoryRequirements MemoryRequirements;
 		vkGetImageMemoryRequirements(Device, Image, &MemoryRequirements);
@@ -128,7 +128,7 @@ namespace VulkanHelper
 		MemoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;
 
 		DeviceMemoryAllocResult Result;
-		VULKAN_CHECK_RESULT(vkAllocateMemory(Device, &MemoryAllocInfo, nullptr, &Result.Memory));
+		VULKAN_CHECK_RESULT(vkAllocateMemory(Device, &MemoryAllocInfo, Allocator, &Result.Memory));
 		Result.Alignment = MemoryRequirements.alignment;
 		Result.Size = MemoryRequirements.size;
 

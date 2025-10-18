@@ -2,13 +2,16 @@
 
 #include <Engine/Systems/HandleManager.h>
 
-System_HandleManager SamplerManager;
-System_HandleManager PipelineManager;
-System_HandleManager PipelineLayoutManager;
-System_HandleManager DescriptorSetLayoutManager;
-System_HandleManager DescriptorPoolManager;
-System_HandleManager ShaderManager;
-System_HandleManager ImageManager;
+static System_HandleManager SamplerManager;
+static System_HandleManager PipelineManager;
+static System_HandleManager PipelineLayoutManager;
+static System_HandleManager DescriptorSetLayoutManager;
+static System_HandleManager DescriptorPoolManager;
+static System_HandleManager ShaderManager;
+static System_HandleManager ImageManager;
+static System_HandleManager ImageViewManager;
+static System_HandleManager GPUBufferManager;
+static System_HandleManager DescriptorSetManager;
 
 static u16 GetNextHandleType()
 {
@@ -51,6 +54,21 @@ void InitializeImageManager(u32 Size)
 {
 	ImageManager = System_HandleManager_InitData(Size, sizeof(ImageResource), GetNextHandleType());
 }
+
+void InitializeImageViewManager(u32 Size)
+{
+	ImageViewManager = System_HandleManager_InitData(Size, sizeof(ImageViewData), GetNextHandleType());
+}
+
+void InitializeGPUBufferManager(u32 Size)
+{
+	GPUBufferManager = System_HandleManager_InitData(Size, sizeof(GPUBufferData), GetNextHandleType());
+}
+
+void InitializeDescriptorSetManager(u32 Size)
+{
+	DescriptorSetManager = System_HandleManager_InitData(Size, sizeof(DescriptorSetData), GetNextHandleType());
+}
 // INIT
 
 // DEINIT
@@ -87,6 +105,21 @@ void DeinitShaderManager(void(*CleanupFunc)(ShaderData*))
 void DeinitImageManager(void(*CleanupFunc)(ImageResource*))
 {
 	System_HandleManager_ClearData(ImageManager, (void(*)(void*))CleanupFunc);
+}
+
+void DeinitImageViewManager(void(*CleanUpFunc)(ImageViewData*))
+{
+	System_HandleManager_ClearData(ImageViewManager, (void(*)(void*))CleanUpFunc);
+}
+
+void DeinitGPUBufferManager(void(*CleanUpFunc)(GPUBufferData*))
+{
+	System_HandleManager_ClearData(GPUBufferManager, (void(*)(void*))CleanUpFunc);
+}
+
+void DeinitDescriptorSetManager()
+{
+	System_HandleManager_ClearData(DescriptorSetManager);
 }
 // DEINIT
 
@@ -139,6 +172,27 @@ BmRender_Image CreateImageHandle(const ImageResource* Data)
 	Handle.Private = System_HandleManager_CreateHandle(ImageManager, Data);
 	return Handle;
 }
+
+BmRender_ImageView CreateImageViewHandle(const ImageViewData* Data)
+{
+	BmRender_ImageView Handle;
+	Handle.Private = System_HandleManager_CreateHandle(ImageViewManager, Data);
+	return Handle;
+}
+
+BmRender_GPUBuffer CreateGPUBufferHandle(const GPUBufferData* Data)
+{
+	BmRender_GPUBuffer Handle;
+	Handle.Private = System_HandleManager_CreateHandle(GPUBufferManager, Data);
+	return Handle;
+}
+
+BmRender_DescriptorSet CreateDescriptorSetHandle(const DescriptorSetData* Data)
+{
+	BmRender_DescriptorSet Handle;
+	Handle.Private = System_HandleManager_CreateHandle(DescriptorSetManager, Data);
+	return Handle;
+}
 // CREATE
 
 // DESTROY
@@ -176,6 +230,21 @@ void DestroyImageHandle(BmRender_Image Handle)
 {
 	System_HandleManager_DestroyHandle(ImageManager, Handle.Private);
 }
+
+void DestroyImageViewHandle(BmRender_ImageView Handle)
+{
+	System_HandleManager_DestroyHandle(ImageViewManager, Handle.Private);
+}
+
+void DestroyGPUBufferHandle(BmRender_GPUBuffer Handle)
+{
+	System_HandleManager_DestroyHandle(GPUBufferManager, Handle.Private);
+}
+
+void DestroyDescriptorSetHandle(BmRender_DescriptorSet Handle)
+{
+	System_HandleManager_DestroyHandle(DescriptorSetManager, Handle.Private);
+}
 // DESTROY
 
 // GET
@@ -212,5 +281,20 @@ ShaderData* GetShaderData(BmRender_Shader Handle)
 ImageResource* GetImageData(BmRender_Image Handle)
 {
 	return (ImageResource*)System_HandleManager_GetHandleData(ImageManager, Handle.Private);
+}
+
+ImageViewData* GetImageViewData(BmRender_ImageView Handle)
+{
+	return (ImageViewData*)System_HandleManager_GetHandleData(ImageViewManager, Handle.Private);
+}
+
+GPUBufferData* GetGPUBufferData(BmRender_GPUBuffer Handle)
+{
+	return (GPUBufferData*)System_HandleManager_GetHandleData(GPUBufferManager, Handle.Private);
+}
+
+DescriptorSetData* GetDescriptorSetData(BmRender_DescriptorSet Handle)
+{
+	return (DescriptorSetData*)System_HandleManager_GetHandleData(DescriptorSetManager, Handle.Private);
 }
 // GET

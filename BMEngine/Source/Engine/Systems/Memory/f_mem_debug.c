@@ -1,3 +1,10 @@
+// Disable specific Visual Studio warnings for this file
+#pragma warning(push)
+#pragma warning(disable: 6308) // 'realloc' might return null pointer
+#pragma warning(disable: 6011) // Dereferencing NULL pointer
+#pragma warning(disable: 28182) // Dereferencing NULL pointer (same as 6011)
+#pragma warning(disable: 6271) // Extra argument passed to 'printf'
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -60,6 +67,9 @@ unsigned int f_freed_memory_store = 1024;
 void *f_alloc_mutex = NULL;
 int (*f_alloc_mutex_lock)(void *mutex) = NULL;
 int (*f_alloc_mutex_unlock)(void *mutex) = NULL;
+
+size_t total_heap_memory_allocated = 0;
+size_t total_allocation_count = 0;
 
 void f_debug_mem_thread_safe_init(int (*lock)(void *mutex), int (*unlock)(void *mutex), void *mutex)
 {
@@ -272,6 +282,11 @@ void *f_debug_mem_malloc(size_t size, const char *file, unsigned int line)
 	pointer += FORGE_MEMORY_PRE_PADDIG;
 	memset(pointer, F_MEMORY_INITIALIZATION, size);
 	f_debug_mem_add(pointer, size, file, line);
+	
+	// Track total memory allocation
+	total_heap_memory_allocated += size;
+	total_allocation_count++;
+	
 	if(f_alloc_mutex != NULL)
 		f_alloc_mutex_unlock(f_alloc_mutex);
 	return pointer;
@@ -321,6 +336,11 @@ void *f_debug_mem_calloc(size_t num, size_t size, const char *file, unsigned int
 	pointer += FORGE_MEMORY_PRE_PADDIG;
 	memset(pointer, 0, size);
 	f_debug_mem_add(pointer, size, file, line);
+	
+	// Track total memory allocation
+	total_heap_memory_allocated += size;
+	total_allocation_count++;
+	
 	if(f_alloc_mutex != NULL)
 		f_alloc_mutex_unlock(f_alloc_mutex);
 	return pointer;
@@ -595,6 +615,12 @@ void *f_debug_mem_realloc(void *pointer, size_t size, const char *file, unsigned
 	f_debug_mem_add(pointer2, size, file, line);
 	move = 0;
 	f_debug_mem_remove(pointer, file, line, TRUE, &move);
+	
+	// Track reallocation: subtract old size, add new size
+	// move contains the old size from f_debug_mem_remove
+	total_heap_memory_allocated = total_heap_memory_allocated - move + size;
+	// Note: total_allocation_count doesn't change for realloc
+	
 	if(forge_memory_log_file != NULL && forge_memory_active)
 		fprintf(forge_memory_log_file, "Relloc %u bytes at pointer %p to %u bytes at pointer %p at %s line %u\n", (unsigned int)size, pointer, (unsigned int)move, pointer2, file, line);
 	if(f_alloc_mutex != NULL)
@@ -607,7 +633,13 @@ void f_debug_mem_print(unsigned int min_allocs)
 	unsigned int i, j, alloc_count;
 	if(f_alloc_mutex != NULL)
 		f_alloc_mutex_lock(f_alloc_mutex);
-	printf("Memory repport:\n----------------------------------------------\n");
+	printf("Memory report:\n----------------------------------------------\n");
+	
+	// Print total lifetime allocations
+	printf("Total lifetime allocations: %.2f MB (%zu bytes)\n", 
+		total_heap_memory_allocated / (1024.0 * 1024.0), total_heap_memory_allocated);
+	printf("Total allocation count: %zu\n\n", total_allocation_count);
+	
 	for(i = 0; i < f_alloc_line_count; i++)
 	{
 		if(min_allocs < f_alloc_lines[i].alocated - f_alloc_lines[i].freed)
@@ -870,7 +902,21 @@ void f_debug_mem_check_heap_reference(unsigned int minimum_allocations)
 					printf("FORGE Mem debugger Warning: Cant find any reference in heap memory of %u out of %u allocations made on line %u in file %s\n", f_alloc_lines[i].alloc_count - (unsigned int)found, f_alloc_lines[i].alloc_count, f_alloc_lines[i].line, f_alloc_lines[i].file);
 			}
 		}
-	}
-	if(f_alloc_mutex != NULL)
-		f_alloc_mutex_unlock(f_alloc_mutex);
+        }
+        if(f_alloc_mutex != NULL)
+                f_alloc_mutex_unlock(f_alloc_mutex);
 }
+
+// Utility functions to access total memory tracking
+size_t f_debug_mem_get_total_heap_memory_allocated(void)
+{
+	return total_heap_memory_allocated;
+}
+
+size_t f_debug_mem_get_total_allocation_count(void)
+{
+	return total_allocation_count;
+}
+
+// Restore warning settings for other files
+#pragma warning(pop)

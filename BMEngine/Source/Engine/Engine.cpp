@@ -339,7 +339,7 @@ namespace Engine
 			Binding.BindingCount = 1;
 			Binding.DstArrayElement = 0;
 
-			BmRender_CreateDescriptorSet("VpSet", "FrameDataLayout", "MainPool");
+			BmRender_CreateDescriptorSet("VpSet", RenderResources::GetDescriptorSetLayoutHandle("FrameDataLayout"), "MainPool");
 			BmRender_UpdateDescriptorSet("VpSet", &Binding, 1);
 		}
 
@@ -349,7 +349,7 @@ namespace Engine
 			Binding.BindingCount = 1;
 			Binding.DstArrayElement = 0;
 
-			BmRender_CreateDescriptorSet("StaticMeshLightSet", "FrameDataLayout", "MainPool");
+			BmRender_CreateDescriptorSet("StaticMeshLightSet", RenderResources::GetDescriptorSetLayoutHandle("FrameDataLayout"), "MainPool");
 			BmRender_UpdateDescriptorSet("StaticMeshLightSet", &Binding, 1);
 		}
 
@@ -361,12 +361,12 @@ namespace Engine
 			Binding.BindingCount = 1;
 			Binding.DstArrayElement = 0;
 
-			BmRender_CreateDescriptorSet("MaterialSet", "MaterialLayout", "MainPool");
+			BmRender_CreateDescriptorSet("MaterialSet", RenderResources::GetDescriptorSetLayoutHandle("MaterialLayout"), "MainPool");
 			BmRender_UpdateDescriptorSet("MaterialSet", &Binding, 1);
 		}
 
 		{
-			BmRender_CreateDescriptorSet("BindlesTexturesSet", "BindlesTexturesLayout", "MainPool");
+			BmRender_CreateDescriptorSet("BindlesTexturesSet", RenderResources::GetDescriptorSetLayoutHandle("BindlesTexturesLayout"), "MainPool");
 		}
 
 		TransferSystem::Init();

@@ -3,6 +3,8 @@
 #include <vulkan/vulkan.h>
 #include "Engine/Systems/HandleManager.h"
 
+#include "RenderInterface.h"
+
 #include <atomic>
 
 struct SamplerData
@@ -20,10 +22,15 @@ struct PipelineLayoutData
 	VkPipelineLayout VulkanPipelineLayout;
 };
 
+struct DescriptorSetLayoutBinding
+{
+	VkDescriptorType DescriptorType;
+};
+
 struct DescriptorSetLayoutData
 {
 	VkDescriptorSetLayout Layout;
-	u32 BindingsIndex;
+	DescriptorSetLayoutBinding* LayoutBindings;
 	u32 BindingsCount;
 };
 
@@ -37,11 +44,6 @@ struct ShaderData
 	VkShaderModule VulkanShaderModule;
 };
 
-struct DescriptorSetLayoutBinding
-{
-	VkDescriptorType DescriptorType;
-};
-
 struct ImageResource
 {
 	VkImage Image;
@@ -51,13 +53,26 @@ struct ImageResource
 	VkFormat Format;
 };
 
-typedef struct { System_HandleManager_Handle Private; } BmRender_Sampler;
-typedef struct { System_HandleManager_Handle Private; } BmRender_Pipeline;
-typedef struct { System_HandleManager_Handle Private; } BmRender_PipelineLayout;
-typedef struct { System_HandleManager_Handle Private; } BmRender_DescriptorSetLayout;
-typedef struct { System_HandleManager_Handle Private; } BmRender_DescriptorPool;
-typedef struct { System_HandleManager_Handle Private; } BmRender_Shader;
-typedef struct { System_HandleManager_Handle Private; } BmRender_Image;
+struct ImageViewData
+{
+	VkImageView View;
+};
+
+struct GPUBufferData
+{
+	VkBuffer Buffer;
+	VkDeviceMemory Memory;
+	u64 Capacity;
+	MemoryPropertyFlag PropertyFlag;
+	PipelineStage BufferStage;
+	BufferUpdateFrequency UpdateFrequency;
+};
+
+struct DescriptorSetData
+{
+	VkDescriptorSet Set;
+	BmRender_DescriptorSetLayout Layout;
+};
 
 void InitializeSamplerManager(u32 Size);
 void InitializePipelineManager(u32 Size);
@@ -66,6 +81,9 @@ void InitializeDescriptorSetLayoutManager(u32 Size);
 void InitializeDescriptorPoolManager(u32 Size);
 void InitializeShaderManager(u32 Size);
 void InitializeImageManager(u32 Size);
+void InitializeImageViewManager(u32 Size);
+void InitializeGPUBufferManager(u32 Size);
+void InitializeDescriptorSetManager(u32 Size);
 
 void DeinitSamplerManager(void(*CleanUpFunc)(SamplerData*));
 void DeinitPipelineManager(void(*CleanUpFunc)(PipelineData*));
@@ -74,6 +92,9 @@ void DeinitDescriptorSetLayoutManager(void(*CleanUpFunc)(DescriptorSetLayoutData
 void DeinitDescriptorPoolManager(void(*CleanUpFunc)(DescriptorPoolData*));
 void DeinitShaderManager(void(*CleanUpFunc)(ShaderData*));
 void DeinitImageManager(void(*CleanUpFunc)(ImageResource*));
+void DeinitImageViewManager(void(*CleanUpFunc)(ImageViewData*));
+void DeinitGPUBufferManager(void(*CleanUpFunc)(GPUBufferData*));
+void DeinitDescriptorSetManager();
 
 BmRender_Sampler CreateSamplerHandle(const SamplerData* Data);
 BmRender_Pipeline CreatePipelineHandle(const PipelineData* Data);
@@ -82,6 +103,9 @@ BmRender_DescriptorSetLayout CreateDescriptorSetLayoutHandle(const DescriptorSet
 BmRender_DescriptorPool CreateDescriptorPoolHandle(const DescriptorPoolData* Data);
 BmRender_Shader CreateShaderHandle(const ShaderData* Data);
 BmRender_Image CreateImageHandle(const ImageResource* Data);
+BmRender_ImageView CreateImageViewHandle(const ImageViewData* Data);
+BmRender_GPUBuffer CreateGPUBufferHandle(const GPUBufferData* Data);
+BmRender_DescriptorSet CreateDescriptorSetHandle(const DescriptorSetData* Data);
 
 void DestroySamplerHandle(BmRender_Sampler handle);
 void DestroyPipelineHandle(BmRender_Pipeline handle);
@@ -90,6 +114,9 @@ void DestroyDescriptorSetLayoutHandle(BmRender_DescriptorSetLayout handle);
 void DestroyDescriptorPoolHandle(BmRender_DescriptorPool handle);
 void DestroyShaderHandle(BmRender_Shader handle);
 void DestroyImageHandle(BmRender_Image handle);
+void DestroyImageViewHandle(BmRender_ImageView Handle);
+void DestroyGPUBufferHandle(BmRender_GPUBuffer Handle);
+void DestroyDescriptorSetHandle(BmRender_DescriptorSet Handle);
 
 SamplerData* GetSamplerData(BmRender_Sampler Handle);
 PipelineData* GetPipelineData(BmRender_Pipeline Handle);
@@ -98,3 +125,7 @@ DescriptorSetLayoutData* GetDescriptorSetLayoutData(BmRender_DescriptorSetLayout
 DescriptorPoolData* GetDescriptorPoolData(BmRender_DescriptorPool Handle);
 ShaderData* GetShaderData(BmRender_Shader Handle);
 ImageResource* GetImageData(BmRender_Image Handle);
+ImageViewData* GetImageViewData(BmRender_ImageView Handle);
+GPUBufferData* GetGPUBufferData(BmRender_GPUBuffer Handle);
+DescriptorSetData* GetDescriptorSetData(BmRender_DescriptorSet Handle);
+

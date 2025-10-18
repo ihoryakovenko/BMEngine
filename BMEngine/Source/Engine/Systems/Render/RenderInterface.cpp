@@ -3,6 +3,7 @@
 #include "RenderResources.h"
 #include "VulkanHelper.h"
 #include "Render.h"
+#include "RenderTypes.h"
 
 #include "Util/Util.h"
 #include <type_traits>
@@ -11,67 +12,131 @@
 
 struct BmRender_BufferRegion_T { u64 Index; };
 struct BmRender_BufferArrayRegion_T { u64 Index; };
-struct BmRender_ImageViewResource_T { u64 Index; };
 struct BmRender_PushConstant_T { u64 Index; };
 
-Memory::Array<DescriptorSetLayoutBinding> LayoutBindings;
+static VkAllocationCallbacks VulkanAllocator;
+
+static void* VKAPI_CALL VulkanAllocationCallback(
+	void* UserData,
+	size_t Size,
+	size_t Alignment,
+	VkSystemAllocationScope AllocationScope)
+{
+	return malloc(Size);
+}
+
+static void* VKAPI_CALL VulkanReallocationCallback(
+	void* pUserData,
+	void* pOriginal,
+	size_t size,
+	size_t alignment,
+	VkSystemAllocationScope allocationScope)
+{
+	return realloc(pOriginal, size);
+}
+
+static void VKAPI_CALL VulkanFreeCallback(
+	void* pUserData,
+	void* pMemory)
+{
+	free(pMemory);
+}
+
+static void VKAPI_CALL VulkanInternalAllocationNotification(
+	void* pUserData,
+	size_t size,
+	VkInternalAllocationType allocationType,
+	VkSystemAllocationScope allocationScope)
+{
+
+}
+
+static void VKAPI_CALL VulkanInternalFreeNotification(
+	void* pUserData,
+	size_t size,
+	VkInternalAllocationType allocationType,
+	VkSystemAllocationScope allocationScope)
+{
+
+}
 
 static void OnSamplerClear(SamplerData* SamplerData)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	vkDestroySampler(Device, SamplerData->VulkanSampler, nullptr);
+	vkDestroySampler(Device, SamplerData->VulkanSampler, &VulkanAllocator);
 }
 
 static void OnPipelineClear(PipelineData* PipelineData)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	vkDestroyPipeline(Device, PipelineData->VulkanPipeline, nullptr);
+	vkDestroyPipeline(Device, PipelineData->VulkanPipeline, &VulkanAllocator);
 }
 
 static void OnPipelineLayoutClear(PipelineLayoutData* LayoutData)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	vkDestroyPipelineLayout(Device, LayoutData->VulkanPipelineLayout, nullptr);
+	vkDestroyPipelineLayout(Device, LayoutData->VulkanPipelineLayout, &VulkanAllocator);
 }
 
 static void OnDescriptorSetLayoutClear(DescriptorSetLayoutData* LayoutData)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	vkDestroyDescriptorSetLayout(Device, LayoutData->Layout, nullptr);
+	vkDestroyDescriptorSetLayout(Device, LayoutData->Layout, &VulkanAllocator);
+	free(LayoutData->LayoutBindings);
 }
 
 static void OnDescriptorPoolClear(DescriptorPoolData* PoolData)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	vkDestroyDescriptorPool(Device, PoolData->VulkanDescriptorPool, nullptr);
+	vkDestroyDescriptorPool(Device, PoolData->VulkanDescriptorPool, &VulkanAllocator);
 }
 
 static void OnShaderClear(ShaderData* Shader)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	vkDestroyShaderModule(Device, Shader->VulkanShaderModule, nullptr);
+	vkDestroyShaderModule(Device, Shader->VulkanShaderModule, &VulkanAllocator);
 }
 
 static void OnImageClear(ImageResource* Image)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	vkDestroyImage(Device, Image->Image, nullptr);
-	vkFreeMemory(Device, Image->Memory, nullptr);
+	vkDestroyImage(Device, Image->Image, &VulkanAllocator);
+	vkFreeMemory(Device, Image->Memory, &VulkanAllocator);
+}
+
+static void OnImageViewClear(ImageViewData* Data)
+{
+	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+	vkDestroyImageView(Device, Data->View, &VulkanAllocator);
+}
+
+static void OnGPUBufferClear(GPUBufferData* Data)
+{
+	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+	vkDestroyBuffer(Device, Data->Buffer, &VulkanAllocator);
+	vkFreeMemory(Device, Data->Memory, &VulkanAllocator);
 }
 
 void BmRender_Init()
 {
+	// Initialize Vulkan allocator callbacks
+	VulkanAllocator.pUserData = nullptr;
+	VulkanAllocator.pfnAllocation = VulkanAllocationCallback;
+	VulkanAllocator.pfnReallocation = VulkanReallocationCallback;
+	VulkanAllocator.pfnFree = VulkanFreeCallback;
+	VulkanAllocator.pfnInternalAllocation = VulkanInternalAllocationNotification;
+	VulkanAllocator.pfnInternalFree = VulkanInternalFreeNotification;
+
 	InitializeSamplerManager(32);
-	InitializePipelineManager(32);
+	InitializePipelineManager(4);
 	InitializePipelineLayoutManager(32);
 	InitializeDescriptorSetLayoutManager(32);
-	InitializeDescriptorPoolManager(32);
+	InitializeDescriptorPoolManager(1);
 	InitializeShaderManager(32);
 	InitializeImageManager(32);
-
-	LayoutBindings.Capacity = 20;
-	LayoutBindings.Count = 0;
-	LayoutBindings.Data = (DescriptorSetLayoutBinding*)malloc(LayoutBindings.Capacity * sizeof(LayoutBindings.Data[0]));
+	InitializeImageViewManager(32);
+	InitializeGPUBufferManager(4);
+	InitializeDescriptorSetManager(32);
 }
 
 void BmRender_DeInit()
@@ -83,43 +148,68 @@ void BmRender_DeInit()
 	DeinitDescriptorPoolManager(OnDescriptorPoolClear);
 	DeinitShaderManager(OnShaderClear);
 	DeinitImageManager(OnImageClear);
-
-	free(LayoutBindings.Data);
+	DeinitImageViewManager(OnImageViewClear);
+	DeinitGPUBufferManager(OnGPUBufferClear);
+	DeinitDescriptorSetManager();
 }
 
-void BmRender_CreateVertexStageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, const std::string& Name)
+VkAllocationCallbacks* BmRender_GetVulkanAllocator()
 {
-	RenderResources::CreateBuffer(Size, UpdateFrequency, PipelineStage::Vertex, BufferUsageFlag::CombinedVertexIndexFlag, Name);
+	return &VulkanAllocator;
 }
 
-void BmRender_CreateInstanceBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, const std::string& Name)
+void BmRender_CreateDescriptorSet(const std::string& Name, BmRender_DescriptorSetLayout LayoutHandle, const std::string& PoolName)
 {
-	RenderResources::CreateBuffer(Size, UpdateFrequency, PipelineStage::Vertex, BufferUsageFlag::InstanceFlag, Name);
+	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+
+	DescriptorSetData NewSet;
+	NewSet.Layout = LayoutHandle;
+
+	DescriptorSetLayoutData* Layout = GetDescriptorSetLayoutData(LayoutHandle);
+	VkDescriptorPool Pool = RenderResources::GetDescriptorPool(PoolName);
+
+	VkDescriptorSetAllocateInfo AllocInfo = { };
+	AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	AllocInfo.descriptorPool = Pool;
+	AllocInfo.descriptorSetCount = 1;
+	AllocInfo.pSetLayouts = &Layout->Layout;
+
+	VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, &NewSet.Set));
+
+	RenderResources::CreateDescriptorSet(Name, CreateDescriptorSetHandle(&NewSet));
 }
 
-void BmRender_CreateUniformBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, const std::string& Name)
+BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutDescription* Description)
 {
-	RenderResources::CreateBuffer(Size, UpdateFrequency, BufferStage, BufferUsageFlag::UniformFlag, Name);
-}
+	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
-void BmRender_CreateStorageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, const std::string& Name)
-{
-	RenderResources::CreateBuffer(Size, UpdateFrequency, BufferStage, BufferUsageFlag::StorageFlag, Name);
-}
+	DescriptorSetLayoutData Layout = { };
+	Layout.BindingsCount = Description->BindingsCount;
+	
+	Layout.LayoutBindings = (DescriptorSetLayoutBinding*)malloc(sizeof(DescriptorSetLayoutBinding) * Description->BindingsCount);
 
-BmRender_ImageViewResource BmRender_CreateImageView2D(BmRender_Image Handle, VkImageAspectFlags AspectFlags)
-{
-	return RenderResources::CreateImageView(Handle, 0, 1, VK_IMAGE_VIEW_TYPE_2D, AspectFlags);
-}
+	VkDescriptorSetLayoutBinding* NewLayoutBindings = (VkDescriptorSetLayoutBinding*)Render::FrameAlloc(sizeof(VkDescriptorSetLayoutBinding) * Description->BindingsCount);
+	for (u32 i = 0; i < Description->BindingsCount; ++i)
+	{
+		NewLayoutBindings[i].binding = i;
+		NewLayoutBindings[i].descriptorCount = Description->Bindings[i].DescriptorCount;
+		NewLayoutBindings[i].descriptorType = Description->Bindings[i].DescriptorType;
+		NewLayoutBindings[i].stageFlags = Description->Bindings[i].StageFlags;
+		NewLayoutBindings[i].pImmutableSamplers = nullptr;
 
-BmRender_ImageViewResource BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags)
-{
-	return RenderResources::CreateImageView(Handle, BaseLayer, LayerCount, VK_IMAGE_VIEW_TYPE_2D_ARRAY, AspectFlags);
-}
+		Layout.LayoutBindings[i].DescriptorType = NewLayoutBindings[i].descriptorType;
+	}
 
-void BmRender_CreateDescriptorSet(const std::string& Name, const std::string& LayoutName, const std::string& PoolName)
-{
-	RenderResources::CreateDescriptorSet(Name, LayoutName, PoolName);
+	VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
+	LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	LayoutCreateInfo.bindingCount = Description->BindingsCount;
+	LayoutCreateInfo.pBindings = NewLayoutBindings;
+	LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+	LayoutCreateInfo.pNext = nullptr;
+
+	VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, &VulkanAllocator, &Layout.Layout));
+
+	return CreateDescriptorSetLayoutHandle(&Layout);
 }
 
 void BmRender_UpdateDescriptorSet(const std::string& DescriptorSetName, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount)
@@ -130,6 +220,45 @@ void BmRender_UpdateDescriptorSet(const std::string& DescriptorSetName, const Bm
 BmRender_PushConstant CreatePushConstant(PipelineStage Stage, u32 Offset, u32 Size)
 {
 	return BmRender_PushConstant();
+}
+
+static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, BufferUsageFlag Flag)
+{
+	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+	VkPhysicalDevice PhysicalDevice = RenderResources::GetCoreContext()->PhysicalDevice;
+
+	MemoryPropertyFlag MemoryFlag = MemoryPropertyFlag::GPULocal;
+
+	if (UpdateFrequency == BufferUpdateFrequency::PerFrame)
+	{
+		MemoryFlag = MemoryPropertyFlag::HostCompatible;
+	}
+
+	if (Flag == BufferUsageFlag::UniformFlag)
+	{
+		VkPhysicalDeviceProperties DeviceProperties;
+		vkGetPhysicalDeviceProperties(PhysicalDevice, &DeviceProperties);
+
+		if (Capacity > DeviceProperties.limits.maxUniformBufferRange)
+		{
+			assert(false);
+		}
+	}
+
+	GPUBufferData NewBuffer = { };
+
+	NewBuffer.Capacity = Capacity;
+	NewBuffer.UpdateFrequency = UpdateFrequency;
+	NewBuffer.PropertyFlag = MemoryFlag;
+	NewBuffer.BufferStage = BufferStage;
+	NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, Capacity, Flag, &VulkanAllocator);
+
+	VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, NewBuffer.Buffer, NewBuffer.PropertyFlag, &VulkanAllocator);
+	NewBuffer.Memory = AllocResult.Memory;
+
+	VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, NewBuffer.Buffer, NewBuffer.Memory, 0));
+
+	return CreateGPUBufferHandle(&NewBuffer);
 }
 
 static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description)
@@ -179,16 +308,43 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 	ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	ImageCreateInfo.flags = 0;
 
-	VULKAN_CHECK_RESULT(vkCreateImage(Device, &ImageCreateInfo, nullptr, &Resource.Image));
+	VULKAN_CHECK_RESULT(vkCreateImage(Device, &ImageCreateInfo, &VulkanAllocator, &Resource.Image));
 
 	VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
-		Resource.Image, MemoryPropertyFlag::GPULocal);
+		Resource.Image, MemoryPropertyFlag::GPULocal, &VulkanAllocator);
 
 	Resource.Memory = AllocResult.Memory;
 	Resource.Size = AllocResult.Size;
 
 	VULKAN_CHECK_RESULT(vkBindImageMemory(Device, Resource.Image, Resource.Memory, 0));
 	return CreateImageHandle(&Resource);
+}
+
+static BmRender_ImageView CreateImageView(BmRender_Image Handle, u32 BaseArrayLayer, u32 LayerCount, VkImageViewType ViewType, VkImageAspectFlags AspectFlags)
+{
+	ImageResource* Resource = GetImageData(Handle);
+	ImageViewData View;
+
+	VkImageViewCreateInfo ViewCreateInfo = { };
+	ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	ViewCreateInfo.flags = 0;
+	ViewCreateInfo.viewType = ViewType;
+	ViewCreateInfo.format = Resource->Format;
+	ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	ViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	ViewCreateInfo.subresourceRange.aspectMask = AspectFlags;
+	ViewCreateInfo.subresourceRange.baseMipLevel = 0;
+	ViewCreateInfo.subresourceRange.levelCount = 1;
+	ViewCreateInfo.subresourceRange.baseArrayLayer = BaseArrayLayer;
+	ViewCreateInfo.subresourceRange.layerCount = LayerCount;
+	ViewCreateInfo.image = Resource->Image;
+
+	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+	VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo, &VulkanAllocator, &View.View));
+
+	return CreateImageViewHandle(&View);
 }
 
 BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description)
@@ -216,7 +372,7 @@ BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Descript
 	CreateInfo.unnormalizedCoordinates = Description->UnnormalizedCoordinates;
 
 	VkSampler VulkanSampler;
-	VULKAN_CHECK_RESULT(vkCreateSampler(Device, &CreateInfo, nullptr, &VulkanSampler));
+	VULKAN_CHECK_RESULT(vkCreateSampler(Device, &CreateInfo, &VulkanAllocator, &VulkanSampler));
 
 	SamplerData Data;
 	Data.VulkanSampler = VulkanSampler;
@@ -272,7 +428,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	PipelineCreateInfo->basePipelineIndex = -1;
 
 	VkPipeline Pipeline;
-	VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, 1, PipelineCreateInfo, nullptr, &Pipeline));
+	VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, 1, PipelineCreateInfo, &VulkanAllocator, &Pipeline));
 
 	PipelineData Data;
 	Data.VulkanPipeline = Pipeline;
@@ -294,46 +450,12 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 	CreateInfo.pNext = Description->Next;
 
 	VkPipelineLayout PipelineLayout;
-	VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &CreateInfo, nullptr, &PipelineLayout));
+	VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &CreateInfo, &VulkanAllocator, &PipelineLayout));
 
 	PipelineLayoutData Data;
 	Data.VulkanPipelineLayout = PipelineLayout;
 
 	return CreatePipelineLayoutHandle(&Data);
-}
-
-BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutDescription* Description)
-{
-	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-
-	DescriptorSetLayoutData Layout = { };
-	Layout.BindingsCount = Description->BindingsCount;
-	Layout.BindingsIndex = LayoutBindings.Count;
-
-	VkDescriptorSetLayoutBinding* NewLayoutBindings = (VkDescriptorSetLayoutBinding*)Render::FrameAlloc(sizeof(VkDescriptorSetLayoutBinding) * Description->BindingsCount);
-	for (u32 i = 0; i < Description->BindingsCount; ++i)
-	{
-		NewLayoutBindings[i].binding = i;
-		NewLayoutBindings[i].descriptorCount = Description->Bindings[i].DescriptorCount;
-		NewLayoutBindings[i].descriptorType = Description->Bindings[i].DescriptorType;
-		NewLayoutBindings[i].stageFlags = Description->Bindings[i].StageFlags;
-		NewLayoutBindings[i].pImmutableSamplers = nullptr;
-
-		assert(LayoutBindings.Count < LayoutBindings.Capacity);
-		DescriptorSetLayoutBinding* Binding = LayoutBindings.Data + LayoutBindings.Count++;
-		Binding->DescriptorType = NewLayoutBindings[i].descriptorType;
-	}
-
-	VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
-	LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	LayoutCreateInfo.bindingCount = Description->BindingsCount;
-	LayoutCreateInfo.pBindings = NewLayoutBindings;
-	LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-	LayoutCreateInfo.pNext = nullptr;
-
-	VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, nullptr, &Layout.Layout));
-
-	return CreateDescriptorSetLayoutHandle(&Layout);
 }
 
 BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolDescription* Description)
@@ -349,7 +471,7 @@ BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorP
 	CreateInfo.pNext = Description->Next;
 	
 	VkDescriptorPool DescriptorPool;
-	VULKAN_CHECK_RESULT(vkCreateDescriptorPool(Device, &CreateInfo, nullptr, &DescriptorPool));
+	VULKAN_CHECK_RESULT(vkCreateDescriptorPool(Device, &CreateInfo, &VulkanAllocator, &DescriptorPool));
 	
 	DescriptorPoolData Data;
 	Data.VulkanDescriptorPool = DescriptorPool;
@@ -369,7 +491,7 @@ BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Descript
 	CreateInfo.pCode = Description->Code;
 	
 	VkShaderModule ShaderModule;
-	VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &CreateInfo, nullptr, &ShaderModule));
+	VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &CreateInfo, &VulkanAllocator, &ShaderModule));
 	
 	ShaderData Data;
 	Data.VulkanShaderModule = ShaderModule;
@@ -485,4 +607,34 @@ BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Forma
 	Descr.Type = Type;
 
 	return CreateImageResource(&Descr);
+}
+
+BmRender_ImageView BmRender_CreateImageView2D(BmRender_Image Handle, VkImageAspectFlags AspectFlags)
+{
+	return CreateImageView(Handle, 0, 1, VK_IMAGE_VIEW_TYPE_2D, AspectFlags);
+}
+
+BmRender_ImageView BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags)
+{
+	return CreateImageView(Handle, BaseLayer, LayerCount, VK_IMAGE_VIEW_TYPE_2D_ARRAY, AspectFlags);
+}
+
+void BmRender_CreateVertexStageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, const std::string& Name)
+{
+	RenderResources::CreateGPUBuffer(CreateGPUBuffer(Size, UpdateFrequency, PipelineStage::Vertex, BufferUsageFlag::CombinedVertexIndexFlag), Name);
+}
+
+void BmRender_CreateInstanceBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, const std::string& Name)
+{
+	RenderResources::CreateGPUBuffer(CreateGPUBuffer(Size, UpdateFrequency, PipelineStage::Vertex, BufferUsageFlag::InstanceFlag), Name);
+}
+
+void BmRender_CreateUniformBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, const std::string& Name)
+{
+	RenderResources::CreateGPUBuffer(CreateGPUBuffer(Size, UpdateFrequency, BufferStage, BufferUsageFlag::UniformFlag), Name);
+}
+
+void BmRender_CreateStorageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, const std::string& Name)
+{
+	RenderResources::CreateGPUBuffer(CreateGPUBuffer(Size, UpdateFrequency, BufferStage, BufferUsageFlag::StorageFlag), Name);
 }

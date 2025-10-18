@@ -6,8 +6,6 @@
 
 #include "Util/EngineTypes.h"
 
-#include "RenderTypes.h"
-
 enum class BufferUpdateFrequency
 {
 	Static,
@@ -16,8 +14,19 @@ enum class BufferUpdateFrequency
 
 typedef struct BmRender_BufferRegion_T* BmRender_BufferRegion;
 typedef struct BmRender_BufferArrayRegion_T* BmRender_BufferArrayRegion;
-typedef struct BmRender_ImageViewResource_T* BmRender_ImageViewResource;
 typedef struct BmRender_PushConstant_T* BmRender_PushConstant;
+
+typedef u64 PrivateHandle;
+typedef struct { PrivateHandle Private; } BmRender_Sampler;
+typedef struct { PrivateHandle Private; } BmRender_Pipeline;
+typedef struct { PrivateHandle Private; } BmRender_PipelineLayout;
+typedef struct { PrivateHandle Private; } BmRender_DescriptorSetLayout;
+typedef struct { PrivateHandle Private; } BmRender_DescriptorPool;
+typedef struct { PrivateHandle Private; } BmRender_Shader;
+typedef struct { PrivateHandle Private; } BmRender_Image;
+typedef struct { PrivateHandle Private; } BmRender_ImageView;
+typedef struct { PrivateHandle Private; } BmRender_GPUBuffer;
+typedef struct { PrivateHandle Private; } BmRender_DescriptorSet;
 
 enum class BufferUsageFlag
 {
@@ -102,7 +111,7 @@ struct BmRender_ImageBinding
 {
 	const char* Sampler;
 	VkImageLayout ImageLayout; // Check if can store layout with Image resource as target layout and use instead this
-	BmRender_ImageViewResource ImageView;
+	BmRender_ImageView ImageView;
 };
 
 struct BmRender_DescriptorSetBinding
@@ -179,10 +188,10 @@ void BmRender_CreateStorageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequenc
 BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, ImageType Type);
 BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Format, ImageType Type, u32 ArrayLayers);
 
-BmRender_ImageViewResource BmRender_CreateImageView2D(BmRender_Image Handle, VkImageAspectFlags AspectFlags);
-BmRender_ImageViewResource BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags);
+BmRender_ImageView BmRender_CreateImageView2D(BmRender_Image Handle, VkImageAspectFlags AspectFlags);
+BmRender_ImageView BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags);
 
-void BmRender_CreateDescriptorSet(const std::string& Name, const std::string& LayoutName, const std::string& PoolName);
+void BmRender_CreateDescriptorSet(const std::string& Name, BmRender_DescriptorSetLayout LayoutHandle, const std::string& PoolName);
 void BmRender_UpdateDescriptorSet(const std::string& DescriptorSetName, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount);
 
 BmRender_PushConstant CreatePushConstant(PipelineStage Stage, u32 Offset, u32 Size);
@@ -208,31 +217,22 @@ struct BmRender_ShaderDescription
 void BmRender_Init();
 void BmRender_DeInit();
 
+VkAllocationCallbacks* BmRender_GetVulkanAllocator();
+
 
 
 BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description);
-void BmRender_DestroySampler(BmRender_Sampler Handle);
-
-
 BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* Description);
-void BmRender_DestroyPipeline(BmRender_Pipeline Handle);
-
-
 BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description);
-void BmRender_DestroyPipelineLayout(BmRender_PipelineLayout Handle);
-
-
 BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutDescription* Description);
-void BmRender_DestroyDescriptorSetLayout(BmRender_DescriptorSetLayout Handle);
-
-
 BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolDescription* Description);
-void BmRender_DestroyDescriptorPool(BmRender_DescriptorPool Handle);
-
-
 BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description);
+
+
+void BmRender_DestroySampler(BmRender_Sampler Handle);
+void BmRender_DestroyPipeline(BmRender_Pipeline Handle);
+void BmRender_DestroyPipelineLayout(BmRender_PipelineLayout Handle);
+void BmRender_DestroyDescriptorSetLayout(BmRender_DescriptorSetLayout Handle);
+void BmRender_DestroyDescriptorPool(BmRender_DescriptorPool Handle);
 void BmRender_DestroyShader(BmRender_Shader Handle);
-
-
 void BmRender_DestroyImage(BmRender_Image Handle);
-

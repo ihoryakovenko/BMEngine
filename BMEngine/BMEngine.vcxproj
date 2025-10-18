@@ -60,7 +60,6 @@
     <ClInclude Include="Source\Engine\Systems\UI\UI.h" />
     <ClInclude Include="Source\Util\DefaultTextureData.h" />
     <ClInclude Include="Source\Engine\Systems\Render\VulkanHelper.h" />
-    <ClInclude Include="Source\Deprecated\VulkanInterface\VulkanInterface.h" />
     <ClInclude Include="Source\Util\Math.h" />
     <ClInclude Include="Source\Util\Settings.h" />
     <ClInclude Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.h" />

@@ -10,14 +10,12 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
-extern Memory::Array<DescriptorSetLayoutBinding> LayoutBindings;
-
 namespace RenderResources
 {
-	struct GPUBufferEntry
+	struct GPUBufferEntryData
 	{
 		std::atomic<bool> IsLoaded;
-		GPUBuffer* GPUBufferHandle; // GPUBuffer* is TMP, use handle
+		BmRender_GPUBuffer GPUBufferHandle;
 		u64 BufferOffset;
 		u64 Size;
 	};
@@ -26,18 +24,18 @@ namespace RenderResources
 	{
 		VulkanCoreContext::VulkanCoreContext CoreContext;
 		std::unordered_map<std::string, VulkanHelper::VertexBinding> VBindings;
+		std::unordered_map<std::string, BmRender_DescriptorSet> DescriptorSets;
+
 		std::unordered_map<std::string, BmRender_Sampler> Samplers;
 		std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 		std::unordered_map<std::string, BmRender_Shader> Shaders;
-		std::unordered_map<std::string, RenderResources::GPUBuffer> StorageBuffers;
 		std::unordered_map<std::string, BmRender_DescriptorPool> DescriptorPools;
-		std::unordered_map<std::string, DescriptorSet> DescriptorSets;
 		std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
 		std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
+		std::unordered_map<std::string, BmRender_GPUBuffer> StorageBuffers;
 
 		Memory::Array<VkPushConstantRange> PushConstants;
-		Memory::Array<GPUBufferEntry> ResourceRecords;
-		Memory::Array<VkImageView> ImageViews;
+		Memory::Array<GPUBufferEntryData> ResourceRecords;
 	};
 
 	static ResourceContext ResContext;
@@ -84,17 +82,13 @@ namespace RenderResources
 		BmRender_DescriptorPool MainPoolHandle = BmRender_CreateDescriptorPool(&PoolDesc);
 		ResContext.DescriptorPools["MainPool"] = MainPoolHandle;
 
-		ResContext.ImageViews.Capacity = 64;
-		ResContext.ImageViews.Count = 0;
-		ResContext.ImageViews.Data = (VkImageView*)malloc(ResContext.ImageViews.Capacity * sizeof(ResContext.ImageViews.Data[0]));
-
 		ResContext.ResourceRecords.Capacity = 60000;
 		ResContext.ResourceRecords.Count = 0;
-		ResContext.ResourceRecords.Data = (GPUBufferEntry*)malloc(ResContext.ResourceRecords.Capacity * sizeof(ResContext.ResourceRecords.Data[0]));
+		ResContext.ResourceRecords.Data = (GPUBufferEntryData*)malloc(ResContext.ResourceRecords.Capacity * sizeof(GPUBufferEntryData));
 
 		ResContext.PushConstants.Capacity = 10;
 		ResContext.PushConstants.Count = 0;
-		ResContext.PushConstants.Data = (VkPushConstantRange*)malloc(ResContext.PushConstants.Capacity * sizeof(ResContext.PushConstants.Data[0]));
+		ResContext.PushConstants.Data = (VkPushConstantRange*)malloc(ResContext.PushConstants.Capacity * sizeof(VkPushConstantRange));
 	}
 
 	void CreateGraphicsPipeline(const std::string& Name, const BmRender_PipelineDescription& Description)
@@ -115,43 +109,9 @@ namespace RenderResources
 		ResContext.PipelineLayouts[Name] = PipelineLayoutHandle;
 	}
 
-	void CreateBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, BufferUsageFlag Flag, const std::string& Name)
+	void CreateGPUBuffer(BmRender_GPUBuffer Buffer, const std::string& Name)
 	{
-		VkDevice Device = ResContext.CoreContext.LogicalDevice;
-		VkPhysicalDevice PhDevice = ResContext.CoreContext.PhysicalDevice;
-
-		MemoryPropertyFlag MemoryFlag = MemoryPropertyFlag::GPULocal;
-
-		if (UpdateFrequency == BufferUpdateFrequency::PerFrame)
-		{
-			MemoryFlag = MemoryPropertyFlag::HostCompatible;
-		}
-
-		if (Flag == BufferUsageFlag::UniformFlag)
-		{
-			VkPhysicalDeviceProperties DeviceProperties;
-			vkGetPhysicalDeviceProperties(PhDevice, &DeviceProperties);
-
-			if (Capacity > DeviceProperties.limits.maxUniformBufferRange)
-			{
-				assert(false);
-			}
-		}
-
-		GPUBuffer NewBuffer = { };
-
-		NewBuffer.Capacity = Capacity;
-		NewBuffer.UpdateFrequency = UpdateFrequency;
-		NewBuffer.PropertyFlag = MemoryFlag;
-		NewBuffer.BufferStage = BufferStage;
-		NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, Capacity, Flag);
-
-		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhDevice, Device, NewBuffer.Buffer, NewBuffer.PropertyFlag);
-		NewBuffer.Memory = AllocResult.Memory;
-
-		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, NewBuffer.Buffer, NewBuffer.Memory, 0));
-
-		ResContext.StorageBuffers[Name] = NewBuffer;
+		ResContext.StorageBuffers[Name] = Buffer;
 	}
 
 	VkPipeline GetPipeline(const std::string& Name)
@@ -179,9 +139,9 @@ namespace RenderResources
 		return GetImageData(Handle)->Image;
 	}
 
-	VkImageView GetImageView(BmRender_ImageViewResource Handle)
+	VkImageView GetImageView(BmRender_ImageView Handle)
 	{
-		return ResContext.ImageViews.Data[(u64)Handle];
+		return GetImageViewData(Handle)->View;
 	}
 
 	VkPushConstantRange GetPushConstant(BmRender_PushConstant Handle)
@@ -193,17 +153,6 @@ namespace RenderResources
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 
-		for (uint32_t i = 0; i < ResContext.ImageViews.Count; ++i)
-		{
-			vkDestroyImageView(Device, ResContext.ImageViews.Data[i], nullptr);
-		}
-
-		for (auto It = ResContext.StorageBuffers.begin(); It != ResContext.StorageBuffers.end(); ++It)
-		{
-			vkDestroyBuffer(Device, It->second.Buffer, nullptr);
-			vkFreeMemory(Device, It->second.Memory, nullptr);
-		}
-
 		VulkanCoreContext::DestroyCoreContext(&ResContext.CoreContext);
 
 		ResContext.Shaders.clear();
@@ -211,7 +160,6 @@ namespace RenderResources
 		ResContext.DescriptorSetLayouts.clear();
 		ResContext.VBindings.clear();
 
-		free(ResContext.ImageViews.Data);
 		free(ResContext.ResourceRecords.Data);
 		free(ResContext.PushConstants.Data);
 	}
@@ -236,29 +184,6 @@ namespace RenderResources
 		ResContext.Samplers[Name] = BmRender_CreateSampler(&Data);
 	}
 
-	void CreateGeometryBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, std::string& Name)
-	{
-		VkDevice Device = ResContext.CoreContext.LogicalDevice;
-		VkPhysicalDevice PhDevice = ResContext.CoreContext.PhysicalDevice;
-
-		VkPhysicalDeviceProperties DeviceProperties;
-		vkGetPhysicalDeviceProperties(PhDevice, &DeviceProperties);
-
-		GPUBuffer NewBuffer = { };
-
-		NewBuffer.Capacity = Capacity;
-		NewBuffer.PropertyFlag = UpdateFrequency == BufferUpdateFrequency::Static ? MemoryPropertyFlag::GPULocal : MemoryPropertyFlag::HostCompatible;
-		NewBuffer.BufferStage = PipelineStage::Vertex;
-		NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, Capacity, BufferUsageFlag::CombinedVertexIndexFlag);
-
-		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhDevice, Device, NewBuffer.Buffer, NewBuffer.PropertyFlag);
-		NewBuffer.Memory = AllocResult.Memory;
-
-		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, NewBuffer.Buffer, NewBuffer.Memory, 0));
-
-		ResContext.StorageBuffers[Name] = NewBuffer;
-	}
-
 	void CreateDescriptorSetLayout(const std::string& Name, const BmRender_DescriptorSetLayoutDescription& Description)
 	{
 
@@ -269,8 +194,8 @@ namespace RenderResources
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 
-		DescriptorSet* Set = GetDescriptorSet(DescriptorSetName);
-		DescriptorSetLayoutData* Layout = GetSetLayout(Set->Layout);
+		DescriptorSetData* Set = GetDescriptorSet(DescriptorSetName);
+		DescriptorSetLayoutData* Layout = GetDescriptorSetLayoutData(Set->Layout);
 
 		VkWriteDescriptorSet* WriteDescriptorSets = (VkWriteDescriptorSet*)Render::FrameAlloc(sizeof(VkWriteDescriptorSet) * BindingsCount);
 
@@ -278,7 +203,7 @@ namespace RenderResources
 		{
 			const BmRender_DescriptorSetBinding& Binding = Bindings[i];
 
-			VkDescriptorType DescriptorType = LayoutBindings.Data[Layout->BindingsIndex + i].DescriptorType;
+			VkDescriptorType DescriptorType = Layout->LayoutBindings[i].DescriptorType;
 
 			WriteDescriptorSets[i] = { };
 			WriteDescriptorSets[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -294,9 +219,9 @@ namespace RenderResources
 				VkDescriptorBufferInfo* BufferInfo = (VkDescriptorBufferInfo*)Render::FrameAlloc(sizeof(VkDescriptorBufferInfo) * Binding.BindingCount);
 				for (u32 j = 0; j < Binding.BindingCount; ++j)
 				{
-					GPUBufferEntry* Entry = ResContext.ResourceRecords.Data + (u64)Binding.BufferRegions[j];
+					GPUBufferEntryData* Entry = ResContext.ResourceRecords.Data + (u64)Binding.BufferRegions[j];
 
-					BufferInfo[j].buffer = Entry->GPUBufferHandle->Buffer;
+					BufferInfo[j].buffer = GetGPUBufferData(Entry->GPUBufferHandle)->Buffer;
 					BufferInfo[j].offset = Entry->BufferOffset;
 					BufferInfo[j].range = Entry->Size;
 				}
@@ -321,24 +246,9 @@ namespace RenderResources
 		vkUpdateDescriptorSets(Device, BindingsCount, WriteDescriptorSets, 0, nullptr);
 	}
 
-	void CreateDescriptorSet(const std::string& Name, const std::string& LayoutName, const std::string& PoolName)
+	void CreateDescriptorSet(const std::string& Name, BmRender_DescriptorSet Set)
 	{
-		VkDevice Device = ResContext.CoreContext.LogicalDevice;
-		
-		DescriptorSet NewSet;
-		NewSet.Layout = LayoutName;
-
-		DescriptorSetLayoutData* Layout = GetSetLayout(LayoutName);
-		VkDescriptorPool Pool = GetDescriptorPool(PoolName);
-		
-		VkDescriptorSetAllocateInfo AllocInfo = { };
-		AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		AllocInfo.descriptorPool = Pool;
-		AllocInfo.descriptorSetCount = 1;
-		AllocInfo.pSetLayouts = &Layout->Layout;
-		
-		VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, &NewSet.Set));
-		ResContext.DescriptorSets[Name] = NewSet;
+		ResContext.DescriptorSets[Name] = Set;
 	}
 
 	VulkanCoreContext::VulkanCoreContext* GetCoreContext()
@@ -368,6 +278,18 @@ namespace RenderResources
 
 		assert(false);
 		return nullptr;
+	}
+
+	BmRender_DescriptorSetLayout GetDescriptorSetLayoutHandle(const std::string& Id)
+	{
+		auto It = ResContext.DescriptorSetLayouts.find(Id);
+		if (It != ResContext.DescriptorSetLayouts.end())
+		{
+			return It->second;
+		}
+
+		assert(false);
+		return BmRender_DescriptorSetLayout{};
 	}
 
 	VkShaderModule GetShader(const std::string& Id)
@@ -406,54 +328,28 @@ namespace RenderResources
 		return VK_NULL_HANDLE;
 	}
 
-	DescriptorSet* GetDescriptorSet(const std::string& Id)
+	DescriptorSetData* GetDescriptorSet(const std::string& Id)
 	{
 		auto It = ResContext.DescriptorSets.find(Id);
 		if (It != ResContext.DescriptorSets.end())
 		{
-			return &It->second;
+			
+			return GetDescriptorSetData(It->second);
 		}
 
 		assert(false);
 		return nullptr;
 	}
 
-	BmRender_ImageViewResource CreateImageView(BmRender_Image Handle, u32 BaseArrayLayer, u32 LayerCount, VkImageViewType ViewType, VkImageAspectFlags AspectFlags)
-	{
-		ImageResource* Resource = GetImageData(Handle);
-		VkImageView* View = ResContext.ImageViews.Data + ResContext.ImageViews.Count;
-
-		VkImageViewCreateInfo ViewCreateInfo = { };
-		ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		ViewCreateInfo.flags = 0;
-		ViewCreateInfo.viewType = ViewType;
-		ViewCreateInfo.format = Resource->Format;
-		ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-		ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-		ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-		ViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-		ViewCreateInfo.subresourceRange.aspectMask = AspectFlags;
-		ViewCreateInfo.subresourceRange.baseMipLevel = 0;
-		ViewCreateInfo.subresourceRange.levelCount = 1;
-		ViewCreateInfo.subresourceRange.baseArrayLayer = BaseArrayLayer;
-		ViewCreateInfo.subresourceRange.layerCount = LayerCount;
-		ViewCreateInfo.image = Resource->Image;
-
-		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-		VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo, nullptr, View));
-
-		return (BmRender_ImageViewResource)ResContext.ImageViews.Count++;
-	}
-
 	BmRender_BufferRegion CreateBufferRegion(u64 BufferOffset, u64 RegionSize, const std::string& BufferName)
 	{
 		assert(ResContext.ResourceRecords.Count < ResContext.ResourceRecords.Capacity);
 
-		GPUBufferEntry* Entry = ResContext.ResourceRecords.Data + ResContext.ResourceRecords.Count;
+		GPUBufferEntryData* Entry = ResContext.ResourceRecords.Data + ResContext.ResourceRecords.Count;
 		Entry->IsLoaded = false;
 		Entry->BufferOffset = BufferOffset;
 		Entry->Size = RegionSize;
-		Entry->GPUBufferHandle = GetGPUBuffer(BufferName);
+		Entry->GPUBufferHandle = ResContext.StorageBuffers[BufferName];
 	
 		return (BmRender_BufferRegion)ResContext.ResourceRecords.Count++;
 	}
@@ -473,8 +369,8 @@ namespace RenderResources
 	void UpdateBufferRegion(BmRender_BufferRegion Handle, u64 ResourceOffset, const void* Data, u32 DataSize)
 	{
 		const u32 Index = (u64)Handle;
-		GPUBufferEntry* Entry = ResContext.ResourceRecords.Data + Index;
-		RenderResources::GPUBuffer* Buffer = Entry->GPUBufferHandle;
+		GPUBufferEntryData* Entry = ResContext.ResourceRecords.Data + Index;
+		GPUBufferData* Buffer = GetGPUBufferData(Entry->GPUBufferHandle);
 
 		const u64 Offset = Entry->BufferOffset + ResourceOffset;
 
@@ -540,12 +436,12 @@ namespace RenderResources
 		return GetImageData(Handle)->IsLoaded;
 	}
 
-	RenderResources::GPUBuffer* GetGPUBuffer(const std::string& Name)
+	GPUBufferData* GetGPUBuffer(const std::string& Name)
 	{
 		auto It = ResContext.StorageBuffers.find(Name);
 		if (It != ResContext.StorageBuffers.end())
 		{
-			return &It->second;
+			return GetGPUBufferData(It->second);
 		}
 
 		assert(false);

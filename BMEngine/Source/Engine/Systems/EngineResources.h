@@ -40,7 +40,7 @@ namespace EngineResources
 	{
 		std::string TexturePath;
 		BmRender_Image RenderImageHandle;
-		BmRender_ImageViewResource RenderViewHandle;
+		BmRender_ImageView RenderViewHandle;
 		u32 TextureGPUIndex;
 		bool IsCreated;
 	};
