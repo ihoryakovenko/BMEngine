@@ -37,8 +37,6 @@ struct System_HandleManager_T
 	u32 FreeIndicesCount;
 	u32 DataSize;
 	u16 HandleType;
-
-	System_HandleManager_OnClearManagerDelegate OnClearDelegate;
 };
 
 bool System_HandleManager_CompareHandles(System_HandleManager_Handle a, System_HandleManager_Handle b)
@@ -46,7 +44,7 @@ bool System_HandleManager_CompareHandles(System_HandleManager_Handle a, System_H
 	return a == b;
 }
 
-System_HandleManager System_HandleManager_InitData(u32 InitialCapacity, u32 DataSize, u16 HandleType, System_HandleManager_OnClearManagerDelegate OnClearDelegate)
+System_HandleManager System_HandleManager_InitData(u32 InitialCapacity, u32 DataSize, u16 HandleType)
 {
 	auto Manager = (System_HandleManager)malloc(sizeof(System_HandleManager_T));
 
@@ -60,23 +58,22 @@ System_HandleManager System_HandleManager_InitData(u32 InitialCapacity, u32 Data
 	Manager->FreeIndicesCount = 0;
 	Manager->DataSize = DataSize;
 	Manager->HandleType = HandleType;
-	Manager->OnClearDelegate = OnClearDelegate;
 
 	return Manager;
 }
 
-void System_HandleManager_ClearData(System_HandleManager Manager)
+void System_HandleManager_ClearData(System_HandleManager Manager, System_HandleManager_OnClearManagerDelegate OnClearDelegate)
 {
 	assert(Manager);
 
-	if (Manager->OnClearDelegate)
+	if (OnClearDelegate)
 	{
 		for (u32 i = 0; i < Manager->StorageCount; ++i)
 		{
 			if (Manager->Entries[i].IsUsed)
 			{
 				void* DataPtr = (u8*)(Manager->StorageData) + (i * Manager->DataSize);
-				Manager->OnClearDelegate(DataPtr);
+				OnClearDelegate(DataPtr);
 			}
 		}
 	}

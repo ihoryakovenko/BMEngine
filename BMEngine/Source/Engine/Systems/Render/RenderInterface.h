@@ -208,29 +208,31 @@ struct BmRender_ShaderDescription
 void BmRender_Init();
 void BmRender_DeInit();
 
+
+
 BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description);
 void BmRender_DestroySampler(BmRender_Sampler Handle);
-SamplerData* BmRender_GetSamplerData(BmRender_Sampler Handle);
+
 
 BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* Description);
 void BmRender_DestroyPipeline(BmRender_Pipeline Handle);
-PipelineData* BmRender_GetPipelineData(BmRender_Pipeline Handle);
+
 
 BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description);
 void BmRender_DestroyPipelineLayout(BmRender_PipelineLayout Handle);
-PipelineLayoutData* BmRender_GetPipelineLayoutData(BmRender_PipelineLayout Handle);
+
 
 BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutDescription* Description);
 void BmRender_DestroyDescriptorSetLayout(BmRender_DescriptorSetLayout Handle);
-DescriptorSetLayoutData* BmRender_GetDescriptorSetLayoutData(BmRender_DescriptorSetLayout Handle);
+
 
 BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolDescription* Description);
 void BmRender_DestroyDescriptorPool(BmRender_DescriptorPool Handle);
-DescriptorPoolData* BmRender_GetDescriptorPoolData(BmRender_DescriptorPool Handle);
+
 
 BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description);
 void BmRender_DestroyShader(BmRender_Shader Handle);
-ShaderData* BmRender_GetShaderData(BmRender_Shader Handle);
+
 
 void BmRender_DestroyImage(BmRender_Image Handle);
-ImageResource* BmRender_GetIamgeData(BmRender_Image Handle);
+

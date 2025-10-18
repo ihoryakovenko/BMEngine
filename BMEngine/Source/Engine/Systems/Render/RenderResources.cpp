@@ -49,7 +49,7 @@ namespace RenderResources
 
 	void OnImageResourceLoaded(BmRender_Image Handle)
 	{
-		BmRender_GetIamgeData(Handle)->IsLoaded = true;
+		GetImageData(Handle)->IsLoaded = true;
 	}
 
 	void Init(GLFWwindow* WindowHandler)
@@ -159,7 +159,7 @@ namespace RenderResources
 		auto it = ResContext.Pipelines.find(Name);
 		if (it != ResContext.Pipelines.end())
 		{
-			return BmRender_GetPipelineData(it->second)->VulkanPipeline;
+			return GetPipelineData(it->second)->VulkanPipeline;
 		}
 		return VK_NULL_HANDLE;
 	}
@@ -169,14 +169,14 @@ namespace RenderResources
 		auto it = ResContext.PipelineLayouts.find(Name);
 		if (it != ResContext.PipelineLayouts.end())
 		{
-			return BmRender_GetPipelineLayoutData(it->second)->VulkanPipelineLayout;
+			return GetPipelineLayoutData(it->second)->VulkanPipelineLayout;
 		}
 		return VK_NULL_HANDLE;
 	}
 
 	VkImage GetImage(BmRender_Image Handle)
 	{
-		return BmRender_GetIamgeData(Handle)->Image;
+		return GetImageData(Handle)->Image;
 	}
 
 	VkImageView GetImageView(BmRender_ImageViewResource Handle)
@@ -351,7 +351,7 @@ namespace RenderResources
 		auto It = ResContext.Samplers.find(Id);
 		if (It != ResContext.Samplers.end())
 		{
-			return BmRender_GetSamplerData(It->second)->VulkanSampler;
+			return GetSamplerData(It->second)->VulkanSampler;
 		}
 
 		assert(false);
@@ -363,7 +363,7 @@ namespace RenderResources
 		auto It = ResContext.DescriptorSetLayouts.find(Id);
 		if (It != ResContext.DescriptorSetLayouts.end())
 		{
-			return BmRender_GetDescriptorSetLayoutData(It->second);
+			return GetDescriptorSetLayoutData(It->second);
 		}
 
 		assert(false);
@@ -375,7 +375,7 @@ namespace RenderResources
 		auto It = ResContext.Shaders.find(Id);
 		if (It != ResContext.Shaders.end())
 		{
-			return BmRender_GetShaderData(It->second)->VulkanShaderModule;
+			return GetShaderData(It->second)->VulkanShaderModule;
 		}
 
 		assert(false);
@@ -399,7 +399,7 @@ namespace RenderResources
 		auto It = ResContext.DescriptorPools.find(Id);
 		if (It != ResContext.DescriptorPools.end())
 		{
-			return BmRender_GetDescriptorPoolData(It->second)->VulkanDescriptorPool;
+			return GetDescriptorPoolData(It->second)->VulkanDescriptorPool;
 		}
 
 		assert(false);
@@ -420,7 +420,7 @@ namespace RenderResources
 
 	BmRender_ImageViewResource CreateImageView(BmRender_Image Handle, u32 BaseArrayLayer, u32 LayerCount, VkImageViewType ViewType, VkImageAspectFlags AspectFlags)
 	{
-		ImageResource* Resource = BmRender_GetIamgeData(Handle);
+		ImageResource* Resource = GetImageData(Handle);
 		VkImageView* View = ResContext.ImageViews.Data + ResContext.ImageViews.Count;
 
 		VkImageViewCreateInfo ViewCreateInfo = { };
@@ -511,7 +511,7 @@ namespace RenderResources
 
 	void UpdateImageResource(BmRender_Image Handle, BmRender_ImageDescription* Description, void* Data)
 	{
-		ImageResource* Image = BmRender_GetIamgeData(Handle);
+		ImageResource* Image = GetImageData(Handle);
 
 		// TODO: TMP solution
 		void* TransferMemory = TransferSystem::RequestTransferMemory(Image->Size);
@@ -537,7 +537,7 @@ namespace RenderResources
 
 	bool IsImageResourceReady(BmRender_Image Handle)
 	{
-		return BmRender_GetIamgeData(Handle)->IsLoaded;
+		return GetImageData(Handle)->IsLoaded;
 	}
 
 	RenderResources::GPUBuffer* GetGPUBuffer(const std::string& Name)

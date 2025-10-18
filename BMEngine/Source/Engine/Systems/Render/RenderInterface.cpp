@@ -14,155 +14,60 @@ struct BmRender_BufferArrayRegion_T { u64 Index; };
 struct BmRender_ImageViewResource_T { u64 Index; };
 struct BmRender_PushConstant_T { u64 Index; };
 
-enum class HandleType : u32
-{
-	Sampler,
-	Pipeline,
-	PipelineLayout,
-	DescriptorSetLayout,
-	DescriptorPool,
-	Shader,
-	Image,
-
-	MAX
-};
-
-static System_HandleManager HandleManagers[(u32)HandleType::MAX];
 Memory::Array<DescriptorSetLayoutBinding> LayoutBindings;
 
-template<typename T>
-concept IsRenderHandle = std::same_as<T, BmRender_Sampler> ||
-						std::same_as<T, BmRender_Pipeline> ||
-						std::same_as<T, BmRender_PipelineLayout> ||
-						std::same_as<T, BmRender_DescriptorSetLayout> ||
-						std::same_as<T, BmRender_DescriptorPool> ||
-						std::same_as<T, BmRender_Shader> ||
-						std::same_as<T, BmRender_Image>;
-
-template<typename T>
-concept IsRenderData = std::same_as<T, SamplerData> ||
-					   std::same_as<T, PipelineData> ||
-					   std::same_as<T, PipelineLayoutData> ||
-					   std::same_as<T, DescriptorSetLayoutData> ||
-					   std::same_as<T, DescriptorPoolData> ||
-					   std::same_as<T, ShaderData> ||
-					   std::same_as<T, ImageResource>;
-
-template<typename HandleType, typename DataType>
-concept CorrelatedHandleData =
-(std::same_as<HandleType, BmRender_Sampler> && std::same_as<DataType, SamplerData>) ||
-(std::same_as<HandleType, BmRender_Pipeline> && std::same_as<DataType, PipelineData>) ||
-(std::same_as<HandleType, BmRender_PipelineLayout> && std::same_as<DataType, PipelineLayoutData>) ||
-(std::same_as<HandleType, BmRender_DescriptorSetLayout> && std::same_as<DataType, DescriptorSetLayoutData>) ||
-(std::same_as<HandleType, BmRender_DescriptorPool> && std::same_as<DataType, DescriptorPoolData>) ||
-(std::same_as<HandleType, BmRender_Shader> && std::same_as<DataType, ShaderData>) ||
-(std::same_as<HandleType, BmRender_Image> && std::same_as<DataType, ImageResource>);
-
-
-template<IsRenderData T>
-static void InitializeManager(u32 capacity, void(*cleanupFunc)(T*))
-{
-	u16 handleType;
-	if constexpr (std::same_as<T, SamplerData>) handleType = (u16)HandleType::Sampler;
-	else if constexpr (std::same_as<T, PipelineData>) handleType = (u16)HandleType::Pipeline;
-	else if constexpr (std::same_as<T, PipelineLayoutData>) handleType = (u16)HandleType::PipelineLayout;
-	else if constexpr (std::same_as<T, DescriptorSetLayoutData>) handleType = (u16)HandleType::DescriptorSetLayout;
-	else if constexpr (std::same_as<T, DescriptorPoolData>) handleType = (u16)HandleType::DescriptorPool;
-	else if constexpr (std::same_as<T, ShaderData>) handleType = (u16)HandleType::Shader;
-	else if constexpr (std::same_as<T, ImageResource>) handleType = (u16)HandleType::Image;
-	
-	HandleManagers[handleType] = System_HandleManager_InitData(capacity, sizeof(T), handleType, (void(*)(void*))cleanupFunc);
-}
-
-template<IsRenderHandle T>
-static System_HandleManager GetManager()
-{
-	u16 handleType;
-	if constexpr (std::same_as<T, BmRender_Sampler>) handleType = (u16)HandleType::Sampler;
-	else if constexpr (std::same_as<T, BmRender_Pipeline>) handleType = (u16)HandleType::Pipeline;
-	else if constexpr (std::same_as<T, BmRender_PipelineLayout>) handleType = (u16)HandleType::PipelineLayout;
-	else if constexpr (std::same_as<T, BmRender_DescriptorSetLayout>) handleType = (u16)HandleType::DescriptorSetLayout;
-	else if constexpr (std::same_as<T, BmRender_DescriptorPool>) handleType = (u16)HandleType::DescriptorPool;
-	else if constexpr (std::same_as<T, BmRender_Shader>) handleType = (u16)HandleType::Shader;
-	else if constexpr (std::same_as<T, BmRender_Image>) handleType = (u16)HandleType::Image;
-
-	return HandleManagers[handleType];
-}
-
-template<typename HandleType, typename DataType>
-	requires CorrelatedHandleData<HandleType, DataType>
-static HandleType CreateResourceTyped(const DataType* data)
-{
-	HandleType handle;
-	handle.Private = System_HandleManager_CreateHandle(GetManager<HandleType>(), data);
-	return handle;
-}
-
-template<typename DataType, typename HandleType>
-	requires CorrelatedHandleData<HandleType, DataType>
-static DataType* GetResourceDataTyped(HandleType handle)
-{
-	return (DataType*)System_HandleManager_GetHandleData(GetManager<HandleType>(), handle.Private);
-}
-
-template<IsRenderHandle HandleType>
-static void DestroyResourceTyped(HandleType handle)
-{
-	System_HandleManager_DestroyHandle(GetManager<HandleType>(), handle.Private);
-}
-
-static void OnSamplerClear(SamplerData* samplerData)
+static void OnSamplerClear(SamplerData* SamplerData)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	vkDestroySampler(Device, samplerData->VulkanSampler, nullptr);
+	vkDestroySampler(Device, SamplerData->VulkanSampler, nullptr);
 }
 
-static void OnPipelineClear(PipelineData* pipelineData)
+static void OnPipelineClear(PipelineData* PipelineData)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	vkDestroyPipeline(Device, pipelineData->VulkanPipeline, nullptr);
+	vkDestroyPipeline(Device, PipelineData->VulkanPipeline, nullptr);
 }
 
-static void OnPipelineLayoutClear(PipelineLayoutData* layoutData)
+static void OnPipelineLayoutClear(PipelineLayoutData* LayoutData)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	vkDestroyPipelineLayout(Device, layoutData->VulkanPipelineLayout, nullptr);
+	vkDestroyPipelineLayout(Device, LayoutData->VulkanPipelineLayout, nullptr);
 }
 
-static void OnDescriptorSetLayoutClear(DescriptorSetLayoutData* layoutData)
+static void OnDescriptorSetLayoutClear(DescriptorSetLayoutData* LayoutData)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	vkDestroyDescriptorSetLayout(Device, layoutData->Layout, nullptr);
+	vkDestroyDescriptorSetLayout(Device, LayoutData->Layout, nullptr);
 }
 
-static void OnDescriptorPoolClear(DescriptorPoolData* poolData)
+static void OnDescriptorPoolClear(DescriptorPoolData* PoolData)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	vkDestroyDescriptorPool(Device, poolData->VulkanDescriptorPool, nullptr);
+	vkDestroyDescriptorPool(Device, PoolData->VulkanDescriptorPool, nullptr);
 }
 
-static void OnShaderClear(ShaderData* shaderData)
+static void OnShaderClear(ShaderData* Shader)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	vkDestroyShaderModule(Device, shaderData->VulkanShaderModule, nullptr);
+	vkDestroyShaderModule(Device, Shader->VulkanShaderModule, nullptr);
 }
 
-static void OnImageClear(ImageResource* imageData)
+static void OnImageClear(ImageResource* Image)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	vkDestroyImage(Device, imageData->Image, nullptr);
-	vkFreeMemory(Device, imageData->Memory, nullptr);
+	vkDestroyImage(Device, Image->Image, nullptr);
+	vkFreeMemory(Device, Image->Memory, nullptr);
 }
 
 void BmRender_Init()
 {
-	InitializeManager<SamplerData>(32, OnSamplerClear);
-	InitializeManager<PipelineData>(32, OnPipelineClear);
-	InitializeManager<PipelineLayoutData>(32, OnPipelineLayoutClear);
-	InitializeManager<DescriptorSetLayoutData>(32, OnDescriptorSetLayoutClear);
-	InitializeManager<DescriptorPoolData>(32, OnDescriptorPoolClear);
-	InitializeManager<ShaderData>(32, OnShaderClear);
-	InitializeManager<ImageResource>(32, OnImageClear);
+	InitializeSamplerManager(32);
+	InitializePipelineManager(32);
+	InitializePipelineLayoutManager(32);
+	InitializeDescriptorSetLayoutManager(32);
+	InitializeDescriptorPoolManager(32);
+	InitializeShaderManager(32);
+	InitializeImageManager(32);
 
 	LayoutBindings.Capacity = 20;
 	LayoutBindings.Count = 0;
@@ -171,14 +76,13 @@ void BmRender_Init()
 
 void BmRender_DeInit()
 {
-	for (u16 i = 0; i < (u16)HandleType::MAX; ++i)
-	{
-		System_HandleManager Manager = HandleManagers[i];
-		if (Manager != nullptr)
-		{
-			System_HandleManager_ClearData(Manager);
-		}
-	}
+	DeinitSamplerManager(OnSamplerClear);
+	DeinitPipelineManager(OnPipelineClear);
+	DeinitPipelineLayoutManager(OnPipelineLayoutClear);
+	DeinitDescriptorSetLayoutManager(OnDescriptorSetLayoutClear);
+	DeinitDescriptorPoolManager(OnDescriptorPoolClear);
+	DeinitShaderManager(OnShaderClear);
+	DeinitImageManager(OnImageClear);
 
 	free(LayoutBindings.Data);
 }
@@ -284,7 +188,7 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 	Resource.Size = AllocResult.Size;
 
 	VULKAN_CHECK_RESULT(vkBindImageMemory(Device, Resource.Image, Resource.Memory, 0));
-	return CreateResourceTyped<BmRender_Image>(&Resource);
+	return CreateImageHandle(&Resource);
 }
 
 BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description)
@@ -317,13 +221,13 @@ BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Descript
 	SamplerData Data;
 	Data.VulkanSampler = VulkanSampler;
 
-	return CreateResourceTyped<BmRender_Sampler>(&Data);
+	return CreateSamplerHandle(&Data);
 }
 
 BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* Description)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-
+	
 	VkPipelineVertexInputStateCreateInfo VertexInputState = { };
 	VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	VertexInputState.vertexBindingDescriptionCount = static_cast<u32>(Description->VertexBindings.size());
@@ -373,13 +277,13 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	PipelineData Data;
 	Data.VulkanPipeline = Pipeline;
 
-	return CreateResourceTyped<BmRender_Pipeline>(&Data);
+	return CreatePipelineHandle(&Data);
 }
 
 BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-
+	
 	VkPipelineLayoutCreateInfo CreateInfo = { };
 	CreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	CreateInfo.setLayoutCount = Description->SetLayoutCount;
@@ -395,7 +299,7 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 	PipelineLayoutData Data;
 	Data.VulkanPipelineLayout = PipelineLayout;
 
-	return CreateResourceTyped<BmRender_PipelineLayout>(&Data);
+	return CreatePipelineLayoutHandle(&Data);
 }
 
 BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutDescription* Description)
@@ -429,13 +333,13 @@ BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_D
 
 	VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, nullptr, &Layout.Layout));
 
-	return CreateResourceTyped<BmRender_DescriptorSetLayout>(&Layout);
+	return CreateDescriptorSetLayoutHandle(&Layout);
 }
 
 BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolDescription* Description)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-
+	
 	VkDescriptorPoolCreateInfo CreateInfo = { };
 	CreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	CreateInfo.maxSets = Description->MaxSets;
@@ -443,125 +347,90 @@ BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorP
 	CreateInfo.pPoolSizes = Description->PoolSizes;
 	CreateInfo.flags = Description->Flags;
 	CreateInfo.pNext = Description->Next;
-
+	
 	VkDescriptorPool DescriptorPool;
 	VULKAN_CHECK_RESULT(vkCreateDescriptorPool(Device, &CreateInfo, nullptr, &DescriptorPool));
-
+	
 	DescriptorPoolData Data;
 	Data.VulkanDescriptorPool = DescriptorPool;
-
-	return CreateResourceTyped<BmRender_DescriptorPool>(&Data);
+	
+	return CreateDescriptorPoolHandle(&Data);
 }
 
 BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-
+	
 	VkShaderModuleCreateInfo CreateInfo = { };
 	CreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	CreateInfo.pNext = nullptr;
 	CreateInfo.flags = 0;
 	CreateInfo.codeSize = Description->CodeSize;
 	CreateInfo.pCode = Description->Code;
-
+	
 	VkShaderModule ShaderModule;
 	VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &CreateInfo, nullptr, &ShaderModule));
-
+	
 	ShaderData Data;
 	Data.VulkanShaderModule = ShaderModule;
-
-	return CreateResourceTyped<BmRender_Shader>(&Data);
+	
+	return CreateShaderHandle(&Data);
 }
 
 void BmRender_DestroyPipelineLayout(BmRender_PipelineLayout Handle)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	auto Data = GetResourceDataTyped<PipelineLayoutData>(Handle);
+	auto Data = GetPipelineLayoutData(Handle);
 	OnPipelineLayoutClear(Data);
-	DestroyResourceTyped(Handle);
+	DestroyPipelineLayoutHandle(Handle);
 }
 
 void BmRender_DestroySampler(BmRender_Sampler Handle)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	auto Data = GetResourceDataTyped<SamplerData>(Handle);
+	auto Data = GetSamplerData(Handle);
 	OnSamplerClear(Data);
-	DestroyResourceTyped(Handle);
+	DestroySamplerHandle(Handle);
 }
 
 void BmRender_DestroyDescriptorSetLayout(BmRender_DescriptorSetLayout Handle)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	auto Data = GetResourceDataTyped<DescriptorSetLayoutData>(Handle);
+	auto Data = GetDescriptorSetLayoutData(Handle);
 	OnDescriptorSetLayoutClear(Data);
-	DestroyResourceTyped(Handle);
+	DestroyDescriptorSetLayoutHandle(Handle);
 }
 
 void BmRender_DestroyDescriptorPool(BmRender_DescriptorPool Handle)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	auto Data = GetResourceDataTyped<DescriptorPoolData>(Handle);
+	auto Data = GetDescriptorPoolData(Handle);
 	OnDescriptorPoolClear(Data);
-	DestroyResourceTyped(Handle);
+	DestroyDescriptorPoolHandle(Handle);
 }
 
 void BmRender_DestroyPipeline(BmRender_Pipeline Handle)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	auto Data = GetResourceDataTyped<PipelineData>(Handle);
+	auto Data = GetPipelineData(Handle);
 	OnPipelineClear(Data);
-	DestroyResourceTyped(Handle);
+	DestroyPipelineHandle(Handle);
 }
 
 void BmRender_DestroyShader(BmRender_Shader Handle)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	auto Data = GetResourceDataTyped<ShaderData>(Handle);
+	auto Data = GetShaderData(Handle);
 	OnShaderClear(Data);
-	DestroyResourceTyped(Handle);
+	DestroyShaderHandle(Handle);
 }
 
 void BmRender_DestroyImage(BmRender_Image Handle)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-	auto Data = GetResourceDataTyped<ImageResource>(Handle);
+	auto Data = GetImageData(Handle);
 	OnImageClear(Data);
-	DestroyResourceTyped(Handle);
-}
-
-SamplerData* BmRender_GetSamplerData(BmRender_Sampler Handle)
-{
-	return GetResourceDataTyped<SamplerData>(Handle);
-}
-
-PipelineData* BmRender_GetPipelineData(BmRender_Pipeline Handle)
-{
-	return GetResourceDataTyped<PipelineData>(Handle);
-}
-
-PipelineLayoutData* BmRender_GetPipelineLayoutData(BmRender_PipelineLayout Handle)
-{
-	return GetResourceDataTyped<PipelineLayoutData>(Handle);
-}
-
-DescriptorSetLayoutData* BmRender_GetDescriptorSetLayoutData(BmRender_DescriptorSetLayout Handle)
-{
-	return GetResourceDataTyped<DescriptorSetLayoutData>(Handle);
-}
-
-DescriptorPoolData* BmRender_GetDescriptorPoolData(BmRender_DescriptorPool Handle)
-{
-	return GetResourceDataTyped<DescriptorPoolData>(Handle);
-}
-
-ShaderData* BmRender_GetShaderData(BmRender_Shader Handle)
-{
-	return GetResourceDataTyped<ShaderData>(Handle);
-}
-
-ImageResource* BmRender_GetIamgeData(BmRender_Image Handle)
-{
-	return GetResourceDataTyped<ImageResource>(Handle);
+	DestroyImageHandle(Handle);
 }
 
 

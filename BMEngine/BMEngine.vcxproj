@@ -36,6 +36,7 @@
     <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderInterface.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderResources.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\RenderTypes.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\TransferSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanCoreContext.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
