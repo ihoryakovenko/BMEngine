@@ -35,7 +35,7 @@ namespace Render
 		u32 IndicesCount;
 		u32 Instances;
 		
-		std::vector<BmRender_ImageResource> ImageDependency;
+		std::vector<BmRender_Image> ImageDependency;
 		std::vector<BmRender_BufferRegion> ResourceDependency;
 	};
 
@@ -163,8 +163,8 @@ namespace DeferredPass
 	BmRender_ImageViewResource* TestDeferredInputColorImageInterface();
 	BmRender_ImageViewResource* TestDeferredInputDepthImageInterface();
 
-	BmRender_ImageResource* TestDeferredInputColorImage();
-	BmRender_ImageResource* TestDeferredInputDepthImage();
+	BmRender_Image* TestDeferredInputColorImage();
+	BmRender_Image* TestDeferredInputDepthImage();
 
 	AttachmentData* GetAttachmentData();
 }

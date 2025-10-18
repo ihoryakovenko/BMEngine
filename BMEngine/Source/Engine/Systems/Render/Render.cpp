@@ -15,7 +15,7 @@
 #include <random>
 #include <mutex>
 
-static BmRender_ImageResource ShadowMapArray;
+static BmRender_Image ShadowMapArray;
 
 namespace Render
 {
@@ -261,6 +261,8 @@ namespace Render
 	{
 		vkDeviceWaitIdle(RenderResources::GetCoreContext()->LogicalDevice);
 
+		BmRender_DeInit();
+
 		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
 		DeInitImGuiPipeline(Device, State.DebugUiPool);
@@ -379,8 +381,8 @@ namespace DeferredPass
 
 	static VkDescriptorSetLayout DeferredInputLayout;
 
-	static BmRender_ImageResource DeferredInputDepthImage[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
-	static BmRender_ImageResource DeferredInputColorImage[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static BmRender_Image DeferredInputDepthImage[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static BmRender_Image DeferredInputColorImage[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 	static BmRender_ImageViewResource DeferredInputDepthImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 	static BmRender_ImageViewResource DeferredInputColorImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
@@ -616,12 +618,12 @@ namespace DeferredPass
 		return DeferredInputDepthImageInterface;
 	}
 
-	BmRender_ImageResource* TestDeferredInputColorImage()
+	BmRender_Image* TestDeferredInputColorImage()
 	{
 		return DeferredInputColorImage;
 	}
 
-	BmRender_ImageResource* TestDeferredInputDepthImage()
+	BmRender_Image* TestDeferredInputDepthImage()
 	{
 		return DeferredInputDepthImage;
 	}

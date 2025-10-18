@@ -20,15 +20,6 @@ namespace VulkanCoreContext
 
 namespace RenderResources
 {
-	struct DescriptorSetLayout
-	{
-		VkDescriptorSetLayout Layout;
-		u32 BindingsIndex;
-		u32 BindingsCount;
-	};
-
-
-
 	struct DescriptorSet
 	{
 		VkDescriptorSet Set;
@@ -60,20 +51,19 @@ namespace RenderResources
 
 	void CreateBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, BufferUsageFlag Flag, const std::string& Name);
 
-	BmRender_ImageResource CreateImageResource(BmRender_ImageDescription* Description);
-	BmRender_ImageViewResource CreateImageView(BmRender_ImageResource Handle, u32 BaseArrayLayer, u32 LayerCount, VkImageViewType ViewType, VkImageAspectFlags AspectFlags);
+	BmRender_ImageViewResource CreateImageView(BmRender_Image Handle, u32 BaseArrayLayer, u32 LayerCount, VkImageViewType ViewType, VkImageAspectFlags AspectFlags);
 	BmRender_BufferRegion CreateBufferRegion(u64 BufferOffset, u64 RegionSize, const std::string& BufferName);
 	BmRender_PushConstant CreatePushConstant(PipelineStage Stage, u32 Offset, u32 Size);
 
 	void UpdateBufferRegion(BmRender_BufferRegion Handle, u64 ResourceOffset, const void* Data, u32 DataSize);
-	void UpdateImageResource(BmRender_ImageResource Handle, BmRender_ImageDescription* Description, void* Data);
+	void UpdateImageResource(BmRender_Image Handle, BmRender_ImageDescription* Description, void* Data);
 
 	void OnBufferResourceLoaded(BmRender_BufferRegion Handle);
-	void OnImageResourceLoaded(BmRender_ImageResource Handle);
+	void OnImageResourceLoaded(BmRender_Image Handle);
 
 	VulkanCoreContext::VulkanCoreContext* GetCoreContext();
 	VkSampler GetSampler(const std::string& Id);
-	DescriptorSetLayout* GetSetLayout(const std::string& Id);
+	DescriptorSetLayoutData* GetSetLayout(const std::string& Id);
 	VkShaderModule GetShader(const std::string& Id);
 	VkDescriptorPool GetDescriptorPool(const std::string& Id);
 	DescriptorSet* GetDescriptorSet(const std::string& Id);
@@ -81,10 +71,10 @@ namespace RenderResources
 	VulkanHelper::VertexBinding GetVertexBinding(const std::string& Id);
 	VkPipeline GetPipeline(const std::string& Name);
 	VkPipelineLayout GetPipelineLayout(const std::string& Name);
-	VkImage GetImage(BmRender_ImageResource Handle);
+	VkImage GetImage(BmRender_Image Handle);
 	VkImageView GetImageView(BmRender_ImageViewResource Handle);
 	VkPushConstantRange GetPushConstant(BmRender_PushConstant Handle);
 
 	bool IsBufferResourceReady(BmRender_BufferRegion Handle);
-	bool IsImageResourceReady(BmRender_ImageResource Handle);
+	bool IsImageResourceReady(BmRender_Image Handle);
 }

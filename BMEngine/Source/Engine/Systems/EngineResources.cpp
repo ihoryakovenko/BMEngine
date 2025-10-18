@@ -11,6 +11,7 @@ namespace EngineResources
 	static std::unordered_map<u64, TextureAsset> TextureAssets;
 	static std::queue<ModelLoadRequest> ModelLoadRequests;
 	static std::mutex ModelLoadMutex;
+	static TextureAsset DefaultAsset;
 
 	static void CreateTexture(TextureAsset& Asset)
 	{
@@ -52,7 +53,6 @@ namespace EngineResources
 		DefaultTextureDescription.ArrayLayers = 1;
 		DefaultTextureDescription.Type = ImageType::TransferSampled;
 
-		TextureAsset DefaultAsset;
 		DefaultAsset.RenderImageHandle = BmRender_CreateImage2D(DefaultAssetExtent.x, DefaultAssetExtent.y, Util::GliFormatToVkFormat(DefaultTexture.format()), ImageType::TransferSampled);
 		DefaultAsset.IsCreated = true;
 
@@ -76,8 +76,6 @@ namespace EngineResources
 		BmRender_DescriptorSetBinding Bindings[] = { DiffuseBinding, SpecularBinding };
 
 		BmRender_UpdateDescriptorSet("BindlesTexturesSet", Bindings, 2);
-
-		TextureAssets[DefaultAssetId] = DefaultAsset;
 	}
 
 	void DeInit()
@@ -113,8 +111,8 @@ namespace EngineResources
 				const u64 VerticesCount = Model.VerticesCounts[i];
 				const u32 IndicesCount = Model.IndicesCounts[i];
 
-				BmRender_ImageResource AlbedoTextureHandle = 0;
-				BmRender_ImageResource SpecularTextureHandle = 0;
+				BmRender_Image AlbedoTextureHandle = DefaultAsset.RenderImageHandle;
+				BmRender_Image SpecularTextureHandle = DefaultAsset.RenderImageHandle;
 				u32 TextureGPUIndex = 0;
 
 				if (Model.Header.MaterialCount > 0)
@@ -229,7 +227,7 @@ namespace EngineResources
 	{
 		TextureAsset Asset;
 		Asset.TexturePath = Path;
-		Asset.RenderImageHandle = 0;
+		Asset.RenderImageHandle;
 		Asset.IsCreated = false;
 
 		TextureAssets[std::hash<std::string>{ }(Name)] = Asset;

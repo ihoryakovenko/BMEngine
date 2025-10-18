@@ -16,7 +16,6 @@ enum class BufferUpdateFrequency
 
 typedef struct BmRender_BufferRegion_T* BmRender_BufferRegion;
 typedef struct BmRender_BufferArrayRegion_T* BmRender_BufferArrayRegion;
-typedef struct BmRender_ImageResource_T* BmRender_ImageResource;
 typedef struct BmRender_ImageViewResource_T* BmRender_ImageViewResource;
 typedef struct BmRender_PushConstant_T* BmRender_PushConstant;
 
@@ -177,11 +176,11 @@ void BmRender_CreateInstanceBuffer(u64 Size, BufferUpdateFrequency UpdateFrequen
 void BmRender_CreateUniformBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, const std::string& Name);
 void BmRender_CreateStorageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, const std::string& Name);
 
-BmRender_ImageResource BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, ImageType Type);
-BmRender_ImageResource BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Format, ImageType Type, u32 ArrayLayers);
+BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, ImageType Type);
+BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Format, ImageType Type, u32 ArrayLayers);
 
-BmRender_ImageViewResource BmRender_CreateImageView2D(BmRender_ImageResource Handle, VkImageAspectFlags AspectFlags);
-BmRender_ImageViewResource BmRender_CreateImageView2DArray(BmRender_ImageResource Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags);
+BmRender_ImageViewResource BmRender_CreateImageView2D(BmRender_Image Handle, VkImageAspectFlags AspectFlags);
+BmRender_ImageViewResource BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags);
 
 void BmRender_CreateDescriptorSet(const std::string& Name, const std::string& LayoutName, const std::string& PoolName);
 void BmRender_UpdateDescriptorSet(const std::string& DescriptorSetName, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount);
@@ -197,6 +196,12 @@ struct BmRender_DescriptorPoolDescription
 	const VkDescriptorPoolSize* PoolSizes;
 	VkDescriptorPoolCreateFlags Flags;
 	const void* Next;
+};
+
+struct BmRender_ShaderDescription
+{
+	const u32* Code;
+	u64 CodeSize;
 };
 
 
@@ -223,12 +228,9 @@ BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorP
 void BmRender_DestroyDescriptorPool(BmRender_DescriptorPool Handle);
 DescriptorPoolData* BmRender_GetDescriptorPoolData(BmRender_DescriptorPool Handle);
 
-struct BmRender_ShaderDescription
-{
-	const u32* Code;
-	u64 CodeSize;
-};
-
 BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description);
 void BmRender_DestroyShader(BmRender_Shader Handle);
 ShaderData* BmRender_GetShaderData(BmRender_Shader Handle);
+
+void BmRender_DestroyImage(BmRender_Image Handle);
+ImageResource* BmRender_GetIamgeData(BmRender_Image Handle);

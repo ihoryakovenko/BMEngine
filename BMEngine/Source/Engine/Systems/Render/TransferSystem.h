@@ -16,7 +16,7 @@ namespace TransferSystem
 	struct ImageTaskDescription
 	{
 		VkImage DstImage;
-		BmRender_ImageResource Handle;
+		BmRender_Image Handle;
 		u32 Width;
 		u32 Height;
 	};

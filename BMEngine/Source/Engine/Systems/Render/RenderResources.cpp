@@ -10,13 +10,10 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
+extern Memory::Array<DescriptorSetLayoutBinding> LayoutBindings;
+
 namespace RenderResources
 {
-	struct DescriptorSetLayoutBinding
-	{
-		VkDescriptorType DescriptorType;
-	};
-
 	struct GPUBufferEntry
 	{
 		std::atomic<bool> IsLoaded;
@@ -25,21 +22,12 @@ namespace RenderResources
 		u64 Size;
 	};
 
-	struct ImageResource
-	{
-		VkImage Image;
-		VkDeviceMemory Memory;
-		u64 Size;
-		std::atomic<bool> IsLoaded;
-		VkFormat Format;
-	};
-
 	struct ResourceContext
 	{
 		VulkanCoreContext::VulkanCoreContext CoreContext;
 		std::unordered_map<std::string, VulkanHelper::VertexBinding> VBindings;
 		std::unordered_map<std::string, BmRender_Sampler> Samplers;
-		std::unordered_map<std::string, DescriptorSetLayout> DescriptorSetLayouts;
+		std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 		std::unordered_map<std::string, BmRender_Shader> Shaders;
 		std::unordered_map<std::string, RenderResources::GPUBuffer> StorageBuffers;
 		std::unordered_map<std::string, BmRender_DescriptorPool> DescriptorPools;
@@ -48,9 +36,7 @@ namespace RenderResources
 		std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
 
 		Memory::Array<VkPushConstantRange> PushConstants;
-		Memory::Array<DescriptorSetLayoutBinding> LayoutBindings;
 		Memory::Array<GPUBufferEntry> ResourceRecords;
-		Memory::Array<ImageResource> Images;
 		Memory::Array<VkImageView> ImageViews;
 	};
 
@@ -61,9 +47,9 @@ namespace RenderResources
 		ResContext.ResourceRecords.Data[(u64)Handle].IsLoaded = true;
 	}
 
-	void OnImageResourceLoaded(BmRender_ImageResource Handle)
+	void OnImageResourceLoaded(BmRender_Image Handle)
 	{
-		ResContext.Images.Data[(u64)Handle].IsLoaded = true;
+		BmRender_GetIamgeData(Handle)->IsLoaded = true;
 	}
 
 	void Init(GLFWwindow* WindowHandler)
@@ -98,25 +84,17 @@ namespace RenderResources
 		BmRender_DescriptorPool MainPoolHandle = BmRender_CreateDescriptorPool(&PoolDesc);
 		ResContext.DescriptorPools["MainPool"] = MainPoolHandle;
 
-		ResContext.Images.Capacity = 64;
-		ResContext.Images.Count = 0;
-		ResContext.Images.Data = (ImageResource*)malloc(ResContext.Images.Capacity * sizeof(ResContext.Images.Data[0]));
-
 		ResContext.ImageViews.Capacity = 64;
 		ResContext.ImageViews.Count = 0;
-		ResContext.ImageViews.Data = (VkImageView*)malloc(ResContext.Images.Capacity * sizeof(ResContext.Images.Data[0]));
+		ResContext.ImageViews.Data = (VkImageView*)malloc(ResContext.ImageViews.Capacity * sizeof(ResContext.ImageViews.Data[0]));
 
 		ResContext.ResourceRecords.Capacity = 60000;
 		ResContext.ResourceRecords.Count = 0;
 		ResContext.ResourceRecords.Data = (GPUBufferEntry*)malloc(ResContext.ResourceRecords.Capacity * sizeof(ResContext.ResourceRecords.Data[0]));
 
-		ResContext.LayoutBindings.Capacity = 20;
-		ResContext.LayoutBindings.Count = 0;
-		ResContext.LayoutBindings.Data = (DescriptorSetLayoutBinding*)malloc(ResContext.ResourceRecords.Capacity * sizeof(ResContext.ResourceRecords.Data[0]));
-
 		ResContext.PushConstants.Capacity = 10;
 		ResContext.PushConstants.Count = 0;
-		ResContext.PushConstants.Data = (VkPushConstantRange*)malloc(ResContext.ResourceRecords.Capacity * sizeof(ResContext.ResourceRecords.Data[0]));
+		ResContext.PushConstants.Data = (VkPushConstantRange*)malloc(ResContext.PushConstants.Capacity * sizeof(ResContext.PushConstants.Data[0]));
 	}
 
 	void CreateGraphicsPipeline(const std::string& Name, const BmRender_PipelineDescription& Description)
@@ -196,9 +174,9 @@ namespace RenderResources
 		return VK_NULL_HANDLE;
 	}
 
-	VkImage GetImage(BmRender_ImageResource Handle)
+	VkImage GetImage(BmRender_Image Handle)
 	{
-		return ResContext.Images.Data[(u64)Handle].Image;
+		return BmRender_GetIamgeData(Handle)->Image;
 	}
 
 	VkImageView GetImageView(BmRender_ImageViewResource Handle)
@@ -220,47 +198,10 @@ namespace RenderResources
 			vkDestroyImageView(Device, ResContext.ImageViews.Data[i], nullptr);
 		}
 
-		for (uint32_t i = 0; i < ResContext.Images.Count; ++i)
-		{
-			vkDestroyImage(Device, ResContext.Images.Data[i].Image, nullptr);
-			vkFreeMemory(Device, ResContext.Images.Data[i].Memory, nullptr);
-		}
-
-		for (auto It = ResContext.Shaders.begin(); It != ResContext.Shaders.end(); ++It)
-		{
-			BmRender_DestroyShader(It->second);
-		}
-
-		for (auto It = ResContext.Samplers.begin(); It != ResContext.Samplers.end(); ++It)
-		{
-			BmRender_DestroySampler(It->second);
-			//vkDestroySampler(Device, It->second, nullptr);
-		}
-
-		for (auto It = ResContext.DescriptorSetLayouts.begin(); It != ResContext.DescriptorSetLayouts.end(); ++It)
-		{
-			vkDestroyDescriptorSetLayout(Device, It->second.Layout, nullptr);
-		}
-
 		for (auto It = ResContext.StorageBuffers.begin(); It != ResContext.StorageBuffers.end(); ++It)
 		{
 			vkDestroyBuffer(Device, It->second.Buffer, nullptr);
 			vkFreeMemory(Device, It->second.Memory, nullptr);
-		}
-
-		for (auto It = ResContext.Pipelines.begin(); It != ResContext.Pipelines.end(); ++It)
-		{
-			BmRender_DestroyPipeline(It->second);
-		}
-
-		for (auto It = ResContext.PipelineLayouts.begin(); It != ResContext.PipelineLayouts.end(); ++It)
-		{
-			BmRender_DestroyPipelineLayout(It->second);
-		}
-
-		for (auto It = ResContext.DescriptorPools.begin(); It != ResContext.DescriptorPools.end(); ++It)
-		{
-			BmRender_DestroyDescriptorPool(It->second);
 		}
 
 		VulkanCoreContext::DestroyCoreContext(&ResContext.CoreContext);
@@ -271,9 +212,7 @@ namespace RenderResources
 		ResContext.VBindings.clear();
 
 		free(ResContext.ImageViews.Data);
-		free(ResContext.Images.Data);
 		free(ResContext.ResourceRecords.Data);
-		free(ResContext.LayoutBindings.Data);
 		free(ResContext.PushConstants.Data);
 	}
 
@@ -322,35 +261,8 @@ namespace RenderResources
 
 	void CreateDescriptorSetLayout(const std::string& Name, const BmRender_DescriptorSetLayoutDescription& Description)
 	{
-		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 
-		DescriptorSetLayout Layout = { };
-		Layout.BindingsCount = Description.BindingsCount;
-		Layout.BindingsIndex = ResContext.LayoutBindings.Count;
-
-		VkDescriptorSetLayoutBinding* LayoutBindings = (VkDescriptorSetLayoutBinding*)Render::FrameAlloc(sizeof(VkDescriptorSetLayoutBinding) * Description.BindingsCount);
-		for (u32 i = 0; i < Description.BindingsCount; ++i)
-		{
-			LayoutBindings[i].binding = i;
-			LayoutBindings[i].descriptorCount = Description.Bindings[i].DescriptorCount;
-			LayoutBindings[i].descriptorType = Description.Bindings[i].DescriptorType;
-			LayoutBindings[i].stageFlags = Description.Bindings[i].StageFlags;
-			LayoutBindings[i].pImmutableSamplers = nullptr;
-
-			assert(ResContext.LayoutBindings.Count < ResContext.LayoutBindings.Capacity);
-			DescriptorSetLayoutBinding* Binding = ResContext.LayoutBindings.Data + ResContext.LayoutBindings.Count++;
-			Binding->DescriptorType = LayoutBindings[i].descriptorType;
-		}
-
-		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
-		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = Description.BindingsCount;
-		LayoutCreateInfo.pBindings = LayoutBindings;
-		LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-		LayoutCreateInfo.pNext = nullptr;
-
-		VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, nullptr, &Layout.Layout));
-		ResContext.DescriptorSetLayouts[Name] = Layout;
+		ResContext.DescriptorSetLayouts[Name] = BmRender_CreateDescriptorSetLayout(&Description);
 	}
 
 	void UpdateDescriptorSet(std::string DescriptorSetName, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount)
@@ -358,7 +270,7 @@ namespace RenderResources
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 
 		DescriptorSet* Set = GetDescriptorSet(DescriptorSetName);
-		DescriptorSetLayout* Layout = GetSetLayout(Set->Layout);
+		DescriptorSetLayoutData* Layout = GetSetLayout(Set->Layout);
 
 		VkWriteDescriptorSet* WriteDescriptorSets = (VkWriteDescriptorSet*)Render::FrameAlloc(sizeof(VkWriteDescriptorSet) * BindingsCount);
 
@@ -366,7 +278,7 @@ namespace RenderResources
 		{
 			const BmRender_DescriptorSetBinding& Binding = Bindings[i];
 
-			VkDescriptorType DescriptorType = ResContext.LayoutBindings.Data[Layout->BindingsIndex + i].DescriptorType;
+			VkDescriptorType DescriptorType = LayoutBindings.Data[Layout->BindingsIndex + i].DescriptorType;
 
 			WriteDescriptorSets[i] = { };
 			WriteDescriptorSets[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -416,7 +328,7 @@ namespace RenderResources
 		DescriptorSet NewSet;
 		NewSet.Layout = LayoutName;
 
-		DescriptorSetLayout* Layout = GetSetLayout(LayoutName);
+		DescriptorSetLayoutData* Layout = GetSetLayout(LayoutName);
 		VkDescriptorPool Pool = GetDescriptorPool(PoolName);
 		
 		VkDescriptorSetAllocateInfo AllocInfo = { };
@@ -446,12 +358,12 @@ namespace RenderResources
 		return nullptr;
 	}
 
-	DescriptorSetLayout* GetSetLayout(const std::string& Id)
+	DescriptorSetLayoutData* GetSetLayout(const std::string& Id)
 	{
 		auto It = ResContext.DescriptorSetLayouts.find(Id);
 		if (It != ResContext.DescriptorSetLayouts.end())
 		{
-			return &It->second;
+			return BmRender_GetDescriptorSetLayoutData(It->second);
 		}
 
 		assert(false);
@@ -506,72 +418,9 @@ namespace RenderResources
 		return nullptr;
 	}
 
-	BmRender_ImageResource CreateImageResource(BmRender_ImageDescription* Description)
+	BmRender_ImageViewResource CreateImageView(BmRender_Image Handle, u32 BaseArrayLayer, u32 LayerCount, VkImageViewType ViewType, VkImageAspectFlags AspectFlags)
 	{
-		assert(ResContext.Images.Count < ResContext.Images.Capacity);
-
-		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-		VkPhysicalDevice PhysicalDevice = RenderResources::GetCoreContext()->PhysicalDevice;
-		VkQueue TransferQueue = RenderResources::GetCoreContext()->GraphicsQueue;
-
-		ImageResource* Resource = &ResContext.Images.Data[ResContext.Images.Count];
-		Resource->IsLoaded = false;
-		Resource->Format = Description->Format;
-
-		VkImageUsageFlags Usage;
-
-		switch (Description->Type)
-		{
-			case ImageType::TransferSampled:
-				Usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-				break;
-
-			case ImageType::DepthSamplad:
-				Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-				break;
-
-			case ImageType::ColorAttachmentSampled:
-				Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-				break;
-
-			default:
-				assert(false);
-				break;
-		}
-
-		VkImageCreateInfo ImageCreateInfo = { };
-		ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-		ImageCreateInfo.extent.width = Description->Width;
-		ImageCreateInfo.extent.height = Description->Height;
-		ImageCreateInfo.extent.depth = 1;
-		ImageCreateInfo.mipLevels = 1;
-		ImageCreateInfo.arrayLayers = Description->ArrayLayers;
-		ImageCreateInfo.format = Resource->Format;
-		ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		ImageCreateInfo.usage = Usage;
-		ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-		ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		ImageCreateInfo.flags = 0;
-
-		VULKAN_CHECK_RESULT(vkCreateImage(Device, &ImageCreateInfo, nullptr, &Resource->Image));
-
-		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
-			Resource->Image, MemoryPropertyFlag::GPULocal);
-		Resource->Memory = AllocResult.Memory;
-		Resource->Size = AllocResult.Size;
-
-		VULKAN_CHECK_RESULT(vkBindImageMemory(Device, Resource->Image, Resource->Memory, 0));
-
-		return (BmRender_ImageResource)ResContext.Images.Count++;
-	}
-
-	BmRender_ImageViewResource CreateImageView(BmRender_ImageResource Handle, u32 BaseArrayLayer, u32 LayerCount, VkImageViewType ViewType, VkImageAspectFlags AspectFlags)
-	{
-		const u32 Index = (u64)Handle;
-
-		ImageResource* Resource = ResContext.Images.Data + Index;
+		ImageResource* Resource = BmRender_GetIamgeData(Handle);
 		VkImageView* View = ResContext.ImageViews.Data + ResContext.ImageViews.Count;
 
 		VkImageViewCreateInfo ViewCreateInfo = { };
@@ -660,10 +509,9 @@ namespace RenderResources
 		}
 	}
 
-	void UpdateImageResource(BmRender_ImageResource Handle, BmRender_ImageDescription* Description, void* Data)
+	void UpdateImageResource(BmRender_Image Handle, BmRender_ImageDescription* Description, void* Data)
 	{
-		const u32 Index = (u64)Handle;
-		ImageResource* Image = ResContext.Images.Data + Index;
+		ImageResource* Image = BmRender_GetIamgeData(Handle);
 
 		// TODO: TMP solution
 		void* TransferMemory = TransferSystem::RequestTransferMemory(Image->Size);
@@ -687,9 +535,9 @@ namespace RenderResources
 		return ResContext.ResourceRecords.Data[(u64)Handle].IsLoaded;
 	}
 
-	bool IsImageResourceReady(BmRender_ImageResource Handle)
+	bool IsImageResourceReady(BmRender_Image Handle)
 	{
-		return ResContext.Images.Data[(u64)Handle].IsLoaded;
+		return BmRender_GetIamgeData(Handle)->IsLoaded;
 	}
 
 	RenderResources::GPUBuffer* GetGPUBuffer(const std::string& Name)

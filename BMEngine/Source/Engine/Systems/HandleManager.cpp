@@ -37,6 +37,8 @@ struct System_HandleManager_T
 	u32 FreeIndicesCount;
 	u32 DataSize;
 	u16 HandleType;
+
+	System_HandleManager_OnClearManagerDelegate OnClearDelegate;
 };
 
 bool System_HandleManager_CompareHandles(System_HandleManager_Handle a, System_HandleManager_Handle b)
@@ -44,7 +46,7 @@ bool System_HandleManager_CompareHandles(System_HandleManager_Handle a, System_H
 	return a == b;
 }
 
-System_HandleManager System_HandleManager_InitData(u32 InitialCapacity, u32 DataSize, u16 HandleType)
+System_HandleManager System_HandleManager_InitData(u32 InitialCapacity, u32 DataSize, u16 HandleType, System_HandleManager_OnClearManagerDelegate OnClearDelegate)
 {
 	auto Manager = (System_HandleManager)malloc(sizeof(System_HandleManager_T));
 
@@ -58,6 +60,7 @@ System_HandleManager System_HandleManager_InitData(u32 InitialCapacity, u32 Data
 	Manager->FreeIndicesCount = 0;
 	Manager->DataSize = DataSize;
 	Manager->HandleType = HandleType;
+	Manager->OnClearDelegate = OnClearDelegate;
 
 	return Manager;
 }
@@ -65,6 +68,19 @@ System_HandleManager System_HandleManager_InitData(u32 InitialCapacity, u32 Data
 void System_HandleManager_ClearData(System_HandleManager Manager)
 {
 	assert(Manager);
+
+	if (Manager->OnClearDelegate)
+	{
+		for (u32 i = 0; i < Manager->StorageCount; ++i)
+		{
+			if (Manager->Entries[i].IsUsed)
+			{
+				void* DataPtr = (u8*)(Manager->StorageData) + (i * Manager->DataSize);
+				Manager->OnClearDelegate(DataPtr);
+			}
+		}
+	}
+
 	free(Manager->Entries);
 	free(Manager->StorageData);
 	free(Manager->FreeIndices);
@@ -122,9 +138,7 @@ void System_HandleManager_DestroyHandle(System_HandleManager Manager, System_Han
 	const u32 Index = GetIndex(DataHandle);
 	const u16 Generation = GetGeneration(DataHandle);
 
-	assert(Index < Manager->StorageCount);
-	assert(Manager->Entries[Index].IsUsed);
-	assert(Manager->Entries[Index].Generation == Generation);
+	assert(System_HandleManager_IsHandleValid(Manager, DataHandle));
 
 	if (Manager->FreeIndicesCount >= Manager->FreeIndicesCapacity)
 	{
@@ -142,9 +156,7 @@ void* System_HandleManager_GetHandleData(System_HandleManager Manager, System_Ha
 	const u32 Index = GetIndex(DataHandle);
 	const u16 Generation = GetGeneration(DataHandle);
 
-	assert(Index < Manager->StorageCount);
-	assert(Manager->Entries[Index].IsUsed);
-	assert(Manager->Entries[Index].Generation == Generation);
+	assert(System_HandleManager_IsHandleValid(Manager, DataHandle));
 
 	return (u8*)(Manager->StorageData) + (Index * Manager->DataSize);
 }
@@ -156,7 +168,6 @@ bool System_HandleManager_IsHandleValid(System_HandleManager Manager, System_Han
 	const u16 Generation = GetGeneration(DataHandle);
 
 	assert(Index < Manager->StorageCount);
-	assert(Type == Manager->HandleType);
 	
-	return Manager->Entries[Index].IsUsed && Manager->Entries[Index].Generation == Generation;
+	return Type == Manager->HandleType && Manager->Entries[Index].IsUsed && Manager->Entries[Index].Generation == Generation;
 }

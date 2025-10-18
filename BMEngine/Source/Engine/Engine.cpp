@@ -408,7 +408,7 @@ namespace Engine
 		EngineResources::DeInit();
 		UI::DeInit();
 
-		BmRender_DeInit();
+		
 
 		glfwDestroyWindow(Window);
 
