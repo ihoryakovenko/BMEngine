@@ -69,7 +69,7 @@ namespace Render
 		vkDestroyDescriptorPool(Device, ImGuiPool, nullptr);
 	}
 
-	static void InitStaticMeshPipeline(VkDevice Device, StaticMeshPipeline* MeshPipeline, BmRender_BufferRegion* EntityLightRegion)
+	static void InitStaticMeshPipeline(VkDevice Device, StaticMeshPipeline* MeshPipeline, BmRender_GPUBufferEntry* EntityLightRegion)
 	{
 		const VkDeviceSize LightBufferSize = sizeof(Render::LightBuffer);
 		MeshPipeline->EntityLightBufferHandle = EntityLightRegion;
@@ -239,7 +239,7 @@ namespace Render
 		State.FrameMemory = Memory::CreateFrameMemory(1024 * 1024);
 	}
 
-	void Init(GLFWwindow* WindowHandler, BmRender_BufferRegion* VpRegion, BmRender_BufferRegion* EntityLightRegion)
+	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferEntry* VpRegion, BmRender_GPUBufferEntry* EntityLightRegion)
 	{		
 		VkPhysicalDevice PhysicalDevice = RenderResources::GetCoreContext()->PhysicalDevice;
 		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
@@ -641,7 +641,7 @@ namespace LightningPass
 
 	static VkDescriptorSet LightSpaceMatrixSet[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
-	static BmRender_BufferRegion LightSpaceMatrixBufferRegion[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static BmRender_GPUBufferEntry LightSpaceMatrixBufferRegion[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 	static BmRender_ImageView ShadowMapElement1ImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 	static BmRender_ImageView ShadowMapElement2ImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
@@ -664,7 +664,7 @@ namespace LightningPass
 
 			std::string BufferName = "LightSpaceMatrixBuffer" + std::to_string(i);
 			BmRender_CreateUniformBuffer(LightSpaceMatrixSize, BufferUpdateFrequency::PerFrame, PipelineStage::Vertex, BufferName);
-			LightSpaceMatrixBufferRegion[i] = RenderResources::CreateBufferRegion(0, LightSpaceMatrixSize, BufferName);
+			LightSpaceMatrixBufferRegion[i] = RenderResources::BmRender_CreateGPUBufferEntry(0, LightSpaceMatrixSize, BufferName);
 
 			std::string DescriptorSetName = "LightSpaceMatrixSet" + std::to_string(i);
 			BmRender_CreateDescriptorSet(DescriptorSetName, RenderResources::GetDescriptorSetLayoutHandle("LightSpaceMatrixLayout"), "MainPool");

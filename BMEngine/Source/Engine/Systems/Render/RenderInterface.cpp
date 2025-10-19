@@ -10,10 +10,6 @@
 
 #include "Engine/Systems/HandleManager.h"
 
-struct BmRender_BufferRegion_T { u64 Index; };
-struct BmRender_BufferArrayRegion_T { u64 Index; };
-struct BmRender_PushConstant_T { u64 Index; };
-
 static VkAllocationCallbacks VulkanAllocator;
 
 static void* VKAPI_CALL VulkanAllocationCallback(
@@ -137,6 +133,8 @@ void BmRender_Init()
 	InitializeImageViewManager(32);
 	InitializeGPUBufferManager(4);
 	InitializeDescriptorSetManager(32);
+	InitializeGPUBufferEntryManager(32);
+	InitializePushConstantManager(4);
 }
 
 void BmRender_DeInit()
@@ -151,6 +149,8 @@ void BmRender_DeInit()
 	DeinitImageViewManager(OnImageViewClear);
 	DeinitGPUBufferManager(OnGPUBufferClear);
 	DeinitDescriptorSetManager();
+	DeinitGPUBufferEntryManager();
+	DeinitPushConstantManager();
 }
 
 VkAllocationCallbacks* BmRender_GetVulkanAllocator()
@@ -217,9 +217,14 @@ void BmRender_UpdateDescriptorSet(const std::string& DescriptorSetName, const Bm
 	RenderResources::UpdateDescriptorSet(DescriptorSetName, Bindings, BindingsCount);
 }
 
-BmRender_PushConstant CreatePushConstant(PipelineStage Stage, u32 Offset, u32 Size)
+BmRender_PushConstant BmRender_CreatePushConstant(PipelineStage Stage, u32 Offset, u32 Size)
 {
-	return BmRender_PushConstant();
+	PushConstantData Constant;
+	Constant.PushConstants.offset = Offset;
+	Constant.PushConstants.size = Size;
+	Constant.PushConstants.stageFlags = (VkShaderStageFlags)Stage;
+	
+	return CreatePushConstantHandle(&Constant);
 }
 
 static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, BufferUsageFlag Flag)

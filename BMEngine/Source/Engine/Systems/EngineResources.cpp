@@ -176,7 +176,7 @@ namespace EngineResources
 
 				const u64 VertexDataSize = VerticesCount * sizeof(StaticMeshVertex) + IndicesCount * sizeof(u32);
 				
-				BmRender_BufferRegion MeshHandle = RenderResources::CreateBufferRegion(ModelVertexByteOffset, VertexDataSize, "VertexStageData");
+				BmRender_GPUBufferEntry MeshHandle = RenderResources::BmRender_CreateGPUBufferEntry(ModelVertexByteOffset, VertexDataSize, "VertexStageData");
 				RenderResources::UpdateBufferRegion(MeshHandle, 0, Model.VertexData + ModelVertexByteOffset, VertexDataSize);
 
 				Material Mat;
@@ -184,7 +184,7 @@ namespace EngineResources
 				Mat.SpecularTexIndex = TextureGPUIndex;
 				Mat.Shininess = 32.0f;
 
-				const BmRender_BufferRegion MaterialHandle = RenderResources::CreateBufferRegion(MateriaIndex * sizeof(Mat), sizeof(Mat), "MaterialBuffer");
+				const BmRender_GPUBufferEntry MaterialHandle = RenderResources::BmRender_CreateGPUBufferEntry(MateriaIndex * sizeof(Mat), sizeof(Mat), "MaterialBuffer");
 				RenderResources::UpdateBufferRegion(MaterialHandle, 0, &Mat, sizeof(Mat));
 
 				InstanceData Instance;
@@ -194,7 +194,7 @@ namespace EngineResources
 				++MateriaIndex;
 
 				const u64 InstanceOffset = InstanceIndex * sizeof(Instance);
-				const BmRender_BufferRegion InstanceHandle = RenderResources::CreateBufferRegion(InstanceOffset, sizeof(Instance), "GPUInstances");
+				const BmRender_GPUBufferEntry InstanceHandle = RenderResources::BmRender_CreateGPUBufferEntry(InstanceOffset, sizeof(Instance), "GPUInstances");
 				RenderResources::UpdateBufferRegion(InstanceHandle, 0, &Instance, sizeof(Instance));
 
 				++InstanceIndex;

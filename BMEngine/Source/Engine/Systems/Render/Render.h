@@ -35,7 +35,7 @@ namespace Render
 		u32 Instances;
 		
 		std::vector<BmRender_Image> ImageDependency;
-		std::vector<BmRender_BufferRegion> ResourceDependency;
+		std::vector<BmRender_GPUBufferEntry> ResourceDependency;
 	};
 
 	struct DrawFrames
@@ -59,7 +59,7 @@ namespace Render
 
 	struct StaticMeshPipeline
 	{
-		BmRender_BufferRegion* EntityLightBufferHandle;
+		BmRender_GPUBufferEntry* EntityLightBufferHandle;
 
 		BmRender_ImageView ShadowMapArrayImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
@@ -74,7 +74,7 @@ namespace Render
 		StaticMeshPipeline MeshPipeline;
 		VkDescriptorPool DebugUiPool; // TODO: ?
 		Memory::FrameMemory FrameMemory;
-		BmRender_BufferRegion* VpHandle;
+		BmRender_GPUBufferEntry* VpHandle;
 	};
 
 	struct PointLight
@@ -141,7 +141,7 @@ namespace Render
 
 	void TmpInitFrameMemory();
 
-	void Init(GLFWwindow* WindowHandler, BmRender_BufferRegion* VpRegion, BmRender_BufferRegion* EntityLightRegion);
+	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferEntry* VpRegion, BmRender_GPUBufferEntry* EntityLightRegion);
 	void DeInit();
 
 	void* FrameAlloc(u32 Size);

@@ -12,20 +12,12 @@
 
 namespace RenderResources
 {
-	struct GPUBufferEntryData
-	{
-		std::atomic<bool> IsLoaded;
-		BmRender_GPUBuffer GPUBufferHandle;
-		u64 BufferOffset;
-		u64 Size;
-	};
-
 	struct ResourceContext
 	{
 		VulkanCoreContext::VulkanCoreContext CoreContext;
 		std::unordered_map<std::string, VulkanHelper::VertexBinding> VBindings;
-		std::unordered_map<std::string, BmRender_DescriptorSet> DescriptorSets;
 
+		std::unordered_map<std::string, BmRender_DescriptorSet> DescriptorSets;
 		std::unordered_map<std::string, BmRender_Sampler> Samplers;
 		std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 		std::unordered_map<std::string, BmRender_Shader> Shaders;
@@ -33,16 +25,13 @@ namespace RenderResources
 		std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
 		std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
 		std::unordered_map<std::string, BmRender_GPUBuffer> StorageBuffers;
-
-		Memory::Array<VkPushConstantRange> PushConstants;
-		Memory::Array<GPUBufferEntryData> ResourceRecords;
 	};
 
 	static ResourceContext ResContext;
 
-	void OnBufferResourceLoaded(BmRender_BufferRegion Handle)
+	void OnBufferResourceLoaded(BmRender_GPUBufferEntry Handle)
 	{
-		ResContext.ResourceRecords.Data[(u64)Handle].IsLoaded = true;
+		GetGPUBufferEntryData(Handle)->IsLoaded = true;
 	}
 
 	void OnImageResourceLoaded(BmRender_Image Handle)
@@ -81,14 +70,6 @@ namespace RenderResources
 
 		BmRender_DescriptorPool MainPoolHandle = BmRender_CreateDescriptorPool(&PoolDesc);
 		ResContext.DescriptorPools["MainPool"] = MainPoolHandle;
-
-		ResContext.ResourceRecords.Capacity = 60000;
-		ResContext.ResourceRecords.Count = 0;
-		ResContext.ResourceRecords.Data = (GPUBufferEntryData*)malloc(ResContext.ResourceRecords.Capacity * sizeof(GPUBufferEntryData));
-
-		ResContext.PushConstants.Capacity = 10;
-		ResContext.PushConstants.Count = 0;
-		ResContext.PushConstants.Data = (VkPushConstantRange*)malloc(ResContext.PushConstants.Capacity * sizeof(VkPushConstantRange));
 	}
 
 	void CreateGraphicsPipeline(const std::string& Name, const BmRender_PipelineDescription& Description)
@@ -146,7 +127,7 @@ namespace RenderResources
 
 	VkPushConstantRange GetPushConstant(BmRender_PushConstant Handle)
 	{
-		return ResContext.PushConstants.Data[(u64)Handle];
+		return GetPushConstantData(Handle)->PushConstants;
 	}
 
 	void DeInit()
@@ -159,9 +140,6 @@ namespace RenderResources
 		ResContext.Samplers.clear();
 		ResContext.DescriptorSetLayouts.clear();
 		ResContext.VBindings.clear();
-
-		free(ResContext.ResourceRecords.Data);
-		free(ResContext.PushConstants.Data);
 	}
 
 	void CreateVertex(const std::string& Name, VulkanHelper::VertexBinding& Binding)
@@ -219,7 +197,8 @@ namespace RenderResources
 				VkDescriptorBufferInfo* BufferInfo = (VkDescriptorBufferInfo*)Render::FrameAlloc(sizeof(VkDescriptorBufferInfo) * Binding.BindingCount);
 				for (u32 j = 0; j < Binding.BindingCount; ++j)
 				{
-					GPUBufferEntryData* Entry = ResContext.ResourceRecords.Data + (u64)Binding.BufferRegions[j];
+
+					GPUBufferEntryData* Entry = GetGPUBufferEntryData(Binding.BufferRegions[j]);
 
 					BufferInfo[j].buffer = GetGPUBufferData(Entry->GPUBufferHandle)->Buffer;
 					BufferInfo[j].offset = Entry->BufferOffset;
@@ -341,35 +320,20 @@ namespace RenderResources
 		return nullptr;
 	}
 
-	BmRender_BufferRegion CreateBufferRegion(u64 BufferOffset, u64 RegionSize, const std::string& BufferName)
+	BmRender_GPUBufferEntry BmRender_CreateGPUBufferEntry(u64 BufferOffset, u64 RegionSize, const std::string& BufferName)
 	{
-		assert(ResContext.ResourceRecords.Count < ResContext.ResourceRecords.Capacity);
+		GPUBufferEntryData Entry;
+		Entry.IsLoaded = false;
+		Entry.BufferOffset = BufferOffset;
+		Entry.Size = RegionSize;
+		Entry.GPUBufferHandle = ResContext.StorageBuffers[BufferName];
 
-		GPUBufferEntryData* Entry = ResContext.ResourceRecords.Data + ResContext.ResourceRecords.Count;
-		Entry->IsLoaded = false;
-		Entry->BufferOffset = BufferOffset;
-		Entry->Size = RegionSize;
-		Entry->GPUBufferHandle = ResContext.StorageBuffers[BufferName];
-	
-		return (BmRender_BufferRegion)ResContext.ResourceRecords.Count++;
+		return CreateGPUBufferEntryHandle(&Entry);
 	}
 
-	BmRender_PushConstant CreatePushConstant(PipelineStage Stage, u32 Offset, u32 Size)
+	void UpdateBufferRegion(BmRender_GPUBufferEntry Handle, u64 ResourceOffset, const void* Data, u32 DataSize)
 	{
-		assert(ResContext.PushConstants.Count < ResContext.PushConstants.Capacity);
-
-		VkPushConstantRange* Constant = ResContext.PushConstants.Data + ResContext.PushConstants.Count;
-		Constant->offset = Offset;
-		Constant->size = Size;
-		Constant->stageFlags = (VkPipelineStageFlagBits)Stage;
-
-		return (BmRender_PushConstant)ResContext.PushConstants.Count;
-	}
-
-	void UpdateBufferRegion(BmRender_BufferRegion Handle, u64 ResourceOffset, const void* Data, u32 DataSize)
-	{
-		const u32 Index = (u64)Handle;
-		GPUBufferEntryData* Entry = ResContext.ResourceRecords.Data + Index;
+		GPUBufferEntryData* Entry = GetGPUBufferEntryData(Handle);
 		GPUBufferData* Buffer = GetGPUBufferData(Entry->GPUBufferHandle);
 
 		const u64 Offset = Entry->BufferOffset + ResourceOffset;
@@ -426,9 +390,9 @@ namespace RenderResources
 		AddTask(&Task);
 	}
 
-	bool IsBufferResourceReady(BmRender_BufferRegion Handle)
+	bool IsBufferResourceReady(BmRender_GPUBufferEntry Handle)
 	{
-		return ResContext.ResourceRecords.Data[(u64)Handle].IsLoaded;
+		return GetGPUBufferEntryData(Handle)->IsLoaded;
 	}
 
 	bool IsImageResourceReady(BmRender_Image Handle)

@@ -35,13 +35,12 @@ namespace RenderResources
 
 	void CreateGPUBuffer(BmRender_GPUBuffer Buffer, const std::string& Name);
 
-	BmRender_BufferRegion CreateBufferRegion(u64 BufferOffset, u64 RegionSize, const std::string& BufferName);
-	BmRender_PushConstant CreatePushConstant(PipelineStage Stage, u32 Offset, u32 Size);
+	BmRender_GPUBufferEntry BmRender_CreateGPUBufferEntry(u64 BufferOffset, u64 RegionSize, const std::string& BufferName);
 
-	void UpdateBufferRegion(BmRender_BufferRegion Handle, u64 ResourceOffset, const void* Data, u32 DataSize);
+	void UpdateBufferRegion(BmRender_GPUBufferEntry Handle, u64 ResourceOffset, const void* Data, u32 DataSize);
 	void UpdateImageResource(BmRender_Image Handle, BmRender_ImageDescription* Description, void* Data);
 
-	void OnBufferResourceLoaded(BmRender_BufferRegion Handle);
+	void OnBufferResourceLoaded(BmRender_GPUBufferEntry Handle);
 	void OnImageResourceLoaded(BmRender_Image Handle);
 
 	VulkanCoreContext::VulkanCoreContext* GetCoreContext();
@@ -59,6 +58,6 @@ namespace RenderResources
 	VkImageView GetImageView(BmRender_ImageView Handle);
 	VkPushConstantRange GetPushConstant(BmRender_PushConstant Handle);
 
-	bool IsBufferResourceReady(BmRender_BufferRegion Handle);
+	bool IsBufferResourceReady(BmRender_GPUBufferEntry Handle);
 	bool IsImageResourceReady(BmRender_Image Handle);
 }

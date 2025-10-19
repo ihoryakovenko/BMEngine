@@ -1768,7 +1768,7 @@ namespace Util
 			}
 			
 			// Create a single push constant handle for the entire definition
-			BmRender_PushConstant PushConstantHandle = RenderResources::CreatePushConstant(
+			BmRender_PushConstant PushConstantHandle = BmRender_CreatePushConstant(
 				static_cast<PipelineStage>(combinedStageFlags), 
 				0, // offset starts at 0 for the entire push constant
 				totalSize

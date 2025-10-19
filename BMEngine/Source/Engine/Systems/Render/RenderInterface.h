@@ -12,10 +12,6 @@ enum class BufferUpdateFrequency
 	PerFrame
 };
 
-typedef struct BmRender_BufferRegion_T* BmRender_BufferRegion;
-typedef struct BmRender_BufferArrayRegion_T* BmRender_BufferArrayRegion;
-typedef struct BmRender_PushConstant_T* BmRender_PushConstant;
-
 typedef u64 PrivateHandle;
 typedef struct { PrivateHandle Private; } BmRender_Sampler;
 typedef struct { PrivateHandle Private; } BmRender_Pipeline;
@@ -26,6 +22,8 @@ typedef struct { PrivateHandle Private; } BmRender_Shader;
 typedef struct { PrivateHandle Private; } BmRender_Image;
 typedef struct { PrivateHandle Private; } BmRender_ImageView;
 typedef struct { PrivateHandle Private; } BmRender_GPUBuffer;
+typedef struct { PrivateHandle Private; } BmRender_GPUBufferEntry;
+typedef struct { PrivateHandle Private; } BmRender_PushConstant;
 typedef struct { PrivateHandle Private; } BmRender_DescriptorSet;
 
 enum class BufferUsageFlag
@@ -116,7 +114,7 @@ struct BmRender_ImageBinding
 
 struct BmRender_DescriptorSetBinding
 {
-	BmRender_BufferRegion* BufferRegions;
+	BmRender_GPUBufferEntry* BufferRegions;
 	BmRender_ImageBinding ImageBinding;
 
 	u32 BindingCount;
@@ -194,7 +192,7 @@ BmRender_ImageView BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 Ba
 void BmRender_CreateDescriptorSet(const std::string& Name, BmRender_DescriptorSetLayout LayoutHandle, const std::string& PoolName);
 void BmRender_UpdateDescriptorSet(const std::string& DescriptorSetName, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount);
 
-BmRender_PushConstant CreatePushConstant(PipelineStage Stage, u32 Offset, u32 Size);
+BmRender_PushConstant BmRender_CreatePushConstant(PipelineStage Stage, u32 Offset, u32 Size);
 
 
 

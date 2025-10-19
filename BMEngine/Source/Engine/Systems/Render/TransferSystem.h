@@ -25,7 +25,7 @@ namespace TransferSystem
 	{
 		VkBuffer DstBuffer;
 		u64 DstOffset;
-		BmRender_BufferRegion Handle;
+		BmRender_GPUBufferEntry Handle;
 		PipelineStage StageBarrier;
 	};
 

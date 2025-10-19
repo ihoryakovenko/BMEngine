@@ -11,6 +11,8 @@ static System_HandleManager ShaderManager;
 static System_HandleManager ImageManager;
 static System_HandleManager ImageViewManager;
 static System_HandleManager GPUBufferManager;
+static System_HandleManager GPUBufferEntryManager;
+static System_HandleManager PushConstantsManager;
 static System_HandleManager DescriptorSetManager;
 
 static u16 GetNextHandleType()
@@ -65,6 +67,16 @@ void InitializeGPUBufferManager(u32 Size)
 	GPUBufferManager = System_HandleManager_InitData(Size, sizeof(GPUBufferData), GetNextHandleType());
 }
 
+void InitializeGPUBufferEntryManager(u32 Size)
+{
+	GPUBufferEntryManager = System_HandleManager_InitData(Size, sizeof(GPUBufferEntryData), GetNextHandleType());
+}
+
+void InitializePushConstantManager(u32 Size)
+{
+	PushConstantsManager = System_HandleManager_InitData(Size, sizeof(PushConstantData), GetNextHandleType());
+}
+
 void InitializeDescriptorSetManager(u32 Size)
 {
 	DescriptorSetManager = System_HandleManager_InitData(Size, sizeof(DescriptorSetData), GetNextHandleType());
@@ -115,6 +127,16 @@ void DeinitImageViewManager(void(*CleanUpFunc)(ImageViewData*))
 void DeinitGPUBufferManager(void(*CleanUpFunc)(GPUBufferData*))
 {
 	System_HandleManager_ClearData(GPUBufferManager, (void(*)(void*))CleanUpFunc);
+}
+
+void DeinitGPUBufferEntryManager()
+{
+	System_HandleManager_ClearData(GPUBufferEntryManager);
+}
+
+void DeinitPushConstantManager()
+{
+	System_HandleManager_ClearData(PushConstantsManager);
 }
 
 void DeinitDescriptorSetManager()
@@ -187,6 +209,20 @@ BmRender_GPUBuffer CreateGPUBufferHandle(const GPUBufferData* Data)
 	return Handle;
 }
 
+BmRender_GPUBufferEntry CreateGPUBufferEntryHandle(const GPUBufferEntryData* Data)
+{
+	BmRender_GPUBufferEntry Handle;
+	Handle.Private = System_HandleManager_CreateHandle(GPUBufferEntryManager, Data);
+	return Handle;
+}
+
+BmRender_PushConstant CreatePushConstantHandle(const PushConstantData* Data)
+{
+	BmRender_PushConstant Handle;
+	Handle.Private = System_HandleManager_CreateHandle(PushConstantsManager, Data);
+	return Handle;
+}
+
 BmRender_DescriptorSet CreateDescriptorSetHandle(const DescriptorSetData* Data)
 {
 	BmRender_DescriptorSet Handle;
@@ -241,6 +277,16 @@ void DestroyGPUBufferHandle(BmRender_GPUBuffer Handle)
 	System_HandleManager_DestroyHandle(GPUBufferManager, Handle.Private);
 }
 
+void DestroyGPUBufferEntryHandle(BmRender_GPUBufferEntry Handle)
+{
+	System_HandleManager_DestroyHandle(GPUBufferEntryManager, Handle.Private);
+}
+
+void DestroyPushConstantHandle(BmRender_PushConstant Handle)
+{
+	System_HandleManager_DestroyHandle(PushConstantsManager, Handle.Private);
+}
+
 void DestroyDescriptorSetHandle(BmRender_DescriptorSet Handle)
 {
 	System_HandleManager_DestroyHandle(DescriptorSetManager, Handle.Private);
@@ -291,6 +337,16 @@ ImageViewData* GetImageViewData(BmRender_ImageView Handle)
 GPUBufferData* GetGPUBufferData(BmRender_GPUBuffer Handle)
 {
 	return (GPUBufferData*)System_HandleManager_GetHandleData(GPUBufferManager, Handle.Private);
+}
+
+GPUBufferEntryData* GetGPUBufferEntryData(BmRender_GPUBufferEntry Handle)
+{
+	return (GPUBufferEntryData*)System_HandleManager_GetHandleData(GPUBufferEntryManager, Handle.Private);
+}
+
+PushConstantData* GetPushConstantData(BmRender_PushConstant Handle)
+{
+	return (PushConstantData*)System_HandleManager_GetHandleData(PushConstantsManager, Handle.Private);
 }
 
 DescriptorSetData* GetDescriptorSetData(BmRender_DescriptorSet Handle)

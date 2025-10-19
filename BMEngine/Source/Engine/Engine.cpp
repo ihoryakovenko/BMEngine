@@ -214,8 +214,8 @@ namespace Engine
 
 	static Render::DrawScene Scene;
 
-	BmRender_BufferRegion VpRegion[3];
-	BmRender_BufferRegion EntityLightRegion[3];
+	BmRender_GPUBufferEntry VpRegion[3];
+	BmRender_GPUBufferEntry EntityLightRegion[3];
 
 	void WindowIconifyCallback(GLFWwindow* window, int iconified)
 	{
@@ -319,13 +319,13 @@ namespace Engine
 		BmRender_CreateUniformBuffer(MB4, BufferUpdateFrequency::PerFrame, PipelineStage::Fragment, "FrameData");
 		BmRender_CreateStorageBuffer(MB4, BufferUpdateFrequency::Static, PipelineStage::Fragment, "MaterialBuffer");
 
-		VpRegion[0] = RenderResources::CreateBufferRegion(0, 128, "FrameData");
-		VpRegion[1] = RenderResources::CreateBufferRegion(128, 128, "FrameData");
-		VpRegion[2] = RenderResources::CreateBufferRegion(128 * 2, 128, "FrameData");
+		VpRegion[0] = RenderResources::BmRender_CreateGPUBufferEntry(0, 128, "FrameData");
+		VpRegion[1] = RenderResources::BmRender_CreateGPUBufferEntry(128, 128, "FrameData");
+		VpRegion[2] = RenderResources::BmRender_CreateGPUBufferEntry(128 * 2, 128, "FrameData");
 
-		EntityLightRegion[0] = RenderResources::CreateBufferRegion(384, 384, "FrameData");
-		EntityLightRegion[1] = RenderResources::CreateBufferRegion(384 + 384, 384, "FrameData");
-		EntityLightRegion[2] = RenderResources::CreateBufferRegion(384 + 384 * 2, 384, "FrameData");
+		EntityLightRegion[0] = RenderResources::BmRender_CreateGPUBufferEntry(384, 384, "FrameData");
+		EntityLightRegion[1] = RenderResources::BmRender_CreateGPUBufferEntry(384 + 384, 384, "FrameData");
+		EntityLightRegion[2] = RenderResources::BmRender_CreateGPUBufferEntry(384 + 384 * 2, 384, "FrameData");
 
 		ParseAndCreateVertices(Util::GetVertices(Root));
 		ParseAndCreateShaders(Util::GetShaders(Root));
@@ -354,7 +354,7 @@ namespace Engine
 		}
 
 		{
-			BmRender_BufferRegion MaterialBufferRegion = RenderResources::CreateBufferRegion(0, VK_WHOLE_SIZE, "MaterialBuffer");
+			BmRender_GPUBufferEntry MaterialBufferRegion = RenderResources::BmRender_CreateGPUBufferEntry(0, VK_WHOLE_SIZE, "MaterialBuffer");
 
 			BmRender_DescriptorSetBinding Binding;
 			Binding.BufferRegions = &MaterialBufferRegion;

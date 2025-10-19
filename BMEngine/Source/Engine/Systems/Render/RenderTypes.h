@@ -74,6 +74,19 @@ struct DescriptorSetData
 	BmRender_DescriptorSetLayout Layout;
 };
 
+struct GPUBufferEntryData
+{
+	std::atomic<bool> IsLoaded;
+	BmRender_GPUBuffer GPUBufferHandle;
+	u64 BufferOffset;
+	u64 Size;
+};
+
+struct PushConstantData
+{
+	VkPushConstantRange PushConstants;
+};
+
 void InitializeSamplerManager(u32 Size);
 void InitializePipelineManager(u32 Size);
 void InitializePipelineLayoutManager(u32 Size);
@@ -83,6 +96,8 @@ void InitializeShaderManager(u32 Size);
 void InitializeImageManager(u32 Size);
 void InitializeImageViewManager(u32 Size);
 void InitializeGPUBufferManager(u32 Size);
+void InitializeGPUBufferEntryManager(u32 Size);
+void InitializePushConstantManager(u32 Size);
 void InitializeDescriptorSetManager(u32 Size);
 
 void DeinitSamplerManager(void(*CleanUpFunc)(SamplerData*));
@@ -94,6 +109,8 @@ void DeinitShaderManager(void(*CleanUpFunc)(ShaderData*));
 void DeinitImageManager(void(*CleanUpFunc)(ImageResource*));
 void DeinitImageViewManager(void(*CleanUpFunc)(ImageViewData*));
 void DeinitGPUBufferManager(void(*CleanUpFunc)(GPUBufferData*));
+void DeinitGPUBufferEntryManager();
+void DeinitPushConstantManager();
 void DeinitDescriptorSetManager();
 
 BmRender_Sampler CreateSamplerHandle(const SamplerData* Data);
@@ -105,6 +122,8 @@ BmRender_Shader CreateShaderHandle(const ShaderData* Data);
 BmRender_Image CreateImageHandle(const ImageResource* Data);
 BmRender_ImageView CreateImageViewHandle(const ImageViewData* Data);
 BmRender_GPUBuffer CreateGPUBufferHandle(const GPUBufferData* Data);
+BmRender_GPUBufferEntry CreateGPUBufferEntryHandle(const GPUBufferEntryData* Data);
+BmRender_PushConstant CreatePushConstantHandle(const PushConstantData* Data);
 BmRender_DescriptorSet CreateDescriptorSetHandle(const DescriptorSetData* Data);
 
 void DestroySamplerHandle(BmRender_Sampler handle);
@@ -116,6 +135,8 @@ void DestroyShaderHandle(BmRender_Shader handle);
 void DestroyImageHandle(BmRender_Image handle);
 void DestroyImageViewHandle(BmRender_ImageView Handle);
 void DestroyGPUBufferHandle(BmRender_GPUBuffer Handle);
+void DestroyGPUBufferEntryHandle(BmRender_GPUBufferEntry Handle);
+void DestroyPushConstantHandle(BmRender_PushConstant Handle);
 void DestroyDescriptorSetHandle(BmRender_DescriptorSet Handle);
 
 SamplerData* GetSamplerData(BmRender_Sampler Handle);
@@ -127,5 +148,7 @@ ShaderData* GetShaderData(BmRender_Shader Handle);
 ImageResource* GetImageData(BmRender_Image Handle);
 ImageViewData* GetImageViewData(BmRender_ImageView Handle);
 GPUBufferData* GetGPUBufferData(BmRender_GPUBuffer Handle);
+GPUBufferEntryData* GetGPUBufferEntryData(BmRender_GPUBufferEntry Handle);
+PushConstantData* GetPushConstantData(BmRender_PushConstant Handle);
 DescriptorSetData* GetDescriptorSetData(BmRender_DescriptorSet Handle);
 
