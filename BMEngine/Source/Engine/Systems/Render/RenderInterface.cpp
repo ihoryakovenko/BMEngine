@@ -158,7 +158,7 @@ VkAllocationCallbacks* BmRender_GetVulkanAllocator()
 	return &VulkanAllocator;
 }
 
-void BmRender_CreateDescriptorSet(const std::string& Name, BmRender_DescriptorSetLayout LayoutHandle, const std::string& PoolName)
+BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout LayoutHandle, BmRender_DescriptorPool PoolHandle)
 {
 	VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
@@ -166,7 +166,7 @@ void BmRender_CreateDescriptorSet(const std::string& Name, BmRender_DescriptorSe
 	NewSet.Layout = LayoutHandle;
 
 	DescriptorSetLayoutData* Layout = GetDescriptorSetLayoutData(LayoutHandle);
-	VkDescriptorPool Pool = RenderResources::GetDescriptorPool(PoolName);
+	VkDescriptorPool Pool = GetDescriptorPoolData(PoolHandle)->VulkanDescriptorPool;
 
 	VkDescriptorSetAllocateInfo AllocInfo = { };
 	AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -176,7 +176,7 @@ void BmRender_CreateDescriptorSet(const std::string& Name, BmRender_DescriptorSe
 
 	VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, &NewSet.Set));
 
-	RenderResources::CreateDescriptorSet(Name, CreateDescriptorSetHandle(&NewSet));
+	return CreateDescriptorSetHandle(&NewSet);
 }
 
 BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutDescription* Description)
@@ -212,9 +212,9 @@ BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_D
 	return CreateDescriptorSetLayoutHandle(&Layout);
 }
 
-void BmRender_UpdateDescriptorSet(const std::string& DescriptorSetName, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount)
+void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount)
 {
-	RenderResources::UpdateDescriptorSet(DescriptorSetName, Bindings, BindingsCount);
+	RenderResources::UpdateDescriptorSet(DescriptorSetHandle, Bindings, BindingsCount);
 }
 
 BmRender_PushConstant BmRender_CreatePushConstant(PipelineStage Stage, u32 Offset, u32 Size)
@@ -624,22 +624,22 @@ BmRender_ImageView BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 Ba
 	return CreateImageView(Handle, BaseLayer, LayerCount, VK_IMAGE_VIEW_TYPE_2D_ARRAY, AspectFlags);
 }
 
-void BmRender_CreateVertexStageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, const std::string& Name)
+BmRender_GPUBuffer BmRender_CreateVertexStageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency)
 {
-	RenderResources::CreateGPUBuffer(CreateGPUBuffer(Size, UpdateFrequency, PipelineStage::Vertex, BufferUsageFlag::CombinedVertexIndexFlag), Name);
+	return CreateGPUBuffer(Size, UpdateFrequency, PipelineStage::Vertex, BufferUsageFlag::CombinedVertexIndexFlag);
 }
 
-void BmRender_CreateInstanceBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, const std::string& Name)
+BmRender_GPUBuffer BmRender_CreateInstanceBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency)
 {
-	RenderResources::CreateGPUBuffer(CreateGPUBuffer(Size, UpdateFrequency, PipelineStage::Vertex, BufferUsageFlag::InstanceFlag), Name);
+	return CreateGPUBuffer(Size, UpdateFrequency, PipelineStage::Vertex, BufferUsageFlag::InstanceFlag);
 }
 
-void BmRender_CreateUniformBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, const std::string& Name)
+BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage)
 {
-	RenderResources::CreateGPUBuffer(CreateGPUBuffer(Size, UpdateFrequency, BufferStage, BufferUsageFlag::UniformFlag), Name);
+	return CreateGPUBuffer(Size, UpdateFrequency, BufferStage, BufferUsageFlag::UniformFlag);
 }
 
-void BmRender_CreateStorageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage, const std::string& Name)
+BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage)
 {
-	RenderResources::CreateGPUBuffer(CreateGPUBuffer(Size, UpdateFrequency, BufferStage, BufferUsageFlag::StorageFlag), Name);
+	return CreateGPUBuffer(Size, UpdateFrequency, BufferStage, BufferUsageFlag::StorageFlag);
 }

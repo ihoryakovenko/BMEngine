@@ -214,8 +214,16 @@ namespace Engine
 
 	static Render::DrawScene Scene;
 
+	static Render::DescriptorSetHandles DescriptorSets;
+
 	BmRender_GPUBufferEntry VpRegion[3];
 	BmRender_GPUBufferEntry EntityLightRegion[3];
+	
+	// Buffer handles
+	BmRender_GPUBuffer VertexStageBuffer;
+	BmRender_GPUBuffer InstanceBuffer;
+	BmRender_GPUBuffer FrameDataBuffer;
+	BmRender_GPUBuffer MaterialBuffer;
 
 	void WindowIconifyCallback(GLFWwindow* window, int iconified)
 	{
@@ -256,7 +264,7 @@ namespace Engine
 
 				u32 Transferred = 0;
 				
-				EngineResources::Update(&Scene);
+				EngineResources::Update(&Scene, DescriptorSets.BindlesTexturesSet);
 
 				TaskSystem::TaskLambda Task = [&]() { Transferred = TransferSystem::Transfer(); };
 				TaskSystem::AddTask(&Task, &Group);
@@ -314,18 +322,46 @@ namespace Engine
 		BmRender_Init();
 
 		RenderResources::Init(Window);
-		BmRender_CreateVertexStageBuffer(MB4, BufferUpdateFrequency::Static, "VertexStageData");
-		BmRender_CreateInstanceBuffer(MB4, BufferUpdateFrequency::Static, "GPUInstances");
-		BmRender_CreateUniformBuffer(MB4, BufferUpdateFrequency::PerFrame, PipelineStage::Fragment, "FrameData");
-		BmRender_CreateStorageBuffer(MB4, BufferUpdateFrequency::Static, PipelineStage::Fragment, "MaterialBuffer");
+		
+		// Create MainPool using stack array
+		const u32 PoolSizeCount = 11;
+		VkDescriptorPoolSize TotalPassPoolSizes[PoolSizeCount];
+		u32 TotalDescriptorLayouts = 21;
+		TotalPassPoolSizes[0] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
+		TotalPassPoolSizes[1] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
+		TotalPassPoolSizes[2] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
+		TotalPassPoolSizes[3] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3 };
+		TotalPassPoolSizes[4] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3 };
+		TotalPassPoolSizes[5] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3 };
+		TotalPassPoolSizes[6] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
+		TotalPassPoolSizes[7] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
+		TotalPassPoolSizes[8] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
+		TotalPassPoolSizes[9] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 256 };
+		TotalPassPoolSizes[10] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
 
-		VpRegion[0] = RenderResources::BmRender_CreateGPUBufferEntry(0, 128, "FrameData");
-		VpRegion[1] = RenderResources::BmRender_CreateGPUBufferEntry(128, 128, "FrameData");
-		VpRegion[2] = RenderResources::BmRender_CreateGPUBufferEntry(128 * 2, 128, "FrameData");
+		u32 TotalDescriptorCount = TotalDescriptorLayouts * 3;
+		TotalDescriptorCount += 256;
 
-		EntityLightRegion[0] = RenderResources::BmRender_CreateGPUBufferEntry(384, 384, "FrameData");
-		EntityLightRegion[1] = RenderResources::BmRender_CreateGPUBufferEntry(384 + 384, 384, "FrameData");
-		EntityLightRegion[2] = RenderResources::BmRender_CreateGPUBufferEntry(384 + 384 * 2, 384, "FrameData");
+		BmRender_DescriptorPoolDescription PoolDesc = {};
+		PoolDesc.MaxSets = TotalDescriptorCount;
+		PoolDesc.PoolSizeCount = PoolSizeCount;
+		PoolDesc.PoolSizes = TotalPassPoolSizes;
+		PoolDesc.Flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
+		PoolDesc.Next = nullptr;
+
+		BmRender_DescriptorPool MainPool = BmRender_CreateDescriptorPool(&PoolDesc);
+		VertexStageBuffer = BmRender_CreateVertexStageBuffer(MB4, BufferUpdateFrequency::Static);
+		InstanceBuffer = BmRender_CreateInstanceBuffer(MB4, BufferUpdateFrequency::Static);
+		FrameDataBuffer = BmRender_CreateUniformBuffer(MB4, BufferUpdateFrequency::PerFrame, PipelineStage::Fragment);
+		MaterialBuffer = BmRender_CreateStorageBuffer(MB4, BufferUpdateFrequency::Static, PipelineStage::Fragment);
+
+		VpRegion[0] = RenderResources::BmRender_CreateGPUBufferEntry(0, 128, FrameDataBuffer);
+		VpRegion[1] = RenderResources::BmRender_CreateGPUBufferEntry(128, 128, FrameDataBuffer);
+		VpRegion[2] = RenderResources::BmRender_CreateGPUBufferEntry(128 * 2, 128, FrameDataBuffer);
+
+		EntityLightRegion[0] = RenderResources::BmRender_CreateGPUBufferEntry(384, 384, FrameDataBuffer);
+		EntityLightRegion[1] = RenderResources::BmRender_CreateGPUBufferEntry(384 + 384, 384, FrameDataBuffer);
+		EntityLightRegion[2] = RenderResources::BmRender_CreateGPUBufferEntry(384 + 384 * 2, 384, FrameDataBuffer);
 
 		ParseAndCreateVertices(Util::GetVertices(Root));
 		ParseAndCreateShaders(Util::GetShaders(Root));
@@ -333,14 +369,16 @@ namespace Engine
 		ParseAndCreateDescriptorSetLayouts(Util::GetDescriptorSetLayouts(Root));
 		Util::ParseAndCreatePushConstants(Util::GetPushConstantsFromResources(Root));
 
+		DescriptorSets = Render::DescriptorSetHandles();
+		
 		{
 			BmRender_DescriptorSetBinding Binding;
 			Binding.BufferRegions = VpRegion;
 			Binding.BindingCount = 1;
 			Binding.DstArrayElement = 0;
 
-			BmRender_CreateDescriptorSet("VpSet", RenderResources::GetDescriptorSetLayoutHandle("FrameDataLayout"), "MainPool");
-			BmRender_UpdateDescriptorSet("VpSet", &Binding, 1);
+			DescriptorSets.VpSet = BmRender_CreateDescriptorSet(RenderResources::GetDescriptorSetLayoutHandle("FrameDataLayout"), MainPool);
+			BmRender_UpdateDescriptorSet(DescriptorSets.VpSet, &Binding, 1);
 		}
 
 		{
@@ -349,30 +387,30 @@ namespace Engine
 			Binding.BindingCount = 1;
 			Binding.DstArrayElement = 0;
 
-			BmRender_CreateDescriptorSet("StaticMeshLightSet", RenderResources::GetDescriptorSetLayoutHandle("FrameDataLayout"), "MainPool");
-			BmRender_UpdateDescriptorSet("StaticMeshLightSet", &Binding, 1);
+			DescriptorSets.StaticMeshLightSet = BmRender_CreateDescriptorSet(RenderResources::GetDescriptorSetLayoutHandle("FrameDataLayout"), MainPool);
+			BmRender_UpdateDescriptorSet(DescriptorSets.StaticMeshLightSet, &Binding, 1);
 		}
 
 		{
-			BmRender_GPUBufferEntry MaterialBufferRegion = RenderResources::BmRender_CreateGPUBufferEntry(0, VK_WHOLE_SIZE, "MaterialBuffer");
+			BmRender_GPUBufferEntry MaterialBufferRegion = RenderResources::BmRender_CreateGPUBufferEntry(0, VK_WHOLE_SIZE, MaterialBuffer);
 
 			BmRender_DescriptorSetBinding Binding;
 			Binding.BufferRegions = &MaterialBufferRegion;
 			Binding.BindingCount = 1;
 			Binding.DstArrayElement = 0;
 
-			BmRender_CreateDescriptorSet("MaterialSet", RenderResources::GetDescriptorSetLayoutHandle("MaterialLayout"), "MainPool");
-			BmRender_UpdateDescriptorSet("MaterialSet", &Binding, 1);
+			DescriptorSets.MaterialSet = BmRender_CreateDescriptorSet(RenderResources::GetDescriptorSetLayoutHandle("MaterialLayout"), MainPool);
+			BmRender_UpdateDescriptorSet(DescriptorSets.MaterialSet, &Binding, 1);
 		}
 
 		{
-			BmRender_CreateDescriptorSet("BindlesTexturesSet", RenderResources::GetDescriptorSetLayoutHandle("BindlesTexturesLayout"), "MainPool");
+			DescriptorSets.BindlesTexturesSet = BmRender_CreateDescriptorSet(RenderResources::GetDescriptorSetLayoutHandle("BindlesTexturesLayout"), MainPool);
 		}
 
 		TransferSystem::Init();
-		Render::Init(Window, VpRegion, EntityLightRegion);
+		Render::Init(Window, VpRegion, EntityLightRegion, DescriptorSets, MainPool, VertexStageBuffer, InstanceBuffer);
 
-		EngineResources::Init();
+		EngineResources::Init(DescriptorSets.BindlesTexturesSet, VertexStageBuffer, InstanceBuffer, FrameDataBuffer, MaterialBuffer);
 
 		Yaml::Node TestScene;
 		Yaml::Parse(TestScene, "./Resources/Scenes/TestScene.yaml");

@@ -17,14 +17,11 @@ namespace RenderResources
 		VulkanCoreContext::VulkanCoreContext CoreContext;
 		std::unordered_map<std::string, VulkanHelper::VertexBinding> VBindings;
 
-		std::unordered_map<std::string, BmRender_DescriptorSet> DescriptorSets;
 		std::unordered_map<std::string, BmRender_Sampler> Samplers;
 		std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 		std::unordered_map<std::string, BmRender_Shader> Shaders;
-		std::unordered_map<std::string, BmRender_DescriptorPool> DescriptorPools;
 		std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
 		std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
-		std::unordered_map<std::string, BmRender_GPUBuffer> StorageBuffers;
 	};
 
 	static ResourceContext ResContext;
@@ -42,34 +39,6 @@ namespace RenderResources
 	void Init(GLFWwindow* WindowHandler)
 	{
 		VulkanCoreContext::CreateCoreContext(&ResContext.CoreContext, WindowHandler);
-
-		const u32 PoolSizeCount = 11;
-		auto TotalPassPoolSizes = (VkDescriptorPoolSize*)Render::FrameAlloc(PoolSizeCount * sizeof(VkDescriptorPoolSize));
-		u32 TotalDescriptorLayouts = 21;
-		TotalPassPoolSizes[0] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		TotalPassPoolSizes[1] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		TotalPassPoolSizes[2] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		TotalPassPoolSizes[3] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3 };
-		TotalPassPoolSizes[4] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3 };
-		TotalPassPoolSizes[5] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3 };
-		TotalPassPoolSizes[6] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		TotalPassPoolSizes[7] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		TotalPassPoolSizes[8] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		TotalPassPoolSizes[9] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 256 };
-		TotalPassPoolSizes[10] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-
-		u32 TotalDescriptorCount = TotalDescriptorLayouts * 3;
-		TotalDescriptorCount += 256;
-
-		BmRender_DescriptorPoolDescription PoolDesc = {};
-		PoolDesc.MaxSets = TotalDescriptorCount;
-		PoolDesc.PoolSizeCount = PoolSizeCount;
-		PoolDesc.PoolSizes = TotalPassPoolSizes;
-		PoolDesc.Flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
-		PoolDesc.Next = nullptr;
-
-		BmRender_DescriptorPool MainPoolHandle = BmRender_CreateDescriptorPool(&PoolDesc);
-		ResContext.DescriptorPools["MainPool"] = MainPoolHandle;
 	}
 
 	void CreateGraphicsPipeline(const std::string& Name, const BmRender_PipelineDescription& Description)
@@ -90,10 +59,6 @@ namespace RenderResources
 		ResContext.PipelineLayouts[Name] = PipelineLayoutHandle;
 	}
 
-	void CreateGPUBuffer(BmRender_GPUBuffer Buffer, const std::string& Name)
-	{
-		ResContext.StorageBuffers[Name] = Buffer;
-	}
 
 	VkPipeline GetPipeline(const std::string& Name)
 	{
@@ -113,21 +78,6 @@ namespace RenderResources
 			return GetPipelineLayoutData(it->second)->VulkanPipelineLayout;
 		}
 		return VK_NULL_HANDLE;
-	}
-
-	VkImage GetImage(BmRender_Image Handle)
-	{
-		return GetImageData(Handle)->Image;
-	}
-
-	VkImageView GetImageView(BmRender_ImageView Handle)
-	{
-		return GetImageViewData(Handle)->View;
-	}
-
-	VkPushConstantRange GetPushConstant(BmRender_PushConstant Handle)
-	{
-		return GetPushConstantData(Handle)->PushConstants;
 	}
 
 	void DeInit()
@@ -168,11 +118,11 @@ namespace RenderResources
 		ResContext.DescriptorSetLayouts[Name] = BmRender_CreateDescriptorSetLayout(&Description);
 	}
 
-	void UpdateDescriptorSet(std::string DescriptorSetName, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount)
+	void UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount)
 	{
 		VkDevice Device = ResContext.CoreContext.LogicalDevice;
 
-		DescriptorSetData* Set = GetDescriptorSet(DescriptorSetName);
+		DescriptorSetData* Set = GetDescriptorSetData(DescriptorSetHandle);
 		DescriptorSetLayoutData* Layout = GetDescriptorSetLayoutData(Set->Layout);
 
 		VkWriteDescriptorSet* WriteDescriptorSets = (VkWriteDescriptorSet*)Render::FrameAlloc(sizeof(VkWriteDescriptorSet) * BindingsCount);
@@ -211,7 +161,7 @@ namespace RenderResources
 			{
 				VkDescriptorImageInfo* ImageInfo = (VkDescriptorImageInfo*)Render::FrameAlloc(sizeof(VkDescriptorImageInfo));
 				ImageInfo->imageLayout = Binding.ImageBinding.ImageLayout;
-				ImageInfo->imageView = GetImageView(Binding.ImageBinding.ImageView);
+				ImageInfo->imageView = GetImageViewData(Binding.ImageBinding.ImageView)->View;
 				ImageInfo->sampler = GetSampler(Binding.ImageBinding.Sampler);
 
 				WriteDescriptorSets[i].pImageInfo = ImageInfo;
@@ -225,10 +175,6 @@ namespace RenderResources
 		vkUpdateDescriptorSets(Device, BindingsCount, WriteDescriptorSets, 0, nullptr);
 	}
 
-	void CreateDescriptorSet(const std::string& Name, BmRender_DescriptorSet Set)
-	{
-		ResContext.DescriptorSets[Name] = Set;
-	}
 
 	VulkanCoreContext::VulkanCoreContext* GetCoreContext()
 	{
@@ -295,38 +241,15 @@ namespace RenderResources
 		return { };
 	}
 
-	VkDescriptorPool GetDescriptorPool(const std::string& Id)
-	{
-		auto It = ResContext.DescriptorPools.find(Id);
-		if (It != ResContext.DescriptorPools.end())
-		{
-			return GetDescriptorPoolData(It->second)->VulkanDescriptorPool;
-		}
 
-		assert(false);
-		return VK_NULL_HANDLE;
-	}
 
-	DescriptorSetData* GetDescriptorSet(const std::string& Id)
-	{
-		auto It = ResContext.DescriptorSets.find(Id);
-		if (It != ResContext.DescriptorSets.end())
-		{
-			
-			return GetDescriptorSetData(It->second);
-		}
-
-		assert(false);
-		return nullptr;
-	}
-
-	BmRender_GPUBufferEntry BmRender_CreateGPUBufferEntry(u64 BufferOffset, u64 RegionSize, const std::string& BufferName)
+	BmRender_GPUBufferEntry BmRender_CreateGPUBufferEntry(u64 BufferOffset, u64 RegionSize, BmRender_GPUBuffer BufferHandle)
 	{
 		GPUBufferEntryData Entry;
 		Entry.IsLoaded = false;
 		Entry.BufferOffset = BufferOffset;
 		Entry.Size = RegionSize;
-		Entry.GPUBufferHandle = ResContext.StorageBuffers[BufferName];
+		Entry.GPUBufferHandle = BufferHandle;
 
 		return CreateGPUBufferEntryHandle(&Entry);
 	}
@@ -400,15 +323,4 @@ namespace RenderResources
 		return GetImageData(Handle)->IsLoaded;
 	}
 
-	GPUBufferData* GetGPUBuffer(const std::string& Name)
-	{
-		auto It = ResContext.StorageBuffers.find(Name);
-		if (It != ResContext.StorageBuffers.end())
-		{
-			return GetGPUBufferData(It->second);
-		}
-
-		assert(false);
-		return nullptr;
-	}
 }

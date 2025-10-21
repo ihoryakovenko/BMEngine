@@ -1874,7 +1874,7 @@ namespace Util
 			if (it != PushConstants.end())
 			{
 				// Convert handle to range using GetPushConstant
-				VkPushConstantRange range = RenderResources::GetPushConstant(it->second);
+				VkPushConstantRange range = GetPushConstantData(it->second)->PushConstants;
 				Description.PushConstantRanges.push_back(range);
 			}
 		}

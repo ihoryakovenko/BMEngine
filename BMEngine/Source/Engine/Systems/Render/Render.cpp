@@ -69,7 +69,7 @@ namespace Render
 		vkDestroyDescriptorPool(Device, ImGuiPool, nullptr);
 	}
 
-	static void InitStaticMeshPipeline(VkDevice Device, StaticMeshPipeline* MeshPipeline, BmRender_GPUBufferEntry* EntityLightRegion)
+	static void InitStaticMeshPipeline(VkDevice Device, StaticMeshPipeline* MeshPipeline, BmRender_GPUBufferEntry* EntityLightRegion, BmRender_DescriptorPool MainPool)
 	{
 		const VkDeviceSize LightBufferSize = sizeof(Render::LightBuffer);
 		MeshPipeline->EntityLightBufferHandle = EntityLightRegion;
@@ -87,11 +87,8 @@ namespace Render
 			ShadowMapBinding.BindingCount = 1;
 			ShadowMapBinding.DstArrayElement = 0;
 
-			std::string ShadowMapSetName = "ShadowMapArraySet" + std::to_string(i);
-			BmRender_CreateDescriptorSet(ShadowMapSetName, RenderResources::GetDescriptorSetLayoutHandle("ShadowMapArrayLayout"), "MainPool");
-			BmRender_UpdateDescriptorSet(ShadowMapSetName, &ShadowMapBinding, 1);
-			
-			MeshPipeline->ShadowMapArraySet[i] = RenderResources::GetDescriptorSet(ShadowMapSetName)->Set;
+			MeshPipeline->ShadowMapArraySet[i] = BmRender_CreateDescriptorSet(RenderResources::GetDescriptorSetLayoutHandle("ShadowMapArrayLayout"), MainPool);
+			BmRender_UpdateDescriptorSet(MeshPipeline->ShadowMapArraySet[i], &ShadowMapBinding, 1);
 		}
 
 		PipelineResourceInfo ResourceInfo = {};
@@ -115,7 +112,7 @@ namespace Render
 		RenderResources::CreateGraphicsPipeline("StaticMesh", PipelineDesc);
 	}
 
-	static void DrawStaticMeshes(VkDevice Device, VkCommandBuffer CmdBuffer, StaticMeshPipeline* MeshPipeline, DrawScene* Scene)
+	static void DrawStaticMeshes(VkDevice Device, VkCommandBuffer CmdBuffer, StaticMeshPipeline* MeshPipeline, DrawScene* Scene, const DescriptorSetHandles& DescriptorSets, BmRender_GPUBuffer VertexStageBuffer, BmRender_GPUBuffer InstanceBuffer)
 	{
 		u32 CurrentImageIndex = Render::GetRenderState()->RenderDrawState.CurrentImageIndex;
 		RenderResources::UpdateBufferRegion(MeshPipeline->EntityLightBufferHandle[CurrentImageIndex], 0,
@@ -128,11 +125,11 @@ namespace Render
 
 		const VkDescriptorSet DescriptorSetGroup[] =
 		{
-			RenderResources::GetDescriptorSet("VpSet")->Set,
-			RenderResources::GetDescriptorSet("BindlesTexturesSet")->Set,
-			RenderResources::GetDescriptorSet("StaticMeshLightSet")->Set,
-			RenderResources::GetDescriptorSet("MaterialSet")->Set,
-			MeshPipeline->ShadowMapArraySet[Render::GetRenderState()->RenderDrawState.CurrentImageIndex],
+			GetDescriptorSetData(DescriptorSets.VpSet)->Set,
+			GetDescriptorSetData(DescriptorSets.BindlesTexturesSet)->Set,
+			GetDescriptorSetData(DescriptorSets.StaticMeshLightSet)->Set,
+			GetDescriptorSetData(DescriptorSets.MaterialSet)->Set,
+			GetDescriptorSetData(MeshPipeline->ShadowMapArraySet[Render::GetRenderState()->RenderDrawState.CurrentImageIndex])->Set,
 		};
 
 		const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
@@ -169,8 +166,8 @@ namespace Render
 
 			const VkBuffer Buffers[] =
 			{
-				RenderResources::GetGPUBuffer("VertexStageData")->Buffer,
-				RenderResources::GetGPUBuffer("GPUInstances")->Buffer
+				GetGPUBufferData(VertexStageBuffer)->Buffer,
+				GetGPUBufferData(InstanceBuffer)->Buffer
 			};
 
 			const u64 Offsets[] = 
@@ -180,7 +177,7 @@ namespace Render
 			};
 
 			vkCmdBindVertexBuffers(CmdBuffer, 0, 2, Buffers, Offsets);
-			vkCmdBindIndexBuffer(CmdBuffer, RenderResources::GetGPUBuffer("VertexStageData")->Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
+			vkCmdBindIndexBuffer(CmdBuffer, GetGPUBufferData(VertexStageBuffer)->Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
 			vkCmdDrawIndexed(CmdBuffer, DrawEntity->IndicesCount, DrawEntity->Instances, 0, 0, 0);
 		}
 	}
@@ -239,22 +236,26 @@ namespace Render
 		State.FrameMemory = Memory::CreateFrameMemory(1024 * 1024);
 	}
 
-	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferEntry* VpRegion, BmRender_GPUBufferEntry* EntityLightRegion)
+	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferEntry* VpRegion, BmRender_GPUBufferEntry* EntityLightRegion, const DescriptorSetHandles& DescriptorSets, BmRender_DescriptorPool MainPool, BmRender_GPUBuffer VertexStageBuffer, BmRender_GPUBuffer InstanceBuffer)
 	{		
 		VkPhysicalDevice PhysicalDevice = RenderResources::GetCoreContext()->PhysicalDevice;
 		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 
 		State.VpHandle = VpRegion;
+		State.DescriptorSets = DescriptorSets;
+		State.MainPool = MainPool;
+		State.VertexStageBuffer = VertexStageBuffer;
+		State.InstanceBuffer = InstanceBuffer;
 
 		InitDrawState(Device, RenderResources::GetCoreContext()->Indices.GraphicsFamily, VulkanHelper::MAX_DRAW_FRAMES, &State.RenderDrawState);
 
-		DeferredPass::Init();
+		DeferredPass::Init(State.MainPool);
 		MainPass::Init();
-		LightningPass::Init();
+		LightningPass::Init(State.MainPool);
 
 		//TerrainRender::Init();
 		//DynamicMapSystem::Init();
-		InitStaticMeshPipeline(Device, &State.MeshPipeline, EntityLightRegion);
+		InitStaticMeshPipeline(Device, &State.MeshPipeline, EntityLightRegion, State.MainPool);
 		InitImGuiPipeline(&State.DebugUiPool, RenderResources::GetCoreContext(), WindowHandler);
 	}
 
@@ -305,7 +306,7 @@ namespace Render
 		LightningPass::Draw(Scene);
 		MainPass::BeginPass();
 		//TerrainRender::Draw();
-		DrawStaticMeshes(Device, DrawCmdBuffer, &State.MeshPipeline, Scene);
+		DrawStaticMeshes(Device, DrawCmdBuffer, &State.MeshPipeline, Scene, State.DescriptorSets, State.VertexStageBuffer, State.InstanceBuffer);
 		MainPass::EndPass();
 		DeferredPass::BeginPass();
 		DeferredPass::Draw();
@@ -388,14 +389,14 @@ namespace DeferredPass
 	static BmRender_ImageView DeferredInputDepthImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 	static BmRender_ImageView DeferredInputColorImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
-	static VkDescriptorSet DeferredInputSet[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static BmRender_DescriptorSet DeferredInputSet[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 	static VkSampler ColorSampler;
 	static VkSampler DepthSampler;
 
 	static AttachmentData PipelineAttachmentData;
 
-	void Init()
+	void Init(BmRender_DescriptorPool MainPool)
 	{
 		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 		VkPhysicalDevice PhysicalDevice = RenderResources::GetCoreContext()->PhysicalDevice;
@@ -433,11 +434,8 @@ namespace DeferredPass
 
 			BmRender_DescriptorSetBinding Bindings[] = { ColorBinding, DepthBinding };
 
-			std::string DeferredInputSetName = "DeferredInputSet" + std::to_string(i);
-			BmRender_CreateDescriptorSet(DeferredInputSetName, RenderResources::GetDescriptorSetLayoutHandle("MainPassOutputLayout"), "MainPool");
-			BmRender_UpdateDescriptorSet(DeferredInputSetName, Bindings, 2);
-			
-			DeferredInputSet[i] = RenderResources::GetDescriptorSet(DeferredInputSetName)->Set;
+			DeferredInputSet[i] = BmRender_CreateDescriptorSet(RenderResources::GetDescriptorSetLayoutHandle("MainPassOutputLayout"), MainPool);
+			BmRender_UpdateDescriptorSet(DeferredInputSet[i], Bindings, 2);
 		}
 
 
@@ -472,7 +470,7 @@ namespace DeferredPass
 		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-			0, 1, &DeferredInputSet[Render::GetRenderState()->RenderDrawState.CurrentImageIndex], 0, nullptr);
+			0, 1, &GetDescriptorSetData(DeferredInputSet[Render::GetRenderState()->RenderDrawState.CurrentImageIndex])->Set, 0, nullptr);
 
 		vkCmdDraw(CmdBuffer, 3, 1, 0, 0); // 3 hardcoded vertices
 	}
@@ -507,7 +505,7 @@ namespace DeferredPass
 		ColorBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		ColorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		ColorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		ColorBarrier.image = RenderResources::GetImage(DeferredInputColorImage[Render::GetRenderState()->RenderDrawState.CurrentImageIndex]);
+		ColorBarrier.image = GetImageData(DeferredInputColorImage[Render::GetRenderState()->RenderDrawState.CurrentImageIndex])->Image;
 		ColorBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		ColorBarrier.subresourceRange.baseMipLevel = 0;
 		ColorBarrier.subresourceRange.levelCount = 1;
@@ -526,7 +524,7 @@ namespace DeferredPass
 		DepthBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		DepthBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		DepthBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		DepthBarrier.image = RenderResources::GetImage(DeferredInputDepthImage[Render::GetRenderState()->RenderDrawState.CurrentImageIndex]);
+		DepthBarrier.image = GetImageData(DeferredInputDepthImage[Render::GetRenderState()->RenderDrawState.CurrentImageIndex])->Image;
 		DepthBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		DepthBarrier.subresourceRange.baseMipLevel = 0;
 		DepthBarrier.subresourceRange.levelCount = 1;
@@ -639,16 +637,19 @@ namespace LightningPass
 {
 	static VkDescriptorSetLayout LightSpaceMatrixLayout;
 
-	static VkDescriptorSet LightSpaceMatrixSet[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	static BmRender_DescriptorSet LightSpaceMatrixSet[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 	static BmRender_GPUBufferEntry LightSpaceMatrixBufferRegion[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	
+	// Buffer handles array
+	static BmRender_GPUBuffer LightSpaceMatrixBuffers[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 	static BmRender_ImageView ShadowMapElement1ImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 	static BmRender_ImageView ShadowMapElement2ImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 	static VkPushConstantRange PushConstants;
 
-	void Init()
+	void Init(BmRender_DescriptorPool MainPool)
 	{
 		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
 		VkPhysicalDevice PhysicalDevice = RenderResources::GetCoreContext()->PhysicalDevice;
@@ -662,20 +663,17 @@ namespace LightningPass
 		{
 			const VkDeviceSize LightSpaceMatrixSize = sizeof(glm::mat4);
 
-			std::string BufferName = "LightSpaceMatrixBuffer" + std::to_string(i);
-			BmRender_CreateUniformBuffer(LightSpaceMatrixSize, BufferUpdateFrequency::PerFrame, PipelineStage::Vertex, BufferName);
-			LightSpaceMatrixBufferRegion[i] = RenderResources::BmRender_CreateGPUBufferEntry(0, LightSpaceMatrixSize, BufferName);
+			LightSpaceMatrixBuffers[i] = BmRender_CreateUniformBuffer(LightSpaceMatrixSize, BufferUpdateFrequency::PerFrame, PipelineStage::Vertex);
+			LightSpaceMatrixBufferRegion[i] = RenderResources::BmRender_CreateGPUBufferEntry(0, LightSpaceMatrixSize, LightSpaceMatrixBuffers[i]);
 
-			std::string DescriptorSetName = "LightSpaceMatrixSet" + std::to_string(i);
-			BmRender_CreateDescriptorSet(DescriptorSetName, RenderResources::GetDescriptorSetLayoutHandle("LightSpaceMatrixLayout"), "MainPool");
+			LightSpaceMatrixSet[i] = BmRender_CreateDescriptorSet(RenderResources::GetDescriptorSetLayoutHandle("LightSpaceMatrixLayout"), MainPool);
 
 			BmRender_DescriptorSetBinding LightSpaceMatrixBinding;
 			LightSpaceMatrixBinding.BufferRegions = &LightSpaceMatrixBufferRegion[i];
 			LightSpaceMatrixBinding.BindingCount = 1;
 			LightSpaceMatrixBinding.DstArrayElement = 0;
 
-			BmRender_UpdateDescriptorSet(DescriptorSetName, &LightSpaceMatrixBinding, 1);
-			LightSpaceMatrixSet[i] = RenderResources::GetDescriptorSet(DescriptorSetName)->Set;
+			BmRender_UpdateDescriptorSet(LightSpaceMatrixSet[i], &LightSpaceMatrixBinding, 1);
 
 			ShadowMapElement1ImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_LIGHT_SOURCES * i, 1, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
 			ShadowMapElement2ImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_LIGHT_SOURCES * i + 1, 1, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
@@ -722,8 +720,8 @@ namespace LightningPass
 		};
 
 		VkImageView Attachments[2];
-		Attachments[0] = RenderResources::GetImageView(ShadowMapElement1ImageInterface[Render::GetRenderState()->RenderDrawState.CurrentImageIndex]);
-		Attachments[1] = RenderResources::GetImageView(ShadowMapElement2ImageInterface[Render::GetRenderState()->RenderDrawState.CurrentImageIndex]);
+		Attachments[0] = GetImageViewData(ShadowMapElement1ImageInterface[Render::GetRenderState()->RenderDrawState.CurrentImageIndex])->View;
+		Attachments[1] = GetImageViewData(ShadowMapElement2ImageInterface[Render::GetRenderState()->RenderDrawState.CurrentImageIndex])->View;
 
 		VkImageMemoryBarrier2 DepthAttachmentTransitionBefore = { };
 		DepthAttachmentTransitionBefore.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -733,7 +731,7 @@ namespace LightningPass
 		DepthAttachmentTransitionBefore.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 		DepthAttachmentTransitionBefore.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		DepthAttachmentTransitionBefore.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-		DepthAttachmentTransitionBefore.image = RenderResources::GetImage(ShadowMapArray);
+		DepthAttachmentTransitionBefore.image = GetImageData(ShadowMapArray)->Image;
 		DepthAttachmentTransitionBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		DepthAttachmentTransitionBefore.subresourceRange.baseMipLevel = 0;
 		DepthAttachmentTransitionBefore.subresourceRange.levelCount = 1;
@@ -800,8 +798,8 @@ namespace LightningPass
 
 				const VkBuffer Buffers[] =
 				{
-					RenderResources::GetGPUBuffer("VertexStageData")->Buffer,
-					RenderResources::GetGPUBuffer("GPUInstances")->Buffer
+					GetGPUBufferData(State->VertexStageBuffer)->Buffer,
+					GetGPUBufferData(State->InstanceBuffer)->Buffer
 				};
 
 				const u64 Offsets[] =
@@ -813,14 +811,14 @@ namespace LightningPass
 				const u32 DescriptorSetGroupCount = 1;
 				const VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] =
 				{
-					LightSpaceMatrixSet[LightCaster],
+					GetDescriptorSetData(LightSpaceMatrixSet[LightCaster])->Set,
 				};
 
 				vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
 					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr);
 
 				vkCmdBindVertexBuffers(CmdBuffer, 0, 2, Buffers, Offsets);
-				vkCmdBindIndexBuffer(CmdBuffer, RenderResources::GetGPUBuffer("VertexStageData")->Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
+				vkCmdBindIndexBuffer(CmdBuffer, GetGPUBufferData(State->VertexStageBuffer)->Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
 				vkCmdDrawIndexed(CmdBuffer, DrawEntity->IndicesCount, DrawEntity->Instances, 0, 0, 0);
 			}
 
@@ -833,7 +831,7 @@ namespace LightningPass
 
 		DepthAttachmentTransitionAfter.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthAttachmentTransitionAfter.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		DepthAttachmentTransitionAfter.image = RenderResources::GetImage(ShadowMapArray);
+		DepthAttachmentTransitionAfter.image = GetImageData(ShadowMapArray)->Image;
 		DepthAttachmentTransitionAfter.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		DepthAttachmentTransitionAfter.subresourceRange.baseMipLevel = 0;
 		DepthAttachmentTransitionAfter.subresourceRange.levelCount = 1;
@@ -917,7 +915,7 @@ namespace MainPass
 		//const VkDescriptorSet VpSet = FrameManager::GetViewProjectionSet()[ImageIndex];
 		VkRenderingAttachmentInfo ColorAttachment = { };
 		ColorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		ColorAttachment.imageView = RenderResources::GetImageView(DeferredPass::TestDeferredInputColorImageInterface()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex]);
+		ColorAttachment.imageView = GetImageViewData(DeferredPass::TestDeferredInputColorImageInterface()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex])->View;
 		ColorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		ColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		ColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -925,7 +923,7 @@ namespace MainPass
 
 		VkRenderingAttachmentInfo DepthAttachment = { };
 		DepthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		DepthAttachment.imageView = RenderResources::GetImageView(DeferredPass::TestDeferredInputDepthImageInterface()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex]);
+		DepthAttachment.imageView = GetImageViewData(DeferredPass::TestDeferredInputDepthImageInterface()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex])->View;
 		DepthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -953,7 +951,7 @@ namespace MainPass
 		ColorBarrierBefore.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		ColorBarrierBefore.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		ColorBarrierBefore.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		ColorBarrierBefore.image = RenderResources::GetImage(DeferredPass::TestDeferredInputColorImage()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex]);
+		ColorBarrierBefore.image = GetImageData(DeferredPass::TestDeferredInputColorImage()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex])->Image;
 		ColorBarrierBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		ColorBarrierBefore.subresourceRange.baseMipLevel = 0;
 		ColorBarrierBefore.subresourceRange.levelCount = 1;
@@ -972,7 +970,7 @@ namespace MainPass
 		DepthBarrierBefore.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthBarrierBefore.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		DepthBarrierBefore.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		DepthBarrierBefore.image = RenderResources::GetImage(DeferredPass::TestDeferredInputDepthImage()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex]);
+		DepthBarrierBefore.image = GetImageData(DeferredPass::TestDeferredInputDepthImage()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex])->Image;
 		DepthBarrierBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		DepthBarrierBefore.subresourceRange.baseMipLevel = 0;
 		DepthBarrierBefore.subresourceRange.levelCount = 1;
@@ -1121,9 +1119,9 @@ namespace TerrainRender
 		VkCommandBuffer CmdBuffer = Render::GetRenderState()->RenderDrawState.Frames.CommandBuffers[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 
 		const VkDescriptorSet Sets[] = {
-			RenderResources::GetDescriptorSet("VpSet")->Set,
-			RenderResources::GetDescriptorSet("BindlesTexturesSet")->Set,
-			RenderResources::GetDescriptorSet("MaterialSet")->Set,
+			GetDescriptorSetData(State->DescriptorSets.VpSet)->Set,
+			GetDescriptorSetData(State->DescriptorSets.BindlesTexturesSet)->Set,
+			GetDescriptorSetData(State->DescriptorSets.MaterialSet)->Set,
 		};
 
 		const u32 TerrainDescriptorSetGroupCount = sizeof(Sets) / sizeof(Sets[0]);

@@ -65,16 +65,30 @@ namespace Render
 
 		VkPushConstantRange PushConstants;
 
-		VkDescriptorSet ShadowMapArraySet[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+		BmRender_DescriptorSet ShadowMapArraySet[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+	};
+
+	struct DescriptorSetHandles
+	{
+		BmRender_DescriptorSet VpSet;
+		BmRender_DescriptorSet BindlesTexturesSet;
+		BmRender_DescriptorSet StaticMeshLightSet;
+		BmRender_DescriptorSet MaterialSet;
 	};
 
 	struct RenderState
 	{
 		DrawState RenderDrawState;	
 		StaticMeshPipeline MeshPipeline;
+		DescriptorSetHandles DescriptorSets;
+		BmRender_DescriptorPool MainPool;
 		VkDescriptorPool DebugUiPool; // TODO: ?
 		Memory::FrameMemory FrameMemory;
 		BmRender_GPUBufferEntry* VpHandle;
+		
+		// Buffer handles
+		BmRender_GPUBuffer VertexStageBuffer;
+		BmRender_GPUBuffer InstanceBuffer;
 	};
 
 	struct PointLight
@@ -141,7 +155,7 @@ namespace Render
 
 	void TmpInitFrameMemory();
 
-	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferEntry* VpRegion, BmRender_GPUBufferEntry* EntityLightRegion);
+	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferEntry* VpRegion, BmRender_GPUBufferEntry* EntityLightRegion, const DescriptorSetHandles& DescriptorSets, BmRender_DescriptorPool MainPool, BmRender_GPUBuffer VertexStageBuffer, BmRender_GPUBuffer InstanceBuffer);
 	void DeInit();
 
 	void* FrameAlloc(u32 Size);
@@ -153,7 +167,7 @@ namespace Render
 
 namespace DeferredPass
 {
-	void Init();
+	void Init(BmRender_DescriptorPool MainPool);
 	void Draw();
 
 	void BeginPass();
@@ -170,7 +184,7 @@ namespace DeferredPass
 
 namespace LightningPass
 {
-	void Init();
+	void Init(BmRender_DescriptorPool MainPool);
 
 	void Draw(Render::DrawScene* Scene);
 }
