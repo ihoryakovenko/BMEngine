@@ -198,10 +198,3 @@ namespace MainPass
 
 	AttachmentData* GetAttachmentData();
 }
-
-namespace TerrainRender
-{
-	void Init();
-
-	void Draw();
-}

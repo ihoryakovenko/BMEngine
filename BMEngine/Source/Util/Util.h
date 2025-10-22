@@ -284,7 +284,6 @@ namespace Util
 	Yaml::Node& GetPushConstantsFromResources(Yaml::Node& Root);
 	
 	// Push constant management
-	extern std::unordered_map<std::string, BmRender_PushConstant> PushConstants;
 	void ParseAndCreatePushConstants(Yaml::Node& PushConstantsNode);
 	Yaml::Node& GetViewportNode(Yaml::Node& PipelineNode);
 	Yaml::Node& GetScissorNode(Yaml::Node& PipelineNode);
@@ -350,7 +349,12 @@ namespace Util
 	
 	void ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode, BmRender_DescriptorSetLayoutDescription& Description, std::vector<BmRender_LayoutBinding>& Bindings);
 	void ParsePushConstantsFromYaml(Yaml::Node& PushConstantsNode, std::vector<VkPushConstantRange>& PushConstantRanges);
-	BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, const PipelineResourceInfo& ResourceInfo);
+	BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, const PipelineResourceInfo& ResourceInfo, 
+		std::vector<VkPipelineShaderStageCreateInfo>& ShaderStages,
+		std::vector<VkVertexInputBindingDescription>& VertexBindings,
+		std::vector<VkVertexInputAttributeDescription>& VertexAttributes,
+		std::vector<BmRender_DescriptorSetLayout>& DescriptorSetLayouts,
+		std::vector<BmRender_PushConstant>& PushConstantRanges);
 	
 	VkFormat GliFormatToVkFormat(gli::format Format);
 

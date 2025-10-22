@@ -15,6 +15,15 @@
 #include <random>
 #include <mutex>
 
+// Extern declarations for global resource maps
+extern std::unordered_map<std::string, VulkanHelper::VertexBinding> VBindings;
+extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
+extern std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
+extern std::unordered_map<std::string, BmRender_Shader> Shaders;
+extern std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
+extern std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
+extern std::unordered_map<std::string, BmRender_PushConstant> PushConstants;
+
 static BmRender_Image ShadowMapArray;
 
 namespace Render
@@ -74,42 +83,49 @@ namespace Render
 		const VkDeviceSize LightBufferSize = sizeof(Render::LightBuffer);
 		MeshPipeline->EntityLightBufferHandle = EntityLightRegion;
 
-		VkDescriptorSetLayout Layout = RenderResources::GetSetLayout("ShadowMapArrayLayout")->Layout;
+		VkDescriptorSetLayout Layout = GetDescriptorSetLayoutData(DescriptorSetLayouts["ShadowMapArrayLayout"])->Layout;
 
-		for (u32 i = 0; i < RenderResources::GetCoreContext()->ImagesCount; i++)
+		for (u32 i = 0; i < GetCoreContext()->ImagesCount; i++)
 		{
 			MeshPipeline->ShadowMapArrayImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_LIGHT_SOURCES * i, MAX_LIGHT_SOURCES, VK_IMAGE_ASPECT_DEPTH_BIT);
 			
 			BmRender_DescriptorSetBinding ShadowMapBinding;
-			ShadowMapBinding.ImageBinding.Sampler = "ShadowMap";
+			ShadowMapBinding.ImageBinding.Sampler = Samplers["ShadowMap"];
 			ShadowMapBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			ShadowMapBinding.ImageBinding.ImageView = MeshPipeline->ShadowMapArrayImageInterface[i];
 			ShadowMapBinding.BindingCount = 1;
 			ShadowMapBinding.DstArrayElement = 0;
 
-			MeshPipeline->ShadowMapArraySet[i] = BmRender_CreateDescriptorSet(RenderResources::GetDescriptorSetLayoutHandle("ShadowMapArrayLayout"), MainPool);
+			MeshPipeline->ShadowMapArraySet[i] = BmRender_CreateDescriptorSet(DescriptorSetLayouts["ShadowMapArrayLayout"], MainPool);
 			BmRender_UpdateDescriptorSet(MeshPipeline->ShadowMapArraySet[i], &ShadowMapBinding, 1);
 		}
 
 		PipelineResourceInfo ResourceInfo = {};
 		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
 
-		BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/StaticMesh.yaml", MainScreenExtent, ResourceInfo);
+		// Create vectors to hold pipeline data
+		std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+		std::vector<VkVertexInputBindingDescription> vertexBindings;
+		std::vector<VkVertexInputAttributeDescription> vertexAttributes;
+		std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
+		std::vector<BmRender_PushConstant> pushConstantRanges;
+
+		BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/StaticMesh.yaml", MainScreenExtent, ResourceInfo, 
+			shaderStages, vertexBindings, vertexAttributes, descriptorSetLayouts, pushConstantRanges);
 
 		// Create pipeline layout from parsed descriptor set layouts
 		BmRender_PipelineLayoutDescription LayoutDesc = {};
-		LayoutDesc.SetLayoutCount = static_cast<u32>(PipelineDesc.DescriptorSetLayouts.size());
-		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts.data();
-		LayoutDesc.PushConstantRangeCount = static_cast<u32>(PipelineDesc.PushConstantRanges.size());
-		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges.data();
+		LayoutDesc.SetLayoutCount = PipelineDesc.DescriptorSetLayoutsCount;
+		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts;
+		LayoutDesc.PushConstantRangeCount = PipelineDesc.PushConstantRangesCount;
+		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges;
 		LayoutDesc.Flags = 0;
-		LayoutDesc.Next = nullptr;
 
-		RenderResources::CreatePipelineLayout("StaticMesh", LayoutDesc);
-		PipelineDesc.PipelineLayout = RenderResources::GetPipelineLayout("StaticMesh");
+		PipelineLayouts["StaticMesh"] = BmRender_CreatePipelineLayout(&LayoutDesc);
+		PipelineDesc.PipelineLayout = GetPipelineLayoutData(PipelineLayouts["StaticMesh"])->VulkanPipelineLayout;
 		ResourceInfo.PipelineLayout = PipelineDesc.PipelineLayout;
 
-		RenderResources::CreateGraphicsPipeline("StaticMesh", PipelineDesc);
+		Pipelines["StaticMesh"] = BmRender_CreatePipeline(&PipelineDesc);
 	}
 
 	static void DrawStaticMeshes(VkDevice Device, VkCommandBuffer CmdBuffer, StaticMeshPipeline* MeshPipeline, DrawScene* Scene, const DescriptorSetHandles& DescriptorSets, BmRender_GPUBuffer VertexStageBuffer, BmRender_GPUBuffer InstanceBuffer)
@@ -118,8 +134,8 @@ namespace Render
 		RenderResources::UpdateBufferRegion(MeshPipeline->EntityLightBufferHandle[CurrentImageIndex], 0,
 			Scene->LightEntity, sizeof(LightBuffer));
 
-		VkPipeline Pipeline = RenderResources::GetPipeline("StaticMesh");
-		VkPipelineLayout PipelineLayout = RenderResources::GetPipelineLayout("StaticMesh");
+		VkPipeline Pipeline = GetPipelineData(Pipelines["StaticMesh"])->VulkanPipeline;
+		VkPipelineLayout PipelineLayout = GetPipelineLayoutData(PipelineLayouts["StaticMesh"])->VulkanPipelineLayout;
 
 		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 
@@ -142,7 +158,9 @@ namespace Render
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
 			0, DescriptorSetGroupCount, DescriptorSetGroup, DynamicOffsetCounts[0] + DynamicOffsetCounts[1] + DynamicOffsetCounts[2] + DynamicOffsetCounts[3] + DynamicOffsetCounts[4], DynamicOffsets);
 
-		vkCmdPushConstants(CmdBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(u32), &Render::GetRenderState()->RenderDrawState.CurrentImageIndex);
+		BmRender_PushConstant Constant = PushConstants["MainConstant"];
+		VkPushConstantRange ConstantData = GetPushConstantData(Constant)->PushConstants;
+		vkCmdPushConstants(CmdBuffer, PipelineLayout, ConstantData.stageFlags, ConstantData.offset, ConstantData.size, &Render::GetRenderState()->RenderDrawState.CurrentImageIndex);
 
 		std::unique_lock Lock(Scene->TempLock);
 		for (u32 i = 0; i < Scene->DrawEntities.size(); ++i)
@@ -238,8 +256,8 @@ namespace Render
 
 	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferEntry* VpRegion, BmRender_GPUBufferEntry* EntityLightRegion, const DescriptorSetHandles& DescriptorSets, BmRender_DescriptorPool MainPool, BmRender_GPUBuffer VertexStageBuffer, BmRender_GPUBuffer InstanceBuffer)
 	{		
-		VkPhysicalDevice PhysicalDevice = RenderResources::GetCoreContext()->PhysicalDevice;
-		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+		VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
+		VkDevice Device = GetCoreContext()->LogicalDevice;
 
 		State.VpHandle = VpRegion;
 		State.DescriptorSets = DescriptorSets;
@@ -247,7 +265,7 @@ namespace Render
 		State.VertexStageBuffer = VertexStageBuffer;
 		State.InstanceBuffer = InstanceBuffer;
 
-		InitDrawState(Device, RenderResources::GetCoreContext()->Indices.GraphicsFamily, VulkanHelper::MAX_DRAW_FRAMES, &State.RenderDrawState);
+		InitDrawState(Device, GetCoreContext()->Indices.GraphicsFamily, VulkanHelper::MAX_DRAW_FRAMES, &State.RenderDrawState);
 
 		DeferredPass::Init(State.MainPool);
 		MainPass::Init();
@@ -256,16 +274,15 @@ namespace Render
 		//TerrainRender::Init();
 		//DynamicMapSystem::Init();
 		InitStaticMeshPipeline(Device, &State.MeshPipeline, EntityLightRegion, State.MainPool);
-		InitImGuiPipeline(&State.DebugUiPool, RenderResources::GetCoreContext(), WindowHandler);
+		InitImGuiPipeline(&State.DebugUiPool, GetCoreContext(), WindowHandler);
 	}
 
 	void DeInit()
 	{
-		vkDeviceWaitIdle(RenderResources::GetCoreContext()->LogicalDevice);
+		vkDeviceWaitIdle(GetCoreContext()->LogicalDevice);
 
-		BmRender_DeInit();
 
-		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+		VkDevice Device = GetCoreContext()->LogicalDevice;
 
 		DeInitImGuiPipeline(Device, State.DebugUiPool);
 		DeInitDrawState(Device, VulkanHelper::MAX_DRAW_FRAMES, &State.RenderDrawState);
@@ -282,12 +299,12 @@ namespace Render
 
 	void Draw(DrawScene* Scene, u64 WaitSemaphoreValue)
 	{
-		VulkanCoreContext::VulkanCoreContext* CoreContext = RenderResources::GetCoreContext();
+		VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
 
 		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
 		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+		VkDevice Device = GetCoreContext()->LogicalDevice;
 		const u32 CurrentFrame = State.RenderDrawState.CurrentFrame;
 		u32 ImageIndex;
 		VkFence FrameFence = State.RenderDrawState.Frames.Fences[CurrentFrame];
@@ -295,7 +312,7 @@ namespace Render
 
 		VULKAN_CHECK_RESULT(vkWaitForFences(Device, 1, &FrameFence, VK_TRUE, UINT64_MAX));
 		VULKAN_CHECK_RESULT(vkResetFences(Device, 1, &FrameFence));
-		VULKAN_CHECK_RESULT(vkAcquireNextImageKHR(Device, RenderResources::GetCoreContext()->VulkanSwapchain, UINT64_MAX, ImagesAvailable, nullptr, &ImageIndex));
+		VULKAN_CHECK_RESULT(vkAcquireNextImageKHR(Device, GetCoreContext()->VulkanSwapchain, UINT64_MAX, ImagesAvailable, nullptr, &ImageIndex));
 		State.RenderDrawState.CurrentImageIndex = ImageIndex;
 
 		RenderResources::UpdateBufferRegion(State.VpHandle[ImageIndex], 0, &Scene->ViewProjection, sizeof(ViewProjectionBuffer));
@@ -334,7 +351,7 @@ namespace Render
 		}
 
 		VkSemaphore RenderFinished = State.RenderDrawState.Frames.RenderFinished[CurrentFrame];
-		VkSwapchainKHR Swapchain = RenderResources::GetCoreContext()->VulkanSwapchain;
+		VkSwapchainKHR Swapchain = GetCoreContext()->VulkanSwapchain;
 
 		VkSubmitInfo SubmitInfo = { };
 		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -356,8 +373,8 @@ namespace Render
 		PresentInfo.pImageIndices = &ImageIndex;
 
 		std::unique_lock Lock(CoreContext->QueueSubmitMutex);
-		VULKAN_CHECK_RESULT(vkQueueSubmit(RenderResources::GetCoreContext()->GraphicsQueue, 1, &SubmitInfo, FrameFence));
-		VULKAN_CHECK_RESULT(vkQueuePresentKHR(RenderResources::GetCoreContext()->GraphicsQueue, &PresentInfo));
+		VULKAN_CHECK_RESULT(vkQueueSubmit(GetCoreContext()->GraphicsQueue, 1, &SubmitInfo, FrameFence));
+		VULKAN_CHECK_RESULT(vkQueuePresentKHR(GetCoreContext()->GraphicsQueue, &PresentInfo));
 		Lock.unlock();
 
 		State.RenderDrawState.CurrentFrame = Math::WrapIncrement(CurrentFrame, VulkanHelper::MAX_DRAW_FRAMES);
@@ -398,17 +415,17 @@ namespace DeferredPass
 
 	void Init(BmRender_DescriptorPool MainPool)
 	{
-		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-		VkPhysicalDevice PhysicalDevice = RenderResources::GetCoreContext()->PhysicalDevice;
+		VkDevice Device = GetCoreContext()->LogicalDevice;
+		VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
 
 		PipelineAttachmentData.ColorAttachmentCount = 1;
-		PipelineAttachmentData.ColorAttachmentFormats[0] = RenderResources::GetCoreContext()->SurfaceFormat.format;
+		PipelineAttachmentData.ColorAttachmentFormats[0] = GetCoreContext()->SurfaceFormat.format;
 		PipelineAttachmentData.DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
 		PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
-		DeferredInputLayout = RenderResources::GetSetLayout("MainPassOutputLayout")->Layout;
+		DeferredInputLayout = GetDescriptorSetLayoutData(DescriptorSetLayouts["MainPassOutputLayout"])->Layout;
 
-		for (u32 i = 0; i < RenderResources::GetCoreContext()->ImagesCount; i++)
+		for (u32 i = 0; i < GetCoreContext()->ImagesCount; i++)
 		{
 			//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
 
@@ -419,14 +436,14 @@ namespace DeferredPass
 			DeferredInputDepthImageInterface[i] = BmRender_CreateImageView2D(DeferredInputDepthImage[i], VK_IMAGE_ASPECT_DEPTH_BIT);
 			
 			BmRender_DescriptorSetBinding ColorBinding;
-			ColorBinding.ImageBinding.Sampler = "ColorAttachment";
+			ColorBinding.ImageBinding.Sampler = Samplers["ColorAttachment"];
 			ColorBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			ColorBinding.ImageBinding.ImageView = DeferredInputColorImageInterface[i];
 			ColorBinding.BindingCount = 1;
 			ColorBinding.DstArrayElement = 0;
 
 			BmRender_DescriptorSetBinding DepthBinding;
-			DepthBinding.ImageBinding.Sampler = "DepthAttachment";
+			DepthBinding.ImageBinding.Sampler = Samplers["DepthAttachment"];
 			DepthBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			DepthBinding.ImageBinding.ImageView = DeferredInputDepthImageInterface[i];
 			DepthBinding.BindingCount = 1;
@@ -434,7 +451,7 @@ namespace DeferredPass
 
 			BmRender_DescriptorSetBinding Bindings[] = { ColorBinding, DepthBinding };
 
-			DeferredInputSet[i] = BmRender_CreateDescriptorSet(RenderResources::GetDescriptorSetLayoutHandle("MainPassOutputLayout"), MainPool);
+			DeferredInputSet[i] = BmRender_CreateDescriptorSet(DescriptorSetLayouts["MainPassOutputLayout"], MainPool);
 			BmRender_UpdateDescriptorSet(DeferredInputSet[i], Bindings, 2);
 		}
 
@@ -442,30 +459,37 @@ namespace DeferredPass
 		PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineAttachmentData = PipelineAttachmentData;
 
-		BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/DeferredPipeline.yaml", MainScreenExtent, ResourceInfo);
+		// Create vectors to hold pipeline data
+		std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+		std::vector<VkVertexInputBindingDescription> vertexBindings;
+		std::vector<VkVertexInputAttributeDescription> vertexAttributes;
+		std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
+		std::vector<BmRender_PushConstant> pushConstantRanges;
+
+		BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/DeferredPipeline.yaml", MainScreenExtent, ResourceInfo, 
+			shaderStages, vertexBindings, vertexAttributes, descriptorSetLayouts, pushConstantRanges);
 
 		// Create pipeline layout from parsed descriptor set layouts
 		BmRender_PipelineLayoutDescription LayoutDesc = {};
-		LayoutDesc.SetLayoutCount = static_cast<u32>(PipelineDesc.DescriptorSetLayouts.size());
-		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts.data();
-		LayoutDesc.PushConstantRangeCount = static_cast<u32>(PipelineDesc.PushConstantRanges.size());
-		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges.data();
+		LayoutDesc.SetLayoutCount = PipelineDesc.DescriptorSetLayoutsCount;
+		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts;
+		LayoutDesc.PushConstantRangeCount = PipelineDesc.PushConstantRangesCount;
+		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges;
 		LayoutDesc.Flags = 0;
-		LayoutDesc.Next = nullptr;
 
-		RenderResources::CreatePipelineLayout("Deferred", LayoutDesc);
-		PipelineDesc.PipelineLayout = RenderResources::GetPipelineLayout("Deferred");
+		PipelineLayouts["Deferred"] = BmRender_CreatePipelineLayout(&LayoutDesc);
+		PipelineDesc.PipelineLayout = GetPipelineLayoutData(PipelineLayouts["Deferred"])->VulkanPipelineLayout;
 		ResourceInfo.PipelineLayout = PipelineDesc.PipelineLayout;
 
-		RenderResources::CreateGraphicsPipeline("Deferred", PipelineDesc);
+		Pipelines["Deferred"] = BmRender_CreatePipeline(&PipelineDesc);
 	}
 
 	void Draw()
 	{
 		VkCommandBuffer CmdBuffer = Render::GetRenderState()->RenderDrawState.Frames.CommandBuffers[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 
-		VkPipeline Pipeline = RenderResources::GetPipeline("Deferred");
-		VkPipelineLayout PipelineLayout = RenderResources::GetPipelineLayout("Deferred");
+		VkPipeline Pipeline = GetPipelineData(Pipelines["Deferred"])->VulkanPipeline;
+		VkPipelineLayout PipelineLayout = GetPipelineLayoutData(PipelineLayouts["Deferred"])->VulkanPipelineLayout;
 
 		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 
@@ -485,7 +509,7 @@ namespace DeferredPass
 
 		VkRenderingAttachmentInfo SwapchainColorAttachment = { };
 		SwapchainColorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		SwapchainColorAttachment.imageView = RenderResources::GetCoreContext()->ImageViews[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
+		SwapchainColorAttachment.imageView = GetCoreContext()->ImageViews[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 		SwapchainColorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		SwapchainColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		SwapchainColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -542,7 +566,7 @@ namespace DeferredPass
 		SwapchainAcquireBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		SwapchainAcquireBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		SwapchainAcquireBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		SwapchainAcquireBarrier.image = RenderResources::GetCoreContext()->Images[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
+		SwapchainAcquireBarrier.image = GetCoreContext()->Images[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 		SwapchainAcquireBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		SwapchainAcquireBarrier.subresourceRange.baseMipLevel = 0;
 		SwapchainAcquireBarrier.subresourceRange.levelCount = 1;
@@ -582,7 +606,7 @@ namespace DeferredPass
 		SwapchainPresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 		SwapchainPresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		SwapchainPresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		SwapchainPresentBarrier.image = RenderResources::GetCoreContext()->Images[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
+		SwapchainPresentBarrier.image = GetCoreContext()->Images[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 		SwapchainPresentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		SwapchainPresentBarrier.subresourceRange.baseMipLevel = 0;
 		SwapchainPresentBarrier.subresourceRange.levelCount = 1;
@@ -651,22 +675,22 @@ namespace LightningPass
 
 	void Init(BmRender_DescriptorPool MainPool)
 	{
-		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-		VkPhysicalDevice PhysicalDevice = RenderResources::GetCoreContext()->PhysicalDevice;
+		VkDevice Device = GetCoreContext()->LogicalDevice;
+		VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
 
-		LightSpaceMatrixLayout = RenderResources::GetSetLayout("LightSpaceMatrixLayout")->Layout;
+		LightSpaceMatrixLayout = GetDescriptorSetLayoutData(DescriptorSetLayouts["LightSpaceMatrixLayout"])->Layout;
 
 		ShadowMapArray = BmRender_CreateImage2DArray(DepthViewportExtent.width, DepthViewportExtent.height, DepthFormat,
-			ImageType::DepthSamplad, MAX_LIGHT_SOURCES * RenderResources::GetCoreContext()->ImagesCount);
+			ImageType::DepthSamplad, MAX_LIGHT_SOURCES * GetCoreContext()->ImagesCount);
 
-		for (u32 i = 0; i < RenderResources::GetCoreContext()->ImagesCount; i++)
+		for (u32 i = 0; i < GetCoreContext()->ImagesCount; i++)
 		{
 			const VkDeviceSize LightSpaceMatrixSize = sizeof(glm::mat4);
 
 			LightSpaceMatrixBuffers[i] = BmRender_CreateUniformBuffer(LightSpaceMatrixSize, BufferUpdateFrequency::PerFrame, PipelineStage::Vertex);
-			LightSpaceMatrixBufferRegion[i] = RenderResources::BmRender_CreateGPUBufferEntry(0, LightSpaceMatrixSize, LightSpaceMatrixBuffers[i]);
+			LightSpaceMatrixBufferRegion[i] = BmRender_CreateGPUBufferEntry(0, LightSpaceMatrixSize, LightSpaceMatrixBuffers[i]);
 
-			LightSpaceMatrixSet[i] = BmRender_CreateDescriptorSet(RenderResources::GetDescriptorSetLayoutHandle("LightSpaceMatrixLayout"), MainPool);
+			LightSpaceMatrixSet[i] = BmRender_CreateDescriptorSet(DescriptorSetLayouts["LightSpaceMatrixLayout"], MainPool);
 
 			BmRender_DescriptorSetBinding LightSpaceMatrixBinding;
 			LightSpaceMatrixBinding.BufferRegions = &LightSpaceMatrixBufferRegion[i];
@@ -689,27 +713,34 @@ namespace LightningPass
 		ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = DepthFormat;
 		ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
-		BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/DepthPipeline.yaml", DepthViewportExtent, ResourceInfo);
+		// Create vectors to hold pipeline data
+		std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+		std::vector<VkVertexInputBindingDescription> vertexBindings;
+		std::vector<VkVertexInputAttributeDescription> vertexAttributes;
+		std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
+		std::vector<BmRender_PushConstant> pushConstantRanges;
+
+		BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/DepthPipeline.yaml", DepthViewportExtent, ResourceInfo, 
+			shaderStages, vertexBindings, vertexAttributes, descriptorSetLayouts, pushConstantRanges);
 
 		// Create pipeline layout from parsed descriptor set layouts
 		BmRender_PipelineLayoutDescription LayoutDesc = {};
-		LayoutDesc.SetLayoutCount = static_cast<u32>(PipelineDesc.DescriptorSetLayouts.size());
-		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts.data();
-		LayoutDesc.PushConstantRangeCount = static_cast<u32>(PipelineDesc.PushConstantRanges.size());
-		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges.data();
+		LayoutDesc.SetLayoutCount = PipelineDesc.DescriptorSetLayoutsCount;
+		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts;
+		LayoutDesc.PushConstantRangeCount = PipelineDesc.PushConstantRangesCount;
+		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges;
 		LayoutDesc.Flags = 0;
-		LayoutDesc.Next = nullptr;
 
-		RenderResources::CreatePipelineLayout("Depth", LayoutDesc);
-		PipelineDesc.PipelineLayout = RenderResources::GetPipelineLayout("Depth");
+		PipelineLayouts["Depth"] = BmRender_CreatePipelineLayout(&LayoutDesc);
+		PipelineDesc.PipelineLayout = GetPipelineLayoutData(PipelineLayouts["Depth"])->VulkanPipelineLayout;
 		ResourceInfo.PipelineLayout = PipelineDesc.PipelineLayout;
 
-		RenderResources::CreateGraphicsPipeline("Depth", PipelineDesc);
+		Pipelines["Depth"] = BmRender_CreatePipeline(&PipelineDesc);
 	}
 
 	void Draw(Render::DrawScene* Scene)
 	{
-		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+		VkDevice Device = GetCoreContext()->LogicalDevice;
 		VkCommandBuffer CmdBuffer = Render::GetRenderState()->RenderDrawState.Frames.CommandBuffers[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
 		const Render::RenderState* State = Render::GetRenderState();
 
@@ -771,8 +802,8 @@ namespace LightningPass
 
 			vkCmdBeginRendering(CmdBuffer, &RenderingInfo);
 
-			VkPipeline Pipeline = RenderResources::GetPipeline("Depth");
-			VkPipelineLayout PipelineLayout = RenderResources::GetPipelineLayout("Depth");
+			VkPipeline Pipeline = GetPipelineData(Pipelines["Depth"])->VulkanPipeline;
+			VkPipelineLayout PipelineLayout = GetPipelineLayoutData(PipelineLayouts["Depth"])->VulkanPipelineLayout;
 
 			vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 
@@ -855,64 +886,17 @@ namespace LightningPass
 
 namespace MainPass
 {
-	static VkDescriptorSetLayout SkyBoxLayout;
-
-	static VkDescriptorSet SkyBoxSet;
-
 	static AttachmentData PipelineAttachmentData;
 
 	void Init()
 	{
-		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-
 		PipelineAttachmentData.ColorAttachmentCount = 1;
 		PipelineAttachmentData.ColorAttachmentFormats[0] = ColorFormat;
 		PipelineAttachmentData.DepthAttachmentFormat = DepthFormat;
-
-
-		const VkDescriptorType Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		const VkShaderStageFlags Flags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		VkDescriptorSetLayoutBinding LayoutBinding = { };
-		LayoutBinding.binding = 0;
-		LayoutBinding.descriptorType = Type;
-		LayoutBinding.descriptorCount = 1;
-		LayoutBinding.stageFlags = Flags;
-		LayoutBinding.pImmutableSamplers = nullptr;
-
-		VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
-		LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		LayoutCreateInfo.bindingCount = 1;
-		LayoutCreateInfo.pBindings = &LayoutBinding;
-		LayoutCreateInfo.flags = 0;
-		LayoutCreateInfo.pNext = nullptr;
-
-		//VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(RenderResources::GetCoreContext()->LogicalDevice, &LayoutCreateInfo, nullptr, &SkyBoxLayout));
-
-		PipelineResourceInfo ResourceInfo;
-		ResourceInfo.PipelineAttachmentData = PipelineAttachmentData;
-
-		//RenderResources::BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/SkyBoxPipeline.yaml", MainScreenExtent, ResourceInfo);
-
-		//// Create pipeline layout from parsed descriptor set layouts
-		//RenderResources::BmRender_PipelineLayoutDescription LayoutDesc = {};
-		//LayoutDesc.SetLayoutCount = static_cast<u32>(PipelineDesc.DescriptorSetLayouts.size());
-		//LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts.data();
-		//LayoutDesc.PushConstantRangeCount = 0;
-		//LayoutDesc.PushConstantRanges = nullptr;
-		//LayoutDesc.Flags = 0;
-		//LayoutDesc.Next = nullptr;
-
-		//RenderResources::CreatePipelineLayout("SkyBox", LayoutDesc);
-		//PipelineDesc.PipelineLayout = RenderResources::GetPipelineLayout("SkyBox");
-		//ResourceInfo.PipelineLayout = PipelineDesc.PipelineLayout;
-
-		//RenderResources::CreateGraphicsPipeline("SkyBox", PipelineDesc);
 	}
 
 	void BeginPass()
 	{
-		//const VkDescriptorSet VpSet = FrameManager::GetViewProjectionSet()[ImageIndex];
 		VkRenderingAttachmentInfo ColorAttachment = { };
 		ColorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 		ColorAttachment.imageView = GetImageViewData(DeferredPass::TestDeferredInputColorImageInterface()[Render::GetRenderState()->RenderDrawState.CurrentImageIndex])->View;
@@ -995,29 +979,6 @@ namespace MainPass
 		vkCmdPipelineBarrier2(CmdBuffer, &DepInfoBefore);
 
 		vkCmdBeginRendering(CmdBuffer, &RenderingInfo);
-
-		//
-		//if (Scene->DrawSkyBox)
-		//{
-		//	vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipelines[2].Pipeline);
-
-		//	const u32 SkyBoxDescriptorSetGroupCount = 2;
-		//	const VkDescriptorSet SkyBoxDescriptorSetGroup[SkyBoxDescriptorSetGroupCount] = {
-		//		VpSet,
-		//		Scene->SkyBox.TextureSet,
-		//	};
-
-		//	const VkPipelineLayout PipelineLayout = Pipelines[2].PipelineLayout;
-
-		//	vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-		//		0, SkyBoxDescriptorSetGroupCount, SkyBoxDescriptorSetGroup, 0, nullptr /*1, &DynamicOffset*/);
-
-		//	vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &PassSharedResources.VertexBuffer.Buffer, &Scene->SkyBox.VertexOffset);
-		//	vkCmdBindIndexBuffer(CommandBuffer, PassSharedResources.IndexBuffer.Buffer, Scene->SkyBox.IndexOffset, VK_INDEX_TYPE_UINT32);
-		//	vkCmdDrawIndexed(CommandBuffer, Scene->SkyBox.IndicesCount, 1, 0, 0, 0);
-		//}
-
-		//MainRenderPass::OnDraw();
 	}
 
 	void EndPass()
@@ -1030,220 +991,5 @@ namespace MainPass
 	AttachmentData* GetAttachmentData()
 	{
 		return &PipelineAttachmentData;
-	}
-}
-
-namespace TerrainRender
-{
-	struct TerrainVertex
-	{
-		f32 Altitude;
-	};
-
-	// TMP
-	struct PushConstantsData
-	{
-		glm::mat4 Model;
-		s32 matIndex;
-	};
-
-	static void LoadTerrain();
-	static void GenerateTerrain(std::vector<u32>& Indices);
-
-	static const u32 NumRows = 600;
-	static const u32 NumCols = 600;
-	static TerrainVertex TerrainVerticesData[NumRows][NumCols];
-	static TerrainVertex* TerrainVerticesDataPointer = &(TerrainVerticesData[0][0]);
-	static u32 IndicesCount;
-
-	static VkDescriptorSet TerrainSet;
-
-	static Render::DrawEntity TerrainDrawObject;
-
-	static VkPushConstantRange PushConstants;
-
-	void Init()
-	{
-		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
-
-		const u32 ShaderCount = 2;
-		VulkanHelper::Shader Shaders[ShaderCount];
-
-		std::vector<char> VertexShaderCode;
-		Util::OpenAndReadFileFull("./Resources/Shaders/TerrainGenerator_vert.spv", VertexShaderCode, "rb");
-		std::vector<char> FragmentShaderCode;
-		Util::OpenAndReadFileFull("./Resources/Shaders/TerrainGenerator_frag.spv", FragmentShaderCode, "rb");
-
-		Shaders[0].Stage = VK_SHADER_STAGE_VERTEX_BIT;
-		Shaders[0].Code = VertexShaderCode.data();
-		Shaders[0].CodeSize = VertexShaderCode.size();
-
-		Shaders[1].Stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		Shaders[1].Code = FragmentShaderCode.data();
-		Shaders[1].CodeSize = FragmentShaderCode.size();
-
-		const Render::RenderState* State = Render::GetRenderState();
-
-		PushConstants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-		PushConstants.offset = 0;
-		// Todo: check constant and model size?
-		PushConstants.size = sizeof(PushConstantsData);
-
-		PipelineResourceInfo ResourceInfo;
-		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
-
-		BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/TerrainPipeline.yaml", MainScreenExtent, ResourceInfo);
-
-		// Create pipeline layout from parsed descriptor set layouts
-		BmRender_PipelineLayoutDescription LayoutDesc = {};
-		LayoutDesc.SetLayoutCount = static_cast<u32>(PipelineDesc.DescriptorSetLayouts.size());
-		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts.data();
-		LayoutDesc.PushConstantRangeCount = static_cast<u32>(PipelineDesc.PushConstantRanges.size());
-		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges.data();
-		LayoutDesc.Flags = 0;
-		LayoutDesc.Next = nullptr;
-
-		RenderResources::CreatePipelineLayout("Terrain", LayoutDesc);
-		PipelineDesc.PipelineLayout = RenderResources::GetPipelineLayout("Terrain");
-		ResourceInfo.PipelineLayout = PipelineDesc.PipelineLayout;
-
-		RenderResources::CreateGraphicsPipeline("Terrain", PipelineDesc);
-
-		LoadTerrain();
-	}
-
-	void Draw()
-	{
-		const Render::RenderState* State = Render::GetRenderState();
-
-		VkCommandBuffer CmdBuffer = Render::GetRenderState()->RenderDrawState.Frames.CommandBuffers[Render::GetRenderState()->RenderDrawState.CurrentImageIndex];
-
-		const VkDescriptorSet Sets[] = {
-			GetDescriptorSetData(State->DescriptorSets.VpSet)->Set,
-			GetDescriptorSetData(State->DescriptorSets.BindlesTexturesSet)->Set,
-			GetDescriptorSetData(State->DescriptorSets.MaterialSet)->Set,
-		};
-
-		const u32 TerrainDescriptorSetGroupCount = sizeof(Sets) / sizeof(Sets[0]);
-
-		VkPipeline Pipeline = RenderResources::GetPipeline("Terrain");
-		VkPipelineLayout PipelineLayout = RenderResources::GetPipelineLayout("Terrain");
-
-		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
-
-		const u32 DynamicOffset = Render::GetRenderState()->RenderDrawState.CurrentImageIndex * sizeof(Render::ViewProjectionBuffer);
-		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-			0, TerrainDescriptorSetGroupCount, Sets, 1, &DynamicOffset);
-
-		PushConstantsData Constants;
-		//Constants.Model = TerrainDrawObject.Model;
-		//Constants.matIndex = TerrainDrawObject.MaterialIndex;
-
-		const VkShaderStageFlags Flags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-		vkCmdPushConstants(CmdBuffer, PipelineLayout, Flags, 0, sizeof(PushConstantsData), &Constants);
-
-		//VkBuffer VertexBuffer = RenderResources::GetVertexBuffer().Buffer;
-		//VkBuffer IndexBuffer = RenderResources::GetIndexBuffer().Buffer;
-
-		//u32 Count;
-		//const u64 VertexOffset = TerrainDrawObject.VertexOffset;
-		//const u64 IndexOffset = TerrainDrawObject.IndexOffset;
-
-		//vkCmdBindVertexBuffers(CmdBuffer, 0, 1, &VertexBuffer, &VertexOffset);
-		//vkCmdBindIndexBuffer(CmdBuffer, IndexBuffer, IndexOffset, VK_INDEX_TYPE_UINT32);
-		//vkCmdDrawIndexed(CmdBuffer, IndicesCount, 1, 0, 0, 0);
-	}
-
-	void LoadTerrain()
-	{
-		std::vector<u32> TerrainIndices;
-		GenerateTerrain(TerrainIndices);
-
-		IndicesCount = TerrainIndices.size();
-
-		//RenderResources::Material Mat = { };
-		//u32 MaterialIndex = Render::CreateMaterial(&Mat);
-		//TerrainDrawObject = RenderResources::CreateTerrain(&TerrainVerticesData[0][0], sizeof(TerrainVertex), NumRows * NumCols,
-			//TerrainIndices.data(), IndicesCount, MaterialIndex);
-	}
-
-	void GenerateTerrain(std::vector<u32>& Indices)
-	{
-		const f32 MaxAltitude = 0.0f;
-		const f32 MinAltitude = -10.0f;
-		const f32 SmoothMin = 7.0f;
-		const f32 SmoothMax = 3.0f;
-		const f32 SmoothFactor = 0.5f;
-		const f32 ScaleFactor = 0.2f;
-
-		std::mt19937 Gen(1);
-		std::uniform_real_distribution<f32> Dist(MinAltitude, MaxAltitude);
-
-		bool UpFactor = false;
-		bool DownFactor = false;
-
-		for (int i = 0; i < NumRows; ++i)
-		{
-			for (int j = 0; j < NumCols; ++j)
-			{
-				const f32 RandomAltitude = Dist(Gen);
-				const f32 Probability = (RandomAltitude - MinAltitude) / (MaxAltitude - MinAltitude);
-
-				const f32 PreviousCornerAltitude = i > 0 && j > 0 ? TerrainVerticesData[i - 1][j - 1].Altitude : 5.0f;
-				const f32 PreviousIAltitude = i > 0 ? TerrainVerticesData[i - 1][j].Altitude : 5.0f;
-				const f32 PreviousJAltitude = j > 0 ? TerrainVerticesData[i][j - 1].Altitude : 5.0f;
-
-				const f32 PreviousAverageAltitude = (PreviousCornerAltitude + PreviousIAltitude + PreviousJAltitude) / 3.0f;
-
-				f32 NormalizedAltitude = (PreviousAverageAltitude - MinAltitude) / (MaxAltitude - MinAltitude);
-
-				const f32 Smooth = (PreviousAverageAltitude <= SmoothMin || PreviousAverageAltitude >= SmoothMax) ? SmoothFactor : 1.0f;
-
-				if (UpFactor)
-				{
-					NormalizedAltitude *= ScaleFactor;
-				}
-				else if (DownFactor)
-				{
-					NormalizedAltitude /= ScaleFactor;
-				}
-
-				if (NormalizedAltitude > Probability)
-				{
-					TerrainVerticesData[i][j].Altitude = PreviousAverageAltitude - Probability * Smooth;
-					UpFactor = false;
-					DownFactor = true;
-				}
-				else
-				{
-					TerrainVerticesData[i][j].Altitude = PreviousAverageAltitude + Probability * Smooth;
-					UpFactor = true;
-					DownFactor = false;
-				}
-			}
-		}
-
-		Indices.reserve(NumRows * NumCols * 6);
-
-		for (int row = 0; row < NumRows - 1; ++row)
-		{
-			for (int col = 0; col < NumCols - 1; ++col)
-			{
-				u32 topLeft = row * NumCols + col;
-				u32 topRight = topLeft + 1;
-				u32 bottomLeft = (row + 1) * NumCols + col;
-				u32 bottomRight = bottomLeft + 1;
-
-				// First triangle (Top-left, Bottom-left, Bottom-right)
-				Indices.push_back(topLeft);
-				Indices.push_back(bottomLeft);
-				Indices.push_back(bottomRight);
-
-				// Second triangle (Top-left, Bottom-right, Top-right)
-				Indices.push_back(topLeft);
-				Indices.push_back(bottomRight);
-				Indices.push_back(topRight);
-			}
-		}
 	}
 }

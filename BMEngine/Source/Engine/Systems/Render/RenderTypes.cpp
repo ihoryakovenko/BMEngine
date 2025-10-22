@@ -2,6 +2,10 @@
 
 #include <Engine/Systems/HandleManager.h>
 
+#include "VulkanCoreContext.h"
+
+static VulkanCoreContext::VulkanCoreContext CoreContext;
+
 static System_HandleManager SamplerManager;
 static System_HandleManager PipelineManager;
 static System_HandleManager PipelineLayoutManager;
@@ -19,6 +23,21 @@ static u16 GetNextHandleType()
 {
 	static u16 HandleType = 0;
 	return HandleType++;
+}
+
+void CreateCoreContext(GLFWwindow* WindowHandler)
+{
+	VulkanCoreContext::CreateCoreContext(&CoreContext, WindowHandler);
+}
+
+void DestroyCoreContext()
+{
+	VulkanCoreContext::DestroyCoreContext(&CoreContext);
+}
+
+VulkanCoreContext::VulkanCoreContext* GetCoreContext()
+{
+	return &CoreContext;
 }
 
 // INIT

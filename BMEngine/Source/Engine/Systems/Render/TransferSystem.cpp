@@ -120,7 +120,7 @@ namespace TransferSystem
 
 		u64 TasksAdded = 0;
 
-		VkDevice Device = RenderResources::GetCoreContext()->LogicalDevice;
+		VkDevice Device = GetCoreContext()->LogicalDevice;
 
 		if (!HasPendingTasks(&TransferState.TransferTasksQueue))
 		{
@@ -291,11 +291,11 @@ namespace TransferSystem
 		SubmitInfo.signalSemaphoreCount = 1;
 		SubmitInfo.pSignalSemaphores = &TransferState.TransferSemaphore;
 
-		VulkanCoreContext::VulkanCoreContext* CoreContext = RenderResources::GetCoreContext();
+		VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
 
 		// Todo submit using queue system
 		std::unique_lock SubmitLock(CoreContext->QueueSubmitMutex);
-		VULKAN_CHECK_RESULT(vkQueueSubmit(RenderResources::GetCoreContext()->GraphicsQueue, 1, &SubmitInfo, TransferFence));
+		VULKAN_CHECK_RESULT(vkQueueSubmit(GetCoreContext()->GraphicsQueue, 1, &SubmitInfo, TransferFence));
 		SubmitLock.unlock();
 
 		assert(TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] <= TransferState.MaxTransferSizePerFrame);
@@ -307,7 +307,7 @@ namespace TransferSystem
 
 	void Init()
 	{
-		VulkanCoreContext::VulkanCoreContext* Context = RenderResources::GetCoreContext();
+		VulkanCoreContext::VulkanCoreContext* Context = GetCoreContext();
 		VkPhysicalDevice PhysicalDevice = Context->PhysicalDevice;
 		VkDevice Device = Context->LogicalDevice;
 
@@ -373,7 +373,7 @@ namespace TransferSystem
 
 	void DeInit()
 	{
-		VulkanCoreContext::VulkanCoreContext* Context = RenderResources::GetCoreContext();
+		VulkanCoreContext::VulkanCoreContext* Context = GetCoreContext();
 		VkDevice Device = Context->LogicalDevice;
 
 		vkDestroyBuffer(Device, TransferState.TransferStagingPool.Buffer, BmRender_GetVulkanAllocator());

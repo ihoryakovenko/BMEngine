@@ -1,10 +1,15 @@
 #pragma once
 
-#include <string>
 #include <vulkan/vulkan.h>
-#include <vector>
 
 #include "Util/EngineTypes.h"
+
+struct GLFWwindow;
+
+namespace VulkanCoreContext
+{
+	struct VulkanCoreContext;
+}
 
 enum class BufferUpdateFrequency
 {
@@ -107,7 +112,7 @@ struct BmRender_LayoutBinding
 
 struct BmRender_ImageBinding
 {
-	const char* Sampler;
+	BmRender_Sampler Sampler;
 	VkImageLayout ImageLayout; // Check if can store layout with Image resource as target layout and use instead this
 	BmRender_ImageView ImageView;
 };
@@ -121,25 +126,10 @@ struct BmRender_DescriptorSetBinding
 	u32 DstArrayElement;
 };
 
-struct BmRender_DescriptorSetDescription
-{
-	std::string Layout;
-	std::string Pool;
-	const BmRender_DescriptorSetBinding* Bindings;
-	u64 BindingsCount;
-};
-
 struct BmRender_DescriptorSetLayoutDescription
 {
 	const BmRender_LayoutBinding* Bindings;
 	u64 BindingsCount;
-};
-
-struct BmRender_ImageViewBindingDescription
-{
-	const char* Sampler;
-	u32 BindingIndex;
-	u64 ArrayElement;
 };
 
 struct BmRender_PipelineDescription
@@ -148,13 +138,18 @@ struct BmRender_PipelineDescription
 	VkPipelineLayout PipelineLayout;
 	PipelineResourceInfo ResourceInfo;
 
-	std::vector<VkPipelineShaderStageCreateInfo> ShaderStages;
-	std::vector<VkVertexInputBindingDescription> VertexBindings;
-	std::vector<VkVertexInputAttributeDescription> VertexAttributes;
+	const VkPipelineShaderStageCreateInfo* ShaderStages;
+	u32 ShaderStagesCount;
+	const VkVertexInputBindingDescription* VertexBindings;
+	u32 VertexBindingsCount;
+	const VkVertexInputAttributeDescription* VertexAttributes;
+	u32 VertexAttributesCount;
 
 	// Pipeline layout information
-	std::vector<VkDescriptorSetLayout> DescriptorSetLayouts;
-	std::vector<VkPushConstantRange> PushConstantRanges;
+	const BmRender_DescriptorSetLayout* DescriptorSetLayouts;
+	u32 DescriptorSetLayoutsCount;
+	const BmRender_PushConstant* PushConstantRanges;
+	u32 PushConstantRangesCount;
 	VkPipelineLayoutCreateFlags PipelineLayoutFlags;
 
 	VkPipelineRasterizationStateCreateInfo RasterizationState;
@@ -171,11 +166,10 @@ struct BmRender_PipelineDescription
 struct BmRender_PipelineLayoutDescription
 {
 	u32 SetLayoutCount;
-	const VkDescriptorSetLayout* SetLayouts;
+	const BmRender_DescriptorSetLayout* SetLayouts;
 	u32 PushConstantRangeCount;
-	const VkPushConstantRange* PushConstantRanges;
+	const BmRender_PushConstant* PushConstantRanges;
 	VkPipelineLayoutCreateFlags Flags;
-	const void* Next;
 };
 
 BmRender_GPUBuffer BmRender_CreateVertexStageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency);
@@ -202,7 +196,6 @@ struct BmRender_DescriptorPoolDescription
 	u32 PoolSizeCount;
 	const VkDescriptorPoolSize* PoolSizes;
 	VkDescriptorPoolCreateFlags Flags;
-	const void* Next;
 };
 
 struct BmRender_ShaderDescription
@@ -212,7 +205,7 @@ struct BmRender_ShaderDescription
 };
 
 
-void BmRender_Init();
+void BmRender_Init(GLFWwindow* WindowHandler);
 void BmRender_DeInit();
 
 VkAllocationCallbacks* BmRender_GetVulkanAllocator();
@@ -227,6 +220,7 @@ BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_D
 BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolDescription* Description);
 BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description);
 BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout LayoutHandle, BmRender_DescriptorPool PoolHandle);
+BmRender_GPUBufferEntry BmRender_CreateGPUBufferEntry(u64 BufferOffset, u64 RegionSize, BmRender_GPUBuffer BufferHandle);
 
 void BmRender_DestroySampler(BmRender_Sampler Handle);
 void BmRender_DestroyPipeline(BmRender_Pipeline Handle);

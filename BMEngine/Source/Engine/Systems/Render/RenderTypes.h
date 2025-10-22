@@ -7,6 +7,14 @@
 
 #include <atomic>
 
+struct GLFWwindow;
+
+namespace VulkanCoreContext
+{
+	struct VulkanCoreContext;
+}
+
+
 struct SamplerData
 {
 	VkSampler VulkanSampler;
@@ -86,6 +94,10 @@ struct PushConstantData
 {
 	VkPushConstantRange PushConstants;
 };
+
+void CreateCoreContext(GLFWwindow* WindowHandler);
+void DestroyCoreContext();
+VulkanCoreContext::VulkanCoreContext* GetCoreContext();
 
 void InitializeSamplerManager(u32 Size);
 void InitializePipelineManager(u32 Size);

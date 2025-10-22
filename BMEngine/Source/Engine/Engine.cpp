@@ -24,6 +24,15 @@
 
 #include <gli/gli.hpp>
 
+// Global resource maps
+std::unordered_map<std::string, VulkanHelper::VertexBinding> VBindings;
+std::unordered_map<std::string, BmRender_Sampler> Samplers;
+std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
+std::unordered_map<std::string, BmRender_Shader> Shaders;
+std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
+std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
+std::unordered_map<std::string, BmRender_PushConstant> PushConstants;
+
 namespace Engine
 {
 	static void ParseAndCreateVertices(Yaml::Node& VerticesNode)
@@ -75,7 +84,7 @@ namespace Engine
 			}
 
 			Binding.Stride = Stride;
-			RenderResources::CreateVertex((*VertexIt).first, Binding);
+			VBindings[(*VertexIt).first] = Binding;
 		}
 	}
 
@@ -88,7 +97,10 @@ namespace Engine
 			std::vector<char> ShaderCode;
 			if (Util::OpenAndReadFileFull(ShaderPath.c_str(), ShaderCode, "rb"))
 			{
-				RenderResources::CreateShader((*It).first, reinterpret_cast<const u32*>(ShaderCode.data()), ShaderCode.size());
+				BmRender_ShaderDescription ShaderDesc = {};
+			ShaderDesc.Code = reinterpret_cast<const u32*>(ShaderCode.data());
+			ShaderDesc.CodeSize = ShaderCode.size();
+			Shaders[(*It).first] = BmRender_CreateShader(&ShaderDesc);
 			}
 			else
 			{
@@ -102,7 +114,7 @@ namespace Engine
 		for (auto It = SamplersNode.Begin(); It != SamplersNode.End(); It++)
 		{
 			BmRHI_SamplerDescription Data = Util::ParseSamplerNode((*It).second);
-			RenderResources::CreateSampler((*It).first, Data);
+			Samplers[(*It).first] = BmRender_CreateSampler(&Data);
 		}
 	}
 
@@ -156,7 +168,7 @@ namespace Engine
 			Description.Bindings = Bindings.data();
 			Description.BindingsCount = static_cast<u32>(Bindings.size());
 			
-			RenderResources::CreateDescriptorSetLayout(Layout.Name, Description);
+			DescriptorSetLayouts[Layout.Name] = BmRender_CreateDescriptorSetLayout(&Description);
 		}
 	}
 
@@ -319,9 +331,7 @@ namespace Engine
 		Yaml::Node Root;
 		Yaml::Parse(Root, "./Resources/Settings/RenderResources.yaml");
 
-		BmRender_Init();
-
-		RenderResources::Init(Window);
+		BmRender_Init(Window);
 		
 		// Create MainPool using stack array
 		const u32 PoolSizeCount = 11;
@@ -347,7 +357,6 @@ namespace Engine
 		PoolDesc.PoolSizeCount = PoolSizeCount;
 		PoolDesc.PoolSizes = TotalPassPoolSizes;
 		PoolDesc.Flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
-		PoolDesc.Next = nullptr;
 
 		BmRender_DescriptorPool MainPool = BmRender_CreateDescriptorPool(&PoolDesc);
 		VertexStageBuffer = BmRender_CreateVertexStageBuffer(MB4, BufferUpdateFrequency::Static);
@@ -355,13 +364,13 @@ namespace Engine
 		FrameDataBuffer = BmRender_CreateUniformBuffer(MB4, BufferUpdateFrequency::PerFrame, PipelineStage::Fragment);
 		MaterialBuffer = BmRender_CreateStorageBuffer(MB4, BufferUpdateFrequency::Static, PipelineStage::Fragment);
 
-		VpRegion[0] = RenderResources::BmRender_CreateGPUBufferEntry(0, 128, FrameDataBuffer);
-		VpRegion[1] = RenderResources::BmRender_CreateGPUBufferEntry(128, 128, FrameDataBuffer);
-		VpRegion[2] = RenderResources::BmRender_CreateGPUBufferEntry(128 * 2, 128, FrameDataBuffer);
+		VpRegion[0] = BmRender_CreateGPUBufferEntry(0, 128, FrameDataBuffer);
+		VpRegion[1] = BmRender_CreateGPUBufferEntry(128, 128, FrameDataBuffer);
+		VpRegion[2] = BmRender_CreateGPUBufferEntry(128 * 2, 128, FrameDataBuffer);
 
-		EntityLightRegion[0] = RenderResources::BmRender_CreateGPUBufferEntry(384, 384, FrameDataBuffer);
-		EntityLightRegion[1] = RenderResources::BmRender_CreateGPUBufferEntry(384 + 384, 384, FrameDataBuffer);
-		EntityLightRegion[2] = RenderResources::BmRender_CreateGPUBufferEntry(384 + 384 * 2, 384, FrameDataBuffer);
+		EntityLightRegion[0] = BmRender_CreateGPUBufferEntry(384, 384, FrameDataBuffer);
+		EntityLightRegion[1] = BmRender_CreateGPUBufferEntry(384 + 384, 384, FrameDataBuffer);
+		EntityLightRegion[2] = BmRender_CreateGPUBufferEntry(384 + 384 * 2, 384, FrameDataBuffer);
 
 		ParseAndCreateVertices(Util::GetVertices(Root));
 		ParseAndCreateShaders(Util::GetShaders(Root));
@@ -377,7 +386,7 @@ namespace Engine
 			Binding.BindingCount = 1;
 			Binding.DstArrayElement = 0;
 
-			DescriptorSets.VpSet = BmRender_CreateDescriptorSet(RenderResources::GetDescriptorSetLayoutHandle("FrameDataLayout"), MainPool);
+			DescriptorSets.VpSet = BmRender_CreateDescriptorSet(DescriptorSetLayouts["FrameDataLayout"], MainPool);
 			BmRender_UpdateDescriptorSet(DescriptorSets.VpSet, &Binding, 1);
 		}
 
@@ -387,24 +396,24 @@ namespace Engine
 			Binding.BindingCount = 1;
 			Binding.DstArrayElement = 0;
 
-			DescriptorSets.StaticMeshLightSet = BmRender_CreateDescriptorSet(RenderResources::GetDescriptorSetLayoutHandle("FrameDataLayout"), MainPool);
+			DescriptorSets.StaticMeshLightSet = BmRender_CreateDescriptorSet(DescriptorSetLayouts["FrameDataLayout"], MainPool);
 			BmRender_UpdateDescriptorSet(DescriptorSets.StaticMeshLightSet, &Binding, 1);
 		}
 
 		{
-			BmRender_GPUBufferEntry MaterialBufferRegion = RenderResources::BmRender_CreateGPUBufferEntry(0, VK_WHOLE_SIZE, MaterialBuffer);
+			BmRender_GPUBufferEntry MaterialBufferRegion = BmRender_CreateGPUBufferEntry(0, VK_WHOLE_SIZE, MaterialBuffer);
 
 			BmRender_DescriptorSetBinding Binding;
 			Binding.BufferRegions = &MaterialBufferRegion;
 			Binding.BindingCount = 1;
 			Binding.DstArrayElement = 0;
 
-			DescriptorSets.MaterialSet = BmRender_CreateDescriptorSet(RenderResources::GetDescriptorSetLayoutHandle("MaterialLayout"), MainPool);
+			DescriptorSets.MaterialSet = BmRender_CreateDescriptorSet(DescriptorSetLayouts["MaterialLayout"], MainPool);
 			BmRender_UpdateDescriptorSet(DescriptorSets.MaterialSet, &Binding, 1);
 		}
 
 		{
-			DescriptorSets.BindlesTexturesSet = BmRender_CreateDescriptorSet(RenderResources::GetDescriptorSetLayoutHandle("BindlesTexturesLayout"), MainPool);
+			DescriptorSets.BindlesTexturesSet = BmRender_CreateDescriptorSet(DescriptorSetLayouts["BindlesTexturesLayout"], MainPool);
 		}
 
 		TransferSystem::Init();
@@ -442,11 +451,10 @@ namespace Engine
 	{
 		Render::DeInit();
 		TransferSystem::DeInit();
-		RenderResources::DeInit();
 		EngineResources::DeInit();
 		UI::DeInit();
 
-		
+		BmRender_DeInit();
 
 		glfwDestroyWindow(Window);
 

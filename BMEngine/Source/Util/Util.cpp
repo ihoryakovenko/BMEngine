@@ -14,6 +14,15 @@ FORGE_MEMORY_DEBUG
 #include "Engine/Systems/EngineResources.h"
 #include "gli/gli.hpp"
 
+// Extern declarations for global resource maps
+extern std::unordered_map<std::string, VulkanHelper::VertexBinding> VBindings;
+extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
+extern std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
+extern std::unordered_map<std::string, BmRender_Shader> Shaders;
+extern std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
+extern std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
+extern 	std::unordered_map<std::string, BmRender_PushConstant> PushConstants;
+
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
@@ -27,6 +36,8 @@ FORGE_MEMORY_DEBUG
 #include <cstdarg>
 #include <unordered_set>
 #include <iostream>
+
+extern std::unordered_map<std::string, VulkanHelper::VertexBinding> VBindings;
 
 struct VertexEqual
 {
@@ -54,8 +65,6 @@ template<> struct std::hash<EngineResources::StaticMeshVertex>
 
 namespace Util
 {
-	// Global push constants map
-	std::unordered_map<std::string, BmRender_PushConstant> PushConstants;
 	template<size_t N>
 	bool StringMatches(const char* Value, u32 Length, const char* const (&Strings)[N])
 	{
@@ -1844,11 +1853,19 @@ namespace Util
 		}
 	}
 
-	BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, const PipelineResourceInfo& ResourceInfo)
+	BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, const PipelineResourceInfo& ResourceInfo, 
+		std::vector<VkPipelineShaderStageCreateInfo>& ShaderStages,
+		std::vector<VkVertexInputBindingDescription>& VertexBindings,
+		std::vector<VkVertexInputAttributeDescription>& VertexAttributes,
+		std::vector<BmRender_DescriptorSetLayout>& OutDescriptorSetLayouts,
+		std::vector<BmRender_PushConstant>& PushConstantRanges)
 	{
-		BmRender_PipelineDescription Description = {};
-		Description.Extent = Extent;
-		Description.ResourceInfo = ResourceInfo;
+		// Clear the vectors first
+		//ShaderStages.clear();
+		//VertexBindings.clear();
+		//VertexAttributes.clear();
+		//DescriptorSetLayouts.clear();
+		//PushConstantRanges.clear();
 
 		Yaml::Node Root;
 		Yaml::Parse(Root, YamlFilePath.c_str());
@@ -1859,8 +1876,8 @@ namespace Util
 		for (auto it = PipelineLayoutNode.Begin(); it != PipelineLayoutNode.End(); it++)
 		{
 			std::string LayoutName = (*it).second.As<std::string>();
-			VkDescriptorSetLayout Layout = RenderResources::GetSetLayout(LayoutName)->Layout;
-			Description.DescriptorSetLayouts.push_back(Layout);
+			BmRender_DescriptorSetLayout LayoutHandle = DescriptorSetLayouts[LayoutName];
+			OutDescriptorSetLayouts.push_back(LayoutHandle);
 		}
 
 		// Parse push constants
@@ -1873,9 +1890,8 @@ namespace Util
 			auto it = PushConstants.find(PushConstantName);
 			if (it != PushConstants.end())
 			{
-				// Convert handle to range using GetPushConstant
-				VkPushConstantRange range = GetPushConstantData(it->second)->PushConstants;
-				Description.PushConstantRanges.push_back(range);
+				// Store the handle directly
+				PushConstantRanges.push_back(it->second);
 			}
 		}
 
@@ -1887,8 +1903,8 @@ namespace Util
 			ShaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 			ShaderStage.stage = ParseShaderStage((*it).first.c_str(), (*it).first.length());
 			ShaderStage.pName = "main";
-			ShaderStage.module = RenderResources::GetShader((*it).second.As<std::string>());
-			Description.ShaderStages.push_back(ShaderStage);
+			ShaderStage.module = GetShaderData(Shaders[(*it).second.As<std::string>()])->VulkanShaderModule;
+			ShaderStages.push_back(ShaderStage);
 		}
 
 		// Parse vertex input
@@ -1903,12 +1919,12 @@ namespace Util
 				Yaml::Node& VertexTypeNode = (*VertexTypeIt).second;
 				std::string VertexTypeName = ParseNameNode(VertexTypeNode);
 
-				VulkanHelper::VertexBinding VertexBinding = RenderResources::GetVertexBinding(VertexTypeName);
+				VulkanHelper::VertexBinding VertexBinding = VBindings[VertexTypeName];
 				VkVertexInputBindingDescription Binding = {};
 				Binding.binding = bindingIndex;
 				Binding.stride = VertexBinding.Stride;
 				Binding.inputRate = VertexBinding.InputRate;
-				Description.VertexBindings.push_back(Binding);
+				VertexBindings.push_back(Binding);
 
 				Yaml::Node& AttributesNode = GetVertexAttributesNode(VertexTypeNode);
 				for (auto AttrIt = AttributesNode.Begin(); AttrIt != AttributesNode.End(); AttrIt++)
@@ -1924,7 +1940,7 @@ namespace Util
 						Attribute.location = currentLocation;
 						Attribute.format = bindingAttrIt->second.Format;
 						Attribute.offset = bindingAttrIt->second.Offset;
-						Description.VertexAttributes.push_back(Attribute);
+						VertexAttributes.push_back(Attribute);
 						currentLocation++;
 					}
 				}
@@ -1943,6 +1959,23 @@ namespace Util
 		Yaml::Node& ViewportStateNode = GetPipelineViewportStateNode(PipelineNode);
 		Yaml::Node& ViewportNode = GetViewportNode(PipelineNode);
 		Yaml::Node& ScissorNode = GetScissorNode(PipelineNode);
+
+		// Create the final description structure with C arrays
+		BmRender_PipelineDescription Description = {};
+		Description.Extent = Extent;
+		Description.ResourceInfo = ResourceInfo;
+
+		// Convert vectors to C arrays
+		Description.ShaderStages = ShaderStages.empty() ? nullptr : ShaderStages.data();
+		Description.ShaderStagesCount = static_cast<u32>(ShaderStages.size());
+		Description.VertexBindings = VertexBindings.empty() ? nullptr : VertexBindings.data();
+		Description.VertexBindingsCount = static_cast<u32>(VertexBindings.size());
+		Description.VertexAttributes = VertexAttributes.empty() ? nullptr : VertexAttributes.data();
+		Description.VertexAttributesCount = static_cast<u32>(VertexAttributes.size());
+		Description.DescriptorSetLayouts = OutDescriptorSetLayouts.empty() ? nullptr : OutDescriptorSetLayouts.data();
+		Description.DescriptorSetLayoutsCount = static_cast<u32>(OutDescriptorSetLayouts.size());
+		Description.PushConstantRanges = PushConstantRanges.empty() ? nullptr : PushConstantRanges.data();
+		Description.PushConstantRangesCount = static_cast<u32>(PushConstantRanges.size());
 
 		Description.RasterizationState = ParsePipelineRasterizationNode(RasterizationNode);
 		Description.ColorBlendAttachment = ParsePipelineColorBlendAttachmentNode(ColorBlendAttachmentNode);

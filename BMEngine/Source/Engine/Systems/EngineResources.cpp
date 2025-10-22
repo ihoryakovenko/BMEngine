@@ -6,6 +6,14 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+// Extern declarations for global resource maps
+extern std::unordered_map<std::string, VulkanHelper::VertexBinding> VBindings;
+extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
+extern std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
+extern std::unordered_map<std::string, BmRender_Shader> Shaders;
+extern std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
+extern std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
+
 namespace EngineResources
 {
 	static std::unordered_map<u64, TextureAsset> TextureAssets;
@@ -71,14 +79,14 @@ namespace EngineResources
 		DefaultAsset.RenderViewHandle = BmRender_CreateImageView2D(DefaultAsset.RenderImageHandle, VK_IMAGE_ASPECT_COLOR_BIT);
 
 		BmRender_DescriptorSetBinding DiffuseBinding;
-		DiffuseBinding.ImageBinding.Sampler = "DiffuseTexture";
+		DiffuseBinding.ImageBinding.Sampler = Samplers["DiffuseTexture"];
 		DiffuseBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		DiffuseBinding.ImageBinding.ImageView = DefaultAsset.RenderViewHandle;
 		DiffuseBinding.DstArrayElement = 0;
 		DiffuseBinding.BindingCount = 1;
 
 		BmRender_DescriptorSetBinding SpecularBinding;
-		SpecularBinding.ImageBinding.Sampler = "SpecularTexture";
+		SpecularBinding.ImageBinding.Sampler = Samplers["SpecularTexture"];
 		SpecularBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		SpecularBinding.ImageBinding.ImageView = DefaultAsset.RenderViewHandle;
 		SpecularBinding.DstArrayElement = 0;
@@ -146,14 +154,14 @@ namespace EngineResources
 							SpecularTextureHandle = AlbedoTextureHandle;
 
 							BmRender_DescriptorSetBinding DiffuseBinding;
-							DiffuseBinding.ImageBinding.Sampler = "DiffuseTexture";
+							DiffuseBinding.ImageBinding.Sampler = Samplers["DiffuseTexture"];
 							DiffuseBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 							DiffuseBinding.ImageBinding.ImageView = it->second.RenderViewHandle;
 							DiffuseBinding.DstArrayElement = TexturesGPUIndexCounter;
 							DiffuseBinding.BindingCount = 1;
 
 							BmRender_DescriptorSetBinding SpecularBinding;
-							SpecularBinding.ImageBinding.Sampler = "SpecularTexture";
+							SpecularBinding.ImageBinding.Sampler = Samplers["SpecularTexture"];
 							SpecularBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 							SpecularBinding.ImageBinding.ImageView = it->second.RenderViewHandle;
 							SpecularBinding.DstArrayElement = TexturesGPUIndexCounter;
@@ -187,7 +195,7 @@ namespace EngineResources
 
 				const u64 VertexDataSize = VerticesCount * sizeof(StaticMeshVertex) + IndicesCount * sizeof(u32);
 				
-				BmRender_GPUBufferEntry MeshHandle = RenderResources::BmRender_CreateGPUBufferEntry(ModelVertexByteOffset, VertexDataSize, VertexStageBuffer);
+				BmRender_GPUBufferEntry MeshHandle = BmRender_CreateGPUBufferEntry(ModelVertexByteOffset, VertexDataSize, VertexStageBuffer);
 				RenderResources::UpdateBufferRegion(MeshHandle, 0, Model.VertexData + ModelVertexByteOffset, VertexDataSize);
 
 				Material Mat;
@@ -195,7 +203,7 @@ namespace EngineResources
 				Mat.SpecularTexIndex = TextureGPUIndex;
 				Mat.Shininess = 32.0f;
 
-				const BmRender_GPUBufferEntry MaterialHandle = RenderResources::BmRender_CreateGPUBufferEntry(MateriaIndex * sizeof(Mat), sizeof(Mat), MaterialBuffer);
+				const BmRender_GPUBufferEntry MaterialHandle = BmRender_CreateGPUBufferEntry(MateriaIndex * sizeof(Mat), sizeof(Mat), MaterialBuffer);
 				RenderResources::UpdateBufferRegion(MaterialHandle, 0, &Mat, sizeof(Mat));
 
 				InstanceData Instance;
@@ -205,7 +213,7 @@ namespace EngineResources
 				++MateriaIndex;
 
 				const u64 InstanceOffset = InstanceIndex * sizeof(Instance);
-				const BmRender_GPUBufferEntry InstanceHandle = RenderResources::BmRender_CreateGPUBufferEntry(InstanceOffset, sizeof(Instance), InstanceBuffer);
+				const BmRender_GPUBufferEntry InstanceHandle = BmRender_CreateGPUBufferEntry(InstanceOffset, sizeof(Instance), InstanceBuffer);
 				RenderResources::UpdateBufferRegion(InstanceHandle, 0, &Instance, sizeof(Instance));
 
 				++InstanceIndex;
