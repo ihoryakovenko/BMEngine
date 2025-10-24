@@ -16,6 +16,7 @@
 
 #include "Engine/Systems/Render/VulkanHelper.h"
 #include "Engine/Systems/Render/RenderResources.h"
+#include "Engine/Systems/Render/RenderInterface.h"
 
 namespace Util
 {
@@ -302,9 +303,8 @@ namespace Util
 	std::string ParseShaderNode(Yaml::Node& ShaderNode);
 	BmRHI_SamplerDescription ParseSamplerNode(Yaml::Node& SamplerNode);
 	BmRender_LayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode);
-	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, VulkanHelper::VertexAttribute* OutAttribute, std::string* OutAttributeName);
-	void ParseMat4AttributeNode(Yaml::Node& AttributeNode, std::vector<VulkanHelper::VertexAttribute>& OutAttributes, std::vector<std::string>& OutAttributeNames, u32 BaseOffset);
-	VulkanHelper::VertexBinding ParseVertexBindingNode(Yaml::Node& BindingNode);
+	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, VertexAttribute* OutAttribute, std::string* OutAttributeName);
+	VertexBinding_depr ParseVertexBindingNode(Yaml::Node& BindingNode);
 	VkPipelineRasterizationStateCreateInfo ParsePipelineRasterizationNode(Yaml::Node& RasterizationNode);
 	VkPipelineColorBlendStateCreateInfo ParsePipelineColorBlendStateNode(Yaml::Node& ColorBlendStateNode);
 	VkPipelineColorBlendAttachmentState ParsePipelineColorBlendAttachmentNode(Yaml::Node& ColorBlendAttachmentNode);
@@ -334,9 +334,9 @@ namespace Util
 	VkDescriptorType ParseDescriptorType(const char* Value, u32 Length);
 	VkShaderStageFlags ParseShaderStageFlags(const char* Value, u32 Length);
 
-	VkFormat ParseShaderTypeToVkFormat(const char* Value, u32 Length);
+	BmRender_AttributeType ParseShaderTypeToAttributeType(const char* Value, u32 Length);
 	VkVertexInputRate ParseVertexInputRate(const char* Value, u32 Length);
-	u32 CalculateFormatSize(VkFormat Format);
+	u32 GetAttributeTypeSize(BmRender_AttributeType Attribute);
 
 	BufferUsageFlag ParseBufferUsageFlag(const char* Value, u32 Length);
 	MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length);
@@ -351,8 +351,7 @@ namespace Util
 	void ParsePushConstantsFromYaml(Yaml::Node& PushConstantsNode, std::vector<VkPushConstantRange>& PushConstantRanges);
 	BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, const PipelineResourceInfo& ResourceInfo, 
 		std::vector<VkPipelineShaderStageCreateInfo>& ShaderStages,
-		std::vector<VkVertexInputBindingDescription>& VertexBindings,
-		std::vector<VkVertexInputAttributeDescription>& VertexAttributes,
+		std::vector<BmRender_VertexBinding>& VertexBindings,
 		std::vector<BmRender_DescriptorSetLayout>& DescriptorSetLayouts,
 		std::vector<BmRender_PushConstant>& PushConstantRanges);
 	

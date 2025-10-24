@@ -20,10 +20,7 @@ pipeline:
         - name: Normal
     - name: StaticMeshInstance
       attributes:
-        - name: InstanceModel0
-        - name: InstanceModel1
-        - name: InstanceModel2
-        - name: InstanceModel3
+        - name: InstanceModel
         - name: InstanceMaterialIndex
 
   rasterization:

@@ -70,19 +70,6 @@ namespace VulkanHelper
 		VkPipelineLayout PipelineLayout;
 	};
 
-	struct VertexAttribute
-	{
-		VkFormat Format;
-		u32 Offset;
-	};
-
-	struct VertexBinding
-	{
-		u32 Stride;
-		VkVertexInputRate InputRate;
-		std::unordered_map<std::string, VertexAttribute> Attributes;
-	};
-
 	VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface, const VkSurfaceFormatKHR* AvailableFormats, u32 Count);
 
 	void GetRequiredInstanceExtensions(const char** RequiredInstanceExtensions, u32 RequiredExtensionsCount,
@@ -116,6 +103,7 @@ namespace VulkanHelper
 	void UpdateHostCompatibleBufferMemory(VkDevice Device, VkDeviceMemory Memory, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);
 
 	u32 GetFormatAlignment(VkFormat Format);
+	u32 CalculateFormatSize(VkFormat Format);
 
 	bool CreateDebugUtilsMessengerEXT(VkInstance Instance, const VkDebugUtilsMessengerCreateInfoEXT* CreateInfo,
 		const VkAllocationCallbacks* Allocator, VkDebugUtilsMessengerEXT* InDebugMessenger);

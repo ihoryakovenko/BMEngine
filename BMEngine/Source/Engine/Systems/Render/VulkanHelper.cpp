@@ -860,4 +860,19 @@ namespace VulkanHelper
 				return 4;
 		}
 	}
+
+	u32 CalculateFormatSize(VkFormat Format)
+	{
+		switch (Format)
+		{
+			case VK_FORMAT_R32_SFLOAT: return 4;
+			case VK_FORMAT_R32G32_SFLOAT: return 8;
+			case VK_FORMAT_R32G32B32_SFLOAT: return 12;
+			case VK_FORMAT_R32G32B32A32_SFLOAT: return 16;
+			case VK_FORMAT_R32_UINT: return 4;
+			default:
+				assert(false);
+				return 4;
+		}
+	}
 }

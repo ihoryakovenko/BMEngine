@@ -2,6 +2,7 @@
 
 #include <mini-yaml/yaml/Yaml.hpp>
 #include <vector>
+#include <algorithm>
 
 #include "EngineTypes.h"
 
@@ -15,7 +16,7 @@ FORGE_MEMORY_DEBUG
 #include "gli/gli.hpp"
 
 // Extern declarations for global resource maps
-extern std::unordered_map<std::string, VulkanHelper::VertexBinding> VBindings;
+extern std::unordered_map<std::string, VertexBinding_depr> VBindings;
 extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
 extern std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 extern std::unordered_map<std::string, BmRender_Shader> Shaders;
@@ -36,8 +37,6 @@ extern 	std::unordered_map<std::string, BmRender_PushConstant> PushConstants;
 #include <cstdarg>
 #include <unordered_set>
 #include <iostream>
-
-extern std::unordered_map<std::string, VulkanHelper::VertexBinding> VBindings;
 
 struct VertexEqual
 {
@@ -588,38 +587,22 @@ namespace Util
 		return Empty;
 	}
 
-	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, VulkanHelper::VertexAttribute* OutAttribute, std::string* OutAttributeName)
+	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, VertexAttribute* OutAttribute, std::string* OutAttributeName)
 	{
 		*OutAttribute = { };
 
 		if (!AttributeNode["type"].IsNone())
 		{
 			std::string typeStr = AttributeNode["type"].As<std::string>();
-			OutAttribute->Format = ParseShaderTypeToVkFormat(typeStr.c_str(), typeStr.length());
+			OutAttribute->Type = ParseShaderTypeToAttributeType(typeStr.c_str(), typeStr.length());
 		}
 
 		*OutAttributeName = ParseNameNode(AttributeNode);
 	}
 
-	void ParseMat4AttributeNode(Yaml::Node& AttributeNode, std::vector<VulkanHelper::VertexAttribute>& OutAttributes, std::vector<std::string>& OutAttributeNames, u32 BaseOffset)
+	VertexBinding_depr ParseVertexBindingNode(Yaml::Node& BindingNode)
 	{
-		std::string baseName = ParseNameNode(AttributeNode);
-		
-		// Create 4 vec4 attributes for mat4
-		for (u32 i = 0; i < 4; ++i)
-		{
-			VulkanHelper::VertexAttribute attribute = {};
-			attribute.Format = VK_FORMAT_R32G32B32A32_SFLOAT;
-			attribute.Offset = BaseOffset + (i * 16); // Each vec4 is 16 bytes
-			
-			OutAttributes.push_back(attribute);
-			OutAttributeNames.push_back(baseName + std::to_string(i));
-		}
-	}
-
-	VulkanHelper::VertexBinding ParseVertexBindingNode(Yaml::Node& BindingNode)
-	{
-		VulkanHelper::VertexBinding OutBinding = { };
+		VertexBinding_depr OutBinding = { };
 
 		if (!BindingNode["inputRate"].IsNone())
 		{
@@ -1193,19 +1176,33 @@ namespace Util
 		return flags;
 	}
 
-	VkFormat ParseShaderTypeToVkFormat(const char* Value, u32 Length)
+	//VkFormat ParseShaderTypeToVkFormat(const char* Value, u32 Length)
+	//{
+	//	if (strncmp(Value, "vec2", Length) == 0) return VK_FORMAT_R32G32_SFLOAT;
+	//	if (strncmp(Value, "vec3", Length) == 0) return VK_FORMAT_R32G32B32_SFLOAT;
+	//	if (strncmp(Value, "vec4", Length) == 0) return VK_FORMAT_R32G32B32A32_SFLOAT;
+	//	if (strncmp(Value, "mat4", Length) == 0) return VK_FORMAT_R32G32B32A32_SFLOAT;
+	//	if (strncmp(Value, "uint", Length) == 0) return VK_FORMAT_R32_UINT;
+	//	if (strncmp(Value, "int", Length) == 0) return VK_FORMAT_R32_SINT;
+	//	if (strncmp(Value, "float", Length) == 0) return VK_FORMAT_R32_SFLOAT;
+	//	if (strncmp(Value, "double", Length) == 0) return VK_FORMAT_R64_SFLOAT;
+
+	//	assert(false);
+	//	return VK_FORMAT_R32_SFLOAT;
+	//}
+
+	BmRender_AttributeType ParseShaderTypeToAttributeType(const char* Value, u32 Length)
 	{
-		if (strncmp(Value, "vec2", Length) == 0) return VK_FORMAT_R32G32_SFLOAT;
-		if (strncmp(Value, "vec3", Length) == 0) return VK_FORMAT_R32G32B32_SFLOAT;
-		if (strncmp(Value, "vec4", Length) == 0) return VK_FORMAT_R32G32B32A32_SFLOAT;
-		if (strncmp(Value, "mat4", Length) == 0) return VK_FORMAT_R32G32B32A32_SFLOAT;
-		if (strncmp(Value, "uint", Length) == 0) return VK_FORMAT_R32_UINT;
-		if (strncmp(Value, "int", Length) == 0) return VK_FORMAT_R32_SINT;
-		if (strncmp(Value, "float", Length) == 0) return VK_FORMAT_R32_SFLOAT;
-		if (strncmp(Value, "double", Length) == 0) return VK_FORMAT_R64_SFLOAT;
+		if (strncmp(Value, "int", Length) == 0) return BmRender_AttributeType::Int;
+		if (strncmp(Value, "uint", Length) == 0) return BmRender_AttributeType::Uint;
+		if (strncmp(Value, "float", Length) == 0) return BmRender_AttributeType::Float;
+		if (strncmp(Value, "vec2", Length) == 0) return BmRender_AttributeType::Vec2;
+		if (strncmp(Value, "vec3", Length) == 0) return BmRender_AttributeType::Vec3;
+		if (strncmp(Value, "vec4", Length) == 0) return BmRender_AttributeType::Vec4;
+		if (strncmp(Value, "mat4", Length) == 0) return BmRender_AttributeType::Mat4;
 
 		assert(false);
-		return VK_FORMAT_R32_SFLOAT;
+		return BmRender_AttributeType::Float;
 	}
 
 	VkVertexInputRate ParseVertexInputRate(const char* Value, u32 Length)
@@ -1217,18 +1214,23 @@ namespace Util
 		return VK_VERTEX_INPUT_RATE_VERTEX;
 	}
 
-	u32 CalculateFormatSize(VkFormat Format)
+	u32 GetAttributeTypeSize(BmRender_AttributeType Attribute)
 	{
-		switch (Format)
+		switch (Attribute)
 		{
-			case VK_FORMAT_R32_SFLOAT: return 4;
-			case VK_FORMAT_R32G32_SFLOAT: return 8;
-			case VK_FORMAT_R32G32B32_SFLOAT: return 12;
-			case VK_FORMAT_R32G32B32A32_SFLOAT: return 16;
-			case VK_FORMAT_R32_UINT: return 4;
-			default:
-				assert(false);
+			case BmRender_AttributeType::Int:
+			case BmRender_AttributeType::Uint:
+			case BmRender_AttributeType::Float:
 				return 4;
+			case BmRender_AttributeType::Vec2:
+				return 8;
+			case BmRender_AttributeType::Vec3:
+				return 12;
+			case BmRender_AttributeType::Vec4:
+				return 16;
+			case BmRender_AttributeType::Mat4:
+				return 64;
+			default: assert(false);
 		}
 	}
 
@@ -1855,8 +1857,7 @@ namespace Util
 
 	BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, const PipelineResourceInfo& ResourceInfo, 
 		std::vector<VkPipelineShaderStageCreateInfo>& ShaderStages,
-		std::vector<VkVertexInputBindingDescription>& VertexBindings,
-		std::vector<VkVertexInputAttributeDescription>& VertexAttributes,
+		std::vector<BmRender_VertexBinding>& VertexBindings,
 		std::vector<BmRender_DescriptorSetLayout>& OutDescriptorSetLayouts,
 		std::vector<BmRender_PushConstant>& PushConstantRanges)
 	{
@@ -1911,41 +1912,36 @@ namespace Util
 		Yaml::Node& VertexAttributeLayoutNode = GetVertexAttributeLayoutNode(PipelineNode);
 		if (!VertexAttributeLayoutNode.IsNone())
 		{
-			u32 currentLocation = 0;
-			u32 bindingIndex = 0;
-
 			for (auto VertexTypeIt = VertexAttributeLayoutNode.Begin(); VertexTypeIt != VertexAttributeLayoutNode.End(); VertexTypeIt++)
 			{
 				Yaml::Node& VertexTypeNode = (*VertexTypeIt).second;
 				std::string VertexTypeName = ParseNameNode(VertexTypeNode);
-
-				VulkanHelper::VertexBinding VertexBinding = VBindings[VertexTypeName];
-				VkVertexInputBindingDescription Binding = {};
-				Binding.binding = bindingIndex;
-				Binding.stride = VertexBinding.Stride;
-				Binding.inputRate = VertexBinding.InputRate;
-				VertexBindings.push_back(Binding);
-
 				Yaml::Node& AttributesNode = GetVertexAttributesNode(VertexTypeNode);
+
+				VertexBinding_depr VertexBindingDepr = VBindings[VertexTypeName];
+
+				BmRender_VertexBinding BmRenderVertexBinding = { };
+				BmRenderVertexBinding.Stride = VertexBindingDepr.Stride;
+				BmRenderVertexBinding.InputRate = VertexBindingDepr.InputRate;
+				BmRenderVertexBinding.AttributesCount = AttributesNode.Size();
+				BmRenderVertexBinding.Attributes = (VertexAttribute*)malloc(sizeof(VertexAttribute) * BmRenderVertexBinding.AttributesCount);
+
+				u32 testIndex = 0;
 				for (auto AttrIt = AttributesNode.Begin(); AttrIt != AttributesNode.End(); AttrIt++)
 				{
 					Yaml::Node& AttributeNode = (*AttrIt).second;
 					std::string AttributeName = ParseNameNode(AttributeNode);
 
-					auto bindingAttrIt = VertexBinding.Attributes.find(AttributeName);
-					if (bindingAttrIt != VertexBinding.Attributes.end())
+					auto bindingAttrIt = VertexBindingDepr.Attributes.find(AttributeName);
+					if (bindingAttrIt != VertexBindingDepr.Attributes.end())
 					{
-						VkVertexInputAttributeDescription Attribute = {};
-						Attribute.binding = bindingIndex;
-						Attribute.location = currentLocation;
-						Attribute.format = bindingAttrIt->second.Format;
-						Attribute.offset = bindingAttrIt->second.Offset;
-						VertexAttributes.push_back(Attribute);
-						currentLocation++;
+						BmRenderVertexBinding.Attributes[testIndex] = bindingAttrIt->second;
 					}
-				}
 
-				bindingIndex++;
+					++testIndex;
+				}
+				
+				VertexBindings.push_back(BmRenderVertexBinding);
 			}
 		}
 
@@ -1970,8 +1966,6 @@ namespace Util
 		Description.ShaderStagesCount = static_cast<u32>(ShaderStages.size());
 		Description.VertexBindings = VertexBindings.empty() ? nullptr : VertexBindings.data();
 		Description.VertexBindingsCount = static_cast<u32>(VertexBindings.size());
-		Description.VertexAttributes = VertexAttributes.empty() ? nullptr : VertexAttributes.data();
-		Description.VertexAttributesCount = static_cast<u32>(VertexAttributes.size());
 		Description.DescriptorSetLayouts = OutDescriptorSetLayouts.empty() ? nullptr : OutDescriptorSetLayouts.data();
 		Description.DescriptorSetLayoutsCount = static_cast<u32>(OutDescriptorSetLayouts.size());
 		Description.PushConstantRanges = PushConstantRanges.empty() ? nullptr : PushConstantRanges.data();

@@ -16,7 +16,7 @@
 #include <mutex>
 
 // Extern declarations for global resource maps
-extern std::unordered_map<std::string, VulkanHelper::VertexBinding> VBindings;
+extern std::unordered_map<std::string, VertexBinding_depr> VBindings;
 extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
 extern std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 extern std::unordered_map<std::string, BmRender_Shader> Shaders;
@@ -105,13 +105,12 @@ namespace Render
 
 		// Create vectors to hold pipeline data
 		std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
-		std::vector<VkVertexInputBindingDescription> vertexBindings;
-		std::vector<VkVertexInputAttributeDescription> vertexAttributes;
+		std::vector<BmRender_VertexBinding> vertexBindings;
 		std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
 		std::vector<BmRender_PushConstant> pushConstantRanges;
 
 		BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/StaticMesh.yaml", MainScreenExtent, ResourceInfo, 
-			shaderStages, vertexBindings, vertexAttributes, descriptorSetLayouts, pushConstantRanges);
+			shaderStages, vertexBindings, descriptorSetLayouts, pushConstantRanges);
 
 		// Create pipeline layout from parsed descriptor set layouts
 		BmRender_PipelineLayoutDescription LayoutDesc = {};
@@ -122,7 +121,7 @@ namespace Render
 		LayoutDesc.Flags = 0;
 
 		PipelineLayouts["StaticMesh"] = BmRender_CreatePipelineLayout(&LayoutDesc);
-		PipelineDesc.PipelineLayout = GetPipelineLayoutData(PipelineLayouts["StaticMesh"])->VulkanPipelineLayout;
+		PipelineDesc.PipelineLayout = PipelineLayouts["StaticMesh"];
 		ResourceInfo.PipelineLayout = PipelineDesc.PipelineLayout;
 
 		Pipelines["StaticMesh"] = BmRender_CreatePipeline(&PipelineDesc);
@@ -461,13 +460,12 @@ namespace DeferredPass
 
 		// Create vectors to hold pipeline data
 		std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
-		std::vector<VkVertexInputBindingDescription> vertexBindings;
-		std::vector<VkVertexInputAttributeDescription> vertexAttributes;
+		std::vector<BmRender_VertexBinding> vertexBindings;
 		std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
 		std::vector<BmRender_PushConstant> pushConstantRanges;
 
 		BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/DeferredPipeline.yaml", MainScreenExtent, ResourceInfo, 
-			shaderStages, vertexBindings, vertexAttributes, descriptorSetLayouts, pushConstantRanges);
+			shaderStages, vertexBindings, descriptorSetLayouts, pushConstantRanges);
 
 		// Create pipeline layout from parsed descriptor set layouts
 		BmRender_PipelineLayoutDescription LayoutDesc = {};
@@ -478,7 +476,7 @@ namespace DeferredPass
 		LayoutDesc.Flags = 0;
 
 		PipelineLayouts["Deferred"] = BmRender_CreatePipelineLayout(&LayoutDesc);
-		PipelineDesc.PipelineLayout = GetPipelineLayoutData(PipelineLayouts["Deferred"])->VulkanPipelineLayout;
+		PipelineDesc.PipelineLayout = PipelineLayouts["Deferred"];
 		ResourceInfo.PipelineLayout = PipelineDesc.PipelineLayout;
 
 		Pipelines["Deferred"] = BmRender_CreatePipeline(&PipelineDesc);
@@ -715,13 +713,12 @@ namespace LightningPass
 
 		// Create vectors to hold pipeline data
 		std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
-		std::vector<VkVertexInputBindingDescription> vertexBindings;
-		std::vector<VkVertexInputAttributeDescription> vertexAttributes;
+		std::vector<BmRender_VertexBinding> vertexBindings;
 		std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
 		std::vector<BmRender_PushConstant> pushConstantRanges;
 
 		BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/DepthPipeline.yaml", DepthViewportExtent, ResourceInfo, 
-			shaderStages, vertexBindings, vertexAttributes, descriptorSetLayouts, pushConstantRanges);
+			shaderStages, vertexBindings, descriptorSetLayouts, pushConstantRanges);
 
 		// Create pipeline layout from parsed descriptor set layouts
 		BmRender_PipelineLayoutDescription LayoutDesc = {};
@@ -732,7 +729,7 @@ namespace LightningPass
 		LayoutDesc.Flags = 0;
 
 		PipelineLayouts["Depth"] = BmRender_CreatePipelineLayout(&LayoutDesc);
-		PipelineDesc.PipelineLayout = GetPipelineLayoutData(PipelineLayouts["Depth"])->VulkanPipelineLayout;
+		PipelineDesc.PipelineLayout = PipelineLayouts["Depth"];
 		ResourceInfo.PipelineLayout = PipelineDesc.PipelineLayout;
 
 		Pipelines["Depth"] = BmRender_CreatePipeline(&PipelineDesc);

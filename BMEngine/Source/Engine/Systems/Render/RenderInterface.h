@@ -4,12 +4,26 @@
 
 #include "Util/EngineTypes.h"
 
+#include <string>
+#include <unordered_map>
+
 struct GLFWwindow;
 
 namespace VulkanCoreContext
 {
 	struct VulkanCoreContext;
 }
+
+enum class BmRender_AttributeType
+{
+	Int,
+	Uint,
+	Float,
+	Vec2,
+	Vec3,
+	Vec4,
+	Mat4
+};
 
 enum class BufferUpdateFrequency
 {
@@ -72,7 +86,7 @@ struct AttachmentData
 struct PipelineResourceInfo
 {
 	AttachmentData PipelineAttachmentData;
-	VkPipelineLayout PipelineLayout = nullptr;
+	BmRender_PipelineLayout PipelineLayout = {};
 };
 
 struct BmRHI_SamplerDescription
@@ -132,18 +146,38 @@ struct BmRender_DescriptorSetLayoutDescription
 	u64 BindingsCount;
 };
 
+struct VertexAttribute
+{
+	BmRender_AttributeType Type;
+	u32 Offset;
+};
+
+struct VertexBinding_depr
+{
+	u32 Stride;
+	VkVertexInputRate InputRate;
+	std::unordered_map<std::string, VertexAttribute> Attributes;
+};
+
+struct BmRender_VertexBinding
+{
+	VertexAttribute* Attributes;
+	u32 AttributesCount;
+	u32 Stride;
+	VkVertexInputRate InputRate;
+	
+};
+
 struct BmRender_PipelineDescription
 {
 	VkExtent2D Extent;
-	VkPipelineLayout PipelineLayout;
+	BmRender_PipelineLayout PipelineLayout;
 	PipelineResourceInfo ResourceInfo;
 
 	const VkPipelineShaderStageCreateInfo* ShaderStages;
 	u32 ShaderStagesCount;
-	const VkVertexInputBindingDescription* VertexBindings;
+	const BmRender_VertexBinding* VertexBindings;
 	u32 VertexBindingsCount;
-	const VkVertexInputAttributeDescription* VertexAttributes;
-	u32 VertexAttributesCount;
 
 	// Pipeline layout information
 	const BmRender_DescriptorSetLayout* DescriptorSetLayouts;

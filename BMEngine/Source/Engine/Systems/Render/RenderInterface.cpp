@@ -446,12 +446,89 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	
+	// Convert VertexBinding structures to Vulkan structures
+	std::vector<VkVertexInputBindingDescription> VkVertexBindings;
+	std::vector<VkVertexInputAttributeDescription> VkVertexAttributes;
+	
+	u32 currentLocation = 0;
+	for (u32 bindingIndex = 0; bindingIndex < Description->VertexBindingsCount; ++bindingIndex)
+	{
+		const BmRender_VertexBinding& VertexBinding = Description->VertexBindings[bindingIndex];
+		
+		// Create VkVertexInputBindingDescription
+		VkVertexInputBindingDescription VkBinding = {};
+		VkBinding.binding = bindingIndex;
+		VkBinding.stride = VertexBinding.Stride;
+		VkBinding.inputRate = VertexBinding.InputRate;
+		VkVertexBindings.push_back(VkBinding);
+		
+		// Create VkVertexInputAttributeDescription for each attribute
+		for (u32 attrIndex = 0; attrIndex < VertexBinding.AttributesCount; ++attrIndex)
+		{
+			const VertexAttribute& attribute = VertexBinding.Attributes[attrIndex];
+			VkVertexInputAttributeDescription VkAttribute = {};
+			
+			if (attribute.Type != BmRender_AttributeType::Mat4)
+			{
+				VkFormat Format;
+				switch (attribute.Type)
+				{
+					case BmRender_AttributeType::Int:
+						Format = VK_FORMAT_R32_SINT;
+						break;
+					case BmRender_AttributeType::Uint:
+						Format = VK_FORMAT_R32_UINT;
+						break;
+					case BmRender_AttributeType::Float:
+						Format = VK_FORMAT_R32_SFLOAT;
+						break;
+					case BmRender_AttributeType::Vec2:
+						Format = VK_FORMAT_R32G32_SFLOAT;
+						break;
+					case BmRender_AttributeType::Vec3:
+						Format = VK_FORMAT_R32G32B32_SFLOAT;
+						break;
+					case BmRender_AttributeType::Vec4:
+						Format = VK_FORMAT_R32G32B32A32_SFLOAT;
+						break;
+					default:
+						assert(false);
+				}
+				
+				VkAttribute.binding = bindingIndex;
+				VkAttribute.location = currentLocation;
+				VkAttribute.format = Format;
+				VkAttribute.offset = attribute.Offset;
+				
+				VkVertexAttributes.push_back(VkAttribute);
+				++currentLocation;
+			}
+			else
+			{
+				// Handle Mat4 as 4 separate Vec4 attributes
+				u32 MatrixBindingOffset = 0;
+				for (u32 i = 0; i < 4; ++i)
+				{
+					VkAttribute.binding = bindingIndex;
+					VkAttribute.location = currentLocation;
+					VkAttribute.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+					VkAttribute.offset = attribute.Offset + MatrixBindingOffset;
+					
+					MatrixBindingOffset += 16;
+					++currentLocation;
+					
+					VkVertexAttributes.push_back(VkAttribute);
+				}
+			}
+		}
+	}
+	
 	VkPipelineVertexInputStateCreateInfo VertexInputState = { };
 	VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	VertexInputState.vertexBindingDescriptionCount = Description->VertexBindingsCount;
-	VertexInputState.pVertexBindingDescriptions = Description->VertexBindings;
-	VertexInputState.vertexAttributeDescriptionCount = Description->VertexAttributesCount;
-	VertexInputState.pVertexAttributeDescriptions = Description->VertexAttributes;
+	VertexInputState.vertexBindingDescriptionCount = static_cast<u32>(VkVertexBindings.size());
+	VertexInputState.pVertexBindingDescriptions = VkVertexBindings.empty() ? nullptr : VkVertexBindings.data();
+	VertexInputState.vertexAttributeDescriptionCount = static_cast<u32>(VkVertexAttributes.size());
+	VertexInputState.pVertexAttributeDescriptions = VkVertexAttributes.empty() ? nullptr : VkVertexAttributes.data();
 
 	VkPipelineRenderingCreateInfo RenderingInfo = { };
 	RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
@@ -481,7 +558,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	PipelineCreateInfo->pMultisampleState = &Description->MultisampleState;
 	PipelineCreateInfo->pColorBlendState = &ColorBlendState;
 	PipelineCreateInfo->pDepthStencilState = &Description->DepthStencilState;
-	PipelineCreateInfo->layout = Description->PipelineLayout;
+	PipelineCreateInfo->layout = GetPipelineLayoutData(Description->PipelineLayout)->VulkanPipelineLayout;
 	PipelineCreateInfo->renderPass = nullptr;
 	PipelineCreateInfo->subpass = 0;
 	PipelineCreateInfo->pNext = &RenderingInfo;

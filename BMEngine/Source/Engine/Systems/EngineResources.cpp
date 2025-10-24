@@ -7,7 +7,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 // Extern declarations for global resource maps
-extern std::unordered_map<std::string, VulkanHelper::VertexBinding> VBindings;
+extern std::unordered_map<std::string, VertexBinding_depr> VBindings;
 extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
 extern std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 extern std::unordered_map<std::string, BmRender_Shader> Shaders;

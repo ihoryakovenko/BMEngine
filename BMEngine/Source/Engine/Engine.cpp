@@ -25,7 +25,7 @@
 #include <gli/gli.hpp>
 
 // Global resource maps
-std::unordered_map<std::string, VulkanHelper::VertexBinding> VBindings;
+std::unordered_map<std::string, VertexBinding_depr> VBindings;
 std::unordered_map<std::string, BmRender_Sampler> Samplers;
 std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 std::unordered_map<std::string, BmRender_Shader> Shaders;
@@ -41,7 +41,7 @@ namespace Engine
 		{
 			Yaml::Node& VertexNode = (*VertexIt).second;
 
-			VulkanHelper::VertexBinding Binding = Util::ParseVertexBindingNode(Util::GetVertexBindingNode(VertexNode));
+			VertexBinding_depr Binding = Util::ParseVertexBindingNode(Util::GetVertexBindingNode(VertexNode));
 
 			Yaml::Node& AttributesNode = Util::GetVertexAttributesNode(VertexNode);
 
@@ -51,36 +51,18 @@ namespace Engine
 			{
 				Yaml::Node& TypeNode = Util::GetVertexAttributeTypeNode((*AttributeIt).second);
 				std::string TypeStr = TypeNode.As<std::string>();
-				
-				if (TypeStr == "mat4")
-				{
-					// Handle mat4 as 4 separate vec4 attributes
-					std::vector<VulkanHelper::VertexAttribute> mat4Attributes;
-					std::vector<std::string> mat4Names;
-					Util::ParseMat4AttributeNode((*AttributeIt).second, mat4Attributes, mat4Names, Offset);
-					
-					for (size_t i = 0; i < mat4Attributes.size(); ++i)
-					{
-						Binding.Attributes[mat4Names[i]] = mat4Attributes[i];
-						Offset += 16; // Each vec4 is 16 bytes
-						Stride += 16;
-					}
-				}
-				else
-				{
-					// Handle regular attributes
-					VulkanHelper::VertexAttribute Attribute = { };
-					std::string AttributeName;
-					Util::ParseVertexAttributeNode((*AttributeIt).second, &Attribute, &AttributeName);
 
-					u32 Size = Util::CalculateFormatSize(Util::ParseShaderTypeToVkFormat(TypeStr.c_str(), (u32)TypeStr.length()));
+				VertexAttribute Attribute = { };
+				std::string AttributeName;
+				Util::ParseVertexAttributeNode((*AttributeIt).second, &Attribute, &AttributeName);
 
-					Attribute.Offset = Offset;
-					Offset += Size;
-					Stride += Size;
+				u32 Size = Util::GetAttributeTypeSize(Attribute.Type);
 
-					Binding.Attributes[AttributeName] = Attribute;
-				}
+				Attribute.Offset = Offset;
+				Offset += Size;
+				Stride += Size;
+
+				Binding.Attributes[AttributeName] = Attribute;
 			}
 
 			Binding.Stride = Stride;
