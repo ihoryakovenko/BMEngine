@@ -4,6 +4,13 @@
 
 namespace Memory
 {
+	struct FrameMemory_T
+	{
+		u32 AllocatedSpace;
+		u8* Head;
+		u8* Base;
+	};
+
 	static std::recursive_mutex MemoryDebugMutex;
 	static bool IsMemoryDebuggingEnabled;
 	static bool IsMemoryDumpAllowed;
@@ -72,22 +79,28 @@ namespace Memory
 
 	FrameMemory CreateFrameMemory(u64 SpaceToAllocate)
 	{
-		FrameMemory Memory;
-		Memory.AllocatedSpace = SpaceToAllocate;
-		Memory.Base = (u8*)calloc(Memory.AllocatedSpace, sizeof(u8));
-		Memory.Head = Memory.Base;
+		FrameMemory Memory = (FrameMemory)malloc(sizeof(FrameMemory_T));
+		Memory->AllocatedSpace = SpaceToAllocate;
+		Memory->Base = (u8*)calloc(Memory->AllocatedSpace, sizeof(u8));
+		Memory->Head = Memory->Base;
 
 		return Memory;
 	}
 
-	void DestroyFrameMemory(FrameMemory* Memory)
+	void DestroyFrameMemory(FrameMemory Memory)
 	{
 		free(Memory->Base);
+		free(Memory);
 	}
 
-	void* FrameAlloc(FrameMemory* Memory, u64 Size)
+	void* FrameAlloc(FrameMemory Memory, u64 Size)
 	{
 		assert(Memory->Head + Size <= Memory->Base + Memory->AllocatedSpace);
+
+		if (Size == 0)
+		{
+			return nullptr;
+		}
 
 		void* ReturnPointer = Memory->Head;
 		Memory->Head += Size;
@@ -95,8 +108,13 @@ namespace Memory
 		return ReturnPointer;
 	}
 
-	void FrameFree(FrameMemory* Memory)
+	void FrameFree(FrameMemory Memory)
 	{
 		Memory->Head = Memory->Base;
+	}
+
+	void* GetHead(FrameMemory Memory)
+	{
+		return Memory->Head;
 	}
 }

@@ -301,6 +301,7 @@ namespace Util
 
 	std::string ParseNameNode(Yaml::Node& Node);
 	std::string ParseShaderNode(Yaml::Node& ShaderNode);
+	PipelineStage ParseShaderPipelineStage(Yaml::Node& ShaderNode);
 	BmRHI_SamplerDescription ParseSamplerNode(Yaml::Node& SamplerNode);
 	BmRender_LayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode);
 	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, VertexAttribute* OutAttribute, std::string* OutAttributeName);
@@ -350,7 +351,7 @@ namespace Util
 	void ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode, BmRender_DescriptorSetLayoutDescription& Description, std::vector<BmRender_LayoutBinding>& Bindings);
 	void ParsePushConstantsFromYaml(Yaml::Node& PushConstantsNode, std::vector<VkPushConstantRange>& PushConstantRanges);
 	BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, const PipelineResourceInfo& ResourceInfo, 
-		std::vector<VkPipelineShaderStageCreateInfo>& ShaderStages,
+		std::vector<BmRender_ShaderStageDescription>& ShaderStages,
 		std::vector<BmRender_VertexBinding>& VertexBindings,
 		std::vector<BmRender_DescriptorSetLayout>& DescriptorSetLayouts,
 		std::vector<BmRender_PushConstant>& PushConstantRanges);

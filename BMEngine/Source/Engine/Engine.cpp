@@ -75,14 +75,16 @@ namespace Engine
 		for (auto It = ShadersNode.Begin(); It != ShadersNode.End(); It++)
 		{
 			std::string ShaderPath = Util::ParseShaderNode((*It).second);
+			PipelineStage ShaderStage = Util::ParseShaderPipelineStage((*It).second);
 
 			std::vector<char> ShaderCode;
 			if (Util::OpenAndReadFileFull(ShaderPath.c_str(), ShaderCode, "rb"))
 			{
 				BmRender_ShaderDescription ShaderDesc = {};
-			ShaderDesc.Code = reinterpret_cast<const u32*>(ShaderCode.data());
-			ShaderDesc.CodeSize = ShaderCode.size();
-			Shaders[(*It).first] = BmRender_CreateShader(&ShaderDesc);
+				ShaderDesc.Code = reinterpret_cast<const u32*>(ShaderCode.data());
+				ShaderDesc.CodeSize = ShaderCode.size();
+				ShaderDesc.Stage = ShaderStage;
+				Shaders[(*It).first] = BmRender_CreateShader(&ShaderDesc);
 			}
 			else
 			{

@@ -114,4 +114,5 @@ namespace VulkanHelper
 		void* UserData);
 
 	void ApplyStageBarrier(VkBufferMemoryBarrier2* Barrier, PipelineStage Stage);
+	VkShaderStageFlagBits PipelineStageToVkShaderStageFlagBits(PipelineStage Stage);
 }

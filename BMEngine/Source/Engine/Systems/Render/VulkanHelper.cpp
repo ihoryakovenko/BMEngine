@@ -875,4 +875,18 @@ namespace VulkanHelper
 				return 4;
 		}
 	}
+
+	VkShaderStageFlagBits PipelineStageToVkShaderStageFlagBits(PipelineStage Stage)
+	{
+		switch (Stage)
+		{
+			case PipelineStage::Vertex:
+				return VK_SHADER_STAGE_VERTEX_BIT;
+			case PipelineStage::Fragment:
+				return VK_SHADER_STAGE_FRAGMENT_BIT;
+			default:
+				assert(false && "Unsupported PipelineStage");
+				return VK_SHADER_STAGE_VERTEX_BIT;
+		}
+	}
 }

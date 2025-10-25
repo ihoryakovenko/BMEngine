@@ -490,11 +490,6 @@ namespace Util
 		return Empty;
 	}
 
-	std::string ParseShaderNode(Yaml::Node& ShaderNode)
-	{
-		return ShaderNode.As<std::string>();
-	}
-
 	Yaml::Node& GetDescriptorSetLayouts(Yaml::Node& Root)
 	{
 		if (!Root["DescriptorSetLayouts"].IsNone())
@@ -1856,7 +1851,7 @@ namespace Util
 	}
 
 	BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, const PipelineResourceInfo& ResourceInfo, 
-		std::vector<VkPipelineShaderStageCreateInfo>& ShaderStages,
+		std::vector<BmRender_ShaderStageDescription>& ShaderStages,
 		std::vector<BmRender_VertexBinding>& VertexBindings,
 		std::vector<BmRender_DescriptorSetLayout>& OutDescriptorSetLayouts,
 		std::vector<BmRender_PushConstant>& PushConstantRanges)
@@ -1900,11 +1895,9 @@ namespace Util
 		Yaml::Node& ShadersNode = GetPipelineShadersNode(PipelineNode);
 		for (auto it = ShadersNode.Begin(); it != ShadersNode.End(); it++)
 		{
-			VkPipelineShaderStageCreateInfo ShaderStage = {};
-			ShaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			ShaderStage.stage = ParseShaderStage((*it).first.c_str(), (*it).first.length());
-			ShaderStage.pName = "main";
-			ShaderStage.module = GetShaderData(Shaders[(*it).second.As<std::string>()])->VulkanShaderModule;
+			BmRender_ShaderStageDescription ShaderStage = {};
+			ShaderStage.Shader = Shaders[(*it).second.As<std::string>()];
+			ShaderStage.EntryPointFunction = "main";
 			ShaderStages.push_back(ShaderStage);
 		}
 
@@ -1924,7 +1917,7 @@ namespace Util
 				BmRenderVertexBinding.Stride = VertexBindingDepr.Stride;
 				BmRenderVertexBinding.InputRate = VertexBindingDepr.InputRate;
 				BmRenderVertexBinding.AttributesCount = AttributesNode.Size();
-				BmRenderVertexBinding.Attributes = (VertexAttribute*)malloc(sizeof(VertexAttribute) * BmRenderVertexBinding.AttributesCount);
+				BmRenderVertexBinding.Attributes = (VertexAttribute*)Render::FrameAlloc(sizeof(VertexAttribute) * BmRenderVertexBinding.AttributesCount);
 
 				u32 testIndex = 0;
 				for (auto AttrIt = AttributesNode.Begin(); AttrIt != AttributesNode.End(); AttrIt++)
@@ -1988,5 +1981,36 @@ namespace Util
 		Description.Scissor.extent.height = Extent.height;
 
 		return Description;
+	}
+
+	std::string ParseShaderNode(Yaml::Node& ShaderNode)
+	{
+		// Check if it's the new format (with path and PipelineStage)
+		if (!ShaderNode["path"].IsNone())
+		{
+			return ShaderNode["path"].As<std::string>();
+		}
+		// Fallback to old format (just a string)
+		else
+		{
+			return ShaderNode.As<std::string>();
+		}
+	}
+
+	PipelineStage ParseShaderPipelineStage(Yaml::Node& ShaderNode)
+	{
+		// Check if it's the new format (with path and PipelineStage)
+		if (!ShaderNode["PipelineStage"].IsNone())
+		{
+			std::string StageStr = ShaderNode["PipelineStage"].As<std::string>();
+			return ParseStageBarrier(StageStr.c_str(), StageStr.length());
+		}
+		// Fallback: try to determine stage from shader name
+		else
+		{
+			// This is a fallback for old format - we'd need the shader name to determine stage
+			// For now, return VERTEX as default
+			return PipelineStage::Vertex;
+		}
 	}
 }

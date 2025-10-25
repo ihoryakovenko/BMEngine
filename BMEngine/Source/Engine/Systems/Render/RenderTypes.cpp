@@ -19,6 +19,52 @@ static System_HandleManager GPUBufferEntryManager;
 static System_HandleManager PushConstantsManager;
 static System_HandleManager DescriptorSetManager;
 
+static VkAllocationCallbacks VulkanAllocator;
+
+static void* VKAPI_CALL VulkanAllocationCallback(
+	void* UserData,
+	size_t Size,
+	size_t Alignment,
+	VkSystemAllocationScope AllocationScope)
+{
+	return malloc(Size);
+}
+
+static void* VKAPI_CALL VulkanReallocationCallback(
+	void* pUserData,
+	void* pOriginal,
+	size_t size,
+	size_t alignment,
+	VkSystemAllocationScope allocationScope)
+{
+	return realloc(pOriginal, size);
+}
+
+static void VKAPI_CALL VulkanFreeCallback(
+	void* pUserData,
+	void* pMemory)
+{
+	free(pMemory);
+}
+
+static void VKAPI_CALL VulkanInternalAllocationNotification(
+	void* pUserData,
+	size_t size,
+	VkInternalAllocationType allocationType,
+	VkSystemAllocationScope allocationScope)
+{
+
+}
+
+static void VKAPI_CALL VulkanInternalFreeNotification(
+	void* pUserData,
+	size_t size,
+	VkInternalAllocationType allocationType,
+	VkSystemAllocationScope allocationScope)
+{
+
+}
+
 static u16 GetNextHandleType()
 {
 	static u16 HandleType = 0;
@@ -27,6 +73,13 @@ static u16 GetNextHandleType()
 
 void CreateCoreContext(GLFWwindow* WindowHandler)
 {
+	VulkanAllocator.pUserData = nullptr;
+	VulkanAllocator.pfnAllocation = VulkanAllocationCallback;
+	VulkanAllocator.pfnReallocation = VulkanReallocationCallback;
+	VulkanAllocator.pfnFree = VulkanFreeCallback;
+	VulkanAllocator.pfnInternalAllocation = VulkanInternalAllocationNotification;
+	VulkanAllocator.pfnInternalFree = VulkanInternalFreeNotification;
+
 	VulkanCoreContext::CreateCoreContext(&CoreContext, WindowHandler);
 }
 
@@ -38,6 +91,11 @@ void DestroyCoreContext()
 VulkanCoreContext::VulkanCoreContext* GetCoreContext()
 {
 	return &CoreContext;
+}
+
+VkAllocationCallbacks* GetVulkanAllocator()
+{
+	return &VulkanAllocator;
 }
 
 // INIT

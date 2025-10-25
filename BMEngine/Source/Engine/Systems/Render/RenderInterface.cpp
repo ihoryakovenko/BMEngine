@@ -12,119 +12,66 @@
 
 #include "VulkanCoreContext.h"
 
-static VkAllocationCallbacks VulkanAllocator;
-
-static void* VKAPI_CALL VulkanAllocationCallback(
-	void* UserData,
-	size_t Size,
-	size_t Alignment,
-	VkSystemAllocationScope AllocationScope)
-{
-	return malloc(Size);
-}
-
-static void* VKAPI_CALL VulkanReallocationCallback(
-	void* pUserData,
-	void* pOriginal,
-	size_t size,
-	size_t alignment,
-	VkSystemAllocationScope allocationScope)
-{
-	return realloc(pOriginal, size);
-}
-
-static void VKAPI_CALL VulkanFreeCallback(
-	void* pUserData,
-	void* pMemory)
-{
-	free(pMemory);
-}
-
-static void VKAPI_CALL VulkanInternalAllocationNotification(
-	void* pUserData,
-	size_t size,
-	VkInternalAllocationType allocationType,
-	VkSystemAllocationScope allocationScope)
-{
-
-}
-
-static void VKAPI_CALL VulkanInternalFreeNotification(
-	void* pUserData,
-	size_t size,
-	VkInternalAllocationType allocationType,
-	VkSystemAllocationScope allocationScope)
-{
-
-}
-
 static void OnSamplerClear(SamplerData* SamplerData)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	vkDestroySampler(Device, SamplerData->VulkanSampler, &VulkanAllocator);
+	vkDestroySampler(Device, SamplerData->VulkanSampler, GetVulkanAllocator());
 }
 
 static void OnPipelineClear(PipelineData* PipelineData)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	vkDestroyPipeline(Device, PipelineData->VulkanPipeline, &VulkanAllocator);
+	vkDestroyPipeline(Device, PipelineData->VulkanPipeline, GetVulkanAllocator());
 }
 
 static void OnPipelineLayoutClear(PipelineLayoutData* LayoutData)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	vkDestroyPipelineLayout(Device, LayoutData->VulkanPipelineLayout, &VulkanAllocator);
+	vkDestroyPipelineLayout(Device, LayoutData->VulkanPipelineLayout, GetVulkanAllocator());
 }
 
 static void OnDescriptorSetLayoutClear(DescriptorSetLayoutData* LayoutData)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	vkDestroyDescriptorSetLayout(Device, LayoutData->Layout, &VulkanAllocator);
+	vkDestroyDescriptorSetLayout(Device, LayoutData->Layout, GetVulkanAllocator());
 	free(LayoutData->LayoutBindings);
 }
 
 static void OnDescriptorPoolClear(DescriptorPoolData* PoolData)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	vkDestroyDescriptorPool(Device, PoolData->VulkanDescriptorPool, &VulkanAllocator);
+	vkDestroyDescriptorPool(Device, PoolData->VulkanDescriptorPool, GetVulkanAllocator());
 }
 
 static void OnShaderClear(ShaderData* Shader)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	vkDestroyShaderModule(Device, Shader->VulkanShaderModule, &VulkanAllocator);
+	vkDestroyShaderModule(Device, Shader->VulkanShaderModule, GetVulkanAllocator());
 }
 
 static void OnImageClear(ImageResource* Image)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	vkDestroyImage(Device, Image->Image, &VulkanAllocator);
-	vkFreeMemory(Device, Image->Memory, &VulkanAllocator);
+	vkDestroyImage(Device, Image->Image, GetVulkanAllocator());
+	vkFreeMemory(Device, Image->Memory, GetVulkanAllocator());
 }
 
 static void OnImageViewClear(ImageViewData* Data)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	vkDestroyImageView(Device, Data->View, &VulkanAllocator);
+	vkDestroyImageView(Device, Data->View, GetVulkanAllocator());
 }
 
 static void OnGPUBufferClear(GPUBufferData* Data)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	vkDestroyBuffer(Device, Data->Buffer, &VulkanAllocator);
-	vkFreeMemory(Device, Data->Memory, &VulkanAllocator);
+	vkDestroyBuffer(Device, Data->Buffer, GetVulkanAllocator());
+	vkFreeMemory(Device, Data->Memory, GetVulkanAllocator());
 }
 
 void BmRender_Init(GLFWwindow* WindowHandler)
 {
 	CreateCoreContext(WindowHandler);
-
-	VulkanAllocator.pUserData = nullptr;
-	VulkanAllocator.pfnAllocation = VulkanAllocationCallback;
-	VulkanAllocator.pfnReallocation = VulkanReallocationCallback;
-	VulkanAllocator.pfnFree = VulkanFreeCallback;
-	VulkanAllocator.pfnInternalAllocation = VulkanInternalAllocationNotification;
-	VulkanAllocator.pfnInternalFree = VulkanInternalFreeNotification;
 
 	InitializeSamplerManager(32);
 	InitializePipelineManager(4);
@@ -158,11 +105,6 @@ void BmRender_DeInit()
 	DestroyCoreContext();
 }
 
-VkAllocationCallbacks* BmRender_GetVulkanAllocator()
-{
-	return &VulkanAllocator;
-}
-
 BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout LayoutHandle, BmRender_DescriptorPool PoolHandle)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
@@ -190,7 +132,6 @@ BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_D
 
 	DescriptorSetLayoutData Layout = { };
 	Layout.BindingsCount = Description->BindingsCount;
-	
 	Layout.LayoutBindings = (DescriptorSetLayoutBinding*)malloc(sizeof(DescriptorSetLayoutBinding) * Description->BindingsCount);
 
 	VkDescriptorSetLayoutBinding* NewLayoutBindings = (VkDescriptorSetLayoutBinding*)Render::FrameAlloc(sizeof(VkDescriptorSetLayoutBinding) * Description->BindingsCount);
@@ -212,7 +153,7 @@ BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_D
 	LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
 	LayoutCreateInfo.pNext = nullptr;
 
-	VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, &VulkanAllocator, &Layout.Layout));
+	VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, GetVulkanAllocator(), &Layout.Layout));
 
 	return CreateDescriptorSetLayoutHandle(&Layout);
 }
@@ -309,13 +250,12 @@ static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, BufferUpdateFrequency Up
 
 	GPUBufferData NewBuffer = { };
 
-	NewBuffer.Capacity = Capacity;
 	NewBuffer.UpdateFrequency = UpdateFrequency;
 	NewBuffer.PropertyFlag = MemoryFlag;
 	NewBuffer.BufferStage = BufferStage;
-	NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, Capacity, Flag, &VulkanAllocator);
+	NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, Capacity, Flag, GetVulkanAllocator());
 
-	VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, NewBuffer.Buffer, NewBuffer.PropertyFlag, &VulkanAllocator);
+	VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, NewBuffer.Buffer, MemoryFlag, GetVulkanAllocator());
 	NewBuffer.Memory = AllocResult.Memory;
 
 	VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, NewBuffer.Buffer, NewBuffer.Memory, 0));
@@ -370,10 +310,10 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 	ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	ImageCreateInfo.flags = 0;
 
-	VULKAN_CHECK_RESULT(vkCreateImage(Device, &ImageCreateInfo, &VulkanAllocator, &Resource.Image));
+	VULKAN_CHECK_RESULT(vkCreateImage(Device, &ImageCreateInfo, GetVulkanAllocator(), &Resource.Image));
 
 	VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
-		Resource.Image, MemoryPropertyFlag::GPULocal, &VulkanAllocator);
+		Resource.Image, MemoryPropertyFlag::GPULocal, GetVulkanAllocator());
 
 	Resource.Memory = AllocResult.Memory;
 	Resource.Size = AllocResult.Size;
@@ -404,7 +344,7 @@ static BmRender_ImageView CreateImageView(BmRender_Image Handle, u32 BaseArrayLa
 	ViewCreateInfo.image = Resource->Image;
 
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo, &VulkanAllocator, &View.View));
+	VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo, GetVulkanAllocator(), &View.View));
 
 	return CreateImageViewHandle(&View);
 }
@@ -434,7 +374,7 @@ BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Descript
 	CreateInfo.unnormalizedCoordinates = Description->UnnormalizedCoordinates;
 
 	VkSampler VulkanSampler;
-	VULKAN_CHECK_RESULT(vkCreateSampler(Device, &CreateInfo, &VulkanAllocator, &VulkanSampler));
+	VULKAN_CHECK_RESULT(vkCreateSampler(Device, &CreateInfo, GetVulkanAllocator(), &VulkanSampler));
 
 	SamplerData Data;
 	Data.VulkanSampler = VulkanSampler;
@@ -446,28 +386,25 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	
-	// Convert VertexBinding structures to Vulkan structures
-	std::vector<VkVertexInputBindingDescription> VkVertexBindings;
-	std::vector<VkVertexInputAttributeDescription> VkVertexAttributes;
+	VkVertexInputBindingDescription* VkVertexBindings = (VkVertexInputBindingDescription*)Render::FrameAlloc(sizeof(VkVertexInputBindingDescription) * Description->VertexBindingsCount);
+
+	u32 TotalAttributes = 0;
+	VkVertexInputAttributeDescription* VkVertexAttributes = (VkVertexInputAttributeDescription*)Render::GetHead();
+	VkVertexInputAttributeDescription* VkAttribute = nullptr;
 	
-	u32 currentLocation = 0;
-	for (u32 bindingIndex = 0; bindingIndex < Description->VertexBindingsCount; ++bindingIndex)
+	u32 CurrentLocation = 0;
+	for (u32 BindingIndex = 0; BindingIndex < Description->VertexBindingsCount; ++BindingIndex)
 	{
-		const BmRender_VertexBinding& VertexBinding = Description->VertexBindings[bindingIndex];
+		const BmRender_VertexBinding& VertexBinding = Description->VertexBindings[BindingIndex];
 		
-		// Create VkVertexInputBindingDescription
-		VkVertexInputBindingDescription VkBinding = {};
-		VkBinding.binding = bindingIndex;
-		VkBinding.stride = VertexBinding.Stride;
-		VkBinding.inputRate = VertexBinding.InputRate;
-		VkVertexBindings.push_back(VkBinding);
+		VkVertexInputBindingDescription* VkBinding = VkVertexBindings + BindingIndex;
+		VkBinding->binding = BindingIndex;
+		VkBinding->stride = VertexBinding.Stride;
+		VkBinding->inputRate = VertexBinding.InputRate;
 		
-		// Create VkVertexInputAttributeDescription for each attribute
-		for (u32 attrIndex = 0; attrIndex < VertexBinding.AttributesCount; ++attrIndex)
+		for (u32 AttrIndex = 0; AttrIndex < VertexBinding.AttributesCount; ++AttrIndex)
 		{
-			const VertexAttribute& attribute = VertexBinding.Attributes[attrIndex];
-			VkVertexInputAttributeDescription VkAttribute = {};
-			
+			const VertexAttribute& attribute = VertexBinding.Attributes[AttrIndex];			
 			if (attribute.Type != BmRender_AttributeType::Mat4)
 			{
 				VkFormat Format;
@@ -495,40 +432,56 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 						assert(false);
 				}
 				
-				VkAttribute.binding = bindingIndex;
-				VkAttribute.location = currentLocation;
-				VkAttribute.format = Format;
-				VkAttribute.offset = attribute.Offset;
+				VkAttribute = (VkVertexInputAttributeDescription*)Render::FrameAlloc(sizeof(VkVertexInputAttributeDescription));
+				VkAttribute->binding = BindingIndex;
+				VkAttribute->location = CurrentLocation;
+				VkAttribute->format = Format;
+				VkAttribute->offset = attribute.Offset;
 				
-				VkVertexAttributes.push_back(VkAttribute);
-				++currentLocation;
+				++CurrentLocation;
+				++TotalAttributes;
 			}
 			else
 			{
-				// Handle Mat4 as 4 separate Vec4 attributes
 				u32 MatrixBindingOffset = 0;
 				for (u32 i = 0; i < 4; ++i)
 				{
-					VkAttribute.binding = bindingIndex;
-					VkAttribute.location = currentLocation;
-					VkAttribute.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-					VkAttribute.offset = attribute.Offset + MatrixBindingOffset;
+					VkAttribute = (VkVertexInputAttributeDescription*)Render::FrameAlloc(sizeof(VkVertexInputAttributeDescription));
+					VkAttribute->binding = BindingIndex;
+					VkAttribute->location = CurrentLocation;
+					VkAttribute->format = VK_FORMAT_R32G32B32A32_SFLOAT;
+					VkAttribute->offset = attribute.Offset + MatrixBindingOffset;
 					
 					MatrixBindingOffset += 16;
-					++currentLocation;
-					
-					VkVertexAttributes.push_back(VkAttribute);
+					++CurrentLocation;
+					++TotalAttributes;
 				}
 			}
 		}
 	}
+
+	VkPipelineShaderStageCreateInfo* VkShaderStages = (VkPipelineShaderStageCreateInfo*)Render::FrameAlloc(sizeof(VkPipelineShaderStageCreateInfo) * Description->ShaderStagesCount);
+	for (u32 i = 0; i < Description->ShaderStagesCount; ++i)
+	{
+		const BmRender_ShaderStageDescription* ShaderStageDesc = Description->ShaderStages + i;
+		ShaderData* ShaderData = GetShaderData(ShaderStageDesc->Shader);
+
+		VkPipelineShaderStageCreateInfo* VkStage = VkShaderStages + i;
+		VkStage->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		VkStage->pNext = nullptr;
+		VkStage->flags = 0;
+		VkStage->stage = VulkanHelper::PipelineStageToVkShaderStageFlagBits(ShaderData->Stage);
+		VkStage->module = ShaderData->VulkanShaderModule;
+		VkStage->pName = ShaderStageDesc->EntryPointFunction;
+		VkStage->pSpecializationInfo = nullptr;
+	}
 	
 	VkPipelineVertexInputStateCreateInfo VertexInputState = { };
 	VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	VertexInputState.vertexBindingDescriptionCount = static_cast<u32>(VkVertexBindings.size());
-	VertexInputState.pVertexBindingDescriptions = VkVertexBindings.empty() ? nullptr : VkVertexBindings.data();
-	VertexInputState.vertexAttributeDescriptionCount = static_cast<u32>(VkVertexAttributes.size());
-	VertexInputState.pVertexAttributeDescriptions = VkVertexAttributes.empty() ? nullptr : VkVertexAttributes.data();
+	VertexInputState.vertexBindingDescriptionCount = Description->VertexBindingsCount;
+	VertexInputState.pVertexBindingDescriptions = VkVertexBindings;
+	VertexInputState.vertexAttributeDescriptionCount = TotalAttributes;
+	VertexInputState.pVertexAttributeDescriptions = TotalAttributes == 0 ? nullptr : VkVertexAttributes;
 
 	VkPipelineRenderingCreateInfo RenderingInfo = { };
 	RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
@@ -549,7 +502,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	*PipelineCreateInfo = { };
 	PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	PipelineCreateInfo->stageCount = Description->ShaderStagesCount;
-	PipelineCreateInfo->pStages = Description->ShaderStages;
+	PipelineCreateInfo->pStages = VkShaderStages;
 	PipelineCreateInfo->pVertexInputState = &VertexInputState;
 	PipelineCreateInfo->pInputAssemblyState = &Description->InputAssemblyState;
 	PipelineCreateInfo->pViewportState = &ViewportState;
@@ -567,7 +520,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	PipelineCreateInfo->basePipelineIndex = -1;
 
 	VkPipeline Pipeline;
-	VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, 1, PipelineCreateInfo, &VulkanAllocator, &Pipeline));
+	VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, 1, PipelineCreateInfo, GetVulkanAllocator(), &Pipeline));
 
 	PipelineData Data;
 	Data.VulkanPipeline = Pipeline;
@@ -579,20 +532,16 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	
-	VkDescriptorSetLayout* VkSetLayouts = (VkDescriptorSetLayout*)malloc(Description->SetLayoutCount * sizeof(VkDescriptorSetLayout));
+	VkDescriptorSetLayout* VkSetLayouts = (VkDescriptorSetLayout*)Render::FrameAlloc(Description->SetLayoutCount * sizeof(VkDescriptorSetLayout));
 	for (u32 i = 0; i < Description->SetLayoutCount; ++i)
 	{
 		VkSetLayouts[i] = GetDescriptorSetLayoutData(Description->SetLayouts[i])->Layout;
 	}
 	
-	VkPushConstantRange* VkPushConstantRanges = nullptr;
-	if (Description->PushConstantRangeCount > 0)
+	VkPushConstantRange* VkPushConstantRanges = (VkPushConstantRange*)Render::FrameAlloc(Description->PushConstantRangeCount * sizeof(VkPushConstantRange));
+	for (u32 i = 0; i < Description->PushConstantRangeCount; ++i)
 	{
-		VkPushConstantRanges = (VkPushConstantRange*)malloc(Description->PushConstantRangeCount * sizeof(VkPushConstantRange));
-		for (u32 i = 0; i < Description->PushConstantRangeCount; ++i)
-		{
-			VkPushConstantRanges[i] = GetPushConstantData(Description->PushConstantRanges[i])->PushConstants;
-		}
+		VkPushConstantRanges[i] = GetPushConstantData(Description->PushConstantRanges[i])->PushConstants;
 	}
 	
 	VkPipelineLayoutCreateInfo CreateInfo = { };
@@ -601,18 +550,10 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 	CreateInfo.pSetLayouts = VkSetLayouts;
 	CreateInfo.pushConstantRangeCount = Description->PushConstantRangeCount;
 	CreateInfo.pPushConstantRanges = VkPushConstantRanges;
-	CreateInfo.flags = Description->Flags;
 	CreateInfo.pNext = nullptr;
 
 	VkPipelineLayout PipelineLayout;
-	VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &CreateInfo, &VulkanAllocator, &PipelineLayout));
-
-	free(VkSetLayouts);
-
-	if (Description->PushConstantRangeCount > 0)
-	{
-		free(VkPushConstantRanges);
-	}
+	VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &CreateInfo, GetVulkanAllocator(), &PipelineLayout));
 
 	PipelineLayoutData Data;
 	Data.VulkanPipelineLayout = PipelineLayout;
@@ -633,7 +574,7 @@ BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorP
 	CreateInfo.pNext = nullptr;
 	
 	VkDescriptorPool DescriptorPool;
-	VULKAN_CHECK_RESULT(vkCreateDescriptorPool(Device, &CreateInfo, &VulkanAllocator, &DescriptorPool));
+	VULKAN_CHECK_RESULT(vkCreateDescriptorPool(Device, &CreateInfo, GetVulkanAllocator(), &DescriptorPool));
 	
 	DescriptorPoolData Data;
 	Data.VulkanDescriptorPool = DescriptorPool;
@@ -653,10 +594,11 @@ BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Descript
 	CreateInfo.pCode = Description->Code;
 	
 	VkShaderModule ShaderModule;
-	VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &CreateInfo, &VulkanAllocator, &ShaderModule));
+	VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &CreateInfo, GetVulkanAllocator(), &ShaderModule));
 	
 	ShaderData Data;
 	Data.VulkanShaderModule = ShaderModule;
+	Data.Stage = Description->Stage;
 	
 	return CreateShaderHandle(&Data);
 }

@@ -112,17 +112,39 @@ samplers:
     unnormalizedCoordinates: false
 
 shaders:
-  StaticMeshVertex: "./Resources/Shaders/Entity_vert.spv"
-  StaticMeshFragment: "./Resources/Shaders/Entity_frag.spv"
-  DeferredVertex: "./Resources/Shaders/Deferred_vert.spv"
-  DeferredFragment: "./Resources/Shaders/Deferred_frag.spv"
-  TerrainGeneratorVertex: "./Resources/Shaders/TerrainGenerator_vert.spv"
-  TerrainGeneratorFragment: "./Resources/Shaders/TerrainGenerator_frag.spv"
-  SkyBoxVertex: "./Resources/Shaders/SkyBox_vert.spv"
-  SkyBoxFragment: "./Resources/Shaders/SkyBox_frag.spv"
-  DepthVertex: "./Resources/Shaders/Depth_vert.spv"
-  QuadBasedSphereVertex: "./Resources/Shaders/QuadBasedSphere_vert.spv"
-  QuadBasedSphereFragment: "./Resources/Shaders/QuadBasedSphere_frag.spv"
+  StaticMeshVertex:
+    path: "./Resources/Shaders/Entity_vert.spv"
+    PipelineStage: Vertex
+  StaticMeshFragment:
+    path: "./Resources/Shaders/Entity_frag.spv"
+    PipelineStage: Fragment
+  DeferredVertex:
+    path: "./Resources/Shaders/Deferred_vert.spv"
+    PipelineStage: Vertex
+  DeferredFragment:
+    path: "./Resources/Shaders/Deferred_frag.spv"
+    PipelineStage: Fragment
+  TerrainGeneratorVertex:
+    path: "./Resources/Shaders/TerrainGenerator_vert.spv"
+    PipelineStage: Vertex
+  TerrainGeneratorFragment:
+    path: "./Resources/Shaders/TerrainGenerator_frag.spv"
+    PipelineStage: Fragment
+  SkyBoxVertex:
+    path: "./Resources/Shaders/SkyBox_vert.spv"
+    PipelineStage: Vertex
+  SkyBoxFragment:
+    path: "./Resources/Shaders/SkyBox_frag.spv"
+    PipelineStage: Fragment
+  DepthVertex:
+    path: "./Resources/Shaders/Depth_vert.spv"
+    PipelineStage: Vertex
+  QuadBasedSphereVertex:
+    path: "./Resources/Shaders/QuadBasedSphere_vert.spv"
+    PipelineStage: Vertex
+  QuadBasedSphereFragment:
+    path: "./Resources/Shaders/QuadBasedSphere_frag.spv"
+    PipelineStage: Fragment
 
 DescriptorSetLayouts:
   FrameDataLayout:

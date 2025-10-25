@@ -18,7 +18,6 @@
     <ClCompile Include="Source\Util\Settings.cpp" />
     <ClCompile Include="Source\Engine\Engine.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\DebugUI.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
     <ClCompile Include="Source\Util\SavedCode.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\VulkanCoreContext.cpp" />

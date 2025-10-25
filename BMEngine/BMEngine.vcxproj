@@ -32,7 +32,6 @@
     <ClCompile Include="Source\Engine\Systems\HandleManager.cpp" />
     <ClCompile Include="Source\Engine\Systems\Memory\f_mem_debug.c" />
     <ClCompile Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\DebugUI.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderInterface.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderResources.cpp" />

@@ -159,6 +159,7 @@ namespace Render
 	void DeInit();
 
 	void* FrameAlloc(u32 Size);
+	void* GetHead();
 
 	void Draw(DrawScene* Data, u64 WaitSemaphoreValue);
 

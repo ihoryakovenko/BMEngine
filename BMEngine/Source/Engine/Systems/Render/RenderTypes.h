@@ -50,6 +50,7 @@ struct DescriptorPoolData
 struct ShaderData
 {
 	VkShaderModule VulkanShaderModule;
+	PipelineStage Stage;
 };
 
 struct ImageResource
@@ -70,7 +71,6 @@ struct GPUBufferData
 {
 	VkBuffer Buffer;
 	VkDeviceMemory Memory;
-	u64 Capacity;
 	MemoryPropertyFlag PropertyFlag;
 	PipelineStage BufferStage;
 	BufferUpdateFrequency UpdateFrequency;
@@ -98,6 +98,8 @@ struct PushConstantData
 void CreateCoreContext(GLFWwindow* WindowHandler);
 void DestroyCoreContext();
 VulkanCoreContext::VulkanCoreContext* GetCoreContext();
+
+VkAllocationCallbacks* GetVulkanAllocator();
 
 void InitializeSamplerManager(u32 Size);
 void InitializePipelineManager(u32 Size);

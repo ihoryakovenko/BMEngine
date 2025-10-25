@@ -66,7 +66,7 @@ namespace Render
 		InitInfo.ImageCount = 3;
 		InitInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 		InitInfo.PipelineRenderingCreateInfo = RenderingInfo;
-		InitInfo.Allocator = BmRender_GetVulkanAllocator();
+		InitInfo.Allocator = GetVulkanAllocator();
 		ImGui_ImplVulkan_Init(&InitInfo);
 
 		ImGui_ImplVulkan_CreateFontsTexture();
@@ -104,7 +104,7 @@ namespace Render
 		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
 
 		// Create vectors to hold pipeline data
-		std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+		std::vector<BmRender_ShaderStageDescription> shaderStages;
 		std::vector<BmRender_VertexBinding> vertexBindings;
 		std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
 		std::vector<BmRender_PushConstant> pushConstantRanges;
@@ -118,7 +118,6 @@ namespace Render
 		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts;
 		LayoutDesc.PushConstantRangeCount = PipelineDesc.PushConstantRangesCount;
 		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges;
-		LayoutDesc.Flags = 0;
 
 		PipelineLayouts["StaticMesh"] = BmRender_CreatePipelineLayout(&LayoutDesc);
 		PipelineDesc.PipelineLayout = PipelineLayouts["StaticMesh"];
@@ -288,12 +287,17 @@ namespace Render
 
 		//TerrainRender::DeInit();
 
-		Memory::DestroyFrameMemory(&State.FrameMemory);
+		Memory::DestroyFrameMemory(State.FrameMemory);
 	}
 
 	void* FrameAlloc(u32 Size)
 	{
-		return Memory::FrameAlloc(&State.FrameMemory, Size);
+		return Memory::FrameAlloc(State.FrameMemory, Size);
+	}
+
+	void* GetHead()
+	{
+		return Memory::GetHead(State.FrameMemory);
 	}
 
 	void Draw(DrawScene* Scene, u64 WaitSemaphoreValue)
@@ -378,7 +382,7 @@ namespace Render
 
 		State.RenderDrawState.CurrentFrame = Math::WrapIncrement(CurrentFrame, VulkanHelper::MAX_DRAW_FRAMES);
 
-		Memory::FrameFree(&State.FrameMemory);
+		Memory::FrameFree(State.FrameMemory);
 	}
 
 	RenderState* GetRenderState()
@@ -459,7 +463,7 @@ namespace DeferredPass
 		ResourceInfo.PipelineAttachmentData = PipelineAttachmentData;
 
 		// Create vectors to hold pipeline data
-		std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+		std::vector<BmRender_ShaderStageDescription> shaderStages;
 		std::vector<BmRender_VertexBinding> vertexBindings;
 		std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
 		std::vector<BmRender_PushConstant> pushConstantRanges;
@@ -473,7 +477,6 @@ namespace DeferredPass
 		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts;
 		LayoutDesc.PushConstantRangeCount = PipelineDesc.PushConstantRangesCount;
 		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges;
-		LayoutDesc.Flags = 0;
 
 		PipelineLayouts["Deferred"] = BmRender_CreatePipelineLayout(&LayoutDesc);
 		PipelineDesc.PipelineLayout = PipelineLayouts["Deferred"];
@@ -712,7 +715,7 @@ namespace LightningPass
 		ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
 		// Create vectors to hold pipeline data
-		std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+		std::vector<BmRender_ShaderStageDescription> shaderStages;
 		std::vector<BmRender_VertexBinding> vertexBindings;
 		std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
 		std::vector<BmRender_PushConstant> pushConstantRanges;
@@ -726,7 +729,6 @@ namespace LightningPass
 		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts;
 		LayoutDesc.PushConstantRangeCount = PipelineDesc.PushConstantRangesCount;
 		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges;
-		LayoutDesc.Flags = 0;
 
 		PipelineLayouts["Depth"] = BmRender_CreatePipelineLayout(&LayoutDesc);
 		PipelineDesc.PipelineLayout = PipelineLayouts["Depth"];
