@@ -16,7 +16,7 @@
 #include <mutex>
 
 // Extern declarations for global resource maps
-extern std::unordered_map<std::string, VertexBinding_depr> VBindings;
+extern std::unordered_map<std::string, Util::VertexBinding_depr> VBindings;
 extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
 extern std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 extern std::unordered_map<std::string, BmRender_Shader> Shaders;
@@ -78,11 +78,8 @@ namespace Render
 		vkDestroyDescriptorPool(Device, ImGuiPool, nullptr);
 	}
 
-	static void InitStaticMeshPipeline(VkDevice Device, StaticMeshPipeline* MeshPipeline, BmRender_GPUBufferEntry* EntityLightRegion, BmRender_DescriptorPool MainPool)
+	static void InitStaticMeshPipeline(VkDevice Device, StaticMeshPipeline* MeshPipeline, BmRender_DescriptorPool MainPool)
 	{
-		const VkDeviceSize LightBufferSize = sizeof(Render::LightBuffer);
-		MeshPipeline->EntityLightBufferHandle = EntityLightRegion;
-
 		VkDescriptorSetLayout Layout = GetDescriptorSetLayoutData(DescriptorSetLayouts["ShadowMapArrayLayout"])->Layout;
 
 		for (u32 i = 0; i < GetCoreContext()->ImagesCount; i++)
@@ -126,75 +123,103 @@ namespace Render
 		Pipelines["StaticMesh"] = BmRender_CreatePipeline(&PipelineDesc);
 	}
 
-	static void DrawStaticMeshes(VkDevice Device, VkCommandBuffer CmdBuffer, StaticMeshPipeline* MeshPipeline, DrawScene* Scene, const DescriptorSetHandles& DescriptorSets, BmRender_GPUBuffer VertexStageBuffer, BmRender_GPUBuffer InstanceBuffer)
+	static void DrawStaticMeshes(VkDevice Device, VkCommandBuffer CmdBuffer, StaticMeshPipeline* MeshPipeline, DrawScene* Scene, const DescriptorSetHandles& DescriptorSets)
 	{
 		u32 CurrentImageIndex = Render::GetRenderState()->RenderDrawState.CurrentImageIndex;
-		RenderResources::UpdateBufferRegion(MeshPipeline->EntityLightBufferHandle[CurrentImageIndex], 0,
-			Scene->LightEntity, sizeof(LightBuffer));
 
-		VkPipeline Pipeline = GetPipelineData(Pipelines["StaticMesh"])->VulkanPipeline;
-		VkPipelineLayout PipelineLayout = GetPipelineLayoutData(PipelineLayouts["StaticMesh"])->VulkanPipelineLayout;
+		const BmRender_DescriptorSet DescriptorSetGroup[] =
+		{
+			DescriptorSets.VpSet,
+			DescriptorSets.BindlesTexturesSet,
+			DescriptorSets.StaticMeshLightSet,
+			DescriptorSets.MaterialSet,
+			MeshPipeline->ShadowMapArraySet[CurrentImageIndex],
+		};
+
+		const u32 VpDynamicOffset = CurrentImageIndex * sizeof(ViewProjectionBuffer);
+		const u32 LightDynamicOffset = CurrentImageIndex * sizeof(LightBuffer);
+		const u32 DynamicOffsets[] = { VpDynamicOffset, LightDynamicOffset };
+
+		DrawEntityBatchConfig Config = {};
+		Config.Pipeline = Pipelines["StaticMesh"];
+		Config.PipelineLayout = PipelineLayouts["StaticMesh"];
+		Config.DescriptorSets = DescriptorSetGroup;
+		Config.DescriptorSetCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
+		Config.DynamicOffsetCount = sizeof(DynamicOffsets) / sizeof(DynamicOffsets[0]);
+		Config.DynamicOffsets = DynamicOffsets;
+		Config.PushConstant = PushConstants["MainConstant"];
+		Config.PushConstantData = &CurrentImageIndex;
+
+		DrawEntityBatch(CmdBuffer, Scene, Config);
+	}
+
+	void DrawEntityBatch(VkCommandBuffer CmdBuffer, DrawScene* Scene, const DrawEntityBatchConfig& Config)
+	{
+		VkPipeline Pipeline = GetPipelineData(Config.Pipeline)->VulkanPipeline;
+		VkPipelineLayout PipelineLayout = GetPipelineLayoutData(Config.PipelineLayout)->VulkanPipelineLayout;
 
 		vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 
-		const VkDescriptorSet DescriptorSetGroup[] =
+		if (Config.PushConstant.Private != 0 && Config.PushConstantData != nullptr)
 		{
-			GetDescriptorSetData(DescriptorSets.VpSet)->Set,
-			GetDescriptorSetData(DescriptorSets.BindlesTexturesSet)->Set,
-			GetDescriptorSetData(DescriptorSets.StaticMeshLightSet)->Set,
-			GetDescriptorSetData(DescriptorSets.MaterialSet)->Set,
-			GetDescriptorSetData(MeshPipeline->ShadowMapArraySet[Render::GetRenderState()->RenderDrawState.CurrentImageIndex])->Set,
-		};
+			VkPushConstantRange PushConstantRange = GetPushConstantData(Config.PushConstant)->PushConstants;
+			vkCmdPushConstants(CmdBuffer, PipelineLayout, PushConstantRange.stageFlags, 
+				PushConstantRange.offset, PushConstantRange.size, Config.PushConstantData);
+		}
 
-		const u32 DescriptorSetGroupCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
+		if (Config.DescriptorSetCount > 0)
+		{
+			VkDescriptorSet* VkDescriptorSets = (VkDescriptorSet*)Render::FrameAlloc(sizeof(VkDescriptorSet) * Config.DescriptorSetCount);
+			for (u32 i = 0; i < Config.DescriptorSetCount; ++i)
+			{
+				VkDescriptorSets[i] = GetDescriptorSetData(Config.DescriptorSets[i])->Set;
+			}
 
-		const u32 VpDynamicOffset = Render::GetRenderState()->RenderDrawState.CurrentImageIndex * sizeof(ViewProjectionBuffer);
-		const u32 LightDynamicOffset = Render::GetRenderState()->RenderDrawState.CurrentImageIndex * sizeof(LightBuffer);
-		const u32 DynamicOffsets[] = { VpDynamicOffset, LightDynamicOffset };
-		const u32 DynamicOffsetCounts[] = { 1, 0, 0, 0, 1 };
-
-		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-			0, DescriptorSetGroupCount, DescriptorSetGroup, DynamicOffsetCounts[0] + DynamicOffsetCounts[1] + DynamicOffsetCounts[2] + DynamicOffsetCounts[3] + DynamicOffsetCounts[4], DynamicOffsets);
-
-		BmRender_PushConstant Constant = PushConstants["MainConstant"];
-		VkPushConstantRange ConstantData = GetPushConstantData(Constant)->PushConstants;
-		vkCmdPushConstants(CmdBuffer, PipelineLayout, ConstantData.stageFlags, ConstantData.offset, ConstantData.size, &Render::GetRenderState()->RenderDrawState.CurrentImageIndex);
+			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
+				0, Config.DescriptorSetCount, VkDescriptorSets, Config.DynamicOffsetCount, Config.DynamicOffsets);
+		}
 
 		std::unique_lock Lock(Scene->TempLock);
+		
 		for (u32 i = 0; i < Scene->DrawEntities.size(); ++i)
 		{
-			DrawEntity* DrawEntity = Scene->DrawEntities.data() + i;
-			for (u32 i = 0; i < DrawEntity->ResourceDependency.size(); ++i)
+			DrawEntity* Entity = Scene->DrawEntities.data() + i;
+		
+			for (u32 j = 0; j < Entity->ImageDependency.size(); ++j)
 			{
-				if (!RenderResources::IsImageResourceReady(DrawEntity->ImageDependency[i]))
+				if (!RenderResources::IsImageResourceReady(Entity->ImageDependency[j]))
+				{
+					continue;
+				}
+			}
+		
+			bool AllBuffersReady = true;
+			for (u32 j = 0; j < Entity->ResourceDependency.size(); ++j)
+			{
+				if (!RenderResources::IsBufferResourceReady(Entity->ResourceDependency[j]))
 				{
 					continue;
 				}
 			}
 
-			for (u32 i = 0; i < DrawEntity->ResourceDependency.size(); ++i)
-			{
-				if (!RenderResources::IsBufferResourceReady(DrawEntity->ResourceDependency[i]))
-				{
-					continue;
-				}
-			}
-
-			const VkBuffer Buffers[] =
-			{
-				GetGPUBufferData(VertexStageBuffer)->Buffer,
-				GetGPUBufferData(InstanceBuffer)->Buffer
-			};
-
-			const u64 Offsets[] = 
-			{
-				DrawEntity->VertexOffset,
-				DrawEntity->InstanceOffset
-			};
-
-			vkCmdBindVertexBuffers(CmdBuffer, 0, 2, Buffers, Offsets);
-			vkCmdBindIndexBuffer(CmdBuffer, GetGPUBufferData(VertexStageBuffer)->Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
-			vkCmdDrawIndexed(CmdBuffer, DrawEntity->IndicesCount, DrawEntity->Instances, 0, 0, 0);
+		GPUBufferEntryData* VertexEntryData = GetGPUBufferEntryData(Entity->VertexBufferEntry);
+		GPUBufferEntryData* IndexEntryData = GetGPUBufferEntryData(Entity->IndexBufferEntry);
+		GPUBufferEntryData* InstanceEntryData = GetGPUBufferEntryData(Entity->InstanceBufferEntry);
+	
+		const VkBuffer Buffers[] = {
+			GetGPUBufferData(VertexEntryData->GPUBufferHandle)->Buffer,
+			GetGPUBufferData(InstanceEntryData->GPUBufferHandle)->Buffer
+		};
+	
+		const u64 Offsets[] = {
+			VertexEntryData->BufferOffset,
+			InstanceEntryData->BufferOffset
+		};
+	
+		vkCmdBindVertexBuffers(CmdBuffer, 0, 2, Buffers, Offsets);
+		vkCmdBindIndexBuffer(CmdBuffer, GetGPUBufferData(IndexEntryData->GPUBufferHandle)->Buffer, 
+			IndexEntryData->BufferOffset, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(CmdBuffer, Entity->IndicesCount, Entity->Instances, 0, 0, 0);
 		}
 	}
 
@@ -252,16 +277,15 @@ namespace Render
 		State.FrameMemory = Memory::CreateFrameMemory(1024 * 1024);
 	}
 
-	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferEntry* VpRegion, BmRender_GPUBufferEntry* EntityLightRegion, const DescriptorSetHandles& DescriptorSets, BmRender_DescriptorPool MainPool, BmRender_GPUBuffer VertexStageBuffer, BmRender_GPUBuffer InstanceBuffer)
+	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferEntry* VpRegion, BmRender_GPUBufferEntry* EntityLightRegion, const DescriptorSetHandles& DescriptorSets, BmRender_DescriptorPool MainPool)
 	{		
 		VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
 		VkDevice Device = GetCoreContext()->LogicalDevice;
 
 		State.VpHandle = VpRegion;
+		State.EntityLightBufferHandle = EntityLightRegion;
 		State.DescriptorSets = DescriptorSets;
 		State.MainPool = MainPool;
-		State.VertexStageBuffer = VertexStageBuffer;
-		State.InstanceBuffer = InstanceBuffer;
 
 		InitDrawState(Device, GetCoreContext()->Indices.GraphicsFamily, VulkanHelper::MAX_DRAW_FRAMES, &State.RenderDrawState);
 
@@ -271,7 +295,7 @@ namespace Render
 
 		//TerrainRender::Init();
 		//DynamicMapSystem::Init();
-		InitStaticMeshPipeline(Device, &State.MeshPipeline, EntityLightRegion, State.MainPool);
+		InitStaticMeshPipeline(Device, &State.MeshPipeline, State.MainPool);
 		InitImGuiPipeline(&State.DebugUiPool, GetCoreContext(), WindowHandler);
 	}
 
@@ -319,6 +343,7 @@ namespace Render
 		State.RenderDrawState.CurrentImageIndex = ImageIndex;
 
 		RenderResources::UpdateBufferRegion(State.VpHandle[ImageIndex], 0, &Scene->ViewProjection, sizeof(ViewProjectionBuffer));
+		RenderResources::UpdateBufferRegion(State.EntityLightBufferHandle[ImageIndex], 0, Scene->LightEntity, sizeof(LightBuffer));
 
 		VkCommandBuffer DrawCmdBuffer = State.RenderDrawState.Frames.CommandBuffers[ImageIndex];
 		VULKAN_CHECK_RESULT(vkBeginCommandBuffer(DrawCmdBuffer, &CommandBufferBeginInfo));
@@ -326,7 +351,7 @@ namespace Render
 		LightningPass::Draw(Scene);
 		MainPass::BeginPass();
 		//TerrainRender::Draw();
-		DrawStaticMeshes(Device, DrawCmdBuffer, &State.MeshPipeline, Scene, State.DescriptorSets, State.VertexStageBuffer, State.InstanceBuffer);
+		DrawStaticMeshes(Device, DrawCmdBuffer, &State.MeshPipeline, Scene, State.DescriptorSets);
 		MainPass::EndPass();
 		DeferredPass::BeginPass();
 		DeferredPass::Draw();
@@ -688,7 +713,7 @@ namespace LightningPass
 		{
 			const VkDeviceSize LightSpaceMatrixSize = sizeof(glm::mat4);
 
-			LightSpaceMatrixBuffers[i] = BmRender_CreateUniformBuffer(LightSpaceMatrixSize, BufferUpdateFrequency::PerFrame, PipelineStage::Vertex);
+			LightSpaceMatrixBuffers[i] = BmRender_CreateUniformBuffer(LightSpaceMatrixSize, BmRender_BufferUpdateFrequency::PerFrame, BmRender_PipelineSyncStage::VertexShader);
 			LightSpaceMatrixBufferRegion[i] = BmRender_CreateGPUBufferEntry(0, LightSpaceMatrixSize, LightSpaceMatrixBuffers[i]);
 
 			LightSpaceMatrixSet[i] = BmRender_CreateDescriptorSet(DescriptorSetLayouts["LightSpaceMatrixLayout"], MainPool);
@@ -801,56 +826,21 @@ namespace LightningPass
 
 			vkCmdBeginRendering(CmdBuffer, &RenderingInfo);
 
-			VkPipeline Pipeline = GetPipelineData(Pipelines["Depth"])->VulkanPipeline;
-			VkPipelineLayout PipelineLayout = GetPipelineLayoutData(PipelineLayouts["Depth"])->VulkanPipelineLayout;
+			const BmRender_DescriptorSet DescriptorSetGroup[] = {
+				LightSpaceMatrixSet[LightCaster],
+			};
 
-			vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
+			Render::DrawEntityBatchConfig Config = {};
+			Config.Pipeline = Pipelines["Depth"];
+			Config.PipelineLayout = PipelineLayouts["Depth"];
+			Config.DescriptorSets = DescriptorSetGroup;
+			Config.DescriptorSetCount = 1;
+			Config.DynamicOffsetCount = 0;
+			Config.DynamicOffsets = nullptr;
+			Config.PushConstant.Private = 0;
+			Config.PushConstantData = nullptr;
 
-			std::unique_lock Lock(Scene->TempLock);
-			for (u32 i = 0; i < Scene->DrawEntities.size(); ++i)
-			{
-				Render::DrawEntity* DrawEntity = Scene->DrawEntities.data() + i;
-				for (u32 i = 0; i < DrawEntity->ResourceDependency.size(); ++i)
-				{
-					if (!RenderResources::IsImageResourceReady(DrawEntity->ImageDependency[i]))
-					{
-						continue;
-					}
-				}
-
-				for (u32 i = 0; i < DrawEntity->ResourceDependency.size(); ++i)
-				{
-					if (!RenderResources::IsBufferResourceReady(DrawEntity->ResourceDependency[i]))
-					{
-						continue;
-					}
-				}
-
-				const VkBuffer Buffers[] =
-				{
-					GetGPUBufferData(State->VertexStageBuffer)->Buffer,
-					GetGPUBufferData(State->InstanceBuffer)->Buffer
-				};
-
-				const u64 Offsets[] =
-				{
-					DrawEntity->VertexOffset,
-					DrawEntity->InstanceOffset
-				};
-
-				const u32 DescriptorSetGroupCount = 1;
-				const VkDescriptorSet DescriptorSetGroup[DescriptorSetGroupCount] =
-				{
-					GetDescriptorSetData(LightSpaceMatrixSet[LightCaster])->Set,
-				};
-
-				vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-					0, DescriptorSetGroupCount, DescriptorSetGroup, 0, nullptr);
-
-				vkCmdBindVertexBuffers(CmdBuffer, 0, 2, Buffers, Offsets);
-				vkCmdBindIndexBuffer(CmdBuffer, GetGPUBufferData(State->VertexStageBuffer)->Buffer, DrawEntity->IndexOffset, VK_INDEX_TYPE_UINT32);
-				vkCmdDrawIndexed(CmdBuffer, DrawEntity->IndicesCount, DrawEntity->Instances, 0, 0, 0);
-			}
+			Render::DrawEntityBatch(CmdBuffer, Scene, Config);
 
 			vkCmdEndRendering(CmdBuffer);
 		}

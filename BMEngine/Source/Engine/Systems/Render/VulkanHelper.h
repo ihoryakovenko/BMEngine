@@ -43,27 +43,6 @@ namespace VulkanHelper
 		u64 Size;
 	};
 
-	struct GPUBuffer
-	{
-		VkBuffer Buffer;
-		VkDeviceMemory Memory;
-		u64 Capacity;
-		u64 Alignment;
-		u64 Offset;
-		BufferUsageFlag UsageFlag;
-		MemoryPropertyFlag PropertyFlag;
-	};
-
-	struct Shader
-	{
-		VkShaderStageFlagBits Stage;
-		const char* Code;
-		u32 CodeSize;
-
-		// TODO: TMP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		Memory::Array<char> ShaderCode;
-	};
-
 	struct RenderPipeline
 	{
 		VkPipeline Pipeline;
@@ -113,6 +92,9 @@ namespace VulkanHelper
 		VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
 		void* UserData);
 
-	void ApplyStageBarrier(VkBufferMemoryBarrier2* Barrier, PipelineStage Stage);
-	VkShaderStageFlagBits PipelineStageToVkShaderStageFlagBits(PipelineStage Stage);
+	void ApplyStageBarrier(VkBufferMemoryBarrier2* Barrier, BmRender_PipelineSyncStage Stage);
+
+	VkShaderStageFlags DescriptorShaderStageToVkShaderStage(BmRender_DescriptorShaderStage stage);
+	VkShaderStageFlagBits PipelineShaderStageToVkShaderStage(BmRender_PipelineShaderStage stage);
+	VkPipelineStageFlags PipelineSyncToVkPipelineStage(BmRender_PipelineSyncStage stage);
 }

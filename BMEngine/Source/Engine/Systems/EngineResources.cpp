@@ -7,7 +7,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 // Extern declarations for global resource maps
-extern std::unordered_map<std::string, VertexBinding_depr> VBindings;
+extern std::unordered_map<std::string, Util::VertexBinding_depr> VBindings;
 extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
 extern std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 extern std::unordered_map<std::string, BmRender_Shader> Shaders;
@@ -194,9 +194,14 @@ namespace EngineResources
 				}
 
 				const u64 VertexDataSize = VerticesCount * sizeof(StaticMeshVertex) + IndicesCount * sizeof(u32);
-				
+				const u64 VerticesSize = sizeof(StaticMeshVertex) * VerticesCount;
+				const u64 IndicesSize = IndicesCount * sizeof(u32);
+					
 				BmRender_GPUBufferEntry MeshHandle = BmRender_CreateGPUBufferEntry(ModelVertexByteOffset, VertexDataSize, VertexStageBuffer);
 				RenderResources::UpdateBufferRegion(MeshHandle, 0, Model.VertexData + ModelVertexByteOffset, VertexDataSize);
+
+				const BmRender_GPUBufferEntry VertexBufferEntry = BmRender_CreateGPUBufferEntry(ModelVertexByteOffset, VerticesSize, VertexStageBuffer);
+				const BmRender_GPUBufferEntry IndexBufferEntry = BmRender_CreateGPUBufferEntry(ModelVertexByteOffset + VerticesSize, IndicesSize, VertexStageBuffer);
 
 				Material Mat;
 				Mat.AlbedoTexIndex = TextureGPUIndex;
@@ -218,18 +223,15 @@ namespace EngineResources
 
 				++InstanceIndex;
 
-				const u64 VerticesSize = sizeof(StaticMeshVertex) * VerticesCount;
-
 				Render::DrawEntity Entity = { };
-				Entity.VertexOffset = ModelVertexByteOffset;
-				Entity.IndexOffset = ModelVertexByteOffset + VerticesSize;
+				Entity.VertexBufferEntry = VertexBufferEntry;
+				Entity.IndexBufferEntry = IndexBufferEntry;
+				Entity.InstanceBufferEntry = InstanceHandle;
 				Entity.IndicesCount = IndicesCount;
 				Entity.Instances = 1;
-				Entity.InstanceOffset = InstanceOffset;
 				Entity.ImageDependency.push_back(AlbedoTextureHandle);
 				Entity.ImageDependency.push_back(SpecularTextureHandle);
 				Entity.ResourceDependency.push_back(MaterialHandle);
-				Entity.ResourceDependency.push_back(InstanceHandle);
 
 				std::unique_lock Lock(TmpScene->TempLock);
 				TmpScene->DrawEntities.push_back(Entity);

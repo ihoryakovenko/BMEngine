@@ -604,17 +604,17 @@ namespace VulkanHelper
 		return VK_FALSE;
 	}
 
-	void ApplyStageBarrier(VkBufferMemoryBarrier2* Barrier, PipelineStage Stage)
+	void ApplyStageBarrier(VkBufferMemoryBarrier2* Barrier, BmRender_PipelineSyncStage Stage)
 	{
 		switch (Stage)
 		{
-			case PipelineStage::Vertex:
+			case BmRender_PipelineSyncStage::VertexShader:
 				Barrier->srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
 				Barrier->srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
 				Barrier->dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT;
 				Barrier->dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
 				break;
-			case PipelineStage::Fragment:
+			case BmRender_PipelineSyncStage::FragmentShader:
 				Barrier->srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
 				Barrier->srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
 				Barrier->dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
@@ -624,6 +624,39 @@ namespace VulkanHelper
 				assert(false);
 				break;
 		}
+	}
+
+	VkShaderStageFlags DescriptorShaderStageToVkShaderStage(BmRender_DescriptorShaderStage stage)
+	{
+		VkShaderStageFlags flags = 0;
+		if ((u64)stage & (u64)BmRender_DescriptorShaderStage::Vertex)   flags |= VK_SHADER_STAGE_VERTEX_BIT;
+		if ((u64)stage & (u64)BmRender_DescriptorShaderStage::Fragment) flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+		if ((u64)stage & (u64)BmRender_DescriptorShaderStage::Compute)  flags |= VK_SHADER_STAGE_COMPUTE_BIT;
+		return flags;
+	}
+
+	VkShaderStageFlagBits PipelineShaderStageToVkShaderStage(BmRender_PipelineShaderStage stage)
+	{
+		switch (stage)
+		{
+			case BmRender_PipelineShaderStage::Vertex:   return VK_SHADER_STAGE_VERTEX_BIT;
+			case BmRender_PipelineShaderStage::Fragment: return VK_SHADER_STAGE_FRAGMENT_BIT;
+			case BmRender_PipelineShaderStage::Geometry: return VK_SHADER_STAGE_GEOMETRY_BIT;
+			case BmRender_PipelineShaderStage::TessControl: return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+			case BmRender_PipelineShaderStage::TessEval:    return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+			case BmRender_PipelineShaderStage::Compute:     return VK_SHADER_STAGE_COMPUTE_BIT;
+		}
+		return VK_SHADER_STAGE_VERTEX_BIT;
+	}
+
+	VkPipelineStageFlags PipelineSyncToVkPipelineStage(BmRender_PipelineSyncStage stage)
+	{
+		VkPipelineStageFlags flags = 0;
+		if ((u64)stage & (u64)BmRender_PipelineSyncStage::VertexShader)          flags |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+		if ((u64)stage & (u64)BmRender_PipelineSyncStage::FragmentShader)        flags |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		if ((u64)stage & (u64)BmRender_PipelineSyncStage::ColorAttachmentOutput) flags |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		if ((u64)stage & (u64)BmRender_PipelineSyncStage::ComputeShader)         flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+		return flags;
 	}
 
 	bool CheckFormats(VkPhysicalDevice PhDevice)
@@ -873,20 +906,6 @@ namespace VulkanHelper
 			default:
 				assert(false);
 				return 4;
-		}
-	}
-
-	VkShaderStageFlagBits PipelineStageToVkShaderStageFlagBits(PipelineStage Stage)
-	{
-		switch (Stage)
-		{
-			case PipelineStage::Vertex:
-				return VK_SHADER_STAGE_VERTEX_BIT;
-			case PipelineStage::Fragment:
-				return VK_SHADER_STAGE_FRAGMENT_BIT;
-			default:
-				assert(false && "Unsupported PipelineStage");
-				return VK_SHADER_STAGE_VERTEX_BIT;
 		}
 	}
 }

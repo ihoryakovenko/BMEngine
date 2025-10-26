@@ -16,7 +16,7 @@ FORGE_MEMORY_DEBUG
 #include "gli/gli.hpp"
 
 // Extern declarations for global resource maps
-extern std::unordered_map<std::string, VertexBinding_depr> VBindings;
+extern std::unordered_map<std::string, Util::VertexBinding_depr> VBindings;
 extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
 extern std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 extern std::unordered_map<std::string, BmRender_Shader> Shaders;
@@ -514,9 +514,9 @@ namespace Util
 		return Empty;
 	}
 
-	BmRender_LayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode)
+	BmRender_DescriptorSetLayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode)
 	{
-		BmRender_LayoutBinding OutBinding = { };		
+		BmRender_DescriptorSetLayoutBinding OutBinding = { };		
 		if (!BindingNode["descriptorType"].IsNone())
 		{
 			std::string value = BindingNode["descriptorType"].As<std::string>();
@@ -1048,39 +1048,39 @@ namespace Util
 		return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	}
 
-	VkShaderStageFlagBits ParseShaderStage(const char* Value, u32 Length)
+	BmRender_PipelineShaderStage ParseShaderStage(const char* Value, u32 Length)
 	{
 		if (StringMatches(Value, Length, ParseStrings::VERTEX_SHADER_STRINGS))
-			return VK_SHADER_STAGE_VERTEX_BIT;
+			return BmRender_PipelineShaderStage::Vertex;
 		if (StringMatches(Value, Length, ParseStrings::FRAGMENT_STRINGS))
-			return VK_SHADER_STAGE_FRAGMENT_BIT;
+			return BmRender_PipelineShaderStage::Fragment;
 		if (StringMatches(Value, Length, ParseStrings::GEOMETRY_STRINGS))
-			return VK_SHADER_STAGE_GEOMETRY_BIT;
+			return BmRender_PipelineShaderStage::Geometry;
 		if (StringMatches(Value, Length, ParseStrings::COMPUTE_STRINGS))
-			return VK_SHADER_STAGE_COMPUTE_BIT;
+			return BmRender_PipelineShaderStage::Compute;
 		if (StringMatches(Value, Length, ParseStrings::TESS_CONTROL_STRINGS))
-			return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+			return BmRender_PipelineShaderStage::TessControl;
 		if (StringMatches(Value, Length, ParseStrings::TESS_EVAL_STRINGS))
-			return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+			return BmRender_PipelineShaderStage::TessEval;
 		if (StringMatches(Value, Length, ParseStrings::TASK_STRINGS))
-			return VK_SHADER_STAGE_TASK_BIT_EXT;
+			assert(false); // Task shader not supported in PipelineShaderStage enum
 		if (StringMatches(Value, Length, ParseStrings::MESH_STRINGS))
-			return VK_SHADER_STAGE_MESH_BIT_EXT;
+			assert(false); // Mesh shader not supported in PipelineShaderStage enum
 		if (StringMatches(Value, Length, ParseStrings::RAYGEN_STRINGS))
-			return VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+			assert(false); // Ray gen shader not supported in PipelineShaderStage enum
 		if (StringMatches(Value, Length, ParseStrings::CLOSEST_HIT_STRINGS))
-			return VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+			assert(false); // Closest hit shader not supported in PipelineShaderStage enum
 		if (StringMatches(Value, Length, ParseStrings::ANY_HIT_STRINGS))
-			return VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+			assert(false); // Any hit shader not supported in PipelineShaderStage enum
 		if (StringMatches(Value, Length, ParseStrings::MISS_STRINGS))
-			return VK_SHADER_STAGE_MISS_BIT_KHR;
+			assert(false); // Miss shader not supported in PipelineShaderStage enum
 		if (StringMatches(Value, Length, ParseStrings::INTERSECTION_STRINGS))
-			return VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
+			assert(false); // Intersection shader not supported in PipelineShaderStage enum
 		if (StringMatches(Value, Length, ParseStrings::CALLABLE_STRINGS))
-			return VK_SHADER_STAGE_CALLABLE_BIT_KHR;
+			assert(false); // Callable shader not supported in PipelineShaderStage enum
 
 		assert(false);
-		return VK_SHADER_STAGE_VERTEX_BIT;
+		return BmRender_PipelineShaderStage::Vertex;
 	}
 
 	VkFilter ParseFilter(const char* Value, u32 Length)
@@ -1135,9 +1135,9 @@ namespace Util
 		return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	}
 
-	VkShaderStageFlags ParseShaderStageFlags(const char* Value, u32 Length)
+	BmRender_DescriptorShaderStage ParseShaderStageFlags(const char* Value, u32 Length)
 	{
-		VkShaderStageFlags flags = 0;
+		u64 flags = 0;
 
 		const char* token = Value;
 		const char* end = Value + Length;
@@ -1152,39 +1152,24 @@ namespace Util
 
 			u32 tokenLength = static_cast<u32>(token - tokenStart);
 
-			if (StringMatches(tokenStart, tokenLength, ParseStrings::VERTEX_BIT_STRINGS)) flags |= VK_SHADER_STAGE_VERTEX_BIT;
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::FRAGMENT_BIT_STRINGS)) flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::GEOMETRY_BIT_STRINGS)) flags |= VK_SHADER_STAGE_GEOMETRY_BIT;
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::COMPUTE_BIT_STRINGS)) flags |= VK_SHADER_STAGE_COMPUTE_BIT;
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::TESSELLATION_CONTROL_BIT_STRINGS)) flags |= VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::TESSELLATION_EVALUATION_BIT_STRINGS)) flags |= VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::TASK_BIT_STRINGS)) flags |= VK_SHADER_STAGE_TASK_BIT_EXT;
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::MESH_BIT_STRINGS)) flags |= VK_SHADER_STAGE_MESH_BIT_EXT;
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::RAYGEN_BIT_STRINGS)) flags |= VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::CLOSEST_HIT_BIT_STRINGS)) flags |= VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::ANY_HIT_BIT_STRINGS)) flags |= VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::MISS_BIT_STRINGS)) flags |= VK_SHADER_STAGE_MISS_BIT_KHR;
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::INTERSECTION_BIT_STRINGS)) flags |= VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::CALLABLE_BIT_STRINGS)) flags |= VK_SHADER_STAGE_CALLABLE_BIT_KHR;
+			if (StringMatches(tokenStart, tokenLength, ParseStrings::VERTEX_BIT_STRINGS)) flags |= static_cast<u64>(BmRender_DescriptorShaderStage::Vertex);
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::FRAGMENT_BIT_STRINGS)) flags |= static_cast<u64>(BmRender_DescriptorShaderStage::Fragment);
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::COMPUTE_BIT_STRINGS)) flags |= static_cast<u64>(BmRender_DescriptorShaderStage::Compute);
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::GEOMETRY_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::TESSELLATION_CONTROL_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::TESSELLATION_EVALUATION_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::TASK_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::MESH_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::RAYGEN_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::CLOSEST_HIT_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::ANY_HIT_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::MISS_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::INTERSECTION_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::CALLABLE_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage
 		}
 
-		return flags;
+		return static_cast<BmRender_DescriptorShaderStage>(flags);
 	}
-
-	//VkFormat ParseShaderTypeToVkFormat(const char* Value, u32 Length)
-	//{
-	//	if (strncmp(Value, "vec2", Length) == 0) return VK_FORMAT_R32G32_SFLOAT;
-	//	if (strncmp(Value, "vec3", Length) == 0) return VK_FORMAT_R32G32B32_SFLOAT;
-	//	if (strncmp(Value, "vec4", Length) == 0) return VK_FORMAT_R32G32B32A32_SFLOAT;
-	//	if (strncmp(Value, "mat4", Length) == 0) return VK_FORMAT_R32G32B32A32_SFLOAT;
-	//	if (strncmp(Value, "uint", Length) == 0) return VK_FORMAT_R32_UINT;
-	//	if (strncmp(Value, "int", Length) == 0) return VK_FORMAT_R32_SINT;
-	//	if (strncmp(Value, "float", Length) == 0) return VK_FORMAT_R32_SFLOAT;
-	//	if (strncmp(Value, "double", Length) == 0) return VK_FORMAT_R64_SFLOAT;
-
-	//	assert(false);
-	//	return VK_FORMAT_R32_SFLOAT;
-	//}
 
 	BmRender_AttributeType ParseShaderTypeToAttributeType(const char* Value, u32 Length)
 	{
@@ -1532,33 +1517,18 @@ namespace Util
 		return MemoryPropertyFlag::GPULocal;
 	}
 
-	PipelineStage ParseStageBarrier(const char* Value, u32 Length)
-	{
-		if (strncmp(Value, "Vertex", Length) == 0)
-		{
-			return PipelineStage::Vertex;
-		}
-		else if (strncmp(Value, "Fragment", Length) == 0)
-		{
-			return PipelineStage::Fragment;
-		}
-
-		assert(false);
-		return PipelineStage::Fragment;
-	}
-
-	BufferUpdateFrequency ParseUpdateFrequency(const char* Value, u32 Length)
+	BmRender_BufferUpdateFrequency ParseUpdateFrequency(const char* Value, u32 Length)
 	{
 		if (strncmp(Value, "Static", Length) == 0)
 		{
-			return BufferUpdateFrequency::Static;
+			return BmRender_BufferUpdateFrequency::Static;
 		}
 		else if (strncmp(Value, "PerFrame", Length) == 0)
 		{
-			return BufferUpdateFrequency::PerFrame;
+			return BmRender_BufferUpdateFrequency::PerFrame;
 		}
 
-		return BufferUpdateFrequency::Static;
+		return BmRender_BufferUpdateFrequency::Static;
 	}
 
 	ShaderType ParseShaderType(const char* Value, u32 Length)
@@ -1614,7 +1584,7 @@ namespace Util
 				}
 				else
 				{
-					Binding.UpdateFrequency = BufferUpdateFrequency::Static;
+					Binding.UpdateFrequency = BmRender_BufferUpdateFrequency::Static;
 				}
 				
 				// Parse stage flags
@@ -1638,35 +1608,6 @@ namespace Util
 		return Layouts;
 	}
 
-	void ParseShaderBufferFromYaml(Yaml::Node& BufferNode, u64& Capacity, BufferUpdateFrequency& UpdateFrequency, PipelineStage& StageBarrier, std::string& OutName)
-	{
-		OutName = GetBufferName(BufferNode);
-		if (!BufferNode["Capacity"].IsNone())
-			Capacity = BufferNode["Capacity"].As<u64>();
-		if (!BufferNode["UpdateFrequency"].IsNone())
-		{
-			std::string v = BufferNode["UpdateFrequency"].As<std::string>();
-			UpdateFrequency = ParseUpdateFrequency(v.c_str(), (u32)v.length());
-		}
-		if (!BufferNode["StageBarier"].IsNone())
-		{
-			std::string v = BufferNode["StageBarier"].As<std::string>();
-			StageBarrier = ParseStageBarrier(v.c_str(), (u32)v.length());
-		}
-	}
-
-	void ParseGeometryBufferFromYaml(Yaml::Node& BufferNode, u64& Capacity, BufferUpdateFrequency& UpdateFrequency, std::string& OutName)
-	{
-		OutName = GetBufferName(BufferNode);
-		if (!BufferNode["Capacity"].IsNone())
-			Capacity = BufferNode["Capacity"].As<u64>();
-		if (!BufferNode["UpdateFrequency"].IsNone())
-		{
-			std::string v = BufferNode["UpdateFrequency"].As<std::string>();
-			UpdateFrequency = ParseUpdateFrequency(v.c_str(), (u32)v.length());
-		}
-	}
-
 // Deprecated ParseStorageBufferNode removed
 
 	std::string GetBufferName(Yaml::Node& BufferNode)
@@ -1676,21 +1617,6 @@ namespace Util
 			return BufferNode["name"].As<std::string>();
 		}
 		return {};
-	}
-
-	void ParseDescriptorSetLayoutFromYaml(Yaml::Node& DescriptorSetLayoutNode, BmRender_DescriptorSetLayoutDescription& Description, std::vector<BmRender_LayoutBinding>& Bindings)
-	{
-		Yaml::Node& BindingsNode = ParseDescriptorSetLayoutNode(DescriptorSetLayoutNode);
-		
-		Bindings.clear();
-		for (auto BindingIt = BindingsNode.Begin(); BindingIt != BindingsNode.End(); BindingIt++)
-		{
-			BmRender_LayoutBinding Binding = ParseDescriptorSetLayoutBindingNode((*BindingIt).second);
-			Bindings.push_back(Binding);
-		}
-		
-		Description.Bindings = Bindings.data();
-		Description.BindingsCount = static_cast<u32>(Bindings.size());
 	}
 
 	Yaml::Node& GetPushConstantNode(Yaml::Node& PipelineNode)
@@ -1721,7 +1647,7 @@ namespace Util
 			Yaml::Node& ConstantNode = (*it).second;
 			
 			u32 totalSize = 0;
-			VkShaderStageFlags combinedStageFlags = 0;
+			BmRender_DescriptorShaderStage combinedStageFlags = BmRender_DescriptorShaderStage::None;
 			
 			// Calculate total size and combine stage flags
 			for (auto TypeIt = ConstantNode.Begin(); TypeIt != ConstantNode.End(); TypeIt++)
@@ -1730,7 +1656,7 @@ namespace Util
 				std::string TypeName = TypeNode["type"].As<std::string>();
 				
 				u32 Size = 0;
-				VkShaderStageFlags StageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+				BmRender_DescriptorShaderStage StageFlags = BmRender_DescriptorShaderStage::None;
 				
 				// Calculate size based on type
 				if (TypeName == "uint" || TypeName == "int")
@@ -1770,83 +1696,18 @@ namespace Util
 				}
 				
 				totalSize += Size;
-				combinedStageFlags |= StageFlags;
+				combinedStageFlags = (BmRender_DescriptorShaderStage)((u64)combinedStageFlags | (u64)StageFlags);
 			}
 			
 			// Create a single push constant handle for the entire definition
 			BmRender_PushConstant PushConstantHandle = BmRender_CreatePushConstant(
-				static_cast<PipelineStage>(combinedStageFlags), 
+				combinedStageFlags,
 				0, // offset starts at 0 for the entire push constant
 				totalSize
 			);
 			
 			// Store the single handle
 			PushConstants[ConstantName] = PushConstantHandle;
-		}
-	}
-
-	void ParsePushConstantsFromYaml(Yaml::Node& PushConstantsNode, std::vector<VkPushConstantRange>& PushConstantRanges)
-	{
-		u32 currentOffset = 0;
-		
-		for (auto it = PushConstantsNode.Begin(); it != PushConstantsNode.End(); it++)
-		{
-			std::string ConstantName = (*it).first;
-			Yaml::Node& ConstantNode = (*it).second;
-			
-			// Parse each constant type in the array
-			for (auto TypeIt = ConstantNode.Begin(); TypeIt != ConstantNode.End(); TypeIt++)
-			{
-				Yaml::Node& TypeNode = (*TypeIt).second;
-				std::string TypeName = TypeNode["type"].As<std::string>();
-				
-				VkPushConstantRange Range = {};
-				Range.offset = currentOffset;
-				
-				// Calculate size based on type
-				if (TypeName == "uint" || TypeName == "int")
-				{
-					Range.size = sizeof(u32);
-				}
-				else if (TypeName == "float")
-				{
-					Range.size = sizeof(float);
-				}
-				else if (TypeName == "vec2")
-				{
-					Range.size = sizeof(float) * 2;
-				}
-				else if (TypeName == "vec3")
-				{
-					Range.size = sizeof(float) * 3;
-				}
-				else if (TypeName == "vec4")
-				{
-					Range.size = sizeof(float) * 4;
-				}
-				else if (TypeName == "mat4")
-				{
-					Range.size = sizeof(float) * 16;
-				}
-				else
-				{
-					assert(false && "Unsupported push constant type");
-				}
-				
-				// Parse stages if specified, otherwise default to vertex and fragment stages
-				if (!TypeNode["stages"].IsNone())
-				{
-					std::string StagesStr = TypeNode["stages"].As<std::string>();
-					Range.stageFlags = ParseShaderStageFlags(StagesStr.c_str(), StagesStr.length());
-				}
-				else
-				{
-					Range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-				}
-				
-				PushConstantRanges.push_back(Range);
-				currentOffset += Range.size;
-			}
 		}
 	}
 
@@ -1997,20 +1858,15 @@ namespace Util
 		}
 	}
 
-	PipelineStage ParseShaderPipelineStage(Yaml::Node& ShaderNode)
+	BmRender_PipelineShaderStage ParseShaderPipelineStage(Yaml::Node& ShaderNode)
 	{
 		// Check if it's the new format (with path and PipelineStage)
 		if (!ShaderNode["PipelineStage"].IsNone())
 		{
 			std::string StageStr = ShaderNode["PipelineStage"].As<std::string>();
-			return ParseStageBarrier(StageStr.c_str(), StageStr.length());
+			return ParseShaderStage(StageStr.c_str(), StageStr.length());
 		}
 		// Fallback: try to determine stage from shader name
-		else
-		{
-			// This is a fallback for old format - we'd need the shader name to determine stage
-			// For now, return VERTEX as default
-			return PipelineStage::Vertex;
-		}
+		assert(false);
 	}
 }

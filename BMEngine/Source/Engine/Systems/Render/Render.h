@@ -28,9 +28,9 @@ namespace Render
 
 	struct DrawEntity
 	{
-		u64 VertexOffset;
-		u64 InstanceOffset;
-		u32 IndexOffset;
+		BmRender_GPUBufferEntry VertexBufferEntry;
+		BmRender_GPUBufferEntry IndexBufferEntry;
+		BmRender_GPUBufferEntry InstanceBufferEntry;
 		u32 IndicesCount;
 		u32 Instances;
 		
@@ -59,8 +59,6 @@ namespace Render
 
 	struct StaticMeshPipeline
 	{
-		BmRender_GPUBufferEntry* EntityLightBufferHandle;
-
 		BmRender_ImageView ShadowMapArrayImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
 
 		VkPushConstantRange PushConstants;
@@ -85,10 +83,7 @@ namespace Render
 		VkDescriptorPool DebugUiPool; // TODO: ?
 		Memory::FrameMemory FrameMemory;
 		BmRender_GPUBufferEntry* VpHandle;
-		
-		// Buffer handles
-		BmRender_GPUBuffer VertexStageBuffer;
-		BmRender_GPUBuffer InstanceBuffer;
+		BmRender_GPUBufferEntry* EntityLightBufferHandle;
 	};
 
 	struct PointLight
@@ -155,7 +150,7 @@ namespace Render
 
 	void TmpInitFrameMemory();
 
-	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferEntry* VpRegion, BmRender_GPUBufferEntry* EntityLightRegion, const DescriptorSetHandles& DescriptorSets, BmRender_DescriptorPool MainPool, BmRender_GPUBuffer VertexStageBuffer, BmRender_GPUBuffer InstanceBuffer);
+	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferEntry* VpRegion, BmRender_GPUBufferEntry* EntityLightRegion, const DescriptorSetHandles& DescriptorSets, BmRender_DescriptorPool MainPool);
 	void DeInit();
 
 	void* FrameAlloc(u32 Size);
@@ -164,6 +159,20 @@ namespace Render
 	void Draw(DrawScene* Data, u64 WaitSemaphoreValue);
 
 	RenderState* GetRenderState();
+
+	struct DrawEntityBatchConfig
+	{
+		BmRender_Pipeline Pipeline;
+		BmRender_PipelineLayout PipelineLayout;
+		const BmRender_DescriptorSet* DescriptorSets;
+		u32 DescriptorSetCount;
+		u32 DynamicOffsetCount;
+		const u32* DynamicOffsets;
+		BmRender_PushConstant PushConstant;
+		const void* PushConstantData;
+	};
+
+	void DrawEntityBatch(VkCommandBuffer CmdBuffer, DrawScene* Scene, const DrawEntityBatchConfig& Config);
 }
 
 namespace DeferredPass

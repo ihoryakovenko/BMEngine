@@ -50,7 +50,7 @@ struct DescriptorPoolData
 struct ShaderData
 {
 	VkShaderModule VulkanShaderModule;
-	PipelineStage Stage;
+	BmRender_PipelineShaderStage Stage;
 };
 
 struct ImageResource
@@ -72,8 +72,8 @@ struct GPUBufferData
 	VkBuffer Buffer;
 	VkDeviceMemory Memory;
 	MemoryPropertyFlag PropertyFlag;
-	PipelineStage BufferStage;
-	BufferUpdateFrequency UpdateFrequency;
+	BmRender_PipelineSyncStage BufferStage;
+	BmRender_BufferUpdateFrequency UpdateFrequency;
 };
 
 struct DescriptorSetData
@@ -165,4 +165,3 @@ GPUBufferData* GetGPUBufferData(BmRender_GPUBuffer Handle);
 GPUBufferEntryData* GetGPUBufferEntryData(BmRender_GPUBufferEntry Handle);
 PushConstantData* GetPushConstantData(BmRender_PushConstant Handle);
 DescriptorSetData* GetDescriptorSetData(BmRender_DescriptorSet Handle);
-

@@ -9,33 +9,6 @@
 
 struct GLFWwindow;
 
-
-struct VertexAttribute
-{
-	BmRender_AttributeType Type;
-	u32 Offset;
-};
-
-struct VertexBinding_depr
-{
-	u32 Stride;
-	VkVertexInputRate InputRate;
-	std::unordered_map<std::string, VertexAttribute> Attributes;
-};
-
-
-
-
-
-
-
-
-
-namespace VulkanCoreContext
-{
-	struct VulkanCoreContext;
-}
-
 typedef u64 PrivateHandle;
 typedef struct { PrivateHandle Private; } BmRender_Sampler;
 typedef struct { PrivateHandle Private; } BmRender_Pipeline;
@@ -50,7 +23,7 @@ typedef struct { PrivateHandle Private; } BmRender_GPUBufferEntry;
 typedef struct { PrivateHandle Private; } BmRender_PushConstant;
 typedef struct { PrivateHandle Private; } BmRender_DescriptorSet;
 
-enum class BmRender_AttributeType
+enum class BmRender_AttributeType : u8
 {
 	Int,
 	Uint,
@@ -61,16 +34,39 @@ enum class BmRender_AttributeType
 	Mat4
 };
 
-enum class BufferUpdateFrequency
+enum class BmRender_BufferUpdateFrequency : u8
 {
 	Static,
 	PerFrame
 };
 
-enum class PipelineStage
+enum class BmRender_DescriptorShaderStage : u64
 {
-	Vertex = 0x00000001,
-	Fragment = 0x00000080,
+	None = 0,
+	Vertex = 1 << 0,
+	Fragment = 1 << 1,
+	Compute = 1 << 2,
+};
+
+enum class BmRender_PipelineShaderStage : u8
+{
+	Vertex,
+	Fragment,
+	Geometry,
+	TessControl,
+	TessEval,
+	Compute
+};
+
+enum class BmRender_PipelineSyncStage : u64
+{
+	None = 0,
+	TopOfPipe = 1ull << 0,
+	VertexShader = 1ull << 1,
+	FragmentShader = 1ull << 2,
+	ColorAttachmentOutput = 1ull << 3,
+	ComputeShader = 1ull << 4,
+	BottomOfPipe = 1ull << 5,
 };
 
 enum class BufferUsageFlag
@@ -90,13 +86,15 @@ enum class MemoryPropertyFlag
 	HostCompatible = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 };
 
-enum class ImageType
+enum class ImageType : u8
 {
 	TransferSampled,
 	DepthSamplad,
 	ColorAttachmentSampled,
 };
 
+
+// TODO: Check
 struct AttachmentData
 {
 	u32 ColorAttachmentCount;
@@ -110,6 +108,7 @@ struct PipelineResourceInfo
 	AttachmentData PipelineAttachmentData;
 	BmRender_PipelineLayout PipelineLayout = {};
 };
+// Check
 
 struct BmRHI_SamplerDescription
 {
@@ -139,11 +138,11 @@ struct BmRender_ImageDescription
 	ImageType Type;
 };
 
-struct BmRender_LayoutBinding
+struct BmRender_DescriptorSetLayoutBinding
 {
 	VkDescriptorType DescriptorType;
 	u32 DescriptorCount;
-	VkShaderStageFlags StageFlags;
+	BmRender_DescriptorShaderStage StageFlags;
 };
 
 struct BmRender_ImageBinding
@@ -157,15 +156,14 @@ struct BmRender_DescriptorSetBinding
 {
 	BmRender_GPUBufferEntry* BufferRegions;
 	BmRender_ImageBinding ImageBinding;
-
 	u32 BindingCount;
 	u32 DstArrayElement;
 };
 
-struct BmRender_DescriptorSetLayoutDescription
+struct VertexAttribute
 {
-	const BmRender_LayoutBinding* Bindings;
-	u64 BindingsCount;
+	BmRender_AttributeType Type;
+	u32 Offset;
 };
 
 struct BmRender_VertexBinding
@@ -174,7 +172,6 @@ struct BmRender_VertexBinding
 	u32 AttributesCount;
 	u32 Stride;
 	VkVertexInputRate InputRate;
-	
 };
 
 struct BmRender_ShaderStageDescription
@@ -189,15 +186,13 @@ struct BmRender_PipelineDescription
 	PipelineResourceInfo ResourceInfo;
 
 	const BmRender_ShaderStageDescription* ShaderStages;
-	u32 ShaderStagesCount;
-
 	const BmRender_VertexBinding* VertexBindings;
-	u32 VertexBindingsCount;
-
-	const BmRender_DescriptorSetLayout* DescriptorSetLayouts;
-	u32 DescriptorSetLayoutsCount;
-
 	const BmRender_PushConstant* PushConstantRanges;
+	const BmRender_DescriptorSetLayout* DescriptorSetLayouts;
+
+	u32 ShaderStagesCount;
+	u32 VertexBindingsCount;
+	u32 DescriptorSetLayoutsCount;
 	u32 PushConstantRangesCount;
 
 	VkPipelineRasterizationStateCreateInfo RasterizationState;
@@ -215,10 +210,10 @@ struct BmRender_PipelineDescription
 
 struct BmRender_PipelineLayoutDescription
 {
-	u32 SetLayoutCount;
 	const BmRender_DescriptorSetLayout* SetLayouts;
-	u32 PushConstantRangeCount;
 	const BmRender_PushConstant* PushConstantRanges;
+	u32 SetLayoutCount;
+	u32 PushConstantRangeCount;
 };
 
 struct BmRender_DescriptorPoolDescription
@@ -226,14 +221,13 @@ struct BmRender_DescriptorPoolDescription
 	u32 MaxSets;
 	u32 PoolSizeCount;
 	const VkDescriptorPoolSize* PoolSizes;
-	VkDescriptorPoolCreateFlags Flags;
 };
 
 struct BmRender_ShaderDescription
 {
 	const u32* Code;
 	u64 CodeSize;
-	PipelineStage Stage;
+	BmRender_PipelineShaderStage Stage;
 };
 
 void BmRender_Init(GLFWwindow* WindowHandler);
@@ -242,21 +236,21 @@ void BmRender_DeInit();
 BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description);
 BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* Description);
 BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description);
-BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutDescription* Description);
+BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutBinding* Bindings, u64 BindingsCount);
 BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolDescription* Description);
 BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description);
 BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout LayoutHandle, BmRender_DescriptorPool PoolHandle);
 BmRender_GPUBufferEntry BmRender_CreateGPUBufferEntry(u64 BufferOffset, u64 RegionSize, BmRender_GPUBuffer BufferHandle);
-BmRender_GPUBuffer BmRender_CreateVertexStageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency);
-BmRender_GPUBuffer BmRender_CreateInstanceBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency);
-BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage);
-BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, BufferUpdateFrequency UpdateFrequency, PipelineStage BufferStage);
+BmRender_GPUBuffer BmRender_CreateVertexStageBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency);
+BmRender_GPUBuffer BmRender_CreateInstanceBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency);
+BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency, BmRender_PipelineSyncStage BufferStage);
+BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency, BmRender_PipelineSyncStage BufferStage);
 BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, ImageType Type);
 BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Format, ImageType Type, u32 ArrayLayers);
 BmRender_ImageView BmRender_CreateImageView2D(BmRender_Image Handle, VkImageAspectFlags AspectFlags);
 BmRender_ImageView BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags);
 BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout LayoutHandle, BmRender_DescriptorPool PoolHandle);
-BmRender_PushConstant BmRender_CreatePushConstant(PipelineStage Stage, u32 Offset, u32 Size);
+BmRender_PushConstant BmRender_CreatePushConstant(BmRender_DescriptorShaderStage Stage, u32 Offset, u32 Size);
 
 void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount);
 

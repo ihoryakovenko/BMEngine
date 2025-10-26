@@ -25,7 +25,7 @@
 #include <gli/gli.hpp>
 
 // Global resource maps
-std::unordered_map<std::string, VertexBinding_depr> VBindings;
+std::unordered_map<std::string, Util::VertexBinding_depr> VBindings;
 std::unordered_map<std::string, BmRender_Sampler> Samplers;
 std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 std::unordered_map<std::string, BmRender_Shader> Shaders;
@@ -41,7 +41,7 @@ namespace Engine
 		{
 			Yaml::Node& VertexNode = (*VertexIt).second;
 
-			VertexBinding_depr Binding = Util::ParseVertexBindingNode(Util::GetVertexBindingNode(VertexNode));
+			Util::VertexBinding_depr Binding = Util::ParseVertexBindingNode(Util::GetVertexBindingNode(VertexNode));
 
 			Yaml::Node& AttributesNode = Util::GetVertexAttributesNode(VertexNode);
 
@@ -75,7 +75,7 @@ namespace Engine
 		for (auto It = ShadersNode.Begin(); It != ShadersNode.End(); It++)
 		{
 			std::string ShaderPath = Util::ParseShaderNode((*It).second);
-			PipelineStage ShaderStage = Util::ParseShaderPipelineStage((*It).second);
+			BmRender_PipelineShaderStage ShaderStage = Util::ParseShaderPipelineStage((*It).second);
 
 			std::vector<char> ShaderCode;
 			if (Util::OpenAndReadFileFull(ShaderPath.c_str(), ShaderCode, "rb"))
@@ -108,28 +108,27 @@ namespace Engine
 		
 		for (const auto& Layout : Layouts)
 		{
-			BmRender_DescriptorSetLayoutDescription Description = {};
-			std::vector<BmRender_LayoutBinding> Bindings;
+			std::vector<BmRender_DescriptorSetLayoutBinding> Bindings;
 			
 			// Convert our simple structs to Vulkan structures
 			for (u32 i = 0; i < Layout.Bindings.size(); ++i)
 			{
 				const auto& Binding = Layout.Bindings[i];
 				
-				BmRender_LayoutBinding VkBinding = {};
+				BmRender_DescriptorSetLayoutBinding VkBinding = {};
 				VkBinding.StageFlags = Binding.StageFlags;
 				
 				// Map shader types to Vulkan descriptor types
 				switch (Binding.Type)
 				{
 					case Util::ShaderType::Uniform:
-						VkBinding.DescriptorType = (Binding.UpdateFrequency == BufferUpdateFrequency::PerFrame) ?
+						VkBinding.DescriptorType = (Binding.UpdateFrequency == BmRender_BufferUpdateFrequency::PerFrame) ?
 							VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 						VkBinding.DescriptorCount = 1;
 
 						break;
 					case Util::ShaderType::Buffer:
-						VkBinding.DescriptorType = (Binding.UpdateFrequency == BufferUpdateFrequency::PerFrame) ?
+						VkBinding.DescriptorType = (Binding.UpdateFrequency == BmRender_BufferUpdateFrequency::PerFrame) ?
 							VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 						VkBinding.DescriptorCount = 1;
 
@@ -149,10 +148,7 @@ namespace Engine
 				Bindings.push_back(VkBinding);
 			}
 			
-			Description.Bindings = Bindings.data();
-			Description.BindingsCount = static_cast<u32>(Bindings.size());
-			
-			DescriptorSetLayouts[Layout.Name] = BmRender_CreateDescriptorSetLayout(&Description);
+			DescriptorSetLayouts[Layout.Name] = BmRender_CreateDescriptorSetLayout(Bindings.data(), static_cast<u32>(Bindings.size()));
 		}
 	}
 
@@ -340,13 +336,12 @@ namespace Engine
 		PoolDesc.MaxSets = TotalDescriptorCount;
 		PoolDesc.PoolSizeCount = PoolSizeCount;
 		PoolDesc.PoolSizes = TotalPassPoolSizes;
-		PoolDesc.Flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
 
 		BmRender_DescriptorPool MainPool = BmRender_CreateDescriptorPool(&PoolDesc);
-		VertexStageBuffer = BmRender_CreateVertexStageBuffer(MB4, BufferUpdateFrequency::Static);
-		InstanceBuffer = BmRender_CreateInstanceBuffer(MB4, BufferUpdateFrequency::Static);
-		FrameDataBuffer = BmRender_CreateUniformBuffer(MB4, BufferUpdateFrequency::PerFrame, PipelineStage::Fragment);
-		MaterialBuffer = BmRender_CreateStorageBuffer(MB4, BufferUpdateFrequency::Static, PipelineStage::Fragment);
+		VertexStageBuffer = BmRender_CreateVertexStageBuffer(MB4, BmRender_BufferUpdateFrequency::Static);
+		InstanceBuffer = BmRender_CreateInstanceBuffer(MB4, BmRender_BufferUpdateFrequency::Static);
+		FrameDataBuffer = BmRender_CreateUniformBuffer(MB4, BmRender_BufferUpdateFrequency::PerFrame, BmRender_PipelineSyncStage::FragmentShader);
+		MaterialBuffer = BmRender_CreateStorageBuffer(MB4, BmRender_BufferUpdateFrequency::Static, BmRender_PipelineSyncStage::FragmentShader);
 
 		VpRegion[0] = BmRender_CreateGPUBufferEntry(0, 128, FrameDataBuffer);
 		VpRegion[1] = BmRender_CreateGPUBufferEntry(128, 128, FrameDataBuffer);
@@ -401,7 +396,7 @@ namespace Engine
 		}
 
 		TransferSystem::Init();
-		Render::Init(Window, VpRegion, EntityLightRegion, DescriptorSets, MainPool, VertexStageBuffer, InstanceBuffer);
+		Render::Init(Window, VpRegion, EntityLightRegion, DescriptorSets, MainPool);
 
 		EngineResources::Init(DescriptorSets.BindlesTexturesSet, VertexStageBuffer, InstanceBuffer, FrameDataBuffer, MaterialBuffer);
 
