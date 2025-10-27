@@ -324,7 +324,7 @@ namespace TransferSystem
 		TransferCommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		TransferCommandBufferAllocateInfo.commandPool = TransferState.TransferCommandPool;
 		TransferCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		TransferCommandBufferAllocateInfo.commandBufferCount = VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT;
+		TransferCommandBufferAllocateInfo.commandBufferCount = VulkanHelper::MAX_DRAW_FRAMES;
 
 		VULKAN_CHECK_RESULT(vkAllocateCommandBuffers(Device, &TransferCommandBufferAllocateInfo, TransferState.Frames.CommandBuffers));
 
@@ -332,7 +332,7 @@ namespace TransferSystem
 		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 		FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-		for (u32 i = 0; i < VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT; ++i)
+		for (u32 i = 0; i < VulkanHelper::MAX_DRAW_FRAMES; ++i)
 		{
 			VULKAN_CHECK_RESULT(vkCreateFence(Device, &FenceCreateInfo, GetVulkanAllocator(), TransferState.Frames.Fences + i));
 		}
@@ -381,7 +381,7 @@ namespace TransferSystem
 
 		vkDestroyCommandPool(Device, TransferState.TransferCommandPool, GetVulkanAllocator());
 
-		for (u32 i = 0; i < VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT; ++i)
+		for (u32 i = 0; i < VulkanHelper::MAX_DRAW_FRAMES; ++i)
 		{
 			vkDestroyFence(Device, TransferState.Frames.Fences[i], GetVulkanAllocator());
 		}
