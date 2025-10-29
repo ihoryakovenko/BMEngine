@@ -57,9 +57,11 @@ struct ImageResource
 {
 	VkImage Image;
 	VkDeviceMemory Memory;
-	u64 Size;
-	std::atomic<bool> IsLoaded;
+	u64 ReadyValue;
 	VkFormat Format;
+	u64 Size;
+	u32 Width;
+	u32 Height;
 };
 
 struct ImageViewData
@@ -84,8 +86,8 @@ struct DescriptorSetData
 
 struct GPUBufferEntryData
 {
-	std::atomic<bool> IsLoaded;
 	BmRender_GPUBuffer GPUBufferHandle;
+	u64 ReadyValue;
 	u64 BufferOffset;
 	u64 Size;
 };

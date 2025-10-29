@@ -270,7 +270,7 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 	VkQueue TransferQueue = GetCoreContext()->GraphicsQueue;
 
 	ImageResource Resource;
-	Resource.IsLoaded = false;
+	Resource.ReadyValue = ULLONG_MAX;
 	Resource.Format = Description->Format;
 
 	VkImageUsageFlags Usage;
@@ -316,6 +316,8 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 		Resource.Image, MemoryPropertyFlag::GPULocal, GetVulkanAllocator());
 
 	Resource.Memory = AllocResult.Memory;
+	Resource.Width = Description->Width;
+	Resource.Height = Description->Height;
 	Resource.Size = AllocResult.Size;
 
 	VULKAN_CHECK_RESULT(vkBindImageMemory(Device, Resource.Image, Resource.Memory, 0));
@@ -606,7 +608,7 @@ BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Descript
 BmRender_GPUBufferEntry BmRender_CreateGPUBufferEntry(u64 BufferOffset, u64 RegionSize, BmRender_GPUBuffer BufferHandle)
 {
 	GPUBufferEntryData Entry;
-	Entry.IsLoaded = false;
+	Entry.ReadyValue = ULLONG_MAX;
 	Entry.BufferOffset = BufferOffset;
 	Entry.Size = RegionSize;
 	Entry.GPUBufferHandle = BufferHandle;

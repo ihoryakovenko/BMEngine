@@ -15,16 +15,11 @@ namespace TransferSystem
 
 	struct ImageTaskDescription
 	{
-		VkImage DstImage;
 		BmRender_Image Handle;
-		u32 Width;
-		u32 Height;
 	};
 
 	struct DataTaskDescription
 	{
-		VkBuffer DstBuffer;
-		u64 DstOffset;
 		BmRender_GPUBufferEntry Handle;
 		BmRender_PipelineSyncStage StageBarrier;
 	};
@@ -53,4 +48,6 @@ namespace TransferSystem
 	TransferMemory RequestTransferMemory(u64 Size);
 
 	void AddTask(TransferTask* Task);
+	bool IsBufferResourceReady(BmRender_GPUBufferEntry Handle);
+	bool IsImageResourceReady(BmRender_Image Handle);
 }

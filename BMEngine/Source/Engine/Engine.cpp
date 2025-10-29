@@ -258,12 +258,13 @@ namespace Engine
 				
 				EngineResources::Update(&Scene, DescriptorSets.BindlesTexturesSet);
 
-				TaskSystem::TaskLambda Task = [&]() { Transferred = TransferSystem::Transfer(); };
-				TaskSystem::AddTask(&Task, &Group);
+				//TaskSystem::TaskLambda Task = [&]() { Transferred = TransferSystem::Transfer(); };
+				//TaskSystem::AddTask(&Task, &Group);
+				TransferSystem::Transfer();
 				Render::Draw(&Scene, LastTransfer);
 
 				TaskSystem::WaitForGroup(&Group);
-				LastTransfer = Transferred;
+				//LastTransfer = Transferred;
 			}
 		}
 

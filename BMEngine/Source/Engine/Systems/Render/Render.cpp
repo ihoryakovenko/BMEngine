@@ -183,21 +183,33 @@ namespace Render
 		{
 			DrawEntity* Entity = Scene->DrawEntities.data() + i;
 		
+			bool AreDependenciesReady = true;
 			for (u32 j = 0; j < Entity->ImageDependency.size(); ++j)
 			{
-				if (!RenderResources::IsImageResourceReady(Entity->ImageDependency[j]))
+				if (!TransferSystem::IsImageResourceReady(Entity->ImageDependency[j]))
 				{
-					continue;
+					AreDependenciesReady = false;
+					break;
 				}
 			}
+
+			if (!AreDependenciesReady)
+			{
+				continue;
+			}
 		
-			bool AllBuffersReady = true;
 			for (u32 j = 0; j < Entity->ResourceDependency.size(); ++j)
 			{
-				if (!RenderResources::IsBufferResourceReady(Entity->ResourceDependency[j]))
+				if (!TransferSystem::IsBufferResourceReady(Entity->ResourceDependency[j]))
 				{
-					continue;
+					AreDependenciesReady = false;
+					break;
 				}
+			}
+
+			if (!AreDependenciesReady)
+			{
+				continue;
 			}
 
 			GPUBufferEntryData* VertexEntryData = GetGPUBufferEntryData(Entity->VertexBufferEntry);
