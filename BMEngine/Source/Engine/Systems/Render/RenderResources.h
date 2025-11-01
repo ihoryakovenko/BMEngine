@@ -15,6 +15,6 @@
 namespace RenderResources
 {
 
-	void UpdateBufferRegion(BmRender_GPUBufferEntry Handle, u64 ResourceOffset, const void* Data, u32 DataSize);
+	void UpdateBufferRegion(BmRender_GPUBufferBinding Handle, u64 ResourceOffset, const void* Data, u32 DataSize);
 	void UpdateImageResource(BmRender_Image Handle, BmRender_ImageDescription* Description, void* Data);
 }

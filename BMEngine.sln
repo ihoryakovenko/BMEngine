@@ -12,6 +12,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		PostBuildScript.bat = PostBuildScript.bat
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ApiTest", "ApiTest\ApiTest.vcxproj", "{43310985-CE08-45F5-8B12-5E2457F9A9F4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -36,6 +38,14 @@ Global
 		{AE0C3971-99F2-47BF-8261-914E31E3D352}.Release|x64.Build.0 = Release|x64
 		{AE0C3971-99F2-47BF-8261-914E31E3D352}.Release|x86.ActiveCfg = Release|Win32
 		{AE0C3971-99F2-47BF-8261-914E31E3D352}.Release|x86.Build.0 = Release|Win32
+		{43310985-CE08-45F5-8B12-5E2457F9A9F4}.Debug|x64.ActiveCfg = Debug|x64
+		{43310985-CE08-45F5-8B12-5E2457F9A9F4}.Debug|x64.Build.0 = Debug|x64
+		{43310985-CE08-45F5-8B12-5E2457F9A9F4}.Debug|x86.ActiveCfg = Debug|Win32
+		{43310985-CE08-45F5-8B12-5E2457F9A9F4}.Debug|x86.Build.0 = Debug|Win32
+		{43310985-CE08-45F5-8B12-5E2457F9A9F4}.Release|x64.ActiveCfg = Release|x64
+		{43310985-CE08-45F5-8B12-5E2457F9A9F4}.Release|x64.Build.0 = Release|x64
+		{43310985-CE08-45F5-8B12-5E2457F9A9F4}.Release|x86.ActiveCfg = Release|Win32
+		{43310985-CE08-45F5-8B12-5E2457F9A9F4}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

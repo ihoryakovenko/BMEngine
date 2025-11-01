@@ -17,9 +17,17 @@ typedef struct { PrivateHandle Private; } BmRender_DescriptorSetLayout;
 typedef struct { PrivateHandle Private; } BmRender_DescriptorPool;
 typedef struct { PrivateHandle Private; } BmRender_Shader;
 typedef struct { PrivateHandle Private; } BmRender_Image;
+typedef struct { BmRender_Image Image; } BmRender_Image2D;
+typedef struct { BmRender_Image Image; } BmRender_Image2DArray;
 typedef struct { PrivateHandle Private; } BmRender_ImageView;
+typedef struct { BmRender_ImageView View; } BmRender_ImageView2D;
+typedef struct { BmRender_ImageView View; } BmRender_ImageView2DArray;
 typedef struct { PrivateHandle Private; } BmRender_GPUBuffer;
-typedef struct { PrivateHandle Private; } BmRender_GPUBufferEntry;
+typedef struct { BmRender_GPUBuffer Buffer; } BmRender_VertexStageBuffer;
+typedef struct { BmRender_GPUBuffer Buffer; } BmRender_InstanceBuffer;
+typedef struct { BmRender_GPUBuffer Buffer; } BmRender_UniformBuffer;
+typedef struct { BmRender_GPUBuffer Buffer; } BmRender_StorageBuffer;
+typedef struct { BmRender_GPUBuffer Buffer; } BmRender_StagingBuffer;
 typedef struct { PrivateHandle Private; } BmRender_PushConstant;
 typedef struct { PrivateHandle Private; } BmRender_DescriptorSet;
 
@@ -69,6 +77,16 @@ enum class BmRender_PipelineSyncStage : u64
 	BottomOfPipe = 1ull << 5,
 };
 
+enum class BmRender_ImageType : u8
+{
+	TransferSampled,
+	DepthSamplad,
+	ColorAttachmentSampled,
+};
+
+
+// TODO: Check
+
 enum class BufferUsageFlag
 {
 	UniformFlag = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -86,15 +104,6 @@ enum class MemoryPropertyFlag
 	HostCompatible = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 };
 
-enum class ImageType : u8
-{
-	TransferSampled,
-	DepthSamplad,
-	ColorAttachmentSampled,
-};
-
-
-// TODO: Check
 struct AttachmentData
 {
 	u32 ColorAttachmentCount;
@@ -135,7 +144,7 @@ struct BmRender_ImageDescription
 	u32 Height;
 	VkFormat Format;
 	u32 ArrayLayers;
-	ImageType Type;
+	BmRender_ImageType Type;
 };
 
 struct BmRender_DescriptorSetLayoutBinding
@@ -152,9 +161,16 @@ struct BmRender_ImageBinding
 	BmRender_ImageView ImageView;
 };
 
+struct BmRender_GPUBufferBinding
+{
+	BmRender_GPUBuffer GPUBufferHandle;
+	u64 BufferOffset;
+	u64 Size;
+};
+
 struct BmRender_DescriptorSetBinding
 {
-	BmRender_GPUBufferEntry* BufferRegions;
+	BmRender_GPUBufferBinding* BufferRegions;
 	BmRender_ImageBinding ImageBinding;
 	u32 BindingCount;
 	u32 DstArrayElement;
@@ -230,7 +246,7 @@ struct BmRender_ShaderDescription
 	BmRender_PipelineShaderStage Stage;
 };
 
-void BmRender_Init(GLFWwindow* WindowHandler);
+void BmRender_Init(GLFWwindow* WindowHandler, u32 MaxFramesInFly);
 void BmRender_DeInit();
 
 BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description);
@@ -240,18 +256,19 @@ BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_D
 BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolDescription* Description);
 BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description);
 BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout LayoutHandle, BmRender_DescriptorPool PoolHandle);
-BmRender_GPUBufferEntry BmRender_CreateGPUBufferEntry(u64 BufferOffset, u64 RegionSize, BmRender_GPUBuffer BufferHandle);
-BmRender_GPUBuffer BmRender_CreateVertexStageBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency);
-BmRender_GPUBuffer BmRender_CreateInstanceBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency);
-BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency, BmRender_PipelineSyncStage BufferStage);
-BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency, BmRender_PipelineSyncStage BufferStage);
-BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, ImageType Type);
-BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Format, ImageType Type, u32 ArrayLayers);
-BmRender_ImageView BmRender_CreateImageView2D(BmRender_Image Handle, VkImageAspectFlags AspectFlags);
-BmRender_ImageView BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags);
+BmRender_VertexStageBuffer BmRender_CreateVertexStageBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency);
+BmRender_InstanceBuffer BmRender_CreateInstanceBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency);
+BmRender_UniformBuffer BmRender_CreateUniformBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency, BmRender_PipelineSyncStage BufferStage);
+BmRender_StorageBuffer BmRender_CreateStorageBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency, BmRender_PipelineSyncStage BufferStage);
+BmRender_StagingBuffer BmRender_CreateStagingBuffer(u64 Size);
+BmRender_Image2D BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, BmRender_ImageType Type);
+BmRender_Image2DArray BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Format, BmRender_ImageType Type, u32 ArrayLayers);
+BmRender_ImageView2D BmRender_CreateImageView2D(BmRender_Image Handle, VkImageAspectFlags AspectFlags);
+BmRender_ImageView2DArray BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags);
 BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout LayoutHandle, BmRender_DescriptorPool PoolHandle);
 BmRender_PushConstant BmRender_CreatePushConstant(BmRender_DescriptorShaderStage Stage, u32 Offset, u32 Size);
 
+void BmRender_UpdateStagingBuffer(BmRender_StagingBuffer StagingBuffer, u64 BufferOffset, u64 DataSize, const void* Data);
 void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount);
 
 void BmRender_DestroySampler(BmRender_Sampler Handle);
@@ -261,3 +278,5 @@ void BmRender_DestroyDescriptorSetLayout(BmRender_DescriptorSetLayout Handle);
 void BmRender_DestroyDescriptorPool(BmRender_DescriptorPool Handle);
 void BmRender_DestroyShader(BmRender_Shader Handle);
 void BmRender_DestroyImage(BmRender_Image Handle);
+
+void Test_FrameFree();

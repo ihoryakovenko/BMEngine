@@ -12,6 +12,8 @@
 
 #include "VulkanCoreContext.h"
 
+static u32 MaxFramesInFly;
+
 static void OnSamplerClear(SamplerData* SamplerData)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
@@ -69,9 +71,13 @@ static void OnGPUBufferClear(GPUBufferData* Data)
 	vkFreeMemory(Device, Data->Memory, GetVulkanAllocator());
 }
 
-void BmRender_Init(GLFWwindow* WindowHandler)
+void BmRender_Init(GLFWwindow* WindowHandler, u32 InMaxFramesInFly)
 {
+	InitializeFrameMemory();
+
 	CreateCoreContext(WindowHandler);
+
+	MaxFramesInFly = InMaxFramesInFly;
 
 	InitializeSamplerManager(32);
 	InitializePipelineManager(4);
@@ -83,8 +89,9 @@ void BmRender_Init(GLFWwindow* WindowHandler)
 	InitializeImageViewManager(32);
 	InitializeGPUBufferManager(4);
 	InitializeDescriptorSetManager(32);
-	InitializeGPUBufferEntryManager(32);
 	InitializePushConstantManager(4);
+
+	
 }
 
 void BmRender_DeInit()
@@ -99,10 +106,11 @@ void BmRender_DeInit()
 	DeinitImageViewManager(OnImageViewClear);
 	DeinitGPUBufferManager(OnGPUBufferClear);
 	DeinitDescriptorSetManager();
-	DeinitGPUBufferEntryManager();
 	DeinitPushConstantManager();
 
 	DestroyCoreContext();
+
+	DeinitFrameMemory();
 }
 
 BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout LayoutHandle, BmRender_DescriptorPool PoolHandle)
@@ -134,7 +142,7 @@ BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_D
 	Layout.BindingsCount = BindingsCount;
 	Layout.LayoutBindings = (DescriptorSetLayoutBinding*)malloc(sizeof(DescriptorSetLayoutBinding) * BindingsCount);
 
-	VkDescriptorSetLayoutBinding* NewLayoutBindings = (VkDescriptorSetLayoutBinding*)Render::FrameAlloc(sizeof(VkDescriptorSetLayoutBinding) * BindingsCount);
+	VkDescriptorSetLayoutBinding* NewLayoutBindings = (VkDescriptorSetLayoutBinding*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkDescriptorSetLayoutBinding) * BindingsCount);
 	for (u32 i = 0; i < BindingsCount; ++i)
 	{
 		NewLayoutBindings[i].binding = i;
@@ -165,7 +173,7 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, co
 	DescriptorSetData* Set = GetDescriptorSetData(DescriptorSetHandle);
 	DescriptorSetLayoutData* Layout = GetDescriptorSetLayoutData(Set->Layout);
 
-	VkWriteDescriptorSet* WriteDescriptorSets = (VkWriteDescriptorSet*)Render::FrameAlloc(sizeof(VkWriteDescriptorSet) * BindingsCount);
+	VkWriteDescriptorSet* WriteDescriptorSets = (VkWriteDescriptorSet*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkWriteDescriptorSet) * BindingsCount);
 
 	for (u32 i = 0; i < BindingsCount; i++)
 	{
@@ -184,22 +192,21 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, co
 		if (DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC ||
 			DescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER || DescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC)
 		{
-			VkDescriptorBufferInfo* BufferInfo = (VkDescriptorBufferInfo*)Render::FrameAlloc(sizeof(VkDescriptorBufferInfo) * Binding.BindingCount);
+			VkDescriptorBufferInfo* BufferInfo = (VkDescriptorBufferInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkDescriptorBufferInfo) * Binding.BindingCount);
 			for (u32 j = 0; j < Binding.BindingCount; ++j)
 			{
+				const BmRender_GPUBufferBinding& Entry = Binding.BufferRegions[j];
 
-				GPUBufferEntryData* Entry = GetGPUBufferEntryData(Binding.BufferRegions[j]);
-
-				BufferInfo[j].buffer = GetGPUBufferData(Entry->GPUBufferHandle)->Buffer;
-				BufferInfo[j].offset = Entry->BufferOffset;
-				BufferInfo[j].range = Entry->Size;
+				BufferInfo[j].buffer = GetGPUBufferData(Entry.GPUBufferHandle)->Buffer;
+				BufferInfo[j].offset = Entry.BufferOffset;
+				BufferInfo[j].range = Entry.Size;
 			}
 
 			WriteDescriptorSets[i].pBufferInfo = BufferInfo;
 		}
 		else if (VK_DESCRIPTOR_TYPE_SAMPLER || VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
 		{
-			VkDescriptorImageInfo* ImageInfo = (VkDescriptorImageInfo*)Render::FrameAlloc(sizeof(VkDescriptorImageInfo));
+			VkDescriptorImageInfo* ImageInfo = (VkDescriptorImageInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkDescriptorImageInfo));
 			ImageInfo->imageLayout = Binding.ImageBinding.ImageLayout;
 			ImageInfo->imageView = GetImageViewData(Binding.ImageBinding.ImageView)->View;
 			ImageInfo->sampler = GetSamplerData(Binding.ImageBinding.Sampler)->VulkanSampler;
@@ -232,9 +239,16 @@ static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, BmRender_BufferUpdateFre
 
 	MemoryPropertyFlag MemoryFlag = MemoryPropertyFlag::GPULocal;
 
+	GPUBufferData NewBuffer = { };
+
 	if (UpdateFrequency == BmRender_BufferUpdateFrequency::PerFrame)
 	{
 		MemoryFlag = MemoryPropertyFlag::HostCompatible;
+		NewBuffer.ReadyValue = 0;
+	}
+	else
+	{
+		NewBuffer.ReadyValue = ULLONG_MAX;
 	}
 
 	if (Flag == BufferUsageFlag::UniformFlag)
@@ -246,9 +260,7 @@ static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, BmRender_BufferUpdateFre
 		{
 			assert(false);
 		}
-	}
-
-	GPUBufferData NewBuffer = { };
+	}	
 
 	NewBuffer.UpdateFrequency = UpdateFrequency;
 	NewBuffer.PropertyFlag = MemoryFlag;
@@ -277,15 +289,15 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 
 	switch (Description->Type)
 	{
-		case ImageType::TransferSampled:
+		case BmRender_ImageType::TransferSampled:
 			Usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 			break;
 
-		case ImageType::DepthSamplad:
+		case BmRender_ImageType::DepthSamplad:
 			Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 			break;
 
-		case ImageType::ColorAttachmentSampled:
+		case BmRender_ImageType::ColorAttachmentSampled:
 			Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 			break;
 
@@ -388,10 +400,10 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	
-	VkVertexInputBindingDescription* VkVertexBindings = (VkVertexInputBindingDescription*)Render::FrameAlloc(sizeof(VkVertexInputBindingDescription) * Description->VertexBindingsCount);
+	VkVertexInputBindingDescription* VkVertexBindings = (VkVertexInputBindingDescription*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkVertexInputBindingDescription) * Description->VertexBindingsCount);
 
 	u32 TotalAttributes = 0;
-	VkVertexInputAttributeDescription* VkVertexAttributes = (VkVertexInputAttributeDescription*)Render::GetHead();
+	VkVertexInputAttributeDescription* VkVertexAttributes = (VkVertexInputAttributeDescription*)Memory::GetHead(GetFrameMemory());
 	VkVertexInputAttributeDescription* VkAttribute = nullptr;
 	
 	u32 CurrentLocation = 0;
@@ -434,7 +446,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 						assert(false);
 				}
 				
-				VkAttribute = (VkVertexInputAttributeDescription*)Render::FrameAlloc(sizeof(VkVertexInputAttributeDescription));
+				VkAttribute = (VkVertexInputAttributeDescription*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkVertexInputAttributeDescription));
 				VkAttribute->binding = BindingIndex;
 				VkAttribute->location = CurrentLocation;
 				VkAttribute->format = Format;
@@ -448,7 +460,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 				u32 MatrixBindingOffset = 0;
 				for (u32 i = 0; i < 4; ++i)
 				{
-					VkAttribute = (VkVertexInputAttributeDescription*)Render::FrameAlloc(sizeof(VkVertexInputAttributeDescription));
+					VkAttribute = (VkVertexInputAttributeDescription*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkVertexInputAttributeDescription));
 					VkAttribute->binding = BindingIndex;
 					VkAttribute->location = CurrentLocation;
 					VkAttribute->format = VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -462,7 +474,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 		}
 	}
 
-	VkPipelineShaderStageCreateInfo* VkShaderStages = (VkPipelineShaderStageCreateInfo*)Render::FrameAlloc(sizeof(VkPipelineShaderStageCreateInfo) * Description->ShaderStagesCount);
+	VkPipelineShaderStageCreateInfo* VkShaderStages = (VkPipelineShaderStageCreateInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkPipelineShaderStageCreateInfo) * Description->ShaderStagesCount);
 	for (u32 i = 0; i < Description->ShaderStagesCount; ++i)
 	{
 		const BmRender_ShaderStageDescription* ShaderStageDesc = Description->ShaderStages + i;
@@ -500,7 +512,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	ViewportState.pViewports = &Description->Viewport;
 	ViewportState.pScissors = &Description->Scissor;
 
-	auto PipelineCreateInfo = (VkGraphicsPipelineCreateInfo*)Render::FrameAlloc(sizeof(VkGraphicsPipelineCreateInfo));
+	auto PipelineCreateInfo = (VkGraphicsPipelineCreateInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkGraphicsPipelineCreateInfo));
 	*PipelineCreateInfo = { };
 	PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	PipelineCreateInfo->stageCount = Description->ShaderStagesCount;
@@ -534,13 +546,13 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	
-	VkDescriptorSetLayout* VkSetLayouts = (VkDescriptorSetLayout*)Render::FrameAlloc(Description->SetLayoutCount * sizeof(VkDescriptorSetLayout));
+	VkDescriptorSetLayout* VkSetLayouts = (VkDescriptorSetLayout*)Memory::FrameAlloc(GetFrameMemory(), Description->SetLayoutCount * sizeof(VkDescriptorSetLayout));
 	for (u32 i = 0; i < Description->SetLayoutCount; ++i)
 	{
 		VkSetLayouts[i] = GetDescriptorSetLayoutData(Description->SetLayouts[i])->Layout;
 	}
 	
-	VkPushConstantRange* VkPushConstantRanges = (VkPushConstantRange*)Render::FrameAlloc(Description->PushConstantRangeCount * sizeof(VkPushConstantRange));
+	VkPushConstantRange* VkPushConstantRanges = (VkPushConstantRange*)Memory::FrameAlloc(GetFrameMemory(), Description->PushConstantRangeCount * sizeof(VkPushConstantRange));
 	for (u32 i = 0; i < Description->PushConstantRangeCount; ++i)
 	{
 		VkPushConstantRanges[i] = GetPushConstantData(Description->PushConstantRanges[i])->PushConstants;
@@ -605,19 +617,10 @@ BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Descript
 	return CreateShaderHandle(&Data);
 }
 
-BmRender_GPUBufferEntry BmRender_CreateGPUBufferEntry(u64 BufferOffset, u64 RegionSize, BmRender_GPUBuffer BufferHandle)
-{
-	GPUBufferEntryData Entry;
-	Entry.ReadyValue = ULLONG_MAX;
-	Entry.BufferOffset = BufferOffset;
-	Entry.Size = RegionSize;
-	Entry.GPUBufferHandle = BufferHandle;
 
-	return CreateGPUBufferEntryHandle(&Entry);
-}
-
-BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, ImageType Type)
+BmRender_Image2D BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, BmRender_ImageType Type)
 {
+	BmRender_Image2D Handle;
 	BmRender_ImageDescription Descr;
 	Descr.ArrayLayers = 1;
 	Descr.Format = Format;
@@ -625,11 +628,13 @@ BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, Im
 	Descr.Height = Height;
 	Descr.Type = Type;
 
-	return CreateImageResource(&Descr);
+	Handle.Image = CreateImageResource(&Descr);
+	return Handle;
 }
 
-BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Format, ImageType Type, u32 ArrayLayers)
+BmRender_Image2DArray BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Format, BmRender_ImageType Type, u32 ArrayLayers)
 {
+	BmRender_Image2DArray Handle;
 	BmRender_ImageDescription Descr;
 	Descr.ArrayLayers = ArrayLayers;
 	Descr.Format = Format;
@@ -637,37 +642,65 @@ BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Forma
 	Descr.Height = Height;
 	Descr.Type = Type;
 
-	return CreateImageResource(&Descr);
+	Handle.Image = CreateImageResource(&Descr);
+	return Handle;
 }
 
-BmRender_ImageView BmRender_CreateImageView2D(BmRender_Image Handle, VkImageAspectFlags AspectFlags)
+BmRender_ImageView2D BmRender_CreateImageView2D(BmRender_Image Handle, VkImageAspectFlags AspectFlags)
 {
-	return CreateImageView(Handle, 0, 1, VK_IMAGE_VIEW_TYPE_2D, AspectFlags);
+	BmRender_ImageView2D ViewHandle;
+	ViewHandle.View = CreateImageView(Handle, 0, 1, VK_IMAGE_VIEW_TYPE_2D, AspectFlags);
+	return ViewHandle;
 }
 
-BmRender_ImageView BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags)
+BmRender_ImageView2DArray BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags)
 {
-	return CreateImageView(Handle, BaseLayer, LayerCount, VK_IMAGE_VIEW_TYPE_2D_ARRAY, AspectFlags);
+	BmRender_ImageView2DArray ViewHandle;
+	ViewHandle.View = CreateImageView(Handle, BaseLayer, LayerCount, VK_IMAGE_VIEW_TYPE_2D_ARRAY, AspectFlags);
+	return ViewHandle;
 }
 
-BmRender_GPUBuffer BmRender_CreateVertexStageBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency)
+BmRender_VertexStageBuffer BmRender_CreateVertexStageBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency)
 {
-	return CreateGPUBuffer(Size, UpdateFrequency, BmRender_PipelineSyncStage::VertexShader, BufferUsageFlag::CombinedVertexIndexFlag);
+	BmRender_VertexStageBuffer Handle;
+	Handle.Buffer = CreateGPUBuffer(Size, UpdateFrequency, BmRender_PipelineSyncStage::VertexShader, BufferUsageFlag::CombinedVertexIndexFlag);
+	return Handle;
 }
 
-BmRender_GPUBuffer BmRender_CreateInstanceBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency)
+BmRender_InstanceBuffer BmRender_CreateInstanceBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency)
 {
-	return CreateGPUBuffer(Size, UpdateFrequency, BmRender_PipelineSyncStage::VertexShader, BufferUsageFlag::InstanceFlag);
+	BmRender_InstanceBuffer Handle;
+	Handle.Buffer = CreateGPUBuffer(Size, UpdateFrequency, BmRender_PipelineSyncStage::VertexShader, BufferUsageFlag::InstanceFlag);
+	return Handle;
 }
 
-BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency, BmRender_PipelineSyncStage BufferStage)
+BmRender_UniformBuffer BmRender_CreateUniformBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency, BmRender_PipelineSyncStage BufferStage)
 {
-	return CreateGPUBuffer(Size, UpdateFrequency, BufferStage, BufferUsageFlag::UniformFlag);
+	BmRender_UniformBuffer Handle;
+	Handle.Buffer = CreateGPUBuffer(Size, UpdateFrequency, BufferStage, BufferUsageFlag::UniformFlag);
+	return Handle;
 }
 
-BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency, BmRender_PipelineSyncStage BufferStage)
+BmRender_StorageBuffer BmRender_CreateStorageBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency, BmRender_PipelineSyncStage BufferStage)
 {
-	return CreateGPUBuffer(Size, UpdateFrequency, BufferStage, BufferUsageFlag::StorageFlag);
+	BmRender_StorageBuffer Handle;
+	Handle.Buffer = CreateGPUBuffer(Size, UpdateFrequency, BufferStage, BufferUsageFlag::StorageFlag);
+	return Handle;
+}
+
+BmRender_StagingBuffer BmRender_CreateStagingBuffer(u64 Size)
+{
+	BmRender_StagingBuffer Handle;
+	// PerFrame TODO: FIX
+	Handle.Buffer = CreateGPUBuffer(Size, BmRender_BufferUpdateFrequency::PerFrame, BmRender_PipelineSyncStage::None, BufferUsageFlag::StagingFlag);
+	return Handle;
+}
+
+void BmRender_UpdateStagingBuffer(BmRender_StagingBuffer StagingBuffer, u64 BufferOffset, u64 DataSize, const void* Data)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	GPUBufferData* BufferData = GetGPUBufferData(StagingBuffer.Buffer);
+	VulkanHelper::UpdateHostCompatibleBufferMemory(Device, BufferData->Memory, DataSize, BufferOffset, Data);
 }
 
 void BmRender_DestroyPipelineLayout(BmRender_PipelineLayout Handle)

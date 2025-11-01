@@ -32,6 +32,7 @@
     <ClCompile Include="Source\Engine\Systems\Render\RenderInterface.cpp" />
     <ClCompile Include="Source\Engine\Systems\HandleManager.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderTypes.cpp" />
+    <ClCompile Include="Source\Util\YamlParsing.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
@@ -54,6 +55,7 @@
     <ClInclude Include="Source\Engine\Systems\Render\RenderInterface.h" />
     <ClInclude Include="Source\Engine\Systems\Render\RenderTypes.h" />
     <ClInclude Include="Source\Engine\Systems\HandleManager.h" />
+    <ClInclude Include="Source\Util\YamlParsing.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />

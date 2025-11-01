@@ -5,6 +5,8 @@
 #include <glm/glm.hpp>
 
 #include "Util/Util.h"
+#include "RenderTypes.h"
+#include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 
 namespace VulkanHelper
 {
@@ -450,7 +452,7 @@ namespace VulkanHelper
 		u32 PresentModeCount;
 		VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &PresentModeCount, nullptr));
 
-		auto PresentModes = (VkPresentModeKHR*)Render::FrameAlloc(PresentModeCount * sizeof(VkPresentModeKHR));
+		auto PresentModes = (VkPresentModeKHR*)Memory::FrameAlloc(GetFrameMemory(), PresentModeCount * sizeof(VkPresentModeKHR));
 		vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &PresentModeCount, PresentModes);
 
 		for (u32 i = 0; i < PresentModeCount; ++i)

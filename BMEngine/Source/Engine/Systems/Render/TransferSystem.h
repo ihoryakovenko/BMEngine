@@ -20,7 +20,7 @@ namespace TransferSystem
 
 	struct DataTaskDescription
 	{
-		BmRender_GPUBufferEntry Handle;
+		BmRender_GPUBufferBinding Handle;
 		BmRender_PipelineSyncStage StageBarrier;
 	};
 
@@ -48,6 +48,6 @@ namespace TransferSystem
 	TransferMemory RequestTransferMemory(u64 Size);
 
 	void AddTask(TransferTask* Task);
-	bool IsBufferResourceReady(BmRender_GPUBufferEntry Handle);
-	bool IsImageResourceReady(BmRender_Image Handle);
+	bool IsBufferLocked(BmRender_GPUBuffer Handle);
+	bool IsImageLocked(BmRender_Image Handle);
 }

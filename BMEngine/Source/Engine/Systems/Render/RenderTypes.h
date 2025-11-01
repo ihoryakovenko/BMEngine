@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan.h>
 #include "Engine/Systems/HandleManager.h"
+#include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 
 #include "RenderInterface.h"
 
@@ -76,6 +77,7 @@ struct GPUBufferData
 	MemoryPropertyFlag PropertyFlag;
 	BmRender_PipelineSyncStage BufferStage;
 	BmRender_BufferUpdateFrequency UpdateFrequency;
+	u64 ReadyValue;
 };
 
 struct DescriptorSetData
@@ -84,13 +86,6 @@ struct DescriptorSetData
 	BmRender_DescriptorSetLayout Layout;
 };
 
-struct GPUBufferEntryData
-{
-	BmRender_GPUBuffer GPUBufferHandle;
-	u64 ReadyValue;
-	u64 BufferOffset;
-	u64 Size;
-};
 
 struct PushConstantData
 {
@@ -112,9 +107,10 @@ void InitializeShaderManager(u32 Size);
 void InitializeImageManager(u32 Size);
 void InitializeImageViewManager(u32 Size);
 void InitializeGPUBufferManager(u32 Size);
-void InitializeGPUBufferEntryManager(u32 Size);
 void InitializePushConstantManager(u32 Size);
 void InitializeDescriptorSetManager(u32 Size);
+void InitializeFrameMemory();
+void DeinitFrameMemory();
 
 void DeinitSamplerManager(void(*CleanUpFunc)(SamplerData*));
 void DeinitPipelineManager(void(*CleanUpFunc)(PipelineData*));
@@ -125,7 +121,6 @@ void DeinitShaderManager(void(*CleanUpFunc)(ShaderData*));
 void DeinitImageManager(void(*CleanUpFunc)(ImageResource*));
 void DeinitImageViewManager(void(*CleanUpFunc)(ImageViewData*));
 void DeinitGPUBufferManager(void(*CleanUpFunc)(GPUBufferData*));
-void DeinitGPUBufferEntryManager();
 void DeinitPushConstantManager();
 void DeinitDescriptorSetManager();
 
@@ -138,7 +133,6 @@ BmRender_Shader CreateShaderHandle(const ShaderData* Data);
 BmRender_Image CreateImageHandle(const ImageResource* Data);
 BmRender_ImageView CreateImageViewHandle(const ImageViewData* Data);
 BmRender_GPUBuffer CreateGPUBufferHandle(const GPUBufferData* Data);
-BmRender_GPUBufferEntry CreateGPUBufferEntryHandle(const GPUBufferEntryData* Data);
 BmRender_PushConstant CreatePushConstantHandle(const PushConstantData* Data);
 BmRender_DescriptorSet CreateDescriptorSetHandle(const DescriptorSetData* Data);
 
@@ -151,7 +145,6 @@ void DestroyShaderHandle(BmRender_Shader handle);
 void DestroyImageHandle(BmRender_Image handle);
 void DestroyImageViewHandle(BmRender_ImageView Handle);
 void DestroyGPUBufferHandle(BmRender_GPUBuffer Handle);
-void DestroyGPUBufferEntryHandle(BmRender_GPUBufferEntry Handle);
 void DestroyPushConstantHandle(BmRender_PushConstant Handle);
 void DestroyDescriptorSetHandle(BmRender_DescriptorSet Handle);
 
@@ -164,6 +157,7 @@ ShaderData* GetShaderData(BmRender_Shader Handle);
 ImageResource* GetImageData(BmRender_Image Handle);
 ImageViewData* GetImageViewData(BmRender_ImageView Handle);
 GPUBufferData* GetGPUBufferData(BmRender_GPUBuffer Handle);
-GPUBufferEntryData* GetGPUBufferEntryData(BmRender_GPUBufferEntry Handle);
 PushConstantData* GetPushConstantData(BmRender_PushConstant Handle);
 DescriptorSetData* GetDescriptorSetData(BmRender_DescriptorSet Handle);
+
+Memory::FrameMemory GetFrameMemory();

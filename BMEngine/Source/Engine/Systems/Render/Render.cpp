@@ -2,6 +2,7 @@
 
 #include "Engine/Systems/Render/VulkanHelper.h"
 #include "RenderResources.h"
+#include "RenderTypes.h"
 #include "TransferSystem.h"
 
 #include "imgui.h"
@@ -9,6 +10,7 @@
 #include "imgui_impl_glfw.h"
 
 #include "Util/Util.h"
+#include "Util/YamlParsing.h"
 #include "Util/Settings.h"
 #include "Util/Math.h"
 
@@ -24,7 +26,7 @@ extern std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
 extern std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
 extern std::unordered_map<std::string, BmRender_PushConstant> PushConstants;
 
-static BmRender_Image ShadowMapArray;
+static BmRender_Image2DArray ShadowMapArray;
 
 namespace Render
 {
@@ -82,12 +84,12 @@ namespace Render
 	{
 		for (u32 i = 0; i < GetCoreContext()->ImagesCount; i++)
 		{
-			MeshPipeline->ShadowMapArrayImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_LIGHT_SOURCES * i, MAX_LIGHT_SOURCES, VK_IMAGE_ASPECT_DEPTH_BIT);
+			MeshPipeline->ShadowMapArrayImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray.Image, MAX_LIGHT_SOURCES * i, MAX_LIGHT_SOURCES, VK_IMAGE_ASPECT_DEPTH_BIT);
 			
 			BmRender_DescriptorSetBinding ShadowMapBinding;
 			ShadowMapBinding.ImageBinding.Sampler = Samplers["ShadowMap"];
 			ShadowMapBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			ShadowMapBinding.ImageBinding.ImageView = MeshPipeline->ShadowMapArrayImageInterface[i];
+			ShadowMapBinding.ImageBinding.ImageView = MeshPipeline->ShadowMapArrayImageInterface[i].View;
 			ShadowMapBinding.BindingCount = 1;
 			ShadowMapBinding.DstArrayElement = 0;
 
@@ -167,7 +169,7 @@ namespace Render
 
 		if (Config.DescriptorSetCount > 0)
 		{
-			VkDescriptorSet* VkDescriptorSets = (VkDescriptorSet*)Render::FrameAlloc(sizeof(VkDescriptorSet) * Config.DescriptorSetCount);
+			VkDescriptorSet* VkDescriptorSets = (VkDescriptorSet*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkDescriptorSet) * Config.DescriptorSetCount);
 			for (u32 i = 0; i < Config.DescriptorSetCount; ++i)
 			{
 				VkDescriptorSets[i] = GetDescriptorSetData(Config.DescriptorSets[i])->Set;
@@ -184,50 +186,46 @@ namespace Render
 			DrawEntity* Entity = Scene->DrawEntities.data() + i;
 		
 			bool AreDependenciesReady = true;
-			for (u32 j = 0; j < Entity->ImageDependency.size(); ++j)
-			{
-				if (!TransferSystem::IsImageResourceReady(Entity->ImageDependency[j]))
-				{
-					AreDependenciesReady = false;
-					break;
-				}
-			}
+			//for (u32 j = 0; j < Entity->ImageDependency.size(); ++j)
+			//{
+			//	if (TransferSystem::IsImageLocked(Entity->ImageDependency[j]))
+			//	{
+			//		AreDependenciesReady = false;
+			//		break;
+			//	}
+			//}
 
 			if (!AreDependenciesReady)
 			{
 				continue;
 			}
 		
-			for (u32 j = 0; j < Entity->ResourceDependency.size(); ++j)
+		for (u32 j = 0; j < Entity->ResourceDependency.size(); ++j)
+		{
+			if (TransferSystem::IsBufferLocked(Entity->ResourceDependency[j].GPUBufferHandle))
 			{
-				if (!TransferSystem::IsBufferResourceReady(Entity->ResourceDependency[j]))
-				{
-					AreDependenciesReady = false;
-					break;
-				}
+				AreDependenciesReady = false;
+				break;
 			}
+		}
 
 			if (!AreDependenciesReady)
 			{
 				continue;
 			}
 
-			GPUBufferEntryData* VertexEntryData = GetGPUBufferEntryData(Entity->VertexBufferEntry);
-			GPUBufferEntryData* IndexEntryData = GetGPUBufferEntryData(Entity->IndexBufferEntry);
-			GPUBufferEntryData* InstanceEntryData = GetGPUBufferEntryData(Entity->InstanceBufferEntry);
+		const VkBuffer Buffers[] = {
+			GetGPUBufferData(Entity->VertexBufferEntry.GPUBufferHandle)->Buffer,
+			GetGPUBufferData(Entity->InstanceBufferEntry.GPUBufferHandle)->Buffer
+		};
 	
-			const VkBuffer Buffers[] = {
-				GetGPUBufferData(VertexEntryData->GPUBufferHandle)->Buffer,
-				GetGPUBufferData(InstanceEntryData->GPUBufferHandle)->Buffer
-			};
+		const u64 Offsets[] = {
+			Entity->VertexBufferEntry.BufferOffset,
+			Entity->InstanceBufferEntry.BufferOffset
+		};
 	
-			const u64 Offsets[] = {
-				VertexEntryData->BufferOffset,
-				InstanceEntryData->BufferOffset
-			};
-	
-			vkCmdBindVertexBuffers(CmdBuffer, 0, 2, Buffers, Offsets);
-			vkCmdBindIndexBuffer(CmdBuffer, GetGPUBufferData(IndexEntryData->GPUBufferHandle)->Buffer, IndexEntryData->BufferOffset, VK_INDEX_TYPE_UINT32);
+		vkCmdBindVertexBuffers(CmdBuffer, 0, 2, Buffers, Offsets);
+		vkCmdBindIndexBuffer(CmdBuffer, GetGPUBufferData(Entity->IndexBufferEntry.GPUBufferHandle)->Buffer, Entity->IndexBufferEntry.BufferOffset, VK_INDEX_TYPE_UINT32);
 			vkCmdDrawIndexed(CmdBuffer, Entity->IndicesCount, Entity->Instances, 0, 0, 0);
 		}
 	}
@@ -281,12 +279,7 @@ namespace Render
 
 	static RenderState State;
 
-	void TmpInitFrameMemory()
-	{
-		State.FrameMemory = Memory::CreateFrameMemory(1024 * 1024);
-	}
-
-	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferEntry* VpRegion, BmRender_GPUBufferEntry* EntityLightRegion, const DescriptorSetHandles& DescriptorSets, BmRender_DescriptorPool MainPool)
+	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferBinding* VpRegion, BmRender_GPUBufferBinding* EntityLightRegion, const DescriptorSetHandles& DescriptorSets, BmRender_DescriptorPool MainPool)
 	{		
 		VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
 		VkDevice Device = GetCoreContext()->LogicalDevice;
@@ -317,20 +310,14 @@ namespace Render
 
 		DeInitImGuiPipeline(Device, State.DebugUiPool);
 		DeInitDrawState(Device, VulkanHelper::MAX_DRAW_FRAMES, &State.RenderDrawState);
-
+		
 		//TerrainRender::DeInit();
 
-		Memory::DestroyFrameMemory(State.FrameMemory);
 	}
 
-	void* FrameAlloc(u32 Size)
+	void Test_FrameFree()
 	{
-		return Memory::FrameAlloc(State.FrameMemory, Size);
-	}
-
-	void* GetHead()
-	{
-		return Memory::GetHead(State.FrameMemory);
+		Memory::FrameFree(GetFrameMemory());
 	}
 
 	void Draw(DrawScene* Scene, u64 WaitSemaphoreValue)
@@ -415,7 +402,7 @@ namespace Render
 
 		State.RenderDrawState.CurrentFrame = Math::WrapIncrement(CurrentFrame, 3u);
 
-		Memory::FrameFree(State.FrameMemory);
+		Test_FrameFree();
 	}
 
 	RenderState* GetRenderState()
@@ -436,11 +423,11 @@ namespace DeferredPass
 
 	static VkDescriptorSetLayout DeferredInputLayout;
 
-	static BmRender_Image DeferredInputDepthImage[VulkanHelper::MAX_DRAW_FRAMES];
-	static BmRender_Image DeferredInputColorImage[VulkanHelper::MAX_DRAW_FRAMES];
-
-	static BmRender_ImageView DeferredInputDepthImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
-	static BmRender_ImageView DeferredInputColorImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
+		static BmRender_Image2D DeferredInputDepthImage[VulkanHelper::MAX_DRAW_FRAMES];
+		static BmRender_Image2D DeferredInputColorImage[VulkanHelper::MAX_DRAW_FRAMES];
+		
+		static BmRender_ImageView2D DeferredInputDepthImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
+		static BmRender_ImageView2D DeferredInputColorImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
 
 	static BmRender_DescriptorSet DeferredInputSet[VulkanHelper::MAX_DRAW_FRAMES];
 
@@ -465,23 +452,23 @@ namespace DeferredPass
 		{
 			//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
 
-			DeferredInputColorImage[i] = BmRender_CreateImage2D(MainScreenExtent.width, MainScreenExtent.height, ColorFormat, ImageType::ColorAttachmentSampled);
-			DeferredInputDepthImage[i] = BmRender_CreateImage2D(MainScreenExtent.width, MainScreenExtent.height, DepthFormat, ImageType::DepthSamplad);
+			DeferredInputColorImage[i] = BmRender_CreateImage2D(MainScreenExtent.width, MainScreenExtent.height, ColorFormat, BmRender_ImageType::ColorAttachmentSampled);
+			DeferredInputDepthImage[i] = BmRender_CreateImage2D(MainScreenExtent.width, MainScreenExtent.height, DepthFormat, BmRender_ImageType::DepthSamplad);
 			
-			DeferredInputColorImageInterface[i] = BmRender_CreateImageView2D(DeferredInputColorImage[i], VK_IMAGE_ASPECT_COLOR_BIT);
-			DeferredInputDepthImageInterface[i] = BmRender_CreateImageView2D(DeferredInputDepthImage[i], VK_IMAGE_ASPECT_DEPTH_BIT);
+			DeferredInputColorImageInterface[i] = BmRender_CreateImageView2D(DeferredInputColorImage[i].Image, VK_IMAGE_ASPECT_COLOR_BIT);
+			DeferredInputDepthImageInterface[i] = BmRender_CreateImageView2D(DeferredInputDepthImage[i].Image, VK_IMAGE_ASPECT_DEPTH_BIT);
 			
 			BmRender_DescriptorSetBinding ColorBinding;
 			ColorBinding.ImageBinding.Sampler = Samplers["ColorAttachment"];
 			ColorBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			ColorBinding.ImageBinding.ImageView = DeferredInputColorImageInterface[i];
+			ColorBinding.ImageBinding.ImageView = DeferredInputColorImageInterface[i].View;
 			ColorBinding.BindingCount = 1;
 			ColorBinding.DstArrayElement = 0;
 
 			BmRender_DescriptorSetBinding DepthBinding;
 			DepthBinding.ImageBinding.Sampler = Samplers["DepthAttachment"];
 			DepthBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			DepthBinding.ImageBinding.ImageView = DeferredInputDepthImageInterface[i];
+			DepthBinding.ImageBinding.ImageView = DeferredInputDepthImageInterface[i].View;
 			DepthBinding.BindingCount = 1;
 			DepthBinding.DstArrayElement = 0;
 
@@ -563,7 +550,7 @@ namespace DeferredPass
 		ColorBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		ColorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		ColorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		ColorBarrier.image = GetImageData(DeferredInputColorImage[Render::GetRenderState()->RenderDrawState.CurrentFrame])->Image;
+		ColorBarrier.image = GetImageData(DeferredInputColorImage[Render::GetRenderState()->RenderDrawState.CurrentFrame].Image)->Image;
 		ColorBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		ColorBarrier.subresourceRange.baseMipLevel = 0;
 		ColorBarrier.subresourceRange.levelCount = 1;
@@ -582,7 +569,7 @@ namespace DeferredPass
 		DepthBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		DepthBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		DepthBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		DepthBarrier.image = GetImageData(DeferredInputDepthImage[Render::GetRenderState()->RenderDrawState.CurrentFrame])->Image;
+		DepthBarrier.image = GetImageData(DeferredInputDepthImage[Render::GetRenderState()->RenderDrawState.CurrentFrame].Image)->Image;
 		DepthBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		DepthBarrier.subresourceRange.baseMipLevel = 0;
 		DepthBarrier.subresourceRange.levelCount = 1;
@@ -665,22 +652,22 @@ namespace DeferredPass
 
 
 
-	BmRender_ImageView* TestDeferredInputColorImageInterface()
+	BmRender_ImageView2D* TestDeferredInputColorImageInterface()
 	{
 		return DeferredInputColorImageInterface;
 	}
 
-	BmRender_ImageView* TestDeferredInputDepthImageInterface()
+	BmRender_ImageView2D* TestDeferredInputDepthImageInterface()
 	{
 		return DeferredInputDepthImageInterface;
 	}
 
-	BmRender_Image* TestDeferredInputColorImage()
+	BmRender_Image2D* TestDeferredInputColorImage()
 	{
 		return DeferredInputColorImage;
 	}
 
-	BmRender_Image* TestDeferredInputDepthImage()
+	BmRender_Image2D* TestDeferredInputDepthImage()
 	{
 		return DeferredInputDepthImage;
 	}
@@ -697,13 +684,13 @@ namespace LightningPass
 
 	static BmRender_DescriptorSet LightSpaceMatrixSet[VulkanHelper::MAX_DRAW_FRAMES];
 
-	static BmRender_GPUBufferEntry LightSpaceMatrixBufferRegion[VulkanHelper::MAX_DRAW_FRAMES];
+	static BmRender_GPUBufferBinding LightSpaceMatrixBufferRegion[VulkanHelper::MAX_DRAW_FRAMES];
 	
 	// Buffer handles array
-	static BmRender_GPUBuffer LightSpaceMatrixBuffers[VulkanHelper::MAX_DRAW_FRAMES];
+	static BmRender_UniformBuffer LightSpaceMatrixBuffers[VulkanHelper::MAX_DRAW_FRAMES];
 
-	static BmRender_ImageView ShadowMapElement1ImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
-	static BmRender_ImageView ShadowMapElement2ImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
+		static BmRender_ImageView2DArray ShadowMapElement1ImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
+		static BmRender_ImageView2DArray ShadowMapElement2ImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
 
 	static VkPushConstantRange PushConstants;
 
@@ -714,15 +701,16 @@ namespace LightningPass
 
 		LightSpaceMatrixLayout = GetDescriptorSetLayoutData(DescriptorSetLayouts["LightSpaceMatrixLayout"])->Layout;
 
-		ShadowMapArray = BmRender_CreateImage2DArray(DepthViewportExtent.width, DepthViewportExtent.height, DepthFormat,
-			ImageType::DepthSamplad, MAX_LIGHT_SOURCES * GetCoreContext()->ImagesCount);
+		BmRender_Image2DArray ShadowMapArrayHandle = BmRender_CreateImage2DArray(DepthViewportExtent.width, DepthViewportExtent.height, DepthFormat,
+			BmRender_ImageType::DepthSamplad, MAX_LIGHT_SOURCES * GetCoreContext()->ImagesCount);
+		ShadowMapArray = ShadowMapArrayHandle;
 
 		for (u32 i = 0; i < GetCoreContext()->ImagesCount; i++)
 		{
 			const VkDeviceSize LightSpaceMatrixSize = sizeof(glm::mat4);
 
 			LightSpaceMatrixBuffers[i] = BmRender_CreateUniformBuffer(LightSpaceMatrixSize, BmRender_BufferUpdateFrequency::PerFrame, BmRender_PipelineSyncStage::VertexShader);
-			LightSpaceMatrixBufferRegion[i] = BmRender_CreateGPUBufferEntry(0, LightSpaceMatrixSize, LightSpaceMatrixBuffers[i]);
+			LightSpaceMatrixBufferRegion[i] = { LightSpaceMatrixBuffers[i].Buffer, 0, LightSpaceMatrixSize };
 
 			LightSpaceMatrixSet[i] = BmRender_CreateDescriptorSet(DescriptorSetLayouts["LightSpaceMatrixLayout"], MainPool);
 
@@ -733,8 +721,8 @@ namespace LightningPass
 
 			BmRender_UpdateDescriptorSet(LightSpaceMatrixSet[i], &LightSpaceMatrixBinding, 1);
 
-			ShadowMapElement1ImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_LIGHT_SOURCES * i, 1, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
-			ShadowMapElement2ImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_LIGHT_SOURCES * i + 1, 1, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+			ShadowMapElement1ImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray.Image, MAX_LIGHT_SOURCES * i, 1, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+			ShadowMapElement2ImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray.Image, MAX_LIGHT_SOURCES * i + 1, 1, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
 		}
 
 		PushConstants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
@@ -783,8 +771,8 @@ namespace LightningPass
 		};
 
 		VkImageView Attachments[2];
-		Attachments[0] = GetImageViewData(ShadowMapElement1ImageInterface[Render::GetRenderState()->RenderDrawState.CurrentFrame])->View;
-		Attachments[1] = GetImageViewData(ShadowMapElement2ImageInterface[Render::GetRenderState()->RenderDrawState.CurrentFrame])->View;
+		Attachments[0] = GetImageViewData(ShadowMapElement1ImageInterface[Render::GetRenderState()->RenderDrawState.CurrentFrame].View)->View;
+		Attachments[1] = GetImageViewData(ShadowMapElement2ImageInterface[Render::GetRenderState()->RenderDrawState.CurrentFrame].View)->View;
 
 		VkImageMemoryBarrier2 DepthAttachmentTransitionBefore = { };
 		DepthAttachmentTransitionBefore.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -794,7 +782,7 @@ namespace LightningPass
 		DepthAttachmentTransitionBefore.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 		DepthAttachmentTransitionBefore.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		DepthAttachmentTransitionBefore.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-		DepthAttachmentTransitionBefore.image = GetImageData(ShadowMapArray)->Image;
+		DepthAttachmentTransitionBefore.image = GetImageData(ShadowMapArray.Image)->Image;
 		DepthAttachmentTransitionBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		DepthAttachmentTransitionBefore.subresourceRange.baseMipLevel = 0;
 		DepthAttachmentTransitionBefore.subresourceRange.levelCount = 1;
@@ -859,7 +847,7 @@ namespace LightningPass
 
 		DepthAttachmentTransitionAfter.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthAttachmentTransitionAfter.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		DepthAttachmentTransitionAfter.image = GetImageData(ShadowMapArray)->Image;
+		DepthAttachmentTransitionAfter.image = GetImageData(ShadowMapArray.Image)->Image;
 		DepthAttachmentTransitionAfter.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		DepthAttachmentTransitionAfter.subresourceRange.baseMipLevel = 0;
 		DepthAttachmentTransitionAfter.subresourceRange.levelCount = 1;
@@ -896,7 +884,7 @@ namespace MainPass
 	{
 		VkRenderingAttachmentInfo ColorAttachment = { };
 		ColorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		ColorAttachment.imageView = GetImageViewData(DeferredPass::TestDeferredInputColorImageInterface()[Render::GetRenderState()->RenderDrawState.CurrentFrame])->View;
+		ColorAttachment.imageView = GetImageViewData(DeferredPass::TestDeferredInputColorImageInterface()[Render::GetRenderState()->RenderDrawState.CurrentFrame].View)->View;
 		ColorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		ColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		ColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -904,7 +892,7 @@ namespace MainPass
 
 		VkRenderingAttachmentInfo DepthAttachment = { };
 		DepthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		DepthAttachment.imageView = GetImageViewData(DeferredPass::TestDeferredInputDepthImageInterface()[Render::GetRenderState()->RenderDrawState.CurrentFrame])->View;
+		DepthAttachment.imageView = GetImageViewData(DeferredPass::TestDeferredInputDepthImageInterface()[Render::GetRenderState()->RenderDrawState.CurrentFrame].View)->View;
 		DepthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -932,7 +920,7 @@ namespace MainPass
 		ColorBarrierBefore.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		ColorBarrierBefore.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		ColorBarrierBefore.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		ColorBarrierBefore.image = GetImageData(DeferredPass::TestDeferredInputColorImage()[Render::GetRenderState()->RenderDrawState.CurrentFrame])->Image;
+		ColorBarrierBefore.image = GetImageData(DeferredPass::TestDeferredInputColorImage()[Render::GetRenderState()->RenderDrawState.CurrentFrame].Image)->Image;
 		ColorBarrierBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		ColorBarrierBefore.subresourceRange.baseMipLevel = 0;
 		ColorBarrierBefore.subresourceRange.levelCount = 1;
@@ -951,7 +939,7 @@ namespace MainPass
 		DepthBarrierBefore.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthBarrierBefore.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		DepthBarrierBefore.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		DepthBarrierBefore.image = GetImageData(DeferredPass::TestDeferredInputDepthImage()[Render::GetRenderState()->RenderDrawState.CurrentFrame])->Image;
+		DepthBarrierBefore.image = GetImageData(DeferredPass::TestDeferredInputDepthImage()[Render::GetRenderState()->RenderDrawState.CurrentFrame].Image)->Image;
 		DepthBarrierBefore.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		DepthBarrierBefore.subresourceRange.baseMipLevel = 0;
 		DepthBarrierBefore.subresourceRange.levelCount = 1;

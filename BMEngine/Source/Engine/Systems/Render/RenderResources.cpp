@@ -12,19 +12,17 @@
 
 namespace RenderResources
 {
-	void UpdateBufferRegion(BmRender_GPUBufferEntry Handle, u64 ResourceOffset, const void* Data, u32 DataSize)
+	void UpdateBufferRegion(BmRender_GPUBufferBinding Handle, u64 ResourceOffset, const void* Data, u32 DataSize)
 	{
-		GPUBufferEntryData* Entry = GetGPUBufferEntryData(Handle);
-		GPUBufferData* Buffer = GetGPUBufferData(Entry->GPUBufferHandle);
+		GPUBufferData* Buffer = GetGPUBufferData(Handle.GPUBufferHandle);
 
-		const u64 Offset = Entry->BufferOffset + ResourceOffset;
+		const u64 Offset = Handle.BufferOffset + ResourceOffset;
 
 		if (Buffer->PropertyFlag == MemoryPropertyFlag::HostCompatible)
 		{
 			VkDevice Device = GetCoreContext()->LogicalDevice;
 			VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
 			VulkanHelper::UpdateHostCompatibleBufferMemory(Device, Buffer->Memory, DataSize, Offset, Data);
-			Entry->ReadyValue = 0;
 		}
 		else if (Buffer->PropertyFlag == MemoryPropertyFlag::GPULocal)
 		{

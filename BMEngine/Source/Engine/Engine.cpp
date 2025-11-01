@@ -17,6 +17,7 @@
 #include "Util/Settings.h"
 #include "Engine/Systems/Render/Render.h"
 #include "Util/Util.h"
+#include "Util/YamlParsing.h"
 #include "Util/Math.h"
 #include "Engine/Systems/EngineResources.h"
 #include "Engine/Systems/Render/TransferSystem.h"
@@ -208,14 +209,14 @@ namespace Engine
 
 	static Render::DescriptorSetHandles DescriptorSets;
 
-	BmRender_GPUBufferEntry VpRegion[3];
-	BmRender_GPUBufferEntry EntityLightRegion[3];
+	BmRender_GPUBufferBinding VpRegion[3];
+	BmRender_GPUBufferBinding EntityLightRegion[3];
 	
 	// Buffer handles
-	BmRender_GPUBuffer VertexStageBuffer;
-	BmRender_GPUBuffer InstanceBuffer;
-	BmRender_GPUBuffer FrameDataBuffer;
-	BmRender_GPUBuffer MaterialBuffer;
+	BmRender_VertexStageBuffer VertexStageBuffer;
+	BmRender_InstanceBuffer InstanceBuffer;
+	BmRender_UniformBuffer FrameDataBuffer;
+	BmRender_StorageBuffer MaterialBuffer;
 
 	void WindowIconifyCallback(GLFWwindow* window, int iconified)
 	{
@@ -249,22 +250,14 @@ namespace Engine
 			Update(DeltaTime);
 
 			if (!IsMinimized)
-			{
-				//TaskSystem::AddTask([] () { EngineResources::Update(&Scene); }, &Group);
-				//TaskSystem::AddTask(TransferSystem::Transfer, &Group);
-				//Render::Draw(&Scene);
-
-				u32 Transferred = 0;
-				
+			{			
 				EngineResources::Update(&Scene, DescriptorSets.BindlesTexturesSet);
 
-				//TaskSystem::TaskLambda Task = [&]() { Transferred = TransferSystem::Transfer(); };
-				//TaskSystem::AddTask(&Task, &Group);
-				TransferSystem::Transfer();
+				TaskSystem::TaskLambda Task = [&]() { TransferSystem::Transfer(); };
+				TaskSystem::AddTask(&Task, &Group);
 				Render::Draw(&Scene, LastTransfer);
 
 				TaskSystem::WaitForGroup(&Group);
-				//LastTransfer = Transferred;
 			}
 		}
 
@@ -302,8 +295,6 @@ namespace Engine
 	{
 		Memory::Init(true);
 
-		Render::TmpInitFrameMemory();
-
 		TaskSystem::Init();
 		//TaskSystem::SetConcurencyEnabled(false);
 
@@ -312,7 +303,7 @@ namespace Engine
 		Yaml::Node Root;
 		Yaml::Parse(Root, "./Resources/Settings/RenderResources.yaml");
 
-		BmRender_Init(Window);
+		BmRender_Init(Window, 3);
 		
 		// Create MainPool using stack array
 		const u32 PoolSizeCount = 11;
@@ -344,13 +335,13 @@ namespace Engine
 		FrameDataBuffer = BmRender_CreateUniformBuffer(MB4, BmRender_BufferUpdateFrequency::PerFrame, BmRender_PipelineSyncStage::FragmentShader);
 		MaterialBuffer = BmRender_CreateStorageBuffer(MB4, BmRender_BufferUpdateFrequency::Static, BmRender_PipelineSyncStage::FragmentShader);
 
-		VpRegion[0] = BmRender_CreateGPUBufferEntry(0, 128, FrameDataBuffer);
-		VpRegion[1] = BmRender_CreateGPUBufferEntry(128, 128, FrameDataBuffer);
-		VpRegion[2] = BmRender_CreateGPUBufferEntry(128 * 2, 128, FrameDataBuffer);
+		VpRegion[0] = { FrameDataBuffer.Buffer, 0, 128 };
+		VpRegion[1] = { FrameDataBuffer.Buffer, 128, 128 };
+		VpRegion[2] = { FrameDataBuffer.Buffer, 128 * 2, 128 };
 
-		EntityLightRegion[0] = BmRender_CreateGPUBufferEntry(384, 384, FrameDataBuffer);
-		EntityLightRegion[1] = BmRender_CreateGPUBufferEntry(384 + 384, 384, FrameDataBuffer);
-		EntityLightRegion[2] = BmRender_CreateGPUBufferEntry(384 + 384 * 2, 384, FrameDataBuffer);
+		EntityLightRegion[0] = { FrameDataBuffer.Buffer, 384, 384 };
+		EntityLightRegion[1] = { FrameDataBuffer.Buffer, 384 + 384, 384 };
+		EntityLightRegion[2] = { FrameDataBuffer.Buffer, 384 + 384 * 2, 384 };
 
 		ParseAndCreateVertices(Util::GetVertices(Root));
 		ParseAndCreateShaders(Util::GetShaders(Root));
@@ -381,7 +372,7 @@ namespace Engine
 		}
 
 		{
-			BmRender_GPUBufferEntry MaterialBufferRegion = BmRender_CreateGPUBufferEntry(0, VK_WHOLE_SIZE, MaterialBuffer);
+			BmRender_GPUBufferBinding MaterialBufferRegion = { MaterialBuffer.Buffer, 0, VK_WHOLE_SIZE };
 
 			BmRender_DescriptorSetBinding Binding;
 			Binding.BufferRegions = &MaterialBufferRegion;

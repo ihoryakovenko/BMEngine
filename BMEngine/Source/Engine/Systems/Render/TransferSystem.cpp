@@ -10,13 +10,13 @@ FORGE_MEMORY_DEBUG
 #include "VulkanCoreContext.h"
 #include "Util/Math.h"
 #include "RenderInterface.h"
+#include "RenderTypes.h"
 
 namespace TransferSystem
 {
 	struct StagingFramePool
 	{
-		VkBuffer Buffer;
-		VkDeviceMemory Memory;
+		BmRender_StagingBuffer Buffer;
 		u64 AllocatedForFrame[VulkanHelper::MAX_DRAW_FRAMES];
 	};
 
@@ -144,17 +144,17 @@ namespace TransferSystem
 
 			TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] = NewTotal;
 
-			VulkanHelper::UpdateHostCompatibleBufferMemory(Device, TransferState.TransferStagingPool.Memory,
-				Task->DataSize, AlignedOffset, Task->RawData);
+			BmRender_UpdateStagingBuffer(TransferState.TransferStagingPool.Buffer, AlignedOffset, Task->DataSize, Task->RawData);
+			GPUBufferData* StagingBufferData = GetGPUBufferData(TransferState.TransferStagingPool.Buffer.Buffer);
 
 			switch (Task->Type)
 			{
 				case TaskType::Data:
 				{
-					GPUBufferEntryData* Entry = GetGPUBufferEntryData(Task->DataDescr.Handle);
-					GPUBufferData* BufferData = GetGPUBufferData(Entry->GPUBufferHandle);
+					const BmRender_GPUBufferBinding& Entry = Task->DataDescr.Handle;
+					GPUBufferData* BufferData = GetGPUBufferData(Entry.GPUBufferHandle);
 
-					Entry->ReadyValue = TransferState.CompletedTransfer + 1;
+					BufferData->ReadyValue = TransferState.CompletedTransfer + 1;
 
 					VkBufferMemoryBarrier2 Barrier = { };
 					Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
@@ -162,7 +162,7 @@ namespace TransferSystem
 					Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 					Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 					Barrier.buffer = BufferData->Buffer;
-					Barrier.offset = Entry->BufferOffset;
+					Barrier.offset = Entry.BufferOffset;
 					Barrier.size = Task->DataSize;
 
 					VkDependencyInfo DepInfo = { };
@@ -172,11 +172,11 @@ namespace TransferSystem
 
 					VkBufferCopy IndexBufferCopyRegion = { };
 					IndexBufferCopyRegion.srcOffset = AlignedOffset;
-					IndexBufferCopyRegion.dstOffset = Entry->BufferOffset;
+					IndexBufferCopyRegion.dstOffset = Entry.BufferOffset;
 					IndexBufferCopyRegion.size = Task->DataSize;
 
 					vkCmdPipelineBarrier2(TransferCommandBuffer, &DepInfo);
-					vkCmdCopyBuffer(TransferCommandBuffer, TransferState.TransferStagingPool.Buffer, BufferData->Buffer, 1, &IndexBufferCopyRegion);
+					vkCmdCopyBuffer(TransferCommandBuffer, StagingBufferData->Buffer, BufferData->Buffer, 1, &IndexBufferCopyRegion);
 					
 					break;
 				}
@@ -255,7 +255,7 @@ namespace TransferSystem
 					PresentDepInfo.pBufferMemoryBarriers = nullptr;
 
 					vkCmdPipelineBarrier2(TransferCommandBuffer, &TransferDepInfo);
-					vkCmdCopyBufferToImage(TransferCommandBuffer, TransferState.TransferStagingPool.Buffer,
+					vkCmdCopyBufferToImage(TransferCommandBuffer, StagingBufferData->Buffer,
 						Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ImageRegion);
 					vkCmdPipelineBarrier2(TransferCommandBuffer, &PresentDepInfo);
 
@@ -353,13 +353,7 @@ namespace TransferSystem
 
 		TransferState.TransferStagingPool = { };
 
-		TransferState.TransferStagingPool.Buffer = VulkanHelper::CreateBuffer(Device, TransferState.MaxTransferSizePerFrame * VulkanHelper::MAX_DRAW_FRAMES,
-			BufferUsageFlag::StagingFlag, GetVulkanAllocator());
-		VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
-			TransferState.TransferStagingPool.Buffer, MemoryPropertyFlag::HostCompatible, GetVulkanAllocator());
-		TransferState.TransferStagingPool.Memory = AllocResult.Memory;
-
-		VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, TransferState.TransferStagingPool.Buffer, TransferState.TransferStagingPool.Memory, 0));
+		TransferState.TransferStagingPool.Buffer = BmRender_CreateStagingBuffer(TransferState.MaxTransferSizePerFrame * VulkanHelper::MAX_DRAW_FRAMES);
 
 		TransferState.TransferMemory = Memory::AllocateRingBuffer<u8>(MB128);
 	}
@@ -368,9 +362,6 @@ namespace TransferSystem
 	{
 		VulkanCoreContext::VulkanCoreContext* Context = GetCoreContext();
 		VkDevice Device = Context->LogicalDevice;
-
-		vkDestroyBuffer(Device, TransferState.TransferStagingPool.Buffer, GetVulkanAllocator());
-		vkFreeMemory(Device, TransferState.TransferStagingPool.Memory, GetVulkanAllocator());
 
 		vkDestroyCommandPool(Device, TransferState.TransferCommandPool, GetVulkanAllocator());
 
@@ -395,7 +386,7 @@ namespace TransferSystem
 		AddPendingTask(&TransferState.TransferTasksQueue, Task);
 	}
 
-	bool IsBufferResourceReady(BmRender_GPUBufferEntry Handle)
+	bool IsBufferLocked(BmRender_GPUBuffer Handle)
 	{
 		VulkanCoreContext::VulkanCoreContext* Context = GetCoreContext();
 		VkDevice Device = Context->LogicalDevice;
@@ -403,11 +394,11 @@ namespace TransferSystem
 		u64 CompletedValue = 0;
 		vkGetSemaphoreCounterValue(Device, TransferState.TransferSemaphore, &CompletedValue);
 
-		GPUBufferEntryData* GPUEntryData = GetGPUBufferEntryData(Handle);
-		return CompletedValue >= GPUEntryData->ReadyValue;
+		GPUBufferData* BufferData = GetGPUBufferData(Handle);
+		return CompletedValue < BufferData->ReadyValue;
 	}
 
-	bool IsImageResourceReady(BmRender_Image Handle)
+	bool IsImageLocked(BmRender_Image Handle)
 	{
 		VulkanCoreContext::VulkanCoreContext* Context = GetCoreContext();
 		VkDevice Device = Context->LogicalDevice;
@@ -416,6 +407,6 @@ namespace TransferSystem
 		vkGetSemaphoreCounterValue(Device, TransferState.TransferSemaphore, &CompletedValue);
 
 		ImageResource* ImageData = GetImageData(Handle);
-		return CompletedValue >= ImageData->ReadyValue;
+		return CompletedValue < ImageData->ReadyValue;
 	}
 }

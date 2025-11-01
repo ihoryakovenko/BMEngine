@@ -28,14 +28,14 @@ namespace Render
 
 	struct DrawEntity
 	{
-		BmRender_GPUBufferEntry VertexBufferEntry;
-		BmRender_GPUBufferEntry IndexBufferEntry;
-		BmRender_GPUBufferEntry InstanceBufferEntry;
+		BmRender_GPUBufferBinding VertexBufferEntry;
+		BmRender_GPUBufferBinding IndexBufferEntry;
+		BmRender_GPUBufferBinding InstanceBufferEntry;
 		u32 IndicesCount;
 		u32 Instances;
 		
 		std::vector<BmRender_Image> ImageDependency;
-		std::vector<BmRender_GPUBufferEntry> ResourceDependency;
+		std::vector<BmRender_GPUBufferBinding> ResourceDependency;
 	};
 
 	struct DrawFrames
@@ -59,7 +59,7 @@ namespace Render
 
 	struct StaticMeshPipeline
 	{
-		BmRender_ImageView ShadowMapArrayImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
+		BmRender_ImageView2DArray ShadowMapArrayImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
 
 		VkPushConstantRange PushConstants;
 
@@ -81,9 +81,8 @@ namespace Render
 		DescriptorSetHandles DescriptorSets;
 		BmRender_DescriptorPool MainPool;
 		VkDescriptorPool DebugUiPool; // TODO: ?
-		Memory::FrameMemory FrameMemory;
-		BmRender_GPUBufferEntry* VpHandle;
-		BmRender_GPUBufferEntry* EntityLightBufferHandle;
+		BmRender_GPUBufferBinding* VpHandle;
+		BmRender_GPUBufferBinding* EntityLightBufferHandle;
 	};
 
 	struct PointLight
@@ -148,13 +147,8 @@ namespace Render
 		std::vector<DrawEntity> DrawEntities;
 	};
 
-	void TmpInitFrameMemory();
-
-	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferEntry* VpRegion, BmRender_GPUBufferEntry* EntityLightRegion, const DescriptorSetHandles& DescriptorSets, BmRender_DescriptorPool MainPool);
+	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferBinding* VpRegion, BmRender_GPUBufferBinding* EntityLightRegion, const DescriptorSetHandles& DescriptorSets, BmRender_DescriptorPool MainPool);
 	void DeInit();
-
-	void* FrameAlloc(u32 Size);
-	void* GetHead();
 
 	void Draw(DrawScene* Data, u64 WaitSemaphoreValue);
 
@@ -183,11 +177,11 @@ namespace DeferredPass
 	void BeginPass();
 	void EndPass();
 
-	BmRender_ImageView* TestDeferredInputColorImageInterface();
-	BmRender_ImageView* TestDeferredInputDepthImageInterface();
+	BmRender_ImageView2D* TestDeferredInputColorImageInterface();
+	BmRender_ImageView2D* TestDeferredInputDepthImageInterface();
 
-	BmRender_Image* TestDeferredInputColorImage();
-	BmRender_Image* TestDeferredInputDepthImage();
+	BmRender_Image2D* TestDeferredInputColorImage();
+	BmRender_Image2D* TestDeferredInputDepthImage();
 
 	AttachmentData* GetAttachmentData();
 }
