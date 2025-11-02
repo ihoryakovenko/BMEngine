@@ -141,8 +141,10 @@
     <ClCompile Include="..\BMEngine\Source\Engine\Systems\HandleManager.cpp" />
     <ClCompile Include="..\BMEngine\Source\Engine\Systems\Memory\f_mem_debug.c" />
     <ClCompile Include="..\BMEngine\Source\Engine\Systems\Memory\MemoryManagmentSystem.cpp" />
+    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\Handles.cpp" />
     <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\RenderInterface.cpp" />
     <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\RenderTypes.cpp" />
+    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\Systems.cpp" />
     <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\VulkanCoreContext.cpp" />
     <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\VulkanHelper.cpp" />
     <ClCompile Include="..\BMEngine\Source\Util\Util.cpp" />

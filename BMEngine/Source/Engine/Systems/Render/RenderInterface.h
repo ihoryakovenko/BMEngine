@@ -269,15 +269,10 @@ void BmRender_DestroyImage(BmRender_Image Handle);
 
 void Test_FrameFree();
 
-BmRender_CommandWorker BmRender_CreateCommandWorker();
-void BmRender_DestroyCommandWorker(BmRender_CommandWorker Handle);
-
 u32 BmRender_GetCurrentFrameIndex();
-bool BmRender_IsDrawFrameFinished(u32 FrameIndex);
 
 u32 BmRender_AcquireNextSwapchainImage(u32 CurrentFrame);
 void BmRender_StartRecording(BmRender_CommandWorker Handle);
 
-u32 BmRender_GetFreeWorkersCount();
-BmRender_CommandWorker BmRender_GetFreeWorker();
+BmRender_CommandWorker BmRender_AcquireWorker(u64 Timeout);
 //void BmRender_RecordBufferCopy(BmRender_GPUBuffer StagingBuffer, u64 StagingBufferOffset, BmRender_GPUBuffer DstBuffer, u64 DstBufferOffset);

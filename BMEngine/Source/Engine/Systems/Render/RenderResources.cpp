@@ -10,6 +10,9 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
+#include "Systems.h"
+#include "Handles.h"
+
 namespace RenderResources
 {
 	void UpdateBufferRegion(BmRender_GPUBufferBinding Handle, u64 ResourceOffset, const void* Data, u32 DataSize)

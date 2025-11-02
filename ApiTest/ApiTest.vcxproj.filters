@@ -42,6 +42,12 @@
     <ClCompile Include="..\BMEngine\Source\Util\Util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\Handles.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\Systems.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\BMEngine\Source\Engine\Systems\Render\RenderInterface.h">

@@ -217,11 +217,16 @@ int main()
 
 	BmRender_Pipeline Pipeline = BmRender_CreatePipeline(&PipelineDesc);
 
-	BmRender_CommandWorker SubmitPool = BmRender_CreateCommandWorker();
 
-	const u32 FrameIndex = BmRender_BeginFrame();
-	const u32 ImageIndex = BmRender_AcquireNextSwapchainImage(FrameIndex);
+
+	const u32 CurrentFrame = BmRender_GetCurrentFrameIndex();
+	const u32 ImageIndex = BmRender_AcquireNextSwapchainImage(CurrentFrame);
+
+	BmRender_CommandWorker SubmitPool = BmRender_AcquireWorker(ULLONG_MAX);
 	BmRender_StartRecording(SubmitPool);
+
+
+
 
 	BmRender_DeInit();
 

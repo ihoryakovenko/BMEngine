@@ -58,7 +58,7 @@ namespace Render
 
 	struct RenderState
 	{
-		BmRender_CommandWorker GraphicsSubmitPool;
+		BmRender_CommandWorker GraphicsCommandWorker;
 		StaticMeshPipeline MeshPipeline;
 		DescriptorSetHandles DescriptorSets;
 		BmRender_DescriptorPool MainPool;

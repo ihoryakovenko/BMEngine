@@ -4,6 +4,8 @@
 #include "RenderResources.h"
 #include "RenderTypes.h"
 #include "TransferSystem.h"
+#include "Systems.h"
+#include "Handles.h"
 
 #include "imgui.h"
 #include "imgui_impl_vulkan.h"
@@ -244,7 +246,6 @@ namespace Render
 		State.MainPool = MainPool;
 
 		DeferredPass::Init(State.MainPool);
-		State.GraphicsSubmitPool = BmRender_CreateCommandWorker();
 		MainPass::Init();
 		LightningPass::Init(State.MainPool);
 
@@ -276,15 +277,18 @@ namespace Render
 		RenderResources::UpdateBufferRegion(State.VpHandle[CurrentFrame], 0, &Scene->ViewProjection, sizeof(ViewProjectionBuffer));
 		RenderResources::UpdateBufferRegion(State.EntityLightBufferHandle[CurrentFrame], 0, Scene->LightEntity, sizeof(LightBuffer));
 
-		BmRender_StartRecording(State.GraphicsSubmitPool);
-
 		const u32 ImageIndex = BmRender_AcquireNextSwapchainImage(CurrentFrame);
 		CurrentImageIndex = ImageIndex;
+
+		State.GraphicsCommandWorker = BmRender_AcquireWorker(ULLONG_MAX);
+		BmRender_StartRecording(State.GraphicsCommandWorker);
+
+
 
 
 
 		
-		CommandWorkerData* SubmitPool = GetSubmitPoolData(State.GraphicsSubmitPool);
+		CommandWorkerData* SubmitPool = GetSubmitPoolData(State.GraphicsCommandWorker);
 		VkCommandBuffer DrawCmdBuffer = SubmitPool->CommandBuffer;
 
 		VkDevice Device = GetCoreContext()->LogicalDevice;
@@ -455,7 +459,7 @@ namespace DeferredPass
 
 	void Draw()
 	{
-		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsSubmitPool);
+		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
 		VkCommandBuffer CmdBuffer = SubmitPool->CommandBuffer;
 
 		VkPipeline Pipeline = GetPipelineData(Pipelines["Deferred"])->VulkanPipeline;
@@ -471,7 +475,7 @@ namespace DeferredPass
 
 	void BeginPass()
 	{
-		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsSubmitPool);
+		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
 		VkCommandBuffer CmdBuffer = SubmitPool->CommandBuffer;
 
 		VkRect2D RenderArea;
@@ -568,7 +572,7 @@ namespace DeferredPass
 
 	void EndPass()
 	{
-		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsSubmitPool);
+		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
 		VkCommandBuffer CmdBuffer = SubmitPool->CommandBuffer;
 		vkCmdEndRendering(CmdBuffer);
 
@@ -711,7 +715,7 @@ namespace LightningPass
 	void Draw(Render::DrawScene* Scene)
 	{
 		VkDevice Device = GetCoreContext()->LogicalDevice;
-		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsSubmitPool);
+		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
 		VkCommandBuffer CmdBuffer = SubmitPool->CommandBuffer;
 		const Render::RenderState* State = Render::GetRenderState();
 
@@ -910,7 +914,7 @@ namespace MainPass
 		DepInfoBefore.imageMemoryBarrierCount = 2;
 		DepInfoBefore.pImageMemoryBarriers = BarriersBefore;
 
-		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsSubmitPool);
+		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
 		VkCommandBuffer CmdBuffer = SubmitPool->CommandBuffer;
 
 		vkCmdPipelineBarrier2(CmdBuffer, &DepInfoBefore);
@@ -920,7 +924,7 @@ namespace MainPass
 
 	void EndPass()
 	{
-		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsSubmitPool);
+		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
 		VkCommandBuffer CmdBuffer = SubmitPool->CommandBuffer;
 
 		vkCmdEndRendering(CmdBuffer);

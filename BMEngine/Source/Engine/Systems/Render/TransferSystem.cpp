@@ -11,6 +11,8 @@ FORGE_MEMORY_DEBUG
 #include "Util/Math.h"
 #include "RenderInterface.h"
 #include "RenderTypes.h"
+#include "Systems.h"
+#include "Handles.h"
 
 namespace TransferSystem
 {

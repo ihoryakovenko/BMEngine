@@ -2,26 +2,13 @@
 
 #include <Engine/Systems/HandleManager.h>
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
+#include "Handles.h"
 
 #include "VulkanCoreContext.h"
 
 #include "Util/Util.h"
 
 static VulkanCoreContext::VulkanCoreContext CoreContext;
-static CommandSystemData SubmitSystem;
-static DrawSystemData DrawSystem;
-
-static System_HandleManager SamplerManager;
-static System_HandleManager PipelineManager;
-static System_HandleManager PipelineLayoutManager;
-static System_HandleManager DescriptorSetLayoutManager;
-static System_HandleManager DescriptorPoolManager;
-static System_HandleManager ShaderManager;
-static System_HandleManager ImageManager;
-static System_HandleManager ImageViewManager;
-static System_HandleManager GPUBufferManager;
-static System_HandleManager PushConstantsManager;
-static System_HandleManager DescriptorSetManager;
 
 static Memory::FrameMemory FrameMemory;
 
@@ -71,12 +58,6 @@ static void VKAPI_CALL VulkanInternalFreeNotification(
 
 }
 
-static u16 GetNextHandleType()
-{
-	static u16 HandleType = 0;
-	return HandleType++;
-}
-
 void CreateCoreContext(GLFWwindow* WindowHandler)
 {
 	VulkanAllocator.pUserData = nullptr;
@@ -104,63 +85,10 @@ VkAllocationCallbacks* GetVulkanAllocator()
 	return &VulkanAllocator;
 }
 
-// INIT
-void InitializeSamplerManager(u32 Size)
+Memory::FrameMemory GetFrameMemory()
 {
-	SamplerManager = System_HandleManager_InitData(Size, sizeof(SamplerData), GetNextHandleType());
+	return FrameMemory;
 }
-
-void InitializePipelineManager(u32 Size)
-{
-	PipelineManager = System_HandleManager_InitData(Size, sizeof(PipelineData), GetNextHandleType());
-}
-
-void InitializePipelineLayoutManager(u32 Size)
-{
-	PipelineLayoutManager = System_HandleManager_InitData(Size, sizeof(PipelineLayoutData), GetNextHandleType());
-}
-
-void InitializeDescriptorSetLayoutManager(u32 Size)
-{
-	DescriptorSetLayoutManager = System_HandleManager_InitData(Size, sizeof(DescriptorSetLayoutData), GetNextHandleType());
-}
-
-void InitializeDescriptorPoolManager(u32 Size)
-{
-	DescriptorPoolManager = System_HandleManager_InitData(Size, sizeof(DescriptorPoolData), GetNextHandleType());
-}
-
-void InitializeShaderManager(u32 Size)
-{
-	ShaderManager = System_HandleManager_InitData(Size, sizeof(ShaderData), GetNextHandleType());
-}
-
-void InitializeImageManager(u32 Size)
-{
-	ImageManager = System_HandleManager_InitData(Size, sizeof(ImageResource), GetNextHandleType());
-}
-
-void InitializeImageViewManager(u32 Size)
-{
-	ImageViewManager = System_HandleManager_InitData(Size, sizeof(ImageViewData), GetNextHandleType());
-}
-
-void InitializeGPUBufferManager(u32 Size)
-{
-	GPUBufferManager = System_HandleManager_InitData(Size, sizeof(GPUBufferData), GetNextHandleType());
-}
-
-
-void InitializePushConstantManager(u32 Size)
-{
-	PushConstantsManager = System_HandleManager_InitData(Size, sizeof(PushConstantData), GetNextHandleType());
-}
-
-void InitializeDescriptorSetManager(u32 Size)
-{
-	DescriptorSetManager = System_HandleManager_InitData(Size, sizeof(DescriptorSetData), GetNextHandleType());
-}
-
 
 void InitializeFrameMemory()
 {
@@ -171,408 +99,689 @@ void DeinitFrameMemory()
 {
 	Memory::DestroyFrameMemory(FrameMemory);
 }
-// INIT
 
-// DEINIT
-void DeinitSamplerManager(void(*CleanupFunc)(SamplerData*))
-{
-	System_HandleManager_ClearData(SamplerManager, (void(*)(void*))CleanupFunc);
-}
-
-void DeinitPipelineManager(void(*CleanupFunc)(PipelineData*))
-{
-	System_HandleManager_ClearData(PipelineManager, (void(*)(void*))CleanupFunc);
-}
-
-void DeinitPipelineLayoutManager(void(*CleanupFunc)(PipelineLayoutData*))
-{
-	System_HandleManager_ClearData(PipelineLayoutManager, (void(*)(void*))CleanupFunc);
-}
-
-void DeinitDescriptorSetLayoutManager(void(*CleanupFunc)(DescriptorSetLayoutData*))
-{
-	System_HandleManager_ClearData(DescriptorSetLayoutManager, (void(*)(void*))CleanupFunc);
-}
-
-void DeinitDescriptorPoolManager(void(*CleanupFunc)(DescriptorPoolData*))
-{
-	System_HandleManager_ClearData(DescriptorPoolManager, (void(*)(void*))CleanupFunc);
-}
-
-void DeinitShaderManager(void(*CleanupFunc)(ShaderData*))
-{
-	System_HandleManager_ClearData(ShaderManager, (void(*)(void*))CleanupFunc);
-}
-
-void DeinitImageManager(void(*CleanupFunc)(ImageResource*))
-{
-	System_HandleManager_ClearData(ImageManager, (void(*)(void*))CleanupFunc);
-}
-
-void DeinitImageViewManager(void(*CleanUpFunc)(ImageViewData*))
-{
-	System_HandleManager_ClearData(ImageViewManager, (void(*)(void*))CleanUpFunc);
-}
-
-void DeinitGPUBufferManager(void(*CleanUpFunc)(GPUBufferData*))
-{
-	System_HandleManager_ClearData(GPUBufferManager, (void(*)(void*))CleanUpFunc);
-}
-
-
-void DeinitPushConstantManager()
-{
-	System_HandleManager_ClearData(PushConstantsManager);
-}
-
-void DeinitDescriptorSetManager()
-{
-	System_HandleManager_ClearData(DescriptorSetManager);
-}
-
-void DeinitCommandSystem(void(*CleanUpFunc)(CommandWorkerData*))
-{
-	CommandSystemData* CommandSystem = GetCommandSystemData();
-	System_HandleManager_ClearData(CommandSystem->WorkerManager, (void(*)(void*))CleanUpFunc);
-}
-// DEINIT
-
-// CREATE
-BmRender_Sampler CreateSamplerHandle(const SamplerData* Data)
-{
-	BmRender_Sampler Handle;
-	Handle.Private = System_HandleManager_CreateHandle(SamplerManager, Data);
-	return Handle;
-}
-
-BmRender_Pipeline CreatePipelineHandle(const PipelineData* Data)
-{
-	BmRender_Pipeline Handle;
-	Handle.Private = System_HandleManager_CreateHandle(PipelineManager, Data);
-	return Handle;
-}
-
-BmRender_PipelineLayout CreatePipelineLayoutHandle(const PipelineLayoutData* Data)
-{
-	BmRender_PipelineLayout Handle;
-	Handle.Private = System_HandleManager_CreateHandle(PipelineLayoutManager, Data);
-	return Handle;
-}
-
-BmRender_DescriptorSetLayout CreateDescriptorSetLayoutHandle(const DescriptorSetLayoutData* Data)
-{
-	BmRender_DescriptorSetLayout Handle;
-	Handle.Private = System_HandleManager_CreateHandle(DescriptorSetLayoutManager, Data);
-	return Handle;
-}
-
-BmRender_DescriptorPool CreateDescriptorPoolHandle(const DescriptorPoolData* Data)
-{
-	BmRender_DescriptorPool Handle;
-	Handle.Private = System_HandleManager_CreateHandle(DescriptorPoolManager, Data);
-	return Handle;
-}
-
-BmRender_Shader CreateShaderHandle(const ShaderData* Data)
-{
-	BmRender_Shader Handle;
-	Handle.Private = System_HandleManager_CreateHandle(ShaderManager, Data);
-	return Handle;
-}
-
-BmRender_Image CreateImageHandle(const ImageResource* Data)
-{
-	BmRender_Image Handle;
-	Handle.Private = System_HandleManager_CreateHandle(ImageManager, Data);
-	return Handle;
-}
-
-BmRender_ImageView CreateImageViewHandle(const ImageViewData* Data)
-{
-	BmRender_ImageView Handle;
-	Handle.Private = System_HandleManager_CreateHandle(ImageViewManager, Data);
-	return Handle;
-}
-
-BmRender_GPUBuffer CreateGPUBufferHandle(const GPUBufferData* Data)
-{
-	BmRender_GPUBuffer Handle;
-	Handle.Private = System_HandleManager_CreateHandle(GPUBufferManager, Data);
-	return Handle;
-}
-
-
-BmRender_PushConstant CreatePushConstantHandle(const PushConstantData* Data)
-{
-	BmRender_PushConstant Handle;
-	Handle.Private = System_HandleManager_CreateHandle(PushConstantsManager, Data);
-	return Handle;
-}
-
-BmRender_DescriptorSet CreateDescriptorSetHandle(const DescriptorSetData* Data)
-{
-	BmRender_DescriptorSet Handle;
-	Handle.Private = System_HandleManager_CreateHandle(DescriptorSetManager, Data);
-	return Handle;
-}
-
-BmRender_CommandWorker CreateCommandWorkerHandle(const CommandWorkerData* Data)
-{
-	BmRender_CommandWorker Handle;
-	CommandSystemData* CommandSystem = GetCommandSystemData();
-	Handle.Private = System_HandleManager_CreateHandle(CommandSystem->WorkerManager, Data);
-	return Handle;
-}
-// CREATE
-
-// DESTROY
-void DestroySamplerHandle(BmRender_Sampler Handle)
-{
-	System_HandleManager_DestroyHandle(SamplerManager, Handle.Private);
-}
-
-void DestroyPipelineHandle(BmRender_Pipeline Handle)
-{
-	System_HandleManager_DestroyHandle(PipelineManager, Handle.Private);
-}
-
-void DestroyPipelineLayoutHandle(BmRender_PipelineLayout Handle)
-{
-	System_HandleManager_DestroyHandle(PipelineLayoutManager, Handle.Private);
-}
-
-void DestroyDescriptorSetLayoutHandle(BmRender_DescriptorSetLayout Handle)
-{
-	System_HandleManager_DestroyHandle(DescriptorSetLayoutManager, Handle.Private);
-}
-
-void DestroyDescriptorPoolHandle(BmRender_DescriptorPool Handle)
-{
-	System_HandleManager_DestroyHandle(DescriptorPoolManager, Handle.Private);
-}
-
-void DestroyShaderHandle(BmRender_Shader Handle)
-{
-	System_HandleManager_DestroyHandle(ShaderManager, Handle.Private);
-}
-
-void DestroyImageHandle(BmRender_Image Handle)
-{
-	System_HandleManager_DestroyHandle(ImageManager, Handle.Private);
-}
-
-void DestroyImageViewHandle(BmRender_ImageView Handle)
-{
-	System_HandleManager_DestroyHandle(ImageViewManager, Handle.Private);
-}
-
-void DestroyGPUBufferHandle(BmRender_GPUBuffer Handle)
-{
-	System_HandleManager_DestroyHandle(GPUBufferManager, Handle.Private);
-}
-
-
-void DestroyPushConstantHandle(BmRender_PushConstant Handle)
-{
-	System_HandleManager_DestroyHandle(PushConstantsManager, Handle.Private);
-}
-
-void DestroyDescriptorSetHandle(BmRender_DescriptorSet Handle)
-{
-	System_HandleManager_DestroyHandle(DescriptorSetManager, Handle.Private);
-}
-
-void DestroyCommandWorkerHandle(BmRender_CommandWorker Handle)
-{
-	CommandSystemData* CommandSystem = GetCommandSystemData();
-	System_HandleManager_DestroyHandle(CommandSystem->WorkerManager, Handle.Private);
-}
-// DESTROY
-
-// GET
-SamplerData* GetSamplerData(BmRender_Sampler Handle)
-{
-	return (SamplerData*)System_HandleManager_GetHandleData(SamplerManager, Handle.Private);
-}
-
-PipelineData* GetPipelineData(BmRender_Pipeline Handle)
-{
-	return (PipelineData*)System_HandleManager_GetHandleData(PipelineManager, Handle.Private);
-}
-
-PipelineLayoutData* GetPipelineLayoutData(BmRender_PipelineLayout Handle)
-{
-	return (PipelineLayoutData*)System_HandleManager_GetHandleData(PipelineLayoutManager, Handle.Private);
-}
-
-DescriptorSetLayoutData* GetDescriptorSetLayoutData(BmRender_DescriptorSetLayout Handle)
-{
-	return (DescriptorSetLayoutData*)System_HandleManager_GetHandleData(DescriptorSetLayoutManager, Handle.Private);
-}
-
-DescriptorPoolData* GetDescriptorPoolData(BmRender_DescriptorPool Handle)
-{
-	return (DescriptorPoolData*)System_HandleManager_GetHandleData(DescriptorPoolManager, Handle.Private);
-}
-
-ShaderData* GetShaderData(BmRender_Shader Handle)
-{
-	return (ShaderData*)System_HandleManager_GetHandleData(ShaderManager, Handle.Private);
-}
-
-ImageResource* GetImageData(BmRender_Image Handle)
-{
-	return (ImageResource*)System_HandleManager_GetHandleData(ImageManager, Handle.Private);
-}
-
-ImageViewData* GetImageViewData(BmRender_ImageView Handle)
-{
-	return (ImageViewData*)System_HandleManager_GetHandleData(ImageViewManager, Handle.Private);
-}
-
-GPUBufferData* GetGPUBufferData(BmRender_GPUBuffer Handle)
-{
-	return (GPUBufferData*)System_HandleManager_GetHandleData(GPUBufferManager, Handle.Private);
-}
-
-
-PushConstantData* GetPushConstantData(BmRender_PushConstant Handle)
-{
-	return (PushConstantData*)System_HandleManager_GetHandleData(PushConstantsManager, Handle.Private);
-}
-
-DescriptorSetData* GetDescriptorSetData(BmRender_DescriptorSet Handle)
-{
-	return (DescriptorSetData*)System_HandleManager_GetHandleData(DescriptorSetManager, Handle.Private);
-}
-
-CommandWorkerData* GetSubmitPoolData(BmRender_CommandWorker Handle)
-{
-	CommandSystemData* CommandSystem = GetCommandSystemData();
-	return (CommandWorkerData*)System_HandleManager_GetHandleData(CommandSystem->WorkerManager, Handle.Private);
-}
-
-Memory::FrameMemory GetFrameMemory()
-{
-	return FrameMemory;
-}
-// GET
-
-void InitCommandSystem(u32 WorkerCount)
-{
-	VulkanCoreContext::VulkanCoreContext* Context = GetCoreContext();
-	CommandSystemData* CommandSystem = GetCommandSystemData();
-
-	// Initialize queue
-	vkGetDeviceQueue(Context->LogicalDevice, (u32)Context->Indices.GraphicsFamily, 0, &CommandSystem->GraphicsQueue);
-
-	// Initialize worker manager
-	CommandSystem->WorkerManager = System_HandleManager_InitData(WorkerCount, sizeof(CommandWorkerData), GetNextHandleType());
-
-	// Create workers
-	CommandSystem->WorkerCount = WorkerCount;
-	CommandSystem->FreeWorkerCount = WorkerCount;
-
-	VkDevice Device = Context->LogicalDevice;
-	u32 GraphicsFamily = Context->Indices.GraphicsFamily;
-
-	VkCommandPoolCreateInfo PoolInfo = { };
-	PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	PoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-	PoolInfo.queueFamilyIndex = GraphicsFamily;
-
-	VkCommandBufferAllocateInfo AllocateInfo = { };
-	AllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	AllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	AllocateInfo.commandBufferCount = 1;
-
-	VkFenceCreateInfo FenceCreateInfo = { };
-	FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // Start signaled so workers are free
-
-	for (u32 i = 0; i < WorkerCount; ++i)
-	{
-		CommandWorkerData WorkerData = { };
-
-		VULKAN_CHECK_RESULT(vkCreateCommandPool(Device, &PoolInfo, GetVulkanAllocator(), &WorkerData.CommandPool));
-
-		AllocateInfo.commandPool = WorkerData.CommandPool;
-		VULKAN_CHECK_RESULT(vkAllocateCommandBuffers(Device, &AllocateInfo, &WorkerData.CommandBuffer));
-
-		VULKAN_CHECK_RESULT(vkCreateFence(Device, &FenceCreateInfo, GetVulkanAllocator(), &WorkerData.Fence));
-
-		CommandSystem->Workers[i] = CreateCommandWorkerHandle(&WorkerData);
-	}
-}
-
-void UpdateCommandSystem()
+void OnSamplerClear(SamplerData* SamplerData)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	CommandSystemData* CommandSystem = GetCommandSystemData();
+	vkDestroySampler(Device, SamplerData->VulkanSampler, GetVulkanAllocator());
+}
 
-	u32 FreeWorkerCount = 0;
+void OnPipelineClear(PipelineData* PipelineData)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDestroyPipeline(Device, PipelineData->VulkanPipeline, GetVulkanAllocator());
+}
 
-	// First pass: reorganize workers - free workers move to front
-	for (u32 i = 0; i < CommandSystem->WorkerCount; ++i)
+void OnPipelineLayoutClear(PipelineLayoutData* LayoutData)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDestroyPipelineLayout(Device, LayoutData->VulkanPipelineLayout, GetVulkanAllocator());
+}
+
+void OnDescriptorSetLayoutClear(DescriptorSetLayoutData* LayoutData)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDestroyDescriptorSetLayout(Device, LayoutData->Layout, GetVulkanAllocator());
+	free(LayoutData->LayoutBindings);
+}
+
+void OnDescriptorPoolClear(DescriptorPoolData* PoolData)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDestroyDescriptorPool(Device, PoolData->VulkanDescriptorPool, GetVulkanAllocator());
+}
+
+void OnShaderClear(ShaderData* Shader)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDestroyShaderModule(Device, Shader->VulkanShaderModule, GetVulkanAllocator());
+}
+
+void OnImageClear(ImageResource* Image)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDestroyImage(Device, Image->Image, GetVulkanAllocator());
+	vkFreeMemory(Device, Image->Memory, GetVulkanAllocator());
+}
+
+void OnImageViewClear(ImageViewData* Data)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDestroyImageView(Device, Data->View, GetVulkanAllocator());
+}
+
+void OnGPUBufferClear(GPUBufferData* Data)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDestroyBuffer(Device, Data->Buffer, GetVulkanAllocator());
+	vkFreeMemory(Device, Data->Memory, GetVulkanAllocator());
+}
+
+void OnComandWorkerClear(CommandWorkerData* PoolData)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDestroyFence(Device, PoolData->Fence, GetVulkanAllocator());
+	vkDestroyCommandPool(Device, PoolData->CommandPool, GetVulkanAllocator());
+}
+
+BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout LayoutHandle, BmRender_DescriptorPool PoolHandle)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+
+	DescriptorSetData NewSet;
+	NewSet.Layout = LayoutHandle;
+
+	DescriptorSetLayoutData* Layout = GetDescriptorSetLayoutData(LayoutHandle);
+	VkDescriptorPool Pool = GetDescriptorPoolData(PoolHandle)->VulkanDescriptorPool;
+
+	VkDescriptorSetAllocateInfo AllocInfo = { };
+	AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	AllocInfo.descriptorPool = Pool;
+	AllocInfo.descriptorSetCount = 1;
+	AllocInfo.pSetLayouts = &Layout->Layout;
+
+	VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, &NewSet.Set));
+
+	return CreateDescriptorSetHandle(&NewSet);
+}
+
+BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutBinding* Bindings, u64 BindingsCount)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+
+	DescriptorSetLayoutData Layout = { };
+	Layout.BindingsCount = BindingsCount;
+	Layout.LayoutBindings = (DescriptorSetLayoutBinding*)malloc(sizeof(DescriptorSetLayoutBinding) * BindingsCount);
+
+	VkDescriptorSetLayoutBinding* NewLayoutBindings = (VkDescriptorSetLayoutBinding*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkDescriptorSetLayoutBinding) * BindingsCount);
+	for (u32 i = 0; i < BindingsCount; ++i)
 	{
-		CommandWorkerData* WorkerData = GetSubmitPoolData(CommandSystem->Workers[i]);
-		VkResult FenceStatus = vkGetFenceStatus(Device, WorkerData->Fence);
+		NewLayoutBindings[i].binding = i;
+		NewLayoutBindings[i].descriptorCount = Bindings[i].DescriptorCount;
+		NewLayoutBindings[i].descriptorType = Bindings[i].DescriptorType;
+		NewLayoutBindings[i].stageFlags = VulkanHelper::DescriptorShaderStageToVkShaderStage(Bindings[i].StageFlags);
+		NewLayoutBindings[i].pImmutableSamplers = nullptr;
 
-		if (FenceStatus == VK_SUCCESS)
+		Layout.LayoutBindings[i].DescriptorType = NewLayoutBindings[i].descriptorType;
+	}
+
+	VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
+	LayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	LayoutCreateInfo.bindingCount = BindingsCount;
+	LayoutCreateInfo.pBindings = NewLayoutBindings;
+	LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+	LayoutCreateInfo.pNext = nullptr;
+
+	VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, GetVulkanAllocator(), &Layout.Layout));
+
+	return CreateDescriptorSetLayoutHandle(&Layout);
+}
+
+void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+
+	DescriptorSetData* Set = GetDescriptorSetData(DescriptorSetHandle);
+	DescriptorSetLayoutData* Layout = GetDescriptorSetLayoutData(Set->Layout);
+
+	VkWriteDescriptorSet* WriteDescriptorSets = (VkWriteDescriptorSet*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkWriteDescriptorSet) * BindingsCount);
+
+	for (u32 i = 0; i < BindingsCount; i++)
+	{
+		const BmRender_DescriptorSetBinding& Binding = Bindings[i];
+
+		VkDescriptorType DescriptorType = Layout->LayoutBindings[i].DescriptorType;
+
+		WriteDescriptorSets[i] = { };
+		WriteDescriptorSets[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		WriteDescriptorSets[i].dstSet = Set->Set;
+		WriteDescriptorSets[i].dstBinding = i;
+		WriteDescriptorSets[i].dstArrayElement = Binding.DstArrayElement;
+		WriteDescriptorSets[i].descriptorType = DescriptorType;
+		WriteDescriptorSets[i].descriptorCount = Binding.BindingCount;
+
+		if (DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC ||
+			DescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER || DescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC)
 		{
-			// Worker is free - swap to front if not already there
-			if (i != FreeWorkerCount)
+			VkDescriptorBufferInfo* BufferInfo = (VkDescriptorBufferInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkDescriptorBufferInfo) * Binding.BindingCount);
+			for (u32 j = 0; j < Binding.BindingCount; ++j)
 			{
-				BmRender_CommandWorker Temp = CommandSystem->Workers[FreeWorkerCount];
-				CommandSystem->Workers[FreeWorkerCount] = CommandSystem->Workers[i];
-				CommandSystem->Workers[i] = Temp;
+				const BmRender_GPUBufferBinding& Entry = Binding.BufferRegions[j];
+
+				BufferInfo[j].buffer = GetGPUBufferData(Entry.GPUBufferHandle)->Buffer;
+				BufferInfo[j].offset = Entry.BufferOffset;
+				BufferInfo[j].range = Entry.Size;
 			}
-			++FreeWorkerCount;
+
+			WriteDescriptorSets[i].pBufferInfo = BufferInfo;
+		}
+		else if (VK_DESCRIPTOR_TYPE_SAMPLER || VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+		{
+			VkDescriptorImageInfo* ImageInfo = (VkDescriptorImageInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkDescriptorImageInfo));
+			ImageInfo->imageLayout = Binding.ImageBinding.ImageLayout;
+			ImageInfo->imageView = GetImageViewData(Binding.ImageBinding.ImageView)->View;
+			ImageInfo->sampler = GetSamplerData(Binding.ImageBinding.Sampler)->VulkanSampler;
+
+			WriteDescriptorSets[i].pImageInfo = ImageInfo;
+		}
+		else
+		{
+			assert(false || "Unimplemented");
 		}
 	}
 
-	CommandSystem->FreeWorkerCount = FreeWorkerCount;
+	vkUpdateDescriptorSets(Device, BindingsCount, WriteDescriptorSets, 0, nullptr);
 }
 
-void InitDrawSystem()
+BmRender_PushConstant BmRender_CreatePushConstant(BmRender_DescriptorShaderStage Stage, u32 Offset, u32 Size)
 {
-	VulkanCoreContext::VulkanCoreContext* Context = GetCoreContext();
-	VkDevice Device = Context->LogicalDevice;
+	PushConstantData Constant;
+	Constant.PushConstants.offset = Offset;
+	Constant.PushConstants.size = Size;
+	Constant.PushConstants.stageFlags = VulkanHelper::DescriptorShaderStageToVkShaderStage(Stage);
 
-	DrawSystem.CurrentFrame = 0;
+	return CreatePushConstantHandle(&Constant);
+}
 
-	VkSemaphoreCreateInfo SemaphoreCreateInfo = { };
-	SemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, MemoryPropertyFlag MemoryFlag, BmRender_PipelineSyncStage BufferStage, BufferUsageFlag Flag)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
 
-	VkFenceCreateInfo FenceCreateInfo = { };
-	FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+	GPUBufferData NewBuffer = { };
 
-	for (u64 i = 0; i < BmRender_GetMaxFramesInFly(); i++)
+	if (MemoryFlag == MemoryPropertyFlag::HostCompatible)
 	{
-		VULKAN_CHECK_RESULT(vkCreateSemaphore(Device, &SemaphoreCreateInfo, GetVulkanAllocator(), &DrawSystem.ImagesAvailable[i]));
-		VULKAN_CHECK_RESULT(vkCreateSemaphore(Device, &SemaphoreCreateInfo, GetVulkanAllocator(), &DrawSystem.RenderFinished[i]));
+		NewBuffer.ReadyValue = 0;
 	}
-}
-
-void DeInitDrawSystem()
-{
-	VulkanCoreContext::VulkanCoreContext* Context = GetCoreContext();
-	VkDevice Device = Context->LogicalDevice;
-
-	for (u64 i = 0; i < BmRender_GetMaxFramesInFly(); i++)
+	else
 	{
-		vkDestroySemaphore(Device, DrawSystem.ImagesAvailable[i], GetVulkanAllocator());
-		vkDestroySemaphore(Device, DrawSystem.RenderFinished[i], GetVulkanAllocator());
+		NewBuffer.ReadyValue = ULLONG_MAX;
 	}
+
+	if (Flag == BufferUsageFlag::UniformFlag)
+	{
+		VkPhysicalDeviceProperties DeviceProperties;
+		vkGetPhysicalDeviceProperties(PhysicalDevice, &DeviceProperties);
+
+		if (Capacity > DeviceProperties.limits.maxUniformBufferRange)
+		{
+			assert(false);
+		}
+	}
+
+	NewBuffer.PropertyFlag = MemoryFlag;
+	NewBuffer.BufferStage = BufferStage;
+	NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, Capacity, Flag, GetVulkanAllocator());
+
+	VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, NewBuffer.Buffer, MemoryFlag, GetVulkanAllocator());
+	NewBuffer.Memory = AllocResult.Memory;
+
+	VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, NewBuffer.Buffer, NewBuffer.Memory, 0));
+
+	return CreateGPUBufferHandle(&NewBuffer);
 }
 
-CommandSystemData* GetCommandSystemData()
+static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description)
 {
-	return &SubmitSystem;
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
+
+	ImageResource Resource;
+	Resource.ReadyValue = ULLONG_MAX;
+	Resource.Format = Description->Format;
+
+	VkImageUsageFlags Usage;
+
+	switch (Description->Type)
+	{
+		case BmRender_ImageType::TransferSampled:
+			Usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+			break;
+
+		case BmRender_ImageType::DepthSamplad:
+			Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+			break;
+
+		case BmRender_ImageType::ColorAttachmentSampled:
+			Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+			break;
+
+		default:
+			assert(false);
+			break;
+	}
+
+	VkImageCreateInfo ImageCreateInfo = { };
+	ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	ImageCreateInfo.extent.width = Description->Width;
+	ImageCreateInfo.extent.height = Description->Height;
+	ImageCreateInfo.extent.depth = 1;
+	ImageCreateInfo.mipLevels = 1;
+	ImageCreateInfo.arrayLayers = Description->ArrayLayers;
+	ImageCreateInfo.format = Description->Format;
+	ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	ImageCreateInfo.usage = Usage;
+	ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	ImageCreateInfo.flags = 0;
+
+	VULKAN_CHECK_RESULT(vkCreateImage(Device, &ImageCreateInfo, GetVulkanAllocator(), &Resource.Image));
+
+	VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
+		Resource.Image, MemoryPropertyFlag::GPULocal, GetVulkanAllocator());
+
+	Resource.Memory = AllocResult.Memory;
+	Resource.Width = Description->Width;
+	Resource.Height = Description->Height;
+	Resource.Size = AllocResult.Size;
+
+	VULKAN_CHECK_RESULT(vkBindImageMemory(Device, Resource.Image, Resource.Memory, 0));
+	return CreateImageHandle(&Resource);
 }
 
-DrawSystemData* GetDrawSystemData()
+static BmRender_ImageView CreateImageView(BmRender_Image Handle, u32 BaseArrayLayer, u32 LayerCount, VkImageViewType ViewType, VkImageAspectFlags AspectFlags)
 {
-	return &DrawSystem;
+	ImageResource* Resource = GetImageData(Handle);
+	ImageViewData View;
+
+	VkImageViewCreateInfo ViewCreateInfo = { };
+	ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	ViewCreateInfo.flags = 0;
+	ViewCreateInfo.viewType = ViewType;
+	ViewCreateInfo.format = Resource->Format;
+	ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	ViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	ViewCreateInfo.subresourceRange.aspectMask = AspectFlags;
+	ViewCreateInfo.subresourceRange.baseMipLevel = 0;
+	ViewCreateInfo.subresourceRange.levelCount = 1;
+	ViewCreateInfo.subresourceRange.baseArrayLayer = BaseArrayLayer;
+	ViewCreateInfo.subresourceRange.layerCount = LayerCount;
+	ViewCreateInfo.image = Resource->Image;
+
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo, GetVulkanAllocator(), &View.View));
+
+	return CreateImageViewHandle(&View);
+}
+
+BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+
+	VkSamplerCreateInfo CreateInfo = { };
+	CreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	CreateInfo.pNext = nullptr;
+	CreateInfo.flags = 0;
+	CreateInfo.magFilter = Description->MagFilter;
+	CreateInfo.minFilter = Description->MinFilter;
+	CreateInfo.mipmapMode = Description->MipmapMode;
+	CreateInfo.addressModeU = Description->AddressModeU;
+	CreateInfo.addressModeV = Description->AddressModeV;
+	CreateInfo.addressModeW = Description->AddressModeW;
+	CreateInfo.mipLodBias = Description->MipLodBias;
+	CreateInfo.anisotropyEnable = Description->AnisotropyEnable;
+	CreateInfo.maxAnisotropy = Description->MaxAnisotropy;
+	CreateInfo.compareEnable = Description->CompareEnable;
+	CreateInfo.compareOp = Description->CompareOp;
+	CreateInfo.minLod = Description->MinLod;
+	CreateInfo.maxLod = Description->MaxLod;
+	CreateInfo.borderColor = Description->BorderColor;
+	CreateInfo.unnormalizedCoordinates = Description->UnnormalizedCoordinates;
+
+	VkSampler VulkanSampler;
+	VULKAN_CHECK_RESULT(vkCreateSampler(Device, &CreateInfo, GetVulkanAllocator(), &VulkanSampler));
+
+	SamplerData Data;
+	Data.VulkanSampler = VulkanSampler;
+
+	return CreateSamplerHandle(&Data);
+}
+
+BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* Description)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+
+	VkVertexInputBindingDescription* VkVertexBindings = (VkVertexInputBindingDescription*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkVertexInputBindingDescription) * Description->VertexBindingsCount);
+
+	u32 TotalAttributes = 0;
+	VkVertexInputAttributeDescription* VkVertexAttributes = (VkVertexInputAttributeDescription*)Memory::GetHead(GetFrameMemory());
+	VkVertexInputAttributeDescription* VkAttribute = nullptr;
+
+	u32 CurrentLocation = 0;
+	for (u32 BindingIndex = 0; BindingIndex < Description->VertexBindingsCount; ++BindingIndex)
+	{
+		const BmRender_VertexBinding& VertexBinding = Description->VertexBindings[BindingIndex];
+
+		VkVertexInputBindingDescription* VkBinding = VkVertexBindings + BindingIndex;
+		VkBinding->binding = BindingIndex;
+		VkBinding->stride = VertexBinding.Stride;
+		VkBinding->inputRate = VertexBinding.InputRate;
+
+		for (u32 AttrIndex = 0; AttrIndex < VertexBinding.AttributesCount; ++AttrIndex)
+		{
+			const VertexAttribute& attribute = VertexBinding.Attributes[AttrIndex];
+			if (attribute.Type != BmRender_AttributeType::Mat4)
+			{
+				VkFormat Format;
+				switch (attribute.Type)
+				{
+					case BmRender_AttributeType::Int:
+						Format = VK_FORMAT_R32_SINT;
+						break;
+					case BmRender_AttributeType::Uint:
+						Format = VK_FORMAT_R32_UINT;
+						break;
+					case BmRender_AttributeType::Float:
+						Format = VK_FORMAT_R32_SFLOAT;
+						break;
+					case BmRender_AttributeType::Vec2:
+						Format = VK_FORMAT_R32G32_SFLOAT;
+						break;
+					case BmRender_AttributeType::Vec3:
+						Format = VK_FORMAT_R32G32B32_SFLOAT;
+						break;
+					case BmRender_AttributeType::Vec4:
+						Format = VK_FORMAT_R32G32B32A32_SFLOAT;
+						break;
+					default:
+						assert(false);
+				}
+
+				VkAttribute = (VkVertexInputAttributeDescription*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkVertexInputAttributeDescription));
+				VkAttribute->binding = BindingIndex;
+				VkAttribute->location = CurrentLocation;
+				VkAttribute->format = Format;
+				VkAttribute->offset = attribute.Offset;
+
+				++CurrentLocation;
+				++TotalAttributes;
+			}
+			else
+			{
+				u32 MatrixBindingOffset = 0;
+				for (u32 i = 0; i < 4; ++i)
+				{
+					VkAttribute = (VkVertexInputAttributeDescription*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkVertexInputAttributeDescription));
+					VkAttribute->binding = BindingIndex;
+					VkAttribute->location = CurrentLocation;
+					VkAttribute->format = VK_FORMAT_R32G32B32A32_SFLOAT;
+					VkAttribute->offset = attribute.Offset + MatrixBindingOffset;
+
+					MatrixBindingOffset += 16;
+					++CurrentLocation;
+					++TotalAttributes;
+				}
+			}
+		}
+	}
+
+	VkPipelineShaderStageCreateInfo* VkShaderStages = (VkPipelineShaderStageCreateInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkPipelineShaderStageCreateInfo) * Description->ShaderStagesCount);
+	for (u32 i = 0; i < Description->ShaderStagesCount; ++i)
+	{
+		const BmRender_ShaderStageDescription* ShaderStageDesc = Description->ShaderStages + i;
+		ShaderData* ShaderData = GetShaderData(ShaderStageDesc->Shader);
+
+		VkPipelineShaderStageCreateInfo* VkStage = VkShaderStages + i;
+		VkStage->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		VkStage->pNext = nullptr;
+		VkStage->flags = 0;
+		VkStage->stage = VulkanHelper::PipelineShaderStageToVkShaderStage(ShaderData->Stage);
+		VkStage->module = ShaderData->VulkanShaderModule;
+		VkStage->pName = ShaderStageDesc->EntryPointFunction;
+		VkStage->pSpecializationInfo = nullptr;
+	}
+
+	VkPipelineVertexInputStateCreateInfo VertexInputState = { };
+	VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	VertexInputState.vertexBindingDescriptionCount = Description->VertexBindingsCount;
+	VertexInputState.pVertexBindingDescriptions = VkVertexBindings;
+	VertexInputState.vertexAttributeDescriptionCount = TotalAttributes;
+	VertexInputState.pVertexAttributeDescriptions = TotalAttributes == 0 ? nullptr : VkVertexAttributes;
+
+	VkPipelineRenderingCreateInfo RenderingInfo = { };
+	RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+	RenderingInfo.pNext = nullptr;
+	RenderingInfo.colorAttachmentCount = Description->ResourceInfo.PipelineAttachmentData.ColorAttachmentCount;
+	RenderingInfo.pColorAttachmentFormats = Description->ResourceInfo.PipelineAttachmentData.ColorAttachmentFormats;
+	RenderingInfo.depthAttachmentFormat = Description->ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat;
+	RenderingInfo.stencilAttachmentFormat = Description->ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat;
+
+	VkPipelineColorBlendStateCreateInfo ColorBlendState = Description->ColorBlendState;
+	ColorBlendState.pAttachments = &Description->ColorBlendAttachment;
+
+	VkPipelineViewportStateCreateInfo ViewportState = Description->ViewportState;
+	ViewportState.pViewports = &Description->Viewport;
+	ViewportState.pScissors = &Description->Scissor;
+
+	auto PipelineCreateInfo = (VkGraphicsPipelineCreateInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkGraphicsPipelineCreateInfo));
+	*PipelineCreateInfo = { };
+	PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	PipelineCreateInfo->stageCount = Description->ShaderStagesCount;
+	PipelineCreateInfo->pStages = VkShaderStages;
+	PipelineCreateInfo->pVertexInputState = &VertexInputState;
+	PipelineCreateInfo->pInputAssemblyState = &Description->InputAssemblyState;
+	PipelineCreateInfo->pViewportState = &ViewportState;
+	PipelineCreateInfo->pDynamicState = nullptr;
+	PipelineCreateInfo->pRasterizationState = &Description->RasterizationState;
+	PipelineCreateInfo->pMultisampleState = &Description->MultisampleState;
+	PipelineCreateInfo->pColorBlendState = &ColorBlendState;
+	PipelineCreateInfo->pDepthStencilState = &Description->DepthStencilState;
+	PipelineCreateInfo->layout = GetPipelineLayoutData(Description->PipelineLayout)->VulkanPipelineLayout;
+	PipelineCreateInfo->renderPass = nullptr;
+	PipelineCreateInfo->subpass = 0;
+	PipelineCreateInfo->pNext = &RenderingInfo;
+
+	PipelineCreateInfo->basePipelineHandle = VK_NULL_HANDLE;
+	PipelineCreateInfo->basePipelineIndex = -1;
+
+	VkPipeline Pipeline;
+	VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, 1, PipelineCreateInfo, GetVulkanAllocator(), &Pipeline));
+
+	PipelineData Data;
+	Data.VulkanPipeline = Pipeline;
+
+	return CreatePipelineHandle(&Data);
+}
+
+BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+
+	VkDescriptorSetLayout* VkSetLayouts = (VkDescriptorSetLayout*)Memory::FrameAlloc(GetFrameMemory(), Description->SetLayoutCount * sizeof(VkDescriptorSetLayout));
+	for (u32 i = 0; i < Description->SetLayoutCount; ++i)
+	{
+		VkSetLayouts[i] = GetDescriptorSetLayoutData(Description->SetLayouts[i])->Layout;
+	}
+
+	VkPushConstantRange* VkPushConstantRanges = (VkPushConstantRange*)Memory::FrameAlloc(GetFrameMemory(), Description->PushConstantRangeCount * sizeof(VkPushConstantRange));
+	for (u32 i = 0; i < Description->PushConstantRangeCount; ++i)
+	{
+		VkPushConstantRanges[i] = GetPushConstantData(Description->PushConstantRanges[i])->PushConstants;
+	}
+
+	VkPipelineLayoutCreateInfo CreateInfo = { };
+	CreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	CreateInfo.setLayoutCount = Description->SetLayoutCount;
+	CreateInfo.pSetLayouts = VkSetLayouts;
+	CreateInfo.pushConstantRangeCount = Description->PushConstantRangeCount;
+	CreateInfo.pPushConstantRanges = VkPushConstantRanges;
+	CreateInfo.pNext = nullptr;
+
+	VkPipelineLayout PipelineLayout;
+	VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &CreateInfo, GetVulkanAllocator(), &PipelineLayout));
+
+	PipelineLayoutData Data;
+	Data.VulkanPipelineLayout = PipelineLayout;
+
+	return CreatePipelineLayoutHandle(&Data);
+}
+
+BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolDescription* Description)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+
+	VkDescriptorPoolCreateInfo CreateInfo = { };
+	CreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	CreateInfo.maxSets = Description->MaxSets;
+	CreateInfo.poolSizeCount = Description->PoolSizeCount;
+	CreateInfo.pPoolSizes = Description->PoolSizes;
+	CreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
+	CreateInfo.pNext = nullptr;
+
+	VkDescriptorPool DescriptorPool;
+	VULKAN_CHECK_RESULT(vkCreateDescriptorPool(Device, &CreateInfo, GetVulkanAllocator(), &DescriptorPool));
+
+	DescriptorPoolData Data;
+	Data.VulkanDescriptorPool = DescriptorPool;
+
+	return CreateDescriptorPoolHandle(&Data);
+}
+
+BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+
+	VkShaderModuleCreateInfo CreateInfo = { };
+	CreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	CreateInfo.pNext = nullptr;
+	CreateInfo.flags = 0;
+	CreateInfo.codeSize = Description->CodeSize;
+	CreateInfo.pCode = Description->Code;
+
+	VkShaderModule ShaderModule;
+	VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &CreateInfo, GetVulkanAllocator(), &ShaderModule));
+
+	ShaderData Data;
+	Data.VulkanShaderModule = ShaderModule;
+	Data.Stage = Description->Stage;
+
+	return CreateShaderHandle(&Data);
+}
+
+
+BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, BmRender_ImageType Type)
+{
+	BmRender_ImageDescription Descr;
+	Descr.ArrayLayers = 1;
+	Descr.Format = Format;
+	Descr.Width = Width;
+	Descr.Height = Height;
+	Descr.Type = Type;
+
+	return CreateImageResource(&Descr);
+}
+
+BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Format, BmRender_ImageType Type, u32 ArrayLayers)
+{
+	BmRender_ImageDescription Descr;
+	Descr.ArrayLayers = ArrayLayers;
+	Descr.Format = Format;
+	Descr.Width = Width;
+	Descr.Height = Height;
+	Descr.Type = Type;
+
+	return CreateImageResource(&Descr);
+}
+
+BmRender_ImageView BmRender_CreateImageView2D(BmRender_Image Handle, VkImageAspectFlags AspectFlags)
+{
+	return CreateImageView(Handle, 0, 1, VK_IMAGE_VIEW_TYPE_2D, AspectFlags);
+}
+
+BmRender_ImageView BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags)
+{
+	return CreateImageView(Handle, BaseLayer, LayerCount, VK_IMAGE_VIEW_TYPE_2D_ARRAY, AspectFlags);
+}
+
+BmRender_GPUBuffer BmRender_CreateVertexStageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag)
+{
+	return CreateGPUBuffer(Size, MemoryFlag, BmRender_PipelineSyncStage::VertexShader, BufferUsageFlag::CombinedVertexIndexFlag);
+}
+
+BmRender_GPUBuffer BmRender_CreateInstanceBuffer(u64 Size, MemoryPropertyFlag MemoryFlag)
+{
+	return CreateGPUBuffer(Size, MemoryFlag, BmRender_PipelineSyncStage::VertexShader, BufferUsageFlag::InstanceFlag);
+}
+
+BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, BmRender_PipelineSyncStage BufferStage)
+{
+	return CreateGPUBuffer(Size, MemoryFlag, BufferStage, BufferUsageFlag::UniformFlag);
+}
+
+BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, BmRender_PipelineSyncStage BufferStage)
+{
+	return CreateGPUBuffer(Size, MemoryFlag, BufferStage, BufferUsageFlag::StorageFlag);
+}
+
+BmRender_GPUBuffer BmRender_CreateStagingBuffer(u64 Size)
+{
+	return CreateGPUBuffer(Size, MemoryPropertyFlag::HostCompatible, BmRender_PipelineSyncStage::None, BufferUsageFlag::StagingFlag);
+}
+
+void BmRender_UpdateHostCompatibleBuffer(BmRender_GPUBuffer StagingBuffer, u64 BufferOffset, u64 DataSize, const void* Data)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	GPUBufferData* BufferData = GetGPUBufferData(StagingBuffer);
+	VulkanHelper::UpdateHostCompatibleBufferMemory(Device, BufferData->Memory, DataSize, BufferOffset, Data);
+}
+
+void BmRender_DestroyPipelineLayout(BmRender_PipelineLayout Handle)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	auto Data = GetPipelineLayoutData(Handle);
+	OnPipelineLayoutClear(Data);
+	DestroyPipelineLayoutHandle(Handle);
+}
+
+void BmRender_DestroySampler(BmRender_Sampler Handle)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	auto Data = GetSamplerData(Handle);
+	OnSamplerClear(Data);
+	DestroySamplerHandle(Handle);
+}
+
+void BmRender_DestroyDescriptorSetLayout(BmRender_DescriptorSetLayout Handle)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	auto Data = GetDescriptorSetLayoutData(Handle);
+	OnDescriptorSetLayoutClear(Data);
+	DestroyDescriptorSetLayoutHandle(Handle);
+}
+
+void BmRender_DestroyDescriptorPool(BmRender_DescriptorPool Handle)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	auto Data = GetDescriptorPoolData(Handle);
+	OnDescriptorPoolClear(Data);
+	DestroyDescriptorPoolHandle(Handle);
+}
+
+void BmRender_DestroyPipeline(BmRender_Pipeline Handle)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	auto Data = GetPipelineData(Handle);
+	OnPipelineClear(Data);
+	DestroyPipelineHandle(Handle);
+}
+
+void BmRender_DestroyShader(BmRender_Shader Handle)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	auto Data = GetShaderData(Handle);
+	OnShaderClear(Data);
+	DestroyShaderHandle(Handle);
+}
+
+void BmRender_DestroyImage(BmRender_Image Handle)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	auto Data = GetImageData(Handle);
+	OnImageClear(Data);
+	DestroyImageHandle(Handle);
 }
