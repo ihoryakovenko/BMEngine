@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "RenderInterface.h"
+#include "RenderTypes.h"
 
 namespace Render
 {
@@ -38,28 +39,9 @@ namespace Render
 		std::vector<BmRender_GPUBufferBinding> ResourceDependency;
 	};
 
-	struct DrawFrames
-	{
-		VkFence Fences[VulkanHelper::MAX_DRAW_FRAMES];
-		VkCommandBuffer CommandBuffers[VulkanHelper::MAX_DRAW_FRAMES];
-		VkSemaphore ImagesAvailable[VulkanHelper::MAX_DRAW_FRAMES];
-		VkSemaphore RenderFinished[VulkanHelper::MAX_DRAW_FRAMES];
-	};
-
-	struct DrawState
-	{
-		VkCommandPool GraphicsCommandPool;
-
-		DrawFrames Frames;
-		u32 CurrentFrame;
-		u32 CurrentImageIndex;
-
-		u64 WaitSemaphoreValueCount;
-	};
-
 	struct StaticMeshPipeline
 	{
-		BmRender_ImageView2DArray ShadowMapArrayImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
+		BmRender_ImageView ShadowMapArrayImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
 
 		VkPushConstantRange PushConstants;
 
@@ -76,7 +58,7 @@ namespace Render
 
 	struct RenderState
 	{
-		DrawState RenderDrawState;	
+		BmRender_CommandWorker GraphicsSubmitPool;
 		StaticMeshPipeline MeshPipeline;
 		DescriptorSetHandles DescriptorSets;
 		BmRender_DescriptorPool MainPool;
@@ -177,11 +159,11 @@ namespace DeferredPass
 	void BeginPass();
 	void EndPass();
 
-	BmRender_ImageView2D* TestDeferredInputColorImageInterface();
-	BmRender_ImageView2D* TestDeferredInputDepthImageInterface();
+	BmRender_ImageView* TestDeferredInputColorImageInterface();
+	BmRender_ImageView* TestDeferredInputDepthImageInterface();
 
-	BmRender_Image2D* TestDeferredInputColorImage();
-	BmRender_Image2D* TestDeferredInputDepthImage();
+	BmRender_Image* TestDeferredInputColorImage();
+	BmRender_Image* TestDeferredInputDepthImage();
 
 	AttachmentData* GetAttachmentData();
 }

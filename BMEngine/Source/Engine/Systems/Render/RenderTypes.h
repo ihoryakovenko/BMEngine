@@ -3,10 +3,12 @@
 #include <vulkan/vulkan.h>
 #include "Engine/Systems/HandleManager.h"
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
+#include "Engine/Systems/Render/VulkanHelper.h"
 
 #include "RenderInterface.h"
 
 #include <atomic>
+#include <mutex>
 
 struct GLFWwindow;
 
@@ -76,7 +78,6 @@ struct GPUBufferData
 	VkDeviceMemory Memory;
 	MemoryPropertyFlag PropertyFlag;
 	BmRender_PipelineSyncStage BufferStage;
-	BmRender_BufferUpdateFrequency UpdateFrequency;
 	u64 ReadyValue;
 };
 
@@ -86,10 +87,36 @@ struct DescriptorSetData
 	BmRender_DescriptorSetLayout Layout;
 };
 
-
 struct PushConstantData
 {
 	VkPushConstantRange PushConstants;
+};
+
+struct DrawSystemData
+{
+	VkSemaphore ImagesAvailable[VulkanHelper::MAX_DRAW_FRAMES];
+	VkSemaphore RenderFinished[VulkanHelper::MAX_DRAW_FRAMES];
+
+	u32 CurrentFrame;
+
+	u64 WaitSemaphoreValueCount;
+};
+
+struct CommandSystemData
+{
+	VkQueue GraphicsQueue;
+	std::mutex QueueSubmitMutex;
+	System_HandleManager WorkerManager;
+	BmRender_CommandWorker Workers[16];
+	u32 WorkerCount;
+	u32 FreeWorkerCount;
+};
+
+struct CommandWorkerData
+{
+	VkCommandPool CommandPool;
+	VkCommandBuffer CommandBuffer;
+	VkFence Fence;
 };
 
 void CreateCoreContext(GLFWwindow* WindowHandler);
@@ -123,6 +150,7 @@ void DeinitImageViewManager(void(*CleanUpFunc)(ImageViewData*));
 void DeinitGPUBufferManager(void(*CleanUpFunc)(GPUBufferData*));
 void DeinitPushConstantManager();
 void DeinitDescriptorSetManager();
+void DeinitCommandSystem(void(*CleanUpFunc)(CommandWorkerData*));
 
 BmRender_Sampler CreateSamplerHandle(const SamplerData* Data);
 BmRender_Pipeline CreatePipelineHandle(const PipelineData* Data);
@@ -135,6 +163,7 @@ BmRender_ImageView CreateImageViewHandle(const ImageViewData* Data);
 BmRender_GPUBuffer CreateGPUBufferHandle(const GPUBufferData* Data);
 BmRender_PushConstant CreatePushConstantHandle(const PushConstantData* Data);
 BmRender_DescriptorSet CreateDescriptorSetHandle(const DescriptorSetData* Data);
+BmRender_CommandWorker CreateCommandWorkerHandle(const CommandWorkerData* Data);
 
 void DestroySamplerHandle(BmRender_Sampler handle);
 void DestroyPipelineHandle(BmRender_Pipeline handle);
@@ -147,6 +176,7 @@ void DestroyImageViewHandle(BmRender_ImageView Handle);
 void DestroyGPUBufferHandle(BmRender_GPUBuffer Handle);
 void DestroyPushConstantHandle(BmRender_PushConstant Handle);
 void DestroyDescriptorSetHandle(BmRender_DescriptorSet Handle);
+void DestroyCommandWorkerHandle(BmRender_CommandWorker Handle);
 
 SamplerData* GetSamplerData(BmRender_Sampler Handle);
 PipelineData* GetPipelineData(BmRender_Pipeline Handle);
@@ -159,5 +189,16 @@ ImageViewData* GetImageViewData(BmRender_ImageView Handle);
 GPUBufferData* GetGPUBufferData(BmRender_GPUBuffer Handle);
 PushConstantData* GetPushConstantData(BmRender_PushConstant Handle);
 DescriptorSetData* GetDescriptorSetData(BmRender_DescriptorSet Handle);
+CommandWorkerData* GetSubmitPoolData(BmRender_CommandWorker Handle);
 
 Memory::FrameMemory GetFrameMemory();
+
+
+void InitCommandSystem(u32 WorkerCount);
+void UpdateCommandSystem();
+void DeinitCommandSystem(void(*CleanUpFunc)(CommandWorkerData*));
+void InitDrawSystem();
+void DeInitDrawSystem();
+
+CommandSystemData* GetCommandSystemData();
+DrawSystemData* GetDrawSystemData();

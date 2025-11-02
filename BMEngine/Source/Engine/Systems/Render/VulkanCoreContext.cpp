@@ -255,15 +255,6 @@ namespace VulkanCoreContext
 		VulkanHelper::CheckFormats(Context->PhysicalDevice);
 		Context->SwapExtent = VulkanHelper::GetBestSwapExtent(Context->PhysicalDevice, Context->WindowHandler, Context->Surface);
 
-		vkGetDeviceQueue(Context->LogicalDevice, static_cast<u32>(Context->Indices.GraphicsFamily), 0, &Context->GraphicsQueue);
-		//vkGetDeviceQueue(Device.LogicalDevice, static_cast<u32>(Device.Indices.PresentationFamily), 0, &PresentationQueue);
-		//vkGetDeviceQueue(Device.LogicalDevice, static_cast<u32>(Device.Indices.TransferFamily), 0, &TransferQueue);
-
-		//if (GraphicsQueue == nullptr || PresentationQueue == nullptr || TransferQueue == nullptr)
-		{
-			//return false;
-		}
-
 		VkSurfaceCapabilitiesKHR SurfaceCapabilities = { };
 		VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Context->PhysicalDevice, Context->Surface, &SurfaceCapabilities));
 

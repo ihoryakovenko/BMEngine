@@ -71,6 +71,13 @@ static void OnGPUBufferClear(GPUBufferData* Data)
 	vkFreeMemory(Device, Data->Memory, GetVulkanAllocator());
 }
 
+static void OnSubmitPoolClear(CommandWorkerData* PoolData)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDestroyFence(Device, PoolData->Fence, GetVulkanAllocator());
+	vkDestroyCommandPool(Device, PoolData->CommandPool, GetVulkanAllocator());
+}
+
 void BmRender_Init(GLFWwindow* WindowHandler, u32 InMaxFramesInFly)
 {
 	InitializeFrameMemory();
@@ -90,12 +97,14 @@ void BmRender_Init(GLFWwindow* WindowHandler, u32 InMaxFramesInFly)
 	InitializeGPUBufferManager(4);
 	InitializeDescriptorSetManager(32);
 	InitializePushConstantManager(4);
-
-	
+	InitCommandSystem(4);
+	InitDrawSystem();
 }
 
 void BmRender_DeInit()
 {
+	DeInitDrawSystem();
+
 	DeinitSamplerManager(OnSamplerClear);
 	DeinitPipelineManager(OnPipelineClear);
 	DeinitPipelineLayoutManager(OnPipelineLayoutClear);
@@ -107,6 +116,7 @@ void BmRender_DeInit()
 	DeinitGPUBufferManager(OnGPUBufferClear);
 	DeinitDescriptorSetManager();
 	DeinitPushConstantManager();
+	DeinitCommandSystem(OnSubmitPoolClear);
 
 	DestroyCoreContext();
 
@@ -232,18 +242,15 @@ BmRender_PushConstant BmRender_CreatePushConstant(BmRender_DescriptorShaderStage
 	return CreatePushConstantHandle(&Constant);
 }
 
-static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, BmRender_BufferUpdateFrequency UpdateFrequency, BmRender_PipelineSyncStage BufferStage, BufferUsageFlag Flag)
+static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, MemoryPropertyFlag MemoryFlag, BmRender_PipelineSyncStage BufferStage, BufferUsageFlag Flag)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
 
-	MemoryPropertyFlag MemoryFlag = MemoryPropertyFlag::GPULocal;
-
 	GPUBufferData NewBuffer = { };
 
-	if (UpdateFrequency == BmRender_BufferUpdateFrequency::PerFrame)
+	if (MemoryFlag == MemoryPropertyFlag::HostCompatible)
 	{
-		MemoryFlag = MemoryPropertyFlag::HostCompatible;
 		NewBuffer.ReadyValue = 0;
 	}
 	else
@@ -262,7 +269,6 @@ static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, BmRender_BufferUpdateFre
 		}
 	}	
 
-	NewBuffer.UpdateFrequency = UpdateFrequency;
 	NewBuffer.PropertyFlag = MemoryFlag;
 	NewBuffer.BufferStage = BufferStage;
 	NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, Capacity, Flag, GetVulkanAllocator());
@@ -279,7 +285,6 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
-	VkQueue TransferQueue = GetCoreContext()->GraphicsQueue;
 
 	ImageResource Resource;
 	Resource.ReadyValue = ULLONG_MAX;
@@ -618,9 +623,8 @@ BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Descript
 }
 
 
-BmRender_Image2D BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, BmRender_ImageType Type)
+BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, BmRender_ImageType Type)
 {
-	BmRender_Image2D Handle;
 	BmRender_ImageDescription Descr;
 	Descr.ArrayLayers = 1;
 	Descr.Format = Format;
@@ -628,13 +632,11 @@ BmRender_Image2D BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, 
 	Descr.Height = Height;
 	Descr.Type = Type;
 
-	Handle.Image = CreateImageResource(&Descr);
-	return Handle;
+	return CreateImageResource(&Descr);
 }
 
-BmRender_Image2DArray BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Format, BmRender_ImageType Type, u32 ArrayLayers)
+BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Format, BmRender_ImageType Type, u32 ArrayLayers)
 {
-	BmRender_Image2DArray Handle;
 	BmRender_ImageDescription Descr;
 	Descr.ArrayLayers = ArrayLayers;
 	Descr.Format = Format;
@@ -642,64 +644,48 @@ BmRender_Image2DArray BmRender_CreateImage2DArray(u32 Width, u32 Height, VkForma
 	Descr.Height = Height;
 	Descr.Type = Type;
 
-	Handle.Image = CreateImageResource(&Descr);
-	return Handle;
+	return CreateImageResource(&Descr);
 }
 
-BmRender_ImageView2D BmRender_CreateImageView2D(BmRender_Image Handle, VkImageAspectFlags AspectFlags)
+BmRender_ImageView BmRender_CreateImageView2D(BmRender_Image Handle, VkImageAspectFlags AspectFlags)
 {
-	BmRender_ImageView2D ViewHandle;
-	ViewHandle.View = CreateImageView(Handle, 0, 1, VK_IMAGE_VIEW_TYPE_2D, AspectFlags);
-	return ViewHandle;
+	return CreateImageView(Handle, 0, 1, VK_IMAGE_VIEW_TYPE_2D, AspectFlags);
 }
 
-BmRender_ImageView2DArray BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags)
+BmRender_ImageView BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags)
 {
-	BmRender_ImageView2DArray ViewHandle;
-	ViewHandle.View = CreateImageView(Handle, BaseLayer, LayerCount, VK_IMAGE_VIEW_TYPE_2D_ARRAY, AspectFlags);
-	return ViewHandle;
+	return CreateImageView(Handle, BaseLayer, LayerCount, VK_IMAGE_VIEW_TYPE_2D_ARRAY, AspectFlags);
 }
 
-BmRender_VertexStageBuffer BmRender_CreateVertexStageBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency)
+BmRender_GPUBuffer BmRender_CreateVertexStageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag)
 {
-	BmRender_VertexStageBuffer Handle;
-	Handle.Buffer = CreateGPUBuffer(Size, UpdateFrequency, BmRender_PipelineSyncStage::VertexShader, BufferUsageFlag::CombinedVertexIndexFlag);
-	return Handle;
+	return CreateGPUBuffer(Size, MemoryFlag, BmRender_PipelineSyncStage::VertexShader, BufferUsageFlag::CombinedVertexIndexFlag);
 }
 
-BmRender_InstanceBuffer BmRender_CreateInstanceBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency)
+BmRender_GPUBuffer BmRender_CreateInstanceBuffer(u64 Size, MemoryPropertyFlag MemoryFlag)
 {
-	BmRender_InstanceBuffer Handle;
-	Handle.Buffer = CreateGPUBuffer(Size, UpdateFrequency, BmRender_PipelineSyncStage::VertexShader, BufferUsageFlag::InstanceFlag);
-	return Handle;
+	return CreateGPUBuffer(Size, MemoryFlag, BmRender_PipelineSyncStage::VertexShader, BufferUsageFlag::InstanceFlag);
 }
 
-BmRender_UniformBuffer BmRender_CreateUniformBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency, BmRender_PipelineSyncStage BufferStage)
+BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, BmRender_PipelineSyncStage BufferStage)
 {
-	BmRender_UniformBuffer Handle;
-	Handle.Buffer = CreateGPUBuffer(Size, UpdateFrequency, BufferStage, BufferUsageFlag::UniformFlag);
-	return Handle;
+	return CreateGPUBuffer(Size, MemoryFlag, BufferStage, BufferUsageFlag::UniformFlag);
 }
 
-BmRender_StorageBuffer BmRender_CreateStorageBuffer(u64 Size, BmRender_BufferUpdateFrequency UpdateFrequency, BmRender_PipelineSyncStage BufferStage)
+BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, BmRender_PipelineSyncStage BufferStage)
 {
-	BmRender_StorageBuffer Handle;
-	Handle.Buffer = CreateGPUBuffer(Size, UpdateFrequency, BufferStage, BufferUsageFlag::StorageFlag);
-	return Handle;
+	return CreateGPUBuffer(Size, MemoryFlag, BufferStage, BufferUsageFlag::StorageFlag);
 }
 
-BmRender_StagingBuffer BmRender_CreateStagingBuffer(u64 Size)
+BmRender_GPUBuffer BmRender_CreateStagingBuffer(u64 Size)
 {
-	BmRender_StagingBuffer Handle;
-	// PerFrame TODO: FIX
-	Handle.Buffer = CreateGPUBuffer(Size, BmRender_BufferUpdateFrequency::PerFrame, BmRender_PipelineSyncStage::None, BufferUsageFlag::StagingFlag);
-	return Handle;
+	return CreateGPUBuffer(Size, MemoryPropertyFlag::HostCompatible, BmRender_PipelineSyncStage::None, BufferUsageFlag::StagingFlag);
 }
 
-void BmRender_UpdateStagingBuffer(BmRender_StagingBuffer StagingBuffer, u64 BufferOffset, u64 DataSize, const void* Data)
+void BmRender_UpdateHostCompatibleBuffer(BmRender_GPUBuffer StagingBuffer, u64 BufferOffset, u64 DataSize, const void* Data)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	GPUBufferData* BufferData = GetGPUBufferData(StagingBuffer.Buffer);
+	GPUBufferData* BufferData = GetGPUBufferData(StagingBuffer);
 	VulkanHelper::UpdateHostCompatibleBufferMemory(Device, BufferData->Memory, DataSize, BufferOffset, Data);
 }
 
@@ -757,4 +743,107 @@ void BmRender_DestroyImage(BmRender_Image Handle)
 	auto Data = GetImageData(Handle);
 	OnImageClear(Data);
 	DestroyImageHandle(Handle);
+}
+
+void Test_FrameFree()
+{
+	Memory::FrameFree(GetFrameMemory());
+}
+
+u32 BmRender_GetMaxFramesInFly()
+{
+	return MaxFramesInFly;
+}
+
+BmRender_CommandWorker BmRender_CreateCommandWorker()
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	u32 GraphicsFamily = GetCoreContext()->Indices.GraphicsFamily;
+
+	CommandWorkerData PoolData = { };
+
+	VkCommandPoolCreateInfo PoolInfo = { };
+	PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	PoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	PoolInfo.queueFamilyIndex = GraphicsFamily;
+
+	VULKAN_CHECK_RESULT(vkCreateCommandPool(Device, &PoolInfo, GetVulkanAllocator(), &PoolData.CommandPool));
+
+	VkCommandBufferAllocateInfo AllocateInfo = { };
+	AllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	AllocateInfo.commandPool = PoolData.CommandPool;
+	AllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	AllocateInfo.commandBufferCount = 1;
+
+	VULKAN_CHECK_RESULT(vkAllocateCommandBuffers(Device, &AllocateInfo, &PoolData.CommandBuffer));
+
+	VkFenceCreateInfo FenceCreateInfo = { };
+	FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+	VULKAN_CHECK_RESULT(vkCreateFence(Device, &FenceCreateInfo, GetVulkanAllocator(), &PoolData.Fence));
+
+	return CreateCommandWorkerHandle(&PoolData);
+}
+
+void BmRender_DestroyCommandWorker(BmRender_CommandWorker Handle)
+{
+	CommandWorkerData* Data = GetSubmitPoolData(Handle);
+	OnSubmitPoolClear(Data);
+	DestroyCommandWorkerHandle(Handle);
+}
+
+u32 BmRender_GetCurrentFrameIndex()
+{
+	DrawSystemData* DrawSystem = GetDrawSystemData();
+	return DrawSystem->CurrentFrame;
+}
+
+bool BmRender_IsDrawFrameFinished(u32 FrameIndex)
+{
+	//VkDevice Device = GetCoreContext()->LogicalDevice;
+	//DrawSystemData* DrawSystem = GetDrawSystemData();
+
+	//VkResult result = vkGetFenceStatus(Device, DrawSystem->);
+	//return false;
+	return false;
+}
+
+u32 BmRender_AcquireNextSwapchainImage(u32 CurrentFrame)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	VkSwapchainKHR Swapchain = GetCoreContext()->VulkanSwapchain;
+
+	DrawSystemData* DrawSystem = GetDrawSystemData();
+	VkSemaphore ImagesAvailable = DrawSystem->ImagesAvailable[CurrentFrame];
+
+	u32 ImageIndex;
+	VULKAN_CHECK_RESULT(vkAcquireNextImageKHR(Device, Swapchain, UINT64_MAX, ImagesAvailable, nullptr, &ImageIndex));
+
+	return ImageIndex;
+}
+
+void BmRender_StartRecording(BmRender_CommandWorker Handle)
+{
+	VulkanCoreContext::VulkanCoreContext* Context = GetCoreContext();
+	CommandWorkerData* SubmitPool = GetSubmitPoolData(Handle);
+
+	VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
+	CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+	VULKAN_CHECK_RESULT(vkWaitForFences(Context->LogicalDevice, 1, &SubmitPool->Fence, VK_TRUE, UINT64_MAX));
+	VULKAN_CHECK_RESULT(vkResetFences(Context->LogicalDevice, 1, &SubmitPool->Fence));
+	VULKAN_CHECK_RESULT(vkBeginCommandBuffer(SubmitPool->CommandBuffer, &CommandBufferBeginInfo));
+}
+
+u32 BmRender_GetFreeWorkersCount()
+{
+	CommandSystemData* CommandSystem = GetCommandSystemData();
+	return CommandSystem->FreeWorkerCount;
+}
+
+BmRender_CommandWorker BmRender_GetFreeWorker()
+{
+	CommandSystemData* CommandSystem = GetCommandSystemData();
+	return CommandSystem->Workers[0];
 }

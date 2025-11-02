@@ -51,7 +51,7 @@ namespace EngineResources
 		std::string Path;
 	};
 
-	void Init(BmRender_DescriptorSet BindlesTexturesSetHandle, BmRender_VertexStageBuffer VertexStageBuffer, BmRender_InstanceBuffer InstanceBuffer, BmRender_UniformBuffer FrameDataBuffer, BmRender_StorageBuffer MaterialBuffer);
+	void Init(BmRender_DescriptorSet BindlesTexturesSetHandle, BmRender_GPUBuffer VertexStageBuffer, BmRender_GPUBuffer InstanceBuffer, BmRender_GPUBuffer FrameDataBuffer, BmRender_GPUBuffer MaterialBuffer);
 	void DeInit();
 
 	void Update(Render::DrawScene* TmpScene, BmRender_DescriptorSet BindlesTexturesSetHandle);

@@ -122,16 +122,16 @@ namespace Engine
 				// Map shader types to Vulkan descriptor types
 				switch (Binding.Type)
 				{
-					case Util::ShaderType::Uniform:
-						VkBinding.DescriptorType = (Binding.UpdateFrequency == BmRender_BufferUpdateFrequency::PerFrame) ?
-							VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-						VkBinding.DescriptorCount = 1;
+				case Util::ShaderType::Uniform:
+					VkBinding.DescriptorType = (Binding.MemoryFlag == MemoryPropertyFlag::HostCompatible) ?
+						VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+					VkBinding.DescriptorCount = 1;
 
-						break;
-					case Util::ShaderType::Buffer:
-						VkBinding.DescriptorType = (Binding.UpdateFrequency == BmRender_BufferUpdateFrequency::PerFrame) ?
-							VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-						VkBinding.DescriptorCount = 1;
+					break;
+				case Util::ShaderType::Buffer:
+					VkBinding.DescriptorType = (Binding.MemoryFlag == MemoryPropertyFlag::HostCompatible) ?
+						VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+					VkBinding.DescriptorCount = 1;
 
 						break;
 					case Util::ShaderType::Sampler2D:
@@ -213,10 +213,10 @@ namespace Engine
 	BmRender_GPUBufferBinding EntityLightRegion[3];
 	
 	// Buffer handles
-	BmRender_VertexStageBuffer VertexStageBuffer;
-	BmRender_InstanceBuffer InstanceBuffer;
-	BmRender_UniformBuffer FrameDataBuffer;
-	BmRender_StorageBuffer MaterialBuffer;
+	BmRender_GPUBuffer VertexStageBuffer;
+	BmRender_GPUBuffer InstanceBuffer;
+	BmRender_GPUBuffer FrameDataBuffer;
+	BmRender_GPUBuffer MaterialBuffer;
 
 	void WindowIconifyCallback(GLFWwindow* window, int iconified)
 	{
@@ -330,18 +330,18 @@ namespace Engine
 		PoolDesc.PoolSizes = TotalPassPoolSizes;
 
 		BmRender_DescriptorPool MainPool = BmRender_CreateDescriptorPool(&PoolDesc);
-		VertexStageBuffer = BmRender_CreateVertexStageBuffer(MB4, BmRender_BufferUpdateFrequency::Static);
-		InstanceBuffer = BmRender_CreateInstanceBuffer(MB4, BmRender_BufferUpdateFrequency::Static);
-		FrameDataBuffer = BmRender_CreateUniformBuffer(MB4, BmRender_BufferUpdateFrequency::PerFrame, BmRender_PipelineSyncStage::FragmentShader);
-		MaterialBuffer = BmRender_CreateStorageBuffer(MB4, BmRender_BufferUpdateFrequency::Static, BmRender_PipelineSyncStage::FragmentShader);
+		VertexStageBuffer = BmRender_CreateVertexStageBuffer(MB4, MemoryPropertyFlag::GPULocal);
+		InstanceBuffer = BmRender_CreateInstanceBuffer(MB4, MemoryPropertyFlag::GPULocal);
+		FrameDataBuffer = BmRender_CreateUniformBuffer(MB4, MemoryPropertyFlag::HostCompatible, BmRender_PipelineSyncStage::FragmentShader);
+		MaterialBuffer = BmRender_CreateStorageBuffer(MB4, MemoryPropertyFlag::GPULocal, BmRender_PipelineSyncStage::FragmentShader);
 
-		VpRegion[0] = { FrameDataBuffer.Buffer, 0, 128 };
-		VpRegion[1] = { FrameDataBuffer.Buffer, 128, 128 };
-		VpRegion[2] = { FrameDataBuffer.Buffer, 128 * 2, 128 };
+		VpRegion[0] = { FrameDataBuffer, 0, 128 };
+		VpRegion[1] = { FrameDataBuffer, 128, 128 };
+		VpRegion[2] = { FrameDataBuffer, 128 * 2, 128 };
 
-		EntityLightRegion[0] = { FrameDataBuffer.Buffer, 384, 384 };
-		EntityLightRegion[1] = { FrameDataBuffer.Buffer, 384 + 384, 384 };
-		EntityLightRegion[2] = { FrameDataBuffer.Buffer, 384 + 384 * 2, 384 };
+		EntityLightRegion[0] = { FrameDataBuffer, 384, 384 };
+		EntityLightRegion[1] = { FrameDataBuffer, 384 + 384, 384 };
+		EntityLightRegion[2] = { FrameDataBuffer, 384 + 384 * 2, 384 };
 
 		ParseAndCreateVertices(Util::GetVertices(Root));
 		ParseAndCreateShaders(Util::GetShaders(Root));
@@ -372,7 +372,7 @@ namespace Engine
 		}
 
 		{
-			BmRender_GPUBufferBinding MaterialBufferRegion = { MaterialBuffer.Buffer, 0, VK_WHOLE_SIZE };
+			BmRender_GPUBufferBinding MaterialBufferRegion = { MaterialBuffer, 0, VK_WHOLE_SIZE };
 
 			BmRender_DescriptorSetBinding Binding;
 			Binding.BufferRegions = &MaterialBufferRegion;

@@ -80,16 +80,8 @@ int main()
 	};
 
 	const u64 VertexBufferSize = sizeof(TriangleVertices);
-	BmRender_VertexStageBuffer VertexBuffer = BmRender_CreateVertexStageBuffer(
-		VertexBufferSize,
-		BmRender_BufferUpdateFrequency::Static
-	);
-
-	BmRender_StagingBuffer StagingBuffer = BmRender_CreateStagingBuffer(VertexBufferSize);
-	BmRender_UpdateStagingBuffer(StagingBuffer, 0, VertexBufferSize, TriangleVertices);
-
-	// TODO: Copy staging buffer to vertex buffer using transfer commands
-	// This would require additional render interface functions or direct Vulkan calls
+	BmRender_GPUBuffer VertexBuffer = BmRender_CreateVertexStageBuffer(VertexBufferSize, MemoryPropertyFlag::HostCompatible);
+	BmRender_UpdateHostCompatibleBuffer(VertexBuffer, 0, VertexBufferSize, TriangleVertices);
 
 	VertexAttribute VertexAttrib = {};
 	VertexAttrib.Type = BmRender_AttributeType::Vec3;
@@ -225,11 +217,12 @@ int main()
 
 	BmRender_Pipeline Pipeline = BmRender_CreatePipeline(&PipelineDesc);
 
+	BmRender_CommandWorker SubmitPool = BmRender_CreateCommandWorker();
 
+	const u32 FrameIndex = BmRender_BeginFrame();
+	const u32 ImageIndex = BmRender_AcquireNextSwapchainImage(FrameIndex);
+	BmRender_StartRecording(SubmitPool);
 
-	BmRender_DestroyPipeline(Pipeline);
-	BmRender_DestroyPipelineLayout(PipelineLayout);
-	BmRender_DestroyShader(VertexShader);
 	BmRender_DeInit();
 
 	return 0;

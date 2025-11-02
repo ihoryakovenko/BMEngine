@@ -31,9 +31,6 @@ namespace VulkanCoreContext
 		VkSurfaceKHR Surface;
 		VkSurfaceFormatKHR SurfaceFormat;
 		GLFWwindow* WindowHandler;
-
-		VkQueue GraphicsQueue;
-		std::mutex QueueSubmitMutex;
 	};
 
 	void CreateCoreContext(VulkanCoreContext* Context, GLFWwindow* Window);

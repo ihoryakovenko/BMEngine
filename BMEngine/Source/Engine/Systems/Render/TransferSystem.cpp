@@ -16,7 +16,7 @@ namespace TransferSystem
 {
 	struct StagingFramePool
 	{
-		BmRender_StagingBuffer Buffer;
+		BmRender_GPUBuffer Buffer;
 		u64 AllocatedForFrame[VulkanHelper::MAX_DRAW_FRAMES];
 	};
 
@@ -144,8 +144,8 @@ namespace TransferSystem
 
 			TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] = NewTotal;
 
-			BmRender_UpdateStagingBuffer(TransferState.TransferStagingPool.Buffer, AlignedOffset, Task->DataSize, Task->RawData);
-			GPUBufferData* StagingBufferData = GetGPUBufferData(TransferState.TransferStagingPool.Buffer.Buffer);
+			BmRender_UpdateHostCompatibleBuffer(TransferState.TransferStagingPool.Buffer, AlignedOffset, Task->DataSize, Task->RawData);
+			GPUBufferData* StagingBufferData = GetGPUBufferData(TransferState.TransferStagingPool.Buffer);
 
 			switch (Task->Type)
 			{
@@ -287,8 +287,8 @@ namespace TransferSystem
 		VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
 
 		// Todo submit using queue system
-		std::unique_lock SubmitLock(CoreContext->QueueSubmitMutex);
-		VULKAN_CHECK_RESULT(vkQueueSubmit(GetCoreContext()->GraphicsQueue, 1, &SubmitInfo, TransferFence));
+		std::unique_lock SubmitLock(GetCommandSystemData()->QueueSubmitMutex);
+		VULKAN_CHECK_RESULT(vkQueueSubmit(GetCommandSystemData()->GraphicsQueue, 1, &SubmitInfo, TransferFence));
 		SubmitLock.unlock();
 
 		assert(TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] <= TransferState.MaxTransferSizePerFrame);

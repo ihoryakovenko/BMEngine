@@ -23,10 +23,10 @@ namespace EngineResources
 	static TextureAsset DefaultAsset;
 	
 	// Buffer handles
-	static BmRender_VertexStageBuffer VertexStageBuffer;
-	static BmRender_InstanceBuffer InstanceBuffer;
-	static BmRender_UniformBuffer FrameDataBuffer;
-	static BmRender_StorageBuffer MaterialBuffer;
+	static BmRender_GPUBuffer VertexStageBuffer;
+	static BmRender_GPUBuffer InstanceBuffer;
+	static BmRender_GPUBuffer FrameDataBuffer;
+	static BmRender_GPUBuffer MaterialBuffer;
 
 	static void CreateTexture(TextureAsset& Asset)
 	{
@@ -45,14 +45,14 @@ namespace EngineResources
 		TextureDescription.ArrayLayers = 1;
 		TextureDescription.Type = BmRender_ImageType::TransferSampled;
 
-		BmRender_Image2D ImageHandle = BmRender_CreateImage2D(Extent.x, Extent.y, Util::GliFormatToVkFormat(Texture.format()), BmRender_ImageType::TransferSampled);
-		Asset.RenderImageHandle = ImageHandle.Image;
+		BmRender_Image ImageHandle = BmRender_CreateImage2D(Extent.x, Extent.y, Util::GliFormatToVkFormat(Texture.format()), BmRender_ImageType::TransferSampled);
+		Asset.RenderImageHandle = ImageHandle;
 		RenderResources::UpdateImageResource(Asset.RenderImageHandle, &TextureDescription, Texture.data());
-		BmRender_ImageView2D ViewHandle = BmRender_CreateImageView2D(Asset.RenderImageHandle, VK_IMAGE_ASPECT_COLOR_BIT);
-		Asset.RenderViewHandle = ViewHandle.View;
+		BmRender_ImageView ViewHandle = BmRender_CreateImageView2D(Asset.RenderImageHandle, VK_IMAGE_ASPECT_COLOR_BIT);
+		Asset.RenderViewHandle = ViewHandle;
 	}
 
-	void Init(BmRender_DescriptorSet BindlesTexturesSetHandle, BmRender_VertexStageBuffer InVertexStageBuffer, BmRender_InstanceBuffer InInstanceBuffer, BmRender_UniformBuffer InFrameDataBuffer, BmRender_StorageBuffer InMaterialBuffer)
+	void Init(BmRender_DescriptorSet BindlesTexturesSetHandle, BmRender_GPUBuffer InVertexStageBuffer, BmRender_GPUBuffer InInstanceBuffer, BmRender_GPUBuffer InFrameDataBuffer, BmRender_GPUBuffer InMaterialBuffer)
 	{
 		// Store buffer handles
 		VertexStageBuffer = InVertexStageBuffer;
@@ -75,13 +75,13 @@ namespace EngineResources
 		DefaultTextureDescription.ArrayLayers = 1;
 		DefaultTextureDescription.Type = BmRender_ImageType::TransferSampled;
 
-		BmRender_Image2D DefaultImageHandle = BmRender_CreateImage2D(DefaultAssetExtent.x, DefaultAssetExtent.y, Util::GliFormatToVkFormat(DefaultTexture.format()), BmRender_ImageType::TransferSampled);
-		DefaultAsset.RenderImageHandle = DefaultImageHandle.Image;
+		BmRender_Image DefaultImageHandle = BmRender_CreateImage2D(DefaultAssetExtent.x, DefaultAssetExtent.y, Util::GliFormatToVkFormat(DefaultTexture.format()), BmRender_ImageType::TransferSampled);
+		DefaultAsset.RenderImageHandle = DefaultImageHandle;
 		DefaultAsset.IsCreated = true;
 
 		RenderResources::UpdateImageResource(DefaultAsset.RenderImageHandle, &DefaultTextureDescription, DefaultTexture.data());
-		BmRender_ImageView2D DefaultViewHandle = BmRender_CreateImageView2D(DefaultAsset.RenderImageHandle, VK_IMAGE_ASPECT_COLOR_BIT);
-		DefaultAsset.RenderViewHandle = DefaultViewHandle.View;
+		BmRender_ImageView DefaultViewHandle = BmRender_CreateImageView2D(DefaultAsset.RenderImageHandle, VK_IMAGE_ASPECT_COLOR_BIT);
+		DefaultAsset.RenderViewHandle = DefaultViewHandle;
 
 		BmRender_DescriptorSetBinding DiffuseBinding;
 		DiffuseBinding.ImageBinding.Sampler = Samplers["DiffuseTexture"];
@@ -202,18 +202,18 @@ namespace EngineResources
 				const u64 VerticesSize = sizeof(StaticMeshVertex) * VerticesCount;
 				const u64 IndicesSize = IndicesCount * sizeof(u32);
 					
-				BmRender_GPUBufferBinding MeshHandle = { VertexStageBuffer.Buffer, ModelVertexByteOffset, VertexDataSize };
+				BmRender_GPUBufferBinding MeshHandle = { VertexStageBuffer, ModelVertexByteOffset, VertexDataSize };
 				RenderResources::UpdateBufferRegion(MeshHandle, 0, Model.VertexData + ModelVertexByteOffset, VertexDataSize);
 
-				const BmRender_GPUBufferBinding VertexBufferEntry = { VertexStageBuffer.Buffer, ModelVertexByteOffset, VerticesSize };
-				const BmRender_GPUBufferBinding IndexBufferEntry = { VertexStageBuffer.Buffer, ModelVertexByteOffset + VerticesSize, IndicesSize };
+				const BmRender_GPUBufferBinding VertexBufferEntry = { VertexStageBuffer, ModelVertexByteOffset, VerticesSize };
+				const BmRender_GPUBufferBinding IndexBufferEntry = { VertexStageBuffer, ModelVertexByteOffset + VerticesSize, IndicesSize };
 
 				Material Mat;
 				Mat.AlbedoTexIndex = TextureGPUIndex;
 				Mat.SpecularTexIndex = TextureGPUIndex;
 				Mat.Shininess = 32.0f;
 
-				const BmRender_GPUBufferBinding MaterialHandle = { MaterialBuffer.Buffer, MateriaIndex * sizeof(Mat), sizeof(Mat) };
+				const BmRender_GPUBufferBinding MaterialHandle = { MaterialBuffer, MateriaIndex * sizeof(Mat), sizeof(Mat) };
 				RenderResources::UpdateBufferRegion(MaterialHandle, 0, &Mat, sizeof(Mat));
 
 				InstanceData Instance;
@@ -223,7 +223,7 @@ namespace EngineResources
 				++MateriaIndex;
 
 				const u64 InstanceOffset = InstanceIndex * sizeof(Instance);
-				const BmRender_GPUBufferBinding InstanceHandle = { InstanceBuffer.Buffer, InstanceOffset, sizeof(Instance) };
+				const BmRender_GPUBufferBinding InstanceHandle = { InstanceBuffer, InstanceOffset, sizeof(Instance) };
 				RenderResources::UpdateBufferRegion(InstanceHandle, 0, &Instance, sizeof(Instance));
 
 				++InstanceIndex;

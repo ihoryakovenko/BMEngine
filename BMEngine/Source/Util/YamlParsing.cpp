@@ -927,19 +927,6 @@ namespace Util
 		return MemoryPropertyFlag::GPULocal;
 	}
 
-	BmRender_BufferUpdateFrequency ParseUpdateFrequency(const char* Value, u32 Length)
-	{
-		if (strncmp(Value, "Static", Length) == 0)
-		{
-			return BmRender_BufferUpdateFrequency::Static;
-		}
-		else if (strncmp(Value, "PerFrame", Length) == 0)
-		{
-			return BmRender_BufferUpdateFrequency::PerFrame;
-		}
-
-		return BmRender_BufferUpdateFrequency::Static;
-	}
 
 	ShaderType ParseShaderType(const char* Value, u32 Length)
 	{
@@ -986,15 +973,32 @@ namespace Util
 					Binding.Type = ParseShaderType(typeStr.c_str(), typeStr.length());
 				}
 
-				// Parse update frequency
+				// Parse memory property flag (backward compatible with updateFrequency field)
 				if (!(*BindingIt).second["updateFrequency"].IsNone())
 				{
 					std::string freqStr = (*BindingIt).second["updateFrequency"].As<std::string>();
-					Binding.UpdateFrequency = ParseUpdateFrequency(freqStr.c_str(), freqStr.length());
+					// Map legacy "Static" -> GPULocal, "PerFrame" -> HostCompatible
+					if (freqStr == "Static")
+					{
+						Binding.MemoryFlag = MemoryPropertyFlag::GPULocal;
+					}
+					else if (freqStr == "PerFrame")
+					{
+						Binding.MemoryFlag = MemoryPropertyFlag::HostCompatible;
+					}
+					else
+					{
+						Binding.MemoryFlag = ParseMemoryPropertyFlag(freqStr.c_str(), freqStr.length());
+					}
+				}
+				else if (!(*BindingIt).second["memoryFlag"].IsNone())
+				{
+					std::string flagStr = (*BindingIt).second["memoryFlag"].As<std::string>();
+					Binding.MemoryFlag = ParseMemoryPropertyFlag(flagStr.c_str(), flagStr.length());
 				}
 				else
 				{
-					Binding.UpdateFrequency = BmRender_BufferUpdateFrequency::Static;
+					Binding.MemoryFlag = MemoryPropertyFlag::GPULocal;
 				}
 
 				// Parse stage flags
