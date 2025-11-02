@@ -18,8 +18,6 @@ void BmRender_Init(GLFWwindow* WindowHandler, u32 InMaxFramesInFly)
 {
 	InitializeFrameMemory();
 
-	CreateCoreContext(WindowHandler);
-
 	InitializeSamplerManager(32);
 	InitializePipelineManager(4);
 	InitializePipelineLayoutManager(32);
@@ -31,16 +29,16 @@ void BmRender_Init(GLFWwindow* WindowHandler, u32 InMaxFramesInFly)
 	InitializeGPUBufferManager(4);
 	InitializeDescriptorSetManager(32);
 	InitializePushConstantManager(4);
-	InitCommandWorkerManager(InMaxFramesInFly);
+	InitializeFenceManager(32);
+	InitializeSemaphoreManager(32);
+	InitializeCommandPoolManager(4);
+	InitializeCommandBufferManager(32);
 
-	InitCommandSystem(InMaxFramesInFly);
-	InitDrawSystem(InMaxFramesInFly);
+	CreateCoreContext(WindowHandler);
 }
 
 void BmRender_DeInit()
 {
-	DeInitDrawSystem();
-
 	DeinitSamplerManager(OnSamplerClear);
 	DeinitPipelineManager(OnPipelineClear);
 	DeinitPipelineLayoutManager(OnPipelineLayoutClear);
@@ -52,10 +50,18 @@ void BmRender_DeInit()
 	DeinitGPUBufferManager(OnGPUBufferClear);
 	DeinitDescriptorSetManager();
 	DeinitPushConstantManager();
-	DeinitCommandWorkerManager(OnComandWorkerClear);
+	DeinitFenceManager(OnFenceClear);
+	DeinitSemaphoreManager(OnSemaphoreClear);
+	DeinitCommandPoolManager(OnCommandPoolClear);
+	DeinitCommandBufferManager();
 
 	DestroyCoreContext();
 	DeinitFrameMemory();
+}
+
+u32 BmRender_GetSwapchainImageCount()
+{
+	return GetCoreContext()->ImagesCount;
 }
 
 void Test_FrameFree()

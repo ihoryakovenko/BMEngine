@@ -140,8 +140,11 @@ void OnShaderClear(ShaderData* Shader)
 void OnImageClear(ImageResource* Image)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	vkDestroyImage(Device, Image->Image, GetVulkanAllocator());
-	vkFreeMemory(Device, Image->Memory, GetVulkanAllocator());
+	if (Image->Memory != VK_NULL_HANDLE)
+	{
+		vkDestroyImage(Device, Image->Image, GetVulkanAllocator());
+		vkFreeMemory(Device, Image->Memory, GetVulkanAllocator());
+	}
 }
 
 void OnImageViewClear(ImageViewData* Data)
@@ -157,11 +160,22 @@ void OnGPUBufferClear(GPUBufferData* Data)
 	vkFreeMemory(Device, Data->Memory, GetVulkanAllocator());
 }
 
-void OnComandWorkerClear(CommandWorkerData* PoolData)
+void OnFenceClear(FenceData* Fence)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	vkDestroyFence(Device, PoolData->Fence, GetVulkanAllocator());
-	vkDestroyCommandPool(Device, PoolData->CommandPool, GetVulkanAllocator());
+	vkDestroyFence(Device, Fence->VulkanFence, GetVulkanAllocator());
+}
+
+void OnSemaphoreClear(SemaphoreData* Semaphore)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDestroySemaphore(Device, Semaphore->VulkanSemaphore, GetVulkanAllocator());
+}
+
+void OnCommandPoolClear(CommandPoolData* CommandPool)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDestroyCommandPool(Device, CommandPool->VulkanCommandPool, GetVulkanAllocator());
 }
 
 BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout LayoutHandle, BmRender_DescriptorPool PoolHandle)
@@ -723,6 +737,92 @@ BmRender_GPUBuffer BmRender_CreateStagingBuffer(u64 Size)
 	return CreateGPUBuffer(Size, MemoryPropertyFlag::HostCompatible, BmRender_PipelineSyncStage::None, BufferUsageFlag::StagingFlag);
 }
 
+BmRender_Fence BmRender_CreateFence()
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+
+	VkFenceCreateInfo CreateInfo = { };
+	CreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	CreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+	FenceData Data;
+	VULKAN_CHECK_RESULT(vkCreateFence(Device, &CreateInfo, GetVulkanAllocator(), &Data.VulkanFence));
+
+	return CreateFenceHandle(&Data);
+}
+
+BmRender_BinarySemaphore BmRender_CreateSemaphore()
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+
+	VkSemaphoreCreateInfo CreateInfo = { };
+	CreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	CreateInfo.pNext = nullptr;
+	CreateInfo.flags = 0;
+
+	SemaphoreData Data;
+	Data.IsTimelineSemaphore = false;
+	VULKAN_CHECK_RESULT(vkCreateSemaphore(Device, &CreateInfo, GetVulkanAllocator(), &Data.VulkanSemaphore));
+
+	return CreateBinarySemaphoreHandle(&Data);
+}
+
+BmRender_TimelineSemaphore BmRender_CreateTimelineSemaphore(u64 InitialValue)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+
+	VkSemaphoreTypeCreateInfo TypeCreateInfo = { };
+	TypeCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+	TypeCreateInfo.pNext = nullptr;
+	TypeCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+	TypeCreateInfo.initialValue = InitialValue;
+
+	VkSemaphoreCreateInfo CreateInfo = { };
+	CreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	CreateInfo.pNext = &TypeCreateInfo;
+	CreateInfo.flags = 0;
+
+	SemaphoreData Data;
+	Data.IsTimelineSemaphore = true;
+	VULKAN_CHECK_RESULT(vkCreateSemaphore(Device, &CreateInfo, GetVulkanAllocator(), &Data.VulkanSemaphore));
+
+	return CreateTimelineSemaphoreHandle(&Data);
+}
+
+BmRender_CommandPool BmRender_CreateCommandPool(u32 QueueFamilyIndex, VkCommandPoolCreateFlags Flags)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+
+	VkCommandPoolCreateInfo CreateInfo = { };
+	CreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	CreateInfo.flags = Flags;
+	CreateInfo.queueFamilyIndex = QueueFamilyIndex;
+
+	CommandPoolData Data;
+	Data.QueueFamilyIndex = QueueFamilyIndex;
+	VULKAN_CHECK_RESULT(vkCreateCommandPool(Device, &CreateInfo, GetVulkanAllocator(), &Data.VulkanCommandPool));
+
+	return CreateCommandPoolHandle(&Data);
+}
+
+BmRender_CommandBuffer BmRender_AllocateCommandBuffer(BmRender_CommandPool CommandPool, VkCommandBufferLevel Level)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	CommandPoolData* PoolData = GetCommandPoolData(CommandPool);
+
+	VkCommandBufferAllocateInfo AllocateInfo = { };
+	AllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	AllocateInfo.commandPool = PoolData->VulkanCommandPool;
+	AllocateInfo.level = Level;
+	AllocateInfo.commandBufferCount = 1;
+
+	CommandBufferData Data;
+	Data.CommandPool = CommandPool;
+	VULKAN_CHECK_RESULT(vkAllocateCommandBuffers(Device, &AllocateInfo, &Data.VulkanCommandBuffer));
+
+	return CreateCommandBufferHandle(&Data);
+}
+
 void BmRender_UpdateHostCompatibleBuffer(BmRender_GPUBuffer StagingBuffer, u64 BufferOffset, u64 DataSize, const void* Data)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
@@ -784,4 +884,285 @@ void BmRender_DestroyImage(BmRender_Image Handle)
 	auto Data = GetImageData(Handle);
 	OnImageClear(Data);
 	DestroyImageHandle(Handle);
+}
+
+void BmRender_DestroyFence(BmRender_Fence Handle)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	auto Data = GetFenceData(Handle);
+	OnFenceClear(Data);
+	DestroyFenceHandle(Handle);
+}
+
+void BmRender_DestroyBinarySemaphore(BmRender_BinarySemaphore Handle)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	auto Data = GetBinarySemaphoreData(Handle);
+	OnSemaphoreClear(Data);
+	DestroyBinarySemaphoreHandle(Handle);
+}
+
+void BmRender_DestroyTimelineSemaphore(BmRender_TimelineSemaphore Handle)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	auto Data = GetTimelineSemaphoreData(Handle);
+	OnSemaphoreClear(Data);
+	DestroyTimelineSemaphoreHandle(Handle);
+}
+
+void BmRender_DestroyCommandPool(BmRender_CommandPool Handle)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	auto Data = GetCommandPoolData(Handle);
+	OnCommandPoolClear(Data);
+	DestroyCommandPoolHandle(Handle);
+}
+
+void BmRender_FreeCommandBuffer(BmRender_CommandBuffer Handle)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	CommandBufferData* BufferData = GetCommandBufferData(Handle);
+	CommandPoolData* PoolData = GetCommandPoolData(BufferData->CommandPool);
+
+	vkFreeCommandBuffers(Device, PoolData->VulkanCommandPool, 1, &BufferData->VulkanCommandBuffer);
+	DestroyCommandBufferHandle(Handle);
+}
+
+BmRender_FenceStatus BmRender_GetFenceStatus(BmRender_Fence Handle)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	FenceData* FenceData = GetFenceData(Handle);
+	VkResult Result = vkGetFenceStatus(Device, FenceData->VulkanFence);
+	
+	if (Result == VK_SUCCESS)
+	{
+		return BmRender_FenceStatus::Signaled;
+	}
+	else if (Result == VK_NOT_READY)
+	{
+		return BmRender_FenceStatus::NotReady;
+	}
+	else
+	{
+		VULKAN_CHECK_RESULT(Result);
+		return BmRender_FenceStatus::NotReady;
+	}
+}
+
+BmRender_WaitResult BmRender_WaitForFences(BmRender_Fence Handle, VkBool32 WaitAll, u64 Timeout)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	FenceData* FenceData = GetFenceData(Handle);
+	VkResult Result = vkWaitForFences(Device, 1, &FenceData->VulkanFence, WaitAll, Timeout);
+	
+	if (Result == VK_SUCCESS)
+	{
+		return BmRender_WaitResult::Success;
+	}
+	else if (Result == VK_TIMEOUT)
+	{
+		return BmRender_WaitResult::Timeout;
+	}
+	else
+	{
+		VULKAN_CHECK_RESULT(Result);
+		return BmRender_WaitResult::Timeout;
+	}
+}
+
+void BmRender_ResetFences(BmRender_Fence Handle)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	FenceData* FenceData = GetFenceData(Handle);
+	VULKAN_CHECK_RESULT(vkResetFences(Device, 1, &FenceData->VulkanFence));
+}
+
+void BmRender_GetSemaphoreCounterValue(BmRender_TimelineSemaphore Handle, u64* pValue)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	SemaphoreData* SemaphoreData = GetTimelineSemaphoreData(Handle);
+	VULKAN_CHECK_RESULT(vkGetSemaphoreCounterValue(Device, SemaphoreData->VulkanSemaphore, pValue));
+}
+
+void BmRender_BeginCommandBuffer(BmRender_CommandBuffer Handle, const VkCommandBufferBeginInfo* pBeginInfo)
+{
+	CommandBufferData* BufferData = GetCommandBufferData(Handle);
+	VULKAN_CHECK_RESULT(vkBeginCommandBuffer(BufferData->VulkanCommandBuffer, pBeginInfo));
+}
+
+void BmRender_EndCommandBuffer(BmRender_CommandBuffer Handle)
+{
+	CommandBufferData* BufferData = GetCommandBufferData(Handle);
+	VULKAN_CHECK_RESULT(vkEndCommandBuffer(BufferData->VulkanCommandBuffer));
+}
+
+void BmRender_QueueSubmit(VkQueue Queue, u32 SubmitCount, const BmRender_SubmitInfo* pSubmits, BmRender_Fence Fence)
+{
+	FenceData* FenceData = GetFenceData(Fence);
+	VkSubmitInfo* VkSubmits = (VkSubmitInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSubmitInfo) * SubmitCount);
+
+	for (u32 i = 0; i < SubmitCount; ++i)
+	{
+		const BmRender_SubmitInfo& Submit = pSubmits[i];
+		VkSubmitInfo& VkSubmit = VkSubmits[i];
+
+		u32 TotalWaitSemaphoreCount = Submit.WaitSemaphoreCount + Submit.WaitTimelineSemaphoreCount;
+		u32 TotalSignalSemaphoreCount = Submit.SignalSemaphoreCount + Submit.SignalTimelineSemaphoreCount;
+
+		VkTimelineSemaphoreSubmitInfo* TimelineInfo = nullptr;
+		if (Submit.WaitTimelineSemaphoreCount > 0 || Submit.SignalTimelineSemaphoreCount > 0)
+		{
+			TimelineInfo = (VkTimelineSemaphoreSubmitInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkTimelineSemaphoreSubmitInfo));
+			TimelineInfo->sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+			TimelineInfo->pNext = nullptr;
+			TimelineInfo->waitSemaphoreValueCount = TotalWaitSemaphoreCount;
+			TimelineInfo->signalSemaphoreValueCount = TotalSignalSemaphoreCount;
+
+			u64* WaitValues = (u64*)Memory::FrameAlloc(GetFrameMemory(), sizeof(u64) * TotalWaitSemaphoreCount);
+			TimelineInfo->pWaitSemaphoreValues = WaitValues;
+				
+			for (u32 j = 0; j < Submit.WaitSemaphoreCount; ++j)
+			{
+				WaitValues[j] = 0;
+			}
+
+			for (u32 j = 0; j < TotalWaitSemaphoreCount; ++j)
+			{
+				WaitValues[Submit.WaitSemaphoreCount + j] = Submit.WaitTimelineSemaphores[j].Value;
+			}
+
+			u64* SignalValues = (u64*)Memory::FrameAlloc(GetFrameMemory(), sizeof(u64) * TotalSignalSemaphoreCount);
+			TimelineInfo->pSignalSemaphoreValues = SignalValues;
+
+			for (u32 j = 0; j < Submit.SignalSemaphoreCount; ++j)
+			{
+				SignalValues[j] = 0;
+			}
+
+			for (u32 j = 0; j < Submit.SignalTimelineSemaphoreCount; ++j)
+			{
+				SignalValues[Submit.SignalSemaphoreCount + j] = Submit.SignalTimelineSemaphores[j].Value;
+			}
+		}
+
+		VkSubmit = { };
+		VkSubmit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		VkSubmit.pNext = TimelineInfo;
+		VkSubmit.waitSemaphoreCount = TotalWaitSemaphoreCount;
+		VkSubmit.pWaitDstStageMask = Submit.WaitDstStageFlags;
+		VkSubmit.commandBufferCount = Submit.CommandBufferCount;
+		VkSubmit.signalSemaphoreCount = TotalSignalSemaphoreCount;
+
+		VkCommandBuffer* CommandBuffers = (VkCommandBuffer*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkCommandBuffer) * Submit.CommandBufferCount);
+		VkSubmit.pCommandBuffers = CommandBuffers;
+
+		for (u32 j = 0; j < Submit.CommandBufferCount; ++j)
+		{
+			CommandBufferData* CmdBufferData = GetCommandBufferData(Submit.CommandBuffers[j]);
+			CommandBuffers[j] = CmdBufferData->VulkanCommandBuffer;
+		}
+
+		VkSemaphore* WaitSemaphores = (VkSemaphore*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSemaphore) * TotalWaitSemaphoreCount);
+		VkSubmit.pWaitSemaphores = WaitSemaphores;
+		
+		for (u32 j = 0; j < Submit.WaitSemaphoreCount; ++j)
+		{
+			SemaphoreData* SemData = GetBinarySemaphoreData(Submit.WaitSemaphores[j]);
+			WaitSemaphores[j] = SemData->VulkanSemaphore;
+		}
+		
+		for (u32 j = 0; j < Submit.WaitTimelineSemaphoreCount; ++j)
+		{
+			SemaphoreData* SemData = GetTimelineSemaphoreData(Submit.WaitTimelineSemaphores[j].Semaphore);
+			WaitSemaphores[Submit.WaitSemaphoreCount + j] = SemData->VulkanSemaphore;
+		}
+
+		VkSemaphore* SignalSemaphores = (VkSemaphore*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSemaphore) * TotalSignalSemaphoreCount);
+		VkSubmit.pSignalSemaphores = SignalSemaphores;
+		
+		for (u32 j = 0; j < Submit.SignalSemaphoreCount; ++j)
+		{
+			SemaphoreData* SemData = GetBinarySemaphoreData(Submit.SignalSemaphores[j]);
+			SignalSemaphores[j] = SemData->VulkanSemaphore;
+		}
+		
+		for (u32 j = 0; j < Submit.SignalTimelineSemaphoreCount; ++j)
+		{
+			SemaphoreData* SemData = GetTimelineSemaphoreData(Submit.SignalTimelineSemaphores[j].Semaphore);
+			SignalSemaphores[Submit.SignalSemaphoreCount + j] = SemData->VulkanSemaphore;
+		}
+	}
+
+	VULKAN_CHECK_RESULT(vkQueueSubmit(Queue, SubmitCount, VkSubmits, FenceData->VulkanFence));
+}
+
+BmRender_SwapchainResult BmRender_QueuePresent(VkQueue Queue, const BmRender_PresentInfo* pPresentInfo)
+{
+	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
+	
+	VkPresentInfoKHR PresentInfo = { };
+	PresentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	PresentInfo.waitSemaphoreCount = pPresentInfo->WaitSemaphoreCount;
+	PresentInfo.swapchainCount = 1;
+	PresentInfo.pSwapchains = &CoreContext->VulkanSwapchain;
+	PresentInfo.pImageIndices = pPresentInfo->ImageIndices;
+
+	VkSemaphore* WaitSemaphores = (VkSemaphore*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSemaphore) * pPresentInfo->WaitSemaphoreCount);
+	PresentInfo.pWaitSemaphores = WaitSemaphores;
+
+	for (u32 i = 0; i < pPresentInfo->WaitSemaphoreCount; ++i)
+	{
+		SemaphoreData* SemData = GetBinarySemaphoreData(pPresentInfo->WaitSemaphores[i]);
+		WaitSemaphores[i] = SemData->VulkanSemaphore;
+	}
+	
+	VkResult Result = vkQueuePresentKHR(Queue, &PresentInfo);
+	
+	if (Result == VK_SUCCESS)
+	{
+		return BmRender_SwapchainResult::Success;
+	}
+	else if (Result == VK_SUBOPTIMAL_KHR)
+	{
+		return BmRender_SwapchainResult::Suboptimal;
+	}
+	else if (Result == VK_ERROR_OUT_OF_DATE_KHR)
+	{
+		return BmRender_SwapchainResult::OutOfDate;
+	}
+	else
+	{
+		VULKAN_CHECK_RESULT(Result);
+		return BmRender_SwapchainResult::Success;
+	}
+}
+
+BmRender_SwapchainResult BmRender_AcquireNextSwapchainImage(u64 Timeout, BmRender_BinarySemaphore Semaphore, VkFence Fence, u32* pImageIndex)
+{
+	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
+	VkDevice Device = CoreContext->LogicalDevice;
+
+	VkSwapchainKHR Swapchain = CoreContext->VulkanSwapchain;
+	SemaphoreData* SemaphoreData = GetBinarySemaphoreData(Semaphore);
+
+	VkSemaphore VkSemaphore = SemaphoreData->VulkanSemaphore;
+	VkResult Result = vkAcquireNextImageKHR(Device, Swapchain, Timeout, VkSemaphore, Fence, pImageIndex);
+	
+	if (Result == VK_SUCCESS)
+	{
+		return BmRender_SwapchainResult::Success;
+	}
+	else if (Result == VK_SUBOPTIMAL_KHR)
+	{
+		return BmRender_SwapchainResult::Suboptimal;
+	}
+	else if (Result == VK_ERROR_OUT_OF_DATE_KHR)
+	{
+		return BmRender_SwapchainResult::OutOfDate;
+	}
+	else
+	{
+		VULKAN_CHECK_RESULT(Result);
+		return BmRender_SwapchainResult::Success;
+	}
 }

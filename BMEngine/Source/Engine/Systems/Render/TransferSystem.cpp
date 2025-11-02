@@ -33,8 +33,8 @@ namespace TransferSystem
 
 	struct TransferFrames
 	{
-		VkFence Fences[VulkanHelper::MAX_DRAW_FRAMES];
-		VkCommandBuffer CommandBuffers[VulkanHelper::MAX_DRAW_FRAMES];
+		BmRender_Fence Fences[VulkanHelper::MAX_DRAW_FRAMES];
+		BmRender_CommandBuffer CommandBuffers[VulkanHelper::MAX_DRAW_FRAMES];
 	};
 
 	struct DataTransferState
@@ -43,10 +43,10 @@ namespace TransferSystem
 
 		Memory::HeapRingBuffer<u8> TransferMemory;
 
-		VkCommandPool TransferCommandPool;
+		BmRender_CommandPool TransferCommandPool;
 		StagingFramePool TransferStagingPool;
 
-		VkSemaphore TransferSemaphore;
+		BmRender_TimelineSemaphore TransferSemaphore;
 		u64 CompletedTransfer;
 
 		TaskQueue TransferTasksQueue;
@@ -116,15 +116,15 @@ namespace TransferSystem
 
 		const u32 CurrentFrame = TransferState.CurrentFrame;
 
-		VkFence TransferFence = TransferState.Frames.Fences[CurrentFrame];
-		VkCommandBuffer TransferCommandBuffer = TransferState.Frames.CommandBuffers[CurrentFrame];
-
 		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
 		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-		VULKAN_CHECK_RESULT(vkWaitForFences(Device, 1, &TransferFence, VK_TRUE, UINT64_MAX));
-		VULKAN_CHECK_RESULT(vkResetFences(Device, 1, &TransferFence));
-		VULKAN_CHECK_RESULT(vkBeginCommandBuffer(TransferCommandBuffer, &CommandBufferBeginInfo));
+		BmRender_WaitForFences(TransferState.Frames.Fences[CurrentFrame], VK_TRUE, UINT64_MAX);
+		BmRender_ResetFences(TransferState.Frames.Fences[CurrentFrame]);
+		BmRender_BeginCommandBuffer(TransferState.Frames.CommandBuffers[CurrentFrame], &CommandBufferBeginInfo);
+
+		CommandBufferData* TransferCommandBufferData = GetCommandBufferData(TransferState.Frames.CommandBuffers[CurrentFrame]);
+		VkCommandBuffer TransferCommandBuffer = TransferCommandBufferData->VulkanCommandBuffer;
 
 		while (HasPendingTasks(&TransferState.TransferTasksQueue))
 		{
@@ -269,28 +269,30 @@ namespace TransferSystem
 			++TasksAdded;
 		}
 
-		VULKAN_CHECK_RESULT(vkEndCommandBuffer(TransferCommandBuffer));
+		BmRender_EndCommandBuffer(TransferState.Frames.CommandBuffers[CurrentFrame]);
 
 		++TransferState.CompletedTransfer;
 
-		VkTimelineSemaphoreSubmitInfo TimelineSubmitInfo = { };
-		TimelineSubmitInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-		TimelineSubmitInfo.signalSemaphoreValueCount = 1;
-		TimelineSubmitInfo.pSignalSemaphoreValues = &TransferState.CompletedTransfer;
+		BmRender_TimelineSemaphoreSubmit SignalTimelineSemaphore;
+		SignalTimelineSemaphore.Semaphore = TransferState.TransferSemaphore;
+		SignalTimelineSemaphore.Value = TransferState.CompletedTransfer;
 
-		VkSubmitInfo SubmitInfo = { };
-		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.commandBufferCount = 1;
-		SubmitInfo.pCommandBuffers = &TransferCommandBuffer;
-		SubmitInfo.pNext = &TimelineSubmitInfo;
-		SubmitInfo.signalSemaphoreCount = 1;
-		SubmitInfo.pSignalSemaphores = &TransferState.TransferSemaphore;
-
-		VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
+		BmRender_SubmitInfo SubmitInfo = { };
+		SubmitInfo.CommandBuffers = &TransferState.Frames.CommandBuffers[CurrentFrame];
+		SubmitInfo.CommandBufferCount = 1;
+		SubmitInfo.SignalSemaphores = nullptr;
+		SubmitInfo.SignalSemaphoreCount = 0;
+		SubmitInfo.SignalTimelineSemaphores = &SignalTimelineSemaphore;
+		SubmitInfo.SignalTimelineSemaphoreCount = 1;
+		SubmitInfo.WaitDstStageFlags = nullptr;
+		SubmitInfo.WaitSemaphores = nullptr;
+		SubmitInfo.WaitSemaphoreCount = 0;
+		SubmitInfo.WaitTimelineSemaphores = nullptr;
+		SubmitInfo.WaitTimelineSemaphoreCount = 0;
 
 		// Todo submit using queue system
 		std::unique_lock SubmitLock(GetCommandSystemData()->QueueSubmitMutex);
-		VULKAN_CHECK_RESULT(vkQueueSubmit(GetCommandSystemData()->GraphicsQueue, 1, &SubmitInfo, TransferFence));
+		BmRender_QueueSubmit(GetCommandSystemData()->GraphicsQueue, 1, &SubmitInfo, TransferState.Frames.Fences[CurrentFrame]);
 		SubmitLock.unlock();
 
 		assert(TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] <= TransferState.MaxTransferSizePerFrame);
@@ -303,47 +305,37 @@ namespace TransferSystem
 	void Init()
 	{
 		VulkanCoreContext::VulkanCoreContext* Context = GetCoreContext();
-		VkPhysicalDevice PhysicalDevice = Context->PhysicalDevice;
 		VkDevice Device = Context->LogicalDevice;
 
 		TransferState.CurrentFrame = 0;
 
-		VkCommandPoolCreateInfo PoolInfo = { };
-		PoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-		PoolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		PoolInfo.queueFamilyIndex = Context->Indices.GraphicsFamily;
+		TransferState.TransferCommandPool = BmRender_CreateCommandPool(
+			Context->Indices.GraphicsFamily,
+			VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
+		);
 
-		VULKAN_CHECK_RESULT(vkCreateCommandPool(Device, &PoolInfo, GetVulkanAllocator(), &TransferState.TransferCommandPool));
+		CommandPoolData* PoolData = GetCommandPoolData(TransferState.TransferCommandPool);
 
 		VkCommandBufferAllocateInfo TransferCommandBufferAllocateInfo = { };
 		TransferCommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		TransferCommandBufferAllocateInfo.commandPool = TransferState.TransferCommandPool;
+		TransferCommandBufferAllocateInfo.commandPool = PoolData->VulkanCommandPool;
 		TransferCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 		TransferCommandBufferAllocateInfo.commandBufferCount = VulkanHelper::MAX_DRAW_FRAMES;
 
-		VULKAN_CHECK_RESULT(vkAllocateCommandBuffers(Device, &TransferCommandBufferAllocateInfo, TransferState.Frames.CommandBuffers));
-
-		VkFenceCreateInfo FenceCreateInfo = { };
-		FenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-		FenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+		VkCommandBuffer RawCommandBuffers[VulkanHelper::MAX_DRAW_FRAMES];
+		VULKAN_CHECK_RESULT(vkAllocateCommandBuffers(Device, &TransferCommandBufferAllocateInfo, RawCommandBuffers));
 
 		for (u32 i = 0; i < VulkanHelper::MAX_DRAW_FRAMES; ++i)
 		{
-			VULKAN_CHECK_RESULT(vkCreateFence(Device, &FenceCreateInfo, GetVulkanAllocator(), TransferState.Frames.Fences + i));
+			TransferState.Frames.Fences[i] = BmRender_CreateFence();
+
+			CommandBufferData CmdBufferData;
+			CmdBufferData.CommandPool = TransferState.TransferCommandPool;
+			CmdBufferData.VulkanCommandBuffer = RawCommandBuffers[i];
+			TransferState.Frames.CommandBuffers[i] = CreateCommandBufferHandle(&CmdBufferData);
 		}
 
-		VkSemaphoreTypeCreateInfo TimelineCreateInfo = { };
-		TimelineCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
-		TimelineCreateInfo.pNext = nullptr;
-		TimelineCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-		TimelineCreateInfo.initialValue = 0;
-
-		VkSemaphoreCreateInfo SemaphoreInfo = { };
-		SemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-		SemaphoreInfo.pNext = &TimelineCreateInfo;
-		SemaphoreInfo.flags = 0;
-
-		VULKAN_CHECK_RESULT(vkCreateSemaphore(Device, &SemaphoreInfo, GetVulkanAllocator(), &TransferState.TransferSemaphore));
+		TransferState.TransferSemaphore = BmRender_CreateTimelineSemaphore(0);
 
 		TransferState.CompletedTransfer = 0;
 
@@ -362,17 +354,14 @@ namespace TransferSystem
 
 	void DeInit()
 	{
-		VulkanCoreContext::VulkanCoreContext* Context = GetCoreContext();
-		VkDevice Device = Context->LogicalDevice;
-
-		vkDestroyCommandPool(Device, TransferState.TransferCommandPool, GetVulkanAllocator());
-
 		for (u32 i = 0; i < VulkanHelper::MAX_DRAW_FRAMES; ++i)
 		{
-			vkDestroyFence(Device, TransferState.Frames.Fences[i], GetVulkanAllocator());
+			BmRender_DestroyFence(TransferState.Frames.Fences[i]);
+			BmRender_FreeCommandBuffer(TransferState.Frames.CommandBuffers[i]);
 		}
 
-		vkDestroySemaphore(Device, TransferState.TransferSemaphore, GetVulkanAllocator());
+		BmRender_DestroyCommandPool(TransferState.TransferCommandPool);
+		BmRender_DestroyTimelineSemaphore(TransferState.TransferSemaphore);
 
 		free(TransferState.TransferTasksQueue.Memory);
 		Memory::FreeRingBuffer(&TransferState.TransferMemory);
@@ -390,11 +379,8 @@ namespace TransferSystem
 
 	bool IsBufferLocked(BmRender_GPUBuffer Handle)
 	{
-		VulkanCoreContext::VulkanCoreContext* Context = GetCoreContext();
-		VkDevice Device = Context->LogicalDevice;
-
 		u64 CompletedValue = 0;
-		vkGetSemaphoreCounterValue(Device, TransferState.TransferSemaphore, &CompletedValue);
+		BmRender_GetSemaphoreCounterValue(TransferState.TransferSemaphore, &CompletedValue);
 
 		GPUBufferData* BufferData = GetGPUBufferData(Handle);
 		return CompletedValue < BufferData->ReadyValue;
@@ -402,11 +388,8 @@ namespace TransferSystem
 
 	bool IsImageLocked(BmRender_Image Handle)
 	{
-		VulkanCoreContext::VulkanCoreContext* Context = GetCoreContext();
-		VkDevice Device = Context->LogicalDevice;
-
 		u64 CompletedValue = 0;
-		vkGetSemaphoreCounterValue(Device, TransferState.TransferSemaphore, &CompletedValue);
+		BmRender_GetSemaphoreCounterValue(TransferState.TransferSemaphore, &CompletedValue);
 
 		ImageResource* ImageData = GetImageData(Handle);
 		return CompletedValue < ImageData->ReadyValue;

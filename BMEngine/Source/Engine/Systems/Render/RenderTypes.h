@@ -92,12 +92,27 @@ struct PushConstantData
 	VkPushConstantRange PushConstants;
 };
 
-struct CommandWorkerData
+struct FenceData
 {
-	VkCommandPool CommandPool;
-	VkCommandBuffer CommandBuffer;
-	VkFence Fence;
-	std::atomic_bool IsLocked;
+	VkFence VulkanFence;
+};
+
+struct SemaphoreData
+{
+	VkSemaphore VulkanSemaphore;
+	bool IsTimelineSemaphore;
+};
+
+struct CommandPoolData
+{
+	VkCommandPool VulkanCommandPool;
+	u32 QueueFamilyIndex;
+};
+
+struct CommandBufferData
+{
+	VkCommandBuffer VulkanCommandBuffer;
+	BmRender_CommandPool CommandPool;
 };
 
 void OnSamplerClear(SamplerData* SamplerData);
@@ -109,7 +124,9 @@ void OnShaderClear(ShaderData* Shader);
 void OnImageClear(ImageResource* Image);
 void OnImageViewClear(ImageViewData* Data);
 void OnGPUBufferClear(GPUBufferData* Data);
-void OnComandWorkerClear(CommandWorkerData* PoolData);
+void OnFenceClear(FenceData* Fence);
+void OnSemaphoreClear(SemaphoreData* Semaphore);
+void OnCommandPoolClear(CommandPoolData* CommandPool);
 
 void InitializeFrameMemory();
 void DeinitFrameMemory();

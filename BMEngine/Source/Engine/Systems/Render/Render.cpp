@@ -237,6 +237,9 @@ namespace Render
 
 	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferBinding* VpRegion, BmRender_GPUBufferBinding* EntityLightRegion, const DescriptorSetHandles& DescriptorSets, BmRender_DescriptorPool MainPool)
 	{		
+		InitCommandSystem(3);
+		InitDrawSystem(3);
+
 		VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
 		VkDevice Device = GetCoreContext()->LogicalDevice;
 
@@ -266,30 +269,28 @@ namespace Render
 		
 		//TerrainRender::DeInit();
 
+		DeInitDrawSystem();
+		DeInitCommandSystem();
 	}
 
 	void Draw(DrawScene* Scene, u64 WaitSemaphoreValue)
 	{
 		VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
 
-		const u32 CurrentFrame = BmRender_GetCurrentFrameIndex();
+		const u32 CurrentFrame = GetCurrentFrameIndex();
 
 		RenderResources::UpdateBufferRegion(State.VpHandle[CurrentFrame], 0, &Scene->ViewProjection, sizeof(ViewProjectionBuffer));
 		RenderResources::UpdateBufferRegion(State.EntityLightBufferHandle[CurrentFrame], 0, Scene->LightEntity, sizeof(LightBuffer));
 
-		const u32 ImageIndex = BmRender_AcquireNextSwapchainImage(CurrentFrame);
+		const u32 ImageIndex = AcquireNextSwapchainImage(CurrentFrame);
 		CurrentImageIndex = ImageIndex;
 
-		State.GraphicsCommandWorker = BmRender_AcquireWorker(ULLONG_MAX);
-		BmRender_StartRecording(State.GraphicsCommandWorker);
+		State.GraphicsCommandWorker = AcquireWorker(ULLONG_MAX);
+		StartRecording(State.GraphicsCommandWorker);
 
-
-
-
-
-		
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(State.GraphicsCommandWorker);
-		VkCommandBuffer DrawCmdBuffer = SubmitPool->CommandBuffer;
+		CommandBufferData* CommandBufferData = GetCommandBufferData(SubmitPool->CommandBuffer);
+		VkCommandBuffer DrawCmdBuffer = CommandBufferData->VulkanCommandBuffer;
 
 		VkDevice Device = GetCoreContext()->LogicalDevice;
 
@@ -304,52 +305,35 @@ namespace Render
 		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), DrawCmdBuffer);
 		DeferredPass::EndPass();
 
-		VULKAN_CHECK_RESULT(vkEndCommandBuffer(DrawCmdBuffer));
+		EndRecording(State.GraphicsCommandWorker);
 
 		VkPipelineStageFlags WaitStages[] = {
 			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 		};
 
-		VkTimelineSemaphoreSubmitInfo* TimelineInfo = nullptr;
-
-		if (WaitSemaphoreValue > 0)
-		{
-			GetDrawSystemData()->WaitSemaphoreValueCount += WaitSemaphoreValue;
-
-			VkTimelineSemaphoreSubmitInfo FrameTimelineInfo;
-			FrameTimelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-			FrameTimelineInfo.waitSemaphoreValueCount = 1;
-			FrameTimelineInfo.pWaitSemaphoreValues = &GetDrawSystemData()->WaitSemaphoreValueCount;
-		}
-
 		DrawSystemData* DrawSystem = GetDrawSystemData();
-		VkSemaphore ImagesAvailable = DrawSystem->ImagesAvailable[CurrentFrame];
-		VkSemaphore RenderFinished = DrawSystem->RenderFinished[CurrentFrame];
-		VkFence FrameFence = SubmitPool->Fence;
-		VkSwapchainKHR Swapchain = GetCoreContext()->VulkanSwapchain;
 
-		VkSubmitInfo SubmitInfo = { };
-		SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		SubmitInfo.waitSemaphoreCount = 1;
-		SubmitInfo.pWaitSemaphores = &ImagesAvailable;
-		SubmitInfo.pWaitDstStageMask = WaitStages;
-		SubmitInfo.commandBufferCount = 1;
-		SubmitInfo.pCommandBuffers = &DrawCmdBuffer;
-		SubmitInfo.signalSemaphoreCount = 1;
-		SubmitInfo.pSignalSemaphores = &RenderFinished;
-		SubmitInfo.pNext = TimelineInfo;
+		BmRender_SubmitInfo SubmitInfo = { };
+		SubmitInfo.WaitDstStageFlags = WaitStages;
+		SubmitInfo.WaitSemaphores = &DrawSystem->ImagesAvailable[CurrentFrame];
+		SubmitInfo.WaitSemaphoreCount = 1;
+		SubmitInfo.WaitTimelineSemaphores = nullptr;
+		SubmitInfo.WaitTimelineSemaphoreCount = 0;
+		SubmitInfo.CommandBuffers = &SubmitPool->CommandBuffer;
+		SubmitInfo.CommandBufferCount = 1;
+		SubmitInfo.SignalSemaphores = &DrawSystem->RenderFinished[CurrentFrame];
+		SubmitInfo.SignalSemaphoreCount = 1;
+		SubmitInfo.SignalTimelineSemaphores = nullptr;
+		SubmitInfo.SignalTimelineSemaphoreCount = 0;
 
-		VkPresentInfoKHR PresentInfo = { };
-		PresentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		PresentInfo.waitSemaphoreCount = 1;
-		PresentInfo.swapchainCount = 1;
-		PresentInfo.pWaitSemaphores = &RenderFinished;
-		PresentInfo.pSwapchains = &Swapchain;
-		PresentInfo.pImageIndices = &ImageIndex;
+		BmRender_PresentInfo PresentInfo = { };
+		PresentInfo.WaitSemaphores = &DrawSystem->RenderFinished[CurrentFrame];
+		PresentInfo.WaitSemaphoreCount = 1;
+		PresentInfo.ImageIndices = &ImageIndex;
 
 		std::unique_lock Lock(GetCommandSystemData()->QueueSubmitMutex);
-		VULKAN_CHECK_RESULT(vkQueueSubmit(GetCommandSystemData()->GraphicsQueue, 1, &SubmitInfo, FrameFence));
-		VULKAN_CHECK_RESULT(vkQueuePresentKHR(GetCommandSystemData()->GraphicsQueue, &PresentInfo));
+		BmRender_QueueSubmit(GetCommandSystemData()->GraphicsQueue, 1, &SubmitInfo, SubmitPool->Fence);
+		BmRender_QueuePresent(GetCommandSystemData()->GraphicsQueue, &PresentInfo);
 		Lock.unlock();
 
 		GetDrawSystemData()->CurrentFrame = Math::WrapIncrement(CurrentFrame, 3u);
@@ -460,7 +444,8 @@ namespace DeferredPass
 	void Draw()
 	{
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
-		VkCommandBuffer CmdBuffer = SubmitPool->CommandBuffer;
+		CommandBufferData* CmdBufferData = GetCommandBufferData(SubmitPool->CommandBuffer);
+		VkCommandBuffer CmdBuffer = CmdBufferData->VulkanCommandBuffer;
 
 		VkPipeline Pipeline = GetPipelineData(Pipelines["Deferred"])->VulkanPipeline;
 		VkPipelineLayout PipelineLayout = GetPipelineLayoutData(PipelineLayouts["Deferred"])->VulkanPipelineLayout;
@@ -476,7 +461,8 @@ namespace DeferredPass
 	void BeginPass()
 	{
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
-		VkCommandBuffer CmdBuffer = SubmitPool->CommandBuffer;
+		CommandBufferData* CmdBufferData = GetCommandBufferData(SubmitPool->CommandBuffer);
+		VkCommandBuffer CmdBuffer = CmdBufferData->VulkanCommandBuffer;
 
 		VkRect2D RenderArea;
 		RenderArea.extent = MainScreenExtent;
@@ -484,7 +470,7 @@ namespace DeferredPass
 
 		VkRenderingAttachmentInfo SwapchainColorAttachment = { };
 		SwapchainColorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		SwapchainColorAttachment.imageView = GetCoreContext()->ImageViews[Render::CurrentImageIndex];
+		SwapchainColorAttachment.imageView = GetImageViewData(GetCoreContext()->ImageViews[Render::CurrentImageIndex])->View;
 		SwapchainColorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		SwapchainColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		SwapchainColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -541,7 +527,7 @@ namespace DeferredPass
 		SwapchainAcquireBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		SwapchainAcquireBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		SwapchainAcquireBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		SwapchainAcquireBarrier.image = GetCoreContext()->Images[Render::CurrentImageIndex];
+		SwapchainAcquireBarrier.image = GetImageData(GetCoreContext()->Images[Render::CurrentImageIndex])->Image;
 		SwapchainAcquireBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		SwapchainAcquireBarrier.subresourceRange.baseMipLevel = 0;
 		SwapchainAcquireBarrier.subresourceRange.levelCount = 1;
@@ -573,7 +559,8 @@ namespace DeferredPass
 	void EndPass()
 	{
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
-		VkCommandBuffer CmdBuffer = SubmitPool->CommandBuffer;
+		CommandBufferData* CmdBufferData = GetCommandBufferData(SubmitPool->CommandBuffer);
+		VkCommandBuffer CmdBuffer = CmdBufferData->VulkanCommandBuffer;
 		vkCmdEndRendering(CmdBuffer);
 
 		VkImageMemoryBarrier2 SwapchainPresentBarrier = { };
@@ -582,7 +569,7 @@ namespace DeferredPass
 		SwapchainPresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 		SwapchainPresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		SwapchainPresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		SwapchainPresentBarrier.image = GetCoreContext()->Images[Render::CurrentImageIndex];
+		SwapchainPresentBarrier.image = GetImageData(GetCoreContext()->Images[Render::CurrentImageIndex])->Image;
 		SwapchainPresentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		SwapchainPresentBarrier.subresourceRange.baseMipLevel = 0;
 		SwapchainPresentBarrier.subresourceRange.levelCount = 1;
@@ -716,7 +703,8 @@ namespace LightningPass
 	{
 		VkDevice Device = GetCoreContext()->LogicalDevice;
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
-		VkCommandBuffer CmdBuffer = SubmitPool->CommandBuffer;
+		CommandBufferData* CmdBufferData = GetCommandBufferData(SubmitPool->CommandBuffer);
+		VkCommandBuffer CmdBuffer = CmdBufferData->VulkanCommandBuffer;
 		const Render::RenderState* State = Render::GetRenderState();
 
 		const glm::mat4* LightViews[] =
@@ -915,7 +903,8 @@ namespace MainPass
 		DepInfoBefore.pImageMemoryBarriers = BarriersBefore;
 
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
-		VkCommandBuffer CmdBuffer = SubmitPool->CommandBuffer;
+		CommandBufferData* CmdBufferData = GetCommandBufferData(SubmitPool->CommandBuffer);
+		VkCommandBuffer CmdBuffer = CmdBufferData->VulkanCommandBuffer;
 
 		vkCmdPipelineBarrier2(CmdBuffer, &DepInfoBefore);
 
@@ -925,7 +914,8 @@ namespace MainPass
 	void EndPass()
 	{
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
-		VkCommandBuffer CmdBuffer = SubmitPool->CommandBuffer;
+		CommandBufferData* CmdBufferData = GetCommandBufferData(SubmitPool->CommandBuffer);
+		VkCommandBuffer CmdBuffer = CmdBufferData->VulkanCommandBuffer;
 
 		vkCmdEndRendering(CmdBuffer);
 	}

@@ -22,6 +22,11 @@ typedef struct { PrivateHandle Private; } BmRender_GPUBuffer;
 typedef struct { PrivateHandle Private; } BmRender_PushConstant;
 typedef struct { PrivateHandle Private; } BmRender_DescriptorSet;
 typedef struct { PrivateHandle Private; } BmRender_CommandWorker;
+typedef struct { PrivateHandle Private; } BmRender_Fence;
+typedef struct { PrivateHandle Private; } BmRender_BinarySemaphore;
+typedef struct { PrivateHandle Private; } BmRender_TimelineSemaphore;
+typedef struct { PrivateHandle Private; } BmRender_CommandPool;
+typedef struct { PrivateHandle Private; } BmRender_CommandBuffer;
 
 enum class BmRender_AttributeType : u8
 {
@@ -68,6 +73,25 @@ enum class BmRender_ImageType : u8
 	TransferSampled,
 	DepthSamplad,
 	ColorAttachmentSampled,
+};
+
+enum class BmRender_FenceStatus : u8
+{
+	NotReady,
+	Signaled,
+};
+
+enum class BmRender_WaitResult : u8
+{
+	Success,
+	Timeout,
+};
+
+enum class BmRender_SwapchainResult : u8
+{
+	Success,
+	Suboptimal,
+	OutOfDate,
 };
 
 
@@ -232,10 +256,42 @@ struct BmRender_ShaderDescription
 	BmRender_PipelineShaderStage Stage;
 };
 
+struct BmRender_TimelineSemaphoreSubmit
+{
+	BmRender_TimelineSemaphore Semaphore;
+	u64 Value;
+};
+
+struct BmRender_SubmitInfo
+{
+	const VkPipelineStageFlags* WaitDstStageFlags;
+	const BmRender_BinarySemaphore* WaitSemaphores;
+	const BmRender_BinarySemaphore* SignalSemaphores;
+	const BmRender_TimelineSemaphoreSubmit* WaitTimelineSemaphores;
+	const BmRender_TimelineSemaphoreSubmit* SignalTimelineSemaphores;
+	const BmRender_CommandBuffer* CommandBuffers;
+
+	u32 WaitSemaphoreCount;
+	u32 WaitTimelineSemaphoreCount;
+	u32 CommandBufferCount;
+	u32 SignalSemaphoreCount;
+	u32 SignalTimelineSemaphoreCount;
+};
+
+struct BmRender_PresentInfo
+{
+	const BmRender_BinarySemaphore* WaitSemaphores;
+	u32 WaitSemaphoreCount;
+	const u32* ImageIndices;
+};
+
 void BmRender_Init(GLFWwindow* WindowHandler, u32 MaxFramesInFly);
 void BmRender_DeInit();
 
-u32 BmRender_GetMaxFramesInFly();
+u32 BmRender_GetSwapchainImageCount();
+void BmRender_QueueSubmit(VkQueue Queue, u32 SubmitCount, const BmRender_SubmitInfo* pSubmits, BmRender_Fence Fence);
+BmRender_SwapchainResult BmRender_QueuePresent(VkQueue Queue, const BmRender_PresentInfo* pPresentInfo);
+BmRender_SwapchainResult BmRender_AcquireNextSwapchainImage(u64 Timeout, BmRender_BinarySemaphore Semaphore, VkFence Fence, u32* pImageIndex);
 
 BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description);
 BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* Description);
@@ -255,9 +311,21 @@ BmRender_ImageView BmRender_CreateImageView2D(BmRender_Image Handle, VkImageAspe
 BmRender_ImageView BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags);
 BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout LayoutHandle, BmRender_DescriptorPool PoolHandle);
 BmRender_PushConstant BmRender_CreatePushConstant(BmRender_DescriptorShaderStage Stage, u32 Offset, u32 Size);
+BmRender_Fence BmRender_CreateFence();
+BmRender_BinarySemaphore BmRender_CreateSemaphore();
+BmRender_TimelineSemaphore BmRender_CreateTimelineSemaphore(u64 InitialValue);
+BmRender_CommandPool BmRender_CreateCommandPool(u32 QueueFamilyIndex, VkCommandPoolCreateFlags Flags);
+BmRender_CommandBuffer BmRender_AllocateCommandBuffer(BmRender_CommandPool CommandPool, VkCommandBufferLevel Level);
 
 void BmRender_UpdateHostCompatibleBuffer(BmRender_GPUBuffer Buffer, u64 BufferOffset, u64 DataSize, const void* Data);
 void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount);
+
+BmRender_FenceStatus BmRender_GetFenceStatus(BmRender_Fence Handle);
+BmRender_WaitResult BmRender_WaitForFences(BmRender_Fence Handle, VkBool32 WaitAll, u64 Timeout);
+void BmRender_ResetFences(BmRender_Fence Handle);
+void BmRender_GetSemaphoreCounterValue(BmRender_TimelineSemaphore Handle, u64* pValue);
+void BmRender_BeginCommandBuffer(BmRender_CommandBuffer Handle, const VkCommandBufferBeginInfo* pBeginInfo);
+void BmRender_EndCommandBuffer(BmRender_CommandBuffer Handle);
 
 void BmRender_DestroySampler(BmRender_Sampler Handle);
 void BmRender_DestroyPipeline(BmRender_Pipeline Handle);
@@ -266,13 +334,18 @@ void BmRender_DestroyDescriptorSetLayout(BmRender_DescriptorSetLayout Handle);
 void BmRender_DestroyDescriptorPool(BmRender_DescriptorPool Handle);
 void BmRender_DestroyShader(BmRender_Shader Handle);
 void BmRender_DestroyImage(BmRender_Image Handle);
+void BmRender_DestroyFence(BmRender_Fence Handle);
+void BmRender_DestroyBinarySemaphore(BmRender_BinarySemaphore Handle);
+void BmRender_DestroyTimelineSemaphore(BmRender_TimelineSemaphore Handle);
+void BmRender_DestroyCommandPool(BmRender_CommandPool Handle);
+void BmRender_FreeCommandBuffer(BmRender_CommandBuffer Handle);
+
+
+
+
+
 
 void Test_FrameFree();
 
-u32 BmRender_GetCurrentFrameIndex();
 
-u32 BmRender_AcquireNextSwapchainImage(u32 CurrentFrame);
-void BmRender_StartRecording(BmRender_CommandWorker Handle);
-
-BmRender_CommandWorker BmRender_AcquireWorker(u64 Timeout);
 //void BmRender_RecordBufferCopy(BmRender_GPUBuffer StagingBuffer, u64 StagingBufferOffset, BmRender_GPUBuffer DstBuffer, u64 DstBufferOffset);

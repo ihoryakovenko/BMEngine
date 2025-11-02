@@ -11,7 +11,10 @@ static System_HandleManager ImageViewManager;
 static System_HandleManager GPUBufferManager;
 static System_HandleManager PushConstantsManager;
 static System_HandleManager DescriptorSetManager;
-static System_HandleManager CommandWorkerManager;
+static System_HandleManager FenceManager;
+static System_HandleManager SemaphoreManager;
+static System_HandleManager CommandPoolManager;
+static System_HandleManager CommandBufferManager;
 
 static u16 GetNextHandleType()
 {
@@ -75,9 +78,24 @@ void InitializeDescriptorSetManager(u32 Size)
 	DescriptorSetManager = System_HandleManager_InitData(Size, sizeof(DescriptorSetData), GetNextHandleType());
 }
 
-void InitCommandWorkerManager(u32 Size)
+void InitializeFenceManager(u32 Size)
 {
-	CommandWorkerManager = System_HandleManager_InitData(Size, sizeof(CommandWorkerData), GetNextHandleType());
+	FenceManager = System_HandleManager_InitData(Size, sizeof(FenceData), GetNextHandleType());
+}
+
+void InitializeSemaphoreManager(u32 Size)
+{
+	SemaphoreManager = System_HandleManager_InitData(Size, sizeof(SemaphoreData), GetNextHandleType());
+}
+
+void InitializeCommandPoolManager(u32 Size)
+{
+	CommandPoolManager = System_HandleManager_InitData(Size, sizeof(CommandPoolData), GetNextHandleType());
+}
+
+void InitializeCommandBufferManager(u32 Size)
+{
+	CommandBufferManager = System_HandleManager_InitData(Size, sizeof(CommandBufferData), GetNextHandleType());
 }
 // INIT
 
@@ -137,9 +155,24 @@ void DeinitDescriptorSetManager()
 	System_HandleManager_ClearData(DescriptorSetManager);
 }
 
-void DeinitCommandWorkerManager(void(*CleanUpFunc)(CommandWorkerData*))
+void DeinitFenceManager(void(*CleanUpFunc)(FenceData*))
 {
-	System_HandleManager_ClearData(CommandWorkerManager, (void(*)(void*))CleanUpFunc);
+	System_HandleManager_ClearData(FenceManager, (void(*)(void*))CleanUpFunc);
+}
+
+void DeinitSemaphoreManager(void(*CleanUpFunc)(SemaphoreData*))
+{
+	System_HandleManager_ClearData(SemaphoreManager, (void(*)(void*))CleanUpFunc);
+}
+
+void DeinitCommandPoolManager(void(*CleanUpFunc)(CommandPoolData*))
+{
+	System_HandleManager_ClearData(CommandPoolManager, (void(*)(void*))CleanUpFunc);
+}
+
+void DeinitCommandBufferManager()
+{
+	System_HandleManager_ClearData(CommandBufferManager);
 }
 // DEINIT
 
@@ -221,10 +254,38 @@ BmRender_DescriptorSet CreateDescriptorSetHandle(const DescriptorSetData* Data)
 	return Handle;
 }
 
-BmRender_CommandWorker CreateCommandWorkerHandle(const CommandWorkerData* Data)
+BmRender_Fence CreateFenceHandle(const FenceData* Data)
 {
-	BmRender_CommandWorker Handle;
-	Handle.Private = System_HandleManager_CreateHandle(CommandWorkerManager, Data);
+	BmRender_Fence Handle;
+	Handle.Private = System_HandleManager_CreateHandle(FenceManager, Data);
+	return Handle;
+}
+
+BmRender_BinarySemaphore CreateBinarySemaphoreHandle(const SemaphoreData* Data)
+{
+	BmRender_BinarySemaphore Handle;
+	Handle.Private = System_HandleManager_CreateHandle(SemaphoreManager, Data);
+	return Handle;
+}
+
+BmRender_TimelineSemaphore CreateTimelineSemaphoreHandle(const SemaphoreData* Data)
+{
+	BmRender_TimelineSemaphore Handle;
+	Handle.Private = System_HandleManager_CreateHandle(SemaphoreManager, Data);
+	return Handle;
+}
+
+BmRender_CommandPool CreateCommandPoolHandle(const CommandPoolData* Data)
+{
+	BmRender_CommandPool Handle;
+	Handle.Private = System_HandleManager_CreateHandle(CommandPoolManager, Data);
+	return Handle;
+}
+
+BmRender_CommandBuffer CreateCommandBufferHandle(const CommandBufferData* Data)
+{
+	BmRender_CommandBuffer Handle;
+	Handle.Private = System_HandleManager_CreateHandle(CommandBufferManager, Data);
 	return Handle;
 }
 // CREATE
@@ -281,14 +342,29 @@ void DestroyPushConstantHandle(BmRender_PushConstant Handle)
 	System_HandleManager_DestroyHandle(PushConstantsManager, Handle.Private);
 }
 
-void DestroyDescriptorSetHandle(BmRender_DescriptorSet Handle)
+void DestroyFenceHandle(BmRender_Fence Handle)
 {
-	System_HandleManager_DestroyHandle(DescriptorSetManager, Handle.Private);
+	System_HandleManager_DestroyHandle(FenceManager, Handle.Private);
 }
 
-void DestroyCommandWorkerHandle(BmRender_CommandWorker Handle)
+void DestroyBinarySemaphoreHandle(BmRender_BinarySemaphore Handle)
 {
-	System_HandleManager_DestroyHandle(CommandWorkerManager, Handle.Private);
+	System_HandleManager_DestroyHandle(SemaphoreManager, Handle.Private);
+}
+
+void DestroyTimelineSemaphoreHandle(BmRender_TimelineSemaphore Handle)
+{
+	System_HandleManager_DestroyHandle(SemaphoreManager, Handle.Private);
+}
+
+void DestroyCommandPoolHandle(BmRender_CommandPool Handle)
+{
+	System_HandleManager_DestroyHandle(CommandPoolManager, Handle.Private);
+}
+
+void DestroyCommandBufferHandle(BmRender_CommandBuffer Handle)
+{
+	System_HandleManager_DestroyHandle(CommandBufferManager, Handle.Private);
 }
 // DESTROY
 
@@ -348,8 +424,28 @@ DescriptorSetData* GetDescriptorSetData(BmRender_DescriptorSet Handle)
 	return (DescriptorSetData*)System_HandleManager_GetHandleData(DescriptorSetManager, Handle.Private);
 }
 
-CommandWorkerData* GetSubmitPoolData(BmRender_CommandWorker Handle)
+FenceData* GetFenceData(BmRender_Fence Handle)
 {
-	return (CommandWorkerData*)System_HandleManager_GetHandleData(CommandWorkerManager, Handle.Private);
+	return (FenceData*)System_HandleManager_GetHandleData(FenceManager, Handle.Private);
+}
+
+SemaphoreData* GetBinarySemaphoreData(BmRender_BinarySemaphore Handle)
+{
+	return (SemaphoreData*)System_HandleManager_GetHandleData(SemaphoreManager, Handle.Private);
+}
+
+SemaphoreData* GetTimelineSemaphoreData(BmRender_TimelineSemaphore Handle)
+{
+	return (SemaphoreData*)System_HandleManager_GetHandleData(SemaphoreManager, Handle.Private);
+}
+
+CommandPoolData* GetCommandPoolData(BmRender_CommandPool Handle)
+{
+	return (CommandPoolData*)System_HandleManager_GetHandleData(CommandPoolManager, Handle.Private);
+}
+
+CommandBufferData* GetCommandBufferData(BmRender_CommandBuffer Handle)
+{
+	return (CommandBufferData*)System_HandleManager_GetHandleData(CommandBufferManager, Handle.Private);
 }
 // GET

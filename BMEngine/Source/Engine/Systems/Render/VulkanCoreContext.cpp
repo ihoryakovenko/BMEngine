@@ -4,6 +4,7 @@
 #include "Render.h"
 #include "RenderTypes.h"
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
+#include "Engine/Systems/Render/Handles.h"
 
 #include <GLFW/glfw3.h>
 
@@ -319,36 +320,22 @@ namespace VulkanCoreContext
 
 		for (u32 i = 0; i < Context->ImagesCount; ++i)
 		{
-			Context->Images[i] = Images[i];
+			ImageResource ImageResourceData = { };
+			ImageResourceData.Image = Images[i];
+			ImageResourceData.Memory = VK_NULL_HANDLE;
+			ImageResourceData.ReadyValue = ULLONG_MAX;
+			ImageResourceData.Format = Context->SurfaceFormat.format;
+			ImageResourceData.Width = Context->SwapExtent.width;
+			ImageResourceData.Height = Context->SwapExtent.height;
+			ImageResourceData.Size = 0;
 
-			VkImageViewCreateInfo ViewCreateInfo = { };
-			ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-			ViewCreateInfo.image = Images[i];
-			ViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-			ViewCreateInfo.format = Context->SurfaceFormat.format;
-			ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-			ViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-			ViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			ViewCreateInfo.subresourceRange.baseMipLevel = 0;
-			ViewCreateInfo.subresourceRange.levelCount = 1;
-			ViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-			ViewCreateInfo.subresourceRange.layerCount = 1;
-
-			VkImageView ImageView;
-			VULKAN_CHECK_RESULT(vkCreateImageView(Context->LogicalDevice, &ViewCreateInfo, nullptr, &Context->ImageViews[i]));
+			Context->Images[i] = CreateImageHandle(&ImageResourceData);
+			Context->ImageViews[i] = BmRender_CreateImageView2D(Context->Images[i], VK_IMAGE_ASPECT_COLOR_BIT);
 		}
 	}
 
 	void DestroyCoreContext(VulkanCoreContext* Context)
 	{
-		for (u32 i = 0; i < Context->ImagesCount; ++i)
-		{
-			vkDestroyImageView(Context->LogicalDevice, Context->ImageViews[i], nullptr);
-		}
-
 		vkDestroySwapchainKHR(Context->LogicalDevice, Context->VulkanSwapchain, nullptr);
 		vkDestroySurfaceKHR(Context->VulkanInstance, Context->Surface, nullptr);
 

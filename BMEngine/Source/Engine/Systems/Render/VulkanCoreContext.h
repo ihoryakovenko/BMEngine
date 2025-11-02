@@ -2,6 +2,7 @@
 
 #include "Util/EngineTypes.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
+#include "Engine/Systems/Render/RenderInterface.h"
 
 #include <mutex>
 
@@ -24,8 +25,8 @@ namespace VulkanCoreContext
 
 		VkSwapchainKHR VulkanSwapchain;
 		u32 ImagesCount;
-		VkImageView ImageViews[MAX_SWAPCHAIN_IMAGES_COUNT];
-		VkImage Images[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BmRender_ImageView ImageViews[MAX_SWAPCHAIN_IMAGES_COUNT];
+		BmRender_Image Images[MAX_SWAPCHAIN_IMAGES_COUNT];
 		VkExtent2D SwapExtent;
 
 		VkSurfaceKHR Surface;
