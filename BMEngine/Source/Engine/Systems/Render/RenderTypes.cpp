@@ -328,7 +328,8 @@ static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, MemoryPropertyFlag Memor
 	NewBuffer.BufferStage = BufferStage;
 	NewBuffer.Buffer = VulkanHelper::CreateBuffer(Device, Capacity, Flag, GetVulkanAllocator());
 
-	VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, NewBuffer.Buffer, MemoryFlag, GetVulkanAllocator());
+	VkBufferUsageFlags BufferUsageFlags = (VkBufferUsageFlags)Flag;
+	VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, NewBuffer.Buffer, MemoryFlag, BufferUsageFlags, GetVulkanAllocator());
 	NewBuffer.Memory = AllocResult.Memory;
 
 	VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, NewBuffer.Buffer, NewBuffer.Memory, 0));
@@ -730,6 +731,11 @@ BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, MemoryPropertyFlag Mem
 BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, BmRender_PipelineSyncStage BufferStage)
 {
 	return CreateGPUBuffer(Size, MemoryFlag, BufferStage, BufferUsageFlag::StorageFlag);
+}
+
+BmRender_GPUBuffer BmRender_CreateIndirectDrawBuffer(u64 Size, MemoryPropertyFlag MemoryFlag)
+{
+	return CreateGPUBuffer(Size, MemoryFlag, BmRender_PipelineSyncStage::VertexShader, BufferUsageFlag::IndirectDrawBufferFlag);
 }
 
 BmRender_GPUBuffer BmRender_CreateStagingBuffer(u64 Size)

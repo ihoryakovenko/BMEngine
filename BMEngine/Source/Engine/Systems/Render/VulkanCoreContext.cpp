@@ -42,6 +42,22 @@ namespace VulkanCoreContext
 		DeviceFeatures2.features.samplerAnisotropy = VK_TRUE; // Todo: get from configs
 		DeviceFeatures2.features.multiViewport = VK_TRUE; // Todo: get from configs
 
+		// Query buffer device address feature support
+		VkPhysicalDeviceBufferDeviceAddressFeatures QueryBufferDeviceAddressFeatures = { };
+		QueryBufferDeviceAddressFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+		
+		VkPhysicalDeviceFeatures2 QueryFeatures2 = { };
+		QueryFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+		QueryFeatures2.pNext = &QueryBufferDeviceAddressFeatures;
+		vkGetPhysicalDeviceFeatures2(PhDevice, &QueryFeatures2);
+		
+		// Enable buffer device address feature if supported
+		VkPhysicalDeviceBufferDeviceAddressFeatures BufferDeviceAddressFeatures = { };
+		BufferDeviceAddressFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+		BufferDeviceAddressFeatures.bufferDeviceAddress = QueryBufferDeviceAddressFeatures.bufferDeviceAddress ? VK_TRUE : VK_FALSE;
+		BufferDeviceAddressFeatures.bufferDeviceAddressCaptureReplay = VK_FALSE;
+		BufferDeviceAddressFeatures.bufferDeviceAddressMultiDevice = VK_FALSE;
+
 		// TODO: Check if supported
 		VkPhysicalDeviceDynamicRenderingFeatures DynamicRenderingFeatures = { };
 		DynamicRenderingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
@@ -65,13 +81,21 @@ namespace VulkanCoreContext
 		TimelineSemaphoreFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
 		TimelineSemaphoreFeatures.timelineSemaphore = VK_TRUE;
 
+		// Query indirect drawing feature support
+		VkPhysicalDeviceFeatures QueryDeviceFeatures = { };
+		vkGetPhysicalDeviceFeatures(PhDevice, &QueryDeviceFeatures);
+
+		// Enable indirect drawing features if supported
 		VkPhysicalDeviceFeatures DeviceFeatures = { };
 		DeviceFeatures.samplerAnisotropy = VK_TRUE;
+		DeviceFeatures.multiDrawIndirect = QueryDeviceFeatures.multiDrawIndirect ? VK_TRUE : VK_FALSE;
+		DeviceFeatures.drawIndirectFirstInstance = QueryDeviceFeatures.drawIndirectFirstInstance ? VK_TRUE : VK_FALSE;
 
 		DeviceFeatures2.pNext = &TimelineSemaphoreFeatures;
 		TimelineSemaphoreFeatures.pNext = &IndexingFeatures;
 		IndexingFeatures.pNext = &Sync2Features;
 		Sync2Features.pNext = &DynamicRenderingFeatures;
+		DynamicRenderingFeatures.pNext = &BufferDeviceAddressFeatures;
 
 
 		VkDeviceCreateInfo DeviceCreateInfo = { };
@@ -120,6 +144,39 @@ namespace VulkanCoreContext
 		{
 			Util::RenderLog(Util::LogType::Warning, "Feature multiViewport is not supported");
 			return false;
+		}
+
+		// Query buffer device address feature support
+		VkPhysicalDeviceBufferDeviceAddressFeatures QueryBufferDeviceAddressFeatures = { };
+		QueryBufferDeviceAddressFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+		
+		VkPhysicalDeviceFeatures2 QueryFeatures2 = { };
+		QueryFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+		QueryFeatures2.pNext = &QueryBufferDeviceAddressFeatures;
+		vkGetPhysicalDeviceFeatures2(Device, &QueryFeatures2);
+
+		// Check if buffer device address feature is supported
+		if (QueryBufferDeviceAddressFeatures.bufferDeviceAddress == VK_TRUE)
+		{
+			Util::RenderLog(Util::LogType::Info, "Buffer device address feature is supported");
+		}
+		else
+		{
+			Util::RenderLog(Util::LogType::Warning, "Buffer device address feature is not supported");
+		}
+
+		// Query indirect drawing feature support
+		VkPhysicalDeviceFeatures QueryDeviceFeatures = { };
+		vkGetPhysicalDeviceFeatures(Device, &QueryDeviceFeatures);
+
+		// Check if indirect drawing features are supported
+		if (QueryDeviceFeatures.multiDrawIndirect == VK_TRUE || QueryDeviceFeatures.drawIndirectFirstInstance == VK_TRUE)
+		{
+			Util::RenderLog(Util::LogType::Info, "Indirect drawing (vkCmdDrawIndirect) features are supported");
+		}
+		else
+		{
+			Util::RenderLog(Util::LogType::Warning, "Indirect drawing (vkCmdDrawIndirect) features are not supported");
 		}
 
 		return true;

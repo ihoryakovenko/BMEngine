@@ -97,7 +97,7 @@ namespace VulkanHelper
 		return Buffer;
 	}
 
-	DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer, MemoryPropertyFlag Properties, const VkAllocationCallbacks* Allocator)
+	DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer, MemoryPropertyFlag Properties, VkBufferUsageFlags BufferUsageFlags, const VkAllocationCallbacks* Allocator)
 	{
 		VkMemoryRequirements MemoryRequirements;
 		vkGetBufferMemoryRequirements(Device, Buffer, &MemoryRequirements);
@@ -108,6 +108,15 @@ namespace VulkanHelper
 		MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		MemoryAllocInfo.allocationSize = MemoryRequirements.size;
 		MemoryAllocInfo.memoryTypeIndex = MemoryTypeIndex;
+
+		VkMemoryAllocateFlagsInfo AllocateFlagsInfo = {};
+		if (BufferUsageFlags & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
+		{
+			AllocateFlagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
+			AllocateFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+			AllocateFlagsInfo.deviceMask = 0;
+			MemoryAllocInfo.pNext = &AllocateFlagsInfo;
+		}
 
 		DeviceMemoryAllocResult Result;
 		VULKAN_CHECK_RESULT(vkAllocateMemory(Device, &MemoryAllocInfo, Allocator, &Result.Memory));
@@ -690,6 +699,7 @@ namespace VulkanHelper
 
 		return true;
 	}
+
 
 	u32 GetFormatAlignment(VkFormat Format)
 	{
