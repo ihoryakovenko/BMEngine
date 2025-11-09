@@ -261,16 +261,9 @@ BmRender_Fence CreateFenceHandle(const FenceData* Data)
 	return Handle;
 }
 
-BmRender_BinarySemaphore CreateBinarySemaphoreHandle(const SemaphoreData* Data)
+BmRender_Semaphore CreateSemaphoreHandle(const SemaphoreData* Data)
 {
-	BmRender_BinarySemaphore Handle;
-	Handle.Private = System_HandleManager_CreateHandle(SemaphoreManager, Data);
-	return Handle;
-}
-
-BmRender_TimelineSemaphore CreateTimelineSemaphoreHandle(const SemaphoreData* Data)
-{
-	BmRender_TimelineSemaphore Handle;
+	BmRender_Semaphore Handle;
 	Handle.Private = System_HandleManager_CreateHandle(SemaphoreManager, Data);
 	return Handle;
 }
@@ -347,12 +340,7 @@ void DestroyFenceHandle(BmRender_Fence Handle)
 	System_HandleManager_DestroyHandle(FenceManager, Handle.Private);
 }
 
-void DestroyBinarySemaphoreHandle(BmRender_BinarySemaphore Handle)
-{
-	System_HandleManager_DestroyHandle(SemaphoreManager, Handle.Private);
-}
-
-void DestroyTimelineSemaphoreHandle(BmRender_TimelineSemaphore Handle)
+void DestroySemaphoreHandle(BmRender_Semaphore Handle)
 {
 	System_HandleManager_DestroyHandle(SemaphoreManager, Handle.Private);
 }
@@ -429,12 +417,7 @@ FenceData* GetFenceData(BmRender_Fence Handle)
 	return (FenceData*)System_HandleManager_GetHandleData(FenceManager, Handle.Private);
 }
 
-SemaphoreData* GetBinarySemaphoreData(BmRender_BinarySemaphore Handle)
-{
-	return (SemaphoreData*)System_HandleManager_GetHandleData(SemaphoreManager, Handle.Private);
-}
-
-SemaphoreData* GetTimelineSemaphoreData(BmRender_TimelineSemaphore Handle)
+SemaphoreData* GetSemaphoreData(BmRender_Semaphore Handle)
 {
 	return (SemaphoreData*)System_HandleManager_GetHandleData(SemaphoreManager, Handle.Private);
 }

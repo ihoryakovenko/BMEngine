@@ -34,6 +34,7 @@
     <ClCompile Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Handles.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\RenderCommands.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderInterface.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderResources.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderTypes.cpp" />

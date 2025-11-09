@@ -48,7 +48,7 @@ namespace EngineResources
 		BmRender_Image ImageHandle = BmRender_CreateImage2D(Extent.x, Extent.y, Util::GliFormatToVkFormat(Texture.format()), BmRender_ImageType::TransferSampled);
 		Asset.RenderImageHandle = ImageHandle;
 		RenderResources::UpdateImageResource(Asset.RenderImageHandle, &TextureDescription, Texture.data());
-		BmRender_ImageView ViewHandle = BmRender_CreateImageView2D(Asset.RenderImageHandle, VK_IMAGE_ASPECT_COLOR_BIT);
+		BmRender_ImageView ViewHandle = BmRender_CreateImageView2D(Asset.RenderImageHandle);
 		Asset.RenderViewHandle = ViewHandle;
 	}
 
@@ -80,7 +80,7 @@ namespace EngineResources
 		DefaultAsset.IsCreated = true;
 
 		RenderResources::UpdateImageResource(DefaultAsset.RenderImageHandle, &DefaultTextureDescription, DefaultTexture.data());
-		BmRender_ImageView DefaultViewHandle = BmRender_CreateImageView2D(DefaultAsset.RenderImageHandle, VK_IMAGE_ASPECT_COLOR_BIT);
+		BmRender_ImageView DefaultViewHandle = BmRender_CreateImageView2D(DefaultAsset.RenderImageHandle);
 		DefaultAsset.RenderViewHandle = DefaultViewHandle;
 
 		BmRender_DescriptorSetBinding DiffuseBinding;

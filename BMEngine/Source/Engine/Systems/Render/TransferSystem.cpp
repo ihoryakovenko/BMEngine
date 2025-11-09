@@ -46,7 +46,7 @@ namespace TransferSystem
 		BmRender_CommandPool TransferCommandPool;
 		StagingFramePool TransferStagingPool;
 
-		BmRender_TimelineSemaphore TransferSemaphore;
+		BmRender_Semaphore TransferSemaphore;
 		u64 CompletedTransfer;
 
 		TaskQueue TransferTasksQueue;
@@ -116,12 +116,9 @@ namespace TransferSystem
 
 		const u32 CurrentFrame = TransferState.CurrentFrame;
 
-		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
-		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
 		BmRender_WaitForFences(TransferState.Frames.Fences[CurrentFrame], VK_TRUE, UINT64_MAX);
 		BmRender_ResetFences(TransferState.Frames.Fences[CurrentFrame]);
-		BmRender_BeginCommandBuffer(TransferState.Frames.CommandBuffers[CurrentFrame], &CommandBufferBeginInfo);
+		BmRender_BeginCommandBuffer(TransferState.Frames.CommandBuffers[CurrentFrame]);
 
 		CommandBufferData* TransferCommandBufferData = GetCommandBufferData(TransferState.Frames.CommandBuffers[CurrentFrame]);
 		VkCommandBuffer TransferCommandBuffer = TransferCommandBufferData->VulkanCommandBuffer;
@@ -309,10 +306,7 @@ namespace TransferSystem
 
 		TransferState.CurrentFrame = 0;
 
-		TransferState.TransferCommandPool = BmRender_CreateCommandPool(
-			Context->Indices.GraphicsFamily,
-			VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
-		);
+		TransferState.TransferCommandPool = BmRender_CreateCommandPool(Context->Indices.GraphicsFamily);
 
 		CommandPoolData* PoolData = GetCommandPoolData(TransferState.TransferCommandPool);
 
@@ -361,7 +355,7 @@ namespace TransferSystem
 		}
 
 		BmRender_DestroyCommandPool(TransferState.TransferCommandPool);
-		BmRender_DestroyTimelineSemaphore(TransferState.TransferSemaphore);
+		BmRender_DestroySemaphore(TransferState.TransferSemaphore);
 
 		free(TransferState.TransferTasksQueue.Memory);
 		Memory::FreeRingBuffer(&TransferState.TransferMemory);

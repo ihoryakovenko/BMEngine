@@ -31,10 +31,7 @@ void InitCommandSystem(u32 WorkerCount)
 	VkDevice Device = Context->LogicalDevice;
 	u32 GraphicsFamily = Context->Indices.GraphicsFamily;
 
-	BmRender_CommandPool CommandPool = BmRender_CreateCommandPool(
-		GraphicsFamily,
-		VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
-	);
+	BmRender_CommandPool CommandPool = BmRender_CreateCommandPool(GraphicsFamily);
 
 	CommandPoolData* PoolData = GetCommandPoolData(CommandPool);
 
@@ -45,7 +42,7 @@ void InitCommandSystem(u32 WorkerCount)
 		WorkerData.IsLocked = false;
 		WorkerData.CommandPool = CommandPool;
 
-		WorkerData.CommandBuffer = BmRender_AllocateCommandBuffer(CommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+		WorkerData.CommandBuffer = BmRender_AllocateCommandBuffer(CommandPool);
 
 		WorkerData.Fence = BmRender_CreateFence();
 
@@ -69,8 +66,8 @@ void DeInitDrawSystem()
 {
 	for (u64 i = 0; i < GetMaxFramesInFly(); i++)
 	{
-		BmRender_DestroyBinarySemaphore(DrawSystem.ImagesAvailable[i]);
-		BmRender_DestroyBinarySemaphore(DrawSystem.RenderFinished[i]);
+		BmRender_DestroySemaphore(DrawSystem.ImagesAvailable[i]);
+		BmRender_DestroySemaphore(DrawSystem.RenderFinished[i]);
 	}
 }
 
@@ -105,10 +102,7 @@ void StartRecording(BmRender_CommandWorker Handle)
 	VulkanCoreContext::VulkanCoreContext* Context = GetCoreContext();
 	CommandWorkerData* SubmitPool = GetSubmitPoolData(Handle);
 
-		VkCommandBufferBeginInfo CommandBufferBeginInfo = { };
-		CommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-		BmRender_BeginCommandBuffer(SubmitPool->CommandBuffer, &CommandBufferBeginInfo);
+	BmRender_BeginCommandBuffer(SubmitPool->CommandBuffer);
 }
 
 void EndRecording(BmRender_CommandWorker Handle)

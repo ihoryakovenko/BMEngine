@@ -142,6 +142,7 @@
     <ClCompile Include="..\BMEngine\Source\Engine\Systems\Memory\f_mem_debug.c" />
     <ClCompile Include="..\BMEngine\Source\Engine\Systems\Memory\MemoryManagmentSystem.cpp" />
     <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\Handles.cpp" />
+    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\RenderCommands.cpp" />
     <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\RenderInterface.cpp" />
     <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\RenderTypes.cpp" />
     <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\Systems.cpp" />

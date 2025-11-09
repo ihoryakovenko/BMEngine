@@ -47,8 +47,7 @@ BmRender_GPUBuffer CreateGPUBufferHandle(const GPUBufferData* Data);
 BmRender_PushConstant CreatePushConstantHandle(const PushConstantData* Data);
 BmRender_DescriptorSet CreateDescriptorSetHandle(const DescriptorSetData* Data);
 BmRender_Fence CreateFenceHandle(const FenceData* Data);
-BmRender_BinarySemaphore CreateBinarySemaphoreHandle(const SemaphoreData* Data);
-BmRender_TimelineSemaphore CreateTimelineSemaphoreHandle(const SemaphoreData* Data);
+BmRender_Semaphore CreateSemaphoreHandle(const SemaphoreData* Data);
 BmRender_CommandPool CreateCommandPoolHandle(const CommandPoolData* Data);
 BmRender_CommandBuffer CreateCommandBufferHandle(const CommandBufferData* Data);
 
@@ -63,8 +62,7 @@ void DestroyImageViewHandle(BmRender_ImageView Handle);
 void DestroyGPUBufferHandle(BmRender_GPUBuffer Handle);
 void DestroyPushConstantHandle(BmRender_PushConstant Handle);
 void DestroyFenceHandle(BmRender_Fence Handle);
-void DestroyBinarySemaphoreHandle(BmRender_BinarySemaphore Handle);
-void DestroyTimelineSemaphoreHandle(BmRender_TimelineSemaphore Handle);
+void DestroySemaphoreHandle(BmRender_Semaphore Handle);
 void DestroyCommandPoolHandle(BmRender_CommandPool Handle);
 void DestroyCommandBufferHandle(BmRender_CommandBuffer Handle);
 
@@ -80,7 +78,6 @@ GPUBufferData* GetGPUBufferData(BmRender_GPUBuffer Handle);
 PushConstantData* GetPushConstantData(BmRender_PushConstant Handle);
 DescriptorSetData* GetDescriptorSetData(BmRender_DescriptorSet Handle);
 FenceData* GetFenceData(BmRender_Fence Handle);
-SemaphoreData* GetBinarySemaphoreData(BmRender_BinarySemaphore Handle);
-SemaphoreData* GetTimelineSemaphoreData(BmRender_TimelineSemaphore Handle);
+SemaphoreData* GetSemaphoreData(BmRender_Semaphore Handle);
 CommandPoolData* GetCommandPoolData(BmRender_CommandPool Handle);
 CommandBufferData* GetCommandBufferData(BmRender_CommandBuffer Handle);

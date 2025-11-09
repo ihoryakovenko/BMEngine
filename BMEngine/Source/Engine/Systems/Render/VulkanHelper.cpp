@@ -673,6 +673,23 @@ namespace VulkanHelper
 		return flags;
 	}
 
+	VkImageAspectFlags ImageTypeToVkImageAspectFlags(BmRender_ImageType Type)
+	{
+		switch (Type)
+		{
+			case BmRender_ImageType::TransferSampled:
+			case BmRender_ImageType::ColorAttachmentSampled:
+				return VK_IMAGE_ASPECT_COLOR_BIT;
+
+			case BmRender_ImageType::DepthSamplad:
+				return VK_IMAGE_ASPECT_DEPTH_BIT;
+
+			default:
+				assert(false);
+				return VK_IMAGE_ASPECT_COLOR_BIT;
+		}
+	}
+
 	bool CheckFormats(VkPhysicalDevice PhDevice)
 	{
 		const u32 FormatPrioritySize = 3;

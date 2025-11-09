@@ -35,6 +35,7 @@
     <ClCompile Include="Source\Util\YamlParsing.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Systems.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Handles.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\RenderCommands.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />

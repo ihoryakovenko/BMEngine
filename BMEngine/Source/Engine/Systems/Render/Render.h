@@ -148,7 +148,7 @@ namespace Render
 		const void* PushConstantData;
 	};
 
-	void DrawEntityBatch(VkCommandBuffer CmdBuffer, DrawScene* Scene, const DrawEntityBatchConfig& Config);
+	void DrawEntityBatch(BmRender_CommandBuffer CmdBuffer, DrawScene* Scene, const DrawEntityBatchConfig& Config);
 }
 
 namespace DeferredPass

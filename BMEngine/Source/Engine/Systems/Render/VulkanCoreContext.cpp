@@ -379,6 +379,7 @@ namespace VulkanCoreContext
 		{
 			ImageResource ImageResourceData = { };
 			ImageResourceData.Image = Images[i];
+			ImageResourceData.Type = BmRender_ImageType::TransferSampled;
 			ImageResourceData.Memory = VK_NULL_HANDLE;
 			ImageResourceData.ReadyValue = ULLONG_MAX;
 			ImageResourceData.Format = Context->SurfaceFormat.format;
@@ -387,7 +388,7 @@ namespace VulkanCoreContext
 			ImageResourceData.Size = 0;
 
 			Context->Images[i] = CreateImageHandle(&ImageResourceData);
-			Context->ImageViews[i] = BmRender_CreateImageView2D(Context->Images[i], VK_IMAGE_ASPECT_COLOR_BIT);
+			Context->ImageViews[i] = BmRender_CreateImageView2D(Context->Images[i]);
 		}
 	}
 

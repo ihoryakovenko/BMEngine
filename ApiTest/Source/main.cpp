@@ -12,6 +12,45 @@
 #include <Engine/Systems/Render/VulkanCoreContext.h>
 
 
+static bool LoadShaderFile(const char* FilePath, char** OutCode, size_t* OutCodeSize)
+{
+	FILE* file = fopen(FilePath, "rb");
+	if (!file)
+	{
+		return false;
+	}
+
+	fseek(file, 0, SEEK_END);
+	long fileSize = ftell(file);
+	if (fileSize < 0)
+	{
+		fclose(file);
+		return false;
+	}
+
+	size_t codeSize = (size_t)fileSize;
+	char* code = (char*)malloc(codeSize);
+	if (!code)
+	{
+		fclose(file);
+		return false;
+	}
+
+	fseek(file, 0, SEEK_SET);
+	size_t readSize = fread(code, 1, codeSize, file);
+	fclose(file);
+
+	if (readSize != codeSize)
+	{
+		free(code);
+		return false;
+	}
+
+	*OutCode = code;
+	*OutCodeSize = codeSize;
+	return true;
+}
+
 int main()
 {
 	s32 WindowWidth = 1920;
@@ -28,38 +67,9 @@ int main()
 
 	char* VertexShaderCode = nullptr;
 	size_t VertexShaderCodeSize = 0;
+	if (!LoadShaderFile("./test_vertex.vert.spv", &VertexShaderCode, &VertexShaderCodeSize))
 	{
-		FILE* file = fopen("./test_vertex.vert.spv", "rb");
-		if (!file)
-		{
-			return -1;
-		}
-
-		fseek(file, 0, SEEK_END);
-		long fileSize = ftell(file);
-		if (fileSize < 0)
-		{
-			fclose(file);
-			return -1;
-		}
-
-		VertexShaderCodeSize = (size_t)fileSize;
-		VertexShaderCode = (char*)malloc(VertexShaderCodeSize);
-		if (!VertexShaderCode)
-		{
-			fclose(file);
-			return -1;
-		}
-
-		fseek(file, 0, SEEK_SET);
-		size_t readSize = fread(VertexShaderCode, 1, VertexShaderCodeSize, file);
-		fclose(file);
-
-		if (readSize != VertexShaderCodeSize)
-		{
-			free(VertexShaderCode);
-			return -1;
-		}
+		return -1;
 	}
 
 	BmRender_ShaderDescription ShaderDesc = {};
@@ -70,41 +80,11 @@ int main()
 
 	free(VertexShaderCode);
 
-	// Load fragment shader
 	char* FragmentShaderCode = nullptr;
 	size_t FragmentShaderCodeSize = 0;
+	if (!LoadShaderFile("./test_fragment.frag.spv", &FragmentShaderCode, &FragmentShaderCodeSize))
 	{
-		FILE* file = fopen("./test_fragment.frag.spv", "rb");
-		if (!file)
-		{
-			return -1;
-		}
-
-		fseek(file, 0, SEEK_END);
-		long fileSize = ftell(file);
-		if (fileSize < 0)
-		{
-			fclose(file);
-			return -1;
-		}
-
-		FragmentShaderCodeSize = (size_t)fileSize;
-		FragmentShaderCode = (char*)malloc(FragmentShaderCodeSize);
-		if (!FragmentShaderCode)
-		{
-			fclose(file);
-			return -1;
-		}
-
-		fseek(file, 0, SEEK_SET);
-		size_t readSize = fread(FragmentShaderCode, 1, FragmentShaderCodeSize, file);
-		fclose(file);
-
-		if (readSize != FragmentShaderCodeSize)
-		{
-			free(FragmentShaderCode);
-			return -1;
-		}
+		return -1;
 	}
 
 	BmRender_ShaderDescription FragShaderDesc = {};
@@ -115,63 +95,11 @@ int main()
 
 	free(FragmentShaderCode);
 
-	struct Vertex
-	{
-		f32 x, y, z;
-		f32 u, v;
-	};
-
-	Vertex TriangleVertices[3] = {
-		{ 0.0f, -0.5f, 0.0f, 0.5f, 0.0f },
-		{ 0.5f,  0.5f, 0.0f, 1.0f, 1.0f },
-		{ -0.5f, 0.5f, 0.0f, 0.0f, 1.0f }
-	};
-
-	const u64 VertexBufferSize = sizeof(TriangleVertices);
-	BmRender_GPUBuffer VertexBuffer = BmRender_CreateVertexStageBuffer(VertexBufferSize, MemoryPropertyFlag::HostCompatible);
-	BmRender_UpdateHostCompatibleBuffer(VertexBuffer, 0, VertexBufferSize, TriangleVertices);
-
-	struct VkDrawIndirectCommand
-	{
-		u32 vertexCount;
-		u32 instanceCount;
-		u32 firstVertex;
-		u32 firstInstance;
-	};
-
-	VkDrawIndirectCommand DrawCommand = {};
-	DrawCommand.vertexCount = 3;
-	DrawCommand.instanceCount = 1;
-	DrawCommand.firstVertex = 0;
-	DrawCommand.firstInstance = 0;
-
-	BmRender_GPUBuffer IndirectDrawBuffer = BmRender_CreateIndirectDrawBuffer(sizeof(VkDrawIndirectCommand), MemoryPropertyFlag::HostCompatible);
-	BmRender_UpdateHostCompatibleBuffer(IndirectDrawBuffer, 0, sizeof(VkDrawIndirectCommand), &DrawCommand);
-
-	BmRender_VertexBinding VertexBinding = {};
-	VertexBinding.Attributes = nullptr;
-	VertexBinding.AttributesCount = 0;
-	VertexBinding.Stride = 0;
-	VertexBinding.InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-	struct PushConstants
-	{
-		u64 vertexBufferAddress;  // 8 bytes, offset 0
-		u32 vertexStride;         // 4 bytes, offset 8
-		u32 padding;              // 4 bytes padding to maintain alignment
-	};
-
-	BmRender_PushConstant PushConstant = BmRender_CreatePushConstant(
-		BmRender_DescriptorShaderStage::Vertex,
-		0,
-		sizeof(PushConstants)
-	);
-
 	BmRender_PipelineLayoutDescription LayoutDesc = {};
 	LayoutDesc.SetLayoutCount = 0;
 	LayoutDesc.SetLayouts = nullptr;
-	LayoutDesc.PushConstantRangeCount = 1;
-	LayoutDesc.PushConstantRanges = &PushConstant;
+	LayoutDesc.PushConstantRangeCount = 0;
+	LayoutDesc.PushConstantRanges = nullptr;
 	BmRender_PipelineLayout PipelineLayout = BmRender_CreatePipelineLayout(&LayoutDesc);
 
 	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
@@ -192,8 +120,8 @@ int main()
 	PipelineDesc.ShaderStages = ShaderStages;
 	PipelineDesc.ShaderStagesCount = 2;
 
-	PipelineDesc.VertexBindings = &VertexBinding;
-	PipelineDesc.VertexBindingsCount = 1;
+	PipelineDesc.VertexBindings = nullptr;
+	PipelineDesc.VertexBindingsCount = 0;
 
 	PipelineDesc.DescriptorSetLayouts = nullptr;
 	PipelineDesc.DescriptorSetLayoutsCount = 0;
@@ -298,44 +226,12 @@ int main()
 	VkQueue GraphicsQueue;
 	vkGetDeviceQueue(CoreContext->LogicalDevice, (u32)CoreContext->Indices.GraphicsFamily, 0, &GraphicsQueue);
 
-	BmRender_CommandPool CommandPool = BmRender_CreateCommandPool(
-		(u32)CoreContext->Indices.GraphicsFamily,
-		VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
-	);
-	BmRender_CommandBuffer CommandBuffer = BmRender_AllocateCommandBuffer(CommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+	BmRender_CommandPool CommandPool = BmRender_CreateCommandPool((u32)CoreContext->Indices.GraphicsFamily);
+	BmRender_CommandBuffer CommandBuffer = BmRender_AllocateCommandBuffer(CommandPool);
 
-	BmRender_BinarySemaphore ImageAvailableSemaphore = BmRender_CreateSemaphore();
-	BmRender_BinarySemaphore RenderFinishedSemaphore = BmRender_CreateSemaphore();
+	BmRender_Semaphore ImageAvailableSemaphore = BmRender_CreateSemaphore();
+	BmRender_Semaphore RenderFinishedSemaphore = BmRender_CreateSemaphore();
 	BmRender_Fence InFlightFence = BmRender_CreateFence();
-
-	CommandBufferData* CmdBufferData = GetCommandBufferData(CommandBuffer);
-	VkCommandBuffer VkCmdBuffer = CmdBufferData->VulkanCommandBuffer;
-	GPUBufferData* VtxBufferData = GetGPUBufferData(VertexBuffer);
-	VkBuffer VkVertexBuffer = VtxBufferData->Buffer;
-	GPUBufferData* IndirectDrawBufferData = GetGPUBufferData(IndirectDrawBuffer);
-	VkBuffer VkIndirectDrawBuffer = IndirectDrawBufferData->Buffer;
-	PipelineData* PipelineData = GetPipelineData(Pipeline);
-	VkPipeline VkPipeline = PipelineData->VulkanPipeline;
-
-	VkBufferDeviceAddressInfo BufferDeviceAddressInfo = {};
-	BufferDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
-	BufferDeviceAddressInfo.buffer = VkVertexBuffer;
-	VkDeviceAddress VertexBufferAddress = vkGetBufferDeviceAddress(CoreContext->LogicalDevice, &BufferDeviceAddressInfo);
-	
-	// Verify device address is valid
-	if (VertexBufferAddress == 0)
-	{
-		printf("ERROR: Vertex buffer device address is 0!\n");
-		return -1;
-	}
-
-	printf("Vertex buffer device address: 0x%llx\n", (unsigned long long)VertexBufferAddress);
-	printf("Vertex stride: %u\n", (u32)sizeof(Vertex));
-
-	PushConstants PushConstantsData = {};
-	PushConstantsData.vertexBufferAddress = VertexBufferAddress;
-	PushConstantsData.vertexStride = sizeof(Vertex);
-	PushConstantsData.padding = 0;  // Initialize padding
 
 	while (!glfwWindowShouldClose(Window))
 	{
@@ -345,89 +241,38 @@ int main()
 		BmRender_ResetFences(InFlightFence);
 
 		u32 ImageIndex;
-		BmRender_SwapchainResult AcquireResult = BmRender_AcquireNextSwapchainImage(UINT64_MAX, ImageAvailableSemaphore,
-			nullptr, &ImageIndex
-		);
+		BmRender_SwapchainResult AcquireResult = BmRender_AcquireNextSwapchainImage(UINT64_MAX, ImageAvailableSemaphore, nullptr, &ImageIndex);
 
 		if (AcquireResult == BmRender_SwapchainResult::OutOfDate || AcquireResult == BmRender_SwapchainResult::Suboptimal)
 		{
 			continue;
 		}
 
-		ImageViewData* ImageViewData = GetImageViewData(CoreContext->ImageViews[ImageIndex]);
-		VkImageView SwapchainImageView = ImageViewData->View;
+		BmRender_BeginCommandBuffer(CommandBuffer);
+		BmRender_TransitionImageForRendering(CommandBuffer, CoreContext->Images[ImageIndex]);
 
-		VkCommandBufferBeginInfo BeginInfo = {};
-		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		BmRender_BeginCommandBuffer(CommandBuffer, &BeginInfo);
+		BmRender_RenderingColorAttachment ColorAttachment = {};
+		ColorAttachment.ImageView = CoreContext->ImageViews[ImageIndex];
+		ColorAttachment.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		ColorAttachment.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+		ColorAttachment.ClearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
 
-		VkImageMemoryBarrier2 SwapchainBarrier = {};
-		SwapchainBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-		SwapchainBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		SwapchainBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		SwapchainBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		SwapchainBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		SwapchainBarrier.image = GetImageData(CoreContext->Images[ImageIndex])->Image;
-		SwapchainBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		SwapchainBarrier.subresourceRange.baseMipLevel = 0;
-		SwapchainBarrier.subresourceRange.levelCount = 1;
-		SwapchainBarrier.subresourceRange.baseArrayLayer = 0;
-		SwapchainBarrier.subresourceRange.layerCount = 1;
-		SwapchainBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-		SwapchainBarrier.srcAccessMask = 0;
-		SwapchainBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-		SwapchainBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+		BmRender_RenderingInfo RenderingInfo = {};
+		RenderingInfo.Offset = { 0, 0 };
+		RenderingInfo.Extent = CoreContext->SwapExtent;
+		RenderingInfo.ColorAttachments = &ColorAttachment;
+		RenderingInfo.ColorAttachmentCount = 1;
+		RenderingInfo.DepthAttachment = nullptr;
 
-		VkDependencyInfo DepInfo = {};
-		DepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-		DepInfo.imageMemoryBarrierCount = 1;
-		DepInfo.pImageMemoryBarriers = &SwapchainBarrier;
-		vkCmdPipelineBarrier2(VkCmdBuffer, &DepInfo);
+		BmRender_BeginRendering(CommandBuffer, &RenderingInfo);
 
-		VkRenderingAttachmentInfo ColorAttachment = {};
-		ColorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		ColorAttachment.imageView = SwapchainImageView;
-		ColorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		ColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		ColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		ColorAttachment.clearValue.color = { 0.0f, 0.0f, 0.0f, 1.0f };
+		BmRender_BindPipeline(CommandBuffer, Pipeline);
 
-		VkRenderingInfo RenderingInfo = {};
-		RenderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-		RenderingInfo.renderArea.offset = { 0, 0 };
-		RenderingInfo.renderArea.extent = CoreContext->SwapExtent;
-		RenderingInfo.layerCount = 1;
-		RenderingInfo.colorAttachmentCount = 1;
-		RenderingInfo.pColorAttachments = &ColorAttachment;
-		RenderingInfo.pDepthAttachment = nullptr;
-		RenderingInfo.pStencilAttachment = nullptr;
+		BmRender_Draw(CommandBuffer, 6, 1, 0, 0);
 
-		vkCmdBeginRendering(VkCmdBuffer, &RenderingInfo);
+		BmRender_EndRendering(CommandBuffer);
 
-		vkCmdBindPipeline(VkCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, VkPipeline);
-
-		PipelineLayoutData* PipelineLayoutData = GetPipelineLayoutData(PipelineLayout);
-		vkCmdPushConstants(
-			VkCmdBuffer,
-			PipelineLayoutData->VulkanPipelineLayout,
-			VK_SHADER_STAGE_VERTEX_BIT,
-			0,
-			sizeof(PushConstants),
-			&PushConstantsData
-		);
-
-		vkCmdDrawIndirect(VkCmdBuffer, VkIndirectDrawBuffer, 0, 1, sizeof(VkDrawIndirectCommand));
-
-		vkCmdEndRendering(VkCmdBuffer);
-
-		SwapchainBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		SwapchainBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-		SwapchainBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-		SwapchainBarrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-		SwapchainBarrier.dstStageMask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
-		SwapchainBarrier.dstAccessMask = 0;
-		vkCmdPipelineBarrier2(VkCmdBuffer, &DepInfo);
+		BmRender_TransitionImageForPresentation(CommandBuffer, CoreContext->Images[ImageIndex]);
 
 		BmRender_EndCommandBuffer(CommandBuffer);
 

@@ -345,6 +345,7 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 	ImageResource Resource;
 	Resource.ReadyValue = ULLONG_MAX;
 	Resource.Format = Description->Format;
+	Resource.Type = Description->Type;
 
 	VkImageUsageFlags Usage;
 
@@ -397,7 +398,7 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 	return CreateImageHandle(&Resource);
 }
 
-static BmRender_ImageView CreateImageView(BmRender_Image Handle, u32 BaseArrayLayer, u32 LayerCount, VkImageViewType ViewType, VkImageAspectFlags AspectFlags)
+static BmRender_ImageView CreateImageView(BmRender_Image Handle, u32 BaseArrayLayer, u32 LayerCount, VkImageViewType ViewType)
 {
 	ImageResource* Resource = GetImageData(Handle);
 	ImageViewData View;
@@ -411,7 +412,7 @@ static BmRender_ImageView CreateImageView(BmRender_Image Handle, u32 BaseArrayLa
 	ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 	ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
 	ViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-	ViewCreateInfo.subresourceRange.aspectMask = AspectFlags;
+	ViewCreateInfo.subresourceRange.aspectMask = VulkanHelper::ImageTypeToVkImageAspectFlags(Resource->Type);
 	ViewCreateInfo.subresourceRange.baseMipLevel = 0;
 	ViewCreateInfo.subresourceRange.levelCount = 1;
 	ViewCreateInfo.subresourceRange.baseArrayLayer = BaseArrayLayer;
@@ -420,6 +421,8 @@ static BmRender_ImageView CreateImageView(BmRender_Image Handle, u32 BaseArrayLa
 
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo, GetVulkanAllocator(), &View.View));
+
+	View.ParentImage = Handle;
 
 	return CreateImageViewHandle(&View);
 }
@@ -703,14 +706,14 @@ BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Forma
 	return CreateImageResource(&Descr);
 }
 
-BmRender_ImageView BmRender_CreateImageView2D(BmRender_Image Handle, VkImageAspectFlags AspectFlags)
+BmRender_ImageView BmRender_CreateImageView2D(BmRender_Image Handle)
 {
-	return CreateImageView(Handle, 0, 1, VK_IMAGE_VIEW_TYPE_2D, AspectFlags);
+	return CreateImageView(Handle, 0, 1, VK_IMAGE_VIEW_TYPE_2D);
 }
 
-BmRender_ImageView BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 BaseLayer, u32 LayerCount, VkImageAspectFlags AspectFlags)
+BmRender_ImageView BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 BaseLayer, u32 LayerCount)
 {
-	return CreateImageView(Handle, BaseLayer, LayerCount, VK_IMAGE_VIEW_TYPE_2D_ARRAY, AspectFlags);
+	return CreateImageView(Handle, BaseLayer, LayerCount, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
 }
 
 BmRender_GPUBuffer BmRender_CreateVertexStageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag)
@@ -757,7 +760,7 @@ BmRender_Fence BmRender_CreateFence()
 	return CreateFenceHandle(&Data);
 }
 
-BmRender_BinarySemaphore BmRender_CreateSemaphore()
+BmRender_Semaphore BmRender_CreateSemaphore()
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 
@@ -767,13 +770,13 @@ BmRender_BinarySemaphore BmRender_CreateSemaphore()
 	CreateInfo.flags = 0;
 
 	SemaphoreData Data;
-	Data.IsTimelineSemaphore = false;
+	Data.Type = BmRender_SemaphoreType::Binary;
 	VULKAN_CHECK_RESULT(vkCreateSemaphore(Device, &CreateInfo, GetVulkanAllocator(), &Data.VulkanSemaphore));
 
-	return CreateBinarySemaphoreHandle(&Data);
+	return CreateSemaphoreHandle(&Data);
 }
 
-BmRender_TimelineSemaphore BmRender_CreateTimelineSemaphore(u64 InitialValue)
+BmRender_Semaphore BmRender_CreateTimelineSemaphore(u64 InitialValue)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 
@@ -789,19 +792,19 @@ BmRender_TimelineSemaphore BmRender_CreateTimelineSemaphore(u64 InitialValue)
 	CreateInfo.flags = 0;
 
 	SemaphoreData Data;
-	Data.IsTimelineSemaphore = true;
+	Data.Type = BmRender_SemaphoreType::Timeline;
 	VULKAN_CHECK_RESULT(vkCreateSemaphore(Device, &CreateInfo, GetVulkanAllocator(), &Data.VulkanSemaphore));
 
-	return CreateTimelineSemaphoreHandle(&Data);
+	return CreateSemaphoreHandle(&Data);
 }
 
-BmRender_CommandPool BmRender_CreateCommandPool(u32 QueueFamilyIndex, VkCommandPoolCreateFlags Flags)
+BmRender_CommandPool BmRender_CreateCommandPool(u32 QueueFamilyIndex)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 
 	VkCommandPoolCreateInfo CreateInfo = { };
 	CreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	CreateInfo.flags = Flags;
+	CreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 	CreateInfo.queueFamilyIndex = QueueFamilyIndex;
 
 	CommandPoolData Data;
@@ -811,7 +814,7 @@ BmRender_CommandPool BmRender_CreateCommandPool(u32 QueueFamilyIndex, VkCommandP
 	return CreateCommandPoolHandle(&Data);
 }
 
-BmRender_CommandBuffer BmRender_AllocateCommandBuffer(BmRender_CommandPool CommandPool, VkCommandBufferLevel Level)
+BmRender_CommandBuffer BmRender_AllocateCommandBuffer(BmRender_CommandPool CommandPool)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	CommandPoolData* PoolData = GetCommandPoolData(CommandPool);
@@ -819,7 +822,7 @@ BmRender_CommandBuffer BmRender_AllocateCommandBuffer(BmRender_CommandPool Comma
 	VkCommandBufferAllocateInfo AllocateInfo = { };
 	AllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	AllocateInfo.commandPool = PoolData->VulkanCommandPool;
-	AllocateInfo.level = Level;
+	AllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	AllocateInfo.commandBufferCount = 1;
 
 	CommandBufferData Data;
@@ -900,20 +903,12 @@ void BmRender_DestroyFence(BmRender_Fence Handle)
 	DestroyFenceHandle(Handle);
 }
 
-void BmRender_DestroyBinarySemaphore(BmRender_BinarySemaphore Handle)
+void BmRender_DestroySemaphore(BmRender_Semaphore Handle)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	auto Data = GetBinarySemaphoreData(Handle);
+	auto Data = GetSemaphoreData(Handle);
 	OnSemaphoreClear(Data);
-	DestroyBinarySemaphoreHandle(Handle);
-}
-
-void BmRender_DestroyTimelineSemaphore(BmRender_TimelineSemaphore Handle)
-{
-	VkDevice Device = GetCoreContext()->LogicalDevice;
-	auto Data = GetTimelineSemaphoreData(Handle);
-	OnSemaphoreClear(Data);
-	DestroyTimelineSemaphoreHandle(Handle);
+	DestroySemaphoreHandle(Handle);
 }
 
 void BmRender_DestroyCommandPool(BmRender_CommandPool Handle)
@@ -932,243 +927,4 @@ void BmRender_FreeCommandBuffer(BmRender_CommandBuffer Handle)
 
 	vkFreeCommandBuffers(Device, PoolData->VulkanCommandPool, 1, &BufferData->VulkanCommandBuffer);
 	DestroyCommandBufferHandle(Handle);
-}
-
-BmRender_FenceStatus BmRender_GetFenceStatus(BmRender_Fence Handle)
-{
-	VkDevice Device = GetCoreContext()->LogicalDevice;
-	FenceData* FenceData = GetFenceData(Handle);
-	VkResult Result = vkGetFenceStatus(Device, FenceData->VulkanFence);
-	
-	if (Result == VK_SUCCESS)
-	{
-		return BmRender_FenceStatus::Signaled;
-	}
-	else if (Result == VK_NOT_READY)
-	{
-		return BmRender_FenceStatus::NotReady;
-	}
-	else
-	{
-		VULKAN_CHECK_RESULT(Result);
-		return BmRender_FenceStatus::NotReady;
-	}
-}
-
-BmRender_WaitResult BmRender_WaitForFences(BmRender_Fence Handle, VkBool32 WaitAll, u64 Timeout)
-{
-	VkDevice Device = GetCoreContext()->LogicalDevice;
-	FenceData* FenceData = GetFenceData(Handle);
-	VkResult Result = vkWaitForFences(Device, 1, &FenceData->VulkanFence, WaitAll, Timeout);
-	
-	if (Result == VK_SUCCESS)
-	{
-		return BmRender_WaitResult::Success;
-	}
-	else if (Result == VK_TIMEOUT)
-	{
-		return BmRender_WaitResult::Timeout;
-	}
-	else
-	{
-		VULKAN_CHECK_RESULT(Result);
-		return BmRender_WaitResult::Timeout;
-	}
-}
-
-void BmRender_ResetFences(BmRender_Fence Handle)
-{
-	VkDevice Device = GetCoreContext()->LogicalDevice;
-	FenceData* FenceData = GetFenceData(Handle);
-	VULKAN_CHECK_RESULT(vkResetFences(Device, 1, &FenceData->VulkanFence));
-}
-
-void BmRender_GetSemaphoreCounterValue(BmRender_TimelineSemaphore Handle, u64* pValue)
-{
-	VkDevice Device = GetCoreContext()->LogicalDevice;
-	SemaphoreData* SemaphoreData = GetTimelineSemaphoreData(Handle);
-	VULKAN_CHECK_RESULT(vkGetSemaphoreCounterValue(Device, SemaphoreData->VulkanSemaphore, pValue));
-}
-
-void BmRender_BeginCommandBuffer(BmRender_CommandBuffer Handle, const VkCommandBufferBeginInfo* pBeginInfo)
-{
-	CommandBufferData* BufferData = GetCommandBufferData(Handle);
-	VULKAN_CHECK_RESULT(vkBeginCommandBuffer(BufferData->VulkanCommandBuffer, pBeginInfo));
-}
-
-void BmRender_EndCommandBuffer(BmRender_CommandBuffer Handle)
-{
-	CommandBufferData* BufferData = GetCommandBufferData(Handle);
-	VULKAN_CHECK_RESULT(vkEndCommandBuffer(BufferData->VulkanCommandBuffer));
-}
-
-void BmRender_QueueSubmit(VkQueue Queue, u32 SubmitCount, const BmRender_SubmitInfo* pSubmits, BmRender_Fence Fence)
-{
-	FenceData* FenceData = GetFenceData(Fence);
-	VkSubmitInfo* VkSubmits = (VkSubmitInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSubmitInfo) * SubmitCount);
-
-	for (u32 i = 0; i < SubmitCount; ++i)
-	{
-		const BmRender_SubmitInfo& Submit = pSubmits[i];
-		VkSubmitInfo& VkSubmit = VkSubmits[i];
-
-		u32 TotalWaitSemaphoreCount = Submit.WaitSemaphoreCount + Submit.WaitTimelineSemaphoreCount;
-		u32 TotalSignalSemaphoreCount = Submit.SignalSemaphoreCount + Submit.SignalTimelineSemaphoreCount;
-
-		VkTimelineSemaphoreSubmitInfo* TimelineInfo = nullptr;
-		if (Submit.WaitTimelineSemaphoreCount > 0 || Submit.SignalTimelineSemaphoreCount > 0)
-		{
-			TimelineInfo = (VkTimelineSemaphoreSubmitInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkTimelineSemaphoreSubmitInfo));
-			TimelineInfo->sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-			TimelineInfo->pNext = nullptr;
-			TimelineInfo->waitSemaphoreValueCount = TotalWaitSemaphoreCount;
-			TimelineInfo->signalSemaphoreValueCount = TotalSignalSemaphoreCount;
-
-			u64* WaitValues = (u64*)Memory::FrameAlloc(GetFrameMemory(), sizeof(u64) * TotalWaitSemaphoreCount);
-			TimelineInfo->pWaitSemaphoreValues = WaitValues;
-				
-			for (u32 j = 0; j < Submit.WaitSemaphoreCount; ++j)
-			{
-				WaitValues[j] = 0;
-			}
-
-			for (u32 j = 0; j < TotalWaitSemaphoreCount; ++j)
-			{
-				WaitValues[Submit.WaitSemaphoreCount + j] = Submit.WaitTimelineSemaphores[j].Value;
-			}
-
-			u64* SignalValues = (u64*)Memory::FrameAlloc(GetFrameMemory(), sizeof(u64) * TotalSignalSemaphoreCount);
-			TimelineInfo->pSignalSemaphoreValues = SignalValues;
-
-			for (u32 j = 0; j < Submit.SignalSemaphoreCount; ++j)
-			{
-				SignalValues[j] = 0;
-			}
-
-			for (u32 j = 0; j < Submit.SignalTimelineSemaphoreCount; ++j)
-			{
-				SignalValues[Submit.SignalSemaphoreCount + j] = Submit.SignalTimelineSemaphores[j].Value;
-			}
-		}
-
-		VkSubmit = { };
-		VkSubmit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		VkSubmit.pNext = TimelineInfo;
-		VkSubmit.waitSemaphoreCount = TotalWaitSemaphoreCount;
-		VkSubmit.pWaitDstStageMask = Submit.WaitDstStageFlags;
-		VkSubmit.commandBufferCount = Submit.CommandBufferCount;
-		VkSubmit.signalSemaphoreCount = TotalSignalSemaphoreCount;
-
-		VkCommandBuffer* CommandBuffers = (VkCommandBuffer*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkCommandBuffer) * Submit.CommandBufferCount);
-		VkSubmit.pCommandBuffers = CommandBuffers;
-
-		for (u32 j = 0; j < Submit.CommandBufferCount; ++j)
-		{
-			CommandBufferData* CmdBufferData = GetCommandBufferData(Submit.CommandBuffers[j]);
-			CommandBuffers[j] = CmdBufferData->VulkanCommandBuffer;
-		}
-
-		VkSemaphore* WaitSemaphores = (VkSemaphore*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSemaphore) * TotalWaitSemaphoreCount);
-		VkSubmit.pWaitSemaphores = WaitSemaphores;
-		
-		for (u32 j = 0; j < Submit.WaitSemaphoreCount; ++j)
-		{
-			SemaphoreData* SemData = GetBinarySemaphoreData(Submit.WaitSemaphores[j]);
-			WaitSemaphores[j] = SemData->VulkanSemaphore;
-		}
-		
-		for (u32 j = 0; j < Submit.WaitTimelineSemaphoreCount; ++j)
-		{
-			SemaphoreData* SemData = GetTimelineSemaphoreData(Submit.WaitTimelineSemaphores[j].Semaphore);
-			WaitSemaphores[Submit.WaitSemaphoreCount + j] = SemData->VulkanSemaphore;
-		}
-
-		VkSemaphore* SignalSemaphores = (VkSemaphore*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSemaphore) * TotalSignalSemaphoreCount);
-		VkSubmit.pSignalSemaphores = SignalSemaphores;
-		
-		for (u32 j = 0; j < Submit.SignalSemaphoreCount; ++j)
-		{
-			SemaphoreData* SemData = GetBinarySemaphoreData(Submit.SignalSemaphores[j]);
-			SignalSemaphores[j] = SemData->VulkanSemaphore;
-		}
-		
-		for (u32 j = 0; j < Submit.SignalTimelineSemaphoreCount; ++j)
-		{
-			SemaphoreData* SemData = GetTimelineSemaphoreData(Submit.SignalTimelineSemaphores[j].Semaphore);
-			SignalSemaphores[Submit.SignalSemaphoreCount + j] = SemData->VulkanSemaphore;
-		}
-	}
-
-	VULKAN_CHECK_RESULT(vkQueueSubmit(Queue, SubmitCount, VkSubmits, FenceData->VulkanFence));
-}
-
-BmRender_SwapchainResult BmRender_QueuePresent(VkQueue Queue, const BmRender_PresentInfo* pPresentInfo)
-{
-	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
-	
-	VkPresentInfoKHR PresentInfo = { };
-	PresentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-	PresentInfo.waitSemaphoreCount = pPresentInfo->WaitSemaphoreCount;
-	PresentInfo.swapchainCount = 1;
-	PresentInfo.pSwapchains = &CoreContext->VulkanSwapchain;
-	PresentInfo.pImageIndices = pPresentInfo->ImageIndices;
-
-	VkSemaphore* WaitSemaphores = (VkSemaphore*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSemaphore) * pPresentInfo->WaitSemaphoreCount);
-	PresentInfo.pWaitSemaphores = WaitSemaphores;
-
-	for (u32 i = 0; i < pPresentInfo->WaitSemaphoreCount; ++i)
-	{
-		SemaphoreData* SemData = GetBinarySemaphoreData(pPresentInfo->WaitSemaphores[i]);
-		WaitSemaphores[i] = SemData->VulkanSemaphore;
-	}
-	
-	VkResult Result = vkQueuePresentKHR(Queue, &PresentInfo);
-	
-	if (Result == VK_SUCCESS)
-	{
-		return BmRender_SwapchainResult::Success;
-	}
-	else if (Result == VK_SUBOPTIMAL_KHR)
-	{
-		return BmRender_SwapchainResult::Suboptimal;
-	}
-	else if (Result == VK_ERROR_OUT_OF_DATE_KHR)
-	{
-		return BmRender_SwapchainResult::OutOfDate;
-	}
-	else
-	{
-		VULKAN_CHECK_RESULT(Result);
-		return BmRender_SwapchainResult::Success;
-	}
-}
-
-BmRender_SwapchainResult BmRender_AcquireNextSwapchainImage(u64 Timeout, BmRender_BinarySemaphore Semaphore, VkFence Fence, u32* pImageIndex)
-{
-	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
-	VkDevice Device = CoreContext->LogicalDevice;
-
-	VkSwapchainKHR Swapchain = CoreContext->VulkanSwapchain;
-	SemaphoreData* SemaphoreData = GetBinarySemaphoreData(Semaphore);
-
-	VkSemaphore VkSemaphore = SemaphoreData->VulkanSemaphore;
-	VkResult Result = vkAcquireNextImageKHR(Device, Swapchain, Timeout, VkSemaphore, Fence, pImageIndex);
-	
-	if (Result == VK_SUCCESS)
-	{
-		return BmRender_SwapchainResult::Success;
-	}
-	else if (Result == VK_SUBOPTIMAL_KHR)
-	{
-		return BmRender_SwapchainResult::Suboptimal;
-	}
-	else if (Result == VK_ERROR_OUT_OF_DATE_KHR)
-	{
-		return BmRender_SwapchainResult::OutOfDate;
-	}
-	else
-	{
-		VULKAN_CHECK_RESULT(Result);
-		return BmRender_SwapchainResult::Success;
-	}
 }

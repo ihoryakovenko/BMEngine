@@ -97,4 +97,5 @@ namespace VulkanHelper
 	VkShaderStageFlags DescriptorShaderStageToVkShaderStage(BmRender_DescriptorShaderStage stage);
 	VkShaderStageFlagBits PipelineShaderStageToVkShaderStage(BmRender_PipelineShaderStage stage);
 	VkPipelineStageFlags PipelineSyncToVkPipelineStage(BmRender_PipelineSyncStage stage);
+	VkImageAspectFlags ImageTypeToVkImageAspectFlags(BmRender_ImageType Type);
 }

@@ -63,6 +63,7 @@ struct ImageResource
 	u64 ReadyValue;
 	VkFormat Format;
 	u64 Size;
+	BmRender_ImageType Type;
 	u32 Width;
 	u32 Height;
 };
@@ -70,6 +71,7 @@ struct ImageResource
 struct ImageViewData
 {
 	VkImageView View;
+	BmRender_Image ParentImage;
 };
 
 struct GPUBufferData
@@ -100,7 +102,7 @@ struct FenceData
 struct SemaphoreData
 {
 	VkSemaphore VulkanSemaphore;
-	bool IsTimelineSemaphore;
+	BmRender_SemaphoreType Type;
 };
 
 struct CommandPoolData
