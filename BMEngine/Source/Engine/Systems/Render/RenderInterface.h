@@ -10,19 +10,18 @@
 struct GLFWwindow;
 
 typedef u64 PrivateHandle;
-typedef struct { PrivateHandle Private; } BmRender_Sampler;
-typedef struct { PrivateHandle Private; } BmRender_Pipeline;
-typedef struct { PrivateHandle Private; } BmRender_PipelineLayout;
+typedef struct BmRender_Sampler_T* BmRender_Sampler;
+typedef struct BmRender_Pipeline_T* BmRender_Pipeline;
+typedef struct BmRender_PipelineLayout_T* BmRender_PipelineLayout;
 typedef struct { PrivateHandle Private; } BmRender_DescriptorSetLayout;
-typedef struct { PrivateHandle Private; } BmRender_DescriptorPool;
+typedef struct BmRender_DescriptorPool_T* BmRender_DescriptorPool;
 typedef struct { PrivateHandle Private; } BmRender_Shader;
 typedef struct { PrivateHandle Private; } BmRender_Image;
-typedef struct { PrivateHandle Private; } BmRender_ImageView;
+typedef struct BmRender_ImageView_T* BmRender_ImageView;
 typedef struct { PrivateHandle Private; } BmRender_GPUBuffer;
-typedef struct { PrivateHandle Private; } BmRender_PushConstant;
 typedef struct { PrivateHandle Private; } BmRender_DescriptorSet;
 typedef struct { PrivateHandle Private; } BmRender_CommandWorker;
-typedef struct { PrivateHandle Private; } BmRender_Fence;
+typedef struct BmRender_Fence_T* BmRender_Fence;
 typedef struct { PrivateHandle Private; } BmRender_Semaphore;
 typedef struct { PrivateHandle Private; } BmRender_CommandPool;
 typedef struct { PrivateHandle Private; } BmRender_CommandBuffer;
@@ -161,6 +160,13 @@ struct BmRender_ImageDescription
 	VkFormat Format;
 	u32 ArrayLayers;
 	BmRender_ImageType Type;
+};
+
+struct BmRender_PushConstant
+{
+	u32 offset;
+	u32 size;
+	VkShaderStageFlags stageFlags;
 };
 
 struct BmRender_DescriptorSetLayoutBinding

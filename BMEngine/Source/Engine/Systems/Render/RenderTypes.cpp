@@ -8,12 +8,6 @@
 
 #include "Util/Util.h"
 
-static VulkanCoreContext::VulkanCoreContext CoreContext;
-
-static Memory::FrameMemory FrameMemory;
-
-static VkAllocationCallbacks VulkanAllocator;
-
 static void* VKAPI_CALL VulkanAllocationCallback(
 	void* UserData,
 	size_t Size,
@@ -58,6 +52,14 @@ static void VKAPI_CALL VulkanInternalFreeNotification(
 
 }
 
+static VulkanCoreContext::VulkanCoreContext CoreContext;
+
+static Memory::FrameMemory FrameMemory;
+
+static VkAllocationCallbacks VulkanAllocator;
+
+
+
 void CreateCoreContext(GLFWwindow* WindowHandler)
 {
 	VulkanAllocator.pUserData = nullptr;
@@ -100,23 +102,42 @@ void DeinitFrameMemory()
 	Memory::DestroyFrameMemory(FrameMemory);
 }
 
-void OnSamplerClear(SamplerData* SamplerData)
+void DestroyTrackedData(TrackedData* Data)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	vkDestroySampler(Device, SamplerData->VulkanSampler, GetVulkanAllocator());
+
+	switch (Data->Type)
+	{
+		case TrackedDataType::Sampler:
+			vkDestroySampler(Device, (VkSampler)Data->InternalData, GetVulkanAllocator());
+			break;
+
+		case TrackedDataType::Pipeline:
+			vkDestroyPipeline(Device, (VkPipeline)Data->InternalData, GetVulkanAllocator());
+			break;
+
+		case TrackedDataType::PipelineLayout:
+			vkDestroyPipelineLayout(Device, (VkPipelineLayout)Data->InternalData, GetVulkanAllocator());
+			break;
+
+		case TrackedDataType::DescriptorPool:
+			vkDestroyDescriptorPool(Device, (VkDescriptorPool)Data->InternalData, GetVulkanAllocator());
+			break;
+
+		case TrackedDataType::Fence:
+			vkDestroyFence(Device, (VkFence)Data->InternalData, GetVulkanAllocator());
+			break;
+
+		case TrackedDataType::ImageVIew:
+			vkDestroyImageView(Device, (VkImageView)Data->InternalData, GetVulkanAllocator());
+			break;
+
+		default:
+			assert(false);
+			break;
+	}
 }
 
-void OnPipelineClear(PipelineData* PipelineData)
-{
-	VkDevice Device = GetCoreContext()->LogicalDevice;
-	vkDestroyPipeline(Device, PipelineData->VulkanPipeline, GetVulkanAllocator());
-}
-
-void OnPipelineLayoutClear(PipelineLayoutData* LayoutData)
-{
-	VkDevice Device = GetCoreContext()->LogicalDevice;
-	vkDestroyPipelineLayout(Device, LayoutData->VulkanPipelineLayout, GetVulkanAllocator());
-}
 
 void OnDescriptorSetLayoutClear(DescriptorSetLayoutData* LayoutData)
 {
@@ -125,11 +146,6 @@ void OnDescriptorSetLayoutClear(DescriptorSetLayoutData* LayoutData)
 	free(LayoutData->LayoutBindings);
 }
 
-void OnDescriptorPoolClear(DescriptorPoolData* PoolData)
-{
-	VkDevice Device = GetCoreContext()->LogicalDevice;
-	vkDestroyDescriptorPool(Device, PoolData->VulkanDescriptorPool, GetVulkanAllocator());
-}
 
 void OnShaderClear(ShaderData* Shader)
 {
@@ -147,12 +163,6 @@ void OnImageClear(ImageResource* Image)
 	}
 }
 
-void OnImageViewClear(ImageViewData* Data)
-{
-	VkDevice Device = GetCoreContext()->LogicalDevice;
-	vkDestroyImageView(Device, Data->View, GetVulkanAllocator());
-}
-
 void OnGPUBufferClear(GPUBufferData* Data)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
@@ -160,11 +170,6 @@ void OnGPUBufferClear(GPUBufferData* Data)
 	vkFreeMemory(Device, Data->Memory, GetVulkanAllocator());
 }
 
-void OnFenceClear(FenceData* Fence)
-{
-	VkDevice Device = GetCoreContext()->LogicalDevice;
-	vkDestroyFence(Device, Fence->VulkanFence, GetVulkanAllocator());
-}
 
 void OnSemaphoreClear(SemaphoreData* Semaphore)
 {
@@ -186,7 +191,7 @@ BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout
 	NewSet.Layout = LayoutHandle;
 
 	DescriptorSetLayoutData* Layout = GetDescriptorSetLayoutData(LayoutHandle);
-	VkDescriptorPool Pool = GetDescriptorPoolData(PoolHandle)->VulkanDescriptorPool;
+	VkDescriptorPool Pool = (VkDescriptorPool)PoolHandle;
 
 	VkDescriptorSetAllocateInfo AllocInfo = { };
 	AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -273,8 +278,8 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, co
 		{
 			VkDescriptorImageInfo* ImageInfo = (VkDescriptorImageInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkDescriptorImageInfo));
 			ImageInfo->imageLayout = Binding.ImageBinding.ImageLayout;
-			ImageInfo->imageView = GetImageViewData(Binding.ImageBinding.ImageView)->View;
-			ImageInfo->sampler = GetSamplerData(Binding.ImageBinding.Sampler)->VulkanSampler;
+			ImageInfo->imageView = (VkImageView)Binding.ImageBinding.ImageView;
+			ImageInfo->sampler = (VkSampler)Binding.ImageBinding.Sampler;
 
 			WriteDescriptorSets[i].pImageInfo = ImageInfo;
 		}
@@ -289,12 +294,12 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, co
 
 BmRender_PushConstant BmRender_CreatePushConstant(BmRender_DescriptorShaderStage Stage, u32 Offset, u32 Size)
 {
-	PushConstantData Constant;
-	Constant.PushConstants.offset = Offset;
-	Constant.PushConstants.size = Size;
-	Constant.PushConstants.stageFlags = VulkanHelper::DescriptorShaderStageToVkShaderStage(Stage);
+	BmRender_PushConstant Constant;
+	Constant.offset = Offset;
+	Constant.size = Size;
+	Constant.stageFlags = VulkanHelper::DescriptorShaderStageToVkShaderStage(Stage);
 
-	return CreatePushConstantHandle(&Constant);
+	return Constant;
 }
 
 static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, MemoryPropertyFlag MemoryFlag, BmRender_PipelineSyncStage BufferStage, BufferUsageFlag Flag)
@@ -401,7 +406,7 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 static BmRender_ImageView CreateImageView(BmRender_Image Handle, u32 BaseArrayLayer, u32 LayerCount, VkImageViewType ViewType)
 {
 	ImageResource* Resource = GetImageData(Handle);
-	ImageViewData View;
+	VkImageView View;
 
 	VkImageViewCreateInfo ViewCreateInfo = { };
 	ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -420,11 +425,9 @@ static BmRender_ImageView CreateImageView(BmRender_Image Handle, u32 BaseArrayLa
 	ViewCreateInfo.image = Resource->Image;
 
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo, GetVulkanAllocator(), &View.View));
+	VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo, GetVulkanAllocator(), &View));
 
-	View.ParentImage = Handle;
-
-	return CreateImageViewHandle(&View);
+	return CreateImageViewHandle(View);
 }
 
 BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description)
@@ -454,10 +457,7 @@ BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Descript
 	VkSampler VulkanSampler;
 	VULKAN_CHECK_RESULT(vkCreateSampler(Device, &CreateInfo, GetVulkanAllocator(), &VulkanSampler));
 
-	SamplerData Data;
-	Data.VulkanSampler = VulkanSampler;
-
-	return CreateSamplerHandle(&Data);
+	return CreateSamplerHandle(VulkanSampler);
 }
 
 BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* Description)
@@ -589,7 +589,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	PipelineCreateInfo->pMultisampleState = &Description->MultisampleState;
 	PipelineCreateInfo->pColorBlendState = &ColorBlendState;
 	PipelineCreateInfo->pDepthStencilState = &Description->DepthStencilState;
-	PipelineCreateInfo->layout = GetPipelineLayoutData(Description->PipelineLayout)->VulkanPipelineLayout;
+	PipelineCreateInfo->layout = (VkPipelineLayout)Description->PipelineLayout;
 	PipelineCreateInfo->renderPass = nullptr;
 	PipelineCreateInfo->subpass = 0;
 	PipelineCreateInfo->pNext = &RenderingInfo;
@@ -600,10 +600,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	VkPipeline Pipeline;
 	VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, 1, PipelineCreateInfo, GetVulkanAllocator(), &Pipeline));
 
-	PipelineData Data;
-	Data.VulkanPipeline = Pipeline;
-
-	return CreatePipelineHandle(&Data);
+	return CreatePipelineHandle(Pipeline);
 }
 
 BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description)
@@ -619,7 +616,9 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 	VkPushConstantRange* VkPushConstantRanges = (VkPushConstantRange*)Memory::FrameAlloc(GetFrameMemory(), Description->PushConstantRangeCount * sizeof(VkPushConstantRange));
 	for (u32 i = 0; i < Description->PushConstantRangeCount; ++i)
 	{
-		VkPushConstantRanges[i] = GetPushConstantData(Description->PushConstantRanges[i])->PushConstants;
+		VkPushConstantRanges[i].offset = Description->PushConstantRanges[i].offset;
+		VkPushConstantRanges[i].size = Description->PushConstantRanges[i].size;
+		VkPushConstantRanges[i].stageFlags = Description->PushConstantRanges[i].stageFlags;
 	}
 
 	VkPipelineLayoutCreateInfo CreateInfo = { };
@@ -633,10 +632,7 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 	VkPipelineLayout PipelineLayout;
 	VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &CreateInfo, GetVulkanAllocator(), &PipelineLayout));
 
-	PipelineLayoutData Data;
-	Data.VulkanPipelineLayout = PipelineLayout;
-
-	return CreatePipelineLayoutHandle(&Data);
+	return CreatePipelineLayoutHandle(PipelineLayout);
 }
 
 BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolDescription* Description)
@@ -654,10 +650,7 @@ BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorP
 	VkDescriptorPool DescriptorPool;
 	VULKAN_CHECK_RESULT(vkCreateDescriptorPool(Device, &CreateInfo, GetVulkanAllocator(), &DescriptorPool));
 
-	DescriptorPoolData Data;
-	Data.VulkanDescriptorPool = DescriptorPool;
-
-	return CreateDescriptorPoolHandle(&Data);
+	return CreateDescriptorPoolHandle(DescriptorPool);
 }
 
 BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description)
@@ -754,10 +747,10 @@ BmRender_Fence BmRender_CreateFence()
 	CreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	CreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-	FenceData Data;
-	VULKAN_CHECK_RESULT(vkCreateFence(Device, &CreateInfo, GetVulkanAllocator(), &Data.VulkanFence));
+	VkFence Fence;
+	VULKAN_CHECK_RESULT(vkCreateFence(Device, &CreateInfo, GetVulkanAllocator(), &Fence));
 
-	return CreateFenceHandle(&Data);
+	return CreateFenceHandle(Fence);
 }
 
 BmRender_Semaphore BmRender_CreateSemaphore()
@@ -841,18 +834,15 @@ void BmRender_UpdateHostCompatibleBuffer(BmRender_GPUBuffer StagingBuffer, u64 B
 
 void BmRender_DestroyPipelineLayout(BmRender_PipelineLayout Handle)
 {
-	VkDevice Device = GetCoreContext()->LogicalDevice;
-	auto Data = GetPipelineLayoutData(Handle);
-	OnPipelineLayoutClear(Data);
 	DestroyPipelineLayoutHandle(Handle);
 }
 
 void BmRender_DestroySampler(BmRender_Sampler Handle)
 {
-	VkDevice Device = GetCoreContext()->LogicalDevice;
-	auto Data = GetSamplerData(Handle);
-	OnSamplerClear(Data);
 	DestroySamplerHandle(Handle);
+
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDestroySampler(Device, (VkSampler)Handle, GetVulkanAllocator());
 }
 
 void BmRender_DestroyDescriptorSetLayout(BmRender_DescriptorSetLayout Handle)
@@ -865,17 +855,11 @@ void BmRender_DestroyDescriptorSetLayout(BmRender_DescriptorSetLayout Handle)
 
 void BmRender_DestroyDescriptorPool(BmRender_DescriptorPool Handle)
 {
-	VkDevice Device = GetCoreContext()->LogicalDevice;
-	auto Data = GetDescriptorPoolData(Handle);
-	OnDescriptorPoolClear(Data);
 	DestroyDescriptorPoolHandle(Handle);
 }
 
 void BmRender_DestroyPipeline(BmRender_Pipeline Handle)
 {
-	VkDevice Device = GetCoreContext()->LogicalDevice;
-	auto Data = GetPipelineData(Handle);
-	OnPipelineClear(Data);
 	DestroyPipelineHandle(Handle);
 }
 
@@ -897,9 +881,6 @@ void BmRender_DestroyImage(BmRender_Image Handle)
 
 void BmRender_DestroyFence(BmRender_Fence Handle)
 {
-	VkDevice Device = GetCoreContext()->LogicalDevice;
-	auto Data = GetFenceData(Handle);
-	OnFenceClear(Data);
 	DestroyFenceHandle(Handle);
 }
 

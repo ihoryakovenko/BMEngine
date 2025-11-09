@@ -348,15 +348,6 @@ namespace TransferSystem
 
 	void DeInit()
 	{
-		for (u32 i = 0; i < VulkanHelper::MAX_DRAW_FRAMES; ++i)
-		{
-			BmRender_DestroyFence(TransferState.Frames.Fences[i]);
-			BmRender_FreeCommandBuffer(TransferState.Frames.CommandBuffers[i]);
-		}
-
-		BmRender_DestroyCommandPool(TransferState.TransferCommandPool);
-		BmRender_DestroySemaphore(TransferState.TransferSemaphore);
-
 		free(TransferState.TransferTasksQueue.Memory);
 		Memory::FreeRingBuffer(&TransferState.TransferMemory);
 	}

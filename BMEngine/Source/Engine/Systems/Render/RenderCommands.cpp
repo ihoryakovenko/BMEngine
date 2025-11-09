@@ -11,8 +11,7 @@
 BmRender_FenceStatus BmRender_GetFenceStatus(BmRender_Fence Handle)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	FenceData* FenceData = GetFenceData(Handle);
-	VkResult Result = vkGetFenceStatus(Device, FenceData->VulkanFence);
+	VkResult Result = vkGetFenceStatus(Device, (VkFence)Handle);
 
 	if (Result == VK_SUCCESS)
 	{
@@ -32,8 +31,8 @@ BmRender_FenceStatus BmRender_GetFenceStatus(BmRender_Fence Handle)
 BmRender_WaitResult BmRender_WaitForFences(BmRender_Fence Handle, VkBool32 WaitAll, u64 Timeout)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	FenceData* FenceData = GetFenceData(Handle);
-	VkResult Result = vkWaitForFences(Device, 1, &FenceData->VulkanFence, WaitAll, Timeout);
+	VkFence Fence = (VkFence)Handle;
+	VkResult Result = vkWaitForFences(Device, 1, &Fence, WaitAll, Timeout);
 
 	if (Result == VK_SUCCESS)
 	{
@@ -53,8 +52,8 @@ BmRender_WaitResult BmRender_WaitForFences(BmRender_Fence Handle, VkBool32 WaitA
 void BmRender_ResetFences(BmRender_Fence Handle)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	FenceData* FenceData = GetFenceData(Handle);
-	VULKAN_CHECK_RESULT(vkResetFences(Device, 1, &FenceData->VulkanFence));
+	VkFence Fence = (VkFence)Handle;
+	VULKAN_CHECK_RESULT(vkResetFences(Device, 1, &Fence));
 }
 
 void BmRender_GetSemaphoreCounterValue(BmRender_Semaphore Handle, u64* pValue)
@@ -232,12 +231,11 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 	for (u32 i = 0; i < pRenderingInfo->ColorAttachmentCount; ++i)
 	{
 		const BmRender_RenderingColorAttachment& Attachment = pRenderingInfo->ColorAttachments[i];
-		ImageViewData* ViewData = GetImageViewData(Attachment.ImageView);
 
 		VkRenderingAttachmentInfo* VkAttachment = ColorAttachments + i;
 		*VkAttachment = { };
 		VkAttachment->sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		VkAttachment->imageView = ViewData->View;
+		VkAttachment->imageView = (VkImageView)Attachment.ImageView;
 		VkAttachment->imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		VkAttachment->loadOp = Attachment.LoadOp;
 		VkAttachment->storeOp = Attachment.StoreOp;
@@ -247,11 +245,10 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 	if (pRenderingInfo->DepthAttachment != nullptr)
 	{
 		const BmRender_RenderingDepthAttachment& Attachment = *pRenderingInfo->DepthAttachment;
-		ImageViewData* ViewData = GetImageViewData(Attachment.ImageView);
 
 		VkRenderingAttachmentInfo DepthAttachmentInfo = { };
 		DepthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		DepthAttachmentInfo.imageView = ViewData->View;
+		DepthAttachmentInfo.imageView = (VkImageView)Attachment.ImageView;
 		DepthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthAttachmentInfo.loadOp = Attachment.LoadOp;
 		DepthAttachmentInfo.storeOp = Attachment.StoreOp;
@@ -277,9 +274,8 @@ void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeli
 {
 	CommandBufferData* CmdBufferData = GetCommandBufferData(CommandBuffer);
 	VkCommandBuffer VkCmdBuffer = CmdBufferData->VulkanCommandBuffer;
-	PipelineData* PipelineDataPtr = GetPipelineData(Pipeline);
 	
-	vkCmdBindPipeline(VkCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineDataPtr->VulkanPipeline);
+	vkCmdBindPipeline(VkCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipeline)Pipeline);
 }
 
 void BmRender_Draw(BmRender_CommandBuffer CommandBuffer, u32 VertexCount, u32 InstanceCount, u32 FirstVertex, u32 FirstInstance)
@@ -308,7 +304,7 @@ void BmRender_EndRendering(BmRender_CommandBuffer CommandBuffer)
 
 void BmRender_QueueSubmit(VkQueue Queue, u32 SubmitCount, const BmRender_SubmitInfo* Submits, BmRender_Fence Fence)
 {
-	FenceData* FenceData = GetFenceData(Fence);
+	VkFence VkFenceHandle = (VkFence)Fence;
 	VkSubmitInfo* VkSubmits = (VkSubmitInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSubmitInfo) * SubmitCount);
 
 	for (u32 i = 0; i < SubmitCount; ++i)
@@ -403,7 +399,7 @@ void BmRender_QueueSubmit(VkQueue Queue, u32 SubmitCount, const BmRender_SubmitI
 		}
 	}
 
-	VULKAN_CHECK_RESULT(vkQueueSubmit(Queue, SubmitCount, VkSubmits, FenceData->VulkanFence));
+	VULKAN_CHECK_RESULT(vkQueueSubmit(Queue, SubmitCount, VkSubmits, VkFenceHandle));
 }
 
 BmRender_SwapchainResult BmRender_QueuePresent(VkQueue Queue, const BmRender_PresentInfo* pPresentInfo)

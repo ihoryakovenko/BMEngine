@@ -1,17 +1,13 @@
 #include "Handles.h"
 
-static System_HandleManager SamplerManager;
-static System_HandleManager PipelineManager;
-static System_HandleManager PipelineLayoutManager;
+static PoolAllocator GeneralHandleStorage;
+static SparceHashMap GeneralHashMap;
+
 static System_HandleManager DescriptorSetLayoutManager;
-static System_HandleManager DescriptorPoolManager;
 static System_HandleManager ShaderManager;
 static System_HandleManager ImageManager;
-static System_HandleManager ImageViewManager;
 static System_HandleManager GPUBufferManager;
-static System_HandleManager PushConstantsManager;
 static System_HandleManager DescriptorSetManager;
-static System_HandleManager FenceManager;
 static System_HandleManager SemaphoreManager;
 static System_HandleManager CommandPoolManager;
 static System_HandleManager CommandBufferManager;
@@ -22,30 +18,21 @@ static u16 GetNextHandleType()
 	return HandleType++;
 }
 
+static u64 MixVkObjectWithVkType(u64 Handle, VkObjectType Type)
+{
+	return Handle ^ (static_cast<uint64_t>(Type) << 48);
+}
+
 // INIT
-void InitializeSamplerManager(u32 Size)
+void InitializeGeneralHandleStorage(u32 Size)
 {
-	SamplerManager = System_HandleManager_InitData(Size, sizeof(SamplerData), GetNextHandleType());
-}
-
-void InitializePipelineManager(u32 Size)
-{
-	PipelineManager = System_HandleManager_InitData(Size, sizeof(PipelineData), GetNextHandleType());
-}
-
-void InitializePipelineLayoutManager(u32 Size)
-{
-	PipelineLayoutManager = System_HandleManager_InitData(Size, sizeof(PipelineLayoutData), GetNextHandleType());
+	Systems_PoolAllocator_Init(&GeneralHandleStorage, Size, sizeof(TrackedData));
+	Systems_SparceHashMap_Init(&GeneralHashMap, Size);
 }
 
 void InitializeDescriptorSetLayoutManager(u32 Size)
 {
 	DescriptorSetLayoutManager = System_HandleManager_InitData(Size, sizeof(DescriptorSetLayoutData), GetNextHandleType());
-}
-
-void InitializeDescriptorPoolManager(u32 Size)
-{
-	DescriptorPoolManager = System_HandleManager_InitData(Size, sizeof(DescriptorPoolData), GetNextHandleType());
 }
 
 void InitializeShaderManager(u32 Size)
@@ -58,29 +45,14 @@ void InitializeImageManager(u32 Size)
 	ImageManager = System_HandleManager_InitData(Size, sizeof(ImageResource), GetNextHandleType());
 }
 
-void InitializeImageViewManager(u32 Size)
-{
-	ImageViewManager = System_HandleManager_InitData(Size, sizeof(ImageViewData), GetNextHandleType());
-}
-
 void InitializeGPUBufferManager(u32 Size)
 {
 	GPUBufferManager = System_HandleManager_InitData(Size, sizeof(GPUBufferData), GetNextHandleType());
 }
 
-void InitializePushConstantManager(u32 Size)
-{
-	PushConstantsManager = System_HandleManager_InitData(Size, sizeof(PushConstantData), GetNextHandleType());
-}
-
 void InitializeDescriptorSetManager(u32 Size)
 {
 	DescriptorSetManager = System_HandleManager_InitData(Size, sizeof(DescriptorSetData), GetNextHandleType());
-}
-
-void InitializeFenceManager(u32 Size)
-{
-	FenceManager = System_HandleManager_InitData(Size, sizeof(FenceData), GetNextHandleType());
 }
 
 void InitializeSemaphoreManager(u32 Size)
@@ -100,29 +72,9 @@ void InitializeCommandBufferManager(u32 Size)
 // INIT
 
 // DEINIT
-void DeinitSamplerManager(void(*CleanupFunc)(SamplerData*))
-{
-	System_HandleManager_ClearData(SamplerManager, (void(*)(void*))CleanupFunc);
-}
-
-void DeinitPipelineManager(void(*CleanupFunc)(PipelineData*))
-{
-	System_HandleManager_ClearData(PipelineManager, (void(*)(void*))CleanupFunc);
-}
-
-void DeinitPipelineLayoutManager(void(*CleanupFunc)(PipelineLayoutData*))
-{
-	System_HandleManager_ClearData(PipelineLayoutManager, (void(*)(void*))CleanupFunc);
-}
-
 void DeinitDescriptorSetLayoutManager(void(*CleanupFunc)(DescriptorSetLayoutData*))
 {
 	System_HandleManager_ClearData(DescriptorSetLayoutManager, (void(*)(void*))CleanupFunc);
-}
-
-void DeinitDescriptorPoolManager(void(*CleanupFunc)(DescriptorPoolData*))
-{
-	System_HandleManager_ClearData(DescriptorPoolManager, (void(*)(void*))CleanupFunc);
 }
 
 void DeinitShaderManager(void(*CleanupFunc)(ShaderData*))
@@ -135,29 +87,14 @@ void DeinitImageManager(void(*CleanupFunc)(ImageResource*))
 	System_HandleManager_ClearData(ImageManager, (void(*)(void*))CleanupFunc);
 }
 
-void DeinitImageViewManager(void(*CleanUpFunc)(ImageViewData*))
-{
-	System_HandleManager_ClearData(ImageViewManager, (void(*)(void*))CleanUpFunc);
-}
-
 void DeinitGPUBufferManager(void(*CleanUpFunc)(GPUBufferData*))
 {
 	System_HandleManager_ClearData(GPUBufferManager, (void(*)(void*))CleanUpFunc);
 }
 
-void DeinitPushConstantManager()
-{
-	System_HandleManager_ClearData(PushConstantsManager);
-}
-
 void DeinitDescriptorSetManager()
 {
 	System_HandleManager_ClearData(DescriptorSetManager);
-}
-
-void DeinitFenceManager(void(*CleanUpFunc)(FenceData*))
-{
-	System_HandleManager_ClearData(FenceManager, (void(*)(void*))CleanUpFunc);
 }
 
 void DeinitSemaphoreManager(void(*CleanUpFunc)(SemaphoreData*))
@@ -174,28 +111,49 @@ void DeinitCommandBufferManager()
 {
 	System_HandleManager_ClearData(CommandBufferManager);
 }
+
+void DeinitGeneralHandleStorage(void(*CleanUpFunc)(TrackedData*))
+{
+	Systems_SparceHashMap_Free(&GeneralHashMap);
+	Systems_PoolAllocator_Free(&GeneralHandleStorage, (void(*)(void*))CleanUpFunc);
+}
 // DEINIT
 
 // CREATE
-BmRender_Sampler CreateSamplerHandle(const SamplerData* Data)
+BmRender_Sampler CreateSamplerHandle(VkSampler Sampler)
 {
-	BmRender_Sampler Handle;
-	Handle.Private = System_HandleManager_CreateHandle(SamplerManager, Data);
-	return Handle;
+	TrackedData Handle;
+	Handle.InternalData = Sampler;
+	Handle.Type = TrackedDataType::Sampler;
+
+	const u32 Index = Systems_PoolAllocator_PushData(&GeneralHandleStorage, &Handle);
+	Systems_SparceHashMap_Insert(&GeneralHashMap, MixVkObjectWithVkType((u64)Sampler, VkObjectType::VK_OBJECT_TYPE_SAMPLER), Index);
+
+	return (BmRender_Sampler)Sampler;
 }
 
-BmRender_Pipeline CreatePipelineHandle(const PipelineData* Data)
+BmRender_Pipeline CreatePipelineHandle(VkPipeline Pipeline)
 {
-	BmRender_Pipeline Handle;
-	Handle.Private = System_HandleManager_CreateHandle(PipelineManager, Data);
-	return Handle;
+	TrackedData Handle;
+	Handle.InternalData = Pipeline;
+	Handle.Type = TrackedDataType::Pipeline;
+
+	const u32 Index = Systems_PoolAllocator_PushData(&GeneralHandleStorage, &Handle);
+	Systems_SparceHashMap_Insert(&GeneralHashMap, MixVkObjectWithVkType((u64)Pipeline, VkObjectType::VK_OBJECT_TYPE_PIPELINE), Index);
+
+	return (BmRender_Pipeline)Pipeline;
 }
 
-BmRender_PipelineLayout CreatePipelineLayoutHandle(const PipelineLayoutData* Data)
+BmRender_PipelineLayout CreatePipelineLayoutHandle(VkPipelineLayout PipelineLayout)
 {
-	BmRender_PipelineLayout Handle;
-	Handle.Private = System_HandleManager_CreateHandle(PipelineLayoutManager, Data);
-	return Handle;
+	TrackedData Handle;
+	Handle.InternalData = PipelineLayout;
+	Handle.Type = TrackedDataType::PipelineLayout;
+
+	const u32 Index = Systems_PoolAllocator_PushData(&GeneralHandleStorage, &Handle);
+	Systems_SparceHashMap_Insert(&GeneralHashMap, MixVkObjectWithVkType((u64)PipelineLayout, VkObjectType::VK_OBJECT_TYPE_PIPELINE_LAYOUT), Index);
+
+	return (BmRender_PipelineLayout)PipelineLayout;
 }
 
 BmRender_DescriptorSetLayout CreateDescriptorSetLayoutHandle(const DescriptorSetLayoutData* Data)
@@ -205,11 +163,16 @@ BmRender_DescriptorSetLayout CreateDescriptorSetLayoutHandle(const DescriptorSet
 	return Handle;
 }
 
-BmRender_DescriptorPool CreateDescriptorPoolHandle(const DescriptorPoolData* Data)
+BmRender_DescriptorPool CreateDescriptorPoolHandle(VkDescriptorPool DescriptorPool)
 {
-	BmRender_DescriptorPool Handle;
-	Handle.Private = System_HandleManager_CreateHandle(DescriptorPoolManager, Data);
-	return Handle;
+	TrackedData Handle;
+	Handle.InternalData = DescriptorPool;
+	Handle.Type = TrackedDataType::DescriptorPool;
+
+	const u32 Index = Systems_PoolAllocator_PushData(&GeneralHandleStorage, &Handle);
+	Systems_SparceHashMap_Insert(&GeneralHashMap, MixVkObjectWithVkType((u64)DescriptorPool, VkObjectType::VK_OBJECT_TYPE_DESCRIPTOR_POOL), Index);
+
+	return (BmRender_DescriptorPool)DescriptorPool;
 }
 
 BmRender_Shader CreateShaderHandle(const ShaderData* Data)
@@ -226,11 +189,16 @@ BmRender_Image CreateImageHandle(const ImageResource* Data)
 	return Handle;
 }
 
-BmRender_ImageView CreateImageViewHandle(const ImageViewData* Data)
+BmRender_ImageView CreateImageViewHandle(VkImageView ImageView)
 {
-	BmRender_ImageView Handle;
-	Handle.Private = System_HandleManager_CreateHandle(ImageViewManager, Data);
-	return Handle;
+	TrackedData Handle;
+	Handle.InternalData = ImageView;
+	Handle.Type = TrackedDataType::ImageVIew;
+
+	const u32 Index = Systems_PoolAllocator_PushData(&GeneralHandleStorage, &Handle);
+	Systems_SparceHashMap_Insert(&GeneralHashMap, MixVkObjectWithVkType((u64)ImageView, VkObjectType::VK_OBJECT_TYPE_IMAGE_VIEW), Index);
+
+	return (BmRender_ImageView)ImageView;
 }
 
 BmRender_GPUBuffer CreateGPUBufferHandle(const GPUBufferData* Data)
@@ -240,12 +208,6 @@ BmRender_GPUBuffer CreateGPUBufferHandle(const GPUBufferData* Data)
 	return Handle;
 }
 
-BmRender_PushConstant CreatePushConstantHandle(const PushConstantData* Data)
-{
-	BmRender_PushConstant Handle;
-	Handle.Private = System_HandleManager_CreateHandle(PushConstantsManager, Data);
-	return Handle;
-}
 
 BmRender_DescriptorSet CreateDescriptorSetHandle(const DescriptorSetData* Data)
 {
@@ -254,11 +216,16 @@ BmRender_DescriptorSet CreateDescriptorSetHandle(const DescriptorSetData* Data)
 	return Handle;
 }
 
-BmRender_Fence CreateFenceHandle(const FenceData* Data)
+BmRender_Fence CreateFenceHandle(VkFence Fence)
 {
-	BmRender_Fence Handle;
-	Handle.Private = System_HandleManager_CreateHandle(FenceManager, Data);
-	return Handle;
+	TrackedData Handle;
+	Handle.InternalData = Fence;
+	Handle.Type = TrackedDataType::Fence;
+
+	const u32 Index = Systems_PoolAllocator_PushData(&GeneralHandleStorage, &Handle);
+	Systems_SparceHashMap_Insert(&GeneralHashMap, MixVkObjectWithVkType((u64)Fence, VkObjectType::VK_OBJECT_TYPE_FENCE), Index);
+
+	return (BmRender_Fence)Fence;
 }
 
 BmRender_Semaphore CreateSemaphoreHandle(const SemaphoreData* Data)
@@ -286,17 +253,29 @@ BmRender_CommandBuffer CreateCommandBufferHandle(const CommandBufferData* Data)
 // DESTROY
 void DestroySamplerHandle(BmRender_Sampler Handle)
 {
-	System_HandleManager_DestroyHandle(SamplerManager, Handle.Private);
+	u32 Index;
+	if (Systems_SparceHashMap_Remove(&GeneralHashMap, (u64)Handle, &Index))
+	{
+		Systems_PoolAllocator_FreeData(&GeneralHandleStorage, Index);
+	}
 }
 
 void DestroyPipelineHandle(BmRender_Pipeline Handle)
 {
-	System_HandleManager_DestroyHandle(PipelineManager, Handle.Private);
+	u32 Index;
+	if (Systems_SparceHashMap_Remove(&GeneralHashMap, (u64)Handle, &Index))
+	{
+		Systems_PoolAllocator_FreeData(&GeneralHandleStorage, Index);
+	}
 }
 
 void DestroyPipelineLayoutHandle(BmRender_PipelineLayout Handle)
 {
-	System_HandleManager_DestroyHandle(PipelineLayoutManager, Handle.Private);
+	u32 Index;
+	if (Systems_SparceHashMap_Remove(&GeneralHashMap, (u64)Handle, &Index))
+	{
+		Systems_PoolAllocator_FreeData(&GeneralHandleStorage, Index);
+	}
 }
 
 void DestroyDescriptorSetLayoutHandle(BmRender_DescriptorSetLayout Handle)
@@ -306,7 +285,11 @@ void DestroyDescriptorSetLayoutHandle(BmRender_DescriptorSetLayout Handle)
 
 void DestroyDescriptorPoolHandle(BmRender_DescriptorPool Handle)
 {
-	System_HandleManager_DestroyHandle(DescriptorPoolManager, Handle.Private);
+	u32 Index;
+	if (Systems_SparceHashMap_Remove(&GeneralHashMap, (u64)Handle, &Index))
+	{
+		Systems_PoolAllocator_FreeData(&GeneralHandleStorage, Index);
+	}
 }
 
 void DestroyShaderHandle(BmRender_Shader Handle)
@@ -321,7 +304,11 @@ void DestroyImageHandle(BmRender_Image Handle)
 
 void DestroyImageViewHandle(BmRender_ImageView Handle)
 {
-	System_HandleManager_DestroyHandle(ImageViewManager, Handle.Private);
+	u32 Index;
+	if (Systems_SparceHashMap_Remove(&GeneralHashMap, (u64)Handle, &Index))
+	{
+		Systems_PoolAllocator_FreeData(&GeneralHandleStorage, Index);
+	}
 }
 
 void DestroyGPUBufferHandle(BmRender_GPUBuffer Handle)
@@ -330,14 +317,14 @@ void DestroyGPUBufferHandle(BmRender_GPUBuffer Handle)
 }
 
 
-void DestroyPushConstantHandle(BmRender_PushConstant Handle)
-{
-	System_HandleManager_DestroyHandle(PushConstantsManager, Handle.Private);
-}
 
 void DestroyFenceHandle(BmRender_Fence Handle)
 {
-	System_HandleManager_DestroyHandle(FenceManager, Handle.Private);
+	u32 Index;
+	if (Systems_SparceHashMap_Remove(&GeneralHashMap, (u64)Handle, &Index))
+	{
+		Systems_PoolAllocator_FreeData(&GeneralHandleStorage, Index);
+	}
 }
 
 void DestroySemaphoreHandle(BmRender_Semaphore Handle)
@@ -357,29 +344,9 @@ void DestroyCommandBufferHandle(BmRender_CommandBuffer Handle)
 // DESTROY
 
 // GET
-SamplerData* GetSamplerData(BmRender_Sampler Handle)
-{
-	return (SamplerData*)System_HandleManager_GetHandleData(SamplerManager, Handle.Private);
-}
-
-PipelineData* GetPipelineData(BmRender_Pipeline Handle)
-{
-	return (PipelineData*)System_HandleManager_GetHandleData(PipelineManager, Handle.Private);
-}
-
-PipelineLayoutData* GetPipelineLayoutData(BmRender_PipelineLayout Handle)
-{
-	return (PipelineLayoutData*)System_HandleManager_GetHandleData(PipelineLayoutManager, Handle.Private);
-}
-
 DescriptorSetLayoutData* GetDescriptorSetLayoutData(BmRender_DescriptorSetLayout Handle)
 {
 	return (DescriptorSetLayoutData*)System_HandleManager_GetHandleData(DescriptorSetLayoutManager, Handle.Private);
-}
-
-DescriptorPoolData* GetDescriptorPoolData(BmRender_DescriptorPool Handle)
-{
-	return (DescriptorPoolData*)System_HandleManager_GetHandleData(DescriptorPoolManager, Handle.Private);
 }
 
 ShaderData* GetShaderData(BmRender_Shader Handle)
@@ -392,29 +359,14 @@ ImageResource* GetImageData(BmRender_Image Handle)
 	return (ImageResource*)System_HandleManager_GetHandleData(ImageManager, Handle.Private);
 }
 
-ImageViewData* GetImageViewData(BmRender_ImageView Handle)
-{
-	return (ImageViewData*)System_HandleManager_GetHandleData(ImageViewManager, Handle.Private);
-}
-
 GPUBufferData* GetGPUBufferData(BmRender_GPUBuffer Handle)
 {
 	return (GPUBufferData*)System_HandleManager_GetHandleData(GPUBufferManager, Handle.Private);
 }
 
-PushConstantData* GetPushConstantData(BmRender_PushConstant Handle)
-{
-	return (PushConstantData*)System_HandleManager_GetHandleData(PushConstantsManager, Handle.Private);
-}
-
 DescriptorSetData* GetDescriptorSetData(BmRender_DescriptorSet Handle)
 {
 	return (DescriptorSetData*)System_HandleManager_GetHandleData(DescriptorSetManager, Handle.Private);
-}
-
-FenceData* GetFenceData(BmRender_Fence Handle)
-{
-	return (FenceData*)System_HandleManager_GetHandleData(FenceManager, Handle.Private);
 }
 
 SemaphoreData* GetSemaphoreData(BmRender_Semaphore Handle)

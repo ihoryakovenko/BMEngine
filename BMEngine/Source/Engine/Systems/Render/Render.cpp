@@ -159,13 +159,16 @@ namespace Render
 	{
 		CommandBufferData* CmdBufferData = GetCommandBufferData(CommandBuffer);
 		VkCommandBuffer CmdBuffer = CmdBufferData->VulkanCommandBuffer;
-		VkPipelineLayout PipelineLayout = GetPipelineLayoutData(Config.PipelineLayout)->VulkanPipelineLayout;
+		VkPipelineLayout PipelineLayout = (VkPipelineLayout)Config.PipelineLayout;
 
 		BmRender_BindPipeline(CommandBuffer, Config.Pipeline);
 
-		if (Config.PushConstant.Private != 0 && Config.PushConstantData != nullptr)
+		if (Config.PushConstant.offset != 0 || Config.PushConstant.size != 0)
 		{
-			VkPushConstantRange PushConstantRange = GetPushConstantData(Config.PushConstant)->PushConstants;
+			VkPushConstantRange PushConstantRange;
+			PushConstantRange.offset = Config.PushConstant.offset;
+			PushConstantRange.size = Config.PushConstant.size;
+			PushConstantRange.stageFlags = Config.PushConstant.stageFlags;
 			vkCmdPushConstants(CmdBuffer, PipelineLayout, PushConstantRange.stageFlags, 
 				PushConstantRange.offset, PushConstantRange.size, Config.PushConstantData);
 		}
@@ -448,7 +451,7 @@ namespace DeferredPass
 		CommandBufferData* CmdBufferData = GetCommandBufferData(SubmitPool->CommandBuffer);
 		VkCommandBuffer CmdBuffer = CmdBufferData->VulkanCommandBuffer;
 
-		VkPipelineLayout PipelineLayout = GetPipelineLayoutData(PipelineLayouts["Deferred"])->VulkanPipelineLayout;
+		VkPipelineLayout PipelineLayout = (VkPipelineLayout)PipelineLayouts["Deferred"];
 
 		BmRender_BindPipeline(SubmitPool->CommandBuffer, Pipelines["Deferred"]);
 
@@ -651,7 +654,7 @@ namespace LightningPass
 			Config.DescriptorSetCount = 1;
 			Config.DynamicOffsetCount = 0;
 			Config.DynamicOffsets = nullptr;
-			Config.PushConstant.Private = 0;
+			Config.PushConstant = {};
 			Config.PushConstantData = nullptr;
 
 			Render::DrawEntityBatch(SubmitPool->CommandBuffer, Scene, Config);

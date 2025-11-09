@@ -12,26 +12,27 @@
 
 struct GLFWwindow;
 
+enum class TrackedDataType
+{
+	Sampler,
+	Pipeline,
+	PipelineLayout,
+	DescriptorPool,
+	Fence,
+	ImageVIew,
+};
+
+struct TrackedData
+{
+	TrackedDataType Type;
+	void* InternalData;
+};
+
 namespace VulkanCoreContext
 {
 	struct VulkanCoreContext;
 }
 
-
-struct SamplerData
-{
-	VkSampler VulkanSampler;
-};
-
-struct PipelineData
-{
-	VkPipeline VulkanPipeline;
-};
-
-struct PipelineLayoutData
-{
-	VkPipelineLayout VulkanPipelineLayout;
-};
 
 struct DescriptorSetLayoutBinding
 {
@@ -45,10 +46,6 @@ struct DescriptorSetLayoutData
 	u32 BindingsCount;
 };
 
-struct DescriptorPoolData
-{
-	VkDescriptorPool VulkanDescriptorPool;
-};
 
 struct ShaderData
 {
@@ -68,12 +65,6 @@ struct ImageResource
 	u32 Height;
 };
 
-struct ImageViewData
-{
-	VkImageView View;
-	BmRender_Image ParentImage;
-};
-
 struct GPUBufferData
 {
 	VkBuffer Buffer;
@@ -89,15 +80,6 @@ struct DescriptorSetData
 	BmRender_DescriptorSetLayout Layout;
 };
 
-struct PushConstantData
-{
-	VkPushConstantRange PushConstants;
-};
-
-struct FenceData
-{
-	VkFence VulkanFence;
-};
 
 struct SemaphoreData
 {
@@ -117,16 +99,11 @@ struct CommandBufferData
 	BmRender_CommandPool CommandPool;
 };
 
-void OnSamplerClear(SamplerData* SamplerData);
-void OnPipelineClear(PipelineData* PipelineData);
-void OnPipelineLayoutClear(PipelineLayoutData* LayoutData);
+void DestroyTrackedData(TrackedData* Data);
 void OnDescriptorSetLayoutClear(DescriptorSetLayoutData* LayoutData);
-void OnDescriptorPoolClear(DescriptorPoolData* PoolData);
 void OnShaderClear(ShaderData* Shader);
 void OnImageClear(ImageResource* Image);
-void OnImageViewClear(ImageViewData* Data);
 void OnGPUBufferClear(GPUBufferData* Data);
-void OnFenceClear(FenceData* Fence);
 void OnSemaphoreClear(SemaphoreData* Semaphore);
 void OnCommandPoolClear(CommandPoolData* CommandPool);
 
