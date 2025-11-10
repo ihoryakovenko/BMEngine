@@ -102,43 +102,6 @@ void DeinitFrameMemory()
 	Memory::DestroyFrameMemory(FrameMemory);
 }
 
-void DestroyTrackedData(TrackedData* Data)
-{
-	VkDevice Device = GetCoreContext()->LogicalDevice;
-
-	switch (Data->Type)
-	{
-		case TrackedDataType::Sampler:
-			vkDestroySampler(Device, (VkSampler)Data->InternalData, GetVulkanAllocator());
-			break;
-
-		case TrackedDataType::Pipeline:
-			vkDestroyPipeline(Device, (VkPipeline)Data->InternalData, GetVulkanAllocator());
-			break;
-
-		case TrackedDataType::PipelineLayout:
-			vkDestroyPipelineLayout(Device, (VkPipelineLayout)Data->InternalData, GetVulkanAllocator());
-			break;
-
-		case TrackedDataType::DescriptorPool:
-			vkDestroyDescriptorPool(Device, (VkDescriptorPool)Data->InternalData, GetVulkanAllocator());
-			break;
-
-		case TrackedDataType::Fence:
-			vkDestroyFence(Device, (VkFence)Data->InternalData, GetVulkanAllocator());
-			break;
-
-		case TrackedDataType::ImageVIew:
-			vkDestroyImageView(Device, (VkImageView)Data->InternalData, GetVulkanAllocator());
-			break;
-
-		default:
-			assert(false);
-			break;
-	}
-}
-
-
 void OnDescriptorSetLayoutClear(DescriptorSetLayoutData* LayoutData)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
@@ -190,14 +153,14 @@ BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout
 	DescriptorSetData NewSet;
 	NewSet.Layout = LayoutHandle;
 
-	DescriptorSetLayoutData* Layout = GetDescriptorSetLayoutData(LayoutHandle);
 	VkDescriptorPool Pool = (VkDescriptorPool)PoolHandle;
 
+	VkDescriptorSetLayout VkLayout = (VkDescriptorSetLayout)LayoutHandle;
 	VkDescriptorSetAllocateInfo AllocInfo = { };
 	AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	AllocInfo.descriptorPool = Pool;
 	AllocInfo.descriptorSetCount = 1;
-	AllocInfo.pSetLayouts = &Layout->Layout;
+	AllocInfo.pSetLayouts = &VkLayout;
 
 	VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, &NewSet.Set));
 
@@ -231,9 +194,11 @@ BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_D
 	LayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
 	LayoutCreateInfo.pNext = nullptr;
 
-	VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, GetVulkanAllocator(), &Layout.Layout));
+	VkDescriptorSetLayout VkLayout;
+	VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, GetVulkanAllocator(), &VkLayout));
+	Layout.Layout = VkLayout;
 
-	return CreateDescriptorSetLayoutHandle(&Layout);
+	return CreateDescriptorSetLayoutHandle(VkLayout, &Layout);
 }
 
 void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount)
@@ -241,7 +206,8 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, co
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 
 	DescriptorSetData* Set = GetDescriptorSetData(DescriptorSetHandle);
-	DescriptorSetLayoutData* Layout = GetDescriptorSetLayoutData(Set->Layout);
+	DescriptorSetLayoutData Layout;
+	GetDescriptorSetLayoutData(Set->Layout, &Layout);
 
 	VkWriteDescriptorSet* WriteDescriptorSets = (VkWriteDescriptorSet*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkWriteDescriptorSet) * BindingsCount);
 
@@ -249,7 +215,7 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, co
 	{
 		const BmRender_DescriptorSetBinding& Binding = Bindings[i];
 
-		VkDescriptorType DescriptorType = Layout->LayoutBindings[i].DescriptorType;
+		VkDescriptorType DescriptorType = Layout.LayoutBindings[i].DescriptorType;
 
 		WriteDescriptorSets[i] = { };
 		WriteDescriptorSets[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -610,7 +576,7 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 	VkDescriptorSetLayout* VkSetLayouts = (VkDescriptorSetLayout*)Memory::FrameAlloc(GetFrameMemory(), Description->SetLayoutCount * sizeof(VkDescriptorSetLayout));
 	for (u32 i = 0; i < Description->SetLayoutCount; ++i)
 	{
-		VkSetLayouts[i] = GetDescriptorSetLayoutData(Description->SetLayouts[i])->Layout;
+		VkSetLayouts[i] = (VkDescriptorSetLayout)Description->SetLayouts[i];
 	}
 
 	VkPushConstantRange* VkPushConstantRanges = (VkPushConstantRange*)Memory::FrameAlloc(GetFrameMemory(), Description->PushConstantRangeCount * sizeof(VkPushConstantRange));
@@ -834,33 +800,34 @@ void BmRender_UpdateHostCompatibleBuffer(BmRender_GPUBuffer StagingBuffer, u64 B
 
 void BmRender_DestroyPipelineLayout(BmRender_PipelineLayout Handle)
 {
-	DestroyPipelineLayoutHandle(Handle);
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDestroyPipelineLayout(Device, (VkPipelineLayout)Handle, GetVulkanAllocator());
 }
 
 void BmRender_DestroySampler(BmRender_Sampler Handle)
 {
-	DestroySamplerHandle(Handle);
-
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	vkDestroySampler(Device, (VkSampler)Handle, GetVulkanAllocator());
 }
 
 void BmRender_DestroyDescriptorSetLayout(BmRender_DescriptorSetLayout Handle)
 {
-	VkDevice Device = GetCoreContext()->LogicalDevice;
-	auto Data = GetDescriptorSetLayoutData(Handle);
-	OnDescriptorSetLayoutClear(Data);
+	DescriptorSetLayoutData Data;
+	GetDescriptorSetLayoutData(Handle, &Data);
+	OnDescriptorSetLayoutClear(&Data);
 	DestroyDescriptorSetLayoutHandle(Handle);
 }
 
 void BmRender_DestroyDescriptorPool(BmRender_DescriptorPool Handle)
 {
-	DestroyDescriptorPoolHandle(Handle);
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDestroyDescriptorPool(Device, (VkDescriptorPool)Handle, GetVulkanAllocator());
 }
 
 void BmRender_DestroyPipeline(BmRender_Pipeline Handle)
 {
-	DestroyPipelineHandle(Handle);
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDestroyPipeline(Device, (VkPipeline)Handle, GetVulkanAllocator());
 }
 
 void BmRender_DestroyShader(BmRender_Shader Handle)
@@ -879,9 +846,16 @@ void BmRender_DestroyImage(BmRender_Image Handle)
 	DestroyImageHandle(Handle);
 }
 
+void BmRender_DestroyImageView(BmRender_ImageView Handle)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDestroyImageView(Device, (VkImageView)Handle, GetVulkanAllocator());
+}
+
 void BmRender_DestroyFence(BmRender_Fence Handle)
 {
-	DestroyFenceHandle(Handle);
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDestroyFence(Device, (VkFence)Handle, GetVulkanAllocator());
 }
 
 void BmRender_DestroySemaphore(BmRender_Semaphore Handle)

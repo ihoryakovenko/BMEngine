@@ -394,6 +394,11 @@ namespace VulkanCoreContext
 
 	void DestroyCoreContext(VulkanCoreContext* Context)
 	{
+		for (u32 i = 0; i < Context->ImagesCount; i++)
+		{
+			BmRender_DestroyImageView(Context->ImageViews[i]);
+		}
+
 		vkDestroySwapchainKHR(Context->LogicalDevice, Context->VulkanSwapchain, nullptr);
 		vkDestroySurfaceKHR(Context->VulkanInstance, Context->Surface, nullptr);
 

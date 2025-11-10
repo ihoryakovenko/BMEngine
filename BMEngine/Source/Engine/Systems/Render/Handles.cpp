@@ -1,17 +1,5 @@
 #include "Handles.h"
 
-static PoolAllocator GeneralHandleStorage;
-static SparceHashMap GeneralHashMap;
-
-static System_HandleManager DescriptorSetLayoutManager;
-static System_HandleManager ShaderManager;
-static System_HandleManager ImageManager;
-static System_HandleManager GPUBufferManager;
-static System_HandleManager DescriptorSetManager;
-static System_HandleManager SemaphoreManager;
-static System_HandleManager CommandPoolManager;
-static System_HandleManager CommandBufferManager;
-
 static u16 GetNextHandleType()
 {
 	static u16 HandleType = 0;
@@ -23,16 +11,43 @@ static u64 MixVkObjectWithVkType(u64 Handle, VkObjectType Type)
 	return Handle ^ (static_cast<uint64_t>(Type) << 48);
 }
 
-// INIT
-void InitializeGeneralHandleStorage(u32 Size)
+struct StoragePair
 {
-	Systems_PoolAllocator_Init(&GeneralHandleStorage, Size, sizeof(TrackedData));
-	Systems_SparceHashMap_Init(&GeneralHashMap, Size);
+	PoolAllocator Allocator;
+	SparceHashMap HashMap;
+};
+
+static void OnStorageClear(StoragePair* Storage, void(*CleanUpFunc)(void* CleanupData))
+{
+	for (u64 i = 0; i < Storage->HashMap.Capacity; ++i)
+	{
+		if (Storage->HashMap.Occupied[i])
+		{
+			DescriptorSetLayoutData Data;
+			Systems_PoolAllocator_GetData(&Storage->Allocator, Storage->HashMap.Indices[i], &Data);
+			CleanUpFunc(&Data);
+		}
+	}
+
+	Systems_SparceHashMap_Free(&Storage->HashMap);
+	Systems_PoolAllocator_Free(&Storage->Allocator);
 }
 
+static StoragePair DescriptorSetLayoutStorage;
+
+static System_HandleManager ShaderManager;
+static System_HandleManager ImageManager;
+static System_HandleManager GPUBufferManager;
+static System_HandleManager DescriptorSetManager;
+static System_HandleManager SemaphoreManager;
+static System_HandleManager CommandPoolManager;
+static System_HandleManager CommandBufferManager;
+
+// INIT
 void InitializeDescriptorSetLayoutManager(u32 Size)
 {
-	DescriptorSetLayoutManager = System_HandleManager_InitData(Size, sizeof(DescriptorSetLayoutData), GetNextHandleType());
+	Systems_PoolAllocator_Init(&DescriptorSetLayoutStorage.Allocator, Size, sizeof(DescriptorSetLayoutData));
+	Systems_SparceHashMap_Init(&DescriptorSetLayoutStorage.HashMap, Size);
 }
 
 void InitializeShaderManager(u32 Size)
@@ -74,7 +89,7 @@ void InitializeCommandBufferManager(u32 Size)
 // DEINIT
 void DeinitDescriptorSetLayoutManager(void(*CleanupFunc)(DescriptorSetLayoutData*))
 {
-	System_HandleManager_ClearData(DescriptorSetLayoutManager, (void(*)(void*))CleanupFunc);
+	OnStorageClear(&DescriptorSetLayoutStorage, (void(*)(void*))CleanupFunc);
 }
 
 void DeinitShaderManager(void(*CleanupFunc)(ShaderData*))
@@ -111,67 +126,34 @@ void DeinitCommandBufferManager()
 {
 	System_HandleManager_ClearData(CommandBufferManager);
 }
-
-void DeinitGeneralHandleStorage(void(*CleanUpFunc)(TrackedData*))
-{
-	Systems_SparceHashMap_Free(&GeneralHashMap);
-	Systems_PoolAllocator_Free(&GeneralHandleStorage, (void(*)(void*))CleanUpFunc);
-}
 // DEINIT
 
 // CREATE
 BmRender_Sampler CreateSamplerHandle(VkSampler Sampler)
 {
-	TrackedData Handle;
-	Handle.InternalData = Sampler;
-	Handle.Type = TrackedDataType::Sampler;
-
-	const u32 Index = Systems_PoolAllocator_PushData(&GeneralHandleStorage, &Handle);
-	Systems_SparceHashMap_Insert(&GeneralHashMap, MixVkObjectWithVkType((u64)Sampler, VkObjectType::VK_OBJECT_TYPE_SAMPLER), Index);
-
 	return (BmRender_Sampler)Sampler;
 }
 
 BmRender_Pipeline CreatePipelineHandle(VkPipeline Pipeline)
 {
-	TrackedData Handle;
-	Handle.InternalData = Pipeline;
-	Handle.Type = TrackedDataType::Pipeline;
-
-	const u32 Index = Systems_PoolAllocator_PushData(&GeneralHandleStorage, &Handle);
-	Systems_SparceHashMap_Insert(&GeneralHashMap, MixVkObjectWithVkType((u64)Pipeline, VkObjectType::VK_OBJECT_TYPE_PIPELINE), Index);
-
 	return (BmRender_Pipeline)Pipeline;
 }
 
 BmRender_PipelineLayout CreatePipelineLayoutHandle(VkPipelineLayout PipelineLayout)
 {
-	TrackedData Handle;
-	Handle.InternalData = PipelineLayout;
-	Handle.Type = TrackedDataType::PipelineLayout;
-
-	const u32 Index = Systems_PoolAllocator_PushData(&GeneralHandleStorage, &Handle);
-	Systems_SparceHashMap_Insert(&GeneralHashMap, MixVkObjectWithVkType((u64)PipelineLayout, VkObjectType::VK_OBJECT_TYPE_PIPELINE_LAYOUT), Index);
-
 	return (BmRender_PipelineLayout)PipelineLayout;
 }
 
-BmRender_DescriptorSetLayout CreateDescriptorSetLayoutHandle(const DescriptorSetLayoutData* Data)
+BmRender_DescriptorSetLayout CreateDescriptorSetLayoutHandle(VkDescriptorSetLayout Layout, const DescriptorSetLayoutData* Data)
 {
-	BmRender_DescriptorSetLayout Handle;
-	Handle.Private = System_HandleManager_CreateHandle(DescriptorSetLayoutManager, Data);
-	return Handle;
+	const u32 Index = Systems_PoolAllocator_PushData(&DescriptorSetLayoutStorage.Allocator, Data);
+	Systems_SparceHashMap_Insert(&DescriptorSetLayoutStorage.HashMap, (u64)Layout, Index);
+
+	return (BmRender_DescriptorSetLayout)Layout;
 }
 
 BmRender_DescriptorPool CreateDescriptorPoolHandle(VkDescriptorPool DescriptorPool)
 {
-	TrackedData Handle;
-	Handle.InternalData = DescriptorPool;
-	Handle.Type = TrackedDataType::DescriptorPool;
-
-	const u32 Index = Systems_PoolAllocator_PushData(&GeneralHandleStorage, &Handle);
-	Systems_SparceHashMap_Insert(&GeneralHashMap, MixVkObjectWithVkType((u64)DescriptorPool, VkObjectType::VK_OBJECT_TYPE_DESCRIPTOR_POOL), Index);
-
 	return (BmRender_DescriptorPool)DescriptorPool;
 }
 
@@ -191,13 +173,6 @@ BmRender_Image CreateImageHandle(const ImageResource* Data)
 
 BmRender_ImageView CreateImageViewHandle(VkImageView ImageView)
 {
-	TrackedData Handle;
-	Handle.InternalData = ImageView;
-	Handle.Type = TrackedDataType::ImageVIew;
-
-	const u32 Index = Systems_PoolAllocator_PushData(&GeneralHandleStorage, &Handle);
-	Systems_SparceHashMap_Insert(&GeneralHashMap, MixVkObjectWithVkType((u64)ImageView, VkObjectType::VK_OBJECT_TYPE_IMAGE_VIEW), Index);
-
 	return (BmRender_ImageView)ImageView;
 }
 
@@ -218,13 +193,6 @@ BmRender_DescriptorSet CreateDescriptorSetHandle(const DescriptorSetData* Data)
 
 BmRender_Fence CreateFenceHandle(VkFence Fence)
 {
-	TrackedData Handle;
-	Handle.InternalData = Fence;
-	Handle.Type = TrackedDataType::Fence;
-
-	const u32 Index = Systems_PoolAllocator_PushData(&GeneralHandleStorage, &Handle);
-	Systems_SparceHashMap_Insert(&GeneralHashMap, MixVkObjectWithVkType((u64)Fence, VkObjectType::VK_OBJECT_TYPE_FENCE), Index);
-
 	return (BmRender_Fence)Fence;
 }
 
@@ -251,44 +219,13 @@ BmRender_CommandBuffer CreateCommandBufferHandle(const CommandBufferData* Data)
 // CREATE
 
 // DESTROY
-void DestroySamplerHandle(BmRender_Sampler Handle)
-{
-	u32 Index;
-	if (Systems_SparceHashMap_Remove(&GeneralHashMap, (u64)Handle, &Index))
-	{
-		Systems_PoolAllocator_FreeData(&GeneralHandleStorage, Index);
-	}
-}
-
-void DestroyPipelineHandle(BmRender_Pipeline Handle)
-{
-	u32 Index;
-	if (Systems_SparceHashMap_Remove(&GeneralHashMap, (u64)Handle, &Index))
-	{
-		Systems_PoolAllocator_FreeData(&GeneralHandleStorage, Index);
-	}
-}
-
-void DestroyPipelineLayoutHandle(BmRender_PipelineLayout Handle)
-{
-	u32 Index;
-	if (Systems_SparceHashMap_Remove(&GeneralHashMap, (u64)Handle, &Index))
-	{
-		Systems_PoolAllocator_FreeData(&GeneralHandleStorage, Index);
-	}
-}
-
 void DestroyDescriptorSetLayoutHandle(BmRender_DescriptorSetLayout Handle)
 {
-	System_HandleManager_DestroyHandle(DescriptorSetLayoutManager, Handle.Private);
-}
-
-void DestroyDescriptorPoolHandle(BmRender_DescriptorPool Handle)
-{
+	VkDescriptorSetLayout Layout = (VkDescriptorSetLayout)Handle;
 	u32 Index;
-	if (Systems_SparceHashMap_Remove(&GeneralHashMap, (u64)Handle, &Index))
+	if (Systems_SparceHashMap_Remove(&DescriptorSetLayoutStorage.HashMap, (u64)Layout, &Index))
 	{
-		Systems_PoolAllocator_FreeData(&GeneralHandleStorage, Index);
+		Systems_PoolAllocator_FreeData(&DescriptorSetLayoutStorage.Allocator, Index);
 	}
 }
 
@@ -302,15 +239,6 @@ void DestroyImageHandle(BmRender_Image Handle)
 	System_HandleManager_DestroyHandle(ImageManager, Handle.Private);
 }
 
-void DestroyImageViewHandle(BmRender_ImageView Handle)
-{
-	u32 Index;
-	if (Systems_SparceHashMap_Remove(&GeneralHashMap, (u64)Handle, &Index))
-	{
-		Systems_PoolAllocator_FreeData(&GeneralHandleStorage, Index);
-	}
-}
-
 void DestroyGPUBufferHandle(BmRender_GPUBuffer Handle)
 {
 	System_HandleManager_DestroyHandle(GPUBufferManager, Handle.Private);
@@ -318,14 +246,6 @@ void DestroyGPUBufferHandle(BmRender_GPUBuffer Handle)
 
 
 
-void DestroyFenceHandle(BmRender_Fence Handle)
-{
-	u32 Index;
-	if (Systems_SparceHashMap_Remove(&GeneralHashMap, (u64)Handle, &Index))
-	{
-		Systems_PoolAllocator_FreeData(&GeneralHandleStorage, Index);
-	}
-}
 
 void DestroySemaphoreHandle(BmRender_Semaphore Handle)
 {
@@ -344,9 +264,14 @@ void DestroyCommandBufferHandle(BmRender_CommandBuffer Handle)
 // DESTROY
 
 // GET
-DescriptorSetLayoutData* GetDescriptorSetLayoutData(BmRender_DescriptorSetLayout Handle)
+void GetDescriptorSetLayoutData(BmRender_DescriptorSetLayout Handle, DescriptorSetLayoutData* OutData)
 {
-	return (DescriptorSetLayoutData*)System_HandleManager_GetHandleData(DescriptorSetLayoutManager, Handle.Private);
+	VkDescriptorSetLayout Layout = (VkDescriptorSetLayout)Handle;
+	u32 Index;
+	if (Systems_SparceHashMap_Get(&DescriptorSetLayoutStorage.HashMap, (u64)Layout, &Index))
+	{
+		Systems_PoolAllocator_GetData(&DescriptorSetLayoutStorage.Allocator, Index, OutData);
+	}
 }
 
 ShaderData* GetShaderData(BmRender_Shader Handle)

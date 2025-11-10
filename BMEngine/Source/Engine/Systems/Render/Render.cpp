@@ -271,7 +271,30 @@ namespace Render
 
 		DeInitImGuiPipeline(Device, State.DebugUiPool);
 		
-		//TerrainRender::DeInit();
+		for (u32 i = 0; i < GetCoreContext()->ImagesCount; i++)
+		{
+			BmRender_DestroyImageView(State.MeshPipeline.ShadowMapArrayImageInterface[i]);
+		}
+
+		DeferredPass::DeInit();
+		LightningPass::DeInit();
+
+		for (auto& [name, pipeline] : Pipelines)
+		{
+			BmRender_DestroyPipeline(pipeline);
+		}
+
+		for (auto& [name, layout] : PipelineLayouts)
+		{
+			BmRender_DestroyPipelineLayout(layout);
+		}
+
+		for (auto& [name, sampler] : Samplers)
+		{
+			BmRender_DestroySampler(sampler);
+		}
+
+		BmRender_DestroyDescriptorPool(State.MainPool);
 
 		DeInitDrawSystem();
 		DeInitCommandSystem();
@@ -363,11 +386,11 @@ namespace DeferredPass
 
 	static VkDescriptorSetLayout DeferredInputLayout;
 
-		static BmRender_Image DeferredInputDepthImage[VulkanHelper::MAX_DRAW_FRAMES];
-		static BmRender_Image DeferredInputColorImage[VulkanHelper::MAX_DRAW_FRAMES];
+	static BmRender_Image DeferredInputDepthImage[VulkanHelper::MAX_DRAW_FRAMES];
+	static BmRender_Image DeferredInputColorImage[VulkanHelper::MAX_DRAW_FRAMES];
 		
-		static BmRender_ImageView DeferredInputDepthImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
-		static BmRender_ImageView DeferredInputColorImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
+	static BmRender_ImageView DeferredInputDepthImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
+	static BmRender_ImageView DeferredInputColorImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
 
 	static BmRender_DescriptorSet DeferredInputSet[VulkanHelper::MAX_DRAW_FRAMES];
 
@@ -386,7 +409,7 @@ namespace DeferredPass
 		PipelineAttachmentData.DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
 		PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
-		DeferredInputLayout = GetDescriptorSetLayoutData(DescriptorSetLayouts["MainPassOutputLayout"])->Layout;
+		DeferredInputLayout = (VkDescriptorSetLayout)DescriptorSetLayouts["MainPassOutputLayout"];
 
 		for (u32 i = 0; i < GetCoreContext()->ImagesCount; i++)
 		{
@@ -523,6 +546,15 @@ namespace DeferredPass
 	{
 		return &PipelineAttachmentData;
 	}
+
+	void DeInit()
+	{
+		for (u32 i = 0; i < GetCoreContext()->ImagesCount; i++)
+		{
+			BmRender_DestroyImageView(DeferredInputColorImageInterface[i]);
+			BmRender_DestroyImageView(DeferredInputDepthImageInterface[i]);
+		}
+	}
 }
 
 namespace LightningPass
@@ -546,7 +578,7 @@ namespace LightningPass
 		VkDevice Device = GetCoreContext()->LogicalDevice;
 		VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
 
-		LightSpaceMatrixLayout = GetDescriptorSetLayoutData(DescriptorSetLayouts["LightSpaceMatrixLayout"])->Layout;
+		LightSpaceMatrixLayout = (VkDescriptorSetLayout)DescriptorSetLayouts["LightSpaceMatrixLayout"];
 
 		ShadowMapArray = BmRender_CreateImage2DArray(DepthViewportExtent.width, DepthViewportExtent.height, DepthFormat,
 			BmRender_ImageType::DepthSamplad, MAX_LIGHT_SOURCES * GetCoreContext()->ImagesCount);
@@ -664,6 +696,15 @@ namespace LightningPass
 
 		// TODO: move to Main pass?
 		BmRender_TransitionImageForSampling(SubmitPool->CommandBuffer, ShadowMapArray, MAX_LIGHT_SOURCES * GetDrawSystemData()->CurrentFrame, MAX_LIGHT_SOURCES);
+	}
+
+	void DeInit()
+	{
+		for (u32 i = 0; i < GetCoreContext()->ImagesCount; i++)
+		{
+			BmRender_DestroyImageView(ShadowMapElement1ImageInterface[i]);
+			BmRender_DestroyImageView(ShadowMapElement2ImageInterface[i]);
+		}
 	}
 }
 

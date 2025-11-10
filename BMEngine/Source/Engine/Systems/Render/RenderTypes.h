@@ -12,22 +12,6 @@
 
 struct GLFWwindow;
 
-enum class TrackedDataType
-{
-	Sampler,
-	Pipeline,
-	PipelineLayout,
-	DescriptorPool,
-	Fence,
-	ImageVIew,
-};
-
-struct TrackedData
-{
-	TrackedDataType Type;
-	void* InternalData;
-};
-
 namespace VulkanCoreContext
 {
 	struct VulkanCoreContext;
@@ -99,7 +83,6 @@ struct CommandBufferData
 	BmRender_CommandPool CommandPool;
 };
 
-void DestroyTrackedData(TrackedData* Data);
 void OnDescriptorSetLayoutClear(DescriptorSetLayoutData* LayoutData);
 void OnShaderClear(ShaderData* Shader);
 void OnImageClear(ImageResource* Image);

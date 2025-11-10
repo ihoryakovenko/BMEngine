@@ -154,6 +154,7 @@ namespace Render
 namespace DeferredPass
 {
 	void Init(BmRender_DescriptorPool MainPool);
+	void DeInit();
 	void Draw();
 
 	void BeginPass();
@@ -171,6 +172,7 @@ namespace DeferredPass
 namespace LightningPass
 {
 	void Init(BmRender_DescriptorPool MainPool);
+	void DeInit();
 
 	void Draw(Render::DrawScene* Scene);
 }

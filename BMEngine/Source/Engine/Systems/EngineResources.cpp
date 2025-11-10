@@ -104,6 +104,21 @@ namespace EngineResources
 
 	void DeInit()
 	{
+		for (auto& [id, asset] : TextureAssets)
+		{
+			if (asset.IsCreated)
+			{
+				BmRender_DestroyImageView(asset.RenderViewHandle);
+				BmRender_DestroyImage(asset.RenderImageHandle);
+			}
+		}
+
+		if (DefaultAsset.IsCreated)
+		{
+			BmRender_DestroyImageView(DefaultAsset.RenderViewHandle);
+			BmRender_DestroyImage(DefaultAsset.RenderImageHandle);
+		}
+
 		TextureAssets.clear();
 
 		std::lock_guard Lock(ModelLoadMutex);

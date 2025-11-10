@@ -11,7 +11,7 @@ static System_HandleManager CommandWorkerManager;
 
 static void OnCommandWorkerClear(CommandWorkerData* PoolData)
 {
-	//BmRender_DestroyFence(PoolData->Fence);
+	BmRender_DestroyFence(PoolData->Fence);
 	//BmRender_DestroyCommandPool(PoolData->CommandPool);
 }
 

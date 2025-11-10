@@ -304,6 +304,10 @@ int main()
 
 	vkDeviceWaitIdle(CoreContext->LogicalDevice);
 
+	BmRender_DestroyFence(InFlightFence);
+	BmRender_DestroyPipeline(Pipeline);
+	BmRender_DestroyPipelineLayout(PipelineLayout);
+
 	BmRender_DeInit();
 
 	return 0;

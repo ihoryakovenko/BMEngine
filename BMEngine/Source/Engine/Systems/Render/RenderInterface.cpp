@@ -18,7 +18,6 @@ void BmRender_Init(GLFWwindow* WindowHandler, u32 InMaxFramesInFly)
 {
 	InitializeFrameMemory();
 
-	InitializeGeneralHandleStorage(32);
 	InitializeDescriptorSetLayoutManager(32);
 	InitializeShaderManager(32);
 	InitializeImageManager(32);
@@ -33,7 +32,6 @@ void BmRender_Init(GLFWwindow* WindowHandler, u32 InMaxFramesInFly)
 
 void BmRender_DeInit()
 {
-	DeinitGeneralHandleStorage(DestroyTrackedData);
 	DeinitDescriptorSetLayoutManager(OnDescriptorSetLayoutClear);
 	DeinitShaderManager(OnShaderClear);
 	DeinitImageManager(OnImageClear);

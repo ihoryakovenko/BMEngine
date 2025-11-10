@@ -198,34 +198,13 @@ void Systems_PoolAllocator_Init(PoolAllocator* Allocator, u64 InitialCapacity, u
 	Allocator->Data = AlignPointer(Allocator->RawData, Allocator->Alignment);
 }
 
-void Systems_PoolAllocator_Free(PoolAllocator* Allocator, System_PoolAllocator_OnFreeDelegate OnFreeDelegate)
+void Systems_PoolAllocator_Free(PoolAllocator* Allocator)
 {
-	if (OnFreeDelegate != nullptr && Allocator->Data != nullptr)
-	{
-		u32 Stride = AlignUp(Allocator->DataSize, Allocator->Alignment);
-
-		for (u64 i = 0; i < Allocator->Count; ++i)
-		{
-			bool IsFree = false;
-			for (u64 j = 0; j < Allocator->FreeCount; ++j)
-			{
-				if (Allocator->FreeList[j] == (u32)i)
-				{
-					IsFree = true;
-					break;
-				}
-			}
-
-			if (!IsFree)
-			{
-				void* DataPtr = (char*)Allocator->Data + i * Stride;
-				OnFreeDelegate(DataPtr);
-			}
-		}
-	}
-
 	free(Allocator->RawData);
-	free(Allocator->FreeList);
+	if (Allocator->FreeList)
+	{
+		free(Allocator->FreeList);
+	}
 }
 
 u32 Systems_PoolAllocator_PushData(PoolAllocator* Allocator, const void* Data)
@@ -307,7 +286,7 @@ static void SparceHashMap_Resize(SparceHashMap* Map)
 	u64* OldKeys = Map->Keys;
 	u32* OldIndices = Map->Indices;
 	u8* OldProbe = Map->ProbeDist;
-	u8* OldOccupied = Map->Occupied;
+	bool* OldOccupied = Map->Occupied;
 
 	u64 NewCapacity = OldCapacity * 2;
 	Systems_SparceHashMap_Init(Map, NewCapacity);
@@ -334,7 +313,7 @@ void Systems_SparceHashMap_Init(SparceHashMap* Map, u64 InitialCapacity)
 	Map->Keys = (u64*)calloc(InitialCapacity, sizeof(u64));
 	Map->Indices = (u32*)calloc(InitialCapacity, sizeof(u32));
 	Map->ProbeDist = (u8*)calloc(InitialCapacity, sizeof(u8));
-	Map->Occupied = (u8*)calloc(InitialCapacity, sizeof(u8));
+	Map->Occupied = (bool*)calloc(InitialCapacity, sizeof(bool));
 }
 
 void Systems_SparceHashMap_Free(SparceHashMap* Map)
@@ -364,7 +343,7 @@ void Systems_SparceHashMap_Insert(SparceHashMap* Map, u64 Key, u32 Index)
 			Map->Keys[i] = Key;
 			Map->Indices[i] = Index;
 			Map->ProbeDist[i] = Dist;
-			Map->Occupied[i] = 1;
+			Map->Occupied[i] = true;
 			Map->Count++;
 			return;
 		}
@@ -435,7 +414,7 @@ bool Systems_SparceHashMap_Remove(SparceHashMap* Map, u64 Key, u32* OutIndex)
 		if (Map->Keys[i] == Key)
 		{
 			*OutIndex = Map->Indices[i];
-			Map->Occupied[i] = 0;
+			Map->Occupied[i] = false;
 
 			// Backward-shift deletion
 			u64 j = NextIndex(i, Mask);
@@ -444,9 +423,9 @@ bool Systems_SparceHashMap_Remove(SparceHashMap* Map, u64 Key, u32* OutIndex)
 				Map->Keys[i] = Map->Keys[j];
 				Map->Indices[i] = Map->Indices[j];
 				Map->ProbeDist[i] = Map->ProbeDist[j] - 1;
-				Map->Occupied[i] = 1;
+				Map->Occupied[i] = true;
 
-				Map->Occupied[j] = 0;
+				Map->Occupied[j] = false;
 				i = j;
 				j = NextIndex(j, Mask);
 			}

@@ -14,8 +14,6 @@ void* System_HandleManager_GetHandleData(System_HandleManager Manager, System_Ha
 bool System_HandleManager_IsHandleValid(System_HandleManager Manager, System_HandleManager_Handle Handle);
 bool System_HandleManager_CompareHandles(System_HandleManager_Handle a, System_HandleManager_Handle b);
 
-typedef void (*System_PoolAllocator_OnFreeDelegate)(void* data);
-
 struct PoolAllocator
 {
     void* Data;
@@ -30,7 +28,7 @@ struct PoolAllocator
 };
 
 void Systems_PoolAllocator_Init(PoolAllocator* Allocator, u64 InitialCapacity, u32 DataSize, u32 Alignment = 1);
-void Systems_PoolAllocator_Free(PoolAllocator* Allocator, System_PoolAllocator_OnFreeDelegate OnFreeDelegate);
+void Systems_PoolAllocator_Free(PoolAllocator* Allocator);
 u32 Systems_PoolAllocator_PushData(PoolAllocator* Allocator, const void* Data);
 void Systems_PoolAllocator_GetData(PoolAllocator* Allocator, u32 Index, void* OutData);
 void Systems_PoolAllocator_FreeData(PoolAllocator* Allocator, u32 Index);
@@ -40,7 +38,7 @@ struct SparceHashMap
     u64* Keys;
     u32* Indices;
     u8* ProbeDist;
-    u8* Occupied;
+    bool* Occupied;
     u64 Capacity;
     u64 Count;
 };
