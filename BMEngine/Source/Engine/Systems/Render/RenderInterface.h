@@ -15,16 +15,16 @@ typedef struct BmRender_Pipeline_T* BmRender_Pipeline;
 typedef struct BmRender_PipelineLayout_T* BmRender_PipelineLayout;
 typedef struct BmRender_DescriptorSetLayout_T* BmRender_DescriptorSetLayout;
 typedef struct BmRender_DescriptorPool_T* BmRender_DescriptorPool;
-typedef struct { PrivateHandle Private; } BmRender_Shader;
-typedef struct { PrivateHandle Private; } BmRender_Image;
+typedef struct BmRender_Shader_T* BmRender_Shader;
+typedef struct BmRender_Image_T* BmRender_Image;
 typedef struct BmRender_ImageView_T* BmRender_ImageView;
-typedef struct { PrivateHandle Private; } BmRender_GPUBuffer;
-typedef struct { PrivateHandle Private; } BmRender_DescriptorSet;
-typedef struct { PrivateHandle Private; } BmRender_CommandWorker;
+typedef struct BmRender_GPUBuffer_T* BmRender_GPUBuffer;
+typedef struct BmRender_DescriptorSet_T* BmRender_DescriptorSet;
+typedef struct BmRender_CommandWorker_T* BmRender_CommandWorker;
 typedef struct BmRender_Fence_T* BmRender_Fence;
-typedef struct { PrivateHandle Private; } BmRender_Semaphore;
-typedef struct { PrivateHandle Private; } BmRender_CommandPool;
-typedef struct { PrivateHandle Private; } BmRender_CommandBuffer;
+typedef struct BmRender_Semaphore_T* BmRender_Semaphore;
+typedef struct BmRender_CommandPool_T* BmRender_CommandPool;
+typedef struct BmRender_CommandBuffer_T* BmRender_CommandBuffer;
 
 enum class BmRender_AttributeType : u8
 {
@@ -383,6 +383,7 @@ void BmRender_DestroyDescriptorPool(BmRender_DescriptorPool Handle);
 void BmRender_DestroyShader(BmRender_Shader Handle);
 void BmRender_DestroyImage(BmRender_Image Handle);
 void BmRender_DestroyImageView(BmRender_ImageView Handle);
+void BmRender_DestroyGPUBuffer(BmRender_GPUBuffer Handle);
 void BmRender_DestroyFence(BmRender_Fence Handle);
 void BmRender_DestroySemaphore(BmRender_Semaphore Handle);
 void BmRender_DestroyCommandPool(BmRender_CommandPool Handle);

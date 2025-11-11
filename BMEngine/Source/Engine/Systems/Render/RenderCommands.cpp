@@ -59,8 +59,8 @@ void BmRender_ResetFences(BmRender_Fence Handle)
 void BmRender_GetSemaphoreCounterValue(BmRender_Semaphore Handle, u64* pValue)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	SemaphoreData* SemaphoreData = GetSemaphoreData(Handle);
-	VULKAN_CHECK_RESULT(vkGetSemaphoreCounterValue(Device, SemaphoreData->VulkanSemaphore, pValue));
+	VkSemaphore VulkanSemaphore = (VkSemaphore)Handle;
+	VULKAN_CHECK_RESULT(vkGetSemaphoreCounterValue(Device, VulkanSemaphore, pValue));
 }
 
 void BmRender_BeginCommandBuffer(BmRender_CommandBuffer Handle)
@@ -69,25 +69,26 @@ void BmRender_BeginCommandBuffer(BmRender_CommandBuffer Handle)
 	BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	BeginInfo.flags = 0;
 
-	CommandBufferData* BufferData = GetCommandBufferData(Handle);
-	VULKAN_CHECK_RESULT(vkBeginCommandBuffer(BufferData->VulkanCommandBuffer, &BeginInfo));
+	VkCommandBuffer VulkanCommandBuffer = (VkCommandBuffer)Handle;
+	VULKAN_CHECK_RESULT(vkBeginCommandBuffer(VulkanCommandBuffer, &BeginInfo));
 }
 
 void BmRender_EndCommandBuffer(BmRender_CommandBuffer Handle)
 {
-	CommandBufferData* BufferData = GetCommandBufferData(Handle);
-	VULKAN_CHECK_RESULT(vkEndCommandBuffer(BufferData->VulkanCommandBuffer));
+	VkCommandBuffer VulkanCommandBuffer = (VkCommandBuffer)Handle;
+	VULKAN_CHECK_RESULT(vkEndCommandBuffer(VulkanCommandBuffer));
 }
 
 void BmRender_TransitionImageForRendering(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer, u32 LayersCount)
 {
-	ImageResource* Data = GetImageData(Image);
+	ImageResource Data;
+	GetImageData(Image, &Data);
 
 	VkImageAspectFlags AspectFlags;
 	VkPipelineStageFlags2 DstStageMask;
 	VkAccessFlags2 DstAccessMask;
 	VkImageLayout NewLayout;
-	switch (Data->Type)
+	switch (Data.Type)
 	{
 		case BmRender_ImageType::ColorAttachmentSampled:
 		case BmRender_ImageType::TransferSampled:
@@ -118,7 +119,7 @@ void BmRender_TransitionImageForRendering(BmRender_CommandBuffer CommandBuffer, 
 	Barrier.dstAccessMask = DstAccessMask;
 	Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	Barrier.image = Data->Image;
+	Barrier.image = (VkImage)Image;
 	Barrier.subresourceRange.aspectMask = AspectFlags;
 	Barrier.subresourceRange.baseMipLevel = 0;
 	Barrier.subresourceRange.levelCount = 1;
@@ -130,18 +131,19 @@ void BmRender_TransitionImageForRendering(BmRender_CommandBuffer CommandBuffer, 
 	DepInfo.imageMemoryBarrierCount = 1;
 	DepInfo.pImageMemoryBarriers = &Barrier;
 
-	vkCmdPipelineBarrier2(GetCommandBufferData(CommandBuffer)->VulkanCommandBuffer, &DepInfo);
+		vkCmdPipelineBarrier2((VkCommandBuffer)CommandBuffer, &DepInfo);
 }
 
 void BmRender_TransitionImageForSampling(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer, u32 LayersCount)
 {
-	ImageResource* Data = GetImageData(Image);
+	ImageResource Data;
+	GetImageData(Image, &Data);
 
 	VkImageAspectFlags AspectFlags;
 	VkPipelineStageFlags2 SrcStageMask;
 	VkAccessFlags2 SrcAccessMask;
 	VkImageLayout OldLayout;
-	switch (Data->Type)
+	switch (Data.Type)
 	{
 		case BmRender_ImageType::ColorAttachmentSampled:
 		case BmRender_ImageType::TransferSampled:
@@ -175,7 +177,7 @@ void BmRender_TransitionImageForSampling(BmRender_CommandBuffer CommandBuffer, B
 	Barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
 	Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	Barrier.image = Data->Image;
+	Barrier.image = (VkImage)Image;
 	Barrier.subresourceRange.aspectMask = AspectFlags;
 	Barrier.subresourceRange.baseMipLevel = 0;
 	Barrier.subresourceRange.levelCount = 1;
@@ -187,20 +189,18 @@ void BmRender_TransitionImageForSampling(BmRender_CommandBuffer CommandBuffer, B
 	DepInfo.imageMemoryBarrierCount = 1;
 	DepInfo.pImageMemoryBarriers = &Barrier;
 
-	vkCmdPipelineBarrier2(GetCommandBufferData(CommandBuffer)->VulkanCommandBuffer, &DepInfo);
+		vkCmdPipelineBarrier2((VkCommandBuffer)CommandBuffer, &DepInfo);
 }
 
 void BmRender_TransitionImageForPresentation(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer, u32 LayersCount)
 {
-	ImageResource* Data = GetImageData(Image);
-
 	VkImageMemoryBarrier2 Barrier = { };
 	Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
 	Barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	Barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 	Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	Barrier.image = Data->Image;
+	Barrier.image = (VkImage)Image;
 	Barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	Barrier.subresourceRange.baseMipLevel = 0;
 	Barrier.subresourceRange.levelCount = 1;
@@ -216,13 +216,12 @@ void BmRender_TransitionImageForPresentation(BmRender_CommandBuffer CommandBuffe
 	DepInfo.imageMemoryBarrierCount = 1;
 	DepInfo.pImageMemoryBarriers = &Barrier;
 
-	vkCmdPipelineBarrier2(GetCommandBufferData(CommandBuffer)->VulkanCommandBuffer, &DepInfo);
+		vkCmdPipelineBarrier2((VkCommandBuffer)CommandBuffer, &DepInfo);
 }
 
 void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRender_RenderingInfo* pRenderingInfo)
 {
-	CommandBufferData* CmdBufferData = GetCommandBufferData(CommandBuffer);
-	VkCommandBuffer VkCmdBuffer = CmdBufferData->VulkanCommandBuffer;
+	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
 
 	VkRenderingAttachmentInfo* ColorAttachments = nullptr;
 	VkRenderingAttachmentInfo* DepthAttachment = nullptr;
@@ -272,33 +271,25 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 
 void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline)
 {
-	CommandBufferData* CmdBufferData = GetCommandBufferData(CommandBuffer);
-	VkCommandBuffer VkCmdBuffer = CmdBufferData->VulkanCommandBuffer;
-	
+	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
 	vkCmdBindPipeline(VkCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipeline)Pipeline);
 }
 
 void BmRender_Draw(BmRender_CommandBuffer CommandBuffer, u32 VertexCount, u32 InstanceCount, u32 FirstVertex, u32 FirstInstance)
 {
-	CommandBufferData* CmdBufferData = GetCommandBufferData(CommandBuffer);
-	VkCommandBuffer VkCmdBuffer = CmdBufferData->VulkanCommandBuffer;
-	
+	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
 	vkCmdDraw(VkCmdBuffer, VertexCount, InstanceCount, FirstVertex, FirstInstance);
 }
 
 void BmRender_DrawIndexed(BmRender_CommandBuffer CommandBuffer, u32 IndexCount, u32 InstanceCount, u32 FirstIndex, u32 VertexOffset, u32 FirstInstance)
 {
-	CommandBufferData* CmdBufferData = GetCommandBufferData(CommandBuffer);
-	VkCommandBuffer VkCmdBuffer = CmdBufferData->VulkanCommandBuffer;
-	
+	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
 	vkCmdDrawIndexed(VkCmdBuffer, IndexCount, InstanceCount, FirstIndex, VertexOffset, FirstInstance);
 }
 
 void BmRender_EndRendering(BmRender_CommandBuffer CommandBuffer)
 {
-	CommandBufferData* CmdBufferData = GetCommandBufferData(CommandBuffer);
-	VkCommandBuffer VkCmdBuffer = CmdBufferData->VulkanCommandBuffer;
-	
+	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
 	vkCmdEndRendering(VkCmdBuffer);
 }
 
@@ -364,8 +355,7 @@ void BmRender_QueueSubmit(VkQueue Queue, u32 SubmitCount, const BmRender_SubmitI
 
 		for (u32 j = 0; j < Submit.CommandBufferCount; ++j)
 		{
-			CommandBufferData* CmdBufferData = GetCommandBufferData(Submit.CommandBuffers[j]);
-			CommandBuffers[j] = CmdBufferData->VulkanCommandBuffer;
+			CommandBuffers[j] = (VkCommandBuffer)Submit.CommandBuffers[j];
 		}
 
 		VkSemaphore* WaitSemaphores = (VkSemaphore*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSemaphore) * TotalWaitSemaphoreCount);
@@ -373,14 +363,12 @@ void BmRender_QueueSubmit(VkQueue Queue, u32 SubmitCount, const BmRender_SubmitI
 
 		for (u32 j = 0; j < Submit.WaitSemaphoreCount; ++j)
 		{
-			SemaphoreData* SemData = GetSemaphoreData(Submit.WaitSemaphores[j]);
-			WaitSemaphores[j] = SemData->VulkanSemaphore;
+			WaitSemaphores[j] = (VkSemaphore)Submit.WaitSemaphores[j];
 		}
 
 		for (u32 j = 0; j < Submit.WaitTimelineSemaphoreCount; ++j)
 		{
-			SemaphoreData* SemData = GetSemaphoreData(Submit.WaitTimelineSemaphores[j].Semaphore);
-			WaitSemaphores[Submit.WaitSemaphoreCount + j] = SemData->VulkanSemaphore;
+			WaitSemaphores[Submit.WaitSemaphoreCount + j] = (VkSemaphore)Submit.WaitTimelineSemaphores[j].Semaphore;
 		}
 
 		VkSemaphore* SignalSemaphores = (VkSemaphore*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSemaphore) * TotalSignalSemaphoreCount);
@@ -388,14 +376,12 @@ void BmRender_QueueSubmit(VkQueue Queue, u32 SubmitCount, const BmRender_SubmitI
 
 		for (u32 j = 0; j < Submit.SignalSemaphoreCount; ++j)
 		{
-			SemaphoreData* SemData = GetSemaphoreData(Submit.SignalSemaphores[j]);
-			SignalSemaphores[j] = SemData->VulkanSemaphore;
+			SignalSemaphores[j] = (VkSemaphore)Submit.SignalSemaphores[j];
 		}
 
 		for (u32 j = 0; j < Submit.SignalTimelineSemaphoreCount; ++j)
 		{
-			SemaphoreData* SemData = GetSemaphoreData(Submit.SignalTimelineSemaphores[j].Semaphore);
-			SignalSemaphores[Submit.SignalSemaphoreCount + j] = SemData->VulkanSemaphore;
+			SignalSemaphores[Submit.SignalSemaphoreCount + j] = (VkSemaphore)Submit.SignalTimelineSemaphores[j].Semaphore;
 		}
 	}
 
@@ -418,8 +404,7 @@ BmRender_SwapchainResult BmRender_QueuePresent(VkQueue Queue, const BmRender_Pre
 
 	for (u32 i = 0; i < pPresentInfo->WaitSemaphoreCount; ++i)
 	{
-		SemaphoreData* SemData = GetSemaphoreData(pPresentInfo->WaitSemaphores[i]);
-		WaitSemaphores[i] = SemData->VulkanSemaphore;
+		WaitSemaphores[i] = (VkSemaphore)pPresentInfo->WaitSemaphores[i];
 	}
 
 	VkResult Result = vkQueuePresentKHR(Queue, &PresentInfo);
@@ -449,10 +434,7 @@ BmRender_SwapchainResult BmRender_AcquireNextSwapchainImage(u64 Timeout, BmRende
 	VkDevice Device = CoreContext->LogicalDevice;
 
 	VkSwapchainKHR Swapchain = CoreContext->VulkanSwapchain;
-	SemaphoreData* SemaphoreData = GetSemaphoreData(Semaphore);
-
-	VkSemaphore VkSemaphore = SemaphoreData->VulkanSemaphore;
-	VkResult Result = vkAcquireNextImageKHR(Device, Swapchain, Timeout, VkSemaphore, Fence, pImageIndex);
+	VkResult Result = vkAcquireNextImageKHR(Device, Swapchain, Timeout, (VkSemaphore)Semaphore, Fence, pImageIndex);
 
 	if (Result == VK_SUCCESS)
 	{

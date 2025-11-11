@@ -17,31 +17,14 @@ struct StoragePair
 	SparceHashMap HashMap;
 };
 
-static void OnStorageClear(StoragePair* Storage, void(*CleanUpFunc)(void* CleanupData))
-{
-	for (u64 i = 0; i < Storage->HashMap.Capacity; ++i)
-	{
-		if (Storage->HashMap.Occupied[i])
-		{
-			DescriptorSetLayoutData Data;
-			Systems_PoolAllocator_GetData(&Storage->Allocator, Storage->HashMap.Indices[i], &Data);
-			CleanUpFunc(&Data);
-		}
-	}
-
-	Systems_SparceHashMap_Free(&Storage->HashMap);
-	Systems_PoolAllocator_Free(&Storage->Allocator);
-}
-
 static StoragePair DescriptorSetLayoutStorage;
-
-static System_HandleManager ShaderManager;
-static System_HandleManager ImageManager;
-static System_HandleManager GPUBufferManager;
-static System_HandleManager DescriptorSetManager;
-static System_HandleManager SemaphoreManager;
-static System_HandleManager CommandPoolManager;
-static System_HandleManager CommandBufferManager;
+static StoragePair ShaderStorage;
+static StoragePair ImageStorage;
+static StoragePair GPUBufferStorage;
+static StoragePair DescriptorSetStorage;
+static StoragePair SemaphoreStorage;
+static StoragePair CommandPoolStorage;
+static StoragePair CommandBufferStorage;
 
 // INIT
 void InitializeDescriptorSetLayoutManager(u32 Size)
@@ -52,79 +35,94 @@ void InitializeDescriptorSetLayoutManager(u32 Size)
 
 void InitializeShaderManager(u32 Size)
 {
-	ShaderManager = System_HandleManager_InitData(Size, sizeof(ShaderData), GetNextHandleType());
+	Systems_PoolAllocator_Init(&ShaderStorage.Allocator, Size, sizeof(ShaderData));
+	Systems_SparceHashMap_Init(&ShaderStorage.HashMap, Size);
 }
 
 void InitializeImageManager(u32 Size)
 {
-	ImageManager = System_HandleManager_InitData(Size, sizeof(ImageResource), GetNextHandleType());
+	Systems_PoolAllocator_Init(&ImageStorage.Allocator, Size, sizeof(ImageResource));
+	Systems_SparceHashMap_Init(&ImageStorage.HashMap, Size);
 }
 
 void InitializeGPUBufferManager(u32 Size)
 {
-	GPUBufferManager = System_HandleManager_InitData(Size, sizeof(GPUBufferData), GetNextHandleType());
+	Systems_PoolAllocator_Init(&GPUBufferStorage.Allocator, Size, sizeof(GPUBufferData));
+	Systems_SparceHashMap_Init(&GPUBufferStorage.HashMap, Size);
 }
 
 void InitializeDescriptorSetManager(u32 Size)
 {
-	DescriptorSetManager = System_HandleManager_InitData(Size, sizeof(DescriptorSetData), GetNextHandleType());
+	Systems_PoolAllocator_Init(&DescriptorSetStorage.Allocator, Size, sizeof(DescriptorSetData));
+	Systems_SparceHashMap_Init(&DescriptorSetStorage.HashMap, Size);
 }
 
 void InitializeSemaphoreManager(u32 Size)
 {
-	SemaphoreManager = System_HandleManager_InitData(Size, sizeof(SemaphoreData), GetNextHandleType());
+	Systems_PoolAllocator_Init(&SemaphoreStorage.Allocator, Size, sizeof(SemaphoreData));
+	Systems_SparceHashMap_Init(&SemaphoreStorage.HashMap, Size);
 }
 
 void InitializeCommandPoolManager(u32 Size)
 {
-	CommandPoolManager = System_HandleManager_InitData(Size, sizeof(CommandPoolData), GetNextHandleType());
+	Systems_PoolAllocator_Init(&CommandPoolStorage.Allocator, Size, sizeof(CommandPoolData));
+	Systems_SparceHashMap_Init(&CommandPoolStorage.HashMap, Size);
 }
 
 void InitializeCommandBufferManager(u32 Size)
 {
-	CommandBufferManager = System_HandleManager_InitData(Size, sizeof(CommandBufferData), GetNextHandleType());
+	Systems_PoolAllocator_Init(&CommandBufferStorage.Allocator, Size, sizeof(CommandBufferData));
+	Systems_SparceHashMap_Init(&CommandBufferStorage.HashMap, Size);
 }
 // INIT
 
 // DEINIT
-void DeinitDescriptorSetLayoutManager(void(*CleanupFunc)(DescriptorSetLayoutData*))
+void DeinitDescriptorSetLayoutManager()
 {
-	OnStorageClear(&DescriptorSetLayoutStorage, (void(*)(void*))CleanupFunc);
+	Systems_SparceHashMap_Free(&DescriptorSetLayoutStorage.HashMap);
+	Systems_PoolAllocator_Free(&DescriptorSetLayoutStorage.Allocator);
 }
 
-void DeinitShaderManager(void(*CleanupFunc)(ShaderData*))
+void DeinitShaderManager()
 {
-	System_HandleManager_ClearData(ShaderManager, (void(*)(void*))CleanupFunc);
+	Systems_SparceHashMap_Free(&ShaderStorage.HashMap);
+	Systems_PoolAllocator_Free(&ShaderStorage.Allocator);
 }
 
-void DeinitImageManager(void(*CleanupFunc)(ImageResource*))
+void DeinitImageManager()
 {
-	System_HandleManager_ClearData(ImageManager, (void(*)(void*))CleanupFunc);
+	Systems_SparceHashMap_Free(&ImageStorage.HashMap);
+	Systems_PoolAllocator_Free(&ImageStorage.Allocator);
 }
 
-void DeinitGPUBufferManager(void(*CleanUpFunc)(GPUBufferData*))
+void DeinitGPUBufferManager()
 {
-	System_HandleManager_ClearData(GPUBufferManager, (void(*)(void*))CleanUpFunc);
+	Systems_SparceHashMap_Free(&GPUBufferStorage.HashMap);
+	Systems_PoolAllocator_Free(&GPUBufferStorage.Allocator);
 }
 
 void DeinitDescriptorSetManager()
 {
-	System_HandleManager_ClearData(DescriptorSetManager);
+	Systems_SparceHashMap_Free(&DescriptorSetStorage.HashMap);
+	Systems_PoolAllocator_Free(&DescriptorSetStorage.Allocator);
 }
 
-void DeinitSemaphoreManager(void(*CleanUpFunc)(SemaphoreData*))
+void DeinitSemaphoreManager()
 {
-	System_HandleManager_ClearData(SemaphoreManager, (void(*)(void*))CleanUpFunc);
+	Systems_SparceHashMap_Free(&SemaphoreStorage.HashMap);
+	Systems_PoolAllocator_Free(&SemaphoreStorage.Allocator);
 }
 
-void DeinitCommandPoolManager(void(*CleanUpFunc)(CommandPoolData*))
+void DeinitCommandPoolManager()
 {
-	System_HandleManager_ClearData(CommandPoolManager, (void(*)(void*))CleanUpFunc);
+	Systems_SparceHashMap_Free(&CommandPoolStorage.HashMap);
+	Systems_PoolAllocator_Free(&CommandPoolStorage.Allocator);
 }
 
 void DeinitCommandBufferManager()
 {
-	System_HandleManager_ClearData(CommandBufferManager);
+	Systems_SparceHashMap_Free(&CommandBufferStorage.HashMap);
+	Systems_PoolAllocator_Free(&CommandBufferStorage.Allocator);
 }
 // DEINIT
 
@@ -157,18 +155,20 @@ BmRender_DescriptorPool CreateDescriptorPoolHandle(VkDescriptorPool DescriptorPo
 	return (BmRender_DescriptorPool)DescriptorPool;
 }
 
-BmRender_Shader CreateShaderHandle(const ShaderData* Data)
+BmRender_Shader CreateShaderHandle(VkShaderModule VulkanShaderModule, const ShaderData* Data)
 {
-	BmRender_Shader Handle;
-	Handle.Private = System_HandleManager_CreateHandle(ShaderManager, Data);
-	return Handle;
+	const u32 Index = Systems_PoolAllocator_PushData(&ShaderStorage.Allocator, Data);
+	Systems_SparceHashMap_Insert(&ShaderStorage.HashMap, (u64)VulkanShaderModule, Index);
+	
+	return (BmRender_Shader)VulkanShaderModule;
 }
 
-BmRender_Image CreateImageHandle(const ImageResource* Data)
+BmRender_Image CreateImageHandle(VkImage Image, const ImageResource* Data)
 {
-	BmRender_Image Handle;
-	Handle.Private = System_HandleManager_CreateHandle(ImageManager, Data);
-	return Handle;
+	const u32 Index = Systems_PoolAllocator_PushData(&ImageStorage.Allocator, Data);
+	Systems_SparceHashMap_Insert(&ImageStorage.HashMap, (u64)Image, Index);
+	
+	return (BmRender_Image)Image;
 }
 
 BmRender_ImageView CreateImageViewHandle(VkImageView ImageView)
@@ -176,19 +176,20 @@ BmRender_ImageView CreateImageViewHandle(VkImageView ImageView)
 	return (BmRender_ImageView)ImageView;
 }
 
-BmRender_GPUBuffer CreateGPUBufferHandle(const GPUBufferData* Data)
+BmRender_GPUBuffer CreateGPUBufferHandle(VkBuffer Buffer, const GPUBufferData* Data)
 {
-	BmRender_GPUBuffer Handle;
-	Handle.Private = System_HandleManager_CreateHandle(GPUBufferManager, Data);
-	return Handle;
+	const u32 Index = Systems_PoolAllocator_PushData(&GPUBufferStorage.Allocator, Data);
+	Systems_SparceHashMap_Insert(&GPUBufferStorage.HashMap, (u64)Buffer, Index);
+	
+	return (BmRender_GPUBuffer)Buffer;
 }
 
-
-BmRender_DescriptorSet CreateDescriptorSetHandle(const DescriptorSetData* Data)
+BmRender_DescriptorSet CreateDescriptorSetHandle(VkDescriptorSet Set, const DescriptorSetData* Data)
 {
-	BmRender_DescriptorSet Handle;
-	Handle.Private = System_HandleManager_CreateHandle(DescriptorSetManager, Data);
-	return Handle;
+	const u32 Index = Systems_PoolAllocator_PushData(&DescriptorSetStorage.Allocator, Data);
+	Systems_SparceHashMap_Insert(&DescriptorSetStorage.HashMap, (u64)Set, Index);
+	
+	return (BmRender_DescriptorSet)Set;
 }
 
 BmRender_Fence CreateFenceHandle(VkFence Fence)
@@ -196,25 +197,28 @@ BmRender_Fence CreateFenceHandle(VkFence Fence)
 	return (BmRender_Fence)Fence;
 }
 
-BmRender_Semaphore CreateSemaphoreHandle(const SemaphoreData* Data)
+BmRender_Semaphore CreateSemaphoreHandle(VkSemaphore VulkanSemaphore, const SemaphoreData* Data)
 {
-	BmRender_Semaphore Handle;
-	Handle.Private = System_HandleManager_CreateHandle(SemaphoreManager, Data);
-	return Handle;
+	const u32 Index = Systems_PoolAllocator_PushData(&SemaphoreStorage.Allocator, Data);
+	Systems_SparceHashMap_Insert(&SemaphoreStorage.HashMap, (u64)VulkanSemaphore, Index);
+	
+	return (BmRender_Semaphore)VulkanSemaphore;
 }
 
-BmRender_CommandPool CreateCommandPoolHandle(const CommandPoolData* Data)
+BmRender_CommandPool CreateCommandPoolHandle(VkCommandPool VulkanCommandPool, const CommandPoolData* Data)
 {
-	BmRender_CommandPool Handle;
-	Handle.Private = System_HandleManager_CreateHandle(CommandPoolManager, Data);
-	return Handle;
+	const u32 Index = Systems_PoolAllocator_PushData(&CommandPoolStorage.Allocator, Data);
+	Systems_SparceHashMap_Insert(&CommandPoolStorage.HashMap, (u64)VulkanCommandPool, Index);
+	
+	return (BmRender_CommandPool)VulkanCommandPool;
 }
 
-BmRender_CommandBuffer CreateCommandBufferHandle(const CommandBufferData* Data)
+BmRender_CommandBuffer CreateCommandBufferHandle(VkCommandBuffer VulkanCommandBuffer, const CommandBufferData* Data)
 {
-	BmRender_CommandBuffer Handle;
-	Handle.Private = System_HandleManager_CreateHandle(CommandBufferManager, Data);
-	return Handle;
+	const u32 Index = Systems_PoolAllocator_PushData(&CommandBufferStorage.Allocator, Data);
+	Systems_SparceHashMap_Insert(&CommandBufferStorage.HashMap, (u64)VulkanCommandBuffer, Index);
+	
+	return (BmRender_CommandBuffer)VulkanCommandBuffer;
 }
 // CREATE
 
@@ -231,35 +235,62 @@ void DestroyDescriptorSetLayoutHandle(BmRender_DescriptorSetLayout Handle)
 
 void DestroyShaderHandle(BmRender_Shader Handle)
 {
-	System_HandleManager_DestroyHandle(ShaderManager, Handle.Private);
+	VkShaderModule ShaderModule = (VkShaderModule)Handle;
+	u32 Index;
+	if (Systems_SparceHashMap_Remove(&ShaderStorage.HashMap, (u64)ShaderModule, &Index))
+	{
+		Systems_PoolAllocator_FreeData(&ShaderStorage.Allocator, Index);
+	}
 }
 
 void DestroyImageHandle(BmRender_Image Handle)
 {
-	System_HandleManager_DestroyHandle(ImageManager, Handle.Private);
+	VkImage Image = (VkImage)Handle;
+	u32 Index;
+	if (Systems_SparceHashMap_Remove(&ImageStorage.HashMap, (u64)Image, &Index))
+	{
+		Systems_PoolAllocator_FreeData(&ImageStorage.Allocator, Index);
+	}
 }
 
 void DestroyGPUBufferHandle(BmRender_GPUBuffer Handle)
 {
-	System_HandleManager_DestroyHandle(GPUBufferManager, Handle.Private);
+	VkBuffer Buffer = (VkBuffer)Handle;
+	u32 Index;
+	if (Systems_SparceHashMap_Remove(&GPUBufferStorage.HashMap, (u64)Buffer, &Index))
+	{
+		Systems_PoolAllocator_FreeData(&GPUBufferStorage.Allocator, Index);
+	}
 }
-
-
-
 
 void DestroySemaphoreHandle(BmRender_Semaphore Handle)
 {
-	System_HandleManager_DestroyHandle(SemaphoreManager, Handle.Private);
+	VkSemaphore Semaphore = (VkSemaphore)Handle;
+	u32 Index;
+	if (Systems_SparceHashMap_Remove(&SemaphoreStorage.HashMap, (u64)Semaphore, &Index))
+	{
+		Systems_PoolAllocator_FreeData(&SemaphoreStorage.Allocator, Index);
+	}
 }
 
 void DestroyCommandPoolHandle(BmRender_CommandPool Handle)
 {
-	System_HandleManager_DestroyHandle(CommandPoolManager, Handle.Private);
+	VkCommandPool CommandPool = (VkCommandPool)Handle;
+	u32 Index;
+	if (Systems_SparceHashMap_Remove(&CommandPoolStorage.HashMap, (u64)CommandPool, &Index))
+	{
+		Systems_PoolAllocator_FreeData(&CommandPoolStorage.Allocator, Index);
+	}
 }
 
 void DestroyCommandBufferHandle(BmRender_CommandBuffer Handle)
 {
-	System_HandleManager_DestroyHandle(CommandBufferManager, Handle.Private);
+	VkCommandBuffer CommandBuffer = (VkCommandBuffer)Handle;
+	u32 Index;
+	if (Systems_SparceHashMap_Remove(&CommandBufferStorage.HashMap, (u64)CommandBuffer, &Index))
+	{
+		Systems_PoolAllocator_FreeData(&CommandBufferStorage.Allocator, Index);
+	}
 }
 // DESTROY
 
@@ -274,38 +305,80 @@ void GetDescriptorSetLayoutData(BmRender_DescriptorSetLayout Handle, DescriptorS
 	}
 }
 
-ShaderData* GetShaderData(BmRender_Shader Handle)
+bool GetShaderData(BmRender_Shader Handle, ShaderData* OutData)
 {
-	return (ShaderData*)System_HandleManager_GetHandleData(ShaderManager, Handle.Private);
+	u32 Index;
+	if (Systems_SparceHashMap_Get(&ShaderStorage.HashMap, (u64)Handle, &Index))
+	{
+		Systems_PoolAllocator_GetData(&ShaderStorage.Allocator, Index, OutData);
+		return true;
+	}
+	return false;
 }
 
-ImageResource* GetImageData(BmRender_Image Handle)
+bool GetImageData(BmRender_Image Handle, ImageResource* OutData)
 {
-	return (ImageResource*)System_HandleManager_GetHandleData(ImageManager, Handle.Private);
+	u32 Index;
+	if (Systems_SparceHashMap_Get(&ImageStorage.HashMap, (u64)Handle, &Index))
+	{
+		Systems_PoolAllocator_GetData(&ImageStorage.Allocator, Index, OutData);
+		return true;
+	}
+	return false;
 }
 
-GPUBufferData* GetGPUBufferData(BmRender_GPUBuffer Handle)
+bool GetGPUBufferData(BmRender_GPUBuffer Handle, GPUBufferData* OutData)
 {
-	return (GPUBufferData*)System_HandleManager_GetHandleData(GPUBufferManager, Handle.Private);
+	u32 Index;
+	if (Systems_SparceHashMap_Get(&GPUBufferStorage.HashMap, (u64)Handle, &Index))
+	{
+		Systems_PoolAllocator_GetData(&GPUBufferStorage.Allocator, Index, OutData);
+		return true;
+	}
+	return false;
 }
 
-DescriptorSetData* GetDescriptorSetData(BmRender_DescriptorSet Handle)
+bool GetDescriptorSetData(BmRender_DescriptorSet Handle, DescriptorSetData* OutData)
 {
-	return (DescriptorSetData*)System_HandleManager_GetHandleData(DescriptorSetManager, Handle.Private);
+	u32 Index;
+	if (Systems_SparceHashMap_Get(&DescriptorSetStorage.HashMap, (u64)Handle, &Index))
+	{
+		Systems_PoolAllocator_GetData(&DescriptorSetStorage.Allocator, Index, OutData);
+		return true;
+	}
+	return false;
 }
 
-SemaphoreData* GetSemaphoreData(BmRender_Semaphore Handle)
+bool GetSemaphoreData(BmRender_Semaphore Handle, SemaphoreData* OutData)
 {
-	return (SemaphoreData*)System_HandleManager_GetHandleData(SemaphoreManager, Handle.Private);
+	u32 Index;
+	if (Systems_SparceHashMap_Get(&SemaphoreStorage.HashMap, (u64)Handle, &Index))
+	{
+		Systems_PoolAllocator_GetData(&SemaphoreStorage.Allocator, Index, OutData);
+		return true;
+	}
+	return false;
 }
 
-CommandPoolData* GetCommandPoolData(BmRender_CommandPool Handle)
+bool GetCommandPoolData(BmRender_CommandPool Handle, CommandPoolData* OutData)
 {
-	return (CommandPoolData*)System_HandleManager_GetHandleData(CommandPoolManager, Handle.Private);
+	u32 Index;
+	if (Systems_SparceHashMap_Get(&CommandPoolStorage.HashMap, (u64)Handle, &Index))
+	{
+		Systems_PoolAllocator_GetData(&CommandPoolStorage.Allocator, Index, OutData);
+		return true;
+	}
+	return false;
 }
 
-CommandBufferData* GetCommandBufferData(BmRender_CommandBuffer Handle)
+bool GetCommandBufferData(BmRender_CommandBuffer Handle, CommandBufferData* OutData)
 {
-	return (CommandBufferData*)System_HandleManager_GetHandleData(CommandBufferManager, Handle.Private);
+	u32 Index;
+	if (Systems_SparceHashMap_Get(&CommandBufferStorage.HashMap, (u64)Handle, &Index))
+	{
+		Systems_PoolAllocator_GetData(&CommandBufferStorage.Allocator, Index, OutData);
+		return true;
+	}
+	return false;
 }
 // GET

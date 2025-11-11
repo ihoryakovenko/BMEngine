@@ -157,8 +157,7 @@ namespace Render
 
 	void DrawEntityBatch(BmRender_CommandBuffer CommandBuffer, DrawScene* Scene, const DrawEntityBatchConfig& Config)
 	{
-		CommandBufferData* CmdBufferData = GetCommandBufferData(CommandBuffer);
-		VkCommandBuffer CmdBuffer = CmdBufferData->VulkanCommandBuffer;
+		VkCommandBuffer CmdBuffer = (VkCommandBuffer)CommandBuffer;
 		VkPipelineLayout PipelineLayout = (VkPipelineLayout)Config.PipelineLayout;
 
 		BmRender_BindPipeline(CommandBuffer, Config.Pipeline);
@@ -178,7 +177,9 @@ namespace Render
 			VkDescriptorSet* VkDescriptorSets = (VkDescriptorSet*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkDescriptorSet) * Config.DescriptorSetCount);
 			for (u32 i = 0; i < Config.DescriptorSetCount; ++i)
 			{
-				VkDescriptorSets[i] = GetDescriptorSetData(Config.DescriptorSets[i])->Set;
+				DescriptorSetData SetData;
+				GetDescriptorSetData(Config.DescriptorSets[i], &SetData);
+				VkDescriptorSets[i] = SetData.Set;
 			}
 
 			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
@@ -221,8 +222,8 @@ namespace Render
 			}
 
 		const VkBuffer Buffers[] = {
-			GetGPUBufferData(Entity->VertexBufferEntry.GPUBufferHandle)->Buffer,
-			GetGPUBufferData(Entity->InstanceBufferEntry.GPUBufferHandle)->Buffer
+			(VkBuffer)Entity->VertexBufferEntry.GPUBufferHandle,
+			(VkBuffer)Entity->InstanceBufferEntry.GPUBufferHandle
 		};
 	
 		const u64 Offsets[] = {
@@ -231,7 +232,7 @@ namespace Render
 		};
 	
 		vkCmdBindVertexBuffers(CmdBuffer, 0, 2, Buffers, Offsets);
-		vkCmdBindIndexBuffer(CmdBuffer, GetGPUBufferData(Entity->IndexBufferEntry.GPUBufferHandle)->Buffer, Entity->IndexBufferEntry.BufferOffset, VK_INDEX_TYPE_UINT32);
+		vkCmdBindIndexBuffer(CmdBuffer, (VkBuffer)Entity->IndexBufferEntry.GPUBufferHandle, Entity->IndexBufferEntry.BufferOffset, VK_INDEX_TYPE_UINT32);
 			BmRender_DrawIndexed(CommandBuffer, Entity->IndicesCount, Entity->Instances, 0, 0, 0);
 		}
 	}
@@ -316,8 +317,7 @@ namespace Render
 		StartRecording(State.GraphicsCommandWorker);
 
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(State.GraphicsCommandWorker);
-		CommandBufferData* CommandBufferData = GetCommandBufferData(SubmitPool->CommandBuffer);
-		VkCommandBuffer DrawCmdBuffer = CommandBufferData->VulkanCommandBuffer;
+		VkCommandBuffer DrawCmdBuffer = (VkCommandBuffer)SubmitPool->CommandBuffer;
 
 		VkDevice Device = GetCoreContext()->LogicalDevice;
 
@@ -471,15 +471,16 @@ namespace DeferredPass
 	void Draw()
 	{
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
-		CommandBufferData* CmdBufferData = GetCommandBufferData(SubmitPool->CommandBuffer);
-		VkCommandBuffer CmdBuffer = CmdBufferData->VulkanCommandBuffer;
+		VkCommandBuffer CmdBuffer = (VkCommandBuffer)SubmitPool->CommandBuffer;
 
 		VkPipelineLayout PipelineLayout = (VkPipelineLayout)PipelineLayouts["Deferred"];
 
 		BmRender_BindPipeline(SubmitPool->CommandBuffer, Pipelines["Deferred"]);
 
+		DescriptorSetData SetData;
+		GetDescriptorSetData(DeferredInputSet[GetDrawSystemData()->CurrentFrame], &SetData);
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-			0, 1, &GetDescriptorSetData(DeferredInputSet[GetDrawSystemData()->CurrentFrame])->Set, 0, nullptr);
+			0, 1, &SetData.Set, 0, nullptr);
 
 		BmRender_Draw(SubmitPool->CommandBuffer, 3, 1, 0, 0); // 3 hardcoded vertices
 	}
@@ -487,8 +488,7 @@ namespace DeferredPass
 	void BeginPass()
 	{
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
-		CommandBufferData* CmdBufferData = GetCommandBufferData(SubmitPool->CommandBuffer);
-		VkCommandBuffer CmdBuffer = CmdBufferData->VulkanCommandBuffer;
+		VkCommandBuffer CmdBuffer = (VkCommandBuffer)SubmitPool->CommandBuffer;
 
 		BmRender_RenderingColorAttachment SwapchainColorAttachment = { };
 		SwapchainColorAttachment.ImageView = GetCoreContext()->ImageViews[Render::CurrentImageIndex];
@@ -553,6 +553,8 @@ namespace DeferredPass
 		{
 			BmRender_DestroyImageView(DeferredInputColorImageInterface[i]);
 			BmRender_DestroyImageView(DeferredInputDepthImageInterface[i]);
+			BmRender_DestroyImage(DeferredInputColorImage[i]);
+			BmRender_DestroyImage(DeferredInputDepthImage[i]);
 		}
 	}
 }
@@ -640,8 +642,7 @@ namespace LightningPass
 	{
 		VkDevice Device = GetCoreContext()->LogicalDevice;
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
-		CommandBufferData* CmdBufferData = GetCommandBufferData(SubmitPool->CommandBuffer);
-		VkCommandBuffer CmdBuffer = CmdBufferData->VulkanCommandBuffer;
+		VkCommandBuffer CmdBuffer = (VkCommandBuffer)SubmitPool->CommandBuffer;
 		const Render::RenderState* State = Render::GetRenderState();
 
 		const glm::mat4* LightViews[] =
@@ -702,9 +703,11 @@ namespace LightningPass
 	{
 		for (u32 i = 0; i < GetCoreContext()->ImagesCount; i++)
 		{
+			BmRender_DestroyGPUBuffer(LightSpaceMatrixBuffers[i]);
 			BmRender_DestroyImageView(ShadowMapElement1ImageInterface[i]);
 			BmRender_DestroyImageView(ShadowMapElement2ImageInterface[i]);
 		}
+		BmRender_DestroyImage(ShadowMapArray);
 	}
 }
 
@@ -722,8 +725,7 @@ namespace MainPass
 	void BeginPass()
 	{
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
-		CommandBufferData* CmdBufferData = GetCommandBufferData(SubmitPool->CommandBuffer);
-		VkCommandBuffer CmdBuffer = CmdBufferData->VulkanCommandBuffer;
+		VkCommandBuffer CmdBuffer = (VkCommandBuffer)SubmitPool->CommandBuffer;
 
 		BmRender_RenderingColorAttachment ColorAttachment = { };
 		ColorAttachment.ImageView = DeferredPass::TestDeferredInputColorImageInterface()[GetDrawSystemData()->CurrentFrame];

@@ -425,6 +425,24 @@ namespace Engine
 		EngineResources::DeInit();
 		UI::DeInit();
 
+		// Destroy GPUBuffers
+		BmRender_DestroyGPUBuffer(VertexStageBuffer);
+		BmRender_DestroyGPUBuffer(InstanceBuffer);
+		BmRender_DestroyGPUBuffer(FrameDataBuffer);
+		BmRender_DestroyGPUBuffer(MaterialBuffer);
+
+		for (auto& [name, layout] : DescriptorSetLayouts)
+		{
+			BmRender_DestroyDescriptorSetLayout(layout);
+		}
+		DescriptorSetLayouts.clear();
+
+		for (auto& [name, shader] : Shaders)
+		{
+			BmRender_DestroyShader(shader);
+		}
+		Shaders.clear();
+
 		BmRender_DeInit();
 
 		glfwDestroyWindow(Window);

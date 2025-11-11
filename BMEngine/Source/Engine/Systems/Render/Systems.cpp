@@ -3,17 +3,14 @@
 #include "Handles.h"
 
 #include "Util/Util.h"
+#include <unordered_map>
 
 static CommandSystemData SubmitSystem;
 static DrawSystemData DrawSystem;
 
-static System_HandleManager CommandWorkerManager;
-
-static void OnCommandWorkerClear(CommandWorkerData* PoolData)
-{
-	BmRender_DestroyFence(PoolData->Fence);
-	//BmRender_DestroyCommandPool(PoolData->CommandPool);
-}
+static std::unordered_map<u64, CommandWorkerData> CommandWorkerStorage;
+static u64 NextCommandWorkerId = 1;
+static BmRender_CommandPool CommandSystemCommandPool = nullptr;
 
 void InitCommandSystem(u32 WorkerCount)
 {
@@ -31,22 +28,23 @@ void InitCommandSystem(u32 WorkerCount)
 	VkDevice Device = Context->LogicalDevice;
 	u32 GraphicsFamily = Context->Indices.GraphicsFamily;
 
-	BmRender_CommandPool CommandPool = BmRender_CreateCommandPool(GraphicsFamily);
+	CommandSystemCommandPool = BmRender_CreateCommandPool(GraphicsFamily);
 
-	CommandPoolData* PoolData = GetCommandPoolData(CommandPool);
+	CommandPoolData PoolData;
+	GetCommandPoolData(CommandSystemCommandPool, &PoolData);
 
 
 	for (u32 i = 0; i < WorkerCount; ++i)
 	{
 		CommandWorkerData WorkerData = { };
 		WorkerData.IsLocked = false;
-		WorkerData.CommandPool = CommandPool;
+		WorkerData.CommandPool = CommandSystemCommandPool;
 
-		WorkerData.CommandBuffer = BmRender_AllocateCommandBuffer(CommandPool);
+		WorkerData.CommandBuffer = BmRender_AllocateCommandBuffer(CommandSystemCommandPool);
 
 		WorkerData.Fence = BmRender_CreateFence();
 
-		CommandSystem->Workers[i] = CreateCommandWorkerHandle(&WorkerData);
+		CommandSystem->Workers[i] = CreateCommandWorkerHandle(std::move(WorkerData));
 	}
 }
 
@@ -73,7 +71,21 @@ void DeInitDrawSystem()
 
 void DeInitCommandSystem()
 {
-	DeinitCommandWorkerManager(OnCommandWorkerClear);
+	// Clean up all command workers
+	for (auto& [Key, WorkerData] : CommandWorkerStorage)
+	{
+		BmRender_FreeCommandBuffer(WorkerData.CommandBuffer);
+		BmRender_DestroyFence(WorkerData.Fence);
+	}
+	
+	// Destroy command pool
+	if (CommandSystemCommandPool != nullptr)
+	{
+		BmRender_DestroyCommandPool(CommandSystemCommandPool);
+		CommandSystemCommandPool = nullptr;
+	}
+	
+	DeinitCommandWorkerManager();
 }
 
 u32 GetMaxFramesInFly()
@@ -157,7 +169,7 @@ BmRender_CommandWorker AcquireWorker(u64 Timeout)
 
 	if (WaitResult == BmRender_WaitResult::Timeout)
 	{
-		return BmRender_CommandWorker{ 0 };
+		return nullptr;
 	}
 
 	if (OldestWorker->IsLocked.load())
@@ -168,7 +180,7 @@ BmRender_CommandWorker AcquireWorker(u64 Timeout)
 	bool Expected = false;
 	if (!OldestWorker->IsLocked.compare_exchange_weak(Expected, true))
 	{
-		return BmRender_CommandWorker{ 0 };
+		return nullptr;
 	}
 
 	BmRender_ResetFences(OldestWorker->Fence);
@@ -200,27 +212,39 @@ u32 GetCurrentFrameIndex()
 
 void InitCommandWorkerManager(u32 Size)
 {
-	CommandWorkerManager = System_HandleManager_InitData(Size, sizeof(CommandWorkerData), 0);
+	CommandWorkerStorage.reserve(Size);
+	NextCommandWorkerId = 1;
 }
 
-void DeinitCommandWorkerManager(void(*CleanUpFunc)(CommandWorkerData*))
+void DeinitCommandWorkerManager()
 {
-	System_HandleManager_ClearData(CommandWorkerManager, (void(*)(void*))CleanUpFunc);
+	CommandWorkerStorage.clear();
 }
 
-BmRender_CommandWorker CreateCommandWorkerHandle(const CommandWorkerData* Data)
+BmRender_CommandWorker CreateCommandWorkerHandle(CommandWorkerData&& Data)
 {
-	BmRender_CommandWorker Handle;
-	Handle.Private = System_HandleManager_CreateHandle(CommandWorkerManager, Data);
-	return Handle;
+	u64 WorkerId = NextCommandWorkerId++;
+	CommandWorkerData& StoredData = CommandWorkerStorage[WorkerId];
+	StoredData.CommandPool = Data.CommandPool;
+	StoredData.CommandBuffer = Data.CommandBuffer;
+	StoredData.Fence = Data.Fence;
+	StoredData.IsLocked.store(Data.IsLocked.load());
+	return (BmRender_CommandWorker)(uintptr_t)WorkerId;
 }
 
 void DestroyCommandWorkerHandle(BmRender_CommandWorker Handle)
 {
-	System_HandleManager_DestroyHandle(CommandWorkerManager, Handle.Private);
+	u64 WorkerId = (u64)(uintptr_t)Handle;
+	CommandWorkerStorage.erase(WorkerId);
 }
 
 CommandWorkerData* GetSubmitPoolData(BmRender_CommandWorker Handle)
 {
-	return (CommandWorkerData*)System_HandleManager_GetHandleData(CommandWorkerManager, Handle.Private);
+	u64 WorkerId = (u64)(uintptr_t)Handle;
+	auto It = CommandWorkerStorage.find(WorkerId);
+	if (It != CommandWorkerStorage.end())
+	{
+		return &It->second;
+	}
+	return nullptr;
 }

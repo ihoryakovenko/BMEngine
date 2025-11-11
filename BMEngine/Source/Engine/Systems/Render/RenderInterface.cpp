@@ -32,13 +32,13 @@ void BmRender_Init(GLFWwindow* WindowHandler, u32 InMaxFramesInFly)
 
 void BmRender_DeInit()
 {
-	DeinitDescriptorSetLayoutManager(OnDescriptorSetLayoutClear);
-	DeinitShaderManager(OnShaderClear);
-	DeinitImageManager(OnImageClear);
-	DeinitGPUBufferManager(OnGPUBufferClear);
+	DeinitDescriptorSetLayoutManager();
+	DeinitShaderManager();
+	DeinitImageManager();
+	DeinitGPUBufferManager();
 	DeinitDescriptorSetManager();
-	DeinitSemaphoreManager(OnSemaphoreClear);
-	DeinitCommandPoolManager(OnCommandPoolClear);
+	DeinitSemaphoreManager();
+	DeinitCommandPoolManager();
 	DeinitCommandBufferManager();
 
 	DestroyCoreContext();

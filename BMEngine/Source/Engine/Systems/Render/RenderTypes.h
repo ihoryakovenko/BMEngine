@@ -25,7 +25,6 @@ struct DescriptorSetLayoutBinding
 
 struct DescriptorSetLayoutData
 {
-	VkDescriptorSetLayout Layout;
 	DescriptorSetLayoutBinding* LayoutBindings;
 	u32 BindingsCount;
 };
@@ -33,13 +32,11 @@ struct DescriptorSetLayoutData
 
 struct ShaderData
 {
-	VkShaderModule VulkanShaderModule;
 	BmRender_PipelineShaderStage Stage;
 };
 
 struct ImageResource
 {
-	VkImage Image;
 	VkDeviceMemory Memory;
 	u64 ReadyValue;
 	VkFormat Format;
@@ -51,7 +48,6 @@ struct ImageResource
 
 struct GPUBufferData
 {
-	VkBuffer Buffer;
 	VkDeviceMemory Memory;
 	MemoryPropertyFlag PropertyFlag;
 	BmRender_PipelineSyncStage BufferStage;
@@ -67,28 +63,19 @@ struct DescriptorSetData
 
 struct SemaphoreData
 {
-	VkSemaphore VulkanSemaphore;
 	BmRender_SemaphoreType Type;
 };
 
 struct CommandPoolData
 {
-	VkCommandPool VulkanCommandPool;
 	u32 QueueFamilyIndex;
 };
 
 struct CommandBufferData
 {
-	VkCommandBuffer VulkanCommandBuffer;
 	BmRender_CommandPool CommandPool;
 };
 
-void OnDescriptorSetLayoutClear(DescriptorSetLayoutData* LayoutData);
-void OnShaderClear(ShaderData* Shader);
-void OnImageClear(ImageResource* Image);
-void OnGPUBufferClear(GPUBufferData* Data);
-void OnSemaphoreClear(SemaphoreData* Semaphore);
-void OnCommandPoolClear(CommandPoolData* CommandPool);
 
 void InitializeFrameMemory();
 void DeinitFrameMemory();

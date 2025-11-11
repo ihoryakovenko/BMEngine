@@ -17,17 +17,18 @@ namespace RenderResources
 {
 	void UpdateBufferRegion(BmRender_GPUBufferBinding Handle, u64 ResourceOffset, const void* Data, u32 DataSize)
 	{
-		GPUBufferData* Buffer = GetGPUBufferData(Handle.GPUBufferHandle);
+		GPUBufferData Buffer;
+		GetGPUBufferData(Handle.GPUBufferHandle, &Buffer);
 
 		const u64 Offset = Handle.BufferOffset + ResourceOffset;
 
-		if (Buffer->PropertyFlag == MemoryPropertyFlag::HostCompatible)
+		if (Buffer.PropertyFlag == MemoryPropertyFlag::HostCompatible)
 		{
 			VkDevice Device = GetCoreContext()->LogicalDevice;
 			VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
-			VulkanHelper::UpdateHostCompatibleBufferMemory(Device, Buffer->Memory, DataSize, Offset, Data);
+			VulkanHelper::UpdateHostCompatibleBufferMemory(Device, Buffer.Memory, DataSize, Offset, Data);
 		}
-		else if (Buffer->PropertyFlag == MemoryPropertyFlag::GPULocal)
+		else if (Buffer.PropertyFlag == MemoryPropertyFlag::GPULocal)
 		{
 			// TODO: TMP solution
 			void* TransferMemory = TransferSystem::RequestTransferMemory(DataSize);
@@ -38,7 +39,7 @@ namespace RenderResources
 			Task.Alignment = 1;
 			Task.RawData = TransferMemory;
 			Task.DataDescr.Handle = Handle;
-			Task.DataDescr.StageBarrier = Buffer->BufferStage;
+			Task.DataDescr.StageBarrier = Buffer.BufferStage;
 			Task.Type = TransferSystem::TaskType::Data;
 
 			TransferSystem::AddTask(&Task);
@@ -51,14 +52,15 @@ namespace RenderResources
 
 	void UpdateImageResource(BmRender_Image Handle, BmRender_ImageDescription* Description, void* Data)
 	{
-		ImageResource* Image = GetImageData(Handle);
+		ImageResource Image;
+		GetImageData(Handle, &Image);
 
 		// TODO: TMP solution
-		void* TransferMemory = TransferSystem::RequestTransferMemory(Image->Size);
-		memcpy(TransferMemory, Data, Image->Size);
+		void* TransferMemory = TransferSystem::RequestTransferMemory(Image.Size);
+		memcpy(TransferMemory, Data, Image.Size);
 
 		TransferSystem::TransferTask Task = { };
-		Task.DataSize = Image->Size;
+		Task.DataSize = Image.Size;
 		Task.Alignment = VulkanHelper::GetFormatAlignment(Description->Format);
 		Task.RawData = TransferMemory;
 		Task.TextureDescr.Handle = Handle;

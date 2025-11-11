@@ -33,8 +33,8 @@ struct DrawSystemData
 };
 
 void InitCommandWorkerManager(u32 Size);
-void DeinitCommandWorkerManager(void(*CleanUpFunc)(CommandWorkerData*));
-BmRender_CommandWorker CreateCommandWorkerHandle(const CommandWorkerData* Data);
+void DeinitCommandWorkerManager();
+BmRender_CommandWorker CreateCommandWorkerHandle(CommandWorkerData&& Data);
 void DestroyCommandWorkerHandle(BmRender_CommandWorker Handle);
 CommandWorkerData* GetSubmitPoolData(BmRender_CommandWorker Handle);
 

@@ -39,7 +39,7 @@ namespace TransferSystem
 
 	struct DataTransferState
 	{
-		const u64 MaxTransferSizePerFrame = MB2;
+		const u64 MaxTransferSizePerFrame = MB32;
 
 		Memory::HeapRingBuffer<u8> TransferMemory;
 
@@ -120,8 +120,7 @@ namespace TransferSystem
 		BmRender_ResetFences(TransferState.Frames.Fences[CurrentFrame]);
 		BmRender_BeginCommandBuffer(TransferState.Frames.CommandBuffers[CurrentFrame]);
 
-		CommandBufferData* TransferCommandBufferData = GetCommandBufferData(TransferState.Frames.CommandBuffers[CurrentFrame]);
-		VkCommandBuffer TransferCommandBuffer = TransferCommandBufferData->VulkanCommandBuffer;
+		VkCommandBuffer TransferCommandBuffer = (VkCommandBuffer)TransferState.Frames.CommandBuffers[CurrentFrame];
 
 		while (HasPendingTasks(&TransferState.TransferTasksQueue))
 		{
@@ -144,23 +143,23 @@ namespace TransferSystem
 			TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] = NewTotal;
 
 			BmRender_UpdateHostCompatibleBuffer(TransferState.TransferStagingPool.Buffer, AlignedOffset, Task->DataSize, Task->RawData);
-			GPUBufferData* StagingBufferData = GetGPUBufferData(TransferState.TransferStagingPool.Buffer);
 
 			switch (Task->Type)
 			{
 				case TaskType::Data:
 				{
 					const BmRender_GPUBufferBinding& Entry = Task->DataDescr.Handle;
-					GPUBufferData* BufferData = GetGPUBufferData(Entry.GPUBufferHandle);
+					GPUBufferData BufferData;
+					GetGPUBufferData(Entry.GPUBufferHandle, &BufferData);
 
-					BufferData->ReadyValue = TransferState.CompletedTransfer + 1;
+					BufferData.ReadyValue = TransferState.CompletedTransfer + 1; // TODO: fix
 
 					VkBufferMemoryBarrier2 Barrier = { };
 					Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
 					VulkanHelper::ApplyStageBarrier(&Barrier, Task->DataDescr.StageBarrier);
 					Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 					Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-					Barrier.buffer = BufferData->Buffer;
+					Barrier.buffer = (VkBuffer)Entry.GPUBufferHandle;
 					Barrier.offset = Entry.BufferOffset;
 					Barrier.size = Task->DataSize;
 
@@ -175,14 +174,15 @@ namespace TransferSystem
 					IndexBufferCopyRegion.size = Task->DataSize;
 
 					vkCmdPipelineBarrier2(TransferCommandBuffer, &DepInfo);
-					vkCmdCopyBuffer(TransferCommandBuffer, StagingBufferData->Buffer, BufferData->Buffer, 1, &IndexBufferCopyRegion);
+					vkCmdCopyBuffer(TransferCommandBuffer, (VkBuffer)TransferState.TransferStagingPool.Buffer, (VkBuffer)Entry.GPUBufferHandle, 1, &IndexBufferCopyRegion);
 					
 					break;
 				}
 				case TaskType::Image:
 				{
-					ImageResource* Image = GetImageData(Task->TextureDescr.Handle);
-					Image->ReadyValue = TransferState.CompletedTransfer + 1;
+					ImageResource Image;
+					GetImageData(Task->TextureDescr.Handle, &Image);
+					Image.ReadyValue = TransferState.CompletedTransfer + 1; // TODO: fix
 
 					VkImageMemoryBarrier2 TransferImageBarrier = { };
 					TransferImageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -195,7 +195,7 @@ namespace TransferSystem
 					TransferImageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 					TransferImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 					TransferImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-					TransferImageBarrier.image = Image->Image;
+					TransferImageBarrier.image = (VkImage)Task->TextureDescr.Handle;
 					TransferImageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 					TransferImageBarrier.subresourceRange.baseMipLevel = 0;
 					TransferImageBarrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
@@ -222,7 +222,7 @@ namespace TransferSystem
 					ImageRegion.imageSubresource.baseArrayLayer = 0;
 					ImageRegion.imageSubresource.layerCount = 1;
 					ImageRegion.imageOffset = { 0, 0, 0 };
-					ImageRegion.imageExtent = { Image->Width, Image->Height, 1 };
+					ImageRegion.imageExtent = { Image.Width, Image.Height, 1 };
 
 					VkImageMemoryBarrier2 PresentationBarrier = { };
 					PresentationBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -235,7 +235,7 @@ namespace TransferSystem
 					PresentationBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 					PresentationBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 					PresentationBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-					PresentationBarrier.image = Image->Image;
+					PresentationBarrier.image = (VkImage)Task->TextureDescr.Handle;
 					PresentationBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 					PresentationBarrier.subresourceRange.baseMipLevel = 0;
 					PresentationBarrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
@@ -254,8 +254,8 @@ namespace TransferSystem
 					PresentDepInfo.pBufferMemoryBarriers = nullptr;
 
 					vkCmdPipelineBarrier2(TransferCommandBuffer, &TransferDepInfo);
-					vkCmdCopyBufferToImage(TransferCommandBuffer, StagingBufferData->Buffer,
-						Image->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ImageRegion);
+					vkCmdCopyBufferToImage(TransferCommandBuffer, (VkBuffer)TransferState.TransferStagingPool.Buffer,
+						(VkImage)Task->TextureDescr.Handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ImageRegion);
 					vkCmdPipelineBarrier2(TransferCommandBuffer, &PresentDepInfo);
 
 					break;
@@ -308,11 +308,11 @@ namespace TransferSystem
 
 		TransferState.TransferCommandPool = BmRender_CreateCommandPool(Context->Indices.GraphicsFamily);
 
-		CommandPoolData* PoolData = GetCommandPoolData(TransferState.TransferCommandPool);
+		VkCommandPool VulkanCommandPool = (VkCommandPool)TransferState.TransferCommandPool;
 
 		VkCommandBufferAllocateInfo TransferCommandBufferAllocateInfo = { };
 		TransferCommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		TransferCommandBufferAllocateInfo.commandPool = PoolData->VulkanCommandPool;
+		TransferCommandBufferAllocateInfo.commandPool = VulkanCommandPool;
 		TransferCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 		TransferCommandBufferAllocateInfo.commandBufferCount = VulkanHelper::MAX_DRAW_FRAMES;
 
@@ -325,8 +325,7 @@ namespace TransferSystem
 
 			CommandBufferData CmdBufferData;
 			CmdBufferData.CommandPool = TransferState.TransferCommandPool;
-			CmdBufferData.VulkanCommandBuffer = RawCommandBuffers[i];
-			TransferState.Frames.CommandBuffers[i] = CreateCommandBufferHandle(&CmdBufferData);
+			TransferState.Frames.CommandBuffers[i] = CreateCommandBufferHandle(RawCommandBuffers[i], &CmdBufferData);
 		}
 
 		TransferState.TransferSemaphore = BmRender_CreateTimelineSemaphore(0);
@@ -350,8 +349,13 @@ namespace TransferSystem
 	{
 		for (u32 i = 0; i < VulkanHelper::MAX_DRAW_FRAMES; ++i)
 		{
+			BmRender_FreeCommandBuffer(TransferState.Frames.CommandBuffers[i]);
 			BmRender_DestroyFence(TransferState.Frames.Fences[i]);
 		}
+
+		BmRender_DestroyCommandPool(TransferState.TransferCommandPool);
+		BmRender_DestroyGPUBuffer(TransferState.TransferStagingPool.Buffer);
+		BmRender_DestroySemaphore(TransferState.TransferSemaphore);
 
 		free(TransferState.TransferTasksQueue.Memory);
 		Memory::FreeRingBuffer(&TransferState.TransferMemory);
@@ -372,8 +376,10 @@ namespace TransferSystem
 		u64 CompletedValue = 0;
 		BmRender_GetSemaphoreCounterValue(TransferState.TransferSemaphore, &CompletedValue);
 
-		GPUBufferData* BufferData = GetGPUBufferData(Handle);
-		return CompletedValue < BufferData->ReadyValue;
+		GPUBufferData BufferData;
+		GetGPUBufferData(Handle, &BufferData);
+		return false; // TODO: fix
+		return CompletedValue < BufferData.ReadyValue;
 	}
 
 	bool IsImageLocked(BmRender_Image Handle)
@@ -381,7 +387,9 @@ namespace TransferSystem
 		u64 CompletedValue = 0;
 		BmRender_GetSemaphoreCounterValue(TransferState.TransferSemaphore, &CompletedValue);
 
-		ImageResource* ImageData = GetImageData(Handle);
-		return CompletedValue < ImageData->ReadyValue;
+		ImageResource ImageData;
+		GetImageData(Handle, &ImageData);
+		return false; // TODO: fix
+		return CompletedValue < ImageData.ReadyValue;
 	}
 }

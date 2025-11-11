@@ -378,7 +378,6 @@ namespace VulkanCoreContext
 		for (u32 i = 0; i < Context->ImagesCount; ++i)
 		{
 			ImageResource ImageResourceData = { };
-			ImageResourceData.Image = Images[i];
 			ImageResourceData.Type = BmRender_ImageType::TransferSampled;
 			ImageResourceData.Memory = VK_NULL_HANDLE;
 			ImageResourceData.ReadyValue = ULLONG_MAX;
@@ -387,7 +386,7 @@ namespace VulkanCoreContext
 			ImageResourceData.Height = Context->SwapExtent.height;
 			ImageResourceData.Size = 0;
 
-			Context->Images[i] = CreateImageHandle(&ImageResourceData);
+			Context->Images[i] = CreateImageHandle(Images[i], &ImageResourceData);
 			Context->ImageViews[i] = BmRender_CreateImageView2D(Context->Images[i]);
 		}
 	}
