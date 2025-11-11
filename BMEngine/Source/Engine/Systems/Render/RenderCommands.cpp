@@ -131,7 +131,7 @@ void BmRender_TransitionImageForRendering(BmRender_CommandBuffer CommandBuffer, 
 	DepInfo.imageMemoryBarrierCount = 1;
 	DepInfo.pImageMemoryBarriers = &Barrier;
 
-		vkCmdPipelineBarrier2((VkCommandBuffer)CommandBuffer, &DepInfo);
+	vkCmdPipelineBarrier2((VkCommandBuffer)CommandBuffer, &DepInfo);
 }
 
 void BmRender_TransitionImageForSampling(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer, u32 LayersCount)
@@ -189,7 +189,7 @@ void BmRender_TransitionImageForSampling(BmRender_CommandBuffer CommandBuffer, B
 	DepInfo.imageMemoryBarrierCount = 1;
 	DepInfo.pImageMemoryBarriers = &Barrier;
 
-		vkCmdPipelineBarrier2((VkCommandBuffer)CommandBuffer, &DepInfo);
+	vkCmdPipelineBarrier2((VkCommandBuffer)CommandBuffer, &DepInfo);
 }
 
 void BmRender_TransitionImageForPresentation(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer, u32 LayersCount)
@@ -216,7 +216,7 @@ void BmRender_TransitionImageForPresentation(BmRender_CommandBuffer CommandBuffe
 	DepInfo.imageMemoryBarrierCount = 1;
 	DepInfo.pImageMemoryBarriers = &Barrier;
 
-		vkCmdPipelineBarrier2((VkCommandBuffer)CommandBuffer, &DepInfo);
+	vkCmdPipelineBarrier2((VkCommandBuffer)CommandBuffer, &DepInfo);
 }
 
 void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRender_RenderingInfo* pRenderingInfo)
@@ -241,11 +241,11 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 		VkAttachment->clearValue.color = Attachment.ClearValue;
 	}
 
+	VkRenderingAttachmentInfo DepthAttachmentInfo = { };
 	if (pRenderingInfo->DepthAttachment != nullptr)
 	{
 		const BmRender_RenderingDepthAttachment& Attachment = *pRenderingInfo->DepthAttachment;
 
-		VkRenderingAttachmentInfo DepthAttachmentInfo = { };
 		DepthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 		DepthAttachmentInfo.imageView = (VkImageView)Attachment.ImageView;
 		DepthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -306,81 +306,52 @@ void BmRender_QueueSubmit(VkQueue Queue, u32 SubmitCount, const BmRender_SubmitI
 		u32 TotalWaitSemaphoreCount = Submit.WaitSemaphoreCount + Submit.WaitTimelineSemaphoreCount;
 		u32 TotalSignalSemaphoreCount = Submit.SignalSemaphoreCount + Submit.SignalTimelineSemaphoreCount;
 
-		VkTimelineSemaphoreSubmitInfo* TimelineInfo = nullptr;
-		if (Submit.WaitTimelineSemaphoreCount > 0 || Submit.SignalTimelineSemaphoreCount > 0)
-		{
-			TimelineInfo = (VkTimelineSemaphoreSubmitInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkTimelineSemaphoreSubmitInfo));
-			TimelineInfo->sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-			TimelineInfo->pNext = nullptr;
-			TimelineInfo->waitSemaphoreValueCount = TotalWaitSemaphoreCount;
-			TimelineInfo->signalSemaphoreValueCount = TotalSignalSemaphoreCount;
-
-			u64* WaitValues = (u64*)Memory::FrameAlloc(GetFrameMemory(), sizeof(u64) * TotalWaitSemaphoreCount);
-			TimelineInfo->pWaitSemaphoreValues = WaitValues;
-
-			for (u32 j = 0; j < Submit.WaitSemaphoreCount; ++j)
-			{
-				WaitValues[j] = 0;
-			}
-
-			for (u32 j = 0; j < TotalWaitSemaphoreCount; ++j)
-			{
-				WaitValues[Submit.WaitSemaphoreCount + j] = Submit.WaitTimelineSemaphores[j].Value;
-			}
-
-			u64* SignalValues = (u64*)Memory::FrameAlloc(GetFrameMemory(), sizeof(u64) * TotalSignalSemaphoreCount);
-			TimelineInfo->pSignalSemaphoreValues = SignalValues;
-
-			for (u32 j = 0; j < Submit.SignalSemaphoreCount; ++j)
-			{
-				SignalValues[j] = 0;
-			}
-
-			for (u32 j = 0; j < Submit.SignalTimelineSemaphoreCount; ++j)
-			{
-				SignalValues[Submit.SignalSemaphoreCount + j] = Submit.SignalTimelineSemaphores[j].Value;
-			}
-		}
+		VkTimelineSemaphoreSubmitInfo NewTimelineInfo = { };
+		NewTimelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+		NewTimelineInfo.pNext = nullptr;
+		NewTimelineInfo.waitSemaphoreValueCount = TotalWaitSemaphoreCount;
+		NewTimelineInfo.signalSemaphoreValueCount = TotalSignalSemaphoreCount;
 
 		VkSubmit = { };
 		VkSubmit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		VkSubmit.pNext = TimelineInfo;
+		VkSubmit.pNext = &NewTimelineInfo;
 		VkSubmit.waitSemaphoreCount = TotalWaitSemaphoreCount;
 		VkSubmit.pWaitDstStageMask = Submit.WaitDstStageFlags;
 		VkSubmit.commandBufferCount = Submit.CommandBufferCount;
 		VkSubmit.signalSemaphoreCount = TotalSignalSemaphoreCount;
 
-		VkCommandBuffer* CommandBuffers = (VkCommandBuffer*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkCommandBuffer) * Submit.CommandBufferCount);
-		VkSubmit.pCommandBuffers = CommandBuffers;
-
-		for (u32 j = 0; j < Submit.CommandBufferCount; ++j)
-		{
-			CommandBuffers[j] = (VkCommandBuffer)Submit.CommandBuffers[j];
-		}
-
+		u64* WaitValues = (u64*)Memory::FrameAlloc(GetFrameMemory(), sizeof(u64) * TotalWaitSemaphoreCount);
+		u64* SignalValues = (u64*)Memory::FrameAlloc(GetFrameMemory(), sizeof(u64) * TotalSignalSemaphoreCount);
 		VkSemaphore* WaitSemaphores = (VkSemaphore*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSemaphore) * TotalWaitSemaphoreCount);
+		VkSemaphore* SignalSemaphores = (VkSemaphore*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSemaphore) * TotalSignalSemaphoreCount);
+
+		NewTimelineInfo.pWaitSemaphoreValues = WaitValues;		
+		NewTimelineInfo.pSignalSemaphoreValues = SignalValues;
+		VkSubmit.pCommandBuffers = (VkCommandBuffer*)Submit.CommandBuffers;
 		VkSubmit.pWaitSemaphores = WaitSemaphores;
+		VkSubmit.pSignalSemaphores = SignalSemaphores;
 
 		for (u32 j = 0; j < Submit.WaitSemaphoreCount; ++j)
 		{
+			WaitValues[j] = 0;
 			WaitSemaphores[j] = (VkSemaphore)Submit.WaitSemaphores[j];
 		}
 
 		for (u32 j = 0; j < Submit.WaitTimelineSemaphoreCount; ++j)
 		{
+			WaitValues[Submit.WaitSemaphoreCount + j] = Submit.WaitTimelineSemaphores[j].Value;
 			WaitSemaphores[Submit.WaitSemaphoreCount + j] = (VkSemaphore)Submit.WaitTimelineSemaphores[j].Semaphore;
 		}
 
-		VkSemaphore* SignalSemaphores = (VkSemaphore*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSemaphore) * TotalSignalSemaphoreCount);
-		VkSubmit.pSignalSemaphores = SignalSemaphores;
-
 		for (u32 j = 0; j < Submit.SignalSemaphoreCount; ++j)
 		{
+			SignalValues[j] = 0;
 			SignalSemaphores[j] = (VkSemaphore)Submit.SignalSemaphores[j];
 		}
 
 		for (u32 j = 0; j < Submit.SignalTimelineSemaphoreCount; ++j)
 		{
+			SignalValues[Submit.SignalSemaphoreCount + j] = Submit.SignalTimelineSemaphores[j].Value;
 			SignalSemaphores[Submit.SignalSemaphoreCount + j] = (VkSemaphore)Submit.SignalTimelineSemaphores[j].Semaphore;
 		}
 	}

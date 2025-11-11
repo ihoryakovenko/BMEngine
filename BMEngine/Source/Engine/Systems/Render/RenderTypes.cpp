@@ -813,13 +813,14 @@ void BmRender_DestroyShader(BmRender_Shader Handle)
 void BmRender_DestroyImage(BmRender_Image Handle)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
+
 	ImageResource Data;
-	if (GetImageData(Handle, &Data) && Data.Memory != VK_NULL_HANDLE)
+	if (GetImageData(Handle, &Data))
 	{
-		VkImage Image = (VkImage)Handle;
-		vkDestroyImage(Device, Image, GetVulkanAllocator());
+		vkDestroyImage(Device, (VkImage)Handle, GetVulkanAllocator());
 		vkFreeMemory(Device, Data.Memory, GetVulkanAllocator());
 	}
+
 	DestroyImageHandle(Handle);
 }
 
@@ -832,16 +833,14 @@ void BmRender_DestroyImageView(BmRender_ImageView Handle)
 void BmRender_DestroyGPUBuffer(BmRender_GPUBuffer Handle)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
+
 	GPUBufferData Data;
-	VkBuffer Buffer = (VkBuffer)Handle;
-	if (GetGPUBufferData(Handle, &Data) && Buffer != VK_NULL_HANDLE)
+	if (GetGPUBufferData(Handle, &Data))
 	{
-		vkDestroyBuffer(Device, Buffer, GetVulkanAllocator());
-		if (Data.Memory != VK_NULL_HANDLE)
-		{
-			vkFreeMemory(Device, Data.Memory, GetVulkanAllocator());
-		}
+		vkDestroyBuffer(Device, (VkBuffer)Handle, GetVulkanAllocator());
+		vkFreeMemory(Device, Data.Memory, GetVulkanAllocator());
 	}
+
 	DestroyGPUBufferHandle(Handle);
 }
 
