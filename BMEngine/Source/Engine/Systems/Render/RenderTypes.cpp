@@ -722,6 +722,122 @@ BmRender_Semaphore BmRender_CreateTimelineSemaphore(u64 InitialValue)
 	return CreateSemaphoreHandle(VulkanSemaphore, &Data);
 }
 
+bool BmRender_IsDedicatedQueuePresent(QueueType QueueType)
+{
+	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
+	VkPhysicalDevice PhysicalDevice = CoreContext->PhysicalDevice;
+
+	u32 QueueFamilyCount;
+	vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &QueueFamilyCount, nullptr);
+
+	if (QueueFamilyCount == 0)
+	{
+		return false;
+	}
+
+	VkQueueFamilyProperties* QueueFamilyProperties = (VkQueueFamilyProperties*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkQueueFamilyProperties) * QueueFamilyCount);
+	vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &QueueFamilyCount, QueueFamilyProperties);
+
+	bool NeedsGraphics = ((u8)QueueType & (u8)QueueType::Graphic) != 0;
+	bool NeedsTransfer = ((u8)QueueType & (u8)QueueType::Transfer) != 0;
+
+	for (u32 i = 0; i < QueueFamilyCount; ++i)
+	{
+		const VkQueueFamilyProperties& Props = QueueFamilyProperties[i];
+		
+		if (Props.queueCount == 0)
+		{
+			continue;
+		}
+
+		bool HasGraphics = (Props.queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0;
+		bool HasTransfer = (Props.queueFlags & VK_QUEUE_TRANSFER_BIT) != 0;
+
+		bool SupportsGraphics = !NeedsGraphics || HasGraphics;
+		bool SupportsTransfer = !NeedsTransfer || HasTransfer;
+
+		if (SupportsGraphics && SupportsTransfer)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+BmRender_Queue BmRender_CreateQueue(QueueType QueueType)
+{
+	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
+	VkDevice Device = CoreContext->LogicalDevice;
+	VkPhysicalDevice PhysicalDevice = CoreContext->PhysicalDevice;
+
+	u32 QueueFamilyCount;
+	vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &QueueFamilyCount, nullptr);
+
+	if (QueueFamilyCount == 0)
+	{
+		return nullptr;
+	}
+
+	VkQueueFamilyProperties* QueueFamilyProperties = (VkQueueFamilyProperties*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkQueueFamilyProperties) * QueueFamilyCount);
+	vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &QueueFamilyCount, QueueFamilyProperties);
+
+	bool NeedsGraphics = ((u8)QueueType & (u8)QueueType::Graphic) != 0;
+	bool NeedsTransfer = ((u8)QueueType & (u8)QueueType::Transfer) != 0;
+
+	s32 SelectedFamilyIndex = -1;
+
+	if (NeedsTransfer && !NeedsGraphics)
+	{
+		for (u32 i = 0; i < QueueFamilyCount; ++i)
+		{
+			const VkQueueFamilyProperties& Props = QueueFamilyProperties[i];
+			if (Props.queueCount > 0 &&
+				(Props.queueFlags & VK_QUEUE_TRANSFER_BIT) != 0 &&
+				(Props.queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0)
+			{
+				SelectedFamilyIndex = i;
+				break;
+			}
+		}
+	}
+
+	if (SelectedFamilyIndex == -1)
+	{
+		for (u32 i = 0; i < QueueFamilyCount; ++i)
+		{
+			const VkQueueFamilyProperties& Props = QueueFamilyProperties[i];
+			
+			if (Props.queueCount == 0)
+			{
+				continue;
+			}
+
+			bool HasGraphics = (Props.queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0;
+			bool HasTransfer = (Props.queueFlags & VK_QUEUE_TRANSFER_BIT) != 0;
+
+			bool SupportsGraphics = !NeedsGraphics || HasGraphics;
+			bool SupportsTransfer = !NeedsTransfer || HasTransfer;
+
+			if (SupportsGraphics && SupportsTransfer)
+			{
+				SelectedFamilyIndex = i;
+				break;
+			}
+		}
+	}
+
+	if (SelectedFamilyIndex == -1)
+	{
+		return nullptr;
+	}
+
+	VkQueue Queue;
+	vkGetDeviceQueue(Device, SelectedFamilyIndex, 0, &Queue);
+
+	return CreateQueueHandle(Queue);
+}
+
 BmRender_CommandPool BmRender_CreateCommandPool(u32 QueueFamilyIndex)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;

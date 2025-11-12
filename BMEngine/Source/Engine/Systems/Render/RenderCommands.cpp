@@ -79,6 +79,17 @@ void BmRender_EndCommandBuffer(BmRender_CommandBuffer Handle)
 	VULKAN_CHECK_RESULT(vkEndCommandBuffer(VulkanCommandBuffer));
 }
 
+void BmRender_QueueWaitIdle(BmRender_Queue Queue)
+{
+	vkQueueWaitIdle((VkQueue)Queue);
+}
+
+void BmRender_DeviceWaitIdle()
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	vkDeviceWaitIdle(Device);
+}
+
 void BmRender_TransitionImageForRendering(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer, u32 LayersCount)
 {
 	ImageResource Data;
@@ -293,7 +304,7 @@ void BmRender_EndRendering(BmRender_CommandBuffer CommandBuffer)
 	vkCmdEndRendering(VkCmdBuffer);
 }
 
-void BmRender_QueueSubmit(VkQueue Queue, u32 SubmitCount, const BmRender_SubmitInfo* Submits, BmRender_Fence Fence)
+void BmRender_QueueSubmit(BmRender_Queue Queue, u32 SubmitCount, const BmRender_SubmitInfo* Submits, BmRender_Fence Fence)
 {
 	VkFence VkFenceHandle = (VkFence)Fence;
 	VkSubmitInfo* VkSubmits = (VkSubmitInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSubmitInfo) * SubmitCount);
@@ -356,10 +367,11 @@ void BmRender_QueueSubmit(VkQueue Queue, u32 SubmitCount, const BmRender_SubmitI
 		}
 	}
 
-	VULKAN_CHECK_RESULT(vkQueueSubmit(Queue, SubmitCount, VkSubmits, VkFenceHandle));
+	VkQueue VkQueueHandle = (VkQueue)Queue;
+	VULKAN_CHECK_RESULT(vkQueueSubmit(VkQueueHandle, SubmitCount, VkSubmits, VkFenceHandle));
 }
 
-BmRender_SwapchainResult BmRender_QueuePresent(VkQueue Queue, const BmRender_PresentInfo* pPresentInfo)
+BmRender_SwapchainResult BmRender_QueuePresent(BmRender_Queue Queue, const BmRender_PresentInfo* pPresentInfo)
 {
 	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
 
@@ -378,7 +390,8 @@ BmRender_SwapchainResult BmRender_QueuePresent(VkQueue Queue, const BmRender_Pre
 		WaitSemaphores[i] = (VkSemaphore)pPresentInfo->WaitSemaphores[i];
 	}
 
-	VkResult Result = vkQueuePresentKHR(Queue, &PresentInfo);
+	VkQueue VkQueueHandle = (VkQueue)Queue;
+	VkResult Result = vkQueuePresentKHR(VkQueueHandle, &PresentInfo);
 
 	if (Result == VK_SUCCESS)
 	{

@@ -36,6 +36,7 @@ BmRender_Fence CreateFenceHandle(VkFence Fence);
 BmRender_Semaphore CreateSemaphoreHandle(VkSemaphore VulkanSemaphore, const SemaphoreData* Data);
 BmRender_CommandPool CreateCommandPoolHandle(VkCommandPool VulkanCommandPool, const CommandPoolData* Data);
 BmRender_CommandBuffer CreateCommandBufferHandle(VkCommandBuffer VulkanCommandBuffer, const CommandBufferData* Data);
+BmRender_Queue CreateQueueHandle(VkQueue Queue);
 
 void DestroyDescriptorSetLayoutHandle(BmRender_DescriptorSetLayout Handle);
 void DestroyShaderHandle(BmRender_Shader Handle);

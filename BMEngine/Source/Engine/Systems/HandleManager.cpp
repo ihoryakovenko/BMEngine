@@ -4,172 +4,7 @@
 
 #include <Engine/Systems/Memory/forge_memory_debugger.h>
 
-static u16 GetType(u64 Handle) { 
-	return (Handle >> 48) & 0xFFFF; 
-}
-
-static u32 GetIndex(u64 Handle) { 
-	return (Handle >> 16) & 0xFFFFFFFF; 
-}
-
-static u16 GetGeneration(u64 Handle) { 
-	return Handle & 0xFFFF; 
-}
-
-static u64 Create(u16 Type, u32 Index, u16 Generation) {
-	return ((u64)Type << 48) | ((u64)Index << 16) | (u64)Generation;
-}
-
-struct System_HandleManager_Entry
-{
-	u32 IsUsed : 1;
-	u32 Generation : 16;
-};
-
-struct System_HandleManager_T
-{
-	System_HandleManager_Entry* Entries;
-	void* StorageData;
-	u32* FreeIndices;
-	u32 StorageCapacity;
-	u32 FreeIndicesCapacity;
-	u32 StorageCount;
-	u32 FreeIndicesCount;
-	u32 DataSize;
-	u16 HandleType;
-};
-
-bool System_HandleManager_CompareHandles(System_HandleManager_Handle a, System_HandleManager_Handle b)
-{
-	return a == b;
-}
-
-System_HandleManager System_HandleManager_InitData(u32 InitialCapacity, u32 DataSize, u16 HandleType)
-{
-	auto Manager = (System_HandleManager)malloc(sizeof(System_HandleManager_T));
-
-	Manager->Entries = (System_HandleManager_Entry*)(calloc(InitialCapacity, sizeof(System_HandleManager_Entry)));
-	Manager->StorageData = malloc(InitialCapacity * DataSize);
-	Manager->FreeIndices = (u32*)(malloc(InitialCapacity * sizeof(u32)));
-
-	Manager->StorageCapacity = InitialCapacity;
-	Manager->FreeIndicesCapacity = InitialCapacity;
-	Manager->StorageCount = 0;
-	Manager->FreeIndicesCount = 0;
-	Manager->DataSize = DataSize;
-	Manager->HandleType = HandleType;
-
-	return Manager;
-}
-
-void System_HandleManager_ClearData(System_HandleManager Manager, System_HandleManager_OnClearManagerDelegate OnClearDelegate)
-{
-	assert(Manager);
-
-	if (OnClearDelegate)
-	{
-		for (u32 i = 0; i < Manager->StorageCount; ++i)
-		{
-			if (Manager->Entries[i].IsUsed)
-			{
-				void* DataPtr = (u8*)(Manager->StorageData) + (i * Manager->DataSize);
-				OnClearDelegate(DataPtr);
-			}
-		}
-	}
-
-	free(Manager->Entries);
-	free(Manager->StorageData);
-	free(Manager->FreeIndices);
-	free(Manager);
-}
-
-System_HandleManager_Handle System_HandleManager_CreateHandle(System_HandleManager Manager, const void* Data)
-{        
-	assert(Manager);
-
-	u32 Index;
-
-	if (Manager->FreeIndicesCount > 0)
-	{
-		Index = Manager->FreeIndices[Manager->FreeIndicesCount - 1];
-		--Manager->FreeIndicesCount;
-	
-		void* DataPtr = (u8*)(Manager->StorageData) + (Index * Manager->DataSize);
-		memcpy(DataPtr, Data, Manager->DataSize);
-
-		Manager->Entries[Index].IsUsed = true;
-		Manager->Entries[Index].Generation++;
-	}
-	else
-	{
-		if (Manager->StorageCount >= Manager->StorageCapacity)
-		{
-			const u32 NewCapacity = Manager->StorageCapacity * 2;
-			System_HandleManager_Entry* NewEntries = (System_HandleManager_Entry*)(calloc(NewCapacity, sizeof(System_HandleManager_Entry)));
-
-			memcpy(NewEntries, Manager->Entries, Manager->StorageCapacity * sizeof(System_HandleManager_Entry));
-			free(Manager->Entries);
-
-			Manager->Entries = NewEntries;
-			Manager->StorageData = realloc(Manager->StorageData, NewCapacity * Manager->DataSize);
-			Manager->StorageCapacity = NewCapacity;
-		}
-		
-		Index = Manager->StorageCount;
-		void* DataPtr = (u8*)(Manager->StorageData) + (Index * Manager->DataSize);
-		memcpy(DataPtr, Data, Manager->DataSize);
-		Manager->Entries[Index].IsUsed = true;
-		Manager->Entries[Index].Generation = 1;
-		
-		++Manager->StorageCount;
-	}
-
-	System_HandleManager_Handle DataHandle = Create(Manager->HandleType, Index, Manager->Entries[Index].Generation);
-
-	return DataHandle;
-}
-
-void System_HandleManager_DestroyHandle(System_HandleManager Manager, System_HandleManager_Handle DataHandle)
-{
-	const u32 Index = GetIndex(DataHandle);
-	const u16 Generation = GetGeneration(DataHandle);
-
-	assert(System_HandleManager_IsHandleValid(Manager, DataHandle));
-
-	if (Manager->FreeIndicesCount >= Manager->FreeIndicesCapacity)
-	{
-		Manager->FreeIndicesCapacity = Manager->FreeIndicesCapacity * 2;
-		Manager->FreeIndices = (u32*)(realloc(Manager->FreeIndices, Manager->FreeIndicesCapacity * sizeof(u32)));
-	}
-
-	Manager->Entries[Index].IsUsed = false;
-	Manager->FreeIndices[Manager->FreeIndicesCount] = Index;
-	++Manager->FreeIndicesCount;
-}
-
-void* System_HandleManager_GetHandleData(System_HandleManager Manager, System_HandleManager_Handle DataHandle)
-{
-	const u32 Index = GetIndex(DataHandle);
-	const u16 Generation = GetGeneration(DataHandle);
-
-	assert(System_HandleManager_IsHandleValid(Manager, DataHandle));
-
-	return (u8*)(Manager->StorageData) + (Index * Manager->DataSize);
-}
-
-bool System_HandleManager_IsHandleValid(System_HandleManager Manager, System_HandleManager_Handle DataHandle)
-{
-	const u32 Index = GetIndex(DataHandle);
-	const u16 Type = GetType(DataHandle);
-	const u16 Generation = GetGeneration(DataHandle);
-
-	assert(Index < Manager->StorageCount);
-	
-	return Type == Manager->HandleType && Manager->Entries[Index].IsUsed && Manager->Entries[Index].Generation == Generation;
-}
-
-// Hash
+// PoolAllocator
 static u32 AlignUp(u32 Value, u32 Alignment)
 {
 	return (Value + Alignment - 1) & ~(Alignment - 1);
@@ -225,7 +60,6 @@ u32 Systems_PoolAllocator_PushData(PoolAllocator* Allocator, const void* Data)
 		void* NewRawData = calloc(1, TotalSize);
 		void* NewData = AlignPointer(NewRawData, Allocator->Alignment);
 
-		// Copy existing data
 		for (u64 i = 0; i < Allocator->Count; ++i)
 		{
 			memcpy((char*)NewData + i * Stride, (char*)Allocator->Data + i * Stride, Allocator->DataSize);
@@ -256,12 +90,10 @@ void Systems_PoolAllocator_FreeData(PoolAllocator* Allocator, u32 Index)
 	Allocator->FreeList[Allocator->FreeCount++] = Index;
 }
 
-// -----------------------------------------------------------------------------
-// BufferMap implementation
-
+// SparceHashMap
 static u64 HashVkHandle(u64 VkHandle)
 {
-	VkHandle >>= 3; // Drop low bits if handles are aligned
+	VkHandle >>= 3;
 	VkHandle ^= VkHandle >> 30; VkHandle *= UINT64_C(0xBF58476D1CE4E5B9);
 	VkHandle ^= VkHandle >> 27; VkHandle *= UINT64_C(0x94D049BB133111EB);
 	VkHandle ^= VkHandle >> 31;
@@ -270,7 +102,7 @@ static u64 HashVkHandle(u64 VkHandle)
 
 static inline u64 GetIndexFromHandleMask(u64 h, u64 Capacity)
 {
-	assert((Capacity & (Capacity - 1)) == 0); // Power of two required
+	assert((Capacity & (Capacity - 1)) == 0);
 	u64 Mask = Capacity - 1;
 	return HashVkHandle(h) & Mask;
 }
@@ -416,7 +248,6 @@ bool Systems_SparceHashMap_Remove(SparceHashMap* Map, u64 Key, u32* OutIndex)
 			*OutIndex = Map->Indices[i];
 			Map->Occupied[i] = false;
 
-			// Backward-shift deletion
 			u64 j = NextIndex(i, Mask);
 			while (Map->Occupied[j] && Map->ProbeDist[j] > 0)
 			{
@@ -437,4 +268,116 @@ bool Systems_SparceHashMap_Remove(SparceHashMap* Map, u64 Key, u32* OutIndex)
 		i = NextIndex(i, Mask);
 		Dist++;
 	}
+}
+
+//HandleManager
+static u16 GetType(u64 Handle)
+{
+	return (Handle >> 48) & 0xFFFF;
+}
+
+static u32 GetIndex(u64 Handle)
+{
+	return (Handle >> 16) & 0xFFFFFFFF;
+}
+
+static u16 GetGeneration(u64 Handle)
+{
+	return Handle & 0xFFFF;
+}
+
+static u64 Create(u16 Type, u32 Index, u16 Generation)
+{
+	return ((u64)Type << 48) | ((u64)Index << 16) | (u64)Generation;
+}
+
+bool System_HandleManager_CompareHandles(System_HandleManager_Handle a, System_HandleManager_Handle b)
+{
+	return a == b;
+}
+
+void System_HandleManager_InitData(System_HandleManager* Manager, u32 InitialCapacity, u32 DataSize, u16 HandleType)
+{
+	assert(Manager);
+
+	Manager->Entries = (System_HandleManager_Entry*)(calloc(InitialCapacity, sizeof(System_HandleManager_Entry)));
+	Systems_PoolAllocator_Init(&Manager->Storage, InitialCapacity, DataSize, 1);
+	Manager->HandleType = HandleType;
+}
+
+void System_HandleManager_ClearData(System_HandleManager* Manager)
+{
+	assert(Manager);
+
+	free(Manager->Entries);
+	Systems_PoolAllocator_Free(&Manager->Storage);
+}
+
+System_HandleManager_Handle System_HandleManager_CreateHandle(System_HandleManager* Manager, const void* Data)
+{
+	assert(Manager);
+
+	u32 OldCapacity = (u32)Manager->Storage.capacity;
+	u32 OldCount = (u32)Manager->Storage.Count;
+	u32 Index = Systems_PoolAllocator_PushData(&Manager->Storage, Data);
+
+	if ((u32)Manager->Storage.capacity > OldCapacity)
+	{
+		const u32 NewCapacity = (u32)Manager->Storage.capacity;
+		System_HandleManager_Entry* NewEntries = (System_HandleManager_Entry*)(calloc(NewCapacity, sizeof(System_HandleManager_Entry)));
+
+		memcpy(NewEntries, Manager->Entries, OldCapacity * sizeof(System_HandleManager_Entry));
+		free(Manager->Entries);
+
+		Manager->Entries = NewEntries;
+	}
+
+	bool IsReused = Index < OldCount;
+
+	if (IsReused)
+	{
+		Manager->Entries[Index].IsUsed = true;
+		Manager->Entries[Index].Generation++;
+	}
+	else
+	{
+		Manager->Entries[Index].IsUsed = true;
+		Manager->Entries[Index].Generation = 1;
+	}
+
+	System_HandleManager_Handle DataHandle = Create(Manager->HandleType, Index, Manager->Entries[Index].Generation);
+
+	return DataHandle;
+}
+
+void System_HandleManager_DestroyHandle(System_HandleManager* Manager, System_HandleManager_Handle DataHandle)
+{
+	const u32 Index = GetIndex(DataHandle);
+	const u16 Generation = GetGeneration(DataHandle);
+
+	assert(System_HandleManager_IsHandleValid(Manager, DataHandle));
+
+	Manager->Entries[Index].IsUsed = false;
+	Systems_PoolAllocator_FreeData(&Manager->Storage, Index);
+}
+
+void System_HandleManager_GetHandleData(System_HandleManager* Manager, System_HandleManager_Handle DataHandle, void* OutData)
+{
+	const u32 Index = GetIndex(DataHandle);
+	const u16 Generation = GetGeneration(DataHandle);
+
+	assert(System_HandleManager_IsHandleValid(Manager, DataHandle));
+
+	Systems_PoolAllocator_GetData(&Manager->Storage, Index, OutData);
+}
+
+bool System_HandleManager_IsHandleValid(System_HandleManager* Manager, System_HandleManager_Handle DataHandle)
+{
+	const u32 Index = GetIndex(DataHandle);
+	const u16 Type = GetType(DataHandle);
+	const u16 Generation = GetGeneration(DataHandle);
+
+	assert(Index < (u32)Manager->Storage.Count);
+
+	return Type == Manager->HandleType && Manager->Entries[Index].IsUsed && Manager->Entries[Index].Generation == Generation;
 }

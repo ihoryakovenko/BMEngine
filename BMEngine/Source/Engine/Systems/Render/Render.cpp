@@ -61,7 +61,7 @@ namespace Render
 		InitInfo.PhysicalDevice = CoreContext->PhysicalDevice;
 		InitInfo.Device = CoreContext->LogicalDevice;
 		InitInfo.QueueFamily = CoreContext->Indices.GraphicsFamily;
-		InitInfo.Queue = GetCommandSystemData()->GraphicsQueue;
+		InitInfo.Queue = (VkQueue)GetCommandSystemData()->GraphicsQueue;
 		InitInfo.PipelineCache = nullptr;
 		InitInfo.DescriptorPool = *ImGuiPool;
 		InitInfo.RenderPass = nullptr;

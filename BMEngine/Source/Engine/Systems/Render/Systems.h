@@ -15,7 +15,7 @@ struct CommandWorkerData
 
 struct CommandSystemData
 {
-	VkQueue GraphicsQueue;
+	BmRender_Queue GraphicsQueue;
 	std::mutex QueueSubmitMutex;
 	BmRender_CommandWorker Workers[16];
 	u32 WorkerCount;

@@ -197,6 +197,11 @@ BmRender_Fence CreateFenceHandle(VkFence Fence)
 	return (BmRender_Fence)Fence;
 }
 
+BmRender_Queue CreateQueueHandle(VkQueue Queue)
+{
+	return (BmRender_Queue)Queue;
+}
+
 BmRender_Semaphore CreateSemaphoreHandle(VkSemaphore VulkanSemaphore, const SemaphoreData* Data)
 {
 	const u32 Index = Systems_PoolAllocator_PushData(&SemaphoreStorage.Allocator, Data);

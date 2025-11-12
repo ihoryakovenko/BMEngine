@@ -25,6 +25,7 @@ typedef struct BmRender_Fence_T* BmRender_Fence;
 typedef struct BmRender_Semaphore_T* BmRender_Semaphore;
 typedef struct BmRender_CommandPool_T* BmRender_CommandPool;
 typedef struct BmRender_CommandBuffer_T* BmRender_CommandBuffer;
+typedef struct BmRender_Queue_T* BmRender_Queue;
 
 enum class BmRender_AttributeType : u8
 {
@@ -96,6 +97,13 @@ enum class BmRender_SemaphoreType : u8
 {
 	Binary,
 	Timeline,
+};
+
+enum class QueueType : u8
+{
+	None = 0,
+	Graphic = 1ull << 0,
+	Transfer = 1ull << 1,
 };
 
 
@@ -326,8 +334,10 @@ void BmRender_Init(GLFWwindow* WindowHandler, u32 MaxFramesInFly);
 void BmRender_DeInit();
 
 u32 BmRender_GetSwapchainImageCount();
-void BmRender_QueueSubmit(VkQueue Queue, u32 SubmitCount, const BmRender_SubmitInfo* pSubmits, BmRender_Fence Fence);
-BmRender_SwapchainResult BmRender_QueuePresent(VkQueue Queue, const BmRender_PresentInfo* pPresentInfo);
+bool BmRender_IsDedicatedQueuePresent(QueueType QueueType);
+BmRender_Queue BmRender_CreateQueue(QueueType QueueType);
+void BmRender_QueueSubmit(BmRender_Queue Queue, u32 SubmitCount, const BmRender_SubmitInfo* pSubmits, BmRender_Fence Fence);
+BmRender_SwapchainResult BmRender_QueuePresent(BmRender_Queue Queue, const BmRender_PresentInfo* pPresentInfo);
 BmRender_SwapchainResult BmRender_AcquireNextSwapchainImage(u64 Timeout, BmRender_Semaphore Semaphore, VkFence Fence, u32* pImageIndex);
 
 BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description);
@@ -364,6 +374,8 @@ void BmRender_ResetFences(BmRender_Fence Handle);
 void BmRender_GetSemaphoreCounterValue(BmRender_Semaphore Handle, u64* pValue);
 void BmRender_BeginCommandBuffer(BmRender_CommandBuffer Handle);
 void BmRender_EndCommandBuffer(BmRender_CommandBuffer Handle);
+void BmRender_QueueWaitIdle(BmRender_Queue Queue);
+void BmRender_DeviceWaitIdle();
 
 void BmRender_TransitionImageForRendering(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer = 0,  u32 LayersCount = 1);
 void BmRender_TransitionImageForSampling(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer = 0, u32 LayersCount = 1);

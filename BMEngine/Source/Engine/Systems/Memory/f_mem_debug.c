@@ -902,9 +902,9 @@ void f_debug_mem_check_heap_reference(unsigned int minimum_allocations)
 					printf("FORGE Mem debugger Warning: Cant find any reference in heap memory of %u out of %u allocations made on line %u in file %s\n", f_alloc_lines[i].alloc_count - (unsigned int)found, f_alloc_lines[i].alloc_count, f_alloc_lines[i].line, f_alloc_lines[i].file);
 			}
 		}
-        }
-        if(f_alloc_mutex != NULL)
-                f_alloc_mutex_unlock(f_alloc_mutex);
+		}
+		if(f_alloc_mutex != NULL)
+				f_alloc_mutex_unlock(f_alloc_mutex);
 }
 
 // Utility functions to access total memory tracking

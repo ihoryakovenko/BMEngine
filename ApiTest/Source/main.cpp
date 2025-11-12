@@ -11,6 +11,7 @@
 #include <Engine/Systems/Render/Handles.h>
 #include <Engine/Systems/Render/VulkanCoreContext.h>
 
+#include <Test.h>
 
 static bool LoadShaderFile(const char* FilePath, char** OutCode, size_t* OutCodeSize)
 {
@@ -53,6 +54,8 @@ static bool LoadShaderFile(const char* FilePath, char** OutCode, size_t* OutCode
 
 int main()
 {
+	test();
+
 	s32 WindowWidth = 1920;
 	s32 WindowHeight = 1080;
 
@@ -223,8 +226,7 @@ int main()
 
 	BmRender_Pipeline Pipeline = BmRender_CreatePipeline(&PipelineDesc);
 
-	VkQueue GraphicsQueue;
-	vkGetDeviceQueue(CoreContext->LogicalDevice, (u32)CoreContext->Indices.GraphicsFamily, 0, &GraphicsQueue);
+	BmRender_Queue GraphicsQueue = BmRender_CreateQueue(QueueType::Graphic);
 
 	BmRender_CommandPool CommandPool = BmRender_CreateCommandPool((u32)CoreContext->Indices.GraphicsFamily);
 	BmRender_CommandBuffer CommandBuffer = BmRender_AllocateCommandBuffer(CommandPool);
@@ -299,11 +301,15 @@ int main()
 		PresentInfo.ImageIndices = &ImageIndex;
 
 		BmRender_SwapchainResult PresentResult = BmRender_QueuePresent(GraphicsQueue, &PresentInfo);
-
 	}
 
-	vkDeviceWaitIdle(CoreContext->LogicalDevice);
+	BmRender_QueueWaitIdle(GraphicsQueue);
 
+	BmRender_DestroyShader(VertexShader);
+	BmRender_DestroyShader(FragmentShader);
+	BmRender_DestroySemaphore(ImageAvailableSemaphore);
+	BmRender_DestroySemaphore(RenderFinishedSemaphore);
+	BmRender_DestroyCommandPool(CommandPool);
 	BmRender_DestroyFence(InFlightFence);
 	BmRender_DestroyPipeline(Pipeline);
 	BmRender_DestroyPipelineLayout(PipelineLayout);

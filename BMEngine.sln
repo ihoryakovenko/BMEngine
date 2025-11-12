@@ -14,6 +14,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ApiTest", "ApiTest\ApiTest.vcxproj", "{43310985-CE08-45F5-8B12-5E2457F9A9F4}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BmRender", "BmRender\BmRender.vcxproj", "{CBBA1D37-E15D-4703-9515-F54026E6357B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -46,6 +48,14 @@ Global
 		{43310985-CE08-45F5-8B12-5E2457F9A9F4}.Release|x64.Build.0 = Release|x64
 		{43310985-CE08-45F5-8B12-5E2457F9A9F4}.Release|x86.ActiveCfg = Release|Win32
 		{43310985-CE08-45F5-8B12-5E2457F9A9F4}.Release|x86.Build.0 = Release|Win32
+		{CBBA1D37-E15D-4703-9515-F54026E6357B}.Debug|x64.ActiveCfg = Debug|x64
+		{CBBA1D37-E15D-4703-9515-F54026E6357B}.Debug|x64.Build.0 = Debug|x64
+		{CBBA1D37-E15D-4703-9515-F54026E6357B}.Debug|x86.ActiveCfg = Debug|Win32
+		{CBBA1D37-E15D-4703-9515-F54026E6357B}.Debug|x86.Build.0 = Debug|Win32
+		{CBBA1D37-E15D-4703-9515-F54026E6357B}.Release|x64.ActiveCfg = Release|x64
+		{CBBA1D37-E15D-4703-9515-F54026E6357B}.Release|x64.Build.0 = Release|x64
+		{CBBA1D37-E15D-4703-9515-F54026E6357B}.Release|x86.ActiveCfg = Release|Win32
+		{CBBA1D37-E15D-4703-9515-F54026E6357B}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
