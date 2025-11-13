@@ -41,11 +41,11 @@ namespace Render
 
 	struct StaticMeshPipeline
 	{
-		BmRender_ImageView ShadowMapArrayImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
+		BmRender_ImageView ShadowMapArrayImageInterface[MAX_DRAW_FRAMES];
 
 		VkPushConstantRange PushConstants;
 
-		BmRender_DescriptorSet ShadowMapArraySet[VulkanHelper::MAX_DRAW_FRAMES];
+		BmRender_DescriptorSet ShadowMapArraySet[MAX_DRAW_FRAMES];
 	};
 
 	struct DescriptorSetHandles

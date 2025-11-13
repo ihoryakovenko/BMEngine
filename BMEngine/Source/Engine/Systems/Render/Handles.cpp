@@ -1,5 +1,7 @@
 #include "Handles.h"
 
+#include <SharedLib.h>
+
 static u16 GetNextHandleType()
 {
 	static u16 HandleType = 0;

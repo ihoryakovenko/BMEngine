@@ -1,8 +1,9 @@
-#include "HandleManager.h"
+#include "SharedLib.h"
+
 #include <cstring>
 #include <cassert>
 
-#include <Engine/Systems/Memory/forge_memory_debugger.h>
+#include <forge_memory_debugger.h>
 
 // PoolAllocator
 static u32 AlignUp(u32 Value, u32 Alignment)

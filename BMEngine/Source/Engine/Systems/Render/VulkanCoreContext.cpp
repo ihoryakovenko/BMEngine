@@ -10,7 +10,7 @@
 
 namespace VulkanCoreContext
 {
-	static VkDevice CreateLogicalDevice(VkPhysicalDevice PhDevice, VulkanHelper::PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
+	static VkDevice CreateLogicalDevice(VkPhysicalDevice PhDevice, PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
 		u32 DeviceExtensionsSize)
 	{
 		const f32 Priority = 1.0f;
@@ -114,15 +114,15 @@ namespace VulkanCoreContext
 	}
 
 	static bool CheckDeviceSuitability(const char* DeviceExtensions[], u32 DeviceExtensionsSize,
-		VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount, VulkanHelper::PhysicalDeviceIndices Indices,
+		VkExtensionProperties* ExtensionProperties, u32 ExtensionPropertiesCount, PhysicalDeviceIndices Indices,
 		VkPhysicalDevice Device, VkPhysicalDeviceProperties* DeviceProperties)
 	{
 		VkPhysicalDeviceFeatures AvailableFeatures;
 		vkGetPhysicalDeviceFeatures(Device, &AvailableFeatures);
 		
-		VulkanHelper::PrintDeviceData(DeviceProperties, &AvailableFeatures);
+		PrintDeviceData(DeviceProperties, &AvailableFeatures);
 
-		if (!VulkanHelper::CheckDeviceExtensionsSupport(ExtensionProperties, ExtensionPropertiesCount, DeviceExtensions, DeviceExtensionsSize))
+		if (!CheckDeviceExtensionsSupport(ExtensionProperties, ExtensionPropertiesCount, DeviceExtensions, DeviceExtensionsSize))
 		{
 			Util::RenderLog(Util::LogType::Warning, "PhysicalDeviceIndices are not initialized");
 			return false;
@@ -208,10 +208,10 @@ namespace VulkanCoreContext
 
 		const u32 ExtensionsCount = RequiredExtensionsCount + ValidationExtensionsCount;
 		auto RequiredExtensions = (const char**)Memory::FrameAlloc(GetFrameMemory(), RequiredExtensionsCount * sizeof(const char**));
-		VulkanHelper::GetRequiredInstanceExtensions(RequiredInstanceExtensions, RequiredExtensionsCount,
+		GetRequiredInstanceExtensions(RequiredInstanceExtensions, RequiredExtensionsCount,
 			ValidationExtensions, ValidationExtensionsCount, RequiredExtensions);
 
-		if (!VulkanHelper::CheckRequiredInstanceExtensionsSupport(AvailableExtensions, ExtensionCount,
+		if (!CheckRequiredInstanceExtensionsSupport(AvailableExtensions, ExtensionCount,
 			RequiredExtensions, ExtensionsCount))
 		{
 			assert(false);
@@ -223,7 +223,7 @@ namespace VulkanCoreContext
 			| VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
 		MessengerCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
 			| VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-		MessengerCreateInfo.pfnUserCallback = VulkanHelper::MessengerDebugCallback;
+		MessengerCreateInfo.pfnUserCallback = MessengerDebugCallback;
 
 		VkApplicationInfo ApplicationInfo = { };
 		ApplicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -241,7 +241,7 @@ namespace VulkanCoreContext
 
 		VULKAN_CHECK_RESULT(vkCreateInstance(&CreateInfo, nullptr, &Context->VulkanInstance));
 
-		if (!VulkanHelper::CreateDebugUtilsMessengerEXT(Context->VulkanInstance, &MessengerCreateInfo, nullptr, &Context->DebugMessenger))
+		if (!CreateDebugUtilsMessengerEXT(Context->VulkanInstance, &MessengerCreateInfo, nullptr, &Context->DebugMessenger))
 		{
 			Util::RenderLog(Util::LogType::Error, "Cannot create debug messenger");
 		}
@@ -280,7 +280,7 @@ namespace VulkanCoreContext
 			auto FamilyPropertiesData = (VkQueueFamilyProperties*)Memory::FrameAlloc(GetFrameMemory(), QueueFamilyCount * sizeof(VkQueueFamilyProperties));
 			vkGetPhysicalDeviceQueueFamilyProperties(Context->PhysicalDevice, &QueueFamilyCount, FamilyPropertiesData);
 
-			Context->Indices = VulkanHelper::GetPhysicalDeviceIndices(FamilyPropertiesData, QueueFamilyCount, Context->PhysicalDevice, Context->Surface);
+			Context->Indices = GetPhysicalDeviceIndices(FamilyPropertiesData, QueueFamilyCount, Context->PhysicalDevice, Context->Surface);
 
 			VkPhysicalDeviceProperties DeviceProperties;
 			vkGetPhysicalDeviceProperties(Context->PhysicalDevice, &DeviceProperties);
@@ -308,15 +308,15 @@ namespace VulkanCoreContext
 		auto AvailableFormats = (VkSurfaceFormatKHR*)Memory::FrameAlloc(GetFrameMemory(), SurfaceFormatCount * sizeof(VkSurfaceFormatKHR));
 		vkGetPhysicalDeviceSurfaceFormatsKHR(Context->PhysicalDevice, Context->Surface, &SurfaceFormatCount, AvailableFormats);
 
-		Context->SurfaceFormat = VulkanHelper::GetBestSurfaceFormat(Context->Surface, AvailableFormats, SurfaceFormatCount);
+		Context->SurfaceFormat = GetBestSurfaceFormat(Context->Surface, AvailableFormats, SurfaceFormatCount);
 
-		VulkanHelper::CheckFormats(Context->PhysicalDevice);
-		Context->SwapExtent = VulkanHelper::GetBestSwapExtent(Context->PhysicalDevice, Context->WindowHandler, Context->Surface);
+		CheckFormats(Context->PhysicalDevice);
+		Context->SwapExtent = GetBestSwapExtent(Context->PhysicalDevice, Context->WindowHandler, Context->Surface);
 
 		VkSurfaceCapabilitiesKHR SurfaceCapabilities = { };
 		VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Context->PhysicalDevice, Context->Surface, &SurfaceCapabilities));
 
-		VkPresentModeKHR PresentationMode = VulkanHelper::GetBestPresentationMode(Context->PhysicalDevice, Context->Surface);
+		VkPresentModeKHR PresentationMode = GetBestPresentationMode(Context->PhysicalDevice, Context->Surface);
 
 		// How many images are in the swap chain
 		// Get 1 more then the minimum to allow triple buffering
@@ -405,7 +405,7 @@ namespace VulkanCoreContext
 
 		if (Context->DebugMessenger != nullptr)
 		{
-			VulkanHelper::DestroyDebugMessenger(Context->VulkanInstance, Context->DebugMessenger, nullptr);
+			DestroyDebugMessenger(Context->VulkanInstance, Context->DebugMessenger, nullptr);
 		}
 
 		vkDestroyInstance(Context->VulkanInstance, nullptr);

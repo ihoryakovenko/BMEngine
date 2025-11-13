@@ -8,7 +8,7 @@
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 FORGE_MEMORY_DEBUG
-#include "Engine/Systems/Memory/forge_memory_debugger.h"
+#include <forge_memory_debugger.h>
 
 #include "Engine/Systems/Render/Render.h"
 #include "Engine/Systems/Render/RenderResources.h"

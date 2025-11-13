@@ -4,7 +4,7 @@
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 FORGE_MEMORY_DEBUG
-#include "Engine/Systems/Memory/forge_memory_debugger.h"
+#include <forge_memory_debugger.h>
 #include "Util/Util.h"
 #include "VulkanHelper.h"
 #include "VulkanCoreContext.h"
@@ -19,7 +19,7 @@ namespace TransferSystem
 	struct StagingFramePool
 	{
 		BmRender_GPUBuffer Buffer;
-		u64 AllocatedForFrame[VulkanHelper::MAX_DRAW_FRAMES];
+		u64 AllocatedForFrame[MAX_DRAW_FRAMES];
 	};
 
 	struct TaskQueue
@@ -33,8 +33,8 @@ namespace TransferSystem
 
 	struct TransferFrames
 	{
-		BmRender_Fence Fences[VulkanHelper::MAX_DRAW_FRAMES];
-		BmRender_CommandBuffer CommandBuffers[VulkanHelper::MAX_DRAW_FRAMES];
+		BmRender_Fence Fences[MAX_DRAW_FRAMES];
+		BmRender_CommandBuffer CommandBuffers[MAX_DRAW_FRAMES];
 	};
 
 	struct DataTransferState
@@ -156,7 +156,7 @@ namespace TransferSystem
 
 					VkBufferMemoryBarrier2 Barrier = { };
 					Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-					VulkanHelper::ApplyStageBarrier(&Barrier, Task->DataDescr.StageBarrier);
+					ApplyStageBarrier(&Barrier, Task->DataDescr.StageBarrier);
 					Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 					Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 					Barrier.buffer = (VkBuffer)Entry.GPUBufferHandle;
@@ -294,7 +294,7 @@ namespace TransferSystem
 
 		assert(TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] <= TransferState.MaxTransferSizePerFrame);
 		TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] = 0;
-		TransferState.CurrentFrame = Math::WrapIncrement(CurrentFrame, VulkanHelper::MAX_DRAW_FRAMES);
+		TransferState.CurrentFrame = Math::WrapIncrement(CurrentFrame, MAX_DRAW_FRAMES);
 
 		return 1;
 	}
@@ -314,12 +314,12 @@ namespace TransferSystem
 		TransferCommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		TransferCommandBufferAllocateInfo.commandPool = VulkanCommandPool;
 		TransferCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		TransferCommandBufferAllocateInfo.commandBufferCount = VulkanHelper::MAX_DRAW_FRAMES;
+		TransferCommandBufferAllocateInfo.commandBufferCount = MAX_DRAW_FRAMES;
 
-		VkCommandBuffer RawCommandBuffers[VulkanHelper::MAX_DRAW_FRAMES];
+		VkCommandBuffer RawCommandBuffers[MAX_DRAW_FRAMES];
 		VULKAN_CHECK_RESULT(vkAllocateCommandBuffers(Device, &TransferCommandBufferAllocateInfo, RawCommandBuffers));
 
-		for (u32 i = 0; i < VulkanHelper::MAX_DRAW_FRAMES; ++i)
+		for (u32 i = 0; i < MAX_DRAW_FRAMES; ++i)
 		{
 			TransferState.Frames.Fences[i] = BmRender_CreateFence();
 
@@ -340,14 +340,14 @@ namespace TransferSystem
 
 		TransferState.TransferStagingPool = { };
 
-		TransferState.TransferStagingPool.Buffer = BmRender_CreateStagingBuffer(TransferState.MaxTransferSizePerFrame * VulkanHelper::MAX_DRAW_FRAMES);
+		TransferState.TransferStagingPool.Buffer = BmRender_CreateStagingBuffer(TransferState.MaxTransferSizePerFrame * MAX_DRAW_FRAMES);
 
 		TransferState.TransferMemory = Memory::AllocateRingBuffer<u8>(MB128);
 	}
 
 	void DeInit()
 	{
-		for (u32 i = 0; i < VulkanHelper::MAX_DRAW_FRAMES; ++i)
+		for (u32 i = 0; i < MAX_DRAW_FRAMES; ++i)
 		{
 			BmRender_FreeCommandBuffer(TransferState.Frames.CommandBuffers[i]);
 			BmRender_DestroyFence(TransferState.Frames.Fences[i]);

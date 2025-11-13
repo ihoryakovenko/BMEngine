@@ -25,8 +25,8 @@ struct CommandSystemData
 
 struct DrawSystemData
 {
-	BmRender_Semaphore ImagesAvailable[VulkanHelper::MAX_DRAW_FRAMES];
-	BmRender_Semaphore RenderFinished[VulkanHelper::MAX_DRAW_FRAMES];
+	BmRender_Semaphore ImagesAvailable[MAX_DRAW_FRAMES];
+	BmRender_Semaphore RenderFinished[MAX_DRAW_FRAMES];
 	u32 CurrentFrame;
 	u32 MaxFramesInFly;
 	u64 WaitSemaphoreValueCount;

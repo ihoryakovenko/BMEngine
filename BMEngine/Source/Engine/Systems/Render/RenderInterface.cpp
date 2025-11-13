@@ -10,8 +10,6 @@
 #include "Util/Util.h"
 #include <type_traits>
 
-#include "Engine/Systems/HandleManager.h"
-
 #include "VulkanCoreContext.h"
 
 void BmRender_Init(GLFWwindow* WindowHandler, u32 InMaxFramesInFly)

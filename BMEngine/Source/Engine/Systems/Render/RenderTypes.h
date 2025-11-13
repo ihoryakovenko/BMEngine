@@ -1,7 +1,6 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
-#include "Engine/Systems/HandleManager.h"
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 #include "Engine/Systems/Render/VulkanHelper.h"
 
@@ -86,4 +85,4 @@ VulkanCoreContext::VulkanCoreContext* GetCoreContext();
 
 VkAllocationCallbacks* GetVulkanAllocator();
 
-Memory::FrameMemory GetFrameMemory();
+Memory::FrameMemory* GetFrameMemory();

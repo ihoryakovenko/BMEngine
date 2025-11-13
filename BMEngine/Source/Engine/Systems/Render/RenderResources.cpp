@@ -26,7 +26,7 @@ namespace RenderResources
 		{
 			VkDevice Device = GetCoreContext()->LogicalDevice;
 			VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
-			VulkanHelper::UpdateHostCompatibleBufferMemory(Device, Buffer.Memory, DataSize, Offset, Data);
+			UpdateHostCompatibleBufferMemory(Device, Buffer.Memory, DataSize, Offset, Data);
 		}
 		else if (Buffer.PropertyFlag == MemoryPropertyFlag::GPULocal)
 		{
@@ -61,7 +61,7 @@ namespace RenderResources
 
 		TransferSystem::TransferTask Task = { };
 		Task.DataSize = Image.Size;
-		Task.Alignment = VulkanHelper::GetFormatAlignment(Description->Format);
+		Task.Alignment = GetFormatAlignment(Description->Format);
 		Task.RawData = TransferMemory;
 		Task.TextureDescr.Handle = Handle;
 		Task.Type = TransferSystem::TaskType::Image;

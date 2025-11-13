@@ -1,6 +1,5 @@
 #include "RenderTypes.h"
 
-#include <Engine/Systems/HandleManager.h>
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 #include "Handles.h"
 
@@ -87,19 +86,19 @@ VkAllocationCallbacks* GetVulkanAllocator()
 	return &VulkanAllocator;
 }
 
-Memory::FrameMemory GetFrameMemory()
+Memory::FrameMemory* GetFrameMemory()
 {
-	return FrameMemory;
+	return& FrameMemory;
 }
 
 void InitializeFrameMemory()
 {
-	FrameMemory = Memory::CreateFrameMemory(1024 * 1024);
+	Memory::InitFrameMemory(&FrameMemory, 1024 * 1024);
 }
 
 void DeinitFrameMemory()
 {
-	Memory::DestroyFrameMemory(FrameMemory);
+	Memory::DestroyFrameMemory(&FrameMemory);
 }
 
 
@@ -141,7 +140,7 @@ BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_D
 		NewLayoutBindings[i].binding = i;
 		NewLayoutBindings[i].descriptorCount = Bindings[i].DescriptorCount;
 		NewLayoutBindings[i].descriptorType = Bindings[i].DescriptorType;
-		NewLayoutBindings[i].stageFlags = VulkanHelper::DescriptorShaderStageToVkShaderStage(Bindings[i].StageFlags);
+		NewLayoutBindings[i].stageFlags = DescriptorShaderStageToVkShaderStage(Bindings[i].StageFlags);
 		NewLayoutBindings[i].pImmutableSamplers = nullptr;
 
 		Layout.LayoutBindings[i].DescriptorType = NewLayoutBindings[i].descriptorType;
@@ -223,7 +222,7 @@ BmRender_PushConstant BmRender_CreatePushConstant(BmRender_DescriptorShaderStage
 	BmRender_PushConstant Constant;
 	Constant.offset = Offset;
 	Constant.size = Size;
-	Constant.stageFlags = VulkanHelper::DescriptorShaderStageToVkShaderStage(Stage);
+	Constant.stageFlags = DescriptorShaderStageToVkShaderStage(Stage);
 
 	return Constant;
 }
@@ -258,10 +257,10 @@ static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, MemoryPropertyFlag Memor
 	NewBuffer.PropertyFlag = MemoryFlag;
 	NewBuffer.BufferStage = BufferStage;
 
-	VkBuffer Buffer = VulkanHelper::CreateBuffer(Device, Capacity, Flag, GetVulkanAllocator());
+	VkBuffer Buffer = CreateBuffer(Device, Capacity, Flag, GetVulkanAllocator());
 
 	VkBufferUsageFlags BufferUsageFlags = (VkBufferUsageFlags)Flag;
-	VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device, Buffer, MemoryFlag, BufferUsageFlags, GetVulkanAllocator());
+	DeviceMemoryAllocResult AllocResult = AllocateDeviceMemory(PhysicalDevice, Device, Buffer, MemoryFlag, BufferUsageFlags, GetVulkanAllocator());
 	NewBuffer.Memory = AllocResult.Memory;
 
 	VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, Buffer, NewBuffer.Memory, 0));
@@ -319,7 +318,7 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 	VkImage Image;
 	VULKAN_CHECK_RESULT(vkCreateImage(Device, &ImageCreateInfo, GetVulkanAllocator(), &Image));
 
-	VulkanHelper::DeviceMemoryAllocResult AllocResult = VulkanHelper::AllocateDeviceMemory(PhysicalDevice, Device,
+	DeviceMemoryAllocResult AllocResult = AllocateDeviceMemory(PhysicalDevice, Device,
 		Image, MemoryPropertyFlag::GPULocal, GetVulkanAllocator());
 
 	Resource.Memory = AllocResult.Memory;
@@ -346,7 +345,7 @@ static BmRender_ImageView CreateImageView(BmRender_Image Handle, u32 BaseArrayLa
 	ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 	ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
 	ViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-	ViewCreateInfo.subresourceRange.aspectMask = VulkanHelper::ImageTypeToVkImageAspectFlags(Resource.Type);
+	ViewCreateInfo.subresourceRange.aspectMask = ImageTypeToVkImageAspectFlags(Resource.Type);
 	ViewCreateInfo.subresourceRange.baseMipLevel = 0;
 	ViewCreateInfo.subresourceRange.levelCount = 1;
 	ViewCreateInfo.subresourceRange.baseArrayLayer = BaseArrayLayer;
@@ -478,7 +477,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 		VkStage->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		VkStage->pNext = nullptr;
 		VkStage->flags = 0;
-		VkStage->stage = VulkanHelper::PipelineShaderStageToVkShaderStage(ShaderData.Stage);
+		VkStage->stage = PipelineShaderStageToVkShaderStage(ShaderData.Stage);
 		VkStage->module = (VkShaderModule)ShaderStageDesc->Shader;
 		VkStage->pName = ShaderStageDesc->EntryPointFunction;
 		VkStage->pSpecializationInfo = nullptr;
@@ -879,7 +878,7 @@ void BmRender_UpdateHostCompatibleBuffer(BmRender_GPUBuffer StagingBuffer, u64 B
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	GPUBufferData BufferData;
 	GetGPUBufferData(StagingBuffer, &BufferData);
-	VulkanHelper::UpdateHostCompatibleBufferMemory(Device, BufferData.Memory, DataSize, BufferOffset, Data);
+	UpdateHostCompatibleBufferMemory(Device, BufferData.Memory, DataSize, BufferOffset, Data);
 }
 
 void BmRender_DestroyPipelineLayout(BmRender_PipelineLayout Handle)

@@ -11,11 +11,16 @@
 #include "Util/Math.h"
 
 #define FORGE_MEMORY_DEBUG
-#include "forge_memory_debugger.h"
+#include <forge_memory_debugger.h>
 
 namespace Memory
 {
-	typedef struct FrameMemory_T* FrameMemory;
+	struct FrameMemory
+	{
+		u32 AllocatedSpace;
+		u8* Head;
+		u8* Base;
+	};
 
 	void Init(bool EnableMemoryDebugging);
 	void DeInit();
@@ -24,13 +29,13 @@ namespace Memory
 	void AllowFrameMemoryDump(bool Allow);
 	void AllowFrameMemoryChecks(bool Allow);
 
-	FrameMemory CreateFrameMemory(u64 SpaceToallocate);
-	void DestroyFrameMemory(FrameMemory Memory);
+	void InitFrameMemory(FrameMemory* Memory, u64 SpaceToallocate);
+	void DestroyFrameMemory(FrameMemory* Memory);
 
-	void* FrameAlloc(FrameMemory Memory, u64 Size);
-	void FrameFree(FrameMemory Memory);
+	void* FrameAlloc(FrameMemory* Memory, u64 Size);
+	void FrameFree(FrameMemory* Memory);
 
-	void* GetHead(FrameMemory Memory);
+	void* GetHead(FrameMemory* Memory);
 
 	template <typename T>
 	struct Array

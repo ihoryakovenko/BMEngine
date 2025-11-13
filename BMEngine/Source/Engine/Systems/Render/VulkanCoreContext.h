@@ -21,7 +21,7 @@ namespace VulkanCoreContext
 
 		VkPhysicalDevice PhysicalDevice;
 		VkDevice LogicalDevice;
-		VulkanHelper::PhysicalDeviceIndices Indices;
+		PhysicalDeviceIndices Indices;
 
 		VkSwapchainKHR VulkanSwapchain;
 		u32 ImagesCount;

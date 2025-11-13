@@ -386,13 +386,13 @@ namespace DeferredPass
 
 	static VkDescriptorSetLayout DeferredInputLayout;
 
-	static BmRender_Image DeferredInputDepthImage[VulkanHelper::MAX_DRAW_FRAMES];
-	static BmRender_Image DeferredInputColorImage[VulkanHelper::MAX_DRAW_FRAMES];
+	static BmRender_Image DeferredInputDepthImage[MAX_DRAW_FRAMES];
+	static BmRender_Image DeferredInputColorImage[MAX_DRAW_FRAMES];
 		
-	static BmRender_ImageView DeferredInputDepthImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
-	static BmRender_ImageView DeferredInputColorImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
+	static BmRender_ImageView DeferredInputDepthImageInterface[MAX_DRAW_FRAMES];
+	static BmRender_ImageView DeferredInputColorImageInterface[MAX_DRAW_FRAMES];
 
-	static BmRender_DescriptorSet DeferredInputSet[VulkanHelper::MAX_DRAW_FRAMES];
+	static BmRender_DescriptorSet DeferredInputSet[MAX_DRAW_FRAMES];
 
 	static VkSampler ColorSampler;
 	static VkSampler DepthSampler;
@@ -563,15 +563,15 @@ namespace LightningPass
 {
 	static VkDescriptorSetLayout LightSpaceMatrixLayout;
 
-	static BmRender_DescriptorSet LightSpaceMatrixSet[VulkanHelper::MAX_DRAW_FRAMES];
+	static BmRender_DescriptorSet LightSpaceMatrixSet[MAX_DRAW_FRAMES];
 
-	static BmRender_GPUBufferBinding LightSpaceMatrixBufferRegion[VulkanHelper::MAX_DRAW_FRAMES];
+	static BmRender_GPUBufferBinding LightSpaceMatrixBufferRegion[MAX_DRAW_FRAMES];
 	
 	// Buffer handles array
-	static BmRender_GPUBuffer LightSpaceMatrixBuffers[VulkanHelper::MAX_DRAW_FRAMES];
+	static BmRender_GPUBuffer LightSpaceMatrixBuffers[MAX_DRAW_FRAMES];
 
-		static BmRender_ImageView ShadowMapElement1ImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
-		static BmRender_ImageView ShadowMapElement2ImageInterface[VulkanHelper::MAX_DRAW_FRAMES];
+		static BmRender_ImageView ShadowMapElement1ImageInterface[MAX_DRAW_FRAMES];
+		static BmRender_ImageView ShadowMapElement2ImageInterface[MAX_DRAW_FRAMES];
 
 	static VkPushConstantRange PushConstants;
 
