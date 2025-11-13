@@ -15,13 +15,6 @@
 
 namespace Memory
 {
-	struct FrameMemory
-	{
-		u32 AllocatedSpace;
-		u8* Head;
-		u8* Base;
-	};
-
 	void Init(bool EnableMemoryDebugging);
 	void DeInit();
 	void Update();
@@ -29,13 +22,6 @@ namespace Memory
 	void AllowFrameMemoryDump(bool Allow);
 	void AllowFrameMemoryChecks(bool Allow);
 
-	void InitFrameMemory(FrameMemory* Memory, u64 SpaceToallocate);
-	void DestroyFrameMemory(FrameMemory* Memory);
-
-	void* FrameAlloc(FrameMemory* Memory, u64 Size);
-	void FrameFree(FrameMemory* Memory);
-
-	void* GetHead(FrameMemory* Memory);
 
 	template <typename T>
 	struct Array

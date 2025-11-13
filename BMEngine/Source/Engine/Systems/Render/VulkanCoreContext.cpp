@@ -203,11 +203,11 @@ namespace VulkanCoreContext
 		u32 ExtensionCount;
 		VULKAN_CHECK_RESULT(vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, nullptr));
 
-		auto AvailableExtensions = (VkExtensionProperties*)Memory::FrameAlloc(GetFrameMemory(), ExtensionCount * sizeof(VkExtensionProperties));
+		auto AvailableExtensions = (VkExtensionProperties*)Memory_LinearAllocator_Alloc(GetFrameMemory(), ExtensionCount * sizeof(VkExtensionProperties));
 		vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, AvailableExtensions);
 
 		const u32 ExtensionsCount = RequiredExtensionsCount + ValidationExtensionsCount;
-		auto RequiredExtensions = (const char**)Memory::FrameAlloc(GetFrameMemory(), RequiredExtensionsCount * sizeof(const char**));
+		auto RequiredExtensions = (const char**)Memory_LinearAllocator_Alloc(GetFrameMemory(), RequiredExtensionsCount * sizeof(const char**));
 		GetRequiredInstanceExtensions(RequiredInstanceExtensions, RequiredExtensionsCount,
 			ValidationExtensions, ValidationExtensionsCount, RequiredExtensions);
 
@@ -260,7 +260,7 @@ namespace VulkanCoreContext
 		u32 DeviceCount;
 		vkEnumeratePhysicalDevices(Context->VulkanInstance, &DeviceCount, nullptr);
 
-		auto DeviceList = (VkPhysicalDevice*)Memory::FrameAlloc(GetFrameMemory(), DeviceCount * sizeof(VkPhysicalDevice));
+		auto DeviceList = (VkPhysicalDevice*)Memory_LinearAllocator_Alloc(GetFrameMemory(), DeviceCount * sizeof(VkPhysicalDevice));
 		vkEnumeratePhysicalDevices(Context->VulkanInstance, &DeviceCount, DeviceList);
 
 		bool IsDeviceFound = false;
@@ -271,13 +271,13 @@ namespace VulkanCoreContext
 			u32 DeviceExtensionCount;
 			VULKAN_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(Context->PhysicalDevice, nullptr, &DeviceExtensionCount, nullptr));
 
-			auto DeviceExtensionsData = (VkExtensionProperties*)Memory::FrameAlloc(GetFrameMemory(), DeviceExtensionCount * sizeof(VkExtensionProperties));
+			auto DeviceExtensionsData = (VkExtensionProperties*)Memory_LinearAllocator_Alloc(GetFrameMemory(), DeviceExtensionCount * sizeof(VkExtensionProperties));
 			VULKAN_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(Context->PhysicalDevice, nullptr, &DeviceExtensionCount, DeviceExtensionsData));
 
 			u32 QueueFamilyCount;
 			vkGetPhysicalDeviceQueueFamilyProperties(Context->PhysicalDevice, &QueueFamilyCount, nullptr);
 
-			auto FamilyPropertiesData = (VkQueueFamilyProperties*)Memory::FrameAlloc(GetFrameMemory(), QueueFamilyCount * sizeof(VkQueueFamilyProperties));
+			auto FamilyPropertiesData = (VkQueueFamilyProperties*)Memory_LinearAllocator_Alloc(GetFrameMemory(), QueueFamilyCount * sizeof(VkQueueFamilyProperties));
 			vkGetPhysicalDeviceQueueFamilyProperties(Context->PhysicalDevice, &QueueFamilyCount, FamilyPropertiesData);
 
 			Context->Indices = GetPhysicalDeviceIndices(FamilyPropertiesData, QueueFamilyCount, Context->PhysicalDevice, Context->Surface);
@@ -305,7 +305,7 @@ namespace VulkanCoreContext
 		u32 SurfaceFormatCount;
 		VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfaceFormatsKHR(Context->PhysicalDevice, Context->Surface, &SurfaceFormatCount, nullptr));
 
-		auto AvailableFormats = (VkSurfaceFormatKHR*)Memory::FrameAlloc(GetFrameMemory(), SurfaceFormatCount * sizeof(VkSurfaceFormatKHR));
+		auto AvailableFormats = (VkSurfaceFormatKHR*)Memory_LinearAllocator_Alloc(GetFrameMemory(), SurfaceFormatCount * sizeof(VkSurfaceFormatKHR));
 		vkGetPhysicalDeviceSurfaceFormatsKHR(Context->PhysicalDevice, Context->Surface, &SurfaceFormatCount, AvailableFormats);
 
 		Context->SurfaceFormat = GetBestSurfaceFormat(Context->Surface, AvailableFormats, SurfaceFormatCount);
@@ -370,7 +370,7 @@ namespace VulkanCoreContext
 		u32 SwapchainImageCount;
 		vkGetSwapchainImagesKHR(Context->LogicalDevice, Context->VulkanSwapchain, &SwapchainImageCount, nullptr);
 
-		auto Images = (VkImage*)Memory::FrameAlloc(GetFrameMemory(), SwapchainImageCount * sizeof(VkImage));
+		auto Images = (VkImage*)Memory_LinearAllocator_Alloc(GetFrameMemory(), SwapchainImageCount * sizeof(VkImage));
 		vkGetSwapchainImagesKHR(Context->LogicalDevice, Context->VulkanSwapchain, &SwapchainImageCount, Images);
 
 		Context->ImagesCount = SwapchainImageCount;

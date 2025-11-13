@@ -406,7 +406,7 @@ void BmRender_FreeCommandBuffer(BmRender_CommandBuffer Handle);
 
 
 
-void Test_FrameFree();
+void Test_Memory_LinearAllocator_FreeAll();
 
 
 //void BmRender_RecordBufferCopy(BmRender_GPUBuffer StagingBuffer, u64 StagingBufferOffset, BmRender_GPUBuffer DstBuffer, u64 DstBufferOffset);

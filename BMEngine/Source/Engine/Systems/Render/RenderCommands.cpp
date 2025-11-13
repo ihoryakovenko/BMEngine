@@ -237,7 +237,7 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 	VkRenderingAttachmentInfo* ColorAttachments = nullptr;
 	VkRenderingAttachmentInfo* DepthAttachment = nullptr;
 
-	ColorAttachments = (VkRenderingAttachmentInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkRenderingAttachmentInfo) * pRenderingInfo->ColorAttachmentCount);
+	ColorAttachments = (VkRenderingAttachmentInfo*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkRenderingAttachmentInfo) * pRenderingInfo->ColorAttachmentCount);
 	for (u32 i = 0; i < pRenderingInfo->ColorAttachmentCount; ++i)
 	{
 		const BmRender_RenderingColorAttachment& Attachment = pRenderingInfo->ColorAttachments[i];
@@ -307,7 +307,7 @@ void BmRender_EndRendering(BmRender_CommandBuffer CommandBuffer)
 void BmRender_QueueSubmit(BmRender_Queue Queue, u32 SubmitCount, const BmRender_SubmitInfo* Submits, BmRender_Fence Fence)
 {
 	VkFence VkFenceHandle = (VkFence)Fence;
-	VkSubmitInfo* VkSubmits = (VkSubmitInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSubmitInfo) * SubmitCount);
+	VkSubmitInfo* VkSubmits = (VkSubmitInfo*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkSubmitInfo) * SubmitCount);
 
 	for (u32 i = 0; i < SubmitCount; ++i)
 	{
@@ -331,10 +331,10 @@ void BmRender_QueueSubmit(BmRender_Queue Queue, u32 SubmitCount, const BmRender_
 		VkSubmit.commandBufferCount = Submit.CommandBufferCount;
 		VkSubmit.signalSemaphoreCount = TotalSignalSemaphoreCount;
 
-		u64* WaitValues = (u64*)Memory::FrameAlloc(GetFrameMemory(), sizeof(u64) * TotalWaitSemaphoreCount);
-		u64* SignalValues = (u64*)Memory::FrameAlloc(GetFrameMemory(), sizeof(u64) * TotalSignalSemaphoreCount);
-		VkSemaphore* WaitSemaphores = (VkSemaphore*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSemaphore) * TotalWaitSemaphoreCount);
-		VkSemaphore* SignalSemaphores = (VkSemaphore*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSemaphore) * TotalSignalSemaphoreCount);
+		u64* WaitValues = (u64*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(u64) * TotalWaitSemaphoreCount);
+		u64* SignalValues = (u64*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(u64) * TotalSignalSemaphoreCount);
+		VkSemaphore* WaitSemaphores = (VkSemaphore*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkSemaphore) * TotalWaitSemaphoreCount);
+		VkSemaphore* SignalSemaphores = (VkSemaphore*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkSemaphore) * TotalSignalSemaphoreCount);
 
 		NewTimelineInfo.pWaitSemaphoreValues = WaitValues;		
 		NewTimelineInfo.pSignalSemaphoreValues = SignalValues;
@@ -382,7 +382,7 @@ BmRender_SwapchainResult BmRender_QueuePresent(BmRender_Queue Queue, const BmRen
 	PresentInfo.pSwapchains = &CoreContext->VulkanSwapchain;
 	PresentInfo.pImageIndices = pPresentInfo->ImageIndices;
 
-	VkSemaphore* WaitSemaphores = (VkSemaphore*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkSemaphore) * pPresentInfo->WaitSemaphoreCount);
+	VkSemaphore* WaitSemaphores = (VkSemaphore*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkSemaphore) * pPresentInfo->WaitSemaphoreCount);
 	PresentInfo.pWaitSemaphores = WaitSemaphores;
 
 	for (u32 i = 0; i < pPresentInfo->WaitSemaphoreCount; ++i)

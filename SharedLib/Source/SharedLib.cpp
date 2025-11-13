@@ -5,7 +5,7 @@
 
 #include <forge_memory_debugger.h>
 
-// PoolAllocator
+// Memory_PoolAllocator
 static u32 AlignUp(u32 Value, u32 Alignment)
 {
 	return (Value + Alignment - 1) & ~(Alignment - 1);
@@ -18,7 +18,7 @@ static void* AlignPointer(void* Ptr, u32 Alignment)
 	return (void*)AlignedAddr;
 }
 
-void Systems_PoolAllocator_Init(PoolAllocator* Allocator, u64 InitialCapacity, u32 DataSize, u32 Alignment)
+void Memory_PoolAllocator_Init(Memory_PoolAllocator* Allocator, u64 InitialCapacity, u32 DataSize, u32 Alignment)
 {
 	Allocator->FreeList = nullptr;
 	Allocator->FreeCount = 0;
@@ -34,7 +34,7 @@ void Systems_PoolAllocator_Init(PoolAllocator* Allocator, u64 InitialCapacity, u
 	Allocator->Data = AlignPointer(Allocator->RawData, Allocator->Alignment);
 }
 
-void Systems_PoolAllocator_Free(PoolAllocator* Allocator)
+void Memory_PoolAllocator_Free(Memory_PoolAllocator* Allocator)
 {
 	free(Allocator->RawData);
 	if (Allocator->FreeList)
@@ -43,7 +43,7 @@ void Systems_PoolAllocator_Free(PoolAllocator* Allocator)
 	}
 }
 
-u32 Systems_PoolAllocator_PushData(PoolAllocator* Allocator, const void* Data)
+u32 Memory_PoolAllocator_PushData(Memory_PoolAllocator* Allocator, const void* Data)
 {
 	u32 Stride = AlignUp(Allocator->DataSize, Allocator->Alignment);
 
@@ -75,13 +75,13 @@ u32 Systems_PoolAllocator_PushData(PoolAllocator* Allocator, const void* Data)
 	return (u32)(Allocator->Count++);
 }
 
-void Systems_PoolAllocator_GetData(PoolAllocator* Allocator, u32 Index, void* OutData)
+void Memory_PoolAllocator_GetData(Memory_PoolAllocator* Allocator, u32 Index, void* OutData)
 {
 	u32 Stride = AlignUp(Allocator->DataSize, Allocator->Alignment);
 	memcpy(OutData, (char*)Allocator->Data + Index * Stride, Allocator->DataSize);
 }
 
-void Systems_PoolAllocator_FreeData(PoolAllocator* Allocator, u32 Index)
+void Memory_PoolAllocator_FreeData(Memory_PoolAllocator* Allocator, u32 Index)
 {
 	if (Allocator->FreeCount >= Allocator->FreeCapacity)
 	{
@@ -302,7 +302,7 @@ void System_HandleManager_InitData(System_HandleManager* Manager, u32 InitialCap
 	assert(Manager);
 
 	Manager->Entries = (System_HandleManager_Entry*)(calloc(InitialCapacity, sizeof(System_HandleManager_Entry)));
-	Systems_PoolAllocator_Init(&Manager->Storage, InitialCapacity, DataSize, 1);
+	Memory_PoolAllocator_Init(&Manager->Storage, InitialCapacity, DataSize, 1);
 	Manager->HandleType = HandleType;
 }
 
@@ -311,7 +311,7 @@ void System_HandleManager_ClearData(System_HandleManager* Manager)
 	assert(Manager);
 
 	free(Manager->Entries);
-	Systems_PoolAllocator_Free(&Manager->Storage);
+	Memory_PoolAllocator_Free(&Manager->Storage);
 }
 
 System_HandleManager_Handle System_HandleManager_CreateHandle(System_HandleManager* Manager, const void* Data)
@@ -320,7 +320,7 @@ System_HandleManager_Handle System_HandleManager_CreateHandle(System_HandleManag
 
 	u32 OldCapacity = (u32)Manager->Storage.capacity;
 	u32 OldCount = (u32)Manager->Storage.Count;
-	u32 Index = Systems_PoolAllocator_PushData(&Manager->Storage, Data);
+	u32 Index = Memory_PoolAllocator_PushData(&Manager->Storage, Data);
 
 	if ((u32)Manager->Storage.capacity > OldCapacity)
 	{
@@ -359,7 +359,7 @@ void System_HandleManager_DestroyHandle(System_HandleManager* Manager, System_Ha
 	assert(System_HandleManager_IsHandleValid(Manager, DataHandle));
 
 	Manager->Entries[Index].IsUsed = false;
-	Systems_PoolAllocator_FreeData(&Manager->Storage, Index);
+	Memory_PoolAllocator_FreeData(&Manager->Storage, Index);
 }
 
 void System_HandleManager_GetHandleData(System_HandleManager* Manager, System_HandleManager_Handle DataHandle, void* OutData)
@@ -369,7 +369,7 @@ void System_HandleManager_GetHandleData(System_HandleManager* Manager, System_Ha
 
 	assert(System_HandleManager_IsHandleValid(Manager, DataHandle));
 
-	Systems_PoolAllocator_GetData(&Manager->Storage, Index, OutData);
+	Memory_PoolAllocator_GetData(&Manager->Storage, Index, OutData);
 }
 
 bool System_HandleManager_IsHandleValid(System_HandleManager* Manager, System_HandleManager_Handle DataHandle)
@@ -381,4 +381,42 @@ bool System_HandleManager_IsHandleValid(System_HandleManager* Manager, System_Ha
 	assert(Index < (u32)Manager->Storage.Count);
 
 	return Type == Manager->HandleType && Manager->Entries[Index].IsUsed && Manager->Entries[Index].Generation == Generation;
+}
+
+// Memory_LinearAllocator
+void Memory_LinearAllocator_Init(Memory_LinearAllocator* Memory, u64 SpaceToAllocate)
+{
+	Memory->AllocatedSpace = SpaceToAllocate;
+	Memory->Base = (u8*)calloc(Memory->AllocatedSpace, sizeof(u8));
+	Memory->Head = Memory->Base;
+}
+
+void Memory_LinearAllocator_Free(Memory_LinearAllocator* Memory)
+{
+	free(Memory->Base);
+}
+
+void* Memory_LinearAllocator_Alloc(Memory_LinearAllocator* Memory, u64 Size)
+{
+	assert(Memory->Head + Size <= Memory->Base + Memory->AllocatedSpace);
+
+	if (Size == 0)
+	{
+		return nullptr;
+	}
+
+	void* ReturnPointer = Memory->Head;
+	Memory->Head += Size;
+
+	return ReturnPointer;
+}
+
+void Memory_LinearAllocator_FreeAll(Memory_LinearAllocator* Memory)
+{
+	Memory->Head = Memory->Base;
+}
+
+void* Memory_LinearAllocator_GetHead(Memory_LinearAllocator* Memory)
+{
+	return Memory->Head;
 }

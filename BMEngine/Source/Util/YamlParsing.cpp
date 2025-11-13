@@ -1192,7 +1192,7 @@ namespace Util
 				BmRenderVertexBinding.Stride = VertexBindingDepr.Stride;
 				BmRenderVertexBinding.InputRate = VertexBindingDepr.InputRate;
 				BmRenderVertexBinding.AttributesCount = AttributesNode.Size();
-				BmRenderVertexBinding.Attributes = (VertexAttribute*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VertexAttribute) * BmRenderVertexBinding.AttributesCount);
+				BmRenderVertexBinding.Attributes = (VertexAttribute*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VertexAttribute) * BmRenderVertexBinding.AttributesCount);
 
 				u32 testIndex = 0;
 				for (auto AttrIt = AttributesNode.Begin(); AttrIt != AttributesNode.End(); AttrIt++)

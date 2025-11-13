@@ -7,6 +7,8 @@
 
 #include "Util/Util.h"
 
+#include <SharedLib.h>
+
 static void* VKAPI_CALL VulkanAllocationCallback(
 	void* UserData,
 	size_t Size,
@@ -53,7 +55,7 @@ static void VKAPI_CALL VulkanInternalFreeNotification(
 
 static VulkanCoreContext::VulkanCoreContext CoreContext;
 
-static Memory::FrameMemory FrameMemory;
+static Memory_LinearAllocator FrameMemory;
 
 static VkAllocationCallbacks VulkanAllocator;
 
@@ -86,19 +88,19 @@ VkAllocationCallbacks* GetVulkanAllocator()
 	return &VulkanAllocator;
 }
 
-Memory::FrameMemory* GetFrameMemory()
+Memory_LinearAllocator* GetFrameMemory()
 {
-	return& FrameMemory;
+	return &FrameMemory;
 }
 
 void InitializeFrameMemory()
 {
-	Memory::InitFrameMemory(&FrameMemory, 1024 * 1024);
+	Memory_LinearAllocator_Init(&FrameMemory, 1024 * 1024);
 }
 
-void DeinitFrameMemory()
+void DeMemory_LinearAllocator_Init()
 {
-	Memory::DestroyFrameMemory(&FrameMemory);
+	Memory_LinearAllocator_Free(&FrameMemory);
 }
 
 
@@ -134,7 +136,7 @@ BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_D
 	Layout.BindingsCount = BindingsCount;
 	Layout.LayoutBindings = (DescriptorSetLayoutBinding*)malloc(sizeof(DescriptorSetLayoutBinding) * BindingsCount);
 
-	VkDescriptorSetLayoutBinding* NewLayoutBindings = (VkDescriptorSetLayoutBinding*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkDescriptorSetLayoutBinding) * BindingsCount);
+	VkDescriptorSetLayoutBinding* NewLayoutBindings = (VkDescriptorSetLayoutBinding*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkDescriptorSetLayoutBinding) * BindingsCount);
 	for (u32 i = 0; i < BindingsCount; ++i)
 	{
 		NewLayoutBindings[i].binding = i;
@@ -168,7 +170,7 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, co
 	DescriptorSetLayoutData Layout;
 	GetDescriptorSetLayoutData(Set.Layout, &Layout);
 
-	VkWriteDescriptorSet* WriteDescriptorSets = (VkWriteDescriptorSet*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkWriteDescriptorSet) * BindingsCount);
+	VkWriteDescriptorSet* WriteDescriptorSets = (VkWriteDescriptorSet*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkWriteDescriptorSet) * BindingsCount);
 
 	for (u32 i = 0; i < BindingsCount; i++)
 	{
@@ -187,7 +189,7 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, co
 		if (DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC ||
 			DescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER || DescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC)
 		{
-			VkDescriptorBufferInfo* BufferInfo = (VkDescriptorBufferInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkDescriptorBufferInfo) * Binding.BindingCount);
+			VkDescriptorBufferInfo* BufferInfo = (VkDescriptorBufferInfo*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkDescriptorBufferInfo) * Binding.BindingCount);
 			for (u32 j = 0; j < Binding.BindingCount; ++j)
 			{
 				const BmRender_GPUBufferBinding& Entry = Binding.BufferRegions[j];
@@ -201,7 +203,7 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, co
 		}
 		else if (VK_DESCRIPTOR_TYPE_SAMPLER || VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
 		{
-			VkDescriptorImageInfo* ImageInfo = (VkDescriptorImageInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkDescriptorImageInfo));
+			VkDescriptorImageInfo* ImageInfo = (VkDescriptorImageInfo*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkDescriptorImageInfo));
 			ImageInfo->imageLayout = Binding.ImageBinding.ImageLayout;
 			ImageInfo->imageView = (VkImageView)Binding.ImageBinding.ImageView;
 			ImageInfo->sampler = (VkSampler)Binding.ImageBinding.Sampler;
@@ -392,10 +394,10 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 
-	VkVertexInputBindingDescription* VkVertexBindings = (VkVertexInputBindingDescription*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkVertexInputBindingDescription) * Description->VertexBindingsCount);
+	VkVertexInputBindingDescription* VkVertexBindings = (VkVertexInputBindingDescription*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkVertexInputBindingDescription) * Description->VertexBindingsCount);
 
 	u32 TotalAttributes = 0;
-	VkVertexInputAttributeDescription* VkVertexAttributes = (VkVertexInputAttributeDescription*)Memory::GetHead(GetFrameMemory());
+	VkVertexInputAttributeDescription* VkVertexAttributes = (VkVertexInputAttributeDescription*)Memory_LinearAllocator_GetHead(GetFrameMemory());
 	VkVertexInputAttributeDescription* VkAttribute = nullptr;
 
 	u32 CurrentLocation = 0;
@@ -438,7 +440,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 						assert(false);
 				}
 
-				VkAttribute = (VkVertexInputAttributeDescription*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkVertexInputAttributeDescription));
+				VkAttribute = (VkVertexInputAttributeDescription*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkVertexInputAttributeDescription));
 				VkAttribute->binding = BindingIndex;
 				VkAttribute->location = CurrentLocation;
 				VkAttribute->format = Format;
@@ -452,7 +454,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 				u32 MatrixBindingOffset = 0;
 				for (u32 i = 0; i < 4; ++i)
 				{
-					VkAttribute = (VkVertexInputAttributeDescription*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkVertexInputAttributeDescription));
+					VkAttribute = (VkVertexInputAttributeDescription*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkVertexInputAttributeDescription));
 					VkAttribute->binding = BindingIndex;
 					VkAttribute->location = CurrentLocation;
 					VkAttribute->format = VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -466,7 +468,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 		}
 	}
 
-	VkPipelineShaderStageCreateInfo* VkShaderStages = (VkPipelineShaderStageCreateInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkPipelineShaderStageCreateInfo) * Description->ShaderStagesCount);
+	VkPipelineShaderStageCreateInfo* VkShaderStages = (VkPipelineShaderStageCreateInfo*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkPipelineShaderStageCreateInfo) * Description->ShaderStagesCount);
 	for (u32 i = 0; i < Description->ShaderStagesCount; ++i)
 	{
 		const BmRender_ShaderStageDescription* ShaderStageDesc = Description->ShaderStages + i;
@@ -505,7 +507,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	ViewportState.pViewports = &Description->Viewport;
 	ViewportState.pScissors = &Description->Scissor;
 
-	auto PipelineCreateInfo = (VkGraphicsPipelineCreateInfo*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkGraphicsPipelineCreateInfo));
+	auto PipelineCreateInfo = (VkGraphicsPipelineCreateInfo*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkGraphicsPipelineCreateInfo));
 	*PipelineCreateInfo = { };
 	PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	PipelineCreateInfo->stageCount = Description->ShaderStagesCount;
@@ -536,13 +538,13 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 
-	VkDescriptorSetLayout* VkSetLayouts = (VkDescriptorSetLayout*)Memory::FrameAlloc(GetFrameMemory(), Description->SetLayoutCount * sizeof(VkDescriptorSetLayout));
+	VkDescriptorSetLayout* VkSetLayouts = (VkDescriptorSetLayout*)Memory_LinearAllocator_Alloc(GetFrameMemory(), Description->SetLayoutCount * sizeof(VkDescriptorSetLayout));
 	for (u32 i = 0; i < Description->SetLayoutCount; ++i)
 	{
 		VkSetLayouts[i] = (VkDescriptorSetLayout)Description->SetLayouts[i];
 	}
 
-	VkPushConstantRange* VkPushConstantRanges = (VkPushConstantRange*)Memory::FrameAlloc(GetFrameMemory(), Description->PushConstantRangeCount * sizeof(VkPushConstantRange));
+	VkPushConstantRange* VkPushConstantRanges = (VkPushConstantRange*)Memory_LinearAllocator_Alloc(GetFrameMemory(), Description->PushConstantRangeCount * sizeof(VkPushConstantRange));
 	for (u32 i = 0; i < Description->PushConstantRangeCount; ++i)
 	{
 		VkPushConstantRanges[i].offset = Description->PushConstantRanges[i].offset;
@@ -734,7 +736,7 @@ bool BmRender_IsDedicatedQueuePresent(QueueType QueueType)
 		return false;
 	}
 
-	VkQueueFamilyProperties* QueueFamilyProperties = (VkQueueFamilyProperties*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkQueueFamilyProperties) * QueueFamilyCount);
+	VkQueueFamilyProperties* QueueFamilyProperties = (VkQueueFamilyProperties*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkQueueFamilyProperties) * QueueFamilyCount);
 	vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &QueueFamilyCount, QueueFamilyProperties);
 
 	bool NeedsGraphics = ((u8)QueueType & (u8)QueueType::Graphic) != 0;
@@ -778,7 +780,7 @@ BmRender_Queue BmRender_CreateQueue(QueueType QueueType)
 		return nullptr;
 	}
 
-	VkQueueFamilyProperties* QueueFamilyProperties = (VkQueueFamilyProperties*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkQueueFamilyProperties) * QueueFamilyCount);
+	VkQueueFamilyProperties* QueueFamilyProperties = (VkQueueFamilyProperties*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkQueueFamilyProperties) * QueueFamilyCount);
 	vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &QueueFamilyCount, QueueFamilyProperties);
 
 	bool NeedsGraphics = ((u8)QueueType & (u8)QueueType::Graphic) != 0;

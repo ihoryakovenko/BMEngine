@@ -19,6 +19,8 @@
 #include <random>
 #include <mutex>
 
+#include <SharedLib.h>
+
 // Extern declarations for global resource maps
 extern std::unordered_map<std::string, Util::VertexBinding_depr> VBindings;
 extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
@@ -174,7 +176,7 @@ namespace Render
 
 		if (Config.DescriptorSetCount > 0)
 		{
-			VkDescriptorSet* VkDescriptorSets = (VkDescriptorSet*)Memory::FrameAlloc(GetFrameMemory(), sizeof(VkDescriptorSet) * Config.DescriptorSetCount);
+			VkDescriptorSet* VkDescriptorSets = (VkDescriptorSet*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkDescriptorSet) * Config.DescriptorSetCount);
 			for (u32 i = 0; i < Config.DescriptorSetCount; ++i)
 			{
 				DescriptorSetData SetData;
@@ -365,7 +367,7 @@ namespace Render
 
 		GetDrawSystemData()->CurrentFrame = Math::WrapIncrement(CurrentFrame, 3u);
 
-		Test_FrameFree();
+		Test_Memory_LinearAllocator_FreeAll();
 	}
 
 	RenderState* GetRenderState()

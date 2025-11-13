@@ -40,7 +40,7 @@ void BmRender_DeInit()
 	DeinitCommandBufferManager();
 
 	DestroyCoreContext();
-	DeinitFrameMemory();
+	DeMemory_LinearAllocator_Init();
 }
 
 u32 BmRender_GetSwapchainImageCount()
@@ -48,7 +48,7 @@ u32 BmRender_GetSwapchainImageCount()
 	return GetCoreContext()->ImagesCount;
 }
 
-void Test_FrameFree()
+void Test_Memory_LinearAllocator_FreeAll()
 {
-	Memory::FrameFree(GetFrameMemory());
+	Memory_LinearAllocator_FreeAll(GetFrameMemory());
 }

@@ -2,7 +2,7 @@
 
 #include "ShortTypes.h"
 
-struct PoolAllocator
+struct Memory_PoolAllocator
 {
 	void* Data;
 	void* RawData;
@@ -15,11 +15,24 @@ struct PoolAllocator
 	u32 Alignment;
 };
 
-void Systems_PoolAllocator_Init(PoolAllocator* Allocator, u64 InitialCapacity, u32 DataSize, u32 Alignment = 1);
-void Systems_PoolAllocator_Free(PoolAllocator* Allocator);
-u32 Systems_PoolAllocator_PushData(PoolAllocator* Allocator, const void* Data);
-void Systems_PoolAllocator_GetData(PoolAllocator* Allocator, u32 Index, void* OutData);
-void Systems_PoolAllocator_FreeData(PoolAllocator* Allocator, u32 Index);
+void Memory_PoolAllocator_Init(Memory_PoolAllocator* Allocator, u64 InitialCapacity, u32 DataSize, u32 Alignment = 1);
+void Memory_PoolAllocator_Free(Memory_PoolAllocator* Allocator);
+u32 Memory_PoolAllocator_PushData(Memory_PoolAllocator* Allocator, const void* Data);
+void Memory_PoolAllocator_GetData(Memory_PoolAllocator* Allocator, u32 Index, void* OutData);
+void Memory_PoolAllocator_FreeData(Memory_PoolAllocator* Allocator, u32 Index);
+
+struct Memory_LinearAllocator
+{
+	u32 AllocatedSpace;
+	u8* Head;
+	u8* Base;
+};
+
+void Memory_LinearAllocator_Init(Memory_LinearAllocator* Memory, u64 SpaceToAllocate);
+void Memory_LinearAllocator_Free(Memory_LinearAllocator* Memory);
+void* Memory_LinearAllocator_Alloc(Memory_LinearAllocator* Memory, u64 Size);
+void Memory_LinearAllocator_FreeAll(Memory_LinearAllocator* Memory);
+void* Memory_LinearAllocator_GetHead(Memory_LinearAllocator* Memory);
 
 struct SparceHashMap
 {
@@ -46,7 +59,7 @@ struct System_HandleManager_Entry
 struct System_HandleManager
 {
 	System_HandleManager_Entry* Entries;
-	PoolAllocator Storage;
+	Memory_PoolAllocator Storage;
 	u16 HandleType;
 };
 

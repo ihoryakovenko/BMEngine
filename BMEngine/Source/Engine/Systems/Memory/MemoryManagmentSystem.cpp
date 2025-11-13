@@ -69,41 +69,4 @@ namespace Memory
 	{
 		AreFrameMemoryChecksEnabled = Allow;
 	}
-
-	void InitFrameMemory(FrameMemory* Memory, u64 SpaceToAllocate)
-	{
-		Memory->AllocatedSpace = SpaceToAllocate;
-		Memory->Base = (u8*)calloc(Memory->AllocatedSpace, sizeof(u8));
-		Memory->Head = Memory->Base;
-	}
-
-	void DestroyFrameMemory(FrameMemory* Memory)
-	{
-		free(Memory->Base);
-	}
-
-	void* FrameAlloc(FrameMemory* Memory, u64 Size)
-	{
-		assert(Memory->Head + Size <= Memory->Base + Memory->AllocatedSpace);
-
-		if (Size == 0)
-		{
-			return nullptr;
-		}
-
-		void* ReturnPointer = Memory->Head;
-		Memory->Head += Size;
-
-		return ReturnPointer;
-	}
-
-	void FrameFree(FrameMemory* Memory)
-	{
-		Memory->Head = Memory->Base;
-	}
-
-	void* GetHead(FrameMemory* Memory)
-	{
-		return Memory->Head;
-	}
 }

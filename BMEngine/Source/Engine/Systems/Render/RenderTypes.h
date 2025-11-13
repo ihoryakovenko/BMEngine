@@ -9,6 +9,8 @@
 #include <atomic>
 #include <mutex>
 
+#include <SharedLib.h>
+
 struct GLFWwindow;
 
 namespace VulkanCoreContext
@@ -77,7 +79,7 @@ struct CommandBufferData
 
 
 void InitializeFrameMemory();
-void DeinitFrameMemory();
+void DeMemory_LinearAllocator_Init();
 
 void CreateCoreContext(GLFWwindow* WindowHandler);
 void DestroyCoreContext();
@@ -85,4 +87,4 @@ VulkanCoreContext::VulkanCoreContext* GetCoreContext();
 
 VkAllocationCallbacks* GetVulkanAllocator();
 
-Memory::FrameMemory* GetFrameMemory();
+Memory_LinearAllocator* GetFrameMemory();
