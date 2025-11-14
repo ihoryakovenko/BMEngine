@@ -5,13 +5,9 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include <Engine/Systems/Memory/MemoryManagmentSystem.h>
 #include <Engine/Systems/Render/RenderInterface.h>
-#include <Engine/Systems/Render/RenderTypes.h>
-#include <Engine/Systems/Render/Handles.h>
-#include <Engine/Systems/Render/VulkanCoreContext.h>
 
-#include <Test.h>
+#include <ShortTypes.h>
 
 static bool LoadShaderFile(const char* FilePath, char** OutCode, size_t* OutCodeSize)
 {
@@ -54,8 +50,6 @@ static bool LoadShaderFile(const char* FilePath, char** OutCode, size_t* OutCode
 
 int main()
 {
-	test();
-
 	s32 WindowWidth = 1920;
 	s32 WindowHeight = 1080;
 
@@ -104,14 +98,12 @@ int main()
 	LayoutDesc.PushConstantRangeCount = 0;
 	LayoutDesc.PushConstantRanges = nullptr;
 	BmRender_PipelineLayout PipelineLayout = BmRender_CreatePipelineLayout(&LayoutDesc);
-
-	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
 	
 	BmRender_PipelineDescription PipelineDesc = {};
 	PipelineDesc.PipelineLayout = PipelineLayout;
 
 	PipelineDesc.ResourceInfo.PipelineAttachmentData.ColorAttachmentCount = 1;
-	PipelineDesc.ResourceInfo.PipelineAttachmentData.ColorAttachmentFormats[0] = CoreContext->SurfaceFormat.format;
+	PipelineDesc.ResourceInfo.PipelineAttachmentData.ColorAttachmentFormats[0] = BmRender_GetSurfaceFormat().format;
 	PipelineDesc.ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
 	PipelineDesc.ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
@@ -226,9 +218,9 @@ int main()
 
 	BmRender_Pipeline Pipeline = BmRender_CreatePipeline(&PipelineDesc);
 
-	BmRender_Queue GraphicsQueue = BmRender_CreateQueue(QueueType::Graphic);
+	BmRender_Queue GraphicsQueue = BmRender_CreateQueue(BmRender_QueueType::Graphic);
 
-	BmRender_CommandPool CommandPool = BmRender_CreateCommandPool((u32)CoreContext->Indices.GraphicsFamily);
+	BmRender_CommandPool CommandPool = BmRender_CreateCommandPool(BmRender_QueueType::Graphic);
 	BmRender_CommandBuffer CommandBuffer = BmRender_AllocateCommandBuffer(CommandPool);
 
 	BmRender_Semaphore ImageAvailableSemaphore = BmRender_CreateSemaphore();
@@ -251,17 +243,17 @@ int main()
 		}
 
 		BmRender_BeginCommandBuffer(CommandBuffer);
-		BmRender_TransitionImageForRendering(CommandBuffer, CoreContext->Images[ImageIndex]);
+		BmRender_TransitionImageForRendering(CommandBuffer, BmRender_GetSwapchainImage(ImageIndex));
 
 		BmRender_RenderingColorAttachment ColorAttachment = {};
-		ColorAttachment.ImageView = CoreContext->ImageViews[ImageIndex];
+		ColorAttachment.ImageView = BmRender_GetSwapchainImageView(ImageIndex);
 		ColorAttachment.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		ColorAttachment.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
 		ColorAttachment.ClearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 		BmRender_RenderingInfo RenderingInfo = {};
 		RenderingInfo.Offset = { 0, 0 };
-		RenderingInfo.Extent = CoreContext->SwapExtent;
+		RenderingInfo.Extent = BmRender_GetSwapchainExtent();
 		RenderingInfo.ColorAttachments = &ColorAttachment;
 		RenderingInfo.ColorAttachmentCount = 1;
 		RenderingInfo.DepthAttachment = nullptr;
@@ -274,7 +266,7 @@ int main()
 
 		BmRender_EndRendering(CommandBuffer);
 
-		BmRender_TransitionImageForPresentation(CommandBuffer, CoreContext->Images[ImageIndex]);
+		BmRender_TransitionImageForPresentation(CommandBuffer, BmRender_GetSwapchainImage(ImageIndex));
 
 		BmRender_EndCommandBuffer(CommandBuffer);
 

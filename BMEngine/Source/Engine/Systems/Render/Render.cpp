@@ -407,7 +407,7 @@ namespace DeferredPass
 		VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
 
 		PipelineAttachmentData.ColorAttachmentCount = 1;
-		PipelineAttachmentData.ColorAttachmentFormats[0] = GetCoreContext()->SurfaceFormat.format;
+		PipelineAttachmentData.ColorAttachmentFormats[0] = BmRender_GetSurfaceFormat().format;
 		PipelineAttachmentData.DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
 		PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
@@ -493,7 +493,7 @@ namespace DeferredPass
 		VkCommandBuffer CmdBuffer = (VkCommandBuffer)SubmitPool->CommandBuffer;
 
 		BmRender_RenderingColorAttachment SwapchainColorAttachment = { };
-		SwapchainColorAttachment.ImageView = GetCoreContext()->ImageViews[Render::CurrentImageIndex];
+		SwapchainColorAttachment.ImageView = BmRender_GetSwapchainImageView(Render::CurrentImageIndex);
 		SwapchainColorAttachment.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		SwapchainColorAttachment.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
 		SwapchainColorAttachment.ClearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -507,7 +507,7 @@ namespace DeferredPass
 
 		BmRender_TransitionImageForSampling(SubmitPool->CommandBuffer, DeferredInputColorImage[GetDrawSystemData()->CurrentFrame]);
 		BmRender_TransitionImageForSampling(SubmitPool->CommandBuffer, DeferredInputDepthImage[GetDrawSystemData()->CurrentFrame]);
-		BmRender_TransitionImageForRendering(SubmitPool->CommandBuffer, GetCoreContext()->Images[Render::CurrentImageIndex]);
+		BmRender_TransitionImageForRendering(SubmitPool->CommandBuffer, BmRender_GetSwapchainImage(Render::CurrentImageIndex));
 
 		BmRender_BeginRendering(SubmitPool->CommandBuffer, &RenderingInfo);
 	}
@@ -517,7 +517,7 @@ namespace DeferredPass
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
 		BmRender_EndRendering(SubmitPool->CommandBuffer);
 
-		BmRender_TransitionImageForPresentation(SubmitPool->CommandBuffer, GetCoreContext()->Images[Render::CurrentImageIndex]);
+		BmRender_TransitionImageForPresentation(SubmitPool->CommandBuffer, BmRender_GetSwapchainImage(Render::CurrentImageIndex));
 	}
 
 

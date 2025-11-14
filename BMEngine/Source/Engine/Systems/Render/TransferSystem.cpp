@@ -152,7 +152,7 @@ namespace TransferSystem
 					GPUBufferData BufferData;
 					GetGPUBufferData(Entry.GPUBufferHandle, &BufferData);
 
-					BufferData.ReadyValue = TransferState.CompletedTransfer + 1; // TODO: fix
+					//BufferData.ReadyValue = TransferState.CompletedTransfer + 1; // TODO: fix
 
 					VkBufferMemoryBarrier2 Barrier = { };
 					Barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
@@ -182,7 +182,7 @@ namespace TransferSystem
 				{
 					ImageResource Image;
 					GetImageData(Task->TextureDescr.Handle, &Image);
-					Image.ReadyValue = TransferState.CompletedTransfer + 1; // TODO: fix
+					//Image.ReadyValue = TransferState.CompletedTransfer + 1; // TODO: fix
 
 					VkImageMemoryBarrier2 TransferImageBarrier = { };
 					TransferImageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -306,7 +306,7 @@ namespace TransferSystem
 
 		TransferState.CurrentFrame = 0;
 
-		TransferState.TransferCommandPool = BmRender_CreateCommandPool(Context->Indices.GraphicsFamily);
+		TransferState.TransferCommandPool = BmRender_CreateCommandPool(BmRender_QueueType::Graphic);
 
 		VkCommandPool VulkanCommandPool = (VkCommandPool)TransferState.TransferCommandPool;
 
@@ -379,7 +379,7 @@ namespace TransferSystem
 		GPUBufferData BufferData;
 		GetGPUBufferData(Handle, &BufferData);
 		return false; // TODO: fix
-		return CompletedValue < BufferData.ReadyValue;
+		//return CompletedValue < BufferData.ReadyValue;
 	}
 
 	bool IsImageLocked(BmRender_Image Handle)
@@ -390,6 +390,6 @@ namespace TransferSystem
 		ImageResource ImageData;
 		GetImageData(Handle, &ImageData);
 		return false; // TODO: fix
-		return CompletedValue < ImageData.ReadyValue;
+		//return CompletedValue < ImageData.ReadyValue;
 	}
 }

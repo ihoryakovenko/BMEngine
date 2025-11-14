@@ -19,7 +19,7 @@ void InitCommandSystem(u32 WorkerCount)
 	VulkanCoreContext::VulkanCoreContext* Context = GetCoreContext();
 	CommandSystemData* CommandSystem = GetCommandSystemData();
 
-	CommandSystem->GraphicsQueue = BmRender_CreateQueue(QueueType::Graphic);
+	CommandSystem->GraphicsQueue = BmRender_CreateQueue(BmRender_QueueType::Graphic);
 
 	CommandSystem->WorkerCount = WorkerCount;
 	CommandSystem->FreeWorkerCount = WorkerCount;
@@ -28,7 +28,7 @@ void InitCommandSystem(u32 WorkerCount)
 	VkDevice Device = Context->LogicalDevice;
 	u32 GraphicsFamily = Context->Indices.GraphicsFamily;
 
-	CommandSystemCommandPool = BmRender_CreateCommandPool(GraphicsFamily);
+	CommandSystemCommandPool = BmRender_CreateCommandPool(BmRender_QueueType::Graphic);
 
 	CommandPoolData PoolData;
 	GetCommandPoolData(CommandSystemCommandPool, &PoolData);

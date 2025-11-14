@@ -236,15 +236,6 @@ static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, MemoryPropertyFlag Memor
 
 	GPUBufferData NewBuffer = { };
 
-	if (MemoryFlag == MemoryPropertyFlag::HostCompatible)
-	{
-		NewBuffer.ReadyValue = 0;
-	}
-	else
-	{
-		NewBuffer.ReadyValue = ULLONG_MAX;
-	}
-
 	if (Flag == BufferUsageFlag::UniformFlag)
 	{
 		VkPhysicalDeviceProperties DeviceProperties;
@@ -276,7 +267,6 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 	VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
 
 	ImageResource Resource;
-	Resource.ReadyValue = ULLONG_MAX;
 	Resource.Format = Description->Format;
 	Resource.Type = Description->Type;
 
@@ -723,109 +713,42 @@ BmRender_Semaphore BmRender_CreateTimelineSemaphore(u64 InitialValue)
 	return CreateSemaphoreHandle(VulkanSemaphore, &Data);
 }
 
-bool BmRender_IsDedicatedQueuePresent(QueueType QueueType)
+bool BmRender_IsDedicatedQueuePresent(BmRender_QueueType BmRender_QueueType)
 {
 	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
-	VkPhysicalDevice PhysicalDevice = CoreContext->PhysicalDevice;
 
-	u32 QueueFamilyCount;
-	vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &QueueFamilyCount, nullptr);
+	bool NeedsGraphics = ((u8)BmRender_QueueType & (u8)BmRender_QueueType::Graphic) != 0;
+	bool NeedsTransfer = ((u8)BmRender_QueueType & (u8)BmRender_QueueType::Transfer) != 0;
 
-	if (QueueFamilyCount == 0)
+	if (NeedsTransfer && !NeedsGraphics)
 	{
-		return false;
+		return CoreContext->Indices.TransferFamily != -1 && CoreContext->Indices.TransferFamily != CoreContext->Indices.GraphicsFamily;
 	}
-
-	VkQueueFamilyProperties* QueueFamilyProperties = (VkQueueFamilyProperties*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkQueueFamilyProperties) * QueueFamilyCount);
-	vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &QueueFamilyCount, QueueFamilyProperties);
-
-	bool NeedsGraphics = ((u8)QueueType & (u8)QueueType::Graphic) != 0;
-	bool NeedsTransfer = ((u8)QueueType & (u8)QueueType::Transfer) != 0;
-
-	for (u32 i = 0; i < QueueFamilyCount; ++i)
+	else if (NeedsGraphics)
 	{
-		const VkQueueFamilyProperties& Props = QueueFamilyProperties[i];
-		
-		if (Props.queueCount == 0)
-		{
-			continue;
-		}
-
-		bool HasGraphics = (Props.queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0;
-		bool HasTransfer = (Props.queueFlags & VK_QUEUE_TRANSFER_BIT) != 0;
-
-		bool SupportsGraphics = !NeedsGraphics || HasGraphics;
-		bool SupportsTransfer = !NeedsTransfer || HasTransfer;
-
-		if (SupportsGraphics && SupportsTransfer)
-		{
-			return true;
-		}
+		return CoreContext->Indices.GraphicsFamily != -1;
 	}
 
 	return false;
 }
 
-BmRender_Queue BmRender_CreateQueue(QueueType QueueType)
+BmRender_Queue BmRender_CreateQueue(BmRender_QueueType BmRender_QueueType)
 {
 	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
 	VkDevice Device = CoreContext->LogicalDevice;
-	VkPhysicalDevice PhysicalDevice = CoreContext->PhysicalDevice;
 
-	u32 QueueFamilyCount;
-	vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &QueueFamilyCount, nullptr);
-
-	if (QueueFamilyCount == 0)
-	{
-		return nullptr;
-	}
-
-	VkQueueFamilyProperties* QueueFamilyProperties = (VkQueueFamilyProperties*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkQueueFamilyProperties) * QueueFamilyCount);
-	vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &QueueFamilyCount, QueueFamilyProperties);
-
-	bool NeedsGraphics = ((u8)QueueType & (u8)QueueType::Graphic) != 0;
-	bool NeedsTransfer = ((u8)QueueType & (u8)QueueType::Transfer) != 0;
+	bool NeedsGraphics = ((u8)BmRender_QueueType & (u8)BmRender_QueueType::Graphic) != 0;
+	bool NeedsTransfer = ((u8)BmRender_QueueType & (u8)BmRender_QueueType::Transfer) != 0;
 
 	s32 SelectedFamilyIndex = -1;
 
 	if (NeedsTransfer && !NeedsGraphics)
 	{
-		for (u32 i = 0; i < QueueFamilyCount; ++i)
-		{
-			const VkQueueFamilyProperties& Props = QueueFamilyProperties[i];
-			if (Props.queueCount > 0 &&
-				(Props.queueFlags & VK_QUEUE_TRANSFER_BIT) != 0 &&
-				(Props.queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0)
-			{
-				SelectedFamilyIndex = i;
-				break;
-			}
-		}
+		SelectedFamilyIndex = CoreContext->Indices.TransferFamily;
 	}
-
-	if (SelectedFamilyIndex == -1)
+	else if (NeedsGraphics)
 	{
-		for (u32 i = 0; i < QueueFamilyCount; ++i)
-		{
-			const VkQueueFamilyProperties& Props = QueueFamilyProperties[i];
-			
-			if (Props.queueCount == 0)
-			{
-				continue;
-			}
-
-			bool HasGraphics = (Props.queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0;
-			bool HasTransfer = (Props.queueFlags & VK_QUEUE_TRANSFER_BIT) != 0;
-
-			bool SupportsGraphics = !NeedsGraphics || HasGraphics;
-			bool SupportsTransfer = !NeedsTransfer || HasTransfer;
-
-			if (SupportsGraphics && SupportsTransfer)
-			{
-				SelectedFamilyIndex = i;
-				break;
-			}
-		}
+		SelectedFamilyIndex = CoreContext->Indices.GraphicsFamily;
 	}
 
 	if (SelectedFamilyIndex == -1)
@@ -839,9 +762,31 @@ BmRender_Queue BmRender_CreateQueue(QueueType QueueType)
 	return CreateQueueHandle(Queue);
 }
 
-BmRender_CommandPool BmRender_CreateCommandPool(u32 QueueFamilyIndex)
+BmRender_CommandPool BmRender_CreateCommandPool(BmRender_QueueType BmRender_QueueType)
 {
-	VkDevice Device = GetCoreContext()->LogicalDevice;
+	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
+	VkDevice Device = CoreContext->LogicalDevice;
+
+	bool NeedsGraphics = ((u8)BmRender_QueueType & (u8)BmRender_QueueType::Graphic) != 0;
+	bool NeedsTransfer = ((u8)BmRender_QueueType & (u8)BmRender_QueueType::Transfer) != 0;
+
+	s32 SelectedFamilyIndex = -1;
+
+	if (NeedsTransfer && !NeedsGraphics)
+	{
+		SelectedFamilyIndex = CoreContext->Indices.TransferFamily;
+	}
+	else if (NeedsGraphics)
+	{
+		SelectedFamilyIndex = CoreContext->Indices.GraphicsFamily;
+	}
+
+	if (SelectedFamilyIndex == -1)
+	{
+		return nullptr;
+	}
+
+	u32 QueueFamilyIndex = (u32)SelectedFamilyIndex;
 
 	VkCommandPoolCreateInfo CreateInfo = { };
 	CreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;

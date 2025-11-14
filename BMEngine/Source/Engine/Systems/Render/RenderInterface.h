@@ -99,7 +99,7 @@ enum class BmRender_SemaphoreType : u8
 	Timeline,
 };
 
-enum class QueueType : u8
+enum class BmRender_QueueType : u8
 {
 	None = 0,
 	Graphic = 1ull << 0,
@@ -334,11 +334,16 @@ void BmRender_Init(GLFWwindow* WindowHandler, u32 MaxFramesInFly);
 void BmRender_DeInit();
 
 u32 BmRender_GetSwapchainImageCount();
-bool BmRender_IsDedicatedQueuePresent(QueueType QueueType);
-BmRender_Queue BmRender_CreateQueue(QueueType QueueType);
+bool BmRender_IsDedicatedQueuePresent(BmRender_QueueType BmRender_QueueType);
+BmRender_Queue BmRender_CreateQueue(BmRender_QueueType BmRender_QueueType);
 void BmRender_QueueSubmit(BmRender_Queue Queue, u32 SubmitCount, const BmRender_SubmitInfo* pSubmits, BmRender_Fence Fence);
 BmRender_SwapchainResult BmRender_QueuePresent(BmRender_Queue Queue, const BmRender_PresentInfo* pPresentInfo);
 BmRender_SwapchainResult BmRender_AcquireNextSwapchainImage(u64 Timeout, BmRender_Semaphore Semaphore, VkFence Fence, u32* pImageIndex);
+
+VkSurfaceFormatKHR BmRender_GetSurfaceFormat();
+BmRender_Image BmRender_GetSwapchainImage(u32 Index);
+BmRender_ImageView BmRender_GetSwapchainImageView(u32 Index);
+VkExtent2D BmRender_GetSwapchainExtent();
 
 BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description);
 BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* Description);
@@ -362,7 +367,7 @@ BmRender_PushConstant BmRender_CreatePushConstant(BmRender_DescriptorShaderStage
 BmRender_Fence BmRender_CreateFence();
 BmRender_Semaphore BmRender_CreateSemaphore();
 BmRender_Semaphore BmRender_CreateTimelineSemaphore(u64 InitialValue);
-BmRender_CommandPool BmRender_CreateCommandPool(u32 QueueFamilyIndex);
+BmRender_CommandPool BmRender_CreateCommandPool(BmRender_QueueType BmRender_QueueType);
 BmRender_CommandBuffer BmRender_AllocateCommandBuffer(BmRender_CommandPool CommandPool);
 
 void BmRender_UpdateHostCompatibleBuffer(BmRender_GPUBuffer Buffer, u64 BufferOffset, u64 DataSize, const void* Data);

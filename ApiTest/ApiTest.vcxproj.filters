@@ -27,12 +27,6 @@
     <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\RenderTypes.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\BMEngine\Source\Engine\Systems\HandleManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Memory\f_mem_debug.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\BMEngine\Source\Engine\Systems\Memory\MemoryManagmentSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

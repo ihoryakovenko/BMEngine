@@ -48,6 +48,36 @@ u32 BmRender_GetSwapchainImageCount()
 	return GetCoreContext()->ImagesCount;
 }
 
+VkSurfaceFormatKHR BmRender_GetSurfaceFormat()
+{
+	return GetCoreContext()->SurfaceFormat;
+}
+
+BmRender_Image BmRender_GetSwapchainImage(u32 Index)
+{
+	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
+	if (Index >= CoreContext->ImagesCount)
+	{
+		return nullptr;
+	}
+	return CoreContext->Images[Index];
+}
+
+BmRender_ImageView BmRender_GetSwapchainImageView(u32 Index)
+{
+	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
+	if (Index >= CoreContext->ImagesCount)
+	{
+		return nullptr;
+	}
+	return CoreContext->ImageViews[Index];
+}
+
+VkExtent2D BmRender_GetSwapchainExtent()
+{
+	return GetCoreContext()->SwapExtent;
+}
+
 void Test_Memory_LinearAllocator_FreeAll()
 {
 	Memory_LinearAllocator_FreeAll(GetFrameMemory());

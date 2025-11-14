@@ -39,7 +39,6 @@ struct ShaderData
 struct ImageResource
 {
 	VkDeviceMemory Memory;
-	u64 ReadyValue;
 	VkFormat Format;
 	u64 Size;
 	BmRender_ImageType Type;
@@ -52,7 +51,6 @@ struct GPUBufferData
 	VkDeviceMemory Memory;
 	MemoryPropertyFlag PropertyFlag;
 	BmRender_PipelineSyncStage BufferStage;
-	u64 ReadyValue;
 };
 
 struct DescriptorSetData
