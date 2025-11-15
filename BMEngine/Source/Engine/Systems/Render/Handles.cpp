@@ -27,6 +27,7 @@ static StoragePair DescriptorSetStorage;
 static StoragePair SemaphoreStorage;
 static StoragePair CommandPoolStorage;
 static StoragePair CommandBufferStorage;
+static StoragePair QueueStorage;
 
 // INIT
 void InitializeDescriptorSetLayoutManager(u32 Size)
@@ -75,6 +76,12 @@ void InitializeCommandBufferManager(u32 Size)
 {
 	Memory_PoolAllocator_Init(&CommandBufferStorage.Allocator, Size, sizeof(CommandBufferData));
 	Systems_SparceHashMap_Init(&CommandBufferStorage.HashMap, Size);
+}
+
+void InitializeQueueManager(u32 Size)
+{
+	Memory_PoolAllocator_Init(&QueueStorage.Allocator, Size, sizeof(QueueData));
+	Systems_SparceHashMap_Init(&QueueStorage.HashMap, Size);
 }
 // INIT
 
@@ -125,6 +132,12 @@ void DeinitCommandBufferManager()
 {
 	Systems_SparceHashMap_Free(&CommandBufferStorage.HashMap);
 	Memory_PoolAllocator_Free(&CommandBufferStorage.Allocator);
+}
+
+void DeinitQueueManager()
+{
+	Systems_SparceHashMap_Free(&QueueStorage.HashMap);
+	Memory_PoolAllocator_Free(&QueueStorage.Allocator);
 }
 // DEINIT
 
@@ -199,8 +212,11 @@ BmRender_Fence CreateFenceHandle(VkFence Fence)
 	return (BmRender_Fence)Fence;
 }
 
-BmRender_Queue CreateQueueHandle(VkQueue Queue)
+BmRender_Queue CreateQueueHandle(VkQueue Queue, const QueueData* Data)
 {
+	const u32 Index = Memory_PoolAllocator_PushData(&QueueStorage.Allocator, Data);
+	Systems_SparceHashMap_Insert(&QueueStorage.HashMap, (u64)Queue, Index);
+	
 	return (BmRender_Queue)Queue;
 }
 
@@ -384,6 +400,17 @@ bool GetCommandBufferData(BmRender_CommandBuffer Handle, CommandBufferData* OutD
 	if (Systems_SparceHashMap_Get(&CommandBufferStorage.HashMap, (u64)Handle, &Index))
 	{
 		Memory_PoolAllocator_GetData(&CommandBufferStorage.Allocator, Index, OutData);
+		return true;
+	}
+	return false;
+}
+
+bool GetQueueData(BmRender_Queue Handle, QueueData* OutData)
+{
+	u32 Index;
+	if (Systems_SparceHashMap_Get(&QueueStorage.HashMap, (u64)Handle, &Index))
+	{
+		Memory_PoolAllocator_GetData(&QueueStorage.Allocator, Index, OutData);
 		return true;
 	}
 	return false;

@@ -62,7 +62,7 @@ namespace Render
 		StaticMeshPipeline MeshPipeline;
 		DescriptorSetHandles DescriptorSets;
 		BmRender_DescriptorPool MainPool;
-		VkDescriptorPool DebugUiPool; // TODO: ?
+		BmRender_DescriptorPool DebugUiPool; // TODO: ?
 		BmRender_GPUBufferBinding* VpHandle;
 		BmRender_GPUBufferBinding* EntityLightBufferHandle;
 	};

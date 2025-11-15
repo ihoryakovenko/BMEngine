@@ -75,6 +75,11 @@ struct CommandBufferData
 	BmRender_CommandPool CommandPool;
 };
 
+struct QueueData
+{
+	BmRender_QueueType QueueType;
+};
+
 
 void InitializeFrameMemory();
 void DeMemory_LinearAllocator_Init();

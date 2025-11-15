@@ -27,6 +27,18 @@ inline constexpr u32 MAX_VERTEX_INPUTS_ATTRIBUTES = 16;
 inline constexpr u32 MAX_VERTEX_INPUT_BINDINGS = 16;
 inline constexpr u32 MAX_DRAW_FRAMES = 3;
 
+enum class BufferUsageFlag
+{
+	UniformFlag = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+	StagingFlag = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+	StorageFlag = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+	VertexFlag = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+	IndexFlag = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+	CombinedVertexIndexFlag = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+	InstanceFlag = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+	IndirectDrawBufferFlag = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+};
+
 struct PhysicalDeviceIndices
 {
 	s32 GraphicsFamily;
@@ -96,3 +108,6 @@ VkShaderStageFlags DescriptorShaderStageToVkShaderStage(BmRender_DescriptorShade
 VkShaderStageFlagBits PipelineShaderStageToVkShaderStage(BmRender_PipelineShaderStage stage);
 VkPipelineStageFlags PipelineSyncToVkPipelineStage(BmRender_PipelineSyncStage stage);
 VkImageAspectFlags ImageTypeToVkImageAspectFlags(BmRender_ImageType Type);
+VkDescriptorPoolCreateFlags DescriptorPoolTypeToVkFlags(BmRender_DescriptorPoolType Type);
+VkMemoryPropertyFlags MemoryPropertyFlagToVkFlags(MemoryPropertyFlag Flag);
+s32 GetQueueFamilyIndexFromQueueType(BmRender_QueueType QueueType, const PhysicalDeviceIndices& Indices);

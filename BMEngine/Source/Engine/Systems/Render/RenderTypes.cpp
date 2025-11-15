@@ -556,16 +556,16 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 	return CreatePipelineLayoutHandle(PipelineLayout);
 }
 
-BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolDescription* Description)
+BmRender_DescriptorPool BmRender_CreateDescriptorPool(const VkDescriptorPoolSize* PoolSizes, u32 MaxSets, u32 PoolSizeCount, BmRender_DescriptorPoolType Type)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 
 	VkDescriptorPoolCreateInfo CreateInfo = { };
 	CreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	CreateInfo.maxSets = Description->MaxSets;
-	CreateInfo.poolSizeCount = Description->PoolSizeCount;
-	CreateInfo.pPoolSizes = Description->PoolSizes;
-	CreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
+	CreateInfo.maxSets = MaxSets;
+	CreateInfo.poolSizeCount = PoolSizeCount;
+	CreateInfo.pPoolSizes = PoolSizes;
+	CreateInfo.flags = DescriptorPoolTypeToVkFlags(Type);
 	CreateInfo.pNext = nullptr;
 
 	VkDescriptorPool DescriptorPool;
@@ -716,20 +716,24 @@ BmRender_Semaphore BmRender_CreateTimelineSemaphore(u64 InitialValue)
 bool BmRender_IsDedicatedQueuePresent(BmRender_QueueType BmRender_QueueType)
 {
 	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
+	s32 SelectedFamilyIndex = GetQueueFamilyIndexFromQueueType(BmRender_QueueType, CoreContext->Indices);
 
-	bool NeedsGraphics = ((u8)BmRender_QueueType & (u8)BmRender_QueueType::Graphic) != 0;
-	bool NeedsTransfer = ((u8)BmRender_QueueType & (u8)BmRender_QueueType::Transfer) != 0;
+	if (SelectedFamilyIndex == -1)
+	{
+		return false;
+	}
 
+	bool NeedsTransfer = ((u32)BmRender_QueueType & (u32)BmRender_QueueType::Transfer) != 0;
+	bool NeedsGraphics = ((u32)BmRender_QueueType & (u32)BmRender_QueueType::Graphic) != 0;
+
+	// If it's a transfer-only queue, check if it's dedicated (different from graphics)
 	if (NeedsTransfer && !NeedsGraphics)
 	{
-		return CoreContext->Indices.TransferFamily != -1 && CoreContext->Indices.TransferFamily != CoreContext->Indices.GraphicsFamily;
-	}
-	else if (NeedsGraphics)
-	{
-		return CoreContext->Indices.GraphicsFamily != -1;
+		return CoreContext->Indices.TransferFamily != CoreContext->Indices.GraphicsFamily;
 	}
 
-	return false;
+	// Graphics queue is always present if we got a valid index
+	return true;
 }
 
 BmRender_Queue BmRender_CreateQueue(BmRender_QueueType BmRender_QueueType)
@@ -737,19 +741,7 @@ BmRender_Queue BmRender_CreateQueue(BmRender_QueueType BmRender_QueueType)
 	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
 	VkDevice Device = CoreContext->LogicalDevice;
 
-	bool NeedsGraphics = ((u8)BmRender_QueueType & (u8)BmRender_QueueType::Graphic) != 0;
-	bool NeedsTransfer = ((u8)BmRender_QueueType & (u8)BmRender_QueueType::Transfer) != 0;
-
-	s32 SelectedFamilyIndex = -1;
-
-	if (NeedsTransfer && !NeedsGraphics)
-	{
-		SelectedFamilyIndex = CoreContext->Indices.TransferFamily;
-	}
-	else if (NeedsGraphics)
-	{
-		SelectedFamilyIndex = CoreContext->Indices.GraphicsFamily;
-	}
+	s32 SelectedFamilyIndex = GetQueueFamilyIndexFromQueueType(BmRender_QueueType, CoreContext->Indices);
 
 	if (SelectedFamilyIndex == -1)
 	{
@@ -759,7 +751,10 @@ BmRender_Queue BmRender_CreateQueue(BmRender_QueueType BmRender_QueueType)
 	VkQueue Queue;
 	vkGetDeviceQueue(Device, SelectedFamilyIndex, 0, &Queue);
 
-	return CreateQueueHandle(Queue);
+	QueueData Data = { };
+	Data.QueueType = BmRender_QueueType;
+
+	return CreateQueueHandle(Queue, &Data);
 }
 
 BmRender_CommandPool BmRender_CreateCommandPool(BmRender_QueueType BmRender_QueueType)
@@ -767,19 +762,7 @@ BmRender_CommandPool BmRender_CreateCommandPool(BmRender_QueueType BmRender_Queu
 	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
 	VkDevice Device = CoreContext->LogicalDevice;
 
-	bool NeedsGraphics = ((u8)BmRender_QueueType & (u8)BmRender_QueueType::Graphic) != 0;
-	bool NeedsTransfer = ((u8)BmRender_QueueType & (u8)BmRender_QueueType::Transfer) != 0;
-
-	s32 SelectedFamilyIndex = -1;
-
-	if (NeedsTransfer && !NeedsGraphics)
-	{
-		SelectedFamilyIndex = CoreContext->Indices.TransferFamily;
-	}
-	else if (NeedsGraphics)
-	{
-		SelectedFamilyIndex = CoreContext->Indices.GraphicsFamily;
-	}
+	s32 SelectedFamilyIndex = GetQueueFamilyIndexFromQueueType(BmRender_QueueType, CoreContext->Indices);
 
 	if (SelectedFamilyIndex == -1)
 	{

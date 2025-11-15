@@ -286,6 +286,13 @@ void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeli
 	vkCmdBindPipeline(VkCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipeline)Pipeline);
 }
 
+void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, VkShaderStageFlags StageFlags, u32 Offset, u32 Size, const void* pValues)
+{
+	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
+	VkPipelineLayout Layout = (VkPipelineLayout)PipelineLayout;
+	vkCmdPushConstants(VkCmdBuffer, Layout, StageFlags, Offset, Size, pValues);
+}
+
 void BmRender_Draw(BmRender_CommandBuffer CommandBuffer, u32 VertexCount, u32 InstanceCount, u32 FirstVertex, u32 FirstInstance)
 {
 	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;

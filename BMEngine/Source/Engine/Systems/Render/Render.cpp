@@ -34,7 +34,7 @@ static BmRender_Image ShadowMapArray;
 
 namespace Render
 {
-	static void InitImGuiPipeline(VkDescriptorPool* ImGuiPool, VulkanCoreContext::VulkanCoreContext* CoreContext, GLFWwindow* Wnd)
+	static void InitImGuiPipeline(BmRender_DescriptorPool* ImGuiPool, GLFWwindow* Wnd)
 	{
 		ImGui_ImplGlfw_InitForVulkan(Wnd, true);
 
@@ -50,22 +50,18 @@ namespace Render
 		{
 			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 },
 		};
-		VkDescriptorPoolCreateInfo PoolInfo = { };
-		PoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		PoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-		PoolInfo.maxSets = 1;
-		PoolInfo.poolSizeCount = (uint32_t)IM_ARRAYSIZE(PoolSizes);
-		PoolInfo.pPoolSizes = PoolSizes;
-		vkCreateDescriptorPool(CoreContext->LogicalDevice, &PoolInfo, nullptr, ImGuiPool);
 
+		*ImGuiPool = BmRender_CreateDescriptorPool(PoolSizes, 1, (u32)IM_ARRAYSIZE(PoolSizes), BmRender_DescriptorPoolType::CreateFree);
+
+		BmRender_Queue GraphicsQueue = BmRender_GetGraphicsQueue();
 		ImGui_ImplVulkan_InitInfo InitInfo = { };
-		InitInfo.Instance = CoreContext->VulkanInstance;
-		InitInfo.PhysicalDevice = CoreContext->PhysicalDevice;
-		InitInfo.Device = CoreContext->LogicalDevice;
-		InitInfo.QueueFamily = CoreContext->Indices.GraphicsFamily;
-		InitInfo.Queue = (VkQueue)GetCommandSystemData()->GraphicsQueue;
+		InitInfo.Instance = (VkInstance)BmRender_GetVulkanInstance();
+		InitInfo.PhysicalDevice = (VkPhysicalDevice)BmRender_GetPhysicalDevice();
+		InitInfo.Device = (VkDevice)BmRender_GetLogicalDevice();
+		InitInfo.QueueFamily = BmRender_GetQueueFamily(GraphicsQueue);
+		InitInfo.Queue = (VkQueue)GraphicsQueue;
 		InitInfo.PipelineCache = nullptr;
-		InitInfo.DescriptorPool = *ImGuiPool;
+		InitInfo.DescriptorPool = *((VkDescriptorPool*)ImGuiPool);
 		InitInfo.RenderPass = nullptr;
 		InitInfo.UseDynamicRendering = true;
 		InitInfo.MinImageCount = 2;
@@ -78,15 +74,15 @@ namespace Render
 		ImGui_ImplVulkan_CreateFontsTexture();
 	}
 
-	static void DeInitImGuiPipeline(VkDevice Device, VkDescriptorPool ImGuiPool)
+	static void DeInitImGuiPipeline(BmRender_DescriptorPool ImGuiPool)
 	{
 		ImGui_ImplVulkan_Shutdown();
-		vkDestroyDescriptorPool(Device, ImGuiPool, nullptr);
+		BmRender_DestroyDescriptorPool(ImGuiPool);
 	}
 
-	static void InitStaticMeshPipeline(VkDevice Device, StaticMeshPipeline* MeshPipeline, BmRender_DescriptorPool MainPool)
+	static void InitStaticMeshPipeline(StaticMeshPipeline* MeshPipeline, BmRender_DescriptorPool MainPool)
 	{
-		for (u32 i = 0; i < GetCoreContext()->ImagesCount; i++)
+		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
 			MeshPipeline->ShadowMapArrayImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_LIGHT_SOURCES * i, MAX_LIGHT_SOURCES);
 			
@@ -127,7 +123,7 @@ namespace Render
 		Pipelines["StaticMesh"] = BmRender_CreatePipeline(&PipelineDesc);
 	}
 
-	static void DrawStaticMeshes(VkDevice Device, BmRender_CommandBuffer CommandBuffer, StaticMeshPipeline* MeshPipeline, DrawScene* Scene, const DescriptorSetHandles& DescriptorSets)
+	static void DrawStaticMeshes(BmRender_CommandBuffer CommandBuffer, StaticMeshPipeline* MeshPipeline, DrawScene* Scene, const DescriptorSetHandles& DescriptorSets)
 	{
 		u32 CurrentImageIndex = GetDrawSystemData()->CurrentFrame;
 
@@ -166,12 +162,8 @@ namespace Render
 
 		if (Config.PushConstant.offset != 0 || Config.PushConstant.size != 0)
 		{
-			VkPushConstantRange PushConstantRange;
-			PushConstantRange.offset = Config.PushConstant.offset;
-			PushConstantRange.size = Config.PushConstant.size;
-			PushConstantRange.stageFlags = Config.PushConstant.stageFlags;
-			vkCmdPushConstants(CmdBuffer, PipelineLayout, PushConstantRange.stageFlags, 
-				PushConstantRange.offset, PushConstantRange.size, Config.PushConstantData);
+			BmRender_RecordPushConstants(CommandBuffer, Config.PipelineLayout, Config.PushConstant.stageFlags,
+				Config.PushConstant.offset, Config.PushConstant.size, Config.PushConstantData);
 		}
 
 		if (Config.DescriptorSetCount > 0)
@@ -261,8 +253,8 @@ namespace Render
 
 		//TerrainRender::Init();
 		//DynamicMapSystem::Init();
-		InitStaticMeshPipeline(Device, &State.MeshPipeline, State.MainPool);
-		InitImGuiPipeline(&State.DebugUiPool, GetCoreContext(), WindowHandler);
+		InitStaticMeshPipeline(&State.MeshPipeline, State.MainPool);
+		InitImGuiPipeline(&State.DebugUiPool, WindowHandler);
 	}
 
 	void DeInit()
@@ -272,9 +264,9 @@ namespace Render
 
 		VkDevice Device = GetCoreContext()->LogicalDevice;
 
-		DeInitImGuiPipeline(Device, State.DebugUiPool);
+		DeInitImGuiPipeline(State.DebugUiPool);
 		
-		for (u32 i = 0; i < GetCoreContext()->ImagesCount; i++)
+		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
 			BmRender_DestroyImageView(State.MeshPipeline.ShadowMapArrayImageInterface[i]);
 		}
@@ -326,7 +318,7 @@ namespace Render
 		LightningPass::Draw(Scene);
 		MainPass::BeginPass();
 		//TerrainRender::Draw();
-		DrawStaticMeshes(Device, SubmitPool->CommandBuffer, &State.MeshPipeline, Scene, State.DescriptorSets);
+		DrawStaticMeshes(SubmitPool->CommandBuffer, &State.MeshPipeline, Scene, State.DescriptorSets);
 		MainPass::EndPass();
 		DeferredPass::BeginPass();
 		DeferredPass::Draw();
@@ -413,7 +405,7 @@ namespace DeferredPass
 
 		DeferredInputLayout = (VkDescriptorSetLayout)DescriptorSetLayouts["MainPassOutputLayout"];
 
-		for (u32 i = 0; i < GetCoreContext()->ImagesCount; i++)
+		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
 			//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
 
@@ -551,7 +543,7 @@ namespace DeferredPass
 
 	void DeInit()
 	{
-		for (u32 i = 0; i < GetCoreContext()->ImagesCount; i++)
+		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
 			BmRender_DestroyImageView(DeferredInputColorImageInterface[i]);
 			BmRender_DestroyImageView(DeferredInputDepthImageInterface[i]);
@@ -585,9 +577,9 @@ namespace LightningPass
 		LightSpaceMatrixLayout = (VkDescriptorSetLayout)DescriptorSetLayouts["LightSpaceMatrixLayout"];
 
 		ShadowMapArray = BmRender_CreateImage2DArray(DepthViewportExtent.width, DepthViewportExtent.height, DepthFormat,
-			BmRender_ImageType::DepthSamplad, MAX_LIGHT_SOURCES * GetCoreContext()->ImagesCount);
+			BmRender_ImageType::DepthSamplad, MAX_LIGHT_SOURCES * BmRender_GetSwapchainImageCount());
 
-		for (u32 i = 0; i < GetCoreContext()->ImagesCount; i++)
+		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
 			const VkDeviceSize LightSpaceMatrixSize = sizeof(glm::mat4);
 
@@ -703,7 +695,7 @@ namespace LightningPass
 
 	void DeInit()
 	{
-		for (u32 i = 0; i < GetCoreContext()->ImagesCount; i++)
+		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
 			BmRender_DestroyGPUBuffer(LightSpaceMatrixBuffers[i]);
 			BmRender_DestroyImageView(ShadowMapElement1ImageInterface[i]);

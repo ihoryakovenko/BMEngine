@@ -100,7 +100,7 @@ DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, Vk
 	VkMemoryRequirements MemoryRequirements;
 	vkGetBufferMemoryRequirements(Device, Buffer, &MemoryRequirements);
 
-	const u32 MemoryTypeIndex = GetMemoryTypeIndex(PhysicalDevice, MemoryRequirements.memoryTypeBits, (VkFlags)Properties);
+	const u32 MemoryTypeIndex = GetMemoryTypeIndex(PhysicalDevice, MemoryRequirements.memoryTypeBits, MemoryPropertyFlagToVkFlags(Properties));
 
 	VkMemoryAllocateInfo MemoryAllocInfo = { };
 	MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -129,7 +129,7 @@ DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, Vk
 	VkMemoryRequirements MemoryRequirements;
 	vkGetImageMemoryRequirements(Device, Image, &MemoryRequirements);
 
-	const u32 MemoryTypeIndex = GetMemoryTypeIndex(PhysicalDevice, MemoryRequirements.memoryTypeBits, (VkFlags)Properties);
+	const u32 MemoryTypeIndex = GetMemoryTypeIndex(PhysicalDevice, MemoryRequirements.memoryTypeBits, MemoryPropertyFlagToVkFlags(Properties));
 
 	VkMemoryAllocateInfo MemoryAllocInfo = { };
 	MemoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -937,4 +937,43 @@ u32 CalculateFormatSize(VkFormat Format)
 			assert(false);
 			return 4;
 	}
+}
+
+VkDescriptorPoolCreateFlags DescriptorPoolTypeToVkFlags(BmRender_DescriptorPoolType Type)
+{
+	VkDescriptorPoolCreateFlags flags = 0;
+	if ((u32)Type & (u32)BmRender_DescriptorPoolType::UpdateAfterBind) flags |= VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
+	if ((u32)Type & (u32)BmRender_DescriptorPoolType::CreateFree) flags |= VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+	return flags;
+}
+
+VkMemoryPropertyFlags MemoryPropertyFlagToVkFlags(MemoryPropertyFlag Flag)
+{
+	switch (Flag)
+	{
+		case MemoryPropertyFlag::GPULocal:
+			return VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		case MemoryPropertyFlag::HostCompatible:
+			return VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		default:
+			assert(false);
+			return 0;
+	}
+}
+
+s32 GetQueueFamilyIndexFromQueueType(BmRender_QueueType QueueType, const PhysicalDeviceIndices& Indices)
+{
+	bool NeedsGraphics = ((u32)QueueType & (u32)BmRender_QueueType::Graphic) != 0;
+	bool NeedsTransfer = ((u32)QueueType & (u32)BmRender_QueueType::Transfer) != 0;
+
+	if (NeedsTransfer && !NeedsGraphics)
+	{
+		return Indices.TransferFamily;
+	}
+	else if (NeedsGraphics)
+	{
+		return Indices.GraphicsFamily;
+	}
+
+	return -1;
 }
