@@ -1,8 +1,8 @@
 #include <SharedLib.h>
-#include "Engine/Systems/Memory/MemoryManagmentSystem.h"
+
 #include "Handles.h"
-#include "RenderTypes.h"
 #include "RenderInterface.h"
+#include "VulkanHelper.h"
 
 #include "VulkanCoreContext.h"
 
@@ -291,6 +291,36 @@ void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender
 	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
 	VkPipelineLayout Layout = (VkPipelineLayout)PipelineLayout;
 	vkCmdPushConstants(VkCmdBuffer, Layout, StageFlags, Offset, Size, pValues);
+}
+
+void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets)
+{
+	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
+	VkPipelineLayout Layout = (VkPipelineLayout)PipelineLayout;
+	
+	PipelineLayoutData LayoutData;
+	if (GetPipelineLayoutData(PipelineLayout, &LayoutData))
+	{
+		VkPipelineBindPoint BindPoint = PipelineTypeToVkPipelineBindPoint(LayoutData.PipelineType);
+		
+		vkCmdBindDescriptorSets(VkCmdBuffer, BindPoint, Layout, FirstSet, DescriptorSetCount, 
+			(const VkDescriptorSet*)pDescriptorSets, DynamicOffsetCount, pDynamicOffsets);
+	}
+}
+
+void BmRender_RecordBindVertexBuffers(BmRender_CommandBuffer CommandBuffer, u32 FirstBinding, u32 BindingCount, const BmRender_GPUBuffer* Buffers, const u64* Offsets)
+{
+	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
+	const VkBuffer* VkBuffers = (const VkBuffer*)Buffers;
+	
+	vkCmdBindVertexBuffers(VkCmdBuffer, FirstBinding, BindingCount, VkBuffers, Offsets);
+}
+
+void BmRender_RecordBindIndexBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer Buffer, u64 Offset, VkIndexType IndexType)
+{
+	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
+	VkBuffer VkBufferHandle = (VkBuffer)Buffer;
+	vkCmdBindIndexBuffer(VkCmdBuffer, VkBufferHandle, Offset, IndexType);
 }
 
 void BmRender_Draw(BmRender_CommandBuffer CommandBuffer, u32 VertexCount, u32 InstanceCount, u32 FirstVertex, u32 FirstInstance)

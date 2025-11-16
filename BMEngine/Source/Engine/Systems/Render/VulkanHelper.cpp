@@ -1,6 +1,7 @@
 #include "VulkanHelper.h"
 
 #include <cassert>
+#include <cstdarg>
 
 #include <glm/glm.hpp>
 
@@ -159,13 +160,13 @@ void GetRequiredInstanceExtensions(const char** RequiredInstanceExtensions, u32 
 	for (u32 i = 0; i < RequiredExtensionsCount; ++i)
 	{
 		OutInstanceExtensions[i] = RequiredInstanceExtensions[i];
-		Util::RenderLog(Util::LogType::Info, "Requested %s extension", OutInstanceExtensions[i]);
+		RenderLog(LogType::Info, "Requested %s extension", OutInstanceExtensions[i]);
 	}
 
 	for (u32 i = 0; i < ValidationExtensionsCount; ++i)
 	{
 		OutInstanceExtensions[i + RequiredExtensionsCount] = ValidationExtensions[i];
-		Util::RenderLog(Util::LogType::Info, "Requested %s extension", OutInstanceExtensions[i + RequiredExtensionsCount]);
+		RenderLog(LogType::Info, "Requested %s extension", OutInstanceExtensions[i + RequiredExtensionsCount]);
 	}
 }
 
@@ -236,7 +237,7 @@ bool CheckFormatSupport(VkPhysicalDevice PhysicalDevice, VkFormat Format, VkImag
 
 void PrintDeviceData(VkPhysicalDeviceProperties* DeviceProperties, VkPhysicalDeviceFeatures* AvailableFeatures)
 {
-	Util::RenderLog(Util::LogType::Info,
+	RenderLog(LogType::Info,
 		"VkPhysicalDeviceProperties:\n"
 		"  apiVersion: %u\n  driverVersion: %u\n  vendorID: %u\n  deviceID: %u\n"
 		"  deviceType: %u\n  deviceName: %s\n"
@@ -258,7 +259,7 @@ void PrintDeviceData(VkPhysicalDeviceProperties* DeviceProperties, VkPhysicalDev
 		DeviceProperties->sparseProperties.residencyNonResidentStrict
 	);
 
-	Util::RenderLog(Util::LogType::Info,
+	RenderLog(LogType::Info,
 		"VkPhysicalDeviceFeatures:\n  robustBufferAccess: %d\n  fullDrawIndexUint32: %d\n"
 		"  imageCubeArray: %d\n  independentBlend: %d\n  geometryShader: %d\n"
 		"  tessellationShader: %d\n  sampleRateShading: %d\n  dualSrcBlend: %d\n"
@@ -306,7 +307,7 @@ void PrintDeviceData(VkPhysicalDeviceProperties* DeviceProperties, VkPhysicalDev
 		AvailableFeatures->inheritedQueries
 	);
 
-	Util::RenderLog(Util::LogType::Info,
+	RenderLog(LogType::Info,
 		"VkPhysicalDeviceLimits:\n  maxImageDimension1D: %u\n  maxImageDimension2D: %u\n"
 		"  maxImageDimension3D: %u\n  maxImageDimensionCube: %u\n"
 		"  maxImageArrayLayers: %u\n  maxTexelBufferElements: %u\n"
@@ -464,7 +465,7 @@ VkPresentModeKHR GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurf
 
 	for (u32 i = 0; i < PresentModeCount; ++i)
 	{
-		Util::RenderLog(Util::LogType::Info, "Present mode %d is available", PresentModes[i]);
+		RenderLog(LogType::Info, "Present mode %d is available", PresentModes[i]);
 	}
 
 	VkPresentModeKHR Mode = VK_PRESENT_MODE_FIFO_KHR;
@@ -479,7 +480,7 @@ VkPresentModeKHR GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurf
 	// Has to be present by spec
 	if (Mode != VK_PRESENT_MODE_MAILBOX_KHR)
 	{
-		Util::RenderLog(Util::LogType::Warning, "Using default VK_PRESENT_MODE_FIFO_KHR");
+		RenderLog(LogType::Warning, "Using default VK_PRESENT_MODE_FIFO_KHR");
 	}
 
 	return Mode;
@@ -502,7 +503,7 @@ bool CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExte
 
 		if (!IsExtensionSupported)
 		{
-			Util::RenderLog(Util::LogType::Error, "Extension %s unsupported", RequiredExtensions[i]);
+			RenderLog(LogType::Error, "Extension %s unsupported", RequiredExtensions[i]);
 			return false;
 		}
 	}
@@ -527,7 +528,7 @@ bool CheckValidationLayersSupport(VkLayerProperties* Properties, u32 PropertiesS
 
 		if (!IsLayerAvailable)
 		{
-			Util::RenderLog(Util::LogType::Error, "Validation layer %s unsupported", ValidationLayersToCheck[i]);
+			RenderLog(LogType::Error, "Validation layer %s unsupported", ValidationLayersToCheck[i]);
 			return false;
 		}
 	}
@@ -552,7 +553,7 @@ bool CheckDeviceExtensionsSupport(VkExtensionProperties* ExtensionProperties, u3
 
 		if (!IsDeviceExtensionSupported)
 		{
-			Util::RenderLog(Util::LogType::Error, "extension %s unsupported", ExtensionsToCheck[i]);
+			RenderLog(LogType::Error, "extension %s unsupported", ExtensionsToCheck[i]);
 			return false;
 		}
 	}
@@ -570,7 +571,7 @@ bool CreateDebugUtilsMessengerEXT(VkInstance Instance, const VkDebugUtilsMesseng
 	}
 	else
 	{
-		Util::RenderLog(Util::LogType::Error, "CreateMessengerFunc is nullptr");
+		RenderLog(LogType::Error, "CreateMessengerFunc is nullptr");
 		return false;
 	}
 
@@ -588,7 +589,7 @@ bool DestroyDebugMessenger(VkInstance Instance, VkDebugUtilsMessengerEXT InDebug
 	}
 	else
 	{
-		Util::RenderLog(Util::LogType::Error, "DestroyMessengerFunc is nullptr");
+		RenderLog(LogType::Error, "DestroyMessengerFunc is nullptr");
 		return false;
 	}
 }
@@ -599,15 +600,15 @@ VKAPI_ATTR VkBool32 VKAPI_CALL MessengerDebugCallback(VkDebugUtilsMessageSeverit
 {
 	if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
 	{
-		Util::RenderLog(Util::LogType::Error, CallbackData->pMessage);
+		RenderLog(LogType::Error, CallbackData->pMessage);
 	}
 	else if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
 	{
-		Util::RenderLog(Util::LogType::Warning, CallbackData->pMessage);
+		RenderLog(LogType::Warning, CallbackData->pMessage);
 	}
 	else
 	{
-		Util::RenderLog(Util::LogType::Info, CallbackData->pMessage);
+		RenderLog(LogType::Info, CallbackData->pMessage);
 	}
 
 	return VK_FALSE;
@@ -671,6 +672,20 @@ VkPipelineStageFlags PipelineSyncToVkPipelineStage(BmRender_PipelineSyncStage st
 	return flags;
 }
 
+VkPipelineBindPoint PipelineTypeToVkPipelineBindPoint(BmRender_PipelineType Type)
+{
+	switch (Type)
+	{
+		case BmRender_PipelineType::Graphics:
+			return VK_PIPELINE_BIND_POINT_GRAPHICS;
+		case BmRender_PipelineType::Compute:
+			return VK_PIPELINE_BIND_POINT_COMPUTE;
+		default:
+			assert(false);
+			return VK_PIPELINE_BIND_POINT_GRAPHICS;
+	}
+}
+
 VkImageAspectFlags ImageTypeToVkImageAspectFlags(BmRender_ImageType Type)
 {
 	switch (Type)
@@ -703,12 +718,12 @@ bool CheckFormats(VkPhysicalDevice PhDevice)
 			break;
 		}
 
-		Util::RenderLog(Util::LogType::Warning, "Format %d is not supported", FormatToCheck);
+		RenderLog(LogType::Warning, "Format %d is not supported", FormatToCheck);
 	}
 
 	if (!IsSupportedFormatFound)
 	{
-		Util::RenderLog(Util::LogType::Error, "No supported format found");
+		RenderLog(LogType::Error, "No supported format found");
 		return false;
 	}
 
@@ -976,4 +991,50 @@ s32 GetQueueFamilyIndexFromQueueType(BmRender_QueueType QueueType, const Physica
 	}
 
 	return -1;
+}
+
+void RenderLog(LogType logType, const char* format, ...)
+{
+	va_list args;
+	va_start(args, format);
+	RenderLog(logType, format, args);
+	va_end(args);
+}
+
+void RenderLog(LogType LogType, const char* Format, va_list Args)
+{
+	switch (LogType)
+	{
+		case LogType::Error:
+		{
+			vprintf("\033[31;5mError: ", Args);
+			va_list ArgsCopy;
+			va_copy(ArgsCopy, Args);
+			vprintf(Format, ArgsCopy);
+			va_end(ArgsCopy);
+			vprintf("\n\033[m", Args);
+			assert(false);
+			break;
+		}
+		case LogType::Warning:
+		{
+			vprintf("\033[33;5mWarning: ", Args);
+			va_list ArgsCopy;
+			va_copy(ArgsCopy, Args);
+			vprintf(Format, ArgsCopy);
+			va_end(ArgsCopy);
+			vprintf("\n\033[m", Args);
+			break;
+		}
+		case LogType::Info:
+		{
+			vprintf("Info: ", Args);
+			va_list ArgsCopy;
+			va_copy(ArgsCopy, Args);
+			vprintf(Format, ArgsCopy);
+			va_end(ArgsCopy);
+			vprintf("\n", Args);
+			break;
+		}
+	}
 }

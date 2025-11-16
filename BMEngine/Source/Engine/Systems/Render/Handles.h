@@ -13,6 +13,7 @@ void InitializeSemaphoreManager(u32 Size);
 void InitializeCommandPoolManager(u32 Size);
 void InitializeCommandBufferManager(u32 Size);
 void InitializeQueueManager(u32 Size);
+void InitializePipelineLayoutManager(u32 Size);
 
 void DeinitDescriptorSetLayoutManager();
 void DeinitShaderManager();
@@ -23,10 +24,11 @@ void DeinitSemaphoreManager();
 void DeinitCommandPoolManager();
 void DeinitCommandBufferManager();
 void DeinitQueueManager();
+void DeinitPipelineLayoutManager();
 
 BmRender_Sampler CreateSamplerHandle(VkSampler Sampler);
 BmRender_Pipeline CreatePipelineHandle(VkPipeline Pipeline);
-BmRender_PipelineLayout CreatePipelineLayoutHandle(VkPipelineLayout PipelineLayout);
+BmRender_PipelineLayout CreatePipelineLayoutHandle(VkPipelineLayout PipelineLayout, const PipelineLayoutData* Data);
 BmRender_DescriptorSetLayout CreateDescriptorSetLayoutHandle(VkDescriptorSetLayout Layout, const DescriptorSetLayoutData* Data);
 BmRender_DescriptorPool CreateDescriptorPoolHandle(VkDescriptorPool DescriptorPool);
 BmRender_Shader CreateShaderHandle(VkShaderModule VulkanShaderModule, const ShaderData* Data);
@@ -57,3 +59,4 @@ bool GetSemaphoreData(BmRender_Semaphore Handle, SemaphoreData* OutData);
 bool GetCommandPoolData(BmRender_CommandPool Handle, CommandPoolData* OutData);
 bool GetCommandBufferData(BmRender_CommandBuffer Handle, CommandBufferData* OutData);
 bool GetQueueData(BmRender_Queue Handle, QueueData* OutData);
+bool GetPipelineLayoutData(BmRender_PipelineLayout Handle, PipelineLayoutData* OutData);

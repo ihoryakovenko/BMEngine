@@ -19,13 +19,23 @@ struct GLFWwindow;
 	{ \
 		const VkResult result = (call); \
 		if (result != VK_SUCCESS) { \
-			Util::RenderLog(Util::LogType::Error, "%s returned %d at %s:%d", #call, result, __FILE__, __LINE__); \
+			RenderLog(LogType::Error, "%s returned %d at %s:%d", #call, result, __FILE__, __LINE__); \
 		} \
 	}
 
 inline constexpr u32 MAX_VERTEX_INPUTS_ATTRIBUTES = 16;
 inline constexpr u32 MAX_VERTEX_INPUT_BINDINGS = 16;
 inline constexpr u32 MAX_DRAW_FRAMES = 3;
+
+enum class LogType
+{
+	Error,
+	Warning,
+	Info
+};
+
+void RenderLog(LogType logType, const char* format, ...);
+void RenderLog(LogType LogType, const char* Format, va_list Args);
 
 enum class BufferUsageFlag
 {
@@ -107,6 +117,7 @@ void ApplyStageBarrier(VkBufferMemoryBarrier2* Barrier, BmRender_PipelineSyncSta
 VkShaderStageFlags DescriptorShaderStageToVkShaderStage(BmRender_DescriptorShaderStage stage);
 VkShaderStageFlagBits PipelineShaderStageToVkShaderStage(BmRender_PipelineShaderStage stage);
 VkPipelineStageFlags PipelineSyncToVkPipelineStage(BmRender_PipelineSyncStage stage);
+VkPipelineBindPoint PipelineTypeToVkPipelineBindPoint(BmRender_PipelineType Type);
 VkImageAspectFlags ImageTypeToVkImageAspectFlags(BmRender_ImageType Type);
 VkDescriptorPoolCreateFlags DescriptorPoolTypeToVkFlags(BmRender_DescriptorPoolType Type);
 VkMemoryPropertyFlags MemoryPropertyFlagToVkFlags(MemoryPropertyFlag Flag);

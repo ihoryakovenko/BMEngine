@@ -2,10 +2,8 @@
 
 #include "Engine/Systems/Render/VulkanHelper.h"
 #include "RenderResources.h"
-#include "RenderTypes.h"
 #include "TransferSystem.h"
 #include "Systems.h"
-#include "Handles.h"
 
 #include "imgui.h"
 #include "imgui_impl_vulkan.h"
@@ -115,6 +113,7 @@ namespace Render
 		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts;
 		LayoutDesc.PushConstantRangeCount = PipelineDesc.PushConstantRangesCount;
 		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges;
+		LayoutDesc.PipelineType = BmRender_PipelineType::Graphics;
 
 		PipelineLayouts["StaticMesh"] = BmRender_CreatePipelineLayout(&LayoutDesc);
 		PipelineDesc.PipelineLayout = PipelineLayouts["StaticMesh"];
@@ -155,9 +154,6 @@ namespace Render
 
 	void DrawEntityBatch(BmRender_CommandBuffer CommandBuffer, DrawScene* Scene, const DrawEntityBatchConfig& Config)
 	{
-		VkCommandBuffer CmdBuffer = (VkCommandBuffer)CommandBuffer;
-		VkPipelineLayout PipelineLayout = (VkPipelineLayout)Config.PipelineLayout;
-
 		BmRender_BindPipeline(CommandBuffer, Config.Pipeline);
 
 		if (Config.PushConstant.offset != 0 || Config.PushConstant.size != 0)
@@ -168,16 +164,8 @@ namespace Render
 
 		if (Config.DescriptorSetCount > 0)
 		{
-			VkDescriptorSet* VkDescriptorSets = (VkDescriptorSet*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkDescriptorSet) * Config.DescriptorSetCount);
-			for (u32 i = 0; i < Config.DescriptorSetCount; ++i)
-			{
-				DescriptorSetData SetData;
-				GetDescriptorSetData(Config.DescriptorSets[i], &SetData);
-				VkDescriptorSets[i] = SetData.Set;
-			}
-
-			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-				0, Config.DescriptorSetCount, VkDescriptorSets, Config.DynamicOffsetCount, Config.DynamicOffsets);
+			BmRender_RecordBindDescriptorSets(CommandBuffer, Config.PipelineLayout,
+				0, Config.DescriptorSetCount, Config.DescriptorSets, Config.DynamicOffsetCount, Config.DynamicOffsets);
 		}
 
 		std::unique_lock Lock(Scene->TempLock);
@@ -201,32 +189,32 @@ namespace Render
 				continue;
 			}
 		
-		for (u32 j = 0; j < Entity->ResourceDependency.size(); ++j)
-		{
-			if (TransferSystem::IsBufferLocked(Entity->ResourceDependency[j].GPUBufferHandle))
+			for (u32 j = 0; j < Entity->ResourceDependency.size(); ++j)
 			{
-				AreDependenciesReady = false;
-				break;
+				if (TransferSystem::IsBufferLocked(Entity->ResourceDependency[j].GPUBufferHandle))
+				{
+					AreDependenciesReady = false;
+					break;
+				}
 			}
-		}
 
 			if (!AreDependenciesReady)
 			{
 				continue;
 			}
 
-		const VkBuffer Buffers[] = {
-			(VkBuffer)Entity->VertexBufferEntry.GPUBufferHandle,
-			(VkBuffer)Entity->InstanceBufferEntry.GPUBufferHandle
-		};
+			const BmRender_GPUBuffer Buffers[] = {
+				Entity->VertexBufferEntry.GPUBufferHandle,
+				Entity->InstanceBufferEntry.GPUBufferHandle
+			};
 	
-		const u64 Offsets[] = {
-			Entity->VertexBufferEntry.BufferOffset,
-			Entity->InstanceBufferEntry.BufferOffset
-		};
+			const u64 Offsets[] = {
+				Entity->VertexBufferEntry.BufferOffset,
+				Entity->InstanceBufferEntry.BufferOffset
+			};
 	
-		vkCmdBindVertexBuffers(CmdBuffer, 0, 2, Buffers, Offsets);
-		vkCmdBindIndexBuffer(CmdBuffer, (VkBuffer)Entity->IndexBufferEntry.GPUBufferHandle, Entity->IndexBufferEntry.BufferOffset, VK_INDEX_TYPE_UINT32);
+			BmRender_RecordBindVertexBuffers(CommandBuffer, 0, 2, Buffers, Offsets);
+			BmRender_RecordBindIndexBuffer(CommandBuffer, Entity->IndexBufferEntry.GPUBufferHandle, Entity->IndexBufferEntry.BufferOffset, VK_INDEX_TYPE_UINT32);
 			BmRender_DrawIndexed(CommandBuffer, Entity->IndicesCount, Entity->Instances, 0, 0, 0);
 		}
 	}
@@ -238,9 +226,6 @@ namespace Render
 	{		
 		InitCommandSystem(3);
 		InitDrawSystem(3);
-
-		VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
-		VkDevice Device = GetCoreContext()->LogicalDevice;
 
 		State.VpHandle = VpRegion;
 		State.EntityLightBufferHandle = EntityLightRegion;
@@ -259,10 +244,7 @@ namespace Render
 
 	void DeInit()
 	{
-		vkDeviceWaitIdle(GetCoreContext()->LogicalDevice);
-
-
-		VkDevice Device = GetCoreContext()->LogicalDevice;
+		BmRender_DeviceWaitIdle();
 
 		DeInitImGuiPipeline(State.DebugUiPool);
 		
@@ -311,9 +293,6 @@ namespace Render
 		StartRecording(State.GraphicsCommandWorker);
 
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(State.GraphicsCommandWorker);
-		VkCommandBuffer DrawCmdBuffer = (VkCommandBuffer)SubmitPool->CommandBuffer;
-
-		VkDevice Device = GetCoreContext()->LogicalDevice;
 
 		LightningPass::Draw(Scene);
 		MainPass::BeginPass();
@@ -323,7 +302,7 @@ namespace Render
 		DeferredPass::BeginPass();
 		DeferredPass::Draw();
 		ImGui::Render();
-		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), DrawCmdBuffer);
+		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), (VkCommandBuffer)SubmitPool->CommandBuffer);
 		DeferredPass::EndPass();
 
 		EndRecording(State.GraphicsCommandWorker);
@@ -359,7 +338,7 @@ namespace Render
 
 		GetDrawSystemData()->CurrentFrame = Math::WrapIncrement(CurrentFrame, 3u);
 
-		Test_Memory_LinearAllocator_FreeAll();
+		BmRender_FrameFree();
 	}
 
 	RenderState* GetRenderState()
@@ -377,9 +356,6 @@ namespace Render
 
 namespace DeferredPass
 {
-
-	static VkDescriptorSetLayout DeferredInputLayout;
-
 	static BmRender_Image DeferredInputDepthImage[MAX_DRAW_FRAMES];
 	static BmRender_Image DeferredInputColorImage[MAX_DRAW_FRAMES];
 		
@@ -388,27 +364,17 @@ namespace DeferredPass
 
 	static BmRender_DescriptorSet DeferredInputSet[MAX_DRAW_FRAMES];
 
-	static VkSampler ColorSampler;
-	static VkSampler DepthSampler;
-
 	static AttachmentData PipelineAttachmentData;
 
 	void Init(BmRender_DescriptorPool MainPool)
 	{
-		VkDevice Device = GetCoreContext()->LogicalDevice;
-		VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
-
 		PipelineAttachmentData.ColorAttachmentCount = 1;
 		PipelineAttachmentData.ColorAttachmentFormats[0] = BmRender_GetSurfaceFormat().format;
 		PipelineAttachmentData.DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
 		PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
-		DeferredInputLayout = (VkDescriptorSetLayout)DescriptorSetLayouts["MainPassOutputLayout"];
-
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
-			//const VkDeviceSize AlignedVpSize = VulkanMemoryManagementSystem::CalculateBufferAlignedSize(VpBufferSize);
-
 			DeferredInputColorImage[i] = BmRender_CreateImage2D(MainScreenExtent.width, MainScreenExtent.height, ColorFormat, BmRender_ImageType::ColorAttachmentSampled);
 			DeferredInputDepthImage[i] = BmRender_CreateImage2D(MainScreenExtent.width, MainScreenExtent.height, DepthFormat, BmRender_ImageType::DepthSamplad);
 			
@@ -454,6 +420,7 @@ namespace DeferredPass
 		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts;
 		LayoutDesc.PushConstantRangeCount = PipelineDesc.PushConstantRangesCount;
 		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges;
+		LayoutDesc.PipelineType = BmRender_PipelineType::Graphics;
 
 		PipelineLayouts["Deferred"] = BmRender_CreatePipelineLayout(&LayoutDesc);
 		PipelineDesc.PipelineLayout = PipelineLayouts["Deferred"];
@@ -465,16 +432,11 @@ namespace DeferredPass
 	void Draw()
 	{
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
-		VkCommandBuffer CmdBuffer = (VkCommandBuffer)SubmitPool->CommandBuffer;
-
-		VkPipelineLayout PipelineLayout = (VkPipelineLayout)PipelineLayouts["Deferred"];
-
 		BmRender_BindPipeline(SubmitPool->CommandBuffer, Pipelines["Deferred"]);
 
-		DescriptorSetData SetData;
-		GetDescriptorSetData(DeferredInputSet[GetDrawSystemData()->CurrentFrame], &SetData);
-		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout,
-			0, 1, &SetData.Set, 0, nullptr);
+		const BmRender_DescriptorSet DescriptorSet = DeferredInputSet[GetDrawSystemData()->CurrentFrame];
+		BmRender_RecordBindDescriptorSets(SubmitPool->CommandBuffer, PipelineLayouts["Deferred"],
+			0, 1, &DescriptorSet, 0, nullptr);
 
 		BmRender_Draw(SubmitPool->CommandBuffer, 3, 1, 0, 0); // 3 hardcoded vertices
 	}
@@ -482,7 +444,6 @@ namespace DeferredPass
 	void BeginPass()
 	{
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
-		VkCommandBuffer CmdBuffer = (VkCommandBuffer)SubmitPool->CommandBuffer;
 
 		BmRender_RenderingColorAttachment SwapchainColorAttachment = { };
 		SwapchainColorAttachment.ImageView = BmRender_GetSwapchainImageView(Render::CurrentImageIndex);
@@ -555,8 +516,6 @@ namespace DeferredPass
 
 namespace LightningPass
 {
-	static VkDescriptorSetLayout LightSpaceMatrixLayout;
-
 	static BmRender_DescriptorSet LightSpaceMatrixSet[MAX_DRAW_FRAMES];
 
 	static BmRender_GPUBufferBinding LightSpaceMatrixBufferRegion[MAX_DRAW_FRAMES];
@@ -564,24 +523,17 @@ namespace LightningPass
 	// Buffer handles array
 	static BmRender_GPUBuffer LightSpaceMatrixBuffers[MAX_DRAW_FRAMES];
 
-		static BmRender_ImageView ShadowMapElement1ImageInterface[MAX_DRAW_FRAMES];
-		static BmRender_ImageView ShadowMapElement2ImageInterface[MAX_DRAW_FRAMES];
-
-	static VkPushConstantRange PushConstants;
+	static BmRender_ImageView ShadowMapElement1ImageInterface[MAX_DRAW_FRAMES];
+	static BmRender_ImageView ShadowMapElement2ImageInterface[MAX_DRAW_FRAMES];
 
 	void Init(BmRender_DescriptorPool MainPool)
 	{
-		VkDevice Device = GetCoreContext()->LogicalDevice;
-		VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
-
-		LightSpaceMatrixLayout = (VkDescriptorSetLayout)DescriptorSetLayouts["LightSpaceMatrixLayout"];
-
 		ShadowMapArray = BmRender_CreateImage2DArray(DepthViewportExtent.width, DepthViewportExtent.height, DepthFormat,
 			BmRender_ImageType::DepthSamplad, MAX_LIGHT_SOURCES * BmRender_GetSwapchainImageCount());
 
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
-			const VkDeviceSize LightSpaceMatrixSize = sizeof(glm::mat4);
+			const u64 LightSpaceMatrixSize = sizeof(glm::mat4);
 
 			LightSpaceMatrixBuffers[i] = BmRender_CreateUniformBuffer(LightSpaceMatrixSize, MemoryPropertyFlag::HostCompatible, BmRender_PipelineSyncStage::VertexShader);
 			LightSpaceMatrixBufferRegion[i] = { LightSpaceMatrixBuffers[i], 0, LightSpaceMatrixSize };
@@ -598,11 +550,6 @@ namespace LightningPass
 			ShadowMapElement1ImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_LIGHT_SOURCES * i, 1);
 			ShadowMapElement2ImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_LIGHT_SOURCES * i + 1, 1);
 		}
-
-		PushConstants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-		PushConstants.offset = 0;
-		// Todo: check constant and model size?
-		PushConstants.size = sizeof(glm::mat4);
 
 		PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineAttachmentData.ColorAttachmentCount = 0;
@@ -624,6 +571,7 @@ namespace LightningPass
 		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts;
 		LayoutDesc.PushConstantRangeCount = PipelineDesc.PushConstantRangesCount;
 		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges;
+		LayoutDesc.PipelineType = BmRender_PipelineType::Graphics;
 
 		PipelineLayouts["Depth"] = BmRender_CreatePipelineLayout(&LayoutDesc);
 		PipelineDesc.PipelineLayout = PipelineLayouts["Depth"];
@@ -634,10 +582,7 @@ namespace LightningPass
 
 	void Draw(Render::DrawScene* Scene)
 	{
-		VkDevice Device = GetCoreContext()->LogicalDevice;
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
-		VkCommandBuffer CmdBuffer = (VkCommandBuffer)SubmitPool->CommandBuffer;
-		const Render::RenderState* State = Render::GetRenderState();
 
 		const glm::mat4* LightViews[] =
 		{
@@ -719,7 +664,6 @@ namespace MainPass
 	void BeginPass()
 	{
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
-		VkCommandBuffer CmdBuffer = (VkCommandBuffer)SubmitPool->CommandBuffer;
 
 		BmRender_RenderingColorAttachment ColorAttachment = { };
 		ColorAttachment.ImageView = DeferredPass::TestDeferredInputColorImageInterface()[GetDrawSystemData()->CurrentFrame];

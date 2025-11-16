@@ -97,6 +97,7 @@ int main()
 	LayoutDesc.SetLayouts = nullptr;
 	LayoutDesc.PushConstantRangeCount = 0;
 	LayoutDesc.PushConstantRanges = nullptr;
+	LayoutDesc.PipelineType = BmRender_PipelineType::Graphics;
 	BmRender_PipelineLayout PipelineLayout = BmRender_CreatePipelineLayout(&LayoutDesc);
 	
 	BmRender_PipelineDescription PipelineDesc = {};

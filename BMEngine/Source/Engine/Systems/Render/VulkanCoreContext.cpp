@@ -124,25 +124,25 @@ namespace VulkanCoreContext
 
 		if (!CheckDeviceExtensionsSupport(ExtensionProperties, ExtensionPropertiesCount, DeviceExtensions, DeviceExtensionsSize))
 		{
-			Util::RenderLog(Util::LogType::Warning, "PhysicalDeviceIndices are not initialized");
+			RenderLog(LogType::Warning, "PhysicalDeviceIndices are not initialized");
 			return false;
 		}
 
 		if (Indices.GraphicsFamily < 0 || Indices.PresentationFamily < 0)
 		{
-			Util::RenderLog(Util::LogType::Warning, "PhysicalDeviceIndices are not initialized");
+			RenderLog(LogType::Warning, "PhysicalDeviceIndices are not initialized");
 			return false;
 		}
 
 		if (!AvailableFeatures.samplerAnisotropy)
 		{
-			Util::RenderLog(Util::LogType::Warning, "Feature samplerAnisotropy is not supported");
+			RenderLog(LogType::Warning, "Feature samplerAnisotropy is not supported");
 			return false;
 		}
 
 		if (!AvailableFeatures.multiViewport)
 		{
-			Util::RenderLog(Util::LogType::Warning, "Feature multiViewport is not supported");
+			RenderLog(LogType::Warning, "Feature multiViewport is not supported");
 			return false;
 		}
 
@@ -158,11 +158,11 @@ namespace VulkanCoreContext
 		// Check if buffer device address feature is supported
 		if (QueryBufferDeviceAddressFeatures.bufferDeviceAddress == VK_TRUE)
 		{
-			Util::RenderLog(Util::LogType::Info, "Buffer device address feature is supported");
+			RenderLog(LogType::Info, "Buffer device address feature is supported");
 		}
 		else
 		{
-			Util::RenderLog(Util::LogType::Warning, "Buffer device address feature is not supported");
+			RenderLog(LogType::Warning, "Buffer device address feature is not supported");
 		}
 
 		// Query indirect drawing feature support
@@ -172,11 +172,11 @@ namespace VulkanCoreContext
 		// Check if indirect drawing features are supported
 		if (QueryDeviceFeatures.multiDrawIndirect == VK_TRUE || QueryDeviceFeatures.drawIndirectFirstInstance == VK_TRUE)
 		{
-			Util::RenderLog(Util::LogType::Info, "Indirect drawing (vkCmdDrawIndirect) features are supported");
+			RenderLog(LogType::Info, "Indirect drawing (vkCmdDrawIndirect) features are supported");
 		}
 		else
 		{
-			Util::RenderLog(Util::LogType::Warning, "Indirect drawing (vkCmdDrawIndirect) features are not supported");
+			RenderLog(LogType::Warning, "Indirect drawing (vkCmdDrawIndirect) features are not supported");
 		}
 
 		return true;
@@ -243,7 +243,7 @@ namespace VulkanCoreContext
 
 		if (!CreateDebugUtilsMessengerEXT(Context->VulkanInstance, &MessengerCreateInfo, nullptr, &Context->DebugMessenger))
 		{
-			Util::RenderLog(Util::LogType::Error, "Cannot create debug messenger");
+			RenderLog(LogType::Error, "Cannot create debug messenger");
 		}
 
 		VULKAN_CHECK_RESULT(glfwCreateWindowSurface(Context->VulkanInstance, Context->WindowHandler, nullptr, &Context->Surface));
@@ -297,7 +297,7 @@ namespace VulkanCoreContext
 
 		if (!IsDeviceFound)
 		{
-			Util::RenderLog(Util::LogType::Error, "Cannot find suitable device");
+			RenderLog(LogType::Error, "Cannot find suitable device");
 		}
 
 		Context->LogicalDevice = CreateLogicalDevice(Context->PhysicalDevice, Context->Indices, DeviceExtensions, DeviceExtensionsSize);

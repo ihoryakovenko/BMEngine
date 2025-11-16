@@ -80,6 +80,11 @@ struct QueueData
 	BmRender_QueueType QueueType;
 };
 
+struct PipelineLayoutData
+{
+	BmRender_PipelineType PipelineType;
+};
+
 
 void InitializeFrameMemory();
 void DeMemory_LinearAllocator_Init();

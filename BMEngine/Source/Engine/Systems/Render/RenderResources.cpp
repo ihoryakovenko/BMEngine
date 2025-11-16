@@ -1,9 +1,7 @@
 #include "RenderResources.h"
 
-#include "Util/EngineTypes.h"
 #include "Util/Util.h"
 
-#include "VulkanCoreContext.h"
 #include "TransferSystem.h"
 #include "RenderInterface.h"
 
@@ -24,9 +22,7 @@ namespace RenderResources
 
 		if (Buffer.PropertyFlag == MemoryPropertyFlag::HostCompatible)
 		{
-			VkDevice Device = GetCoreContext()->LogicalDevice;
-			VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
-			UpdateHostCompatibleBufferMemory(Device, Buffer.Memory, DataSize, Offset, Data);
+			BmRender_UpdateHostCompatibleBuffer(Handle.GPUBufferHandle, Offset, DataSize, Data);
 		}
 		else if (Buffer.PropertyFlag == MemoryPropertyFlag::GPULocal)
 		{

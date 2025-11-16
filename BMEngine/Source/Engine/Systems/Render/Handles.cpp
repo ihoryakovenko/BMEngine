@@ -28,6 +28,7 @@ static StoragePair SemaphoreStorage;
 static StoragePair CommandPoolStorage;
 static StoragePair CommandBufferStorage;
 static StoragePair QueueStorage;
+static StoragePair PipelineLayoutStorage;
 
 // INIT
 void InitializeDescriptorSetLayoutManager(u32 Size)
@@ -82,6 +83,12 @@ void InitializeQueueManager(u32 Size)
 {
 	Memory_PoolAllocator_Init(&QueueStorage.Allocator, Size, sizeof(QueueData));
 	Systems_SparceHashMap_Init(&QueueStorage.HashMap, Size);
+}
+
+void InitializePipelineLayoutManager(u32 Size)
+{
+	Memory_PoolAllocator_Init(&PipelineLayoutStorage.Allocator, Size, sizeof(PipelineLayoutData));
+	Systems_SparceHashMap_Init(&PipelineLayoutStorage.HashMap, Size);
 }
 // INIT
 
@@ -139,6 +146,12 @@ void DeinitQueueManager()
 	Systems_SparceHashMap_Free(&QueueStorage.HashMap);
 	Memory_PoolAllocator_Free(&QueueStorage.Allocator);
 }
+
+void DeinitPipelineLayoutManager()
+{
+	Systems_SparceHashMap_Free(&PipelineLayoutStorage.HashMap);
+	Memory_PoolAllocator_Free(&PipelineLayoutStorage.Allocator);
+}
 // DEINIT
 
 // CREATE
@@ -152,8 +165,11 @@ BmRender_Pipeline CreatePipelineHandle(VkPipeline Pipeline)
 	return (BmRender_Pipeline)Pipeline;
 }
 
-BmRender_PipelineLayout CreatePipelineLayoutHandle(VkPipelineLayout PipelineLayout)
+BmRender_PipelineLayout CreatePipelineLayoutHandle(VkPipelineLayout PipelineLayout, const PipelineLayoutData* Data)
 {
+	const u32 Index = Memory_PoolAllocator_PushData(&PipelineLayoutStorage.Allocator, Data);
+	Systems_SparceHashMap_Insert(&PipelineLayoutStorage.HashMap, (u64)PipelineLayout, Index);
+
 	return (BmRender_PipelineLayout)PipelineLayout;
 }
 
@@ -411,6 +427,18 @@ bool GetQueueData(BmRender_Queue Handle, QueueData* OutData)
 	if (Systems_SparceHashMap_Get(&QueueStorage.HashMap, (u64)Handle, &Index))
 	{
 		Memory_PoolAllocator_GetData(&QueueStorage.Allocator, Index, OutData);
+		return true;
+	}
+	return false;
+}
+
+bool GetPipelineLayoutData(BmRender_PipelineLayout Handle, PipelineLayoutData* OutData)
+{
+	VkPipelineLayout PipelineLayout = (VkPipelineLayout)Handle;
+	u32 Index;
+	if (Systems_SparceHashMap_Get(&PipelineLayoutStorage.HashMap, (u64)PipelineLayout, &Index))
+	{
+		Memory_PoolAllocator_GetData(&PipelineLayoutStorage.Allocator, Index, OutData);
 		return true;
 	}
 	return false;

@@ -96,50 +96,11 @@ namespace Util
 				return true;
 			}
 
-			Log::Error("Failed to read file {}: ", FileName);
 			fclose(File);
 			return false;
 		}
 
-		Log::Error("Cannot open file {}: Result = {}", FileName, 0);
 		return false;
-	}
-
-	void RenderLog(LogType logType, const char* format, ...)
-	{
-		va_list args;
-		va_start(args, format);
-		RenderLog(logType, format, args);
-		va_end(args);
-	}
-
-	void RenderLog(LogType LogType, const char* Format, va_list Args)
-	{
-		switch (LogType)
-		{
-			case LogType::Error:
-			{
-				std::cout << "\033[31;5mError: "; // Set red color
-				vprintf(Format, Args);
-				std::cout << "\n\033[m"; // Reset red color
-				assert(false);
-				break;
-			}
-			case LogType::Warning:
-			{
-				std::cout << "\033[33;5mWarning: "; // Set red color
-				vprintf(Format, Args);
-				std::cout << "\n\033[m"; // Reset red color
-				break;
-			}
-			case LogType::Info:
-			{
-				std::cout << "Info: ";
-				vprintf(Format, Args);
-				std::cout << '\n';
-				break;
-			}
-		}
 	}
 
 	void ObjToModel3D(const char* FilePath, const char* OutputPath)

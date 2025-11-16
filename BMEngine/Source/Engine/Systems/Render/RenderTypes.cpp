@@ -553,7 +553,10 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 	VkPipelineLayout PipelineLayout;
 	VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &CreateInfo, GetVulkanAllocator(), &PipelineLayout));
 
-	return CreatePipelineLayoutHandle(PipelineLayout);
+	PipelineLayoutData LayoutData = { };
+	LayoutData.PipelineType = Description->PipelineType;
+
+	return CreatePipelineLayoutHandle(PipelineLayout, &LayoutData);
 }
 
 BmRender_DescriptorPool BmRender_CreateDescriptorPool(const VkDescriptorPoolSize* PoolSizes, u32 MaxSets, u32 PoolSizeCount, BmRender_DescriptorPoolType Type)
@@ -803,11 +806,11 @@ BmRender_CommandBuffer BmRender_AllocateCommandBuffer(BmRender_CommandPool Comma
 	return CreateCommandBufferHandle(VulkanCommandBuffer, &Data);
 }
 
-void BmRender_UpdateHostCompatibleBuffer(BmRender_GPUBuffer StagingBuffer, u64 BufferOffset, u64 DataSize, const void* Data)
+void BmRender_UpdateHostCompatibleBuffer(BmRender_GPUBuffer Buffer, u64 BufferOffset, u64 DataSize, const void* Data)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	GPUBufferData BufferData;
-	GetGPUBufferData(StagingBuffer, &BufferData);
+	GetGPUBufferData(Buffer, &BufferData);
 	UpdateHostCompatibleBufferMemory(Device, BufferData.Memory, DataSize, BufferOffset, Data);
 }
 

@@ -24,7 +24,8 @@ void BmRender_Init(GLFWwindow* WindowHandler, u32 InMaxFramesInFly)
 	InitializeSemaphoreManager(32);
 	InitializeCommandPoolManager(4);
 	InitializeCommandBufferManager(32);
-	InitializeQueueManager(4);
+	InitializeQueueManager(2);
+	InitializePipelineLayoutManager(32);
 
 	CreateCoreContext(WindowHandler);
 }
@@ -40,6 +41,7 @@ void BmRender_DeInit()
 	DeinitCommandPoolManager();
 	DeinitCommandBufferManager();
 	DeinitQueueManager();
+	DeinitPipelineLayoutManager();
 
 	DestroyCoreContext();
 	DeMemory_LinearAllocator_Init();
@@ -130,7 +132,7 @@ u32 BmRender_GetQueueFamily(BmRender_Queue Queue)
 	return 0;
 }
 
-void Test_Memory_LinearAllocator_FreeAll()
+void BmRender_FrameFree()
 {
 	Memory_LinearAllocator_FreeAll(GetFrameMemory());
 }

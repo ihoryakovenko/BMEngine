@@ -40,7 +40,7 @@
 //	VkResult Result = vkCreateCommandPool(Device, &PoolInfo, nullptr, &TransferCommandPool.CommandPool);
 //	if (Result != VK_SUCCESS)
 //	{
-//		Util::RenderLog(Util::LogType::Error, "vkCreateCommandPool result is %d", Result);
+//		RenderLog(LogType::Error, "vkCreateCommandPool result is %d", Result);
 //	}
 //
 //	VkCommandBufferAllocateInfo TransferCommandBufferAllocateInfo = { };
@@ -53,14 +53,14 @@
 //	{
 //		if (vkCreateFence(Device, &FenceCreateInfo, nullptr, TransferCommandPool.BufferFences + i) != VK_SUCCESS)
 //		{
-//			Util::RenderLog(Util::LogType::Error, "TransferFences creation error");
+//			RenderLog(LogType::Error, "TransferFences creation error");
 //			assert(false);
 //		}
 //	}
 //
 //	if (vkAllocateCommandBuffers(Device, &TransferCommandBufferAllocateInfo, TransferCommandPool.Buffers) != VK_SUCCESS)
 //	{
-//		Util::RenderLog(Util::LogType::Error, "vkAllocateCommandBuffers error");
+//		RenderLog(LogType::Error, "vkAllocateCommandBuffers error");
 //		assert(false);
 //	}
 //}

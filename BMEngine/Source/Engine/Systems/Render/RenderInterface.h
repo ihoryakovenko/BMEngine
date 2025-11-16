@@ -109,6 +109,12 @@ enum class BmRender_QueueType : u32
 	Transfer = 1ull << 1,
 };
 
+enum class BmRender_PipelineType : u8
+{
+	Graphics,
+	Compute,
+};
+
 enum class BmRender_DescriptorPoolType : u32
 {
 	None = 0,
@@ -282,6 +288,7 @@ struct BmRender_PipelineLayoutDescription
 	const BmRender_PushConstant* PushConstantRanges;
 	u32 SetLayoutCount;
 	u32 PushConstantRangeCount;
+	BmRender_PipelineType PipelineType;
 };
 
 struct BmRender_ShaderDescription
@@ -387,9 +394,11 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 void BmRender_EndRendering(BmRender_CommandBuffer CommandBuffer);
 void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline);
 void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, VkShaderStageFlags StageFlags, u32 Offset, u32 Size, const void* pValues);
+void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets);
+void BmRender_RecordBindVertexBuffers(BmRender_CommandBuffer CommandBuffer, u32 FirstBinding, u32 BindingCount, const BmRender_GPUBuffer* Buffers, const u64* Offsets);
+void BmRender_RecordBindIndexBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer Buffer, u64 Offset, VkIndexType IndexType);
 void BmRender_Draw(BmRender_CommandBuffer CommandBuffer, u32 VertexCount, u32 InstanceCount, u32 FirstVertex, u32 FirstInstance);
 void BmRender_DrawIndexed(BmRender_CommandBuffer CommandBuffer, u32 IndexCount, u32 InstanceCount, u32 FirstIndex, u32 VertexOffset, u32 FirstInstance);
-
 
 void BmRender_DestroySampler(BmRender_Sampler Handle);
 void BmRender_DestroyPipeline(BmRender_Pipeline Handle);
@@ -405,12 +414,4 @@ void BmRender_DestroySemaphore(BmRender_Semaphore Handle);
 void BmRender_DestroyCommandPool(BmRender_CommandPool Handle);
 void BmRender_FreeCommandBuffer(BmRender_CommandBuffer Handle);
 
-
-
-
-
-
-void Test_Memory_LinearAllocator_FreeAll();
-
-
-//void BmRender_RecordBufferCopy(BmRender_GPUBuffer StagingBuffer, u64 StagingBufferOffset, BmRender_GPUBuffer DstBuffer, u64 DstBufferOffset);
+void BmRender_FrameFree();
