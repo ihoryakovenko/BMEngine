@@ -3,11 +3,15 @@
 #include <cassert>
 #include <cstdarg>
 
+#include <GLFW/glfw3.h>
+
 #include <glm/glm.hpp>
 
-#include "Util/Util.h"
 #include "RenderTypes.h"
-#include "Engine/Systems/Memory/MemoryManagmentSystem.h"
+#include "RenderHelper.h"
+
+#define FORGE_MEMORY_DEBUG
+#include <forge_memory_debugger.h>
 
 VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface, const VkSurfaceFormatKHR* AvailableFormats, u32 Count)
 {
@@ -52,34 +56,6 @@ u32 GetMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, u32 AllowedTypes, VkMemo
 
 	assert(false);
 	return 0;
-}
-
-u64 CalculateBufferAlignedSize(VkDevice Device, VkBuffer Buffer, u64 BufferSize)
-{
-	VkMemoryRequirements MemoryRequirements;
-	vkGetBufferMemoryRequirements(Device, Buffer, &MemoryRequirements);
-
-	u32 Padding = 0;
-	if (BufferSize % MemoryRequirements.alignment != 0)
-	{
-		Padding = MemoryRequirements.alignment - (BufferSize % MemoryRequirements.alignment);
-	}
-
-	return BufferSize + Padding;
-}
-
-u64 CalculateImageAlignedSize(VkDevice Device, VkImage Image, u64 ImageSize)
-{
-	VkMemoryRequirements MemoryRequirements;
-	vkGetImageMemoryRequirements(Device, Image, &MemoryRequirements);
-
-	u32 Padding = 0;
-	if (ImageSize % MemoryRequirements.alignment != 0)
-	{
-		Padding = IMAGE_ALIGNMENT - (ImageSize % MemoryRequirements.alignment);
-	}
-
-	return ImageSize + Padding;
 }
 
 VkBuffer CreateBuffer(VkDevice Device, u64 Size, BufferUsageFlag Flag, const VkAllocationCallbacks* Allocator)
@@ -233,6 +209,8 @@ bool CheckFormatSupport(VkPhysicalDevice PhysicalDevice, VkFormat Format, VkImag
 	{
 		return true;
 	}
+
+	return false;
 }
 
 void PrintDeviceData(VkPhysicalDeviceProperties* DeviceProperties, VkPhysicalDeviceFeatures* AvailableFeatures)
@@ -614,31 +592,6 @@ VKAPI_ATTR VkBool32 VKAPI_CALL MessengerDebugCallback(VkDebugUtilsMessageSeverit
 	return VK_FALSE;
 }
 
-void ApplyStageBarrier(VkBufferMemoryBarrier2* Barrier, BmRender_PipelineSyncStage Stage)
-{
-	switch (Stage)
-	{
-		case BmRender_PipelineSyncStage::VertexShader:
-			Barrier->srcStageMask = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT;
-			Barrier->srcAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
-			Barrier->dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-			Barrier->dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-			break;
-		case BmRender_PipelineSyncStage::FragmentShader:
-			Barrier->srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-			Barrier->srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT;
-			Barrier->dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-			Barrier->dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-			break;
-		default:
-			Barrier->srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-			Barrier->srcAccessMask = VK_ACCESS_2_MEMORY_READ_BIT;
-			Barrier->dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-			Barrier->dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-			break;
-	}
-}
-
 VkShaderStageFlags DescriptorShaderStageToVkShaderStage(BmRender_DescriptorShaderStage stage)
 {
 	VkShaderStageFlags flags = 0;
@@ -731,7 +684,7 @@ bool CheckFormats(VkPhysicalDevice PhDevice)
 }
 
 
-u32 GetFormatAlignment(VkFormat Format)
+u32 BmRender_GetFormatAlignment(VkFormat Format)
 {
 	switch (Format)
 	{

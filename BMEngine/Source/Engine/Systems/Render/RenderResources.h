@@ -2,15 +2,16 @@
 
 #include <vulkan/vulkan.h>
 
+
+#include <ShortTypes.h>
+
 #include <unordered_map>
 #include <string>
 #include <vector>
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
-#include "Engine/Systems/Render/VulkanHelper.h"
 #include "Render.h"
 #include "RenderInterface.h"
-#include "RenderTypes.h"
 
 namespace RenderResources
 {

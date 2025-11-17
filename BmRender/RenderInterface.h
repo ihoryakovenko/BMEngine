@@ -2,14 +2,12 @@
 
 #include <vulkan/vulkan.h>
 
-#include "Util/EngineTypes.h"
-
-#include <string>
-#include <unordered_map>
+#include <ShortTypes.h>
 
 struct GLFWwindow;
 
-typedef u64 PrivateHandle;
+inline constexpr u32 MAX_DRAW_FRAMES = 3;
+
 typedef struct BmRender_Instance_T* BmRender_Instance;
 typedef struct BmRender_PhysicalDevice_T* BmRender_PhysicalDevice;
 typedef struct BmRender_Device_T* BmRender_Device;
@@ -327,6 +325,70 @@ struct BmRender_PresentInfo
 	const u32* ImageIndices;
 };
 
+struct BmRender_DescriptorSetLayoutBindingData
+{
+	VkDescriptorType DescriptorType;
+};
+
+struct BmRender_DescriptorSetLayoutData
+{
+	BmRender_DescriptorSetLayoutBindingData* LayoutBindings;
+	u32 BindingsCount;
+};
+
+struct BmRender_ShaderData
+{
+	BmRender_PipelineShaderStage Stage;
+};
+
+struct BmRender_ImageResource
+{
+	VkDeviceMemory Memory;
+	VkFormat Format;
+	u64 Size;
+	BmRender_ImageType Type;
+	u32 Width;
+	u32 Height;
+};
+
+struct BmRender_GPUBufferData
+{
+	VkDeviceMemory Memory;
+	MemoryPropertyFlag PropertyFlag;
+	BmRender_PipelineSyncStage BufferStage;
+};
+
+struct BmRender_DescriptorSetData
+{
+	VkDescriptorSet Set;
+	BmRender_DescriptorSetLayout Layout;
+};
+
+struct BmRender_SemaphoreData
+{
+	BmRender_SemaphoreType Type;
+};
+
+struct BmRender_CommandPoolData
+{
+	u32 QueueFamilyIndex;
+};
+
+struct BmRender_CommandBufferData
+{
+	BmRender_CommandPool CommandPool;
+};
+
+struct BmRender_QueueData
+{
+	BmRender_QueueType QueueType;
+};
+
+struct BmRender_PipelineLayoutData
+{
+	BmRender_PipelineType PipelineType;
+};
+
 void BmRender_Init(GLFWwindow* WindowHandler, u32 MaxFramesInFly);
 void BmRender_DeInit();
 
@@ -346,14 +408,13 @@ BmRender_Instance BmRender_GetVulkanInstance();
 BmRender_PhysicalDevice BmRender_GetPhysicalDevice();
 BmRender_Device BmRender_GetLogicalDevice();
 u32 BmRender_GetGraphicsQueueFamily();
-BmRender_Queue BmRender_GetGraphicsQueue();
 BmRender_QueueType BmRender_GetQueueType(BmRender_Queue Queue);
 u32 BmRender_GetQueueFamily(BmRender_Queue Queue);
 
 BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description);
 BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* Description);
 BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description);
-BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutBinding* Bindings, u64 BindingsCount);
+BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutBinding* Bindings, u32 BindingsCount);
 BmRender_DescriptorPool BmRender_CreateDescriptorPool(const VkDescriptorPoolSize* PoolSizes, u32 MaxSets, u32 PoolSizeCount, BmRender_DescriptorPoolType Type);
 BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description);
 BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout LayoutHandle, BmRender_DescriptorPool PoolHandle);
@@ -376,7 +437,7 @@ BmRender_CommandPool BmRender_CreateCommandPool(BmRender_QueueType BmRender_Queu
 BmRender_CommandBuffer BmRender_AllocateCommandBuffer(BmRender_CommandPool CommandPool);
 
 void BmRender_UpdateHostCompatibleBuffer(BmRender_GPUBuffer Buffer, u64 BufferOffset, u64 DataSize, const void* Data);
-void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, const BmRender_DescriptorSetBinding* Bindings, u64 BindingsCount);
+void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, const BmRender_DescriptorSetBinding* Bindings, u32 BindingsCount);
 
 BmRender_FenceStatus BmRender_GetFenceStatus(BmRender_Fence Handle);
 BmRender_WaitResult BmRender_WaitForFences(BmRender_Fence Handle, VkBool32 WaitAll, u64 Timeout);
@@ -413,5 +474,16 @@ void BmRender_DestroyFence(BmRender_Fence Handle);
 void BmRender_DestroySemaphore(BmRender_Semaphore Handle);
 void BmRender_DestroyCommandPool(BmRender_CommandPool Handle);
 void BmRender_FreeCommandBuffer(BmRender_CommandBuffer Handle);
+
+void BmRender_GetDescriptorSetLayoutData(BmRender_DescriptorSetLayout Handle, BmRender_DescriptorSetLayoutData* OutData);
+bool BmRender_GetShaderData(BmRender_Shader Handle, BmRender_ShaderData* OutData);
+bool BmRender_GetImageData(BmRender_Image Handle, BmRender_ImageResource* OutData);
+bool BmRender_GetGPUBufferData(BmRender_GPUBuffer Handle, BmRender_GPUBufferData* OutData);
+bool BmRender_GetDescriptorSetData(BmRender_DescriptorSet Handle, BmRender_DescriptorSetData* OutData);
+bool BmRender_GetSemaphoreData(BmRender_Semaphore Handle, BmRender_SemaphoreData* OutData);
+bool BmRender_GetCommandPoolData(BmRender_CommandPool Handle, BmRender_CommandPoolData* OutData);
+bool BmRender_GetCommandBufferData(BmRender_CommandBuffer Handle, BmRender_CommandBufferData* OutData);
+bool BmRender_GetQueueData(BmRender_Queue Handle, BmRender_QueueData* OutData);
+bool BmRender_GetPipelineLayoutData(BmRender_PipelineLayout Handle, BmRender_PipelineLayoutData* OutData);
 
 void BmRender_FrameFree();

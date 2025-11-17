@@ -1,12 +1,15 @@
+#include <cassert>
+
 #include <SharedLib.h>
 
 #include "Handles.h"
 #include "RenderInterface.h"
+#include "RenderTypes.h"
 #include "VulkanHelper.h"
-
 #include "VulkanCoreContext.h"
 
-#include <Util/Util.h>
+#define FORGE_MEMORY_DEBUG
+#include <forge_memory_debugger.h>
 
 BmRender_FenceStatus BmRender_GetFenceStatus(BmRender_Fence Handle)
 {
@@ -92,8 +95,8 @@ void BmRender_DeviceWaitIdle()
 
 void BmRender_TransitionImageForRendering(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer, u32 LayersCount)
 {
-	ImageResource Data;
-	GetImageData(Image, &Data);
+	BmRender_ImageResource Data;
+	BmRender_GetImageData(Image, &Data);
 
 	VkImageAspectFlags AspectFlags;
 	VkPipelineStageFlags2 DstStageMask;
@@ -147,8 +150,8 @@ void BmRender_TransitionImageForRendering(BmRender_CommandBuffer CommandBuffer, 
 
 void BmRender_TransitionImageForSampling(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer, u32 LayersCount)
 {
-	ImageResource Data;
-	GetImageData(Image, &Data);
+	BmRender_ImageResource Data;
+	BmRender_GetImageData(Image, &Data);
 
 	VkImageAspectFlags AspectFlags;
 	VkPipelineStageFlags2 SrcStageMask;
@@ -298,8 +301,8 @@ void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmR
 	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
 	VkPipelineLayout Layout = (VkPipelineLayout)PipelineLayout;
 	
-	PipelineLayoutData LayoutData;
-	if (GetPipelineLayoutData(PipelineLayout, &LayoutData))
+	BmRender_PipelineLayoutData LayoutData;
+	if (BmRender_GetPipelineLayoutData(PipelineLayout, &LayoutData))
 	{
 		VkPipelineBindPoint BindPoint = PipelineTypeToVkPipelineBindPoint(LayoutData.PipelineType);
 		
@@ -410,7 +413,7 @@ void BmRender_QueueSubmit(BmRender_Queue Queue, u32 SubmitCount, const BmRender_
 
 BmRender_SwapchainResult BmRender_QueuePresent(BmRender_Queue Queue, const BmRender_PresentInfo* pPresentInfo)
 {
-	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
+	VulkanCoreContext* CoreContext = GetCoreContext();
 
 	VkPresentInfoKHR PresentInfo = { };
 	PresentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -451,7 +454,7 @@ BmRender_SwapchainResult BmRender_QueuePresent(BmRender_Queue Queue, const BmRen
 
 BmRender_SwapchainResult BmRender_AcquireNextSwapchainImage(u64 Timeout, BmRender_Semaphore Semaphore, VkFence Fence, u32* pImageIndex)
 {
-	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
+	VulkanCoreContext* CoreContext = GetCoreContext();
 	VkDevice Device = CoreContext->LogicalDevice;
 
 	VkSwapchainKHR Swapchain = CoreContext->VulkanSwapchain;

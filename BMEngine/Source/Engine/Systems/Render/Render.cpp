@@ -1,6 +1,5 @@
 #include "Render.h"
 
-#include "Engine/Systems/Render/VulkanHelper.h"
 #include "RenderResources.h"
 #include "TransferSystem.h"
 #include "Systems.h"
@@ -51,7 +50,7 @@ namespace Render
 
 		*ImGuiPool = BmRender_CreateDescriptorPool(PoolSizes, 1, (u32)IM_ARRAYSIZE(PoolSizes), BmRender_DescriptorPoolType::CreateFree);
 
-		BmRender_Queue GraphicsQueue = BmRender_GetGraphicsQueue();
+		BmRender_Queue GraphicsQueue = BmRender_CreateQueue(BmRender_QueueType::Graphic);
 		ImGui_ImplVulkan_InitInfo InitInfo = { };
 		InitInfo.Instance = (VkInstance)BmRender_GetVulkanInstance();
 		InitInfo.PhysicalDevice = (VkPhysicalDevice)BmRender_GetPhysicalDevice();
@@ -66,7 +65,7 @@ namespace Render
 		InitInfo.ImageCount = 3;
 		InitInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 		InitInfo.PipelineRenderingCreateInfo = RenderingInfo;
-		InitInfo.Allocator = GetVulkanAllocator();
+		//InitInfo.Allocator = GetVulkanAllocator();
 		ImGui_ImplVulkan_Init(&InitInfo);
 
 		ImGui_ImplVulkan_CreateFontsTexture();
@@ -279,8 +278,6 @@ namespace Render
 
 	void Draw(DrawScene* Scene, u64 WaitSemaphoreValue)
 	{
-		VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
-
 		const u32 CurrentFrame = GetCurrentFrameIndex();
 
 		RenderResources::UpdateBufferRegion(State.VpHandle[CurrentFrame], 0, &Scene->ViewProjection, sizeof(ViewProjectionBuffer));

@@ -31,7 +31,7 @@ struct Memory_LinearAllocator
 void Memory_LinearAllocator_Init(Memory_LinearAllocator* Memory, u64 SpaceToAllocate);
 void Memory_LinearAllocator_Free(Memory_LinearAllocator* Memory);
 void* Memory_LinearAllocator_Alloc(Memory_LinearAllocator* Memory, u64 Size);
-void Memory_LinearAllocator_FreeAll(Memory_LinearAllocator* Memory);
+void Memory_LinearAllocator_FreeMemory(Memory_LinearAllocator* Memory);
 void* Memory_LinearAllocator_GetHead(Memory_LinearAllocator* Memory);
 
 struct SparceHashMap

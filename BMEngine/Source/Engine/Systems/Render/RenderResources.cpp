@@ -4,19 +4,19 @@
 
 #include "TransferSystem.h"
 #include "RenderInterface.h"
+#include "RenderHelper.h"
 
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
 #include "Systems.h"
-#include "Handles.h"
 
 namespace RenderResources
 {
 	void UpdateBufferRegion(BmRender_GPUBufferBinding Handle, u64 ResourceOffset, const void* Data, u32 DataSize)
 	{
-		GPUBufferData Buffer;
-		GetGPUBufferData(Handle.GPUBufferHandle, &Buffer);
+		BmRender_GPUBufferData Buffer;
+		BmRender_GetGPUBufferData(Handle.GPUBufferHandle, &Buffer);
 
 		const u64 Offset = Handle.BufferOffset + ResourceOffset;
 
@@ -48,8 +48,8 @@ namespace RenderResources
 
 	void UpdateImageResource(BmRender_Image Handle, BmRender_ImageDescription* Description, void* Data)
 	{
-		ImageResource Image;
-		GetImageData(Handle, &Image);
+		BmRender_ImageResource Image;
+		BmRender_GetImageData(Handle, &Image);
 
 		// TODO: TMP solution
 		void* TransferMemory = TransferSystem::RequestTransferMemory(Image.Size);
@@ -57,7 +57,7 @@ namespace RenderResources
 
 		TransferSystem::TransferTask Task = { };
 		Task.DataSize = Image.Size;
-		Task.Alignment = GetFormatAlignment(Description->Format);
+		Task.Alignment = BmRender_GetFormatAlignment(Description->Format);
 		Task.RawData = TransferMemory;
 		Task.TextureDescr.Handle = Handle;
 		Task.Type = TransferSystem::TaskType::Image;

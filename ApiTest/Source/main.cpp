@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include <Engine/Systems/Render/RenderInterface.h>
+#include <RenderInterface.h>
 
 #include <ShortTypes.h>
 

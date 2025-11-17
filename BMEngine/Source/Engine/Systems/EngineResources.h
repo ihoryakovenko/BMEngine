@@ -7,7 +7,7 @@
 #include <string>
 #include "Util/EngineTypes.h"
 
-#include "Engine/Systems/Render/RenderInterface.h"
+#include <RenderInterface.h>
 
 namespace Render
 {

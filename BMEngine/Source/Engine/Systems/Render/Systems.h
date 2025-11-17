@@ -1,9 +1,9 @@
 #pragma once
 
+#include <atomic>
+#include <mutex>
+
 #include "RenderInterface.h"
-#include "RenderTypes.h"
-
-
 
 struct CommandWorkerData
 {

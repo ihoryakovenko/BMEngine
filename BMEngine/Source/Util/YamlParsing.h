@@ -1,8 +1,7 @@
 #pragma once
 
-#include "Engine/Systems/Render/VulkanHelper.h"
 #include "Engine/Systems/Render/RenderResources.h"
-#include "Engine/Systems/Render/RenderInterface.h"
+#include <RenderInterface.h>
 
 #include <vector>
 #include <string>
@@ -280,7 +279,6 @@ namespace Util
 	BmRender_AttributeType ParseShaderTypeToAttributeType(const char* Value, u32 Length);
 	VkVertexInputRate ParseVertexInputRate(const char* Value, u32 Length);
 
-	BufferUsageFlag ParseBufferUsageFlag(const char* Value, u32 Length);
 	MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length);
 	std::string GetBufferName(Yaml::Node& BufferNode);
 

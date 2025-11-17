@@ -10,9 +10,8 @@
 
 #include <gli/gli.hpp>
 
-#include "Engine/Systems/Render/VulkanHelper.h"
 #include "Engine/Systems/Render/RenderResources.h"
-#include "Engine/Systems/Render/RenderInterface.h"
+#include <RenderInterface.h>
 
 namespace Util
 {

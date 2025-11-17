@@ -2,8 +2,12 @@
 
 #include <mutex>
 
+#include <SharedLib.h>
+
 namespace Memory
 {
+	static Memory_LinearAllocator GeneralFrameMemory;
+
 	static std::recursive_mutex MemoryDebugMutex;
 	static bool IsMemoryDebuggingEnabled;
 	static bool IsMemoryDumpAllowed;
@@ -29,10 +33,14 @@ namespace Memory
 		{
 			f_debug_mem_thread_safe_init((int(*)(void*))Lock, (int(*)(void*))Unlock, &MemoryDebugMutex);
 		}
+
+		Memory_LinearAllocator_Init(&GeneralFrameMemory, 1024 * 1024);
 	}
 
 	void DeInit()
 	{
+		Memory_LinearAllocator_Free(&GeneralFrameMemory);
+
 		if (IsMemoryDebuggingEnabled)
 		{
 			f_debug_mem_print(0);
@@ -68,5 +76,10 @@ namespace Memory
 	void AllowFrameMemoryChecks(bool Allow)
 	{
 		AreFrameMemoryChecksEnabled = Allow;
+	}
+
+	Memory_LinearAllocator* GetGeneralFrameMemory()
+	{
+		return &GeneralFrameMemory;
 	}
 }

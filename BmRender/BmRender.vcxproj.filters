@@ -1,9 +1,19 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClInclude Include="Test.h" />
+    <ClInclude Include="RenderInterface.h" />
+    <ClInclude Include="Sources\Handles.h" />
+    <ClInclude Include="Sources\RenderTypes.h" />
+    <ClInclude Include="Sources\VulkanCoreContext.h" />
+    <ClInclude Include="Sources\VulkanHelper.h" />
+    <ClInclude Include="RenderHelper.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Sources\Test.cpp" />
+    <ClCompile Include="Sources\Handles.cpp" />
+    <ClCompile Include="Sources\RenderCommands.cpp" />
+    <ClCompile Include="Sources\RenderInterface.cpp" />
+    <ClCompile Include="Sources\RenderTypes.cpp" />
+    <ClCompile Include="Sources\VulkanCoreContext.cpp" />
+    <ClCompile Include="Sources\VulkanHelper.cpp" />
   </ItemGroup>
 </Project>

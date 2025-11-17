@@ -3,6 +3,7 @@
 #include <cstring>
 #include <cassert>
 
+#define FORGE_MEMORY_DEBUG
 #include <forge_memory_debugger.h>
 
 // Memory_PoolAllocator
@@ -411,7 +412,7 @@ void* Memory_LinearAllocator_Alloc(Memory_LinearAllocator* Memory, u64 Size)
 	return ReturnPointer;
 }
 
-void Memory_LinearAllocator_FreeAll(Memory_LinearAllocator* Memory)
+void Memory_LinearAllocator_FreeMemory(Memory_LinearAllocator* Memory)
 {
 	Memory->Head = Memory->Base;
 }

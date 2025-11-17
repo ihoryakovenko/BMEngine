@@ -83,15 +83,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Memory\MemoryManagmentSystem.cpp" />
-    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\Handles.cpp" />
-    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\RenderCommands.cpp" />
-    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\RenderInterface.cpp" />
-    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\RenderTypes.cpp" />
-    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\Systems.cpp" />
-    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\VulkanCoreContext.cpp" />
-    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\VulkanHelper.cpp" />
-    <ClCompile Include="..\BMEngine\Source\Util\Util.cpp" />
     <ClCompile Include="Source\main.cpp" />
   </ItemGroup>
   <ItemGroup>

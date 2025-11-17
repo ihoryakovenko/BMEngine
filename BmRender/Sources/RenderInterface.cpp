@@ -1,16 +1,15 @@
 #include "RenderInterface.h"
 
-#include "RenderResources.h"
 #include "VulkanHelper.h"
-#include "Render.h"
 #include "RenderTypes.h"
-#include "Systems.h"
 #include "Handles.h"
 
-#include "Util/Util.h"
 #include <type_traits>
 
 #include "VulkanCoreContext.h"
+
+#define FORGE_MEMORY_DEBUG
+#include <forge_memory_debugger.h>
 
 void BmRender_Init(GLFWwindow* WindowHandler, u32 InMaxFramesInFly)
 {
@@ -59,7 +58,7 @@ VkSurfaceFormatKHR BmRender_GetSurfaceFormat()
 
 BmRender_Image BmRender_GetSwapchainImage(u32 Index)
 {
-	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
+	VulkanCoreContext* CoreContext = GetCoreContext();
 	if (Index >= CoreContext->ImagesCount)
 	{
 		return nullptr;
@@ -69,7 +68,7 @@ BmRender_Image BmRender_GetSwapchainImage(u32 Index)
 
 BmRender_ImageView BmRender_GetSwapchainImageView(u32 Index)
 {
-	VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
+	VulkanCoreContext* CoreContext = GetCoreContext();
 	if (Index >= CoreContext->ImagesCount)
 	{
 		return nullptr;
@@ -102,15 +101,10 @@ u32 BmRender_GetGraphicsQueueFamily()
 	return (u32)GetCoreContext()->Indices.GraphicsFamily;
 }
 
-BmRender_Queue BmRender_GetGraphicsQueue()
-{
-	return GetCommandSystemData()->GraphicsQueue;
-}
-
 BmRender_QueueType BmRender_GetQueueType(BmRender_Queue Queue)
 {
-	QueueData Data;
-	if (GetQueueData(Queue, &Data))
+	BmRender_QueueData Data;
+	if (BmRender_GetQueueData(Queue, &Data))
 	{
 		return Data.QueueType;
 	}
@@ -119,10 +113,10 @@ BmRender_QueueType BmRender_GetQueueType(BmRender_Queue Queue)
 
 u32 BmRender_GetQueueFamily(BmRender_Queue Queue)
 {
-	QueueData Data;
-	if (GetQueueData(Queue, &Data))
+	BmRender_QueueData Data;
+	if (BmRender_GetQueueData(Queue, &Data))
 	{
-		VulkanCoreContext::VulkanCoreContext* CoreContext = GetCoreContext();
+		VulkanCoreContext* CoreContext = GetCoreContext();
 		s32 FamilyIndex = GetQueueFamilyIndexFromQueueType(Data.QueueType, CoreContext->Indices);
 		if (FamilyIndex != -1)
 		{
@@ -134,5 +128,5 @@ u32 BmRender_GetQueueFamily(BmRender_Queue Queue)
 
 void BmRender_FrameFree()
 {
-	Memory_LinearAllocator_FreeAll(GetFrameMemory());
+	Memory_LinearAllocator_FreeMemory(GetFrameMemory());
 }

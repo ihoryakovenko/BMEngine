@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Engine/Systems/Render/Render.h"
-#include "Engine/Systems/Render/VulkanHelper.h"
 
 void LoadSettings(u32 WindowWidth, u32 WindowHeight);
 

@@ -13,6 +13,8 @@
 #define FORGE_MEMORY_DEBUG
 #include <forge_memory_debugger.h>
 
+struct Memory_LinearAllocator;
+
 namespace Memory
 {
 	void Init(bool EnableMemoryDebugging);
@@ -22,6 +24,7 @@ namespace Memory
 	void AllowFrameMemoryDump(bool Allow);
 	void AllowFrameMemoryChecks(bool Allow);
 
+	Memory_LinearAllocator* GetGeneralFrameMemory();
 
 	template <typename T>
 	struct Array

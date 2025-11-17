@@ -1,13 +1,9 @@
 #pragma once
 
-#include <unordered_map>
-#include <string>
+#include <SharedLib.h>
 
 #include <vulkan/vulkan.h>
 
-#include "Util/EngineTypes.h"
-
-#include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 
 #include "RenderInterface.h"
 
@@ -25,7 +21,6 @@ struct GLFWwindow;
 
 inline constexpr u32 MAX_VERTEX_INPUTS_ATTRIBUTES = 16;
 inline constexpr u32 MAX_VERTEX_INPUT_BINDINGS = 16;
-inline constexpr u32 MAX_DRAW_FRAMES = 3;
 
 enum class LogType
 {
@@ -91,9 +86,6 @@ bool CheckFormats(VkPhysicalDevice PhDevice);
 
 void PrintDeviceData(VkPhysicalDeviceProperties* DeviceProperties, VkPhysicalDeviceFeatures* AvailableFeatures);
 
-VkDeviceSize CalculateBufferAlignedSize(VkDevice Device, VkBuffer Buffer, u64 BufferSize);
-VkDeviceSize CalculateImageAlignedSize(VkDevice Device, VkImage Image, u64 ImageSize);
-
 DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer, MemoryPropertyFlag Properties, VkBufferUsageFlags BufferUsageFlags, const VkAllocationCallbacks* Allocator);
 DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkImage Image, MemoryPropertyFlag Properties, const VkAllocationCallbacks* Allocator);
 
@@ -101,7 +93,6 @@ VkBuffer CreateBuffer(VkDevice Device, u64 Size, BufferUsageFlag Flag, const VkA
 
 void UpdateHostCompatibleBufferMemory(VkDevice Device, VkDeviceMemory Memory, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);
 
-u32 GetFormatAlignment(VkFormat Format);
 u32 CalculateFormatSize(VkFormat Format);
 
 bool CreateDebugUtilsMessengerEXT(VkInstance Instance, const VkDebugUtilsMessengerCreateInfoEXT* CreateInfo,
@@ -111,8 +102,6 @@ bool DestroyDebugMessenger(VkInstance Instance, VkDebugUtilsMessengerEXT InDebug
 VKAPI_ATTR VkBool32 VKAPI_CALL MessengerDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
 	VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
 	void* UserData);
-
-void ApplyStageBarrier(VkBufferMemoryBarrier2* Barrier, BmRender_PipelineSyncStage Stage);
 
 VkShaderStageFlags DescriptorShaderStageToVkShaderStage(BmRender_DescriptorShaderStage stage);
 VkShaderStageFlagBits PipelineShaderStageToVkShaderStage(BmRender_PipelineShaderStage stage);

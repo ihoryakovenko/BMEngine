@@ -6,13 +6,9 @@
 FORGE_MEMORY_DEBUG
 #include <forge_memory_debugger.h>
 #include "Util/Util.h"
-#include "VulkanHelper.h"
-#include "VulkanCoreContext.h"
 #include "Util/Math.h"
 #include "RenderInterface.h"
-#include "RenderTypes.h"
 #include "Systems.h"
-#include "Handles.h"
 
 namespace TransferSystem
 {
@@ -94,6 +90,31 @@ namespace TransferSystem
 		return Queue->Memory + Queue->Tail.load(std::memory_order_acquire);
 	}
 
+	static void ApplyStageBarrier(VkBufferMemoryBarrier2* Barrier, BmRender_PipelineSyncStage Stage)
+	{
+		switch (Stage)
+		{
+			case BmRender_PipelineSyncStage::VertexShader:
+				Barrier->srcStageMask = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT;
+				Barrier->srcAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
+				Barrier->dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+				Barrier->dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+				break;
+			case BmRender_PipelineSyncStage::FragmentShader:
+				Barrier->srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+				Barrier->srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT;
+				Barrier->dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+				Barrier->dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+				break;
+			default:
+				Barrier->srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+				Barrier->srcAccessMask = VK_ACCESS_2_MEMORY_READ_BIT;
+				Barrier->dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+				Barrier->dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+				break;
+		}
+	}
+
 	static DataTransferState TransferState;
 
 	u64 Transfer()
@@ -106,8 +127,6 @@ namespace TransferSystem
 		}
 
 		u64 TasksAdded = 0;
-
-		VkDevice Device = GetCoreContext()->LogicalDevice;
 
 		if (!HasPendingTasks(&TransferState.TransferTasksQueue))
 		{
@@ -149,8 +168,8 @@ namespace TransferSystem
 				case TaskType::Data:
 				{
 					const BmRender_GPUBufferBinding& Entry = Task->DataDescr.Handle;
-					GPUBufferData BufferData;
-					GetGPUBufferData(Entry.GPUBufferHandle, &BufferData);
+					BmRender_GPUBufferData BufferData;
+					BmRender_GetGPUBufferData(Entry.GPUBufferHandle, &BufferData);
 
 					//BufferData.ReadyValue = TransferState.CompletedTransfer + 1; // TODO: fix
 
@@ -180,8 +199,8 @@ namespace TransferSystem
 				}
 				case TaskType::Image:
 				{
-					ImageResource Image;
-					GetImageData(Task->TextureDescr.Handle, &Image);
+					BmRender_ImageResource Image;
+					BmRender_GetImageData(Task->TextureDescr.Handle, &Image);
 					//Image.ReadyValue = TransferState.CompletedTransfer + 1; // TODO: fix
 
 					VkImageMemoryBarrier2 TransferImageBarrier = { };
@@ -301,31 +320,14 @@ namespace TransferSystem
 
 	void Init()
 	{
-		VulkanCoreContext::VulkanCoreContext* Context = GetCoreContext();
-		VkDevice Device = Context->LogicalDevice;
-
 		TransferState.CurrentFrame = 0;
 
 		TransferState.TransferCommandPool = BmRender_CreateCommandPool(BmRender_QueueType::Graphic);
 
-		VkCommandPool VulkanCommandPool = (VkCommandPool)TransferState.TransferCommandPool;
-
-		VkCommandBufferAllocateInfo TransferCommandBufferAllocateInfo = { };
-		TransferCommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		TransferCommandBufferAllocateInfo.commandPool = VulkanCommandPool;
-		TransferCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		TransferCommandBufferAllocateInfo.commandBufferCount = MAX_DRAW_FRAMES;
-
-		VkCommandBuffer RawCommandBuffers[MAX_DRAW_FRAMES];
-		VULKAN_CHECK_RESULT(vkAllocateCommandBuffers(Device, &TransferCommandBufferAllocateInfo, RawCommandBuffers));
-
 		for (u32 i = 0; i < MAX_DRAW_FRAMES; ++i)
 		{
 			TransferState.Frames.Fences[i] = BmRender_CreateFence();
-
-			CommandBufferData CmdBufferData;
-			CmdBufferData.CommandPool = TransferState.TransferCommandPool;
-			TransferState.Frames.CommandBuffers[i] = CreateCommandBufferHandle(RawCommandBuffers[i], &CmdBufferData);
+			TransferState.Frames.CommandBuffers[i] = BmRender_AllocateCommandBuffer(TransferState.TransferCommandPool);
 		}
 
 		TransferState.TransferSemaphore = BmRender_CreateTimelineSemaphore(0);
@@ -376,8 +378,8 @@ namespace TransferSystem
 		u64 CompletedValue = 0;
 		BmRender_GetSemaphoreCounterValue(TransferState.TransferSemaphore, &CompletedValue);
 
-		GPUBufferData BufferData;
-		GetGPUBufferData(Handle, &BufferData);
+		BmRender_GPUBufferData BufferData;
+		BmRender_GetGPUBufferData(Handle, &BufferData);
 		return false; // TODO: fix
 		//return CompletedValue < BufferData.ReadyValue;
 	}
@@ -387,8 +389,8 @@ namespace TransferSystem
 		u64 CompletedValue = 0;
 		BmRender_GetSemaphoreCounterValue(TransferState.TransferSemaphore, &CompletedValue);
 
-		ImageResource ImageData;
-		GetImageData(Handle, &ImageData);
+		BmRender_ImageResource ImageData;
+		BmRender_GetImageData(Handle, &ImageData);
 		return false; // TODO: fix
 		//return CompletedValue < ImageData.ReadyValue;
 	}

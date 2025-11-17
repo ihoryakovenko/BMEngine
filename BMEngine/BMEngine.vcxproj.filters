@@ -17,10 +17,8 @@
     <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Source\Util\Settings.cpp" />
     <ClCompile Include="Source\Engine\Engine.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
     <ClCompile Include="Source\Util\SavedCode.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\VulkanCoreContext.cpp" />
     <ClCompile Include="Source\Engine\Systems\UI\UI.cpp" />
     <ClCompile Include="..\External\mini-yaml\yaml\Yaml.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderResources.cpp" />
@@ -28,12 +26,8 @@
     <ClCompile Include="Source\Engine\Systems\Render\TransferSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\Concurrency\TaskSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\RenderInterface.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\RenderTypes.cpp" />
     <ClCompile Include="Source\Util\YamlParsing.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Systems.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\Handles.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\RenderCommands.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
@@ -44,19 +38,14 @@
     <ClInclude Include="Source\Util\Settings.h" />
     <ClInclude Include="Source\Engine\Engine.h" />
     <ClInclude Include="Source\Util\Math.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\VulkanHelper.h" />
     <ClInclude Include="Source\Util\DefaultTextureData.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\VulkanCoreContext.h" />
     <ClInclude Include="Source\Engine\Systems\UI\UI.h" />
     <ClInclude Include="Source\Engine\Systems\Render\RenderResources.h" />
     <ClInclude Include="Source\Engine\Systems\EngineResources.h" />
     <ClInclude Include="Source\Engine\Systems\Render\TransferSystem.h" />
     <ClInclude Include="Source\Engine\Systems\Concurrency\TaskSystem.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\RenderInterface.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\RenderTypes.h" />
     <ClInclude Include="Source\Util\YamlParsing.h" />
     <ClInclude Include="Source\Engine\Systems\Render\Systems.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\Handles.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />

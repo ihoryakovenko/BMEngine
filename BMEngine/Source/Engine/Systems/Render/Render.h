@@ -3,11 +3,12 @@
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 
-#include "Engine/Systems/Render/VulkanHelper.h"
+#include <ShortTypes.h>
+
+#include <RenderInterface.h>
 
 #include "Util/EngineTypes.h"
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
-#include "Engine/Systems/Render/VulkanCoreContext.h"
 #include "RenderInterface.h"
 
 #include <atomic>
@@ -17,7 +18,6 @@
 #include <vector>
 
 #include "RenderInterface.h"
-#include "RenderTypes.h"
 
 namespace Render
 {

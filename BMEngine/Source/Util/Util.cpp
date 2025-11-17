@@ -12,7 +12,6 @@ FORGE_MEMORY_DEBUG
 
 #include "Engine/Systems/Render/Render.h"
 #include "Engine/Systems/Render/RenderResources.h"
-#include "Engine/Systems/Render/RenderTypes.h"
 #include "Engine/Systems/EngineResources.h"
 #include "gli/gli.hpp"
 

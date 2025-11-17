@@ -8,6 +8,8 @@
 #include <thread>
 #include <filesystem>
 
+#include <SharedLib.h>
+
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtx/hash.hpp>
@@ -259,6 +261,8 @@ namespace Engine
 
 				TaskSystem::WaitForGroup(&Group);
 			}
+
+			Memory_LinearAllocator_FreeMemory(Memory::GetGeneralFrameMemory());
 		}
 
 		DeInit();

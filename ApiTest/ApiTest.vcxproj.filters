@@ -18,33 +18,6 @@
     <ClCompile Include="Source\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\RenderInterface.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\VulkanHelper.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\RenderTypes.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Memory\MemoryManagmentSystem.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\VulkanCoreContext.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\BMEngine\Source\Util\Util.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\Handles.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\Systems.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\BMEngine\Source\Engine\Systems\Render\RenderCommands.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\BMEngine\Source\Engine\Systems\Render\RenderInterface.h">

@@ -1,7 +1,5 @@
 #include "Systems.h"
 
-#include "Handles.h"
-
 #include "Util/Util.h"
 #include <unordered_map>
 
@@ -16,7 +14,6 @@ void InitCommandSystem(u32 WorkerCount)
 {
 	InitCommandWorkerManager(WorkerCount);
 
-	VulkanCoreContext::VulkanCoreContext* Context = GetCoreContext();
 	CommandSystemData* CommandSystem = GetCommandSystemData();
 
 	CommandSystem->GraphicsQueue = BmRender_CreateQueue(BmRender_QueueType::Graphic);
@@ -25,13 +22,10 @@ void InitCommandSystem(u32 WorkerCount)
 	CommandSystem->FreeWorkerCount = WorkerCount;
 	CommandSystem->OldestWorkerIndex.store(0);
 
-	VkDevice Device = Context->LogicalDevice;
-	u32 GraphicsFamily = Context->Indices.GraphicsFamily;
-
 	CommandSystemCommandPool = BmRender_CreateCommandPool(BmRender_QueueType::Graphic);
 
-	CommandPoolData PoolData;
-	GetCommandPoolData(CommandSystemCommandPool, &PoolData);
+	BmRender_CommandPoolData PoolData;
+	BmRender_GetCommandPoolData(CommandSystemCommandPool, &PoolData);
 
 
 	for (u32 i = 0; i < WorkerCount; ++i)
@@ -111,9 +105,7 @@ u32 AcquireNextSwapchainImage(u32 CurrentFrame)
 
 void StartRecording(BmRender_CommandWorker Handle)
 {
-	VulkanCoreContext::VulkanCoreContext* Context = GetCoreContext();
 	CommandWorkerData* SubmitPool = GetSubmitPoolData(Handle);
-
 	BmRender_BeginCommandBuffer(SubmitPool->CommandBuffer);
 }
 
@@ -134,7 +126,6 @@ void PresentFrame(u32 FrameIndex)
 
 BmRender_CommandWorker AcquireWorker(u64 Timeout)
 {
-	VkDevice Device = GetCoreContext()->LogicalDevice;
 	CommandSystemData* CommandSystem = GetCommandSystemData();
 
 	for (u32 i = 0; i < CommandSystem->WorkerCount; ++i)

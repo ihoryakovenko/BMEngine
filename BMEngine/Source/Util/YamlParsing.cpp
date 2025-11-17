@@ -1,5 +1,9 @@
 #include "YamlParsing.h"
 
+#include <SharedLib.h>
+
+#include <Engine/Systems/Memory/MemoryManagmentSystem.h>
+
 extern std::unordered_map<std::string, Util::VertexBinding_depr> VBindings;
 extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
 extern std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
@@ -905,19 +909,6 @@ namespace Util
 		return VK_VERTEX_INPUT_RATE_VERTEX;
 	}
 
-	BufferUsageFlag ParseBufferUsageFlag(const char* Value, u32 Length)
-	{
-		if (StringMatches(Value, Length, ParseStrings::COMBINED_VERTEX_INDEX_FLAG_STRINGS)) return BufferUsageFlag::CombinedVertexIndexFlag;
-		if (StringMatches(Value, Length, ParseStrings::INSTANCE_FLAG_STRINGS)) return BufferUsageFlag::InstanceFlag;
-		if (StringMatches(Value, Length, ParseStrings::STORAGE_FLAG_STRINGS)) return BufferUsageFlag::StorageFlag;
-		if (StringMatches(Value, Length, ParseStrings::UNIFORM_FLAG_STRINGS)) return BufferUsageFlag::UniformFlag;
-		if (StringMatches(Value, Length, ParseStrings::VERTEX_FLAG_STRINGS)) return BufferUsageFlag::VertexFlag;
-		if (StringMatches(Value, Length, ParseStrings::INDEX_FLAG_STRINGS)) return BufferUsageFlag::IndexFlag;
-
-		assert(false);
-		return BufferUsageFlag::VertexFlag;
-	}
-
 	MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length)
 	{
 		if (StringMatches(Value, Length, ParseStrings::GPU_LOCAL_STRINGS)) return MemoryPropertyFlag::GPULocal;
@@ -1192,7 +1183,7 @@ namespace Util
 				BmRenderVertexBinding.Stride = VertexBindingDepr.Stride;
 				BmRenderVertexBinding.InputRate = VertexBindingDepr.InputRate;
 				BmRenderVertexBinding.AttributesCount = AttributesNode.Size();
-				BmRenderVertexBinding.Attributes = (VertexAttribute*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VertexAttribute) * BmRenderVertexBinding.AttributesCount);
+				BmRenderVertexBinding.Attributes = (VertexAttribute*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), sizeof(VertexAttribute) * BmRenderVertexBinding.AttributesCount);
 
 				u32 testIndex = 0;
 				for (auto AttrIt = AttributesNode.Begin(); AttrIt != AttributesNode.End(); AttrIt++)
