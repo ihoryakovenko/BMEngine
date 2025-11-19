@@ -85,14 +85,14 @@ namespace EngineResources
 
 		BmRender_DescriptorSetBinding DiffuseBinding;
 		DiffuseBinding.ImageBinding.Sampler = Samplers["DiffuseTexture"];
-		DiffuseBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		DiffuseBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
 		DiffuseBinding.ImageBinding.ImageView = DefaultAsset.RenderViewHandle;
 		DiffuseBinding.DstArrayElement = 0;
 		DiffuseBinding.BindingCount = 1;
 
 		BmRender_DescriptorSetBinding SpecularBinding;
 		SpecularBinding.ImageBinding.Sampler = Samplers["SpecularTexture"];
-		SpecularBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		SpecularBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
 		SpecularBinding.ImageBinding.ImageView = DefaultAsset.RenderViewHandle;
 		SpecularBinding.DstArrayElement = 0;
 		SpecularBinding.BindingCount = 1;
@@ -175,14 +175,14 @@ namespace EngineResources
 
 							BmRender_DescriptorSetBinding DiffuseBinding;
 							DiffuseBinding.ImageBinding.Sampler = Samplers["DiffuseTexture"];
-							DiffuseBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+							DiffuseBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
 							DiffuseBinding.ImageBinding.ImageView = it->second.RenderViewHandle;
 							DiffuseBinding.DstArrayElement = TexturesGPUIndexCounter;
 							DiffuseBinding.BindingCount = 1;
 
 							BmRender_DescriptorSetBinding SpecularBinding;
 							SpecularBinding.ImageBinding.Sampler = Samplers["SpecularTexture"];
-							SpecularBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+							SpecularBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
 							SpecularBinding.ImageBinding.ImageView = it->second.RenderViewHandle;
 							SpecularBinding.DstArrayElement = TexturesGPUIndexCounter;
 							SpecularBinding.BindingCount = 1;

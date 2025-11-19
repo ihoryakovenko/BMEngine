@@ -34,7 +34,7 @@ namespace Util
 	struct VertexBinding_depr
 	{
 		u32 Stride;
-		VkVertexInputRate InputRate;
+		BmRender_VertexInputRate InputRate;
 		std::unordered_map<std::string, VertexAttribute> Attributes;
 	};
 
@@ -257,7 +257,7 @@ namespace Util
 	VkViewport ParseViewportNode(Yaml::Node& ViewportNode);
 	VkRect2D ParseScissorNode(Yaml::Node& ScissorNode);
 
-	VkBool32 ParseBool(const char* Value, u32 Length);
+	bool ParseBool(const char* Value, u32 Length);
 	VkPolygonMode ParsePolygonMode(const char* Value, u32 Length);
 	VkCullModeFlags ParseCullMode(const char* Value, u32 Length);
 	VkFrontFace ParseFrontFace(const char* Value, u32 Length);
@@ -269,15 +269,15 @@ namespace Util
 	VkPrimitiveTopology ParseTopology(const char* Value, u32 Length);
 	BmRender_PipelineShaderStage ParseShaderStage(const char* Value, u32 Length);
 
-	VkFilter ParseFilter(const char* Value, u32 Length);
-	VkSamplerAddressMode ParseAddressMode(const char* Value, u32 Length);
-	VkBorderColor ParseBorderColor(const char* Value, u32 Length);
-	VkSamplerMipmapMode ParseMipmapMode(const char* Value, u32 Length);
-	VkDescriptorType ParseDescriptorType(const char* Value, u32 Length);
+	BmRender_Filter ParseFilter(const char* Value, u32 Length);
+	BmRender_SamplerAddressMode ParseAddressMode(const char* Value, u32 Length);
+	BmRender_BorderColor ParseBorderColor(const char* Value, u32 Length);
+	BmRender_SamplerMipmapMode ParseMipmapMode(const char* Value, u32 Length);
+	BmRender_DescriptorType ParseDescriptorType(const char* Value, u32 Length);
 	BmRender_DescriptorShaderStage ParseShaderStageFlags(const char* Value, u32 Length);
 
 	BmRender_AttributeType ParseShaderTypeToAttributeType(const char* Value, u32 Length);
-	VkVertexInputRate ParseVertexInputRate(const char* Value, u32 Length);
+	BmRender_VertexInputRate ParseVertexInputRate(const char* Value, u32 Length);
 
 	MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length);
 	std::string GetBufferName(Yaml::Node& BufferNode);

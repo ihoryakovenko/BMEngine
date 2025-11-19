@@ -6,6 +6,7 @@
 
 #include "Handles.h"
 #include "VulkanCoreContext.h"
+#include "RenderHelper.h"
 
 #include <SharedLib.h>
 
@@ -144,11 +145,11 @@ BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_D
 	{
 		NewLayoutBindings[i].binding = i;
 		NewLayoutBindings[i].descriptorCount = Bindings[i].DescriptorCount;
-		NewLayoutBindings[i].descriptorType = Bindings[i].DescriptorType;
+		NewLayoutBindings[i].descriptorType = DescriptorTypeToVk(Bindings[i].DescriptorType);
 		NewLayoutBindings[i].stageFlags = DescriptorShaderStageToVkShaderStage(Bindings[i].StageFlags);
 		NewLayoutBindings[i].pImmutableSamplers = nullptr;
 
-		Layout.LayoutBindings[i].DescriptorType = NewLayoutBindings[i].descriptorType;
+		Layout.LayoutBindings[i].DescriptorType = Bindings[i].DescriptorType;
 	}
 
 	VkDescriptorSetLayoutCreateInfo LayoutCreateInfo = { };
@@ -179,18 +180,19 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, co
 	{
 		const BmRender_DescriptorSetBinding& Binding = Bindings[i];
 
-		VkDescriptorType DescriptorType = Layout.LayoutBindings[i].DescriptorType;
+		BmRender_DescriptorType DescriptorType = Layout.LayoutBindings[i].DescriptorType;
+		VkDescriptorType VkDescriptorType = DescriptorTypeToVk(DescriptorType);
 
 		WriteDescriptorSets[i] = { };
 		WriteDescriptorSets[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		WriteDescriptorSets[i].dstSet = Set.Set;
 		WriteDescriptorSets[i].dstBinding = i;
 		WriteDescriptorSets[i].dstArrayElement = Binding.DstArrayElement;
-		WriteDescriptorSets[i].descriptorType = DescriptorType;
+		WriteDescriptorSets[i].descriptorType = VkDescriptorType;
 		WriteDescriptorSets[i].descriptorCount = Binding.BindingCount;
 
-		if (DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || DescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC ||
-			DescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER || DescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC)
+		if (VkDescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || VkDescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC ||
+			VkDescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER || VkDescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC)
 		{
 			VkDescriptorBufferInfo* BufferInfo = (VkDescriptorBufferInfo*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkDescriptorBufferInfo) * Binding.BindingCount);
 			for (u32 j = 0; j < Binding.BindingCount; ++j)
@@ -204,10 +206,10 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, co
 
 			WriteDescriptorSets[i].pBufferInfo = BufferInfo;
 		}
-		else if (VK_DESCRIPTOR_TYPE_SAMPLER || VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+		else if (VkDescriptorType == VK_DESCRIPTOR_TYPE_SAMPLER || VkDescriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
 		{
 			VkDescriptorImageInfo* ImageInfo = (VkDescriptorImageInfo*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkDescriptorImageInfo));
-			ImageInfo->imageLayout = Binding.ImageBinding.ImageLayout;
+			ImageInfo->imageLayout = ImageLayoutToVk(Binding.ImageBinding.ImageLayout);
 			ImageInfo->imageView = (VkImageView)Binding.ImageBinding.ImageView;
 			ImageInfo->sampler = (VkSampler)Binding.ImageBinding.Sampler;
 
@@ -302,7 +304,7 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 	ImageCreateInfo.extent.depth = 1;
 	ImageCreateInfo.mipLevels = 1;
 	ImageCreateInfo.arrayLayers = Description->ArrayLayers;
-	ImageCreateInfo.format = Description->Format;
+	ImageCreateInfo.format = FormatToVk(Description->Format);
 	ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 	ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	ImageCreateInfo.usage = Usage;
@@ -335,7 +337,7 @@ static BmRender_ImageView CreateImageView(BmRender_Image Handle, u32 BaseArrayLa
 	ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	ViewCreateInfo.flags = 0;
 	ViewCreateInfo.viewType = ViewType;
-	ViewCreateInfo.format = Resource.Format;
+	ViewCreateInfo.format = FormatToVk(Resource.Format);
 	ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 	ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 	ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -361,20 +363,20 @@ BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Descript
 	CreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 	CreateInfo.pNext = nullptr;
 	CreateInfo.flags = 0;
-	CreateInfo.magFilter = Description->MagFilter;
-	CreateInfo.minFilter = Description->MinFilter;
-	CreateInfo.mipmapMode = Description->MipmapMode;
-	CreateInfo.addressModeU = Description->AddressModeU;
-	CreateInfo.addressModeV = Description->AddressModeV;
-	CreateInfo.addressModeW = Description->AddressModeW;
+	CreateInfo.magFilter = FilterToVkFilter(Description->MagFilter);
+	CreateInfo.minFilter = FilterToVkFilter(Description->MinFilter);
+	CreateInfo.mipmapMode = SamplerMipmapModeToVk(Description->MipmapMode);
+	CreateInfo.addressModeU = SamplerAddressModeToVk(Description->AddressModeU);
+	CreateInfo.addressModeV = SamplerAddressModeToVk(Description->AddressModeV);
+	CreateInfo.addressModeW = SamplerAddressModeToVk(Description->AddressModeW);
 	CreateInfo.mipLodBias = Description->MipLodBias;
 	CreateInfo.anisotropyEnable = Description->AnisotropyEnable;
 	CreateInfo.maxAnisotropy = Description->MaxAnisotropy;
 	CreateInfo.compareEnable = Description->CompareEnable;
-	CreateInfo.compareOp = Description->CompareOp;
+	CreateInfo.compareOp = CompareOpToVk(Description->CompareOp);
 	CreateInfo.minLod = Description->MinLod;
 	CreateInfo.maxLod = Description->MaxLod;
-	CreateInfo.borderColor = Description->BorderColor;
+	CreateInfo.borderColor = BorderColorToVk(Description->BorderColor);
 	CreateInfo.unnormalizedCoordinates = Description->UnnormalizedCoordinates;
 
 	VkSampler VulkanSampler;
@@ -401,33 +403,33 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 		VkVertexInputBindingDescription* VkBinding = VkVertexBindings + BindingIndex;
 		VkBinding->binding = BindingIndex;
 		VkBinding->stride = VertexBinding.Stride;
-		VkBinding->inputRate = VertexBinding.InputRate;
+		VkBinding->inputRate = VertexInputRateToVk(VertexBinding.InputRate);
 
 		for (u32 AttrIndex = 0; AttrIndex < VertexBinding.AttributesCount; ++AttrIndex)
 		{
 			const VertexAttribute& attribute = VertexBinding.Attributes[AttrIndex];
 			if (attribute.Type != BmRender_AttributeType::Mat4)
 			{
-				VkFormat Format;
+				BmRender_Format Format;
 				switch (attribute.Type)
 				{
 					case BmRender_AttributeType::Int:
-						Format = VK_FORMAT_R32_SINT;
+						Format = BmRender_Format::R32_SINT;
 						break;
 					case BmRender_AttributeType::Uint:
-						Format = VK_FORMAT_R32_UINT;
+						Format = BmRender_Format::R32_UINT;
 						break;
 					case BmRender_AttributeType::Float:
-						Format = VK_FORMAT_R32_SFLOAT;
+						Format = BmRender_Format::R32_SFLOAT;
 						break;
 					case BmRender_AttributeType::Vec2:
-						Format = VK_FORMAT_R32G32_SFLOAT;
+						Format = BmRender_Format::R32G32_SFLOAT;
 						break;
 					case BmRender_AttributeType::Vec3:
-						Format = VK_FORMAT_R32G32B32_SFLOAT;
+						Format = BmRender_Format::R32G32B32_SFLOAT;
 						break;
 					case BmRender_AttributeType::Vec4:
-						Format = VK_FORMAT_R32G32B32A32_SFLOAT;
+						Format = BmRender_Format::R32G32B32A32_SFLOAT;
 						break;
 					default:
 						assert(false);
@@ -436,7 +438,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 				VkAttribute = (VkVertexInputAttributeDescription*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkVertexInputAttributeDescription));
 				VkAttribute->binding = BindingIndex;
 				VkAttribute->location = CurrentLocation;
-				VkAttribute->format = Format;
+				VkAttribute->format = FormatToVk(Format);
 				VkAttribute->offset = attribute.Offset;
 
 				++CurrentLocation;
@@ -450,7 +452,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 					VkAttribute = (VkVertexInputAttributeDescription*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkVertexInputAttributeDescription));
 					VkAttribute->binding = BindingIndex;
 					VkAttribute->location = CurrentLocation;
-					VkAttribute->format = VK_FORMAT_R32G32B32A32_SFLOAT;
+					VkAttribute->format = FormatToVk(BmRender_Format::R32G32B32A32_SFLOAT);
 					VkAttribute->offset = attribute.Offset + MatrixBindingOffset;
 
 					MatrixBindingOffset += 16;
@@ -485,13 +487,19 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	VertexInputState.vertexAttributeDescriptionCount = TotalAttributes;
 	VertexInputState.pVertexAttributeDescriptions = TotalAttributes == 0 ? nullptr : VkVertexAttributes;
 
+	VkFormat* ColorAttachmentFormats = (VkFormat*)Memory_LinearAllocator_Alloc(GetFrameMemory(), Description->ResourceInfo.PipelineAttachmentData.ColorAttachmentCount * sizeof(VkFormat));
+	for (u32 i = 0; i < Description->ResourceInfo.PipelineAttachmentData.ColorAttachmentCount; ++i)
+	{
+		ColorAttachmentFormats[i] = FormatToVk(Description->ResourceInfo.PipelineAttachmentData.ColorAttachmentFormats[i]);
+	}
+
 	VkPipelineRenderingCreateInfo RenderingInfo = { };
 	RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
 	RenderingInfo.pNext = nullptr;
 	RenderingInfo.colorAttachmentCount = Description->ResourceInfo.PipelineAttachmentData.ColorAttachmentCount;
-	RenderingInfo.pColorAttachmentFormats = Description->ResourceInfo.PipelineAttachmentData.ColorAttachmentFormats;
-	RenderingInfo.depthAttachmentFormat = Description->ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat;
-	RenderingInfo.stencilAttachmentFormat = Description->ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat;
+	RenderingInfo.pColorAttachmentFormats = ColorAttachmentFormats;
+	RenderingInfo.depthAttachmentFormat = FormatToVk(Description->ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat);
+	RenderingInfo.stencilAttachmentFormat = FormatToVk(Description->ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat);
 
 	VkPipelineColorBlendStateCreateInfo ColorBlendState = Description->ColorBlendState;
 	ColorBlendState.pAttachments = &Description->ColorBlendAttachment;
@@ -601,7 +609,7 @@ BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Descript
 }
 
 
-BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, BmRender_ImageType Type)
+BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type)
 {
 	BmRender_ImageDescription Descr;
 	Descr.ArrayLayers = 1;
@@ -613,7 +621,7 @@ BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, Bm
 	return CreateImageResource(&Descr);
 }
 
-BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Format, BmRender_ImageType Type, u32 ArrayLayers)
+BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, u32 ArrayLayers)
 {
 	BmRender_ImageDescription Descr;
 	Descr.ArrayLayers = ArrayLayers;

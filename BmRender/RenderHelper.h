@@ -2,4 +2,5 @@
 
 #include "RenderInterface.h"
 
-u32 BmRender_GetFormatAlignment(VkFormat Format);
+u32 BmRender_GetFormatAlignment(BmRender_Format Format);
+VkFormat FormatToVk(BmRender_Format Format);

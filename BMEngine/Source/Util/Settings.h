@@ -12,5 +12,5 @@ struct SkyBoxVertex
 extern VkExtent2D MainScreenExtent;
 extern VkExtent2D DepthViewportExtent;
 
-extern VkFormat ColorFormat;
-extern VkFormat DepthFormat;
+extern BmRender_Format ColorFormat;
+extern BmRender_Format DepthFormat;

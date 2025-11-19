@@ -126,23 +126,23 @@ namespace Engine
 				{
 				case Util::ShaderType::Uniform:
 					VkBinding.DescriptorType = (Binding.MemoryFlag == MemoryPropertyFlag::HostCompatible) ?
-						VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+						BmRender_DescriptorType::UniformBufferDynamic : BmRender_DescriptorType::UniformBuffer;
 					VkBinding.DescriptorCount = 1;
 
 					break;
 				case Util::ShaderType::Buffer:
 					VkBinding.DescriptorType = (Binding.MemoryFlag == MemoryPropertyFlag::HostCompatible) ?
-						VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+						BmRender_DescriptorType::StorageBufferDynamic : BmRender_DescriptorType::StorageBuffer;
 					VkBinding.DescriptorCount = 1;
 
 						break;
 					case Util::ShaderType::Sampler2D:
-						VkBinding.DescriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+						VkBinding.DescriptorType = BmRender_DescriptorType::CombinedImageSampler;
 						VkBinding.DescriptorCount = 1;
 
 						break;
 					case Util::ShaderType::Sampler2DArray:
-						VkBinding.DescriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+						VkBinding.DescriptorType = BmRender_DescriptorType::CombinedImageSampler;
 						VkBinding.DescriptorCount = 64;
 
 						break;

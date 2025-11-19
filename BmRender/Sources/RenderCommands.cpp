@@ -31,7 +31,7 @@ BmRender_FenceStatus BmRender_GetFenceStatus(BmRender_Fence Handle)
 	}
 }
 
-BmRender_WaitResult BmRender_WaitForFences(BmRender_Fence Handle, VkBool32 WaitAll, u64 Timeout)
+BmRender_WaitResult BmRender_WaitForFences(BmRender_Fence Handle, bool WaitAll, u64 Timeout)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	VkFence Fence = (VkFence)Handle;
@@ -250,8 +250,8 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 		VkAttachment->sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 		VkAttachment->imageView = (VkImageView)Attachment.ImageView;
 		VkAttachment->imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		VkAttachment->loadOp = Attachment.LoadOp;
-		VkAttachment->storeOp = Attachment.StoreOp;
+		VkAttachment->loadOp = AttachmentLoadOpToVk(Attachment.LoadOp);
+		VkAttachment->storeOp = AttachmentStoreOpToVk(Attachment.StoreOp);
 		VkAttachment->clearValue.color = Attachment.ClearValue;
 	}
 
@@ -263,8 +263,8 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 		DepthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 		DepthAttachmentInfo.imageView = (VkImageView)Attachment.ImageView;
 		DepthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-		DepthAttachmentInfo.loadOp = Attachment.LoadOp;
-		DepthAttachmentInfo.storeOp = Attachment.StoreOp;
+		DepthAttachmentInfo.loadOp = AttachmentLoadOpToVk(Attachment.LoadOp);
+		DepthAttachmentInfo.storeOp = AttachmentStoreOpToVk(Attachment.StoreOp);
 		DepthAttachmentInfo.clearValue.depthStencil = Attachment.ClearValue;
 
 		DepthAttachment = &DepthAttachmentInfo;
@@ -319,11 +319,11 @@ void BmRender_RecordBindVertexBuffers(BmRender_CommandBuffer CommandBuffer, u32 
 	vkCmdBindVertexBuffers(VkCmdBuffer, FirstBinding, BindingCount, VkBuffers, Offsets);
 }
 
-void BmRender_RecordBindIndexBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer Buffer, u64 Offset, VkIndexType IndexType)
+void BmRender_RecordBindIndexBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer Buffer, u64 Offset, BmRender_IndexType IndexType)
 {
 	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
 	VkBuffer VkBufferHandle = (VkBuffer)Buffer;
-	vkCmdBindIndexBuffer(VkCmdBuffer, VkBufferHandle, Offset, IndexType);
+	vkCmdBindIndexBuffer(VkCmdBuffer, VkBufferHandle, Offset, IndexTypeToVk(IndexType));
 }
 
 void BmRender_Draw(BmRender_CommandBuffer CommandBuffer, u32 VertexCount, u32 InstanceCount, u32 FirstVertex, u32 FirstInstance)

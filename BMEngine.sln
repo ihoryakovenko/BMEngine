@@ -5,8 +5,6 @@ VisualStudioVersion = 17.10.34928.147
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BMEngine", "BMEngine\BMEngine.vcxproj", "{586F058E-5AC9-47A6-A6E4-178952F88B82}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Converter", "Converter\Converter.vcxproj", "{AE0C3971-99F2-47BF-8261-914E31E3D352}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{B1A2EE96-CC3D-4946-998C-F62C8FD315EB}"
 	ProjectSection(SolutionItems) = preProject
 		PostBuildScript.bat = PostBuildScript.bat
@@ -22,6 +20,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BmRender", "BmRender\BmRend
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SharedLib", "SharedLib\SharedLib.vcxproj", "{90865B4C-29F1-46B5-9711-3353435AE322}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Converter", "Tools\Converter\Converter.vcxproj", "{AE0C3971-99F2-47BF-8261-914E31E3D352}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tools", "Tools", "{E997B9B9-B7B0-4D2A-99FC-D3F58A599050}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -36,12 +38,6 @@ Global
 		{586F058E-5AC9-47A6-A6E4-178952F88B82}.Release|x64.ActiveCfg = Release|x64
 		{586F058E-5AC9-47A6-A6E4-178952F88B82}.Release|x64.Build.0 = Release|x64
 		{586F058E-5AC9-47A6-A6E4-178952F88B82}.Release|x86.ActiveCfg = Release|x64
-		{AE0C3971-99F2-47BF-8261-914E31E3D352}.Debug|x64.ActiveCfg = Debug|x64
-		{AE0C3971-99F2-47BF-8261-914E31E3D352}.Debug|x64.Build.0 = Debug|x64
-		{AE0C3971-99F2-47BF-8261-914E31E3D352}.Debug|x86.ActiveCfg = Debug|x64
-		{AE0C3971-99F2-47BF-8261-914E31E3D352}.Release|x64.ActiveCfg = Release|x64
-		{AE0C3971-99F2-47BF-8261-914E31E3D352}.Release|x64.Build.0 = Release|x64
-		{AE0C3971-99F2-47BF-8261-914E31E3D352}.Release|x86.ActiveCfg = Release|x64
 		{43310985-CE08-45F5-8B12-5E2457F9A9F4}.Debug|x64.ActiveCfg = Debug|x64
 		{43310985-CE08-45F5-8B12-5E2457F9A9F4}.Debug|x64.Build.0 = Debug|x64
 		{43310985-CE08-45F5-8B12-5E2457F9A9F4}.Debug|x86.ActiveCfg = Debug|x64
@@ -60,9 +56,20 @@ Global
 		{90865B4C-29F1-46B5-9711-3353435AE322}.Release|x64.ActiveCfg = Release|x64
 		{90865B4C-29F1-46B5-9711-3353435AE322}.Release|x64.Build.0 = Release|x64
 		{90865B4C-29F1-46B5-9711-3353435AE322}.Release|x86.ActiveCfg = Release|x64
+		{AE0C3971-99F2-47BF-8261-914E31E3D352}.Debug|x64.ActiveCfg = Debug|x64
+		{AE0C3971-99F2-47BF-8261-914E31E3D352}.Debug|x64.Build.0 = Debug|x64
+		{AE0C3971-99F2-47BF-8261-914E31E3D352}.Debug|x86.ActiveCfg = Debug|x64
+		{AE0C3971-99F2-47BF-8261-914E31E3D352}.Debug|x86.Build.0 = Debug|x64
+		{AE0C3971-99F2-47BF-8261-914E31E3D352}.Release|x64.ActiveCfg = Release|x64
+		{AE0C3971-99F2-47BF-8261-914E31E3D352}.Release|x64.Build.0 = Release|x64
+		{AE0C3971-99F2-47BF-8261-914E31E3D352}.Release|x86.ActiveCfg = Release|x64
+		{AE0C3971-99F2-47BF-8261-914E31E3D352}.Release|x86.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{AE0C3971-99F2-47BF-8261-914E31E3D352} = {E997B9B9-B7B0-4D2A-99FC-D3F58A599050}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9FAE9EB7-07D8-4635-A46A-495DDA63D3FA}

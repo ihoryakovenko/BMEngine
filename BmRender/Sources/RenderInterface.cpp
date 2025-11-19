@@ -51,9 +51,9 @@ u32 BmRender_GetSwapchainImageCount()
 	return GetCoreContext()->ImagesCount;
 }
 
-VkSurfaceFormatKHR BmRender_GetSurfaceFormat()
+BmRender_SurfaceFormat BmRender_GetSurfaceFormat()
 {
-	return GetCoreContext()->SurfaceFormat;
+	return VkSurfaceFormatToBmRender(GetCoreContext()->SurfaceFormat);
 }
 
 BmRender_Image BmRender_GetSwapchainImage(u32 Index)

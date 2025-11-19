@@ -22,7 +22,7 @@ namespace Util
 
 
 	
-	VkFormat GliFormatToVkFormat(gli::format Format);
+	BmRender_Format GliFormatToVkFormat(gli::format Format);
 	u32 GetAttributeTypeSize(BmRender_AttributeType Attribute);
 
 	typedef u8* Model3DData;

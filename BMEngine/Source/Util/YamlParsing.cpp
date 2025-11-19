@@ -638,7 +638,7 @@ namespace Util
 		return Empty;
 	}
 
-	VkBool32 ParseBool(const char* Value, u32 Length)
+	bool ParseBool(const char* Value, u32 Length)
 	{
 		if (Length == 0) return VK_FALSE;
 
@@ -798,56 +798,56 @@ namespace Util
 		return BmRender_PipelineShaderStage::Vertex;
 	}
 
-	VkFilter ParseFilter(const char* Value, u32 Length)
+	BmRender_Filter ParseFilter(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::NEAREST_STRINGS)) return VK_FILTER_NEAREST;
-		if (StringMatches(Value, Length, ParseStrings::LINEAR_STRINGS)) return VK_FILTER_LINEAR;
-		return VK_FILTER_LINEAR;
+		if (StringMatches(Value, Length, ParseStrings::NEAREST_STRINGS)) return BmRender_Filter::Nearest;
+		if (StringMatches(Value, Length, ParseStrings::LINEAR_STRINGS)) return BmRender_Filter::Linear;
+		return BmRender_Filter::Linear;
 	}
 
-	VkSamplerAddressMode ParseAddressMode(const char* Value, u32 Length)
+	BmRender_SamplerAddressMode ParseAddressMode(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::REPEAT_STRINGS)) return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		if (StringMatches(Value, Length, ParseStrings::MIRRORED_REPEAT_STRINGS)) return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-		if (StringMatches(Value, Length, ParseStrings::CLAMP_TO_EDGE_STRINGS)) return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		if (StringMatches(Value, Length, ParseStrings::CLAMP_TO_BORDER_STRINGS)) return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-		if (StringMatches(Value, Length, ParseStrings::MIRROR_CLAMP_TO_EDGE_STRINGS)) return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
-		return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		if (StringMatches(Value, Length, ParseStrings::REPEAT_STRINGS)) return BmRender_SamplerAddressMode::Repeat;
+		if (StringMatches(Value, Length, ParseStrings::MIRRORED_REPEAT_STRINGS)) return BmRender_SamplerAddressMode::MirroredRepeat;
+		if (StringMatches(Value, Length, ParseStrings::CLAMP_TO_EDGE_STRINGS)) return BmRender_SamplerAddressMode::ClampToEdge;
+		if (StringMatches(Value, Length, ParseStrings::CLAMP_TO_BORDER_STRINGS)) return BmRender_SamplerAddressMode::ClampToBorder;
+		if (StringMatches(Value, Length, ParseStrings::MIRROR_CLAMP_TO_EDGE_STRINGS)) return BmRender_SamplerAddressMode::MirrorClampToEdge;
+		return BmRender_SamplerAddressMode::ClampToEdge;
 	}
 
-	VkBorderColor ParseBorderColor(const char* Value, u32 Length)
+	BmRender_BorderColor ParseBorderColor(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::FLOAT_TRANSPARENT_BLACK_STRINGS)) return VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
-		if (StringMatches(Value, Length, ParseStrings::INT_TRANSPARENT_BLACK_STRINGS)) return VK_BORDER_COLOR_INT_TRANSPARENT_BLACK;
-		if (StringMatches(Value, Length, ParseStrings::FLOAT_OPAQUE_BLACK_STRINGS)) return VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
-		if (StringMatches(Value, Length, ParseStrings::INT_OPAQUE_BLACK_STRINGS)) return VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-		if (StringMatches(Value, Length, ParseStrings::FLOAT_OPAQUE_WHITE_STRINGS)) return VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		if (StringMatches(Value, Length, ParseStrings::INT_OPAQUE_WHITE_STRINGS)) return VK_BORDER_COLOR_INT_OPAQUE_WHITE;
-		return VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+		if (StringMatches(Value, Length, ParseStrings::FLOAT_TRANSPARENT_BLACK_STRINGS)) return BmRender_BorderColor::FloatTransparentBlack;
+		if (StringMatches(Value, Length, ParseStrings::INT_TRANSPARENT_BLACK_STRINGS)) return BmRender_BorderColor::IntTransparentBlack;
+		if (StringMatches(Value, Length, ParseStrings::FLOAT_OPAQUE_BLACK_STRINGS)) return BmRender_BorderColor::FloatOpaqueBlack;
+		if (StringMatches(Value, Length, ParseStrings::INT_OPAQUE_BLACK_STRINGS)) return BmRender_BorderColor::IntOpaqueBlack;
+		if (StringMatches(Value, Length, ParseStrings::FLOAT_OPAQUE_WHITE_STRINGS)) return BmRender_BorderColor::FloatOpaqueWhite;
+		if (StringMatches(Value, Length, ParseStrings::INT_OPAQUE_WHITE_STRINGS)) return BmRender_BorderColor::IntOpaqueWhite;
+		return BmRender_BorderColor::IntOpaqueBlack;
 	}
 
-	VkSamplerMipmapMode ParseMipmapMode(const char* Value, u32 Length)
+	BmRender_SamplerMipmapMode ParseMipmapMode(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::MIPMAP_NEAREST_STRINGS)) return VK_SAMPLER_MIPMAP_MODE_NEAREST;
-		if (StringMatches(Value, Length, ParseStrings::MIPMAP_LINEAR_STRINGS)) return VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		if (StringMatches(Value, Length, ParseStrings::MIPMAP_NEAREST_STRINGS)) return BmRender_SamplerMipmapMode::Nearest;
+		if (StringMatches(Value, Length, ParseStrings::MIPMAP_LINEAR_STRINGS)) return BmRender_SamplerMipmapMode::Linear;
+		return BmRender_SamplerMipmapMode::Linear;
 	}
 
-	VkDescriptorType ParseDescriptorType(const char* Value, u32 Length)
+	BmRender_DescriptorType ParseDescriptorType(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::SAMPLER_STRINGS)) return VK_DESCRIPTOR_TYPE_SAMPLER;
-		if (StringMatches(Value, Length, ParseStrings::COMBINED_IMAGE_SAMPLER_STRINGS)) return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		if (StringMatches(Value, Length, ParseStrings::SAMPLED_IMAGE_STRINGS)) return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-		if (StringMatches(Value, Length, ParseStrings::STORAGE_IMAGE_STRINGS)) return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		if (StringMatches(Value, Length, ParseStrings::UNIFORM_TEXEL_BUFFER_STRINGS)) return VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
-		if (StringMatches(Value, Length, ParseStrings::STORAGE_TEXEL_BUFFER_STRINGS)) return VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
-		if (StringMatches(Value, Length, ParseStrings::UNIFORM_BUFFER_STRINGS)) return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		if (StringMatches(Value, Length, ParseStrings::STORAGE_BUFFER_STRINGS)) return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		if (StringMatches(Value, Length, ParseStrings::UNIFORM_BUFFER_DYNAMIC_STRINGS)) return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		if (StringMatches(Value, Length, ParseStrings::STORAGE_BUFFER_DYNAMIC_STRINGS)) return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-		if (StringMatches(Value, Length, ParseStrings::INPUT_ATTACHMENT_STRINGS)) return VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		if (StringMatches(Value, Length, ParseStrings::SAMPLER_STRINGS)) return BmRender_DescriptorType::Sampler;
+		if (StringMatches(Value, Length, ParseStrings::COMBINED_IMAGE_SAMPLER_STRINGS)) return BmRender_DescriptorType::CombinedImageSampler;
+		if (StringMatches(Value, Length, ParseStrings::SAMPLED_IMAGE_STRINGS)) return BmRender_DescriptorType::SampledImage;
+		if (StringMatches(Value, Length, ParseStrings::STORAGE_IMAGE_STRINGS)) return BmRender_DescriptorType::StorageImage;
+		if (StringMatches(Value, Length, ParseStrings::UNIFORM_TEXEL_BUFFER_STRINGS)) return BmRender_DescriptorType::UniformTexelBuffer;
+		if (StringMatches(Value, Length, ParseStrings::STORAGE_TEXEL_BUFFER_STRINGS)) return BmRender_DescriptorType::StorageTexelBuffer;
+		if (StringMatches(Value, Length, ParseStrings::UNIFORM_BUFFER_STRINGS)) return BmRender_DescriptorType::UniformBuffer;
+		if (StringMatches(Value, Length, ParseStrings::STORAGE_BUFFER_STRINGS)) return BmRender_DescriptorType::StorageBuffer;
+		if (StringMatches(Value, Length, ParseStrings::UNIFORM_BUFFER_DYNAMIC_STRINGS)) return BmRender_DescriptorType::UniformBufferDynamic;
+		if (StringMatches(Value, Length, ParseStrings::STORAGE_BUFFER_DYNAMIC_STRINGS)) return BmRender_DescriptorType::StorageBufferDynamic;
+		if (StringMatches(Value, Length, ParseStrings::INPUT_ATTACHMENT_STRINGS)) return BmRender_DescriptorType::InputAttachment;
 
-		return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		return BmRender_DescriptorType::CombinedImageSampler;
 	}
 
 	BmRender_DescriptorShaderStage ParseShaderStageFlags(const char* Value, u32 Length)
@@ -900,13 +900,13 @@ namespace Util
 		return BmRender_AttributeType::Float;
 	}
 
-	VkVertexInputRate ParseVertexInputRate(const char* Value, u32 Length)
+	BmRender_VertexInputRate ParseVertexInputRate(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::VERTEX_STRINGS)) return VK_VERTEX_INPUT_RATE_VERTEX;
-		if (StringMatches(Value, Length, ParseStrings::INSTANCE_STRINGS)) return VK_VERTEX_INPUT_RATE_INSTANCE;
+		if (StringMatches(Value, Length, ParseStrings::VERTEX_STRINGS)) return BmRender_VertexInputRate::Vertex;
+		if (StringMatches(Value, Length, ParseStrings::INSTANCE_STRINGS)) return BmRender_VertexInputRate::Instance;
 
 		assert(false);
-		return VK_VERTEX_INPUT_RATE_VERTEX;
+		return BmRender_VertexInputRate::Vertex;
 	}
 
 	MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length)

@@ -104,9 +104,9 @@ int main()
 	PipelineDesc.PipelineLayout = PipelineLayout;
 
 	PipelineDesc.ResourceInfo.PipelineAttachmentData.ColorAttachmentCount = 1;
-	PipelineDesc.ResourceInfo.PipelineAttachmentData.ColorAttachmentFormats[0] = BmRender_GetSurfaceFormat().format;
-	PipelineDesc.ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
-	PipelineDesc.ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+	PipelineDesc.ResourceInfo.PipelineAttachmentData.ColorAttachmentFormats[0] = BmRender_GetSurfaceFormat().Format;
+	PipelineDesc.ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = BmRender_Format::Undefined;
+	PipelineDesc.ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = BmRender_Format::Undefined;
 
 	BmRender_ShaderStageDescription ShaderStages[2] = {};
 	ShaderStages[0].Shader = VertexShader;
@@ -248,8 +248,8 @@ int main()
 
 		BmRender_RenderingColorAttachment ColorAttachment = {};
 		ColorAttachment.ImageView = BmRender_GetSwapchainImageView(ImageIndex);
-		ColorAttachment.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		ColorAttachment.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+		ColorAttachment.LoadOp = BmRender_AttachmentLoadOp::Clear;
+		ColorAttachment.StoreOp = BmRender_AttachmentStoreOp::Store;
 		ColorAttachment.ClearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 		BmRender_RenderingInfo RenderingInfo = {};

@@ -120,20 +120,259 @@ enum class BmRender_DescriptorPoolType : u32
 	CreateFree = 1ull << 1,
 };
 
-// TODO: Check
-
 enum class MemoryPropertyFlag : u32
 {
 	GPULocal = 0,
 	HostCompatible = 1,
 };
 
+enum class BmRender_Filter : u32
+{
+	Nearest,
+	Linear,
+};
+
+enum class BmRender_SamplerMipmapMode : u32
+{
+	Nearest,
+	Linear,
+};
+
+enum class BmRender_SamplerAddressMode : u32
+{
+	Repeat,
+	MirroredRepeat,
+	ClampToEdge,
+	ClampToBorder,
+	MirrorClampToEdge,
+};
+
+enum class BmRender_CompareOp : u32
+{
+	Never,
+	Less,
+	Equal,
+	LessOrEqual,
+	Greater,
+	NotEqual,
+	GreaterOrEqual,
+	Always,
+};
+
+enum class BmRender_BorderColor : u32
+{
+	FloatTransparentBlack,
+	IntTransparentBlack,
+	FloatOpaqueBlack,
+	IntOpaqueBlack,
+	FloatOpaqueWhite,
+	IntOpaqueWhite,
+};
+
+enum class BmRender_ImageLayout : u32
+{
+	Undefined,
+	General,
+	ColorAttachmentOptimal,
+	DepthStencilAttachmentOptimal,
+	DepthStencilReadOnlyOptimal,
+	ShaderReadOnlyOptimal,
+	TransferSrcOptimal,
+	TransferDstOptimal,
+	Preinitialized,
+	PresentSrcKHR,
+};
+
+enum class BmRender_AttachmentLoadOp : u32
+{
+	Load,
+	Clear,
+	DontCare,
+};
+
+enum class BmRender_AttachmentStoreOp : u32
+{
+	Store,
+	DontCare,
+};
+
+enum class BmRender_VertexInputRate : u32
+{
+	Vertex,
+	Instance,
+};
+
+enum class BmRender_DescriptorType : u32
+{
+	Sampler,
+	CombinedImageSampler,
+	SampledImage,
+	StorageImage,
+	UniformTexelBuffer,
+	StorageTexelBuffer,
+	UniformBuffer,
+	StorageBuffer,
+	UniformBufferDynamic,
+	StorageBufferDynamic,
+	InputAttachment,
+};
+
+enum class BmRender_IndexType : u32
+{
+	Uint16,
+	Uint32,
+};
+
+enum class BmRender_Format : u32
+{
+	Undefined,
+	// 8-bit formats
+	R8_UNORM,
+	R8_SNORM,
+	R8_USCALED,
+	R8_SSCALED,
+	R8_UINT,
+	R8_SINT,
+	R8_SRGB,
+	// 16-bit formats
+	R8G8_UNORM,
+	R8G8_SNORM,
+	R8G8_USCALED,
+	R8G8_SSCALED,
+	R8G8_UINT,
+	R8G8_SINT,
+	R8G8_SRGB,
+	R16_UNORM,
+	R16_SNORM,
+	R16_USCALED,
+	R16_SSCALED,
+	R16_UINT,
+	R16_SINT,
+	R16_SFLOAT,
+	// 24-bit formats
+	R8G8B8_UNORM,
+	R8G8B8_SNORM,
+	R8G8B8_USCALED,
+	R8G8B8_SSCALED,
+	R8G8B8_UINT,
+	R8G8B8_SINT,
+	R8G8B8_SRGB,
+	B8G8R8_UNORM,
+	B8G8R8_SNORM,
+	B8G8R8_USCALED,
+	B8G8R8_SSCALED,
+	B8G8R8_UINT,
+	B8G8R8_SINT,
+	B8G8R8_SRGB,
+	// 32-bit formats
+	R8G8B8A8_UNORM,
+	R8G8B8A8_SNORM,
+	R8G8B8A8_USCALED,
+	R8G8B8A8_SSCALED,
+	R8G8B8A8_UINT,
+	R8G8B8A8_SINT,
+	R8G8B8A8_SRGB,
+	B8G8R8A8_UNORM,
+	B8G8R8A8_SNORM,
+	B8G8R8A8_USCALED,
+	B8G8R8A8_SSCALED,
+	B8G8R8A8_UINT,
+	B8G8R8A8_SINT,
+	B8G8R8A8_SRGB,
+	R16G16_UNORM,
+	R16G16_SNORM,
+	R16G16_USCALED,
+	R16G16_SSCALED,
+	R16G16_UINT,
+	R16G16_SINT,
+	R16G16_SFLOAT,
+	R32_UINT,
+	R32_SINT,
+	R32_SFLOAT,
+	// 48-bit formats
+	R16G16B16_UNORM,
+	R16G16B16_SNORM,
+	R16G16B16_USCALED,
+	R16G16B16_SSCALED,
+	R16G16B16_UINT,
+	R16G16B16_SINT,
+	R16G16B16_SFLOAT,
+	// 64-bit formats
+	R16G16B16A16_UNORM,
+	R16G16B16A16_SNORM,
+	R16G16B16A16_USCALED,
+	R16G16B16A16_SSCALED,
+	R16G16B16A16_UINT,
+	R16G16B16A16_SINT,
+	R16G16B16A16_SFLOAT,
+	R32G32_UINT,
+	R32G32_SINT,
+	R32G32_SFLOAT,
+	// 96-bit formats
+	R32G32B32_UINT,
+	R32G32B32_SINT,
+	R32G32B32_SFLOAT,
+	// 128-bit formats
+	R32G32B32A32_UINT,
+	R32G32B32A32_SINT,
+	R32G32B32A32_SFLOAT,
+	// Special formats
+	A2R10G10B10_UNORM_PACK32,
+	A2R10G10B10_SNORM_PACK32,
+	A2R10G10B10_USCALED_PACK32,
+	A2R10G10B10_SSCALED_PACK32,
+	A2R10G10B10_UINT_PACK32,
+	A2R10G10B10_SINT_PACK32,
+	A2B10G10R10_UNORM_PACK32,
+	A2B10G10R10_SNORM_PACK32,
+	A2B10G10R10_USCALED_PACK32,
+	A2B10G10R10_SSCALED_PACK32,
+	A2B10G10R10_UINT_PACK32,
+	A2B10G10R10_SINT_PACK32,
+	// Depth formats
+	D16_UNORM,
+	D24_UNORM_S8_UINT,
+	D32_SFLOAT,
+	S8_UINT,
+	D16_UNORM_S8_UINT,
+	D32_SFLOAT_S8_UINT,
+	// Compressed formats - BC1/BC2/BC3
+	BC1_RGB_UNORM_BLOCK,
+	BC1_RGB_SRGB_BLOCK,
+	BC1_RGBA_UNORM_BLOCK,
+	BC1_RGBA_SRGB_BLOCK,
+	BC2_UNORM_BLOCK,
+	BC2_SRGB_BLOCK,
+	BC3_UNORM_BLOCK,
+	BC3_SRGB_BLOCK,
+	// Compressed formats - BC7
+	BC7_UNORM_BLOCK,
+	BC7_SRGB_BLOCK,
+	// Compressed formats - ETC2
+	ETC2_R8G8B8_UNORM_BLOCK,
+	ETC2_R8G8B8_SRGB_BLOCK,
+	ETC2_R8G8B8A1_UNORM_BLOCK,
+	ETC2_R8G8B8A1_SRGB_BLOCK,
+	ETC2_R8G8B8A8_UNORM_BLOCK,
+	ETC2_R8G8B8A8_SRGB_BLOCK,
+	// Special packed formats (not commonly used but needed for GliFormatToVkFormat)
+	B10G11R11_UFLOAT_PACK32,
+	E5B9G9R9_UFLOAT_PACK32,
+};
+
+struct BmRender_SurfaceFormat
+{
+	BmRender_Format Format;
+	VkColorSpaceKHR ColorSpace;
+};
+
+// TODO: Check
 struct AttachmentData
 {
 	u32 ColorAttachmentCount;
-	VkFormat ColorAttachmentFormats[16]; // get max attachments from device
-	VkFormat DepthAttachmentFormat;
-	VkFormat StencilAttachmentFormat;
+	BmRender_Format ColorAttachmentFormats[16]; // get max attachments from device
+	BmRender_Format DepthAttachmentFormat;
+	BmRender_Format StencilAttachmentFormat;
 };
 
 struct PipelineResourceInfo
@@ -145,28 +384,28 @@ struct PipelineResourceInfo
 
 struct BmRHI_SamplerDescription
 {
-	VkFilter MagFilter;
-	VkFilter MinFilter;
-	VkSamplerMipmapMode MipmapMode;
-	VkSamplerAddressMode AddressModeU;
-	VkSamplerAddressMode AddressModeV;
-	VkSamplerAddressMode AddressModeW;
+	BmRender_Filter MagFilter;
+	BmRender_Filter MinFilter;
+	BmRender_SamplerMipmapMode MipmapMode;
+	BmRender_SamplerAddressMode AddressModeU;
+	BmRender_SamplerAddressMode AddressModeV;
+	BmRender_SamplerAddressMode AddressModeW;
 	f32 MipLodBias;
-	VkBool32 AnisotropyEnable;
+	bool AnisotropyEnable;
 	f32 MaxAnisotropy;
-	VkBool32 CompareEnable;
-	VkCompareOp CompareOp;
+	bool CompareEnable;
+	BmRender_CompareOp CompareOp;
 	f32 MinLod;
 	f32 MaxLod;
-	VkBorderColor BorderColor;
-	VkBool32 UnnormalizedCoordinates;
+	BmRender_BorderColor BorderColor;
+	bool UnnormalizedCoordinates;
 };
 
 struct BmRender_ImageDescription
 {
 	u32 Width;
 	u32 Height;
-	VkFormat Format;
+	BmRender_Format Format;
 	u32 ArrayLayers;
 	BmRender_ImageType Type;
 };
@@ -180,7 +419,7 @@ struct BmRender_PushConstant
 
 struct BmRender_DescriptorSetLayoutBinding
 {
-	VkDescriptorType DescriptorType;
+	BmRender_DescriptorType DescriptorType;
 	u32 DescriptorCount;
 	BmRender_DescriptorShaderStage StageFlags;
 };
@@ -188,7 +427,7 @@ struct BmRender_DescriptorSetLayoutBinding
 struct BmRender_ImageBinding
 {
 	BmRender_Sampler Sampler;
-	VkImageLayout ImageLayout; // Check if can store layout with Image resource as target layout and use instead this
+	BmRender_ImageLayout ImageLayout; // Check if can store layout with Image resource as target layout and use instead this
 	BmRender_ImageView ImageView;
 };
 
@@ -202,16 +441,16 @@ struct BmRender_GPUBufferBinding
 struct BmRender_RenderingColorAttachment
 {
 	BmRender_ImageView ImageView;
-	VkAttachmentLoadOp LoadOp;
-	VkAttachmentStoreOp StoreOp;
+	BmRender_AttachmentLoadOp LoadOp;
+	BmRender_AttachmentStoreOp StoreOp;
 	VkClearColorValue ClearValue;
 };
 
 struct BmRender_RenderingDepthAttachment
 {
 	BmRender_ImageView ImageView;
-	VkAttachmentLoadOp LoadOp;
-	VkAttachmentStoreOp StoreOp;
+	BmRender_AttachmentLoadOp LoadOp;
+	BmRender_AttachmentStoreOp StoreOp;
 	VkClearDepthStencilValue ClearValue;
 };
 
@@ -243,7 +482,7 @@ struct BmRender_VertexBinding
 	VertexAttribute* Attributes;
 	u32 AttributesCount;
 	u32 Stride;
-	VkVertexInputRate InputRate;
+	BmRender_VertexInputRate InputRate;
 };
 
 struct BmRender_ShaderStageDescription
@@ -327,7 +566,7 @@ struct BmRender_PresentInfo
 
 struct BmRender_DescriptorSetLayoutBindingData
 {
-	VkDescriptorType DescriptorType;
+	BmRender_DescriptorType DescriptorType;
 };
 
 struct BmRender_DescriptorSetLayoutData
@@ -344,7 +583,7 @@ struct BmRender_ShaderData
 struct BmRender_ImageResource
 {
 	VkDeviceMemory Memory;
-	VkFormat Format;
+	BmRender_Format Format;
 	u64 Size;
 	BmRender_ImageType Type;
 	u32 Width;
@@ -399,7 +638,7 @@ void BmRender_QueueSubmit(BmRender_Queue Queue, u32 SubmitCount, const BmRender_
 BmRender_SwapchainResult BmRender_QueuePresent(BmRender_Queue Queue, const BmRender_PresentInfo* pPresentInfo);
 BmRender_SwapchainResult BmRender_AcquireNextSwapchainImage(u64 Timeout, BmRender_Semaphore Semaphore, VkFence Fence, u32* pImageIndex);
 
-VkSurfaceFormatKHR BmRender_GetSurfaceFormat();
+BmRender_SurfaceFormat BmRender_GetSurfaceFormat();
 BmRender_Image BmRender_GetSwapchainImage(u32 Index);
 BmRender_ImageView BmRender_GetSwapchainImageView(u32 Index);
 VkExtent2D BmRender_GetSwapchainExtent();
@@ -424,8 +663,8 @@ BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, MemoryPropertyFlag Mem
 BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, BmRender_PipelineSyncStage BufferStage);
 BmRender_GPUBuffer BmRender_CreateIndirectDrawBuffer(u64 Size, MemoryPropertyFlag MemoryFlag);
 BmRender_GPUBuffer BmRender_CreateStagingBuffer(u64 Size);
-BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, VkFormat Format, BmRender_ImageType Type);
-BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, VkFormat Format, BmRender_ImageType Type, u32 ArrayLayers);
+BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type);
+BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, u32 ArrayLayers);
 BmRender_ImageView BmRender_CreateImageView2D(BmRender_Image Handle);
 BmRender_ImageView BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 BaseLayer, u32 LayerCount);
 BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout LayoutHandle, BmRender_DescriptorPool PoolHandle);
@@ -440,7 +679,7 @@ void BmRender_UpdateHostCompatibleBuffer(BmRender_GPUBuffer Buffer, u64 BufferOf
 void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, const BmRender_DescriptorSetBinding* Bindings, u32 BindingsCount);
 
 BmRender_FenceStatus BmRender_GetFenceStatus(BmRender_Fence Handle);
-BmRender_WaitResult BmRender_WaitForFences(BmRender_Fence Handle, VkBool32 WaitAll, u64 Timeout);
+BmRender_WaitResult BmRender_WaitForFences(BmRender_Fence Handle, bool WaitAll, u64 Timeout);
 void BmRender_ResetFences(BmRender_Fence Handle);
 void BmRender_GetSemaphoreCounterValue(BmRender_Semaphore Handle, u64* pValue);
 void BmRender_BeginCommandBuffer(BmRender_CommandBuffer Handle);
@@ -457,7 +696,7 @@ void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeli
 void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, VkShaderStageFlags StageFlags, u32 Offset, u32 Size, const void* pValues);
 void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets);
 void BmRender_RecordBindVertexBuffers(BmRender_CommandBuffer CommandBuffer, u32 FirstBinding, u32 BindingCount, const BmRender_GPUBuffer* Buffers, const u64* Offsets);
-void BmRender_RecordBindIndexBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer Buffer, u64 Offset, VkIndexType IndexType);
+void BmRender_RecordBindIndexBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer Buffer, u64 Offset, BmRender_IndexType IndexType);
 void BmRender_Draw(BmRender_CommandBuffer CommandBuffer, u32 VertexCount, u32 InstanceCount, u32 FirstVertex, u32 FirstInstance);
 void BmRender_DrawIndexed(BmRender_CommandBuffer CommandBuffer, u32 IndexCount, u32 InstanceCount, u32 FirstIndex, u32 VertexOffset, u32 FirstInstance);
 

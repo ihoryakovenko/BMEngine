@@ -93,7 +93,7 @@ VkBuffer CreateBuffer(VkDevice Device, u64 Size, BufferUsageFlag Flag, const VkA
 
 void UpdateHostCompatibleBufferMemory(VkDevice Device, VkDeviceMemory Memory, VkDeviceSize DataSize, VkDeviceSize Offset, const void* Data);
 
-u32 CalculateFormatSize(VkFormat Format);
+u32 CalculateFormatSize(BmRender_Format Format);
 
 bool CreateDebugUtilsMessengerEXT(VkInstance Instance, const VkDebugUtilsMessengerCreateInfoEXT* CreateInfo,
 	const VkAllocationCallbacks* Allocator, VkDebugUtilsMessengerEXT* InDebugMessenger);
@@ -111,3 +111,18 @@ VkImageAspectFlags ImageTypeToVkImageAspectFlags(BmRender_ImageType Type);
 VkDescriptorPoolCreateFlags DescriptorPoolTypeToVkFlags(BmRender_DescriptorPoolType Type);
 VkMemoryPropertyFlags MemoryPropertyFlagToVkFlags(MemoryPropertyFlag Flag);
 s32 GetQueueFamilyIndexFromQueueType(BmRender_QueueType QueueType, const PhysicalDeviceIndices& Indices);
+
+VkFilter FilterToVkFilter(BmRender_Filter Filter);
+VkSamplerMipmapMode SamplerMipmapModeToVk(BmRender_SamplerMipmapMode Mode);
+VkSamplerAddressMode SamplerAddressModeToVk(BmRender_SamplerAddressMode Mode);
+VkCompareOp CompareOpToVk(BmRender_CompareOp Op);
+VkBorderColor BorderColorToVk(BmRender_BorderColor Color);
+VkImageLayout ImageLayoutToVk(BmRender_ImageLayout Layout);
+VkAttachmentLoadOp AttachmentLoadOpToVk(BmRender_AttachmentLoadOp Op);
+VkAttachmentStoreOp AttachmentStoreOpToVk(BmRender_AttachmentStoreOp Op);
+VkVertexInputRate VertexInputRateToVk(BmRender_VertexInputRate Rate);
+VkDescriptorType DescriptorTypeToVk(BmRender_DescriptorType Type);
+VkIndexType IndexTypeToVk(BmRender_IndexType Type);
+BmRender_Format VkFormatToBmRender(VkFormat Format);
+VkSurfaceFormatKHR SurfaceFormatToVk(BmRender_SurfaceFormat SurfaceFormat);
+BmRender_SurfaceFormat VkSurfaceFormatToBmRender(VkSurfaceFormatKHR SurfaceFormat);

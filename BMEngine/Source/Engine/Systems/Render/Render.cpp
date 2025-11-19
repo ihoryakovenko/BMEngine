@@ -13,6 +13,10 @@
 #include "Util/Settings.h"
 #include "Util/Math.h"
 
+#include "Engine/Systems/Memory/MemoryManagmentSystem.h"
+
+#include <RenderHelper.h>
+
 #include <random>
 #include <mutex>
 
@@ -35,13 +39,20 @@ namespace Render
 	{
 		ImGui_ImplGlfw_InitForVulkan(Wnd, true);
 
+		AttachmentData* AttachmentDataPtr = DeferredPass::GetAttachmentData();
+		VkFormat* ColorAttachmentFormats = (VkFormat*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), AttachmentDataPtr->ColorAttachmentCount * sizeof(VkFormat));
+		for (u32 i = 0; i < AttachmentDataPtr->ColorAttachmentCount; ++i)
+		{
+			ColorAttachmentFormats[i] = FormatToVk(AttachmentDataPtr->ColorAttachmentFormats[i]);
+		}
+
 		VkPipelineRenderingCreateInfo RenderingInfo = { };
 		RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
 		RenderingInfo.pNext = nullptr;
-		RenderingInfo.colorAttachmentCount = DeferredPass::GetAttachmentData()->ColorAttachmentCount;
-		RenderingInfo.pColorAttachmentFormats = DeferredPass::GetAttachmentData()->ColorAttachmentFormats;
-		RenderingInfo.depthAttachmentFormat = DeferredPass::GetAttachmentData()->DepthAttachmentFormat;
-		RenderingInfo.stencilAttachmentFormat = DeferredPass::GetAttachmentData()->DepthAttachmentFormat;
+		RenderingInfo.colorAttachmentCount = AttachmentDataPtr->ColorAttachmentCount;
+		RenderingInfo.pColorAttachmentFormats = ColorAttachmentFormats;
+		RenderingInfo.depthAttachmentFormat = FormatToVk(AttachmentDataPtr->DepthAttachmentFormat);
+		RenderingInfo.stencilAttachmentFormat = FormatToVk(AttachmentDataPtr->StencilAttachmentFormat);
 
 		VkDescriptorPoolSize PoolSizes[] =
 		{
@@ -85,7 +96,7 @@ namespace Render
 			
 			BmRender_DescriptorSetBinding ShadowMapBinding;
 			ShadowMapBinding.ImageBinding.Sampler = Samplers["ShadowMap"];
-			ShadowMapBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			ShadowMapBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
 			ShadowMapBinding.ImageBinding.ImageView = MeshPipeline->ShadowMapArrayImageInterface[i];
 			ShadowMapBinding.BindingCount = 1;
 			ShadowMapBinding.DstArrayElement = 0;
@@ -213,7 +224,7 @@ namespace Render
 			};
 	
 			BmRender_RecordBindVertexBuffers(CommandBuffer, 0, 2, Buffers, Offsets);
-			BmRender_RecordBindIndexBuffer(CommandBuffer, Entity->IndexBufferEntry.GPUBufferHandle, Entity->IndexBufferEntry.BufferOffset, VK_INDEX_TYPE_UINT32);
+			BmRender_RecordBindIndexBuffer(CommandBuffer, Entity->IndexBufferEntry.GPUBufferHandle, Entity->IndexBufferEntry.BufferOffset, BmRender_IndexType::Uint32);
 			BmRender_DrawIndexed(CommandBuffer, Entity->IndicesCount, Entity->Instances, 0, 0, 0);
 		}
 	}
@@ -366,9 +377,9 @@ namespace DeferredPass
 	void Init(BmRender_DescriptorPool MainPool)
 	{
 		PipelineAttachmentData.ColorAttachmentCount = 1;
-		PipelineAttachmentData.ColorAttachmentFormats[0] = BmRender_GetSurfaceFormat().format;
-		PipelineAttachmentData.DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
-		PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+		PipelineAttachmentData.ColorAttachmentFormats[0] = BmRender_GetSurfaceFormat().Format;
+		PipelineAttachmentData.DepthAttachmentFormat = BmRender_Format::Undefined;
+		PipelineAttachmentData.StencilAttachmentFormat = BmRender_Format::Undefined;
 
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
@@ -380,14 +391,14 @@ namespace DeferredPass
 			
 			BmRender_DescriptorSetBinding ColorBinding;
 			ColorBinding.ImageBinding.Sampler = Samplers["ColorAttachment"];
-			ColorBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			ColorBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
 			ColorBinding.ImageBinding.ImageView = DeferredInputColorImageInterface[i];
 			ColorBinding.BindingCount = 1;
 			ColorBinding.DstArrayElement = 0;
 
 			BmRender_DescriptorSetBinding DepthBinding;
 			DepthBinding.ImageBinding.Sampler = Samplers["DepthAttachment"];
-			DepthBinding.ImageBinding.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			DepthBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
 			DepthBinding.ImageBinding.ImageView = DeferredInputDepthImageInterface[i];
 			DepthBinding.BindingCount = 1;
 			DepthBinding.DstArrayElement = 0;
@@ -444,8 +455,8 @@ namespace DeferredPass
 
 		BmRender_RenderingColorAttachment SwapchainColorAttachment = { };
 		SwapchainColorAttachment.ImageView = BmRender_GetSwapchainImageView(Render::CurrentImageIndex);
-		SwapchainColorAttachment.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		SwapchainColorAttachment.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+		SwapchainColorAttachment.LoadOp = BmRender_AttachmentLoadOp::Clear;
+		SwapchainColorAttachment.StoreOp = BmRender_AttachmentStoreOp::Store;
 		SwapchainColorAttachment.ClearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 		BmRender_RenderingInfo RenderingInfo{ };
@@ -551,7 +562,7 @@ namespace LightningPass
 		PipelineResourceInfo ResourceInfo;
 		ResourceInfo.PipelineAttachmentData.ColorAttachmentCount = 0;
 		ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = DepthFormat;
-		ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+		ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = BmRender_Format::Undefined;
 
 		// Create vectors to hold pipeline data
 		std::vector<BmRender_ShaderStageDescription> shaderStages;
@@ -599,8 +610,8 @@ namespace LightningPass
 
 			BmRender_RenderingDepthAttachment DepthAttachment{ };
 			DepthAttachment.ImageView = DepthImageView;
-			DepthAttachment.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			DepthAttachment.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+			DepthAttachment.LoadOp = BmRender_AttachmentLoadOp::Clear;
+			DepthAttachment.StoreOp = BmRender_AttachmentStoreOp::Store;
 			DepthAttachment.ClearValue = { 1.0f, 0 };
 
 			BmRender_RenderingInfo RenderingInfo{ };
@@ -664,14 +675,14 @@ namespace MainPass
 
 		BmRender_RenderingColorAttachment ColorAttachment = { };
 		ColorAttachment.ImageView = DeferredPass::TestDeferredInputColorImageInterface()[GetDrawSystemData()->CurrentFrame];
-		ColorAttachment.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		ColorAttachment.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+		ColorAttachment.LoadOp = BmRender_AttachmentLoadOp::Clear;
+		ColorAttachment.StoreOp = BmRender_AttachmentStoreOp::Store;
 		ColorAttachment.ClearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 		BmRender_RenderingDepthAttachment DepthAttachment = { };
 		DepthAttachment.ImageView = DeferredPass::TestDeferredInputDepthImageInterface()[GetDrawSystemData()->CurrentFrame];
-		DepthAttachment.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		DepthAttachment.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+		DepthAttachment.LoadOp = BmRender_AttachmentLoadOp::Clear;
+		DepthAttachment.StoreOp = BmRender_AttachmentStoreOp::Store;
 		DepthAttachment.ClearValue = { 1.0f, 0 };
 
 		BmRender_RenderingInfo RenderingInfo = { };
