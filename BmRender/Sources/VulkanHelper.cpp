@@ -1429,7 +1429,7 @@ VkSurfaceFormatKHR SurfaceFormatToVk(BmRender_SurfaceFormat SurfaceFormat)
 {
 	VkSurfaceFormatKHR VkSurfaceFormat;
 	VkSurfaceFormat.format = FormatToVk(SurfaceFormat.Format);
-	VkSurfaceFormat.colorSpace = SurfaceFormat.ColorSpace;
+	//VkSurfaceFormat.colorSpace = SurfaceFormat.ColorSpace;
 	return VkSurfaceFormat;
 }
 
@@ -1437,7 +1437,7 @@ BmRender_SurfaceFormat VkSurfaceFormatToBmRender(VkSurfaceFormatKHR SurfaceForma
 {
 	BmRender_SurfaceFormat BmSurfaceFormat;
 	BmSurfaceFormat.Format = VkFormatToBmRender(SurfaceFormat.format);
-	BmSurfaceFormat.ColorSpace = SurfaceFormat.colorSpace;
+	//BmSurfaceFormat.ColorSpace = SurfaceFormat.colorSpace;
 	return BmSurfaceFormat;
 }
 

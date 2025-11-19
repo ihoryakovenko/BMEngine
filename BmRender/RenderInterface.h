@@ -413,7 +413,7 @@ struct BmRender_DescriptorPoolSize
 struct BmRender_SurfaceFormat
 {
 	BmRender_Format Format;
-	VkColorSpaceKHR ColorSpace; // Keep as VkColorSpaceKHR for now, rarely used
+	//VkColorSpaceKHR ColorSpace;
 };
 
 // TODO: Check
@@ -556,13 +556,13 @@ struct BmRender_PipelineDescription
 	u32 DescriptorSetLayoutsCount;
 	u32 PushConstantRangesCount;
 
-	VkPipelineRasterizationStateCreateInfo RasterizationState; // Keep as Vk for now - complex structure
-	VkPipelineColorBlendAttachmentState ColorBlendAttachment; // Keep as Vk for now - complex structure
-	VkPipelineColorBlendStateCreateInfo ColorBlendState; // Keep as Vk for now - complex structure
-	VkPipelineDepthStencilStateCreateInfo DepthStencilState; // Keep as Vk for now - complex structure
-	VkPipelineMultisampleStateCreateInfo MultisampleState; // Keep as Vk for now - complex structure
-	VkPipelineInputAssemblyStateCreateInfo InputAssemblyState; // Keep as Vk for now - complex structure
-	VkPipelineViewportStateCreateInfo ViewportState; // Keep as Vk for now - complex structure
+	VkPipelineRasterizationStateCreateInfo RasterizationState;
+	VkPipelineColorBlendAttachmentState ColorBlendAttachment;
+	VkPipelineColorBlendStateCreateInfo ColorBlendState;
+	VkPipelineDepthStencilStateCreateInfo DepthStencilState;
+	VkPipelineMultisampleStateCreateInfo MultisampleState;
+	VkPipelineInputAssemblyStateCreateInfo InputAssemblyState;
+	VkPipelineViewportStateCreateInfo ViewportState;
 
 	BmRender_Extent2D Extent;
 	BmRender_Viewport Viewport;
