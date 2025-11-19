@@ -589,27 +589,27 @@ namespace Util
 		return OutViewportState;
 	}
 
-	VkViewport ParseViewportNode(Yaml::Node& ViewportNode)
+	BmRender_Viewport ParseViewportNode(Yaml::Node& ViewportNode)
 	{
-		VkViewport OutViewport = { };
+		BmRender_Viewport OutViewport = { };
 		if (!ViewportNode["minDepth"].IsNone())
-			OutViewport.minDepth = ViewportNode["minDepth"].As<f32>();
+			OutViewport.MinDepth = ViewportNode["minDepth"].As<f32>();
 		if (!ViewportNode["maxDepth"].IsNone())
-			OutViewport.maxDepth = ViewportNode["maxDepth"].As<f32>();
+			OutViewport.MaxDepth = ViewportNode["maxDepth"].As<f32>();
 		if (!ViewportNode["x"].IsNone())
-			OutViewport.x = ViewportNode["x"].As<f32>();
+			OutViewport.X = ViewportNode["x"].As<f32>();
 		if (!ViewportNode["y"].IsNone())
-			OutViewport.y = ViewportNode["y"].As<f32>();
+			OutViewport.Y = ViewportNode["y"].As<f32>();
 		return OutViewport;
 	}
 
-	VkRect2D ParseScissorNode(Yaml::Node& ScissorNode)
+	BmRender_Rect2D ParseScissorNode(Yaml::Node& ScissorNode)
 	{
-		VkRect2D OutScissor = { };
+		BmRender_Rect2D OutScissor = { };
 		if (!ScissorNode["offsetX"].IsNone())
-			OutScissor.offset.x = ScissorNode["offsetX"].As<s32>();
+			OutScissor.Offset.X = ScissorNode["offsetX"].As<s32>();
 		if (!ScissorNode["offsetY"].IsNone())
-			OutScissor.offset.y = ScissorNode["offsetY"].As<s32>();
+			OutScissor.Offset.Y = ScissorNode["offsetY"].As<s32>();
 		return OutScissor;
 	}
 
@@ -1116,7 +1116,7 @@ namespace Util
 		}
 	}
 
-	BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, const PipelineResourceInfo& ResourceInfo,
+	BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, BmRender_Extent2D Extent, const PipelineResourceInfo& ResourceInfo,
 		std::vector<BmRender_ShaderStageDescription>& ShaderStages,
 		std::vector<BmRender_VertexBinding>& VertexBindings,
 		std::vector<BmRender_DescriptorSetLayout>& OutDescriptorSetLayouts,
@@ -1239,12 +1239,12 @@ namespace Util
 		Description.ViewportState = ParsePipelineViewportStateNode(ViewportStateNode);
 
 		Description.Viewport = ParseViewportNode(ViewportNode);
-		Description.Viewport.width = Extent.width;
-		Description.Viewport.height = Extent.height;
+		Description.Viewport.Width = Extent.Width;
+		Description.Viewport.Height = Extent.Height;
 
 		Description.Scissor = ParseScissorNode(ScissorNode);
-		Description.Scissor.extent.width = Extent.width;
-		Description.Scissor.extent.height = Extent.height;
+		Description.Scissor.Extent.Width = Extent.Width;
+		Description.Scissor.Extent.Height = Extent.Height;
 
 		return Description;
 	}

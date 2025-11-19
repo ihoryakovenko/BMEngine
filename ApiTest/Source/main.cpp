@@ -194,18 +194,18 @@ int main()
 	PipelineDesc.InputAssemblyState.primitiveRestartEnable = VK_FALSE;
 
 	PipelineDesc.Extent = { (u32)WindowWidth, (u32)WindowHeight };
-	VkViewport Viewport = {};
-	Viewport.x = 0.0f;
-	Viewport.y = 0.0f;
-	Viewport.width = (f32)WindowWidth;
-	Viewport.height = (f32)WindowHeight;
-	Viewport.minDepth = 0.0f;
-	Viewport.maxDepth = 1.0f;
+	BmRender_Viewport Viewport = {};
+	Viewport.X = 0.0f;
+	Viewport.Y = 0.0f;
+	Viewport.Width = (f32)WindowWidth;
+	Viewport.Height = (f32)WindowHeight;
+	Viewport.MinDepth = 0.0f;
+	Viewport.MaxDepth = 1.0f;
 	PipelineDesc.Viewport = Viewport;
 
-	VkRect2D Scissor = {};
-	Scissor.offset = { 0, 0 };
-	Scissor.extent = { (u32)WindowWidth, (u32)WindowHeight };
+	BmRender_Rect2D Scissor = {};
+	Scissor.Offset = { 0, 0 };
+	Scissor.Extent = { (u32)WindowWidth, (u32)WindowHeight };
 	PipelineDesc.Scissor = Scissor;
 
 	PipelineDesc.ViewportState = {};
@@ -214,8 +214,8 @@ int main()
 	PipelineDesc.ViewportState.flags = 0;
 	PipelineDesc.ViewportState.viewportCount = 1;
 	PipelineDesc.ViewportState.scissorCount = 1;
-	PipelineDesc.ViewportState.pViewports = &PipelineDesc.Viewport;
-	PipelineDesc.ViewportState.pScissors = &PipelineDesc.Scissor;
+	PipelineDesc.ViewportState.pViewports = nullptr; // Will be set in RenderTypes.cpp
+	PipelineDesc.ViewportState.pScissors = nullptr; // Will be set in RenderTypes.cpp
 
 	BmRender_Pipeline Pipeline = BmRender_CreatePipeline(&PipelineDesc);
 
@@ -253,7 +253,7 @@ int main()
 		ColorAttachment.ClearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 		BmRender_RenderingInfo RenderingInfo = {};
-		RenderingInfo.Offset = { 0, 0 };
+		RenderingInfo.Offset = { 0, 0 }; // BmRender_Offset2D
 		RenderingInfo.Extent = BmRender_GetSwapchainExtent();
 		RenderingInfo.ColorAttachments = &ColorAttachment;
 		RenderingInfo.ColorAttachmentCount = 1;

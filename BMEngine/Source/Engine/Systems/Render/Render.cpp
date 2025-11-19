@@ -54,9 +54,9 @@ namespace Render
 		RenderingInfo.depthAttachmentFormat = FormatToVk(AttachmentDataPtr->DepthAttachmentFormat);
 		RenderingInfo.stencilAttachmentFormat = FormatToVk(AttachmentDataPtr->StencilAttachmentFormat);
 
-		VkDescriptorPoolSize PoolSizes[] =
+		BmRender_DescriptorPoolSize PoolSizes[] =
 		{
-			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 },
+			{ BmRender_DescriptorType::CombinedImageSampler, 1 },
 		};
 
 		*ImGuiPool = BmRender_CreateDescriptorPool(PoolSizes, 1, (u32)IM_ARRAYSIZE(PoolSizes), BmRender_DescriptorPoolType::CreateFree);
@@ -315,8 +315,8 @@ namespace Render
 
 		EndRecording(State.GraphicsCommandWorker);
 
-		VkPipelineStageFlags WaitStages[] = {
-			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		BmRender_PipelineSyncStage WaitStages[] = {
+			BmRender_PipelineSyncStage::ColorAttachmentOutput,
 		};
 
 		DrawSystemData* DrawSystem = GetDrawSystemData();
@@ -383,8 +383,8 @@ namespace DeferredPass
 
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
-			DeferredInputColorImage[i] = BmRender_CreateImage2D(MainScreenExtent.width, MainScreenExtent.height, ColorFormat, BmRender_ImageType::ColorAttachmentSampled);
-			DeferredInputDepthImage[i] = BmRender_CreateImage2D(MainScreenExtent.width, MainScreenExtent.height, DepthFormat, BmRender_ImageType::DepthSamplad);
+			DeferredInputColorImage[i] = BmRender_CreateImage2D(MainScreenExtent.Width, MainScreenExtent.Height, ColorFormat, BmRender_ImageType::ColorAttachmentSampled);
+			DeferredInputDepthImage[i] = BmRender_CreateImage2D(MainScreenExtent.Width, MainScreenExtent.Height, DepthFormat, BmRender_ImageType::DepthSamplad);
 			
 			DeferredInputColorImageInterface[i] = BmRender_CreateImageView2D(DeferredInputColorImage[i]);
 			DeferredInputDepthImageInterface[i] = BmRender_CreateImageView2D(DeferredInputDepthImage[i]);
@@ -536,7 +536,7 @@ namespace LightningPass
 
 	void Init(BmRender_DescriptorPool MainPool)
 	{
-		ShadowMapArray = BmRender_CreateImage2DArray(DepthViewportExtent.width, DepthViewportExtent.height, DepthFormat,
+		ShadowMapArray = BmRender_CreateImage2DArray(DepthViewportExtent.Width, DepthViewportExtent.Height, DepthFormat,
 			BmRender_ImageType::DepthSamplad, MAX_LIGHT_SOURCES * BmRender_GetSwapchainImageCount());
 
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)

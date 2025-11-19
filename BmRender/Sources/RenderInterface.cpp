@@ -76,9 +76,9 @@ BmRender_ImageView BmRender_GetSwapchainImageView(u32 Index)
 	return CoreContext->ImageViews[Index];
 }
 
-VkExtent2D BmRender_GetSwapchainExtent()
+BmRender_Extent2D BmRender_GetSwapchainExtent()
 {
-	return GetCoreContext()->SwapExtent;
+	return VkExtent2DToBmRender(GetCoreContext()->SwapExtent);
 }
 
 BmRender_Instance BmRender_GetVulkanInstance()

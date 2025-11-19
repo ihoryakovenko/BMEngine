@@ -122,7 +122,34 @@ VkAttachmentLoadOp AttachmentLoadOpToVk(BmRender_AttachmentLoadOp Op);
 VkAttachmentStoreOp AttachmentStoreOpToVk(BmRender_AttachmentStoreOp Op);
 VkVertexInputRate VertexInputRateToVk(BmRender_VertexInputRate Rate);
 VkDescriptorType DescriptorTypeToVk(BmRender_DescriptorType Type);
+BmRender_DescriptorType VkDescriptorTypeToBmRender(VkDescriptorType Type);
 VkIndexType IndexTypeToVk(BmRender_IndexType Type);
 BmRender_Format VkFormatToBmRender(VkFormat Format);
 VkSurfaceFormatKHR SurfaceFormatToVk(BmRender_SurfaceFormat SurfaceFormat);
 BmRender_SurfaceFormat VkSurfaceFormatToBmRender(VkSurfaceFormatKHR SurfaceFormat);
+
+// 2D types conversions
+VkOffset2D Offset2DToVk(BmRender_Offset2D Offset);
+BmRender_Offset2D VkOffset2DToBmRender(VkOffset2D Offset);
+VkExtent2D Extent2DToVk(BmRender_Extent2D Extent);
+BmRender_Extent2D VkExtent2DToBmRender(VkExtent2D Extent);
+VkViewport ViewportToVk(BmRender_Viewport Viewport);
+BmRender_Viewport VkViewportToBmRender(VkViewport Viewport);
+VkRect2D Rect2DToVk(BmRender_Rect2D Rect);
+BmRender_Rect2D VkRect2DToBmRender(VkRect2D Rect);
+
+// Clear value conversions
+VkClearColorValue ClearColorValueToVk(BmRender_ClearColorValue ClearValue);
+BmRender_ClearColorValue VkClearColorValueToBmRender(VkClearColorValue ClearValue);
+VkClearDepthStencilValue ClearDepthStencilValueToVk(BmRender_ClearDepthStencilValue ClearValue);
+BmRender_ClearDepthStencilValue VkClearDepthStencilValueToBmRender(VkClearDepthStencilValue ClearValue);
+
+// Descriptor pool size conversion
+VkDescriptorPoolSize DescriptorPoolSizeToVk(BmRender_DescriptorPoolSize PoolSize);
+BmRender_DescriptorPoolSize VkDescriptorPoolSizeToBmRender(VkDescriptorPoolSize PoolSize);
+
+// Shader stage flags conversion
+VkShaderStageFlags ShaderStageFlagsToVk(BmRender_DescriptorShaderStage StageFlags);
+BmRender_DescriptorShaderStage VkShaderStageFlagsToBmRender(VkShaderStageFlags StageFlags);
+VkPipelineStageFlags PipelineStageFlagsToVk(BmRender_PipelineSyncStage StageFlags);
+BmRender_PipelineSyncStage VkPipelineStageFlagsToBmRender(VkPipelineStageFlags StageFlags);

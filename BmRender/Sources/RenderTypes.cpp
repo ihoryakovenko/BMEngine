@@ -229,7 +229,7 @@ BmRender_PushConstant BmRender_CreatePushConstant(BmRender_DescriptorShaderStage
 	BmRender_PushConstant Constant;
 	Constant.offset = Offset;
 	Constant.size = Size;
-	Constant.stageFlags = DescriptorShaderStageToVkShaderStage(Stage);
+	Constant.stageFlags = Stage; // Now uses BmRender_DescriptorShaderStage directly
 
 	return Constant;
 }
@@ -504,9 +504,12 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	VkPipelineColorBlendStateCreateInfo ColorBlendState = Description->ColorBlendState;
 	ColorBlendState.pAttachments = &Description->ColorBlendAttachment;
 
+	VkViewport VkViewport = ViewportToVk(Description->Viewport);
+	VkRect2D VkScissor = Rect2DToVk(Description->Scissor);
+	
 	VkPipelineViewportStateCreateInfo ViewportState = Description->ViewportState;
-	ViewportState.pViewports = &Description->Viewport;
-	ViewportState.pScissors = &Description->Scissor;
+	ViewportState.pViewports = &VkViewport;
+	ViewportState.pScissors = &VkScissor;
 
 	auto PipelineCreateInfo = (VkGraphicsPipelineCreateInfo*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkGraphicsPipelineCreateInfo));
 	*PipelineCreateInfo = { };
@@ -550,7 +553,7 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 	{
 		VkPushConstantRanges[i].offset = Description->PushConstantRanges[i].offset;
 		VkPushConstantRanges[i].size = Description->PushConstantRanges[i].size;
-		VkPushConstantRanges[i].stageFlags = Description->PushConstantRanges[i].stageFlags;
+		VkPushConstantRanges[i].stageFlags = ShaderStageFlagsToVk(Description->PushConstantRanges[i].stageFlags);
 	}
 
 	VkPipelineLayoutCreateInfo CreateInfo = { };
@@ -570,15 +573,21 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 	return CreatePipelineLayoutHandle(PipelineLayout, &LayoutData);
 }
 
-BmRender_DescriptorPool BmRender_CreateDescriptorPool(const VkDescriptorPoolSize* PoolSizes, u32 MaxSets, u32 PoolSizeCount, BmRender_DescriptorPoolType Type)
+BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolSize* PoolSizes, u32 MaxSets, u32 PoolSizeCount, BmRender_DescriptorPoolType Type)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
+
+	VkDescriptorPoolSize* VkPoolSizes = (VkDescriptorPoolSize*)Memory_LinearAllocator_Alloc(GetFrameMemory(), PoolSizeCount * sizeof(VkDescriptorPoolSize));
+	for (u32 i = 0; i < PoolSizeCount; ++i)
+	{
+		VkPoolSizes[i] = DescriptorPoolSizeToVk(PoolSizes[i]);
+	}
 
 	VkDescriptorPoolCreateInfo CreateInfo = { };
 	CreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	CreateInfo.maxSets = MaxSets;
 	CreateInfo.poolSizeCount = PoolSizeCount;
-	CreateInfo.pPoolSizes = PoolSizes;
+	CreateInfo.pPoolSizes = VkPoolSizes;
 	CreateInfo.flags = DescriptorPoolTypeToVkFlags(Type);
 	CreateInfo.pNext = nullptr;
 

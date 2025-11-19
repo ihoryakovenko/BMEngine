@@ -858,6 +858,38 @@ VkDescriptorType DescriptorTypeToVk(BmRender_DescriptorType Type)
 	}
 }
 
+BmRender_DescriptorType VkDescriptorTypeToBmRender(VkDescriptorType Type)
+{
+	switch (Type)
+	{
+		case VK_DESCRIPTOR_TYPE_SAMPLER:
+			return BmRender_DescriptorType::Sampler;
+		case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+			return BmRender_DescriptorType::CombinedImageSampler;
+		case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+			return BmRender_DescriptorType::SampledImage;
+		case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+			return BmRender_DescriptorType::StorageImage;
+		case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
+			return BmRender_DescriptorType::UniformTexelBuffer;
+		case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
+			return BmRender_DescriptorType::StorageTexelBuffer;
+		case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+			return BmRender_DescriptorType::UniformBuffer;
+		case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+			return BmRender_DescriptorType::StorageBuffer;
+		case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
+			return BmRender_DescriptorType::UniformBufferDynamic;
+		case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
+			return BmRender_DescriptorType::StorageBufferDynamic;
+		case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
+			return BmRender_DescriptorType::InputAttachment;
+		default:
+			assert(false);
+			return BmRender_DescriptorType::Sampler;
+	}
+}
+
 VkIndexType IndexTypeToVk(BmRender_IndexType Type)
 {
 	switch (Type)
@@ -1407,6 +1439,196 @@ BmRender_SurfaceFormat VkSurfaceFormatToBmRender(VkSurfaceFormatKHR SurfaceForma
 	BmSurfaceFormat.Format = VkFormatToBmRender(SurfaceFormat.format);
 	BmSurfaceFormat.ColorSpace = SurfaceFormat.colorSpace;
 	return BmSurfaceFormat;
+}
+
+// 2D types conversions
+VkOffset2D Offset2DToVk(BmRender_Offset2D Offset)
+{
+	VkOffset2D VkOffset;
+	VkOffset.x = Offset.X;
+	VkOffset.y = Offset.Y;
+	return VkOffset;
+}
+
+BmRender_Offset2D VkOffset2DToBmRender(VkOffset2D Offset)
+{
+	BmRender_Offset2D BmOffset;
+	BmOffset.X = Offset.x;
+	BmOffset.Y = Offset.y;
+	return BmOffset;
+}
+
+VkExtent2D Extent2DToVk(BmRender_Extent2D Extent)
+{
+	VkExtent2D VkExtent;
+	VkExtent.width = Extent.Width;
+	VkExtent.height = Extent.Height;
+	return VkExtent;
+}
+
+BmRender_Extent2D VkExtent2DToBmRender(VkExtent2D Extent)
+{
+	BmRender_Extent2D BmExtent;
+	BmExtent.Width = Extent.width;
+	BmExtent.Height = Extent.height;
+	return BmExtent;
+}
+
+VkViewport ViewportToVk(BmRender_Viewport Viewport)
+{
+	VkViewport VkViewport;
+	VkViewport.x = Viewport.X;
+	VkViewport.y = Viewport.Y;
+	VkViewport.width = Viewport.Width;
+	VkViewport.height = Viewport.Height;
+	VkViewport.minDepth = Viewport.MinDepth;
+	VkViewport.maxDepth = Viewport.MaxDepth;
+	return VkViewport;
+}
+
+BmRender_Viewport VkViewportToBmRender(VkViewport Viewport)
+{
+	BmRender_Viewport BmViewport;
+	BmViewport.X = Viewport.x;
+	BmViewport.Y = Viewport.y;
+	BmViewport.Width = Viewport.width;
+	BmViewport.Height = Viewport.height;
+	BmViewport.MinDepth = Viewport.minDepth;
+	BmViewport.MaxDepth = Viewport.maxDepth;
+	return BmViewport;
+}
+
+VkRect2D Rect2DToVk(BmRender_Rect2D Rect)
+{
+	VkRect2D VkRect;
+	VkRect.offset = Offset2DToVk(Rect.Offset);
+	VkRect.extent = Extent2DToVk(Rect.Extent);
+	return VkRect;
+}
+
+BmRender_Rect2D VkRect2DToBmRender(VkRect2D Rect)
+{
+	BmRender_Rect2D BmRect;
+	BmRect.Offset = VkOffset2DToBmRender(Rect.offset);
+	BmRect.Extent = VkExtent2DToBmRender(Rect.extent);
+	return BmRect;
+}
+
+// Clear value conversions
+VkClearColorValue ClearColorValueToVk(BmRender_ClearColorValue ClearValue)
+{
+	VkClearColorValue VkClearValue;
+	VkClearValue.float32[0] = ClearValue.Float32[0];
+	VkClearValue.float32[1] = ClearValue.Float32[1];
+	VkClearValue.float32[2] = ClearValue.Float32[2];
+	VkClearValue.float32[3] = ClearValue.Float32[3];
+	return VkClearValue;
+}
+
+BmRender_ClearColorValue VkClearColorValueToBmRender(VkClearColorValue ClearValue)
+{
+	BmRender_ClearColorValue BmClearValue;
+	BmClearValue.Float32[0] = ClearValue.float32[0];
+	BmClearValue.Float32[1] = ClearValue.float32[1];
+	BmClearValue.Float32[2] = ClearValue.float32[2];
+	BmClearValue.Float32[3] = ClearValue.float32[3];
+	return BmClearValue;
+}
+
+VkClearDepthStencilValue ClearDepthStencilValueToVk(BmRender_ClearDepthStencilValue ClearValue)
+{
+	VkClearDepthStencilValue VkClearValue;
+	VkClearValue.depth = ClearValue.Depth;
+	VkClearValue.stencil = ClearValue.Stencil;
+	return VkClearValue;
+}
+
+BmRender_ClearDepthStencilValue VkClearDepthStencilValueToBmRender(VkClearDepthStencilValue ClearValue)
+{
+	BmRender_ClearDepthStencilValue BmClearValue;
+	BmClearValue.Depth = ClearValue.depth;
+	BmClearValue.Stencil = ClearValue.stencil;
+	return BmClearValue;
+}
+
+// Descriptor pool size conversion
+VkDescriptorPoolSize DescriptorPoolSizeToVk(BmRender_DescriptorPoolSize PoolSize)
+{
+	VkDescriptorPoolSize VkPoolSize;
+	VkPoolSize.type = DescriptorTypeToVk(PoolSize.Type);
+	VkPoolSize.descriptorCount = PoolSize.DescriptorCount;
+	return VkPoolSize;
+}
+
+BmRender_DescriptorPoolSize VkDescriptorPoolSizeToBmRender(VkDescriptorPoolSize PoolSize)
+{
+	BmRender_DescriptorPoolSize BmPoolSize;
+	BmPoolSize.Type = VkDescriptorTypeToBmRender(PoolSize.type);
+	BmPoolSize.DescriptorCount = PoolSize.descriptorCount;
+	return BmPoolSize;
+}
+
+// Shader stage flags conversion
+VkShaderStageFlags ShaderStageFlagsToVk(BmRender_DescriptorShaderStage StageFlags)
+{
+	VkShaderStageFlags VkFlags = 0;
+	u64 FlagsValue = static_cast<u64>(StageFlags);
+	if ((FlagsValue & static_cast<u64>(BmRender_DescriptorShaderStage::Vertex)) != 0)
+		VkFlags |= VK_SHADER_STAGE_VERTEX_BIT;
+	if ((FlagsValue & static_cast<u64>(BmRender_DescriptorShaderStage::Fragment)) != 0)
+		VkFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+	if ((FlagsValue & static_cast<u64>(BmRender_DescriptorShaderStage::Compute)) != 0)
+		VkFlags |= VK_SHADER_STAGE_COMPUTE_BIT;
+	return VkFlags;
+}
+
+BmRender_DescriptorShaderStage VkShaderStageFlagsToBmRender(VkShaderStageFlags StageFlags)
+{
+	BmRender_DescriptorShaderStage BmFlags = BmRender_DescriptorShaderStage::None;
+	if (StageFlags & VK_SHADER_STAGE_VERTEX_BIT)
+		BmFlags = static_cast<BmRender_DescriptorShaderStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_DescriptorShaderStage::Vertex));
+	if (StageFlags & VK_SHADER_STAGE_FRAGMENT_BIT)
+		BmFlags = static_cast<BmRender_DescriptorShaderStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_DescriptorShaderStage::Fragment));
+	if (StageFlags & VK_SHADER_STAGE_COMPUTE_BIT)
+		BmFlags = static_cast<BmRender_DescriptorShaderStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_DescriptorShaderStage::Compute));
+	return BmFlags;
+}
+
+VkPipelineStageFlags PipelineStageFlagsToVk(BmRender_PipelineSyncStage StageFlags)
+{
+	VkPipelineStageFlags VkFlags = 0;
+	u64 FlagsValue = static_cast<u64>(StageFlags);
+	if ((FlagsValue & static_cast<u64>(BmRender_PipelineSyncStage::TopOfPipe)) != 0)
+		VkFlags |= VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+	if ((FlagsValue & static_cast<u64>(BmRender_PipelineSyncStage::VertexShader)) != 0)
+		VkFlags |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+	if ((FlagsValue & static_cast<u64>(BmRender_PipelineSyncStage::FragmentShader)) != 0)
+		VkFlags |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	if ((FlagsValue & static_cast<u64>(BmRender_PipelineSyncStage::ColorAttachmentOutput)) != 0)
+		VkFlags |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	if ((FlagsValue & static_cast<u64>(BmRender_PipelineSyncStage::ComputeShader)) != 0)
+		VkFlags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+	if ((FlagsValue & static_cast<u64>(BmRender_PipelineSyncStage::BottomOfPipe)) != 0)
+		VkFlags |= VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	return VkFlags;
+}
+
+BmRender_PipelineSyncStage VkPipelineStageFlagsToBmRender(VkPipelineStageFlags StageFlags)
+{
+	BmRender_PipelineSyncStage BmFlags = BmRender_PipelineSyncStage::None;
+	if (StageFlags & VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT)
+		BmFlags = static_cast<BmRender_PipelineSyncStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_PipelineSyncStage::TopOfPipe));
+	if (StageFlags & VK_PIPELINE_STAGE_VERTEX_SHADER_BIT)
+		BmFlags = static_cast<BmRender_PipelineSyncStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_PipelineSyncStage::VertexShader));
+	if (StageFlags & VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+		BmFlags = static_cast<BmRender_PipelineSyncStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_PipelineSyncStage::FragmentShader));
+	if (StageFlags & VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+		BmFlags = static_cast<BmRender_PipelineSyncStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_PipelineSyncStage::ColorAttachmentOutput));
+	if (StageFlags & VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT)
+		BmFlags = static_cast<BmRender_PipelineSyncStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_PipelineSyncStage::ComputeShader));
+	if (StageFlags & VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT)
+		BmFlags = static_cast<BmRender_PipelineSyncStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_PipelineSyncStage::BottomOfPipe));
+	return BmFlags;
 }
 
 bool CheckFormats(VkPhysicalDevice PhDevice)

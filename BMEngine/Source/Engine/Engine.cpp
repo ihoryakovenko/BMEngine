@@ -311,19 +311,19 @@ namespace Engine
 		
 		// Create MainPool using stack array
 		const u32 PoolSizeCount = 11;
-		VkDescriptorPoolSize TotalPassPoolSizes[PoolSizeCount];
+		BmRender_DescriptorPoolSize TotalPassPoolSizes[PoolSizeCount];
 		u32 TotalDescriptorLayouts = 21;
-		TotalPassPoolSizes[0] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		TotalPassPoolSizes[1] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		TotalPassPoolSizes[2] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		TotalPassPoolSizes[3] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3 };
-		TotalPassPoolSizes[4] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3 };
-		TotalPassPoolSizes[5] = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3 };
-		TotalPassPoolSizes[6] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		TotalPassPoolSizes[7] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		TotalPassPoolSizes[8] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
-		TotalPassPoolSizes[9] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 256 };
-		TotalPassPoolSizes[10] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 };
+		TotalPassPoolSizes[0] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[1] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[2] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[3] = { BmRender_DescriptorType::InputAttachment, 3 };
+		TotalPassPoolSizes[4] = { BmRender_DescriptorType::InputAttachment, 3 };
+		TotalPassPoolSizes[5] = { BmRender_DescriptorType::InputAttachment, 3 };
+		TotalPassPoolSizes[6] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[7] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[8] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[9] = { BmRender_DescriptorType::CombinedImageSampler, 256 };
+		TotalPassPoolSizes[10] = { BmRender_DescriptorType::UniformBuffer, 3 };
 
 		u32 TotalDescriptorCount = TotalDescriptorLayouts * 3;
 		TotalDescriptorCount += 256;
@@ -499,7 +499,7 @@ namespace Engine
 	void SetUpScene()
 	{
 		MainCamera.Fov = 45.0f;
-		MainCamera.AspectRatio = (float)MainScreenExtent.width / (float)MainScreenExtent.height;
+		MainCamera.AspectRatio = (float)MainScreenExtent.Width / (float)MainScreenExtent.Height;
 
 		MainCamera.Position = glm::vec3(0.0f, 0.0f, 20.0f);
 		MainCamera.Front = glm::vec3(0.0f, 0.0f, -1.0f);

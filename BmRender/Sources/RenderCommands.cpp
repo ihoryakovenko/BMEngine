@@ -252,7 +252,7 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 		VkAttachment->imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		VkAttachment->loadOp = AttachmentLoadOpToVk(Attachment.LoadOp);
 		VkAttachment->storeOp = AttachmentStoreOpToVk(Attachment.StoreOp);
-		VkAttachment->clearValue.color = Attachment.ClearValue;
+		VkAttachment->clearValue.color = ClearColorValueToVk(Attachment.ClearValue);
 	}
 
 	VkRenderingAttachmentInfo DepthAttachmentInfo = { };
@@ -265,15 +265,15 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 		DepthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthAttachmentInfo.loadOp = AttachmentLoadOpToVk(Attachment.LoadOp);
 		DepthAttachmentInfo.storeOp = AttachmentStoreOpToVk(Attachment.StoreOp);
-		DepthAttachmentInfo.clearValue.depthStencil = Attachment.ClearValue;
+		DepthAttachmentInfo.clearValue.depthStencil = ClearDepthStencilValueToVk(Attachment.ClearValue);
 
 		DepthAttachment = &DepthAttachmentInfo;
 	}
 
 	VkRenderingInfo RenderingInfo = { };
 	RenderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-	RenderingInfo.renderArea.offset = pRenderingInfo->Offset;
-	RenderingInfo.renderArea.extent = pRenderingInfo->Extent;
+	RenderingInfo.renderArea.offset = Offset2DToVk(pRenderingInfo->Offset);
+	RenderingInfo.renderArea.extent = Extent2DToVk(pRenderingInfo->Extent);
 	RenderingInfo.layerCount = 1;
 	RenderingInfo.colorAttachmentCount = pRenderingInfo->ColorAttachmentCount;
 	RenderingInfo.pColorAttachments = ColorAttachments;
@@ -289,11 +289,11 @@ void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeli
 	vkCmdBindPipeline(VkCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipeline)Pipeline);
 }
 
-void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, VkShaderStageFlags StageFlags, u32 Offset, u32 Size, const void* pValues)
+void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* pValues)
 {
 	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
 	VkPipelineLayout Layout = (VkPipelineLayout)PipelineLayout;
-	vkCmdPushConstants(VkCmdBuffer, Layout, StageFlags, Offset, Size, pValues);
+	vkCmdPushConstants(VkCmdBuffer, Layout, ShaderStageFlagsToVk(StageFlags), Offset, Size, pValues);
 }
 
 void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets)
@@ -363,11 +363,21 @@ void BmRender_QueueSubmit(BmRender_Queue Queue, u32 SubmitCount, const BmRender_
 		NewTimelineInfo.waitSemaphoreValueCount = TotalWaitSemaphoreCount;
 		NewTimelineInfo.signalSemaphoreValueCount = TotalSignalSemaphoreCount;
 
+		VkPipelineStageFlags* WaitDstStageFlags = nullptr;
+		if (Submit.WaitDstStageFlags != nullptr)
+		{
+			WaitDstStageFlags = (VkPipelineStageFlags*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkPipelineStageFlags) * TotalWaitSemaphoreCount);
+			for (u32 j = 0; j < TotalWaitSemaphoreCount; ++j)
+			{
+				WaitDstStageFlags[j] = PipelineStageFlagsToVk(Submit.WaitDstStageFlags[j]);
+			}
+		}
+
 		VkSubmit = { };
 		VkSubmit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		VkSubmit.pNext = &NewTimelineInfo;
 		VkSubmit.waitSemaphoreCount = TotalWaitSemaphoreCount;
-		VkSubmit.pWaitDstStageMask = Submit.WaitDstStageFlags;
+		VkSubmit.pWaitDstStageMask = WaitDstStageFlags;
 		VkSubmit.commandBufferCount = Submit.CommandBufferCount;
 		VkSubmit.signalSemaphoreCount = TotalSignalSemaphoreCount;
 
@@ -452,13 +462,14 @@ BmRender_SwapchainResult BmRender_QueuePresent(BmRender_Queue Queue, const BmRen
 	}
 }
 
-BmRender_SwapchainResult BmRender_AcquireNextSwapchainImage(u64 Timeout, BmRender_Semaphore Semaphore, VkFence Fence, u32* pImageIndex)
+BmRender_SwapchainResult BmRender_AcquireNextSwapchainImage(u64 Timeout, BmRender_Semaphore Semaphore, BmRender_Fence Fence, u32* pImageIndex)
 {
 	VulkanCoreContext* CoreContext = GetCoreContext();
 	VkDevice Device = CoreContext->LogicalDevice;
 
 	VkSwapchainKHR Swapchain = CoreContext->VulkanSwapchain;
-	VkResult Result = vkAcquireNextImageKHR(Device, Swapchain, Timeout, (VkSemaphore)Semaphore, Fence, pImageIndex);
+	VkFence VkFenceHandle = Fence != nullptr ? (VkFence)Fence : VK_NULL_HANDLE;
+	VkResult Result = vkAcquireNextImageKHR(Device, Swapchain, Timeout, (VkSemaphore)Semaphore, VkFenceHandle, pImageIndex);
 
 	if (Result == VK_SUCCESS)
 	{

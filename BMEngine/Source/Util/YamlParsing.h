@@ -254,8 +254,8 @@ namespace Util
 	VkPipelineMultisampleStateCreateInfo ParsePipelineMultisampleNode(Yaml::Node& MultisampleNode);
 	VkPipelineInputAssemblyStateCreateInfo ParsePipelineInputAssemblyNode(Yaml::Node& InputAssemblyNode);
 	VkPipelineViewportStateCreateInfo ParsePipelineViewportStateNode(Yaml::Node& ViewportStateNode);
-	VkViewport ParseViewportNode(Yaml::Node& ViewportNode);
-	VkRect2D ParseScissorNode(Yaml::Node& ScissorNode);
+	BmRender_Viewport ParseViewportNode(Yaml::Node& ViewportNode);
+	BmRender_Rect2D ParseScissorNode(Yaml::Node& ScissorNode);
 
 	bool ParseBool(const char* Value, u32 Length);
 	VkPolygonMode ParsePolygonMode(const char* Value, u32 Length);
@@ -285,7 +285,7 @@ namespace Util
 	ShaderType ParseShaderType(const char* Value, u32 Length);
 	std::vector<DescriptorSetLayout> ParseDescriptorSetLayouts(Yaml::Node& DescriptorSetLayoutsNode);
 
-	BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, VkExtent2D Extent, const PipelineResourceInfo& ResourceInfo,
+	BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, BmRender_Extent2D Extent, const PipelineResourceInfo& ResourceInfo,
 		std::vector<BmRender_ShaderStageDescription>& ShaderStages,
 		std::vector<BmRender_VertexBinding>& VertexBindings,
 		std::vector<BmRender_DescriptorSetLayout>& DescriptorSetLayouts,

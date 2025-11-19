@@ -97,7 +97,7 @@ u32 AcquireNextSwapchainImage(u32 CurrentFrame)
 	DrawSystemData* DrawSystem = GetDrawSystemData();
 
 	u32 ImageIndex;
-	BmRender_AcquireNextSwapchainImage(UINT64_MAX, DrawSystem->ImagesAvailable[CurrentFrame], VK_NULL_HANDLE, &ImageIndex);
+	BmRender_AcquireNextSwapchainImage(UINT64_MAX, DrawSystem->ImagesAvailable[CurrentFrame], nullptr, &ImageIndex);
 
 	return ImageIndex;
 }
