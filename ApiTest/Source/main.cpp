@@ -125,73 +125,42 @@ int main()
 	PipelineDesc.PushConstantRangesCount = 0;
 
 	PipelineDesc.RasterizationState = {};
-	PipelineDesc.RasterizationState.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	PipelineDesc.RasterizationState.pNext = nullptr;
-	PipelineDesc.RasterizationState.flags = 0;
-	PipelineDesc.RasterizationState.depthClampEnable = VK_FALSE;
-	PipelineDesc.RasterizationState.rasterizerDiscardEnable = VK_FALSE;
-	PipelineDesc.RasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
+	PipelineDesc.RasterizationState.depthClampEnable = false;
+	PipelineDesc.RasterizationState.rasterizerDiscardEnable = false;
+	PipelineDesc.RasterizationState.polygonMode = BmRender_PolygonMode::Fill;
 	PipelineDesc.RasterizationState.lineWidth = 1.0f;
-	PipelineDesc.RasterizationState.cullMode = VK_CULL_MODE_NONE;
-	PipelineDesc.RasterizationState.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	PipelineDesc.RasterizationState.depthBiasEnable = VK_FALSE;
-	PipelineDesc.RasterizationState.depthBiasConstantFactor = 0.0f;
-	PipelineDesc.RasterizationState.depthBiasClamp = 0.0f;
-	PipelineDesc.RasterizationState.depthBiasSlopeFactor = 0.0f;
+	PipelineDesc.RasterizationState.cullMode = BmRender_CullModeFlags::None;
+	PipelineDesc.RasterizationState.frontFace = BmRender_FrontFace::CounterClockwise;
+	PipelineDesc.RasterizationState.depthBiasEnable = false;
 
 	PipelineDesc.ColorBlendAttachment = {};
-	PipelineDesc.ColorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | 
-	                                                   VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	PipelineDesc.ColorBlendAttachment.blendEnable = VK_FALSE;
-	PipelineDesc.ColorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	PipelineDesc.ColorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	PipelineDesc.ColorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-	PipelineDesc.ColorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-	PipelineDesc.ColorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	PipelineDesc.ColorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+	PipelineDesc.ColorBlendAttachment.colorWriteMask = BmRender_ColorComponentFlags::RGBA;
+	PipelineDesc.ColorBlendAttachment.blendEnable = false;
+	PipelineDesc.ColorBlendAttachment.srcColorBlendFactor = BmRender_BlendFactor::SrcAlpha;
+	PipelineDesc.ColorBlendAttachment.dstColorBlendFactor = BmRender_BlendFactor::OneMinusSrcAlpha;
+	PipelineDesc.ColorBlendAttachment.colorBlendOp = BmRender_BlendOp::Add;
+	PipelineDesc.ColorBlendAttachment.srcAlphaBlendFactor = BmRender_BlendFactor::One;
+	PipelineDesc.ColorBlendAttachment.dstAlphaBlendFactor = BmRender_BlendFactor::Zero;
+	PipelineDesc.ColorBlendAttachment.alphaBlendOp = BmRender_BlendOp::Add;
 
 	PipelineDesc.ColorBlendState = {};
-	PipelineDesc.ColorBlendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	PipelineDesc.ColorBlendState.pNext = nullptr;
-	PipelineDesc.ColorBlendState.flags = 0;
-	PipelineDesc.ColorBlendState.logicOpEnable = VK_FALSE;
-	PipelineDesc.ColorBlendState.logicOp = VK_LOGIC_OP_COPY;
+	PipelineDesc.ColorBlendState.logicOpEnable = false;
 	PipelineDesc.ColorBlendState.attachmentCount = 1;
-	PipelineDesc.ColorBlendState.pAttachments = &PipelineDesc.ColorBlendAttachment;
-	PipelineDesc.ColorBlendState.blendConstants[0] = 0.0f;
-	PipelineDesc.ColorBlendState.blendConstants[1] = 0.0f;
-	PipelineDesc.ColorBlendState.blendConstants[2] = 0.0f;
-	PipelineDesc.ColorBlendState.blendConstants[3] = 0.0f;
 
 	PipelineDesc.DepthStencilState = {};
-	PipelineDesc.DepthStencilState.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-	PipelineDesc.DepthStencilState.pNext = nullptr;
-	PipelineDesc.DepthStencilState.flags = 0;
-	PipelineDesc.DepthStencilState.depthTestEnable = VK_FALSE;
-	PipelineDesc.DepthStencilState.depthWriteEnable = VK_FALSE;
-	PipelineDesc.DepthStencilState.depthCompareOp = VK_COMPARE_OP_LESS;
-	PipelineDesc.DepthStencilState.depthBoundsTestEnable = VK_FALSE;
-	PipelineDesc.DepthStencilState.stencilTestEnable = VK_FALSE;
-	PipelineDesc.DepthStencilState.front = {};
-	PipelineDesc.DepthStencilState.back = {};
+	PipelineDesc.DepthStencilState.depthTestEnable = false;
+	PipelineDesc.DepthStencilState.depthWriteEnable = false;
+	PipelineDesc.DepthStencilState.depthCompareOp = BmRender_CompareOp::Less;
+	PipelineDesc.DepthStencilState.depthBoundsTestEnable = false;
+	PipelineDesc.DepthStencilState.stencilTestEnable = false;
 
 	PipelineDesc.MultisampleState = {};
-	PipelineDesc.MultisampleState.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	PipelineDesc.MultisampleState.pNext = nullptr;
-	PipelineDesc.MultisampleState.flags = 0;
-	PipelineDesc.MultisampleState.sampleShadingEnable = VK_FALSE;
-	PipelineDesc.MultisampleState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-	PipelineDesc.MultisampleState.minSampleShading = 1.0f;
-	PipelineDesc.MultisampleState.pSampleMask = nullptr;
-	PipelineDesc.MultisampleState.alphaToCoverageEnable = VK_FALSE;
-	PipelineDesc.MultisampleState.alphaToOneEnable = VK_FALSE;
+	PipelineDesc.MultisampleState.sampleShadingEnable = false;
+	PipelineDesc.MultisampleState.rasterizationSamples = BmRender_SampleCount::Count1;
 
 	PipelineDesc.InputAssemblyState = {};
-	PipelineDesc.InputAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	PipelineDesc.InputAssemblyState.pNext = nullptr;
-	PipelineDesc.InputAssemblyState.flags = 0;
-	PipelineDesc.InputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	PipelineDesc.InputAssemblyState.primitiveRestartEnable = VK_FALSE;
+	PipelineDesc.InputAssemblyState.topology = BmRender_PrimitiveTopology::TriangleList;
+	PipelineDesc.InputAssemblyState.primitiveRestartEnable = false;
 
 	PipelineDesc.Extent = { (u32)WindowWidth, (u32)WindowHeight };
 	BmRender_Viewport Viewport = {};
@@ -209,13 +178,8 @@ int main()
 	PipelineDesc.Scissor = Scissor;
 
 	PipelineDesc.ViewportState = {};
-	PipelineDesc.ViewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-	PipelineDesc.ViewportState.pNext = nullptr;
-	PipelineDesc.ViewportState.flags = 0;
 	PipelineDesc.ViewportState.viewportCount = 1;
 	PipelineDesc.ViewportState.scissorCount = 1;
-	PipelineDesc.ViewportState.pViewports = nullptr; // Will be set in RenderTypes.cpp
-	PipelineDesc.ViewportState.pScissors = nullptr; // Will be set in RenderTypes.cpp
 
 	BmRender_Pipeline Pipeline = BmRender_CreatePipeline(&PipelineDesc);
 
@@ -232,7 +196,7 @@ int main()
 	{
 		glfwPollEvents();
 
-		BmRender_WaitForFences(InFlightFence, VK_TRUE, UINT64_MAX);
+		BmRender_WaitForFences(InFlightFence, true, UINT64_MAX);
 		BmRender_ResetFences(InFlightFence);
 
 		u32 ImageIndex;
@@ -271,7 +235,7 @@ int main()
 
 		BmRender_EndCommandBuffer(CommandBuffer);
 
-		VkPipelineStageFlags WaitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+		BmRender_PipelineSyncStage WaitStages[] = { BmRender_PipelineSyncStage::ColorAttachmentOutput };
 
 		BmRender_SubmitInfo SubmitInfo = {};
 		SubmitInfo.WaitDstStageFlags = WaitStages;
