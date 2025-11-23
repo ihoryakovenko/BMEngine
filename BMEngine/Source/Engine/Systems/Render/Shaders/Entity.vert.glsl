@@ -6,6 +6,10 @@ layout(location = 2) in vec3 Normal;
 layout(location = 3) in mat4 ModelMatrix;  // occupies locations 3,4,5,6
 layout(location = 7) in uint MaterialIndex;
 
+layout(push_constant) uniform PushConstants {
+	uint FrameIndex;
+} Constants;
+
 layout(set = 0, binding = 0) uniform UboViewProjection
 {
 	mat4 View;
@@ -19,6 +23,9 @@ layout(location = 3) out flat uint FragmentMaterialIndex;
 
 void main()
 {
+	int idx = int(Constants.FrameIndex);
+	int prev = (idx + 3 - 1) % 3;
+
 	FragmentTexture = TextureCoords;
 	WorldFragPos = ModelMatrix * vec4(Position, 1.0);
 	FragmentNormal = normalize(mat3(transpose(inverse(ViewProjection.View * ModelMatrix))) * Normal);

@@ -7,48 +7,47 @@
 
 namespace TransferSystem
 {
-	struct TextureTaskDescription
+	enum class TaskType
 	{
-		VkImage DstImage;
-		u32 Width;
-		u32 Height;
+		Image,
+		Data
+	};
+
+	struct ImageTaskDescription
+	{
+		BmRender_Image Handle;
 	};
 
 	struct DataTaskDescription
 	{
-		VkBuffer DstBuffer;
-		u64 DstOffset;
+		BmRender_GPUBufferBinding Handle;
+		BmRender_PipelineSyncStage StageBarrier;
 	};
 
 	struct TransferTask
 	{
 		union
 		{
-			TextureTaskDescription TextureDescr;
+			ImageTaskDescription TextureDescr;
 			DataTaskDescription DataDescr;
 		};
 
 		void* RawData;
 		u64 DataSize;
 		u32 Alignment;
-		RenderResources::ResourceType Type;
-		u32 ResourceIndex;
+		TaskType Type;
 	};
 
 	typedef void* TransferMemory;
 
-	struct ResourceTransferMemory
-	{
-		void* Memory;
-		RenderResources::ResourceType Type;
-	};
-
 	void Init();
 	void DeInit();
 
-	void Transfer();
+	u64 Transfer();
 
 	TransferMemory RequestTransferMemory(u64 Size);
 
 	void AddTask(TransferTask* Task);
+	bool IsBufferLocked(BmRender_GPUBuffer Handle);
+	bool IsImageLocked(BmRender_Image Handle);
 }

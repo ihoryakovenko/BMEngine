@@ -3,70 +3,68 @@
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 
-#include "Deprecated/VulkanInterface/VulkanInterface.h"
-#include "Engine/Systems/Render/VulkanHelper.h"
+#include <ShortTypes.h>
+
+#include <RenderInterface.h>
 
 #include "Util/EngineTypes.h"
-#include "Deprecated/FrameManager.h"
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
-#include "Engine/Systems/Render/VulkanCoreContext.h"
-
-#include "Deprecated/FrameManager.h"
+#include "RenderInterface.h"
 
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
 #include <unordered_map>
+#include <vector>
+
+#include "RenderInterface.h"
 
 namespace Render
 {
+	struct ViewProjectionBuffer
+	{
+		glm::mat4 View;
+		glm::mat4 Projection;
+	};
+
 	struct DrawEntity
 	{
-		u64 StaticMeshIndex;
-		u32 InstanceDataIndex;
+		BmRender_GPUBufferBinding VertexBufferEntry;
+		BmRender_GPUBufferBinding IndexBufferEntry;
+		BmRender_GPUBufferBinding InstanceBufferEntry;
+		u32 IndicesCount;
 		u32 Instances;
-	};
-
-	struct DrawFrames
-	{
-		VkFence Fences[VulkanHelper::MAX_DRAW_FRAMES];
-		VkCommandBuffer CommandBuffers[VulkanHelper::MAX_DRAW_FRAMES];
-		VkSemaphore ImagesAvailable[VulkanHelper::MAX_DRAW_FRAMES];
-		VkSemaphore RenderFinished[VulkanHelper::MAX_DRAW_FRAMES];
-	};
-
-	struct DrawState
-	{
-		VkCommandPool GraphicsCommandPool;
-
-		DrawFrames Frames;
-		u32 CurrentFrame;
-		u32 CurrentImageIndex;
+		
+		std::vector<BmRender_Image> ImageDependency;
+		std::vector<BmRender_GPUBufferBinding> ResourceDependency;
 	};
 
 	struct StaticMeshPipeline
 	{
-		VulkanHelper::RenderPipeline Pipeline;
-
-		VkDescriptorSetLayout StaticMeshLightLayout;
-		VkDescriptorSetLayout ShadowMapArrayLayout;
-
-		FrameManager::UniformMemoryHnadle EntityLightBufferHandle;
-
-		VkImageView ShadowMapArrayImageInterface[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+		BmRender_ImageView ShadowMapArrayImageInterface[MAX_DRAW_FRAMES];
 
 		VkPushConstantRange PushConstants;
 
-		VkDescriptorSet StaticMeshLightSet;
-		VkDescriptorSet ShadowMapArraySet[VulkanCoreContext::MAX_SWAPCHAIN_IMAGES_COUNT];
+		BmRender_DescriptorSet ShadowMapArraySet[MAX_DRAW_FRAMES];
+	};
+
+	struct DescriptorSetHandles
+	{
+		BmRender_DescriptorSet VpSet;
+		BmRender_DescriptorSet BindlesTexturesSet;
+		BmRender_DescriptorSet StaticMeshLightSet;
+		BmRender_DescriptorSet MaterialSet;
 	};
 
 	struct RenderState
 	{
-		DrawState RenderDrawState;	
+		BmRender_CommandWorker GraphicsCommandWorker;
 		StaticMeshPipeline MeshPipeline;
-		VkDescriptorPool DebugUiPool; // TODO: ?
-		Memory::FrameMemory FrameMemory;
+		DescriptorSetHandles DescriptorSets;
+		BmRender_DescriptorPool MainPool;
+		BmRender_DescriptorPool DebugUiPool; // TODO: ?
+		BmRender_GPUBufferBinding* VpHandle;
+		BmRender_GPUBufferBinding* EntityLightBufferHandle;
 	};
 
 	struct PointLight
@@ -117,7 +115,7 @@ namespace Render
 
 	struct DrawScene
 	{
-		FrameManager::ViewProjectionBuffer ViewProjection;
+		ViewProjectionBuffer ViewProjection;
 
 		DrawEntity* DrawTransparentEntities = nullptr;
 		u32 DrawTransparentEntitiesCount = 0;
@@ -128,65 +126,63 @@ namespace Render
 		LightBuffer* LightEntity = nullptr;
 
 		std::mutex TempLock;
-		Memory::DynamicHeapArray<DrawEntity> DrawEntities;
+		std::vector<DrawEntity> DrawEntities;
 	};
 
-	void TmpInitFrameMemory();
-
-	void Init(GLFWwindow* WindowHandler);
+	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferBinding* VpRegion, BmRender_GPUBufferBinding* EntityLightRegion, const DescriptorSetHandles& DescriptorSets, BmRender_DescriptorPool MainPool);
 	void DeInit();
 
-	void* FrameAlloc(u32 Size);
-
-	void Draw(DrawScene* Data);
+	void Draw(DrawScene* Data, u64 WaitSemaphoreValue);
 
 	RenderState* GetRenderState();
+
+	struct DrawEntityBatchConfig
+	{
+		BmRender_Pipeline Pipeline;
+		BmRender_PipelineLayout PipelineLayout;
+		const BmRender_DescriptorSet* DescriptorSets;
+		u32 DescriptorSetCount;
+		u32 DynamicOffsetCount;
+		const u32* DynamicOffsets;
+		BmRender_PushConstant PushConstant;
+		const void* PushConstantData;
+	};
+
+	void DrawEntityBatch(BmRender_CommandBuffer CmdBuffer, DrawScene* Scene, const DrawEntityBatchConfig& Config);
 }
 
 namespace DeferredPass
 {
-	void Init();
+	void Init(BmRender_DescriptorPool MainPool);
 	void DeInit();
-
 	void Draw();
 
 	void BeginPass();
 	void EndPass();
 
-	VkImageView* TestDeferredInputColorImageInterface();
-	VkImageView* TestDeferredInputDepthImageInterface();
+	BmRender_ImageView* TestDeferredInputColorImageInterface();
+	BmRender_ImageView* TestDeferredInputDepthImageInterface();
 
-	VulkanInterface::UniformImage* TestDeferredInputColorImage();
-	VulkanInterface::UniformImage* TestDeferredInputDepthImage();
+	BmRender_Image* TestDeferredInputColorImage();
+	BmRender_Image* TestDeferredInputDepthImage();
 
-	VulkanHelper::AttachmentData* GetAttachmentData();
+	AttachmentData* GetAttachmentData();
 }
 
 namespace LightningPass
 {
-	void Init();
+	void Init(BmRender_DescriptorPool MainPool);
 	void DeInit();
 
 	void Draw(Render::DrawScene* Scene);
-
-	VulkanInterface::UniformImage* GetShadowMapArray();
 }
 
 namespace MainPass
 {
 	void Init();
-	void DeInit();
 
 	void BeginPass();
 	void EndPass();
 
-	VulkanHelper::AttachmentData* GetAttachmentData();
-}
-
-namespace TerrainRender
-{
-	void Init();
-	void DeInit();
-
-	void Draw();
+	AttachmentData* GetAttachmentData();
 }

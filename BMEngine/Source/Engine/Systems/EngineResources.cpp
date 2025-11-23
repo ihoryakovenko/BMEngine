@@ -1,22 +1,36 @@
 #include "EngineResources.h"
 
 #include "Util/Util.h"
-#include "Engine/Systems/Render/Render.h"
-#include "Engine/Systems/Render/TransferSystem.h"
+#include "Util/YamlParsing.h"
 #include "Util/DefaultTextureData.h"
 #include <gli/gli.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
+// Extern declarations for global resource maps
+extern std::unordered_map<std::string, Util::VertexBinding_depr> VBindings;
+extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
+extern std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
+extern std::unordered_map<std::string, BmRender_Shader> Shaders;
+extern std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
+extern std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
 
 namespace EngineResources
 {
 	static std::unordered_map<u64, TextureAsset> TextureAssets;
 	static std::queue<ModelLoadRequest> ModelLoadRequests;
 	static std::mutex ModelLoadMutex;
+	static TextureAsset DefaultAsset;
+	
+	// Buffer handles
+	static BmRender_GPUBuffer VertexStageBuffer;
+	static BmRender_GPUBuffer InstanceBuffer;
+	static BmRender_GPUBuffer FrameDataBuffer;
+	static BmRender_GPUBuffer MaterialBuffer;
 
-	static u32 CreateTexture(const std::string& Path)
+	static void CreateTexture(TextureAsset& Asset)
 	{
-		gli::texture Texture = gli::load(Path);
+		gli::texture Texture = gli::load(Asset.TexturePath);
 		if (Texture.empty())
 		{
 			assert(false);
@@ -24,16 +38,27 @@ namespace EngineResources
 
 		const glm::tvec3<u32> Extent = Texture.extent();
 
-		RenderResources::TextureDescription TextureDescription;
+		BmRender_ImageDescription TextureDescription;
 		TextureDescription.Width = Extent.x;
 		TextureDescription.Height = Extent.y;
 		TextureDescription.Format = Util::GliFormatToVkFormat(Texture.format());
+		TextureDescription.ArrayLayers = 1;
+		TextureDescription.Type = BmRender_ImageType::TransferSampled;
 
-		return RenderResources::CreateTexture(&TextureDescription, Texture.data());
+		BmRender_Image ImageHandle = BmRender_CreateImage2D(Extent.x, Extent.y, Util::GliFormatToVkFormat(Texture.format()), BmRender_ImageType::TransferSampled);
+		Asset.RenderImageHandle = ImageHandle;
+		RenderResources::UpdateImageResource(Asset.RenderImageHandle, &TextureDescription, Texture.data());
+		BmRender_ImageView ViewHandle = BmRender_CreateImageView2D(Asset.RenderImageHandle);
+		Asset.RenderViewHandle = ViewHandle;
 	}
 
-	void Init()
+	void Init(BmRender_DescriptorSet BindlesTexturesSetHandle, BmRender_GPUBuffer InVertexStageBuffer, BmRender_GPUBuffer InInstanceBuffer, BmRender_GPUBuffer InFrameDataBuffer, BmRender_GPUBuffer InMaterialBuffer)
 	{
+		// Store buffer handles
+		VertexStageBuffer = InVertexStageBuffer;
+		InstanceBuffer = InInstanceBuffer;
+		FrameDataBuffer = InFrameDataBuffer;
+		MaterialBuffer = InMaterialBuffer;
 		const u64 DefaultTextureDataCount = sizeof(DefaultTextureData) / sizeof(DefaultTextureData[0]);
 		gli::texture DefaultTexture = gli::load((char const*)DefaultTextureData, DefaultTextureDataCount);
 		if (DefaultTexture.empty())
@@ -43,20 +68,57 @@ namespace EngineResources
 		const u64 DefaultAssetId = std::hash<std::string>{ }("Default");
 		const glm::tvec3<u32> DefaultAssetExtent = DefaultTexture.extent();
 
-		RenderResources::TextureDescription DefaultTextureDescription;
+		BmRender_ImageDescription DefaultTextureDescription;
 		DefaultTextureDescription.Width = DefaultAssetExtent.x;
 		DefaultTextureDescription.Height = DefaultAssetExtent.y;
 		DefaultTextureDescription.Format = Util::GliFormatToVkFormat(DefaultTexture.format());
+		DefaultTextureDescription.ArrayLayers = 1;
+		DefaultTextureDescription.Type = BmRender_ImageType::TransferSampled;
 
-		TextureAsset DefaultAsset;
-		DefaultAsset.RenderTextureIndex = RenderResources::CreateTexture(&DefaultTextureDescription, DefaultTexture.data());
+		BmRender_Image DefaultImageHandle = BmRender_CreateImage2D(DefaultAssetExtent.x, DefaultAssetExtent.y, Util::GliFormatToVkFormat(DefaultTexture.format()), BmRender_ImageType::TransferSampled);
+		DefaultAsset.RenderImageHandle = DefaultImageHandle;
 		DefaultAsset.IsCreated = true;
 
-		TextureAssets[DefaultAssetId] = DefaultAsset;
+		RenderResources::UpdateImageResource(DefaultAsset.RenderImageHandle, &DefaultTextureDescription, DefaultTexture.data());
+		BmRender_ImageView DefaultViewHandle = BmRender_CreateImageView2D(DefaultAsset.RenderImageHandle);
+		DefaultAsset.RenderViewHandle = DefaultViewHandle;
+
+		BmRender_DescriptorSetBinding DiffuseBinding;
+		DiffuseBinding.ImageBinding.Sampler = Samplers["DiffuseTexture"];
+		DiffuseBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
+		DiffuseBinding.ImageBinding.ImageView = DefaultAsset.RenderViewHandle;
+		DiffuseBinding.DstArrayElement = 0;
+		DiffuseBinding.BindingCount = 1;
+
+		BmRender_DescriptorSetBinding SpecularBinding;
+		SpecularBinding.ImageBinding.Sampler = Samplers["SpecularTexture"];
+		SpecularBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
+		SpecularBinding.ImageBinding.ImageView = DefaultAsset.RenderViewHandle;
+		SpecularBinding.DstArrayElement = 0;
+		SpecularBinding.BindingCount = 1;
+
+		BmRender_DescriptorSetBinding Bindings[] = { DiffuseBinding, SpecularBinding };
+
+		BmRender_UpdateDescriptorSet(BindlesTexturesSetHandle, Bindings, 2);
 	}
 
 	void DeInit()
 	{
+		for (auto& [id, asset] : TextureAssets)
+		{
+			if (asset.IsCreated)
+			{
+				BmRender_DestroyImageView(asset.RenderViewHandle);
+				BmRender_DestroyImage(asset.RenderImageHandle);
+			}
+		}
+
+		if (DefaultAsset.IsCreated)
+		{
+			BmRender_DestroyImageView(DefaultAsset.RenderViewHandle);
+			BmRender_DestroyImage(DefaultAsset.RenderImageHandle);
+		}
+
 		TextureAssets.clear();
 
 		std::lock_guard Lock(ModelLoadMutex);
@@ -66,9 +128,12 @@ namespace EngineResources
 		}
 	}
 
-	void Update(Render::DrawScene* TmpScene)
+	void Update(Render::DrawScene* TmpScene, BmRender_DescriptorSet BindlesTexturesSetHandle)
 	{
 		std::lock_guard Lock(ModelLoadMutex);
+
+		u32 TexturesGPUIndexCounter = 1;
+
 		while (!ModelLoadRequests.empty())
 		{
 			ModelLoadRequest Request = ModelLoadRequests.front();
@@ -77,14 +142,17 @@ namespace EngineResources
 			Util::Model3DData ModelData = Util::LoadModel3DData(Request.Path.c_str());
 			Util::Model3D Model = Util::ParseModel3D(ModelData);
 
+			u32 MateriaIndex = 0;
+			u32 InstanceIndex = 0;
 			u64 ModelVertexByteOffset = 0;
 			for (u32 i = 0; i < Model.Header.MeshCount; i++)
 			{
 				const u64 VerticesCount = Model.VerticesCounts[i];
 				const u32 IndicesCount = Model.IndicesCounts[i];
 
-				u32 AlbedoTextureIndex = 0;
-				u32 SpecularTextureIndex = 0;
+				BmRender_Image AlbedoTextureHandle = DefaultAsset.RenderImageHandle;
+				BmRender_Image SpecularTextureHandle = DefaultAsset.RenderImageHandle;
+				u32 TextureGPUIndex = 0;
 
 				if (Model.Header.MaterialCount > 0)
 				{
@@ -96,50 +164,97 @@ namespace EngineResources
 					{
 						if (!it->second.IsCreated)
 						{
-							it->second.RenderTextureIndex = CreateTexture(it->second.TexturePath);
+							TextureGPUIndex = TexturesGPUIndexCounter;
+
+							CreateTexture(it->second);
 							it->second.IsCreated = true;
+							it->second.TextureGPUIndex = TextureGPUIndex;
+
+							AlbedoTextureHandle = it->second.RenderImageHandle;
+							SpecularTextureHandle = AlbedoTextureHandle;
+
+							BmRender_DescriptorSetBinding DiffuseBinding;
+							DiffuseBinding.ImageBinding.Sampler = Samplers["DiffuseTexture"];
+							DiffuseBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
+							DiffuseBinding.ImageBinding.ImageView = it->second.RenderViewHandle;
+							DiffuseBinding.DstArrayElement = TexturesGPUIndexCounter;
+							DiffuseBinding.BindingCount = 1;
+
+							BmRender_DescriptorSetBinding SpecularBinding;
+							SpecularBinding.ImageBinding.Sampler = Samplers["SpecularTexture"];
+							SpecularBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
+							SpecularBinding.ImageBinding.ImageView = it->second.RenderViewHandle;
+							SpecularBinding.DstArrayElement = TexturesGPUIndexCounter;
+							SpecularBinding.BindingCount = 1;
+
+							BmRender_DescriptorSetBinding Bindings[] = { DiffuseBinding, SpecularBinding };
+
+							BmRender_UpdateDescriptorSet(BindlesTexturesSetHandle, Bindings, 2);
+
+							++TexturesGPUIndexCounter;
 						}
-
-						AlbedoTextureIndex = it->second.RenderTextureIndex;
-						SpecularTextureIndex = AlbedoTextureIndex;
-					}
-
-					it = TextureAssets.find(material.SpecularTextureHash);
-					if (it != TextureAssets.end())
-					{
-						if (!it->second.IsCreated)
+						else
 						{
-							it->second.RenderTextureIndex = CreateTexture(it->second.TexturePath);
-							it->second.IsCreated = true;
+							TextureGPUIndex = it->second.TextureGPUIndex;
 						}
-
-						SpecularTextureIndex = it->second.RenderTextureIndex;
 					}
+
+					//it = TextureAssets.find(material.SpecularTextureHash);
+					//if (it != TextureAssets.end())
+					//{
+					//	if (!it->second.IsCreated)
+					//	{
+					//		CreateTexture(it->second);
+					//		++TextureAssetsIndex;
+					//		it->second.IsCreated = true;
+					//	}
+
+					//	SpecularTextureHandle = it->second.RenderImageHandle;
+					//}
 				}
 
 				const u64 VertexDataSize = VerticesCount * sizeof(StaticMeshVertex) + IndicesCount * sizeof(u32);
+				const u64 VerticesSize = sizeof(StaticMeshVertex) * VerticesCount;
+				const u64 IndicesSize = IndicesCount * sizeof(u32);
+					
+				BmRender_GPUBufferBinding MeshHandle = { VertexStageBuffer, ModelVertexByteOffset, VertexDataSize };
+				RenderResources::UpdateBufferRegion(MeshHandle, 0, Model.VertexData + ModelVertexByteOffset, VertexDataSize);
 
-				RenderResources::Material Mat;
-				Mat.AlbedoTexIndex = AlbedoTextureIndex;
-				Mat.SpecularTexIndex = SpecularTextureIndex;
+				const BmRender_GPUBufferBinding VertexBufferEntry = { VertexStageBuffer, ModelVertexByteOffset, VerticesSize };
+				const BmRender_GPUBufferBinding IndexBufferEntry = { VertexStageBuffer, ModelVertexByteOffset + VerticesSize, IndicesSize };
+
+				Material Mat;
+				Mat.AlbedoTexIndex = TextureGPUIndex;
+				Mat.SpecularTexIndex = TextureGPUIndex;
 				Mat.Shininess = 32.0f;
 
-				RenderResources::InstanceData Instance;
-				Instance.MaterialIndex = RenderResources::CreateMaterial(&Mat);
+				const BmRender_GPUBufferBinding MaterialHandle = { MaterialBuffer, MateriaIndex * sizeof(Mat), sizeof(Mat) };
+				RenderResources::UpdateBufferRegion(MaterialHandle, 0, &Mat, sizeof(Mat));
+
+				InstanceData Instance;
+				Instance.MaterialIndex = MateriaIndex;
 				Instance.ModelMatrix = glm::translate(glm::mat4(1), Request.Position);
 
-				RenderResources::MeshDescription Mesh;
-				Mesh.IndicesCount = IndicesCount;
-				Mesh.VertexSize = sizeof(StaticMeshVertex);
-				Mesh.VerticesCount = VerticesCount;
+				++MateriaIndex;
+
+				const u64 InstanceOffset = InstanceIndex * sizeof(Instance);
+				const BmRender_GPUBufferBinding InstanceHandle = { InstanceBuffer, InstanceOffset, sizeof(Instance) };
+				RenderResources::UpdateBufferRegion(InstanceHandle, 0, &Instance, sizeof(Instance));
+
+				++InstanceIndex;
 
 				Render::DrawEntity Entity = { };
-				Entity.StaticMeshIndex = RenderResources::CreateStaticMesh(&Mesh, Model.VertexData + ModelVertexByteOffset);
+				Entity.VertexBufferEntry = VertexBufferEntry;
+				Entity.IndexBufferEntry = IndexBufferEntry;
+				Entity.InstanceBufferEntry = InstanceHandle;
+				Entity.IndicesCount = IndicesCount;
 				Entity.Instances = 1;
-				Entity.InstanceDataIndex = RenderResources::CreateStaticMeshInstance(&Instance);
+				Entity.ImageDependency.push_back(AlbedoTextureHandle);
+				Entity.ImageDependency.push_back(SpecularTextureHandle);
+				Entity.ResourceDependency.push_back(MaterialHandle);
 
 				std::unique_lock Lock(TmpScene->TempLock);
-				Memory::PushBackToArray(&TmpScene->DrawEntities, &Entity);
+				TmpScene->DrawEntities.push_back(Entity);
 				Lock.unlock();
 
 				ModelVertexByteOffset += VertexDataSize;
@@ -153,7 +268,7 @@ namespace EngineResources
 	{
 		TextureAsset Asset;
 		Asset.TexturePath = Path;
-		Asset.RenderTextureIndex = 0;
+		Asset.RenderImageHandle;
 		Asset.IsCreated = false;
 
 		TextureAssets[std::hash<std::string>{ }(Name)] = Asset;

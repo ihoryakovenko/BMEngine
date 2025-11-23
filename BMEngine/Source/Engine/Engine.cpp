@@ -8,6 +8,8 @@
 #include <thread>
 #include <filesystem>
 
+#include <SharedLib.h>
+
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtx/hash.hpp>
@@ -17,13 +19,22 @@
 #include "Util/Settings.h"
 #include "Engine/Systems/Render/Render.h"
 #include "Util/Util.h"
+#include "Util/YamlParsing.h"
 #include "Util/Math.h"
-#include "Deprecated/FrameManager.h"
 #include "Engine/Systems/EngineResources.h"
 #include "Engine/Systems/Render/TransferSystem.h"
 #include "Engine/Systems/Concurrency/TaskSystem.h"
 
 #include <gli/gli.hpp>
+
+// Global resource maps
+std::unordered_map<std::string, Util::VertexBinding_depr> VBindings;
+std::unordered_map<std::string, BmRender_Sampler> Samplers;
+std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
+std::unordered_map<std::string, BmRender_Shader> Shaders;
+std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
+std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
+std::unordered_map<std::string, BmRender_PushConstant> PushConstants;
 
 namespace Engine
 {
@@ -33,7 +44,7 @@ namespace Engine
 		{
 			Yaml::Node& VertexNode = (*VertexIt).second;
 
-			VulkanHelper::VertexBinding Binding = Util::ParseVertexBindingNode(Util::GetVertexBindingNode(VertexNode));
+			Util::VertexBinding_depr Binding = Util::ParseVertexBindingNode(Util::GetVertexBindingNode(VertexNode));
 
 			Yaml::Node& AttributesNode = Util::GetVertexAttributesNode(VertexNode);
 
@@ -41,13 +52,14 @@ namespace Engine
 			u32 Stride = 0;
 			for (auto AttributeIt = AttributesNode.Begin(); AttributeIt != AttributesNode.End(); AttributeIt++)
 			{
-				VulkanHelper::VertexAttribute Attribute = { };
+				Yaml::Node& TypeNode = Util::GetVertexAttributeTypeNode((*AttributeIt).second);
+				std::string TypeStr = TypeNode.As<std::string>();
+
+				VertexAttribute Attribute = { };
 				std::string AttributeName;
 				Util::ParseVertexAttributeNode((*AttributeIt).second, &Attribute, &AttributeName);
 
-				Yaml::Node& FormatNode = Util::GetVertexAttributeFormatNode((*AttributeIt).second);
-				std::string FormatStr = FormatNode.As<std::string>();
-				u32 Size = Util::CalculateFormatSizeFromString(FormatStr.c_str(), (u32)FormatStr.length());
+				u32 Size = Util::GetAttributeTypeSize(Attribute.Type);
 
 				Attribute.Offset = Offset;
 				Offset += Size;
@@ -57,7 +69,7 @@ namespace Engine
 			}
 
 			Binding.Stride = Stride;
-			RenderResources::CreateVertex((*VertexIt).first, Binding);
+			VBindings[(*VertexIt).first] = Binding;
 		}
 	}
 
@@ -66,11 +78,16 @@ namespace Engine
 		for (auto It = ShadersNode.Begin(); It != ShadersNode.End(); It++)
 		{
 			std::string ShaderPath = Util::ParseShaderNode((*It).second);
+			BmRender_PipelineShaderStage ShaderStage = Util::ParseShaderPipelineStage((*It).second);
 
 			std::vector<char> ShaderCode;
 			if (Util::OpenAndReadFileFull(ShaderPath.c_str(), ShaderCode, "rb"))
 			{
-				RenderResources::CreateShader((*It).first, reinterpret_cast<const u32*>(ShaderCode.data()), ShaderCode.size());
+				BmRender_ShaderDescription ShaderDesc = {};
+				ShaderDesc.Code = reinterpret_cast<const u32*>(ShaderCode.data());
+				ShaderDesc.CodeSize = ShaderCode.size();
+				ShaderDesc.Stage = ShaderStage;
+				Shaders[(*It).first] = BmRender_CreateShader(&ShaderDesc);
 			}
 			else
 			{
@@ -83,8 +100,58 @@ namespace Engine
 	{
 		for (auto It = SamplersNode.Begin(); It != SamplersNode.End(); It++)
 		{
-			RenderResources::SamplerDescription Data = Util::ParseSamplerNode((*It).second);
-			RenderResources::CreateSampler((*It).first, Data);
+			BmRHI_SamplerDescription Data = Util::ParseSamplerNode((*It).second);
+			Samplers[(*It).first] = BmRender_CreateSampler(&Data);
+		}
+	}
+
+	static void ParseAndCreateDescriptorSetLayouts(Yaml::Node& DescriptorSetLayoutsNode)
+	{
+		std::vector<Util::DescriptorSetLayout> Layouts = Util::ParseDescriptorSetLayouts(DescriptorSetLayoutsNode);
+		
+		for (const auto& Layout : Layouts)
+		{
+			std::vector<BmRender_DescriptorSetLayoutBinding> Bindings;
+			
+			// Convert our simple structs to Vulkan structures
+			for (u32 i = 0; i < Layout.Bindings.size(); ++i)
+			{
+				const auto& Binding = Layout.Bindings[i];
+				
+				BmRender_DescriptorSetLayoutBinding VkBinding = {};
+				VkBinding.StageFlags = Binding.StageFlags;
+				
+				// Map shader types to Vulkan descriptor types
+				switch (Binding.Type)
+				{
+				case Util::ShaderType::Uniform:
+					VkBinding.DescriptorType = (Binding.MemoryFlag == MemoryPropertyFlag::HostCompatible) ?
+						BmRender_DescriptorType::UniformBufferDynamic : BmRender_DescriptorType::UniformBuffer;
+					VkBinding.DescriptorCount = 1;
+
+					break;
+				case Util::ShaderType::Buffer:
+					VkBinding.DescriptorType = (Binding.MemoryFlag == MemoryPropertyFlag::HostCompatible) ?
+						BmRender_DescriptorType::StorageBufferDynamic : BmRender_DescriptorType::StorageBuffer;
+					VkBinding.DescriptorCount = 1;
+
+						break;
+					case Util::ShaderType::Sampler2D:
+						VkBinding.DescriptorType = BmRender_DescriptorType::CombinedImageSampler;
+						VkBinding.DescriptorCount = 1;
+
+						break;
+					case Util::ShaderType::Sampler2DArray:
+						VkBinding.DescriptorType = BmRender_DescriptorType::CombinedImageSampler;
+						VkBinding.DescriptorCount = 64;
+
+						break;
+				}
+				
+				Bindings.push_back(VkBinding);
+			}
+			
+			DescriptorSetLayouts[Layout.Name] = BmRender_CreateDescriptorSetLayout(Bindings.data(), static_cast<u32>(Bindings.size()));
 		}
 	}
 
@@ -136,13 +203,22 @@ namespace Engine
 	static glm::vec3 CameraSphericalPosition = glm::vec3(0.0f, 0.0f, 6371.0f);
 	static s32 Zoom = 4;
 
-	static FrameManager::ViewProjectionBuffer ViewProjection;
+	static Render::ViewProjectionBuffer ViewProjection;
 
 
 
 	static Render::DrawScene Scene;
 
+	static Render::DescriptorSetHandles DescriptorSets;
 
+	BmRender_GPUBufferBinding VpRegion[3];
+	BmRender_GPUBufferBinding EntityLightRegion[3];
+	
+	// Buffer handles
+	BmRender_GPUBuffer VertexStageBuffer;
+	BmRender_GPUBuffer InstanceBuffer;
+	BmRender_GPUBuffer FrameDataBuffer;
+	BmRender_GPUBuffer MaterialBuffer;
 
 	void WindowIconifyCallback(GLFWwindow* window, int iconified)
 	{
@@ -163,6 +239,8 @@ namespace Engine
 		TaskSystem::TaskGroup Group;
 		Group.TasksInGroup = 0;
 
+		u32 LastTransfer = 0;
+
 		while (!glfwWindowShouldClose(Window) && !Close)
 		{
 			glfwPollEvents();
@@ -174,13 +252,17 @@ namespace Engine
 			Update(DeltaTime);
 
 			if (!IsMinimized)
-			{
-				TaskSystem::AddTask([] () { EngineResources::Update(&Scene); }, &Group);
-				TaskSystem::AddTask(TransferSystem::Transfer, &Group);
-				Render::Draw(&Scene);
+			{			
+				EngineResources::Update(&Scene, DescriptorSets.BindlesTexturesSet);
+
+				TaskSystem::TaskLambda Task = [&]() { TransferSystem::Transfer(); };
+				TaskSystem::AddTask(&Task, &Group);
+				Render::Draw(&Scene, LastTransfer);
+
+				TaskSystem::WaitForGroup(&Group);
 			}
 
-			TaskSystem::WaitForGroup(&Group);
+			Memory_LinearAllocator_FreeMemory(Memory::GetGeneralFrameMemory());
 		}
 
 		DeInit();
@@ -217,8 +299,6 @@ namespace Engine
 	{
 		Memory::Init(true);
 
-		Render::TmpInitFrameMemory();
-
 		TaskSystem::Init();
 		//TaskSystem::SetConcurencyEnabled(false);
 
@@ -227,19 +307,89 @@ namespace Engine
 		Yaml::Node Root;
 		Yaml::Parse(Root, "./Resources/Settings/RenderResources.yaml");
 
-		RenderResources::Init(Window);
+		BmRender_Init(Window, 3);
+		
+		// Create MainPool using stack array
+		const u32 PoolSizeCount = 11;
+		BmRender_DescriptorPoolSize TotalPassPoolSizes[PoolSizeCount];
+		u32 TotalDescriptorLayouts = 21;
+		TotalPassPoolSizes[0] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[1] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[2] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[3] = { BmRender_DescriptorType::InputAttachment, 3 };
+		TotalPassPoolSizes[4] = { BmRender_DescriptorType::InputAttachment, 3 };
+		TotalPassPoolSizes[5] = { BmRender_DescriptorType::InputAttachment, 3 };
+		TotalPassPoolSizes[6] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[7] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[8] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[9] = { BmRender_DescriptorType::CombinedImageSampler, 256 };
+		TotalPassPoolSizes[10] = { BmRender_DescriptorType::UniformBuffer, 3 };
+
+		u32 TotalDescriptorCount = TotalDescriptorLayouts * 3;
+		TotalDescriptorCount += 256;
+
+		BmRender_DescriptorPool MainPool = BmRender_CreateDescriptorPool(TotalPassPoolSizes, TotalDescriptorCount, PoolSizeCount, BmRender_DescriptorPoolType::UpdateAfterBind);
+		VertexStageBuffer = BmRender_CreateVertexStageBuffer(MB4, MemoryPropertyFlag::GPULocal);
+		InstanceBuffer = BmRender_CreateInstanceBuffer(MB4, MemoryPropertyFlag::GPULocal);
+		FrameDataBuffer = BmRender_CreateUniformBuffer(MB4, MemoryPropertyFlag::HostCompatible, BmRender_PipelineSyncStage::FragmentShader);
+		MaterialBuffer = BmRender_CreateStorageBuffer(MB4, MemoryPropertyFlag::GPULocal, BmRender_PipelineSyncStage::FragmentShader);
+
+		VpRegion[0] = { FrameDataBuffer, 0, 128 };
+		VpRegion[1] = { FrameDataBuffer, 128, 128 };
+		VpRegion[2] = { FrameDataBuffer, 128 * 2, 128 };
+
+		EntityLightRegion[0] = { FrameDataBuffer, 384, 384 };
+		EntityLightRegion[1] = { FrameDataBuffer, 384 + 384, 384 };
+		EntityLightRegion[2] = { FrameDataBuffer, 384 + 384 * 2, 384 };
+
 		ParseAndCreateVertices(Util::GetVertices(Root));
 		ParseAndCreateShaders(Util::GetShaders(Root));
 		ParseAndCreateSamplers(Util::GetSamplers(Root));
-		RenderResources::CreateDescriptorLayouts(Util::GetDescriptorSetLayouts(Root));
-		RenderResources::PostCreateInit();
+		ParseAndCreateDescriptorSetLayouts(Util::GetDescriptorSetLayouts(Root));
+		Util::ParseAndCreatePushConstants(Util::GetPushConstantsFromResources(Root));
+
+		DescriptorSets = Render::DescriptorSetHandles();
+		
+		{
+			BmRender_DescriptorSetBinding Binding;
+			Binding.BufferRegions = VpRegion;
+			Binding.BindingCount = 1;
+			Binding.DstArrayElement = 0;
+
+			DescriptorSets.VpSet = BmRender_CreateDescriptorSet(DescriptorSetLayouts["FrameDataLayout"], MainPool);
+			BmRender_UpdateDescriptorSet(DescriptorSets.VpSet, &Binding, 1);
+		}
+
+		{
+			BmRender_DescriptorSetBinding Binding;
+			Binding.BufferRegions = EntityLightRegion;
+			Binding.BindingCount = 1;
+			Binding.DstArrayElement = 0;
+
+			DescriptorSets.StaticMeshLightSet = BmRender_CreateDescriptorSet(DescriptorSetLayouts["FrameDataLayout"], MainPool);
+			BmRender_UpdateDescriptorSet(DescriptorSets.StaticMeshLightSet, &Binding, 1);
+		}
+
+		{
+			BmRender_GPUBufferBinding MaterialBufferRegion = { MaterialBuffer, 0, VK_WHOLE_SIZE };
+
+			BmRender_DescriptorSetBinding Binding;
+			Binding.BufferRegions = &MaterialBufferRegion;
+			Binding.BindingCount = 1;
+			Binding.DstArrayElement = 0;
+
+			DescriptorSets.MaterialSet = BmRender_CreateDescriptorSet(DescriptorSetLayouts["MaterialLayout"], MainPool);
+			BmRender_UpdateDescriptorSet(DescriptorSets.MaterialSet, &Binding, 1);
+		}
+
+		{
+			DescriptorSets.BindlesTexturesSet = BmRender_CreateDescriptorSet(DescriptorSetLayouts["BindlesTexturesLayout"], MainPool);
+		}
 
 		TransferSystem::Init();
-		Render::Init(Window);
+		Render::Init(Window, VpRegion, EntityLightRegion, DescriptorSets, MainPool);
 
-		EngineResources::Init();
-
-		Scene.DrawEntities = Memory::AllocateArray<Render::DrawEntity>(512);
+		EngineResources::Init(DescriptorSets.BindlesTexturesSet, VertexStageBuffer, InstanceBuffer, FrameDataBuffer, MaterialBuffer);
 
 		Yaml::Node TestScene;
 		Yaml::Parse(TestScene, "./Resources/Scenes/TestScene.yaml");
@@ -271,11 +421,28 @@ namespace Engine
 	{
 		Render::DeInit();
 		TransferSystem::DeInit();
-		RenderResources::DeInit();
 		EngineResources::DeInit();
 		UI::DeInit();
 
-		Memory::FreeArray(&Scene.DrawEntities);
+		// Destroy GPUBuffers
+		BmRender_DestroyGPUBuffer(VertexStageBuffer);
+		BmRender_DestroyGPUBuffer(InstanceBuffer);
+		BmRender_DestroyGPUBuffer(FrameDataBuffer);
+		BmRender_DestroyGPUBuffer(MaterialBuffer);
+
+		for (auto& [name, layout] : DescriptorSetLayouts)
+		{
+			BmRender_DestroyDescriptorSetLayout(layout);
+		}
+		DescriptorSetLayouts.clear();
+
+		for (auto& [name, shader] : Shaders)
+		{
+			BmRender_DestroyShader(shader);
+		}
+		Shaders.clear();
+
+		BmRender_DeInit();
 
 		glfwDestroyWindow(Window);
 
@@ -332,7 +499,7 @@ namespace Engine
 	void SetUpScene()
 	{
 		MainCamera.Fov = 45.0f;
-		MainCamera.AspectRatio = (float)MainScreenExtent.width / (float)MainScreenExtent.height;
+		MainCamera.AspectRatio = (float)MainScreenExtent.Width / (float)MainScreenExtent.Height;
 
 		MainCamera.Position = glm::vec3(0.0f, 0.0f, 20.0f);
 		MainCamera.Front = glm::vec3(0.0f, 0.0f, -1.0f);

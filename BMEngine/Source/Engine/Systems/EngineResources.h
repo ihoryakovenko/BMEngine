@@ -7,6 +7,8 @@
 #include <string>
 #include "Util/EngineTypes.h"
 
+#include <RenderInterface.h>
+
 namespace Render
 {
 	struct DrawScene;
@@ -21,10 +23,25 @@ namespace EngineResources
 		glm::vec3 Normal;
 	};
 
+	struct Material
+	{
+		u32 AlbedoTexIndex;
+		u32 SpecularTexIndex;
+		f32 Shininess;
+	};
+
+	struct InstanceData
+	{
+		glm::mat4 ModelMatrix;
+		u32 MaterialIndex;
+	};
+
 	struct TextureAsset
 	{
 		std::string TexturePath;
-		u32 RenderTextureIndex;
+		BmRender_Image RenderImageHandle;
+		BmRender_ImageView RenderViewHandle;
+		u32 TextureGPUIndex;
 		bool IsCreated;
 	};
 
@@ -34,10 +51,10 @@ namespace EngineResources
 		std::string Path;
 	};
 
-	void Init();
+	void Init(BmRender_DescriptorSet BindlesTexturesSetHandle, BmRender_GPUBuffer VertexStageBuffer, BmRender_GPUBuffer InstanceBuffer, BmRender_GPUBuffer FrameDataBuffer, BmRender_GPUBuffer MaterialBuffer);
 	void DeInit();
 
-	void Update(Render::DrawScene* TmpScene);
+	void Update(Render::DrawScene* TmpScene, BmRender_DescriptorSet BindlesTexturesSetHandle);
 
 	void RegisterTextureAsset(const std::string& Name, const std::string& Path);
 	void RequestModelLoad(const ModelLoadRequest& Request);

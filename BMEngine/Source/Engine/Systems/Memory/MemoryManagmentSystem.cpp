@@ -2,8 +2,12 @@
 
 #include <mutex>
 
+#include <SharedLib.h>
+
 namespace Memory
 {
+	static Memory_LinearAllocator GeneralFrameMemory;
+
 	static std::recursive_mutex MemoryDebugMutex;
 	static bool IsMemoryDebuggingEnabled;
 	static bool IsMemoryDumpAllowed;
@@ -29,10 +33,14 @@ namespace Memory
 		{
 			f_debug_mem_thread_safe_init((int(*)(void*))Lock, (int(*)(void*))Unlock, &MemoryDebugMutex);
 		}
+
+		Memory_LinearAllocator_Init(&GeneralFrameMemory, 1024 * 1024);
 	}
 
 	void DeInit()
 	{
+		Memory_LinearAllocator_Free(&GeneralFrameMemory);
+
 		if (IsMemoryDebuggingEnabled)
 		{
 			f_debug_mem_print(0);
@@ -70,33 +78,8 @@ namespace Memory
 		AreFrameMemoryChecksEnabled = Allow;
 	}
 
-	FrameMemory CreateFrameMemory(u64 SpaceToAllocate)
+	Memory_LinearAllocator* GetGeneralFrameMemory()
 	{
-		FrameMemory Memory;
-		Memory.AllocatedSpace = SpaceToAllocate;
-		Memory.Base = (u8*)calloc(Memory.AllocatedSpace, sizeof(u8));
-		Memory.Head = Memory.Base;
-
-		return Memory;
-	}
-
-	void DestroyFrameMemory(FrameMemory* Memory)
-	{
-		free(Memory->Base);
-	}
-
-	void* FrameAlloc(FrameMemory* Memory, u64 Size)
-	{
-		assert(Memory->Head + Size <= Memory->Base + Memory->AllocatedSpace);
-
-		void* ReturnPointer = Memory->Head;
-		Memory->Head += Size;
-
-		return ReturnPointer;
-	}
-
-	void FrameFree(FrameMemory* Memory)
-	{
-		Memory->Head = Memory->Base;
+		return &GeneralFrameMemory;
 	}
 }

@@ -3,6 +3,11 @@ pipeline:
     vertex:   TerrainVertex
     fragment: TerrainFragment
 
+  PipelineLayout:
+    - FrameDataLayout
+    - BindlesTexturesLayout
+    - MaterialLayout
+
   VertexAttributeLayout:
     - name: TerrainVertex
       attributes:

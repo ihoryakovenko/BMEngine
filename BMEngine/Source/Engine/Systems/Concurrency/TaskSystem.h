@@ -2,12 +2,13 @@
 
 #include <atomic>
 #include <semaphore>
+#include <functional>
 
 #include "Util/EngineTypes.h"
 
 namespace TaskSystem
 {
-	typedef void (*TaskFunction)();
+	typedef std::function<void()> TaskLambda;
 
 	struct TaskGroup
 	{
@@ -20,6 +21,6 @@ namespace TaskSystem
 
 	void SetConcurencyEnabled(bool Enabled);
 	
-	void AddTask(TaskFunction Function, TaskGroup* Group);
+	void AddTask(TaskLambda* Function, TaskGroup* Group);
 	void WaitForGroup(TaskGroup* Group);
 }

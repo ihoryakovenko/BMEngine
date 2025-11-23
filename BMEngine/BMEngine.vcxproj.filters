@@ -16,14 +16,9 @@
     <ClCompile Include="..\External\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Source\Util\Settings.cpp" />
-    <ClCompile Include="Source\Deprecated\VulkanInterface\VulkanInterface.cpp" />
     <ClCompile Include="Source\Engine\Engine.cpp" />
-    <ClCompile Include="Source\Deprecated\FrameManager.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\VulkanHelper.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\DebugUI.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
     <ClCompile Include="Source\Util\SavedCode.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\VulkanCoreContext.cpp" />
     <ClCompile Include="Source\Engine\Systems\UI\UI.cpp" />
     <ClCompile Include="..\External\mini-yaml\yaml\Yaml.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderResources.cpp" />
@@ -31,7 +26,8 @@
     <ClCompile Include="Source\Engine\Systems\Render\TransferSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\Concurrency\TaskSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Memory\f_mem_debug.c" />
+    <ClCompile Include="Source\Util\YamlParsing.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\Systems.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
@@ -40,19 +36,16 @@
     <ClInclude Include="Source\Util\EngineTypes.h" />
     <ClInclude Include="Source\Engine\Systems\Render\Render.h" />
     <ClInclude Include="Source\Util\Settings.h" />
-    <ClInclude Include="Source\Deprecated\VulkanInterface\VulkanInterface.h" />
     <ClInclude Include="Source\Engine\Engine.h" />
     <ClInclude Include="Source\Util\Math.h" />
-    <ClInclude Include="Source\Deprecated\FrameManager.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\VulkanHelper.h" />
     <ClInclude Include="Source\Util\DefaultTextureData.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\VulkanCoreContext.h" />
     <ClInclude Include="Source\Engine\Systems\UI\UI.h" />
     <ClInclude Include="Source\Engine\Systems\Render\RenderResources.h" />
     <ClInclude Include="Source\Engine\Systems\EngineResources.h" />
     <ClInclude Include="Source\Engine\Systems\Render\TransferSystem.h" />
     <ClInclude Include="Source\Engine\Systems\Concurrency\TaskSystem.h" />
-    <ClInclude Include="Source\Engine\Systems\Memory\forge_memory_debugger.h" />
+    <ClInclude Include="Source\Util\YamlParsing.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\Systems.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />

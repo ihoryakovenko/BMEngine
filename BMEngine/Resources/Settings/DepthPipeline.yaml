@@ -2,16 +2,16 @@ pipeline:
   shaders:
     vertex:   DepthVertex
 
+  PipelineLayout:
+    - LightSpaceMatrixLayout
+
   VertexAttributeLayout:
     - name: StaticMeshVertex
       attributes:
         - name: Position
     - name: StaticMeshInstance
       attributes:
-        - name: InstanceModel0
-        - name: InstanceModel1
-        - name: InstanceModel2
-        - name: InstanceModel3
+        - name: InstanceModel
 
   rasterization:
     depthClampEnable: false

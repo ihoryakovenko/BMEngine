@@ -53,6 +53,10 @@ layout(location = 1) in vec3 FragmentNormal;
 layout(location = 2) in vec4 WorldFragPos;
 layout(location = 3) in flat uint FragmentMaterialIndex;
 
+layout(push_constant) uniform PushConstants {
+	uint FrameIndex;
+} Constants;
+
 layout(set = 0, binding = 0) uniform UboViewProjection
 {
 	mat4 View;
@@ -137,55 +141,55 @@ float ApplyShadow(mat4 LightSpaceMatrix, float ShadowMapLayer, bool Linearize, v
 	return shadow /= 9.0;
 }
 
-vec3 CastDirectionLight(vec3 FragmentPosition, vec3 DiffuseTexture, vec3 SpecularTexture, float Shininess)
+vec3 CastDirectionLight(mat4 View, DirectionLight directionLight, vec3 FragmentPosition, vec3 DiffuseTexture, vec3 SpecularTexture, float Shininess)
 {
-	vec3 LightDirection = normalize(mat3(ViewProjection.View) * (-lightCasters.directionLight.Direction));
+	vec3 LightDirection = normalize(mat3(View) * (-directionLight.Direction));
 
-	vec3 AmbientColor = lightCasters.directionLight.Ambient * DiffuseTexture;
-	vec3 DiffuseColor = Diffuse(LightDirection, lightCasters.directionLight.Diffuse, DiffuseTexture);
-	vec3 SpecularColor = Specular(FragmentPosition, LightDirection, lightCasters.directionLight.Specular, SpecularTexture, Shininess);
+	vec3 AmbientColor = directionLight.Ambient * DiffuseTexture;
+	vec3 DiffuseColor = Diffuse(LightDirection, directionLight.Diffuse, DiffuseTexture);
+	vec3 SpecularColor = Specular(FragmentPosition, LightDirection, directionLight.Specular, SpecularTexture, Shininess);
 
-	float Shadow = ApplyShadow(lightCasters.directionLight.LightSpaceMatrix,
+	float Shadow = ApplyShadow(directionLight.LightSpaceMatrix,
 	DIRECTIONAL_LIGHT_SHADOW_TEXTURE_INDEX, false, vec2(1.0));
 
 	return AmbientColor + (1.0 - Shadow) * (DiffuseColor + SpecularColor);
 }
 
-vec3 CastPointLight(vec3 FragmentPosition, vec3 DiffuseTexture, vec3 SpecularTexture, float Shininess)
+vec3 CastPointLight(mat4 View, PointLight pointlight, vec3 FragmentPosition, vec3 DiffuseTexture, vec3 SpecularTexture, float Shininess)
 {
-	vec3 LightPosition = vec3(ViewProjection.View * lightCasters.pointlight.Position);
+	vec3 LightPosition = vec3(View * pointlight.Position);
 	vec3 LightDirection = normalize(LightPosition - FragmentPosition);
 
-	vec3 AmbientColor = lightCasters.pointlight.Ambient * DiffuseTexture;
-	vec3 DiffuseColor = Diffuse(LightDirection, lightCasters.pointlight.Diffuse, DiffuseTexture);
-	vec3 SpecularColor = Specular(FragmentPosition, LightDirection, lightCasters.pointlight.Specular, SpecularTexture, Shininess);
+	vec3 AmbientColor = pointlight.Ambient * DiffuseTexture;
+	vec3 DiffuseColor = Diffuse(LightDirection, pointlight.Diffuse, DiffuseTexture);
+	vec3 SpecularColor = Specular(FragmentPosition, LightDirection, pointlight.Specular, SpecularTexture, Shininess);
 
-	float Attenuation = LightDistanceAttenuation(FragmentPosition, LightPosition, lightCasters.pointlight.Constant, 
-		lightCasters.pointlight.Linear, lightCasters.pointlight.Quadratic);
+	float Attenuation = LightDistanceAttenuation(FragmentPosition, LightPosition, pointlight.Constant, 
+		pointlight.Linear, pointlight.Quadratic);
 
 	return AmbientColor * Attenuation + DiffuseColor * Attenuation + SpecularColor * Attenuation;
 }
 
-vec3 CastSpotLigh(vec3 FragmentPosition, vec3 DiffuseTexture, vec3 SpecularTexture, float Shininess)
+vec3 CastSpotLigh(mat4 View, SpotLight spotlight, vec3 FragmentPosition, vec3 DiffuseTexture, vec3 SpecularTexture, float Shininess)
 {
-	vec3 ViewLightPosition = vec3(ViewProjection.View * vec4(lightCasters.spotlight.Position, 1.0));
-	vec3 ViewLightDirection = normalize(mat3(ViewProjection.View) * (-lightCasters.spotlight.Direction));
+	vec3 ViewLightPosition = vec3(View * vec4(spotlight.Position, 1.0));
+	vec3 ViewLightDirection = normalize(mat3(View) * (-spotlight.Direction));
 
-	vec3 AmbientColor = lightCasters.spotlight.Ambient * DiffuseTexture;
-	vec3 DiffuseColor = Diffuse(ViewLightDirection, lightCasters.spotlight.Diffuse, DiffuseTexture);
-	vec3 SpecularColor = Specular(FragmentPosition, ViewLightDirection, lightCasters.spotlight.Specular, SpecularTexture, Shininess);
+	vec3 AmbientColor = spotlight.Ambient * DiffuseTexture;
+	vec3 DiffuseColor = Diffuse(ViewLightDirection, spotlight.Diffuse, DiffuseTexture);
+	vec3 SpecularColor = Specular(FragmentPosition, ViewLightDirection, spotlight.Specular, SpecularTexture, Shininess);
 
 	// Soft edges
 	vec3 LightDirection = normalize(ViewLightPosition - FragmentPosition);
 	float Theta = dot(LightDirection, ViewLightDirection);
-	float Intensity = smoothstep(0.0, 1.0, (Theta - lightCasters.spotlight.OuterCutOff) /
-		(lightCasters.spotlight.CutOff - lightCasters.spotlight.OuterCutOff));
+	float Intensity = smoothstep(0.0, 1.0, (Theta - spotlight.OuterCutOff) /
+		(spotlight.CutOff - spotlight.OuterCutOff));
 
-	float Attenuation = LightDistanceAttenuation(FragmentPosition, ViewLightPosition, lightCasters.spotlight.Constant, 
-	lightCasters.spotlight.Linear, lightCasters.spotlight.Quadratic);
+	float Attenuation = LightDistanceAttenuation(FragmentPosition, ViewLightPosition, spotlight.Constant, 
+	spotlight.Linear, spotlight.Quadratic);
 
-	float Shadow = ApplyShadow(lightCasters.spotlight.LightSpaceMatrix,
-	SPOT_LIGHT_SHADOW_TEXTURE_INDEX, true, lightCasters.spotlight.Planes);
+	float Shadow = ApplyShadow(spotlight.LightSpaceMatrix,
+	SPOT_LIGHT_SHADOW_TEXTURE_INDEX, true, spotlight.Planes);
 
 	AmbientColor *= Attenuation * Intensity;
 	DiffuseColor *= Attenuation * Intensity;
@@ -197,6 +201,8 @@ vec3 CastSpotLigh(vec3 FragmentPosition, vec3 DiffuseTexture, vec3 SpecularTextu
 
 void main()
 {
+	int idx = int(Constants.FrameIndex);
+
 	vec3 FragmentPosition = vec3(ViewProjection.View * WorldFragPos);
 
 	Material Mat = Materials.materials[FragmentMaterialIndex];
@@ -204,8 +210,8 @@ void main()
 	vec3 SpecularTexture = vec3(texture(SpecularTexture[nonuniformEXT(Mat.SpecularTexIndex)], FragmentTexture));
 
 	vec3 ResultLightColor = vec3(0.0);
-	ResultLightColor += CastDirectionLight(FragmentPosition, vec3(DiffuseTexture), SpecularTexture, Mat.Shininess);
-	ResultLightColor += CastPointLight(FragmentPosition, vec3(DiffuseTexture), SpecularTexture, Mat.Shininess);
-	ResultLightColor += CastSpotLigh(FragmentPosition, vec3(DiffuseTexture), SpecularTexture, Mat.Shininess);
+	ResultLightColor += CastDirectionLight(ViewProjection.View, lightCasters.directionLight, FragmentPosition, vec3(DiffuseTexture), SpecularTexture, Mat.Shininess);
+	ResultLightColor += CastPointLight(ViewProjection.View, lightCasters.pointlight, FragmentPosition, vec3(DiffuseTexture), SpecularTexture, Mat.Shininess);
+	ResultLightColor += CastSpotLigh(ViewProjection.View, lightCasters.spotlight, FragmentPosition, vec3(DiffuseTexture), SpecularTexture, Mat.Shininess);
 	OutColor = vec4(ResultLightColor, DiffuseTexture.a);
 }

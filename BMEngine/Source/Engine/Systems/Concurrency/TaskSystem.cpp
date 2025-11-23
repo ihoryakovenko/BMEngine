@@ -13,7 +13,7 @@ namespace TaskSystem
 {
 	struct Task
 	{
-		TaskFunction Function;
+		TaskLambda* Lambda;
 		TaskGroup* Group;
 	};
 
@@ -46,7 +46,7 @@ namespace TaskSystem
 				TaskQueue.pop();
 			}
 
-			CurrentTask.Function();
+			(*CurrentTask.Lambda)();
 			if (CurrentTask.Group != nullptr)
 			{
 				CurrentTask.Group->Semaphore.release();
@@ -93,11 +93,11 @@ namespace TaskSystem
 		ConcurencyEnabled.store(Enabled, std::memory_order_relaxed);
 	}
 	
-	void AddTask(TaskFunction Function, TaskGroup* Group)
+	void AddTask(TaskLambda* Function, TaskGroup* Group)
 	{
 		if (!ConcurencyEnabled.load(std::memory_order_relaxed))
 		{
-			Function();
+			(*Function)();
 			return;
 		}
 
@@ -106,7 +106,7 @@ namespace TaskSystem
 
 		Task NewTask;
 		NewTask.Group = Group;
-		NewTask.Function = Function;
+		NewTask.Lambda = Function;
 				
 		{
 			std::lock_guard<std::mutex> Lock(QueueMutex);
