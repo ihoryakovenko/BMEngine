@@ -434,10 +434,9 @@ namespace Util
 		return Empty;
 	}
 
-	VkPipelineRasterizationStateCreateInfo ParsePipelineRasterizationNode(Yaml::Node& RasterizationNode)
+	BmRender_RasterizationState ParsePipelineRasterizationNode(Yaml::Node& RasterizationNode)
 	{
-		VkPipelineRasterizationStateCreateInfo OutRasterizationState = { };
-		OutRasterizationState.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+		BmRender_RasterizationState OutRasterizationState = { };
 
 		if (!RasterizationNode["depthClampEnable"].IsNone())
 			OutRasterizationState.depthClampEnable = RasterizationNode["depthClampEnable"].As<bool>();
@@ -449,7 +448,7 @@ namespace Util
 			OutRasterizationState.polygonMode = ParsePolygonMode(polygonModeStr.c_str(), polygonModeStr.length());
 		}
 		if (!RasterizationNode["lineWidth"].IsNone())
-			OutRasterizationState.lineWidth = RasterizationNode["lineWidth"].As<u32>();
+			OutRasterizationState.lineWidth = RasterizationNode["lineWidth"].As<f32>();
 		if (!RasterizationNode["cullMode"].IsNone())
 		{
 			std::string cullModeStr = RasterizationNode["cullMode"].As<std::string>();
@@ -466,10 +465,9 @@ namespace Util
 		return OutRasterizationState;
 	}
 
-	VkPipelineColorBlendStateCreateInfo ParsePipelineColorBlendStateNode(Yaml::Node& ColorBlendStateNode)
+	BmRender_ColorBlendState ParsePipelineColorBlendStateNode(Yaml::Node& ColorBlendStateNode)
 	{
-		VkPipelineColorBlendStateCreateInfo OutColorBlendState = { };
-		OutColorBlendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		BmRender_ColorBlendState OutColorBlendState = { };
 
 		if (!ColorBlendStateNode["logicOpEnable"].IsNone())
 			OutColorBlendState.logicOpEnable = ColorBlendStateNode["logicOpEnable"].As<bool>();
@@ -479,9 +477,9 @@ namespace Util
 		return OutColorBlendState;
 	}
 
-	VkPipelineColorBlendAttachmentState ParsePipelineColorBlendAttachmentNode(Yaml::Node& ColorBlendAttachmentNode)
+	BmRender_ColorBlendAttachment ParsePipelineColorBlendAttachmentNode(Yaml::Node& ColorBlendAttachmentNode)
 	{
-		VkPipelineColorBlendAttachmentState OutColorBlendAttachment = { };
+		BmRender_ColorBlendAttachment OutColorBlendAttachment = { };
 
 		if (!ColorBlendAttachmentNode["colorWriteMask"].IsNone())
 		{
@@ -524,10 +522,9 @@ namespace Util
 		return OutColorBlendAttachment;
 	}
 
-	VkPipelineDepthStencilStateCreateInfo ParsePipelineDepthStencilNode(Yaml::Node& DepthStencilNode)
+	BmRender_DepthStencilState ParsePipelineDepthStencilNode(Yaml::Node& DepthStencilNode)
 	{
-		VkPipelineDepthStencilStateCreateInfo OutDepthStencilState = { };
-		OutDepthStencilState.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		BmRender_DepthStencilState OutDepthStencilState = { };
 
 		if (!DepthStencilNode["depthTestEnable"].IsNone())
 			OutDepthStencilState.depthTestEnable = DepthStencilNode["depthTestEnable"].As<bool>();
@@ -546,10 +543,9 @@ namespace Util
 		return OutDepthStencilState;
 	}
 
-	VkPipelineMultisampleStateCreateInfo ParsePipelineMultisampleNode(Yaml::Node& MultisampleNode)
+	BmRender_MultisampleState ParsePipelineMultisampleNode(Yaml::Node& MultisampleNode)
 	{
-		VkPipelineMultisampleStateCreateInfo OutMultisampleState = { };
-		OutMultisampleState.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+		BmRender_MultisampleState OutMultisampleState = { };
 
 		if (!MultisampleNode["sampleShadingEnable"].IsNone())
 			OutMultisampleState.sampleShadingEnable = MultisampleNode["sampleShadingEnable"].As<bool>();
@@ -562,10 +558,9 @@ namespace Util
 		return OutMultisampleState;
 	}
 
-	VkPipelineInputAssemblyStateCreateInfo ParsePipelineInputAssemblyNode(Yaml::Node& InputAssemblyNode)
+	BmRender_InputAssemblyState ParsePipelineInputAssemblyNode(Yaml::Node& InputAssemblyNode)
 	{
-		VkPipelineInputAssemblyStateCreateInfo OutInputAssemblyState = { };
-		OutInputAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+		BmRender_InputAssemblyState OutInputAssemblyState = { };
 
 		if (!InputAssemblyNode["topology"].IsNone())
 		{
@@ -578,10 +573,9 @@ namespace Util
 		return OutInputAssemblyState;
 	}
 
-	VkPipelineViewportStateCreateInfo ParsePipelineViewportStateNode(Yaml::Node& ViewportStateNode)
+	BmRender_ViewportState ParsePipelineViewportStateNode(Yaml::Node& ViewportStateNode)
 	{
-		VkPipelineViewportStateCreateInfo OutViewportState = { };
-		OutViewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+		BmRender_ViewportState OutViewportState = { };
 		if (!ViewportStateNode["viewportCount"].IsNone())
 			OutViewportState.viewportCount = ViewportStateNode["viewportCount"].As<u32>();
 		if (!ViewportStateNode["scissorCount"].IsNone())
@@ -648,119 +642,119 @@ namespace Util
 		return VK_FALSE;
 	}
 
-	VkPolygonMode ParsePolygonMode(const char* Value, u32 Length)
+	BmRender_PolygonMode ParsePolygonMode(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::FILL_STRINGS)) return VK_POLYGON_MODE_FILL;
-		if (StringMatches(Value, Length, ParseStrings::LINE_STRINGS)) return VK_POLYGON_MODE_LINE;
-		if (StringMatches(Value, Length, ParseStrings::POINT_STRINGS)) return VK_POLYGON_MODE_POINT;
+		if (StringMatches(Value, Length, ParseStrings::FILL_STRINGS)) return BmRender_PolygonMode::Fill;
+		if (StringMatches(Value, Length, ParseStrings::LINE_STRINGS)) return BmRender_PolygonMode::Line;
+		if (StringMatches(Value, Length, ParseStrings::POINT_STRINGS)) return BmRender_PolygonMode::Point;
 
-		return VK_POLYGON_MODE_FILL;
+		return BmRender_PolygonMode::Fill;
 	}
 
-	VkCullModeFlags ParseCullMode(const char* Value, u32 Length)
+	BmRender_CullModeFlags ParseCullMode(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::NONE_STRINGS)) return VK_CULL_MODE_NONE;
-		if (StringMatches(Value, Length, ParseStrings::BACK_STRINGS)) return VK_CULL_MODE_BACK_BIT;
-		if (StringMatches(Value, Length, ParseStrings::FRONT_STRINGS)) return VK_CULL_MODE_FRONT_BIT;
-		if (StringMatches(Value, Length, ParseStrings::FRONT_BACK_STRINGS)) return VK_CULL_MODE_FRONT_AND_BACK;
+		if (StringMatches(Value, Length, ParseStrings::NONE_STRINGS)) return BmRender_CullModeFlags::None;
+		if (StringMatches(Value, Length, ParseStrings::BACK_STRINGS)) return BmRender_CullModeFlags::Back;
+		if (StringMatches(Value, Length, ParseStrings::FRONT_STRINGS)) return BmRender_CullModeFlags::Front;
+		if (StringMatches(Value, Length, ParseStrings::FRONT_BACK_STRINGS)) return BmRender_CullModeFlags::FrontAndBack;
 
-		return VK_CULL_MODE_BACK_BIT;
+		return BmRender_CullModeFlags::Back;
 	}
 
-	VkFrontFace ParseFrontFace(const char* Value, u32 Length)
+	BmRender_FrontFace ParseFrontFace(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::COUNTER_CLOCKWISE_STRINGS)) return VK_FRONT_FACE_COUNTER_CLOCKWISE;
-		if (StringMatches(Value, Length, ParseStrings::CLOCKWISE_STRINGS)) return VK_FRONT_FACE_CLOCKWISE;
+		if (StringMatches(Value, Length, ParseStrings::COUNTER_CLOCKWISE_STRINGS)) return BmRender_FrontFace::CounterClockwise;
+		if (StringMatches(Value, Length, ParseStrings::CLOCKWISE_STRINGS)) return BmRender_FrontFace::Clockwise;
 
-		return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		return BmRender_FrontFace::CounterClockwise;
 	}
 
-	VkColorComponentFlags ParseColorWriteMask(const char* Value, u32 Length)
+	BmRender_ColorComponentFlags ParseColorWriteMask(const char* Value, u32 Length)
 	{
-		VkColorComponentFlags Flags = 0;
+		BmRender_ColorComponentFlags Flags = BmRender_ColorComponentFlags::None;
 
 		for (u32 i = 0; i < Length; ++i)
 		{
-			if (Value[i] == 'R' || Value[i] == 'r') Flags |= VK_COLOR_COMPONENT_R_BIT;
-			if (Value[i] == 'G' || Value[i] == 'g') Flags |= VK_COLOR_COMPONENT_G_BIT;
-			if (Value[i] == 'B' || Value[i] == 'b') Flags |= VK_COLOR_COMPONENT_B_BIT;
-			if (Value[i] == 'A' || Value[i] == 'a') Flags |= VK_COLOR_COMPONENT_A_BIT;
+			if (Value[i] == 'R' || Value[i] == 'r') Flags = static_cast<BmRender_ColorComponentFlags>(static_cast<u32>(Flags) | static_cast<u32>(BmRender_ColorComponentFlags::R));
+			if (Value[i] == 'G' || Value[i] == 'g') Flags = static_cast<BmRender_ColorComponentFlags>(static_cast<u32>(Flags) | static_cast<u32>(BmRender_ColorComponentFlags::G));
+			if (Value[i] == 'B' || Value[i] == 'b') Flags = static_cast<BmRender_ColorComponentFlags>(static_cast<u32>(Flags) | static_cast<u32>(BmRender_ColorComponentFlags::B));
+			if (Value[i] == 'A' || Value[i] == 'a') Flags = static_cast<BmRender_ColorComponentFlags>(static_cast<u32>(Flags) | static_cast<u32>(BmRender_ColorComponentFlags::A));
 		}
 
-		if (Flags == 0) Flags = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+		if (Flags == BmRender_ColorComponentFlags::None) Flags = BmRender_ColorComponentFlags::RGBA;
 
 		return Flags;
 	}
 
-	VkBlendFactor ParseBlendFactor(const char* Value, u32 Length)
+	BmRender_BlendFactor ParseBlendFactor(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::ONE_MINUS_SRC_ALPHA_STRINGS)) return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		if (StringMatches(Value, Length, ParseStrings::ONE_MINUS_DST_ALPHA_STRINGS)) return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
-		if (StringMatches(Value, Length, ParseStrings::ONE_MINUS_SRC_COLOR_STRINGS)) return VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
-		if (StringMatches(Value, Length, ParseStrings::ONE_MINUS_DST_COLOR_STRINGS)) return VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
-		if (StringMatches(Value, Length, ParseStrings::SRC_COLOR_STRINGS)) return VK_BLEND_FACTOR_SRC_COLOR;
-		if (StringMatches(Value, Length, ParseStrings::DST_COLOR_STRINGS)) return VK_BLEND_FACTOR_DST_COLOR;
-		if (StringMatches(Value, Length, ParseStrings::SRC_ALPHA_STRINGS)) return VK_BLEND_FACTOR_SRC_ALPHA;
-		if (StringMatches(Value, Length, ParseStrings::DST_ALPHA_STRINGS)) return VK_BLEND_FACTOR_DST_ALPHA;
-		if (StringMatches(Value, Length, ParseStrings::ZERO_STRINGS)) return VK_BLEND_FACTOR_ZERO;
-		if (StringMatches(Value, Length, ParseStrings::ONE_STRINGS)) return VK_BLEND_FACTOR_ONE;
+		if (StringMatches(Value, Length, ParseStrings::ONE_MINUS_SRC_ALPHA_STRINGS)) return BmRender_BlendFactor::OneMinusSrcAlpha;
+		if (StringMatches(Value, Length, ParseStrings::ONE_MINUS_DST_ALPHA_STRINGS)) return BmRender_BlendFactor::OneMinusDstAlpha;
+		if (StringMatches(Value, Length, ParseStrings::ONE_MINUS_SRC_COLOR_STRINGS)) return BmRender_BlendFactor::OneMinusSrcColor;
+		if (StringMatches(Value, Length, ParseStrings::ONE_MINUS_DST_COLOR_STRINGS)) return BmRender_BlendFactor::OneMinusDstColor;
+		if (StringMatches(Value, Length, ParseStrings::SRC_COLOR_STRINGS)) return BmRender_BlendFactor::SrcColor;
+		if (StringMatches(Value, Length, ParseStrings::DST_COLOR_STRINGS)) return BmRender_BlendFactor::DstColor;
+		if (StringMatches(Value, Length, ParseStrings::SRC_ALPHA_STRINGS)) return BmRender_BlendFactor::SrcAlpha;
+		if (StringMatches(Value, Length, ParseStrings::DST_ALPHA_STRINGS)) return BmRender_BlendFactor::DstAlpha;
+		if (StringMatches(Value, Length, ParseStrings::ZERO_STRINGS)) return BmRender_BlendFactor::Zero;
+		if (StringMatches(Value, Length, ParseStrings::ONE_STRINGS)) return BmRender_BlendFactor::One;
 
-		return VK_BLEND_FACTOR_SRC_ALPHA;
+		return BmRender_BlendFactor::SrcAlpha;
 	}
 
-	VkBlendOp ParseBlendOp(const char* Value, u32 Length)
+	BmRender_BlendOp ParseBlendOp(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::REVERSE_SUBTRACT_STRINGS)) return VK_BLEND_OP_REVERSE_SUBTRACT;
-		if (StringMatches(Value, Length, ParseStrings::SUBTRACT_STRINGS)) return VK_BLEND_OP_SUBTRACT;
-		if (StringMatches(Value, Length, ParseStrings::ADD_STRINGS)) return VK_BLEND_OP_ADD;
-		if (StringMatches(Value, Length, ParseStrings::MIN_STRINGS)) return VK_BLEND_OP_MIN;
-		if (StringMatches(Value, Length, ParseStrings::MAX_STRINGS)) return VK_BLEND_OP_MAX;
+		if (StringMatches(Value, Length, ParseStrings::REVERSE_SUBTRACT_STRINGS)) return BmRender_BlendOp::ReverseSubtract;
+		if (StringMatches(Value, Length, ParseStrings::SUBTRACT_STRINGS)) return BmRender_BlendOp::Subtract;
+		if (StringMatches(Value, Length, ParseStrings::ADD_STRINGS)) return BmRender_BlendOp::Add;
+		if (StringMatches(Value, Length, ParseStrings::MIN_STRINGS)) return BmRender_BlendOp::Min;
+		if (StringMatches(Value, Length, ParseStrings::MAX_STRINGS)) return BmRender_BlendOp::Max;
 
-		return VK_BLEND_OP_ADD;
+		return BmRender_BlendOp::Add;
 	}
 
-	VkCompareOp ParseCompareOp(const char* Value, u32 Length)
+	BmRender_CompareOp ParseCompareOp(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::NEVER_STRINGS)) return VK_COMPARE_OP_NEVER;
-		if (StringMatches(Value, Length, ParseStrings::LESS_STRINGS)) return VK_COMPARE_OP_LESS;
-		if (StringMatches(Value, Length, ParseStrings::EQUAL_STRINGS)) return VK_COMPARE_OP_EQUAL;
-		if (StringMatches(Value, Length, ParseStrings::LESS_OR_EQUAL_STRINGS)) return VK_COMPARE_OP_LESS_OR_EQUAL;
-		if (StringMatches(Value, Length, ParseStrings::GREATER_STRINGS)) return VK_COMPARE_OP_GREATER;
-		if (StringMatches(Value, Length, ParseStrings::NOT_EQUAL_STRINGS)) return VK_COMPARE_OP_NOT_EQUAL;
-		if (StringMatches(Value, Length, ParseStrings::GREATER_OR_EQUAL_STRINGS)) return VK_COMPARE_OP_GREATER_OR_EQUAL;
-		if (StringMatches(Value, Length, ParseStrings::ALWAYS_STRINGS)) return VK_COMPARE_OP_ALWAYS;
+		if (StringMatches(Value, Length, ParseStrings::NEVER_STRINGS)) return BmRender_CompareOp::Never;
+		if (StringMatches(Value, Length, ParseStrings::LESS_STRINGS)) return BmRender_CompareOp::Less;
+		if (StringMatches(Value, Length, ParseStrings::EQUAL_STRINGS)) return BmRender_CompareOp::Equal;
+		if (StringMatches(Value, Length, ParseStrings::LESS_OR_EQUAL_STRINGS)) return BmRender_CompareOp::LessOrEqual;
+		if (StringMatches(Value, Length, ParseStrings::GREATER_STRINGS)) return BmRender_CompareOp::Greater;
+		if (StringMatches(Value, Length, ParseStrings::NOT_EQUAL_STRINGS)) return BmRender_CompareOp::NotEqual;
+		if (StringMatches(Value, Length, ParseStrings::GREATER_OR_EQUAL_STRINGS)) return BmRender_CompareOp::GreaterOrEqual;
+		if (StringMatches(Value, Length, ParseStrings::ALWAYS_STRINGS)) return BmRender_CompareOp::Always;
 
-		return VK_COMPARE_OP_LESS;
+		return BmRender_CompareOp::Less;
 	}
 
-	VkSampleCountFlagBits ParseSampleCount(const char* Value, u32 Length)
+	BmRender_SampleCount ParseSampleCount(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::SAMPLE_1_STRINGS)) return VK_SAMPLE_COUNT_1_BIT;
-		if (StringMatches(Value, Length, ParseStrings::SAMPLE_2_STRINGS)) return VK_SAMPLE_COUNT_2_BIT;
-		if (StringMatches(Value, Length, ParseStrings::SAMPLE_4_STRINGS)) return VK_SAMPLE_COUNT_4_BIT;
-		if (StringMatches(Value, Length, ParseStrings::SAMPLE_8_STRINGS)) return VK_SAMPLE_COUNT_8_BIT;
-		if (StringMatches(Value, Length, ParseStrings::SAMPLE_16_STRINGS)) return VK_SAMPLE_COUNT_16_BIT;
-		if (StringMatches(Value, Length, ParseStrings::SAMPLE_32_STRINGS)) return VK_SAMPLE_COUNT_32_BIT;
-		if (StringMatches(Value, Length, ParseStrings::SAMPLE_64_STRINGS)) return VK_SAMPLE_COUNT_64_BIT;
+		if (StringMatches(Value, Length, ParseStrings::SAMPLE_1_STRINGS)) return BmRender_SampleCount::Count1;
+		if (StringMatches(Value, Length, ParseStrings::SAMPLE_2_STRINGS)) return BmRender_SampleCount::Count2;
+		if (StringMatches(Value, Length, ParseStrings::SAMPLE_4_STRINGS)) return BmRender_SampleCount::Count4;
+		if (StringMatches(Value, Length, ParseStrings::SAMPLE_8_STRINGS)) return BmRender_SampleCount::Count8;
+		if (StringMatches(Value, Length, ParseStrings::SAMPLE_16_STRINGS)) return BmRender_SampleCount::Count16;
+		if (StringMatches(Value, Length, ParseStrings::SAMPLE_32_STRINGS)) return BmRender_SampleCount::Count32;
+		if (StringMatches(Value, Length, ParseStrings::SAMPLE_64_STRINGS)) return BmRender_SampleCount::Count64;
 
-		return VK_SAMPLE_COUNT_1_BIT;
+		return BmRender_SampleCount::Count1;
 	}
 
-	VkPrimitiveTopology ParseTopology(const char* Value, u32 Length)
+	BmRender_PrimitiveTopology ParseTopology(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::POINT_LIST_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-		if (StringMatches(Value, Length, ParseStrings::LINE_LIST_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-		if (StringMatches(Value, Length, ParseStrings::LINE_STRIP_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
-		if (StringMatches(Value, Length, ParseStrings::TRIANGLE_LIST_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-		if (StringMatches(Value, Length, ParseStrings::TRIANGLE_STRIP_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-		if (StringMatches(Value, Length, ParseStrings::TRIANGLE_FAN_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
-		if (StringMatches(Value, Length, ParseStrings::LINE_LIST_WITH_ADJACENCY_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY;
-		if (StringMatches(Value, Length, ParseStrings::LINE_STRIP_WITH_ADJACENCY_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY;
-		if (StringMatches(Value, Length, ParseStrings::TRIANGLE_LIST_WITH_ADJACENCY_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY;
-		if (StringMatches(Value, Length, ParseStrings::TRIANGLE_STRIP_WITH_ADJACENCY_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY;
-		if (StringMatches(Value, Length, ParseStrings::PATCH_LIST_STRINGS)) return VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
+		if (StringMatches(Value, Length, ParseStrings::POINT_LIST_STRINGS)) return BmRender_PrimitiveTopology::PointList;
+		if (StringMatches(Value, Length, ParseStrings::LINE_LIST_STRINGS)) return BmRender_PrimitiveTopology::LineList;
+		if (StringMatches(Value, Length, ParseStrings::LINE_STRIP_STRINGS)) return BmRender_PrimitiveTopology::LineStrip;
+		if (StringMatches(Value, Length, ParseStrings::TRIANGLE_LIST_STRINGS)) return BmRender_PrimitiveTopology::TriangleList;
+		if (StringMatches(Value, Length, ParseStrings::TRIANGLE_STRIP_STRINGS)) return BmRender_PrimitiveTopology::TriangleStrip;
+		if (StringMatches(Value, Length, ParseStrings::TRIANGLE_FAN_STRINGS)) return BmRender_PrimitiveTopology::TriangleFan;
+		if (StringMatches(Value, Length, ParseStrings::LINE_LIST_WITH_ADJACENCY_STRINGS)) return BmRender_PrimitiveTopology::LineListWithAdjacency;
+		if (StringMatches(Value, Length, ParseStrings::LINE_STRIP_WITH_ADJACENCY_STRINGS)) return BmRender_PrimitiveTopology::LineStripWithAdjacency;
+		if (StringMatches(Value, Length, ParseStrings::TRIANGLE_LIST_WITH_ADJACENCY_STRINGS)) return BmRender_PrimitiveTopology::TriangleListWithAdjacency;
+		if (StringMatches(Value, Length, ParseStrings::TRIANGLE_STRIP_WITH_ADJACENCY_STRINGS)) return BmRender_PrimitiveTopology::TriangleStripWithAdjacency;
+		if (StringMatches(Value, Length, ParseStrings::PATCH_LIST_STRINGS)) return BmRender_PrimitiveTopology::PatchList;
 
-		return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		return BmRender_PrimitiveTopology::TriangleList;
 	}
 
 	BmRender_PipelineShaderStage ParseShaderStage(const char* Value, u32 Length)

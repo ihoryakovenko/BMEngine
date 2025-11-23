@@ -1,7 +1,5 @@
 #pragma once
 
-#include <vulkan/vulkan.h>
-
 #include <ShortTypes.h>
 
 struct GLFWwindow;
@@ -27,6 +25,7 @@ typedef struct BmRender_Semaphore_T* BmRender_Semaphore;
 typedef struct BmRender_CommandPool_T* BmRender_CommandPool;
 typedef struct BmRender_CommandBuffer_T* BmRender_CommandBuffer;
 typedef struct BmRender_Queue_T* BmRender_Queue;
+typedef struct BmRender_DeviceMemory_T* BmRender_DeviceMemory;
 
 enum class BmRender_AttributeType : u8
 {
@@ -360,6 +359,87 @@ enum class BmRender_Format : u32
 	E5B9G9R9_UFLOAT_PACK32,
 };
 
+enum class BmRender_PolygonMode : u32
+{
+	Fill,
+	Line,
+	Point,
+};
+
+enum class BmRender_CullModeFlags : u32
+{
+	None = 0,
+	Front = 1 << 0,
+	Back = 1 << 1,
+	FrontAndBack = Front | Back,
+};
+
+enum class BmRender_FrontFace : u32
+{
+	CounterClockwise,
+	Clockwise,
+};
+
+enum class BmRender_ColorComponentFlags : u32
+{
+	None = 0,
+	R = 1 << 0,
+	G = 1 << 1,
+	B = 1 << 2,
+	A = 1 << 3,
+	RGBA = R | G | B | A,
+};
+
+enum class BmRender_BlendFactor : u32
+{
+	Zero,
+	One,
+	SrcColor,
+	DstColor,
+	SrcAlpha,
+	DstAlpha,
+	OneMinusSrcColor,
+	OneMinusDstColor,
+	OneMinusSrcAlpha,
+	OneMinusDstAlpha,
+};
+
+enum class BmRender_BlendOp : u32
+{
+	Add,
+	Subtract,
+	ReverseSubtract,
+	Min,
+	Max,
+};
+
+enum class BmRender_PrimitiveTopology : u32
+{
+	PointList,
+	LineList,
+	LineStrip,
+	TriangleList,
+	TriangleStrip,
+	TriangleFan,
+	LineListWithAdjacency,
+	LineStripWithAdjacency,
+	TriangleListWithAdjacency,
+	TriangleStripWithAdjacency,
+	PatchList,
+};
+
+enum class BmRender_SampleCount : u32
+{
+	Count1,
+	Count2,
+	Count4,
+	Count8,
+	Count16,
+	Count32,
+	Count64,
+};
+
+
 struct BmRender_Offset2D
 {
 	s32 X;
@@ -541,6 +621,62 @@ struct BmRender_ShaderStageDescription
 	const char* EntryPointFunction;
 };
 
+struct BmRender_RasterizationState
+{
+	bool depthClampEnable;
+	bool rasterizerDiscardEnable;
+	BmRender_PolygonMode polygonMode;
+	f32 lineWidth;
+	BmRender_CullModeFlags cullMode;
+	BmRender_FrontFace frontFace;
+	bool depthBiasEnable;
+};
+
+struct BmRender_ColorBlendAttachment
+{
+	BmRender_ColorComponentFlags colorWriteMask;
+	bool blendEnable;
+	BmRender_BlendFactor srcColorBlendFactor;
+	BmRender_BlendFactor dstColorBlendFactor;
+	BmRender_BlendOp colorBlendOp;
+	BmRender_BlendFactor srcAlphaBlendFactor;
+	BmRender_BlendFactor dstAlphaBlendFactor;
+	BmRender_BlendOp alphaBlendOp;
+};
+
+struct BmRender_ColorBlendState
+{
+	bool logicOpEnable;
+	u32 attachmentCount;
+};
+
+struct BmRender_DepthStencilState
+{
+	bool depthTestEnable;
+	bool depthWriteEnable;
+	BmRender_CompareOp depthCompareOp;
+	bool depthBoundsTestEnable;
+	bool stencilTestEnable;
+};
+
+struct BmRender_MultisampleState
+{
+	bool sampleShadingEnable;
+	BmRender_SampleCount rasterizationSamples;
+};
+
+struct BmRender_InputAssemblyState
+{
+	BmRender_PrimitiveTopology topology;
+	bool primitiveRestartEnable;
+};
+
+struct BmRender_ViewportState
+{
+	u32 viewportCount;
+	u32 scissorCount;
+};
+
 struct BmRender_PipelineDescription
 {
 	BmRender_PipelineLayout PipelineLayout;
@@ -556,13 +692,13 @@ struct BmRender_PipelineDescription
 	u32 DescriptorSetLayoutsCount;
 	u32 PushConstantRangesCount;
 
-	VkPipelineRasterizationStateCreateInfo RasterizationState;
-	VkPipelineColorBlendAttachmentState ColorBlendAttachment;
-	VkPipelineColorBlendStateCreateInfo ColorBlendState;
-	VkPipelineDepthStencilStateCreateInfo DepthStencilState;
-	VkPipelineMultisampleStateCreateInfo MultisampleState;
-	VkPipelineInputAssemblyStateCreateInfo InputAssemblyState;
-	VkPipelineViewportStateCreateInfo ViewportState;
+	BmRender_RasterizationState RasterizationState;
+	BmRender_ColorBlendAttachment ColorBlendAttachment;
+	BmRender_ColorBlendState ColorBlendState;
+	BmRender_DepthStencilState DepthStencilState;
+	BmRender_MultisampleState MultisampleState;
+	BmRender_InputAssemblyState InputAssemblyState;
+	BmRender_ViewportState ViewportState;
 
 	BmRender_Extent2D Extent;
 	BmRender_Viewport Viewport;
@@ -593,7 +729,7 @@ struct BmRender_TimelineSemaphoreSubmit
 
 struct BmRender_SubmitInfo
 {
-	const BmRender_PipelineSyncStage* WaitDstStageFlags; // Use existing BmRender_PipelineSyncStage
+	const BmRender_PipelineSyncStage* WaitDstStageFlags;
 	const BmRender_Semaphore* WaitSemaphores;
 	const BmRender_Semaphore* SignalSemaphores;
 	const BmRender_TimelineSemaphoreSubmit* WaitTimelineSemaphores;
@@ -632,7 +768,7 @@ struct BmRender_ShaderData
 
 struct BmRender_ImageResource
 {
-	VkDeviceMemory Memory;
+	BmRender_DeviceMemory Memory;
 	BmRender_Format Format;
 	u64 Size;
 	BmRender_ImageType Type;
@@ -642,14 +778,13 @@ struct BmRender_ImageResource
 
 struct BmRender_GPUBufferData
 {
-	VkDeviceMemory Memory;
+	BmRender_DeviceMemory Memory;
 	MemoryPropertyFlag PropertyFlag;
 	BmRender_PipelineSyncStage BufferStage;
 };
 
 struct BmRender_DescriptorSetData
 {
-	VkDescriptorSet Set;
 	BmRender_DescriptorSetLayout Layout;
 };
 

@@ -127,7 +127,6 @@ BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout
 
 	VkDescriptorSet Set;
 	VULKAN_CHECK_RESULT(vkAllocateDescriptorSets(Device, &AllocInfo, &Set));
-	NewSet.Set = Set;
 
 	return CreateDescriptorSetHandle(Set, &NewSet);
 }
@@ -185,7 +184,7 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, co
 
 		WriteDescriptorSets[i] = { };
 		WriteDescriptorSets[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		WriteDescriptorSets[i].dstSet = Set.Set;
+		WriteDescriptorSets[i].dstSet = (VkDescriptorSet)DescriptorSetHandle;
 		WriteDescriptorSets[i].dstBinding = i;
 		WriteDescriptorSets[i].dstArrayElement = Binding.DstArrayElement;
 		WriteDescriptorSets[i].descriptorType = VkDescriptorType;
@@ -259,9 +258,9 @@ static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, MemoryPropertyFlag Memor
 
 	VkBufferUsageFlags BufferUsageFlags = (VkBufferUsageFlags)Flag;
 	DeviceMemoryAllocResult AllocResult = AllocateDeviceMemory(PhysicalDevice, Device, Buffer, MemoryFlag, BufferUsageFlags, GetVulkanAllocator());
-	NewBuffer.Memory = AllocResult.Memory;
+	NewBuffer.Memory = CreateDeviceMemoryHandle(AllocResult.Memory);
 
-	VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, Buffer, NewBuffer.Memory, 0));
+	VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, Buffer, (VkDeviceMemory)NewBuffer.Memory, 0));
 
 	return CreateGPUBufferHandle(Buffer, &NewBuffer);
 }
@@ -318,12 +317,12 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 	DeviceMemoryAllocResult AllocResult = AllocateDeviceMemory(PhysicalDevice, Device,
 		Image, MemoryPropertyFlag::GPULocal, GetVulkanAllocator());
 
-	Resource.Memory = AllocResult.Memory;
+	Resource.Memory = CreateDeviceMemoryHandle(AllocResult.Memory);
 	Resource.Width = Description->Width;
 	Resource.Height = Description->Height;
 	Resource.Size = AllocResult.Size;
 
-	VULKAN_CHECK_RESULT(vkBindImageMemory(Device, Image, Resource.Memory, 0));
+	VULKAN_CHECK_RESULT(vkBindImageMemory(Device, Image, (VkDeviceMemory)Resource.Memory, 0));
 	return CreateImageHandle(Image, &Resource);
 }
 
@@ -501,15 +500,21 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	RenderingInfo.depthAttachmentFormat = FormatToVk(Description->ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat);
 	RenderingInfo.stencilAttachmentFormat = FormatToVk(Description->ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat);
 
-	VkPipelineColorBlendStateCreateInfo ColorBlendState = Description->ColorBlendState;
-	ColorBlendState.pAttachments = &Description->ColorBlendAttachment;
+	VkPipelineColorBlendAttachmentState VkColorBlendAttachment = ColorBlendAttachmentToVk(Description->ColorBlendAttachment);
+	VkPipelineColorBlendStateCreateInfo ColorBlendState = ColorBlendStateToVk(Description->ColorBlendState);
+	ColorBlendState.pAttachments = &VkColorBlendAttachment;
 
 	VkViewport VkViewport = ViewportToVk(Description->Viewport);
 	VkRect2D VkScissor = Rect2DToVk(Description->Scissor);
 	
-	VkPipelineViewportStateCreateInfo ViewportState = Description->ViewportState;
+	VkPipelineViewportStateCreateInfo ViewportState = ViewportStateToVk(Description->ViewportState);
 	ViewportState.pViewports = &VkViewport;
 	ViewportState.pScissors = &VkScissor;
+
+	VkPipelineRasterizationStateCreateInfo RasterizationState = RasterizationStateToVk(Description->RasterizationState);
+	VkPipelineMultisampleStateCreateInfo MultisampleState = MultisampleStateToVk(Description->MultisampleState);
+	VkPipelineInputAssemblyStateCreateInfo InputAssemblyState = InputAssemblyStateToVk(Description->InputAssemblyState);
+	VkPipelineDepthStencilStateCreateInfo DepthStencilState = DepthStencilStateToVk(Description->DepthStencilState);
 
 	auto PipelineCreateInfo = (VkGraphicsPipelineCreateInfo*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkGraphicsPipelineCreateInfo));
 	*PipelineCreateInfo = { };
@@ -517,13 +522,13 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	PipelineCreateInfo->stageCount = Description->ShaderStagesCount;
 	PipelineCreateInfo->pStages = VkShaderStages;
 	PipelineCreateInfo->pVertexInputState = &VertexInputState;
-	PipelineCreateInfo->pInputAssemblyState = &Description->InputAssemblyState;
+	PipelineCreateInfo->pInputAssemblyState = &InputAssemblyState;
 	PipelineCreateInfo->pViewportState = &ViewportState;
 	PipelineCreateInfo->pDynamicState = nullptr;
-	PipelineCreateInfo->pRasterizationState = &Description->RasterizationState;
-	PipelineCreateInfo->pMultisampleState = &Description->MultisampleState;
+	PipelineCreateInfo->pRasterizationState = &RasterizationState;
+	PipelineCreateInfo->pMultisampleState = &MultisampleState;
 	PipelineCreateInfo->pColorBlendState = &ColorBlendState;
-	PipelineCreateInfo->pDepthStencilState = &Description->DepthStencilState;
+	PipelineCreateInfo->pDepthStencilState = &DepthStencilState;
 	PipelineCreateInfo->layout = (VkPipelineLayout)Description->PipelineLayout;
 	PipelineCreateInfo->renderPass = nullptr;
 	PipelineCreateInfo->subpass = 0;
@@ -831,7 +836,7 @@ void BmRender_UpdateHostCompatibleBuffer(BmRender_GPUBuffer Buffer, u64 BufferOf
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	BmRender_GPUBufferData BufferData;
 	BmRender_GetGPUBufferData(Buffer, &BufferData);
-	UpdateHostCompatibleBufferMemory(Device, BufferData.Memory, DataSize, BufferOffset, Data);
+	UpdateHostCompatibleBufferMemory(Device, (VkDeviceMemory)BufferData.Memory, DataSize, BufferOffset, Data);
 }
 
 void BmRender_DestroyPipelineLayout(BmRender_PipelineLayout Handle)
@@ -886,7 +891,7 @@ void BmRender_DestroyImage(BmRender_Image Handle)
 	if (BmRender_GetImageData(Handle, &Data))
 	{
 		vkDestroyImage(Device, (VkImage)Handle, GetVulkanAllocator());
-		vkFreeMemory(Device, Data.Memory, GetVulkanAllocator());
+		vkFreeMemory(Device, (VkDeviceMemory)Data.Memory, GetVulkanAllocator());
 	}
 
 	DestroyImageHandle(Handle);
@@ -906,7 +911,7 @@ void BmRender_DestroyGPUBuffer(BmRender_GPUBuffer Handle)
 	if (BmRender_GetGPUBufferData(Handle, &Data))
 	{
 		vkDestroyBuffer(Device, (VkBuffer)Handle, GetVulkanAllocator());
-		vkFreeMemory(Device, Data.Memory, GetVulkanAllocator());
+		vkFreeMemory(Device, (VkDeviceMemory)Data.Memory, GetVulkanAllocator());
 	}
 
 	DestroyGPUBufferHandle(Handle);

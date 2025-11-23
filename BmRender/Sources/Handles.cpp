@@ -228,6 +228,11 @@ BmRender_Queue CreateQueueHandle(VkQueue Queue, const BmRender_QueueData* Data)
 	return (BmRender_Queue)Queue;
 }
 
+BmRender_DeviceMemory CreateDeviceMemoryHandle(VkDeviceMemory Memory)
+{
+	return (BmRender_DeviceMemory)Memory;
+}
+
 BmRender_Semaphore CreateSemaphoreHandle(VkSemaphore VulkanSemaphore, const BmRender_SemaphoreData* Data)
 {
 	const u32 Index = Memory_PoolAllocator_PushData(&SemaphoreStorage.Allocator, Data);

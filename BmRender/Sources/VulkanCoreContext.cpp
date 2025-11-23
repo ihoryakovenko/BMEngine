@@ -381,7 +381,7 @@ void CreateCoreContext(VulkanCoreContext* Context, GLFWwindow* Window)
 	{
 		BmRender_ImageResource ImageResourceData = { };
 		ImageResourceData.Type = BmRender_ImageType::TransferSampled;
-		ImageResourceData.Memory = VK_NULL_HANDLE;
+		ImageResourceData.Memory = CreateDeviceMemoryHandle(VK_NULL_HANDLE);
 		ImageResourceData.Format = VkFormatToBmRender(Context->SurfaceFormat.format);
 		ImageResourceData.Width = Context->SwapExtent.width;
 		ImageResourceData.Height = Context->SwapExtent.height;

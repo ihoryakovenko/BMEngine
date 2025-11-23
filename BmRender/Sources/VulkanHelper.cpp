@@ -1631,6 +1631,247 @@ BmRender_PipelineSyncStage VkPipelineStageFlagsToBmRender(VkPipelineStageFlags S
 	return BmFlags;
 }
 
+VkPolygonMode PolygonModeToVk(BmRender_PolygonMode Mode)
+{
+	switch (Mode)
+	{
+		case BmRender_PolygonMode::Fill:
+			return VK_POLYGON_MODE_FILL;
+		case BmRender_PolygonMode::Line:
+			return VK_POLYGON_MODE_LINE;
+		case BmRender_PolygonMode::Point:
+			return VK_POLYGON_MODE_POINT;
+		default:
+			assert(false);
+			return VK_POLYGON_MODE_FILL;
+	}
+}
+
+VkCullModeFlags CullModeFlagsToVk(BmRender_CullModeFlags Flags)
+{
+	if (Flags == BmRender_CullModeFlags::None)
+		return VK_CULL_MODE_NONE;
+	
+	VkCullModeFlags VkFlags = 0;
+	u32 FlagsValue = static_cast<u32>(Flags);
+	if ((FlagsValue & static_cast<u32>(BmRender_CullModeFlags::Front)) != 0)
+		VkFlags |= VK_CULL_MODE_FRONT_BIT;
+	if ((FlagsValue & static_cast<u32>(BmRender_CullModeFlags::Back)) != 0)
+		VkFlags |= VK_CULL_MODE_BACK_BIT;
+	return VkFlags;
+}
+
+VkFrontFace FrontFaceToVk(BmRender_FrontFace Face)
+{
+	switch (Face)
+	{
+		case BmRender_FrontFace::CounterClockwise:
+			return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		case BmRender_FrontFace::Clockwise:
+			return VK_FRONT_FACE_CLOCKWISE;
+		default:
+			assert(false);
+			return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	}
+}
+
+VkColorComponentFlags ColorComponentFlagsToVk(BmRender_ColorComponentFlags Flags)
+{
+	VkColorComponentFlags VkFlags = 0;
+	u32 FlagsValue = static_cast<u32>(Flags);
+	if ((FlagsValue & static_cast<u32>(BmRender_ColorComponentFlags::R)) != 0)
+		VkFlags |= VK_COLOR_COMPONENT_R_BIT;
+	if ((FlagsValue & static_cast<u32>(BmRender_ColorComponentFlags::G)) != 0)
+		VkFlags |= VK_COLOR_COMPONENT_G_BIT;
+	if ((FlagsValue & static_cast<u32>(BmRender_ColorComponentFlags::B)) != 0)
+		VkFlags |= VK_COLOR_COMPONENT_B_BIT;
+	if ((FlagsValue & static_cast<u32>(BmRender_ColorComponentFlags::A)) != 0)
+		VkFlags |= VK_COLOR_COMPONENT_A_BIT;
+	return VkFlags;
+}
+
+VkBlendFactor BlendFactorToVk(BmRender_BlendFactor Factor)
+{
+	switch (Factor)
+	{
+		case BmRender_BlendFactor::Zero:
+			return VK_BLEND_FACTOR_ZERO;
+		case BmRender_BlendFactor::One:
+			return VK_BLEND_FACTOR_ONE;
+		case BmRender_BlendFactor::SrcColor:
+			return VK_BLEND_FACTOR_SRC_COLOR;
+		case BmRender_BlendFactor::DstColor:
+			return VK_BLEND_FACTOR_DST_COLOR;
+		case BmRender_BlendFactor::SrcAlpha:
+			return VK_BLEND_FACTOR_SRC_ALPHA;
+		case BmRender_BlendFactor::DstAlpha:
+			return VK_BLEND_FACTOR_DST_ALPHA;
+		case BmRender_BlendFactor::OneMinusSrcColor:
+			return VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+		case BmRender_BlendFactor::OneMinusDstColor:
+			return VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
+		case BmRender_BlendFactor::OneMinusSrcAlpha:
+			return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		case BmRender_BlendFactor::OneMinusDstAlpha:
+			return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+		default:
+			assert(false);
+			return VK_BLEND_FACTOR_SRC_ALPHA;
+	}
+}
+
+VkBlendOp BlendOpToVk(BmRender_BlendOp Op)
+{
+	switch (Op)
+	{
+		case BmRender_BlendOp::Add:
+			return VK_BLEND_OP_ADD;
+		case BmRender_BlendOp::Subtract:
+			return VK_BLEND_OP_SUBTRACT;
+		case BmRender_BlendOp::ReverseSubtract:
+			return VK_BLEND_OP_REVERSE_SUBTRACT;
+		case BmRender_BlendOp::Min:
+			return VK_BLEND_OP_MIN;
+		case BmRender_BlendOp::Max:
+			return VK_BLEND_OP_MAX;
+		default:
+			assert(false);
+			return VK_BLEND_OP_ADD;
+	}
+}
+
+VkPrimitiveTopology PrimitiveTopologyToVk(BmRender_PrimitiveTopology Topology)
+{
+	switch (Topology)
+	{
+		case BmRender_PrimitiveTopology::PointList:
+			return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+		case BmRender_PrimitiveTopology::LineList:
+			return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+		case BmRender_PrimitiveTopology::LineStrip:
+			return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+		case BmRender_PrimitiveTopology::TriangleList:
+			return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		case BmRender_PrimitiveTopology::TriangleStrip:
+			return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+		case BmRender_PrimitiveTopology::TriangleFan:
+			return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
+		case BmRender_PrimitiveTopology::LineListWithAdjacency:
+			return VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY;
+		case BmRender_PrimitiveTopology::LineStripWithAdjacency:
+			return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY;
+		case BmRender_PrimitiveTopology::TriangleListWithAdjacency:
+			return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY;
+		case BmRender_PrimitiveTopology::TriangleStripWithAdjacency:
+			return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY;
+		case BmRender_PrimitiveTopology::PatchList:
+			return VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
+		default:
+			assert(false);
+			return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	}
+}
+
+VkSampleCountFlagBits SampleCountToVk(BmRender_SampleCount Count)
+{
+	switch (Count)
+	{
+		case BmRender_SampleCount::Count1:
+			return VK_SAMPLE_COUNT_1_BIT;
+		case BmRender_SampleCount::Count2:
+			return VK_SAMPLE_COUNT_2_BIT;
+		case BmRender_SampleCount::Count4:
+			return VK_SAMPLE_COUNT_4_BIT;
+		case BmRender_SampleCount::Count8:
+			return VK_SAMPLE_COUNT_8_BIT;
+		case BmRender_SampleCount::Count16:
+			return VK_SAMPLE_COUNT_16_BIT;
+		case BmRender_SampleCount::Count32:
+			return VK_SAMPLE_COUNT_32_BIT;
+		case BmRender_SampleCount::Count64:
+			return VK_SAMPLE_COUNT_64_BIT;
+		default:
+			assert(false);
+			return VK_SAMPLE_COUNT_1_BIT;
+	}
+}
+
+VkPipelineRasterizationStateCreateInfo RasterizationStateToVk(const BmRender_RasterizationState& State)
+{
+	VkPipelineRasterizationStateCreateInfo VkState = {};
+	VkState.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	VkState.depthClampEnable = State.depthClampEnable ? VK_TRUE : VK_FALSE;
+	VkState.rasterizerDiscardEnable = State.rasterizerDiscardEnable ? VK_TRUE : VK_FALSE;
+	VkState.polygonMode = PolygonModeToVk(State.polygonMode);
+	VkState.lineWidth = State.lineWidth;
+	VkState.cullMode = CullModeFlagsToVk(State.cullMode);
+	VkState.frontFace = FrontFaceToVk(State.frontFace);
+	VkState.depthBiasEnable = State.depthBiasEnable ? VK_TRUE : VK_FALSE;
+	return VkState;
+}
+
+VkPipelineColorBlendAttachmentState ColorBlendAttachmentToVk(const BmRender_ColorBlendAttachment& Attachment)
+{
+	VkPipelineColorBlendAttachmentState VkAttachment = {};
+	VkAttachment.colorWriteMask = ColorComponentFlagsToVk(Attachment.colorWriteMask);
+	VkAttachment.blendEnable = Attachment.blendEnable ? VK_TRUE : VK_FALSE;
+	VkAttachment.srcColorBlendFactor = BlendFactorToVk(Attachment.srcColorBlendFactor);
+	VkAttachment.dstColorBlendFactor = BlendFactorToVk(Attachment.dstColorBlendFactor);
+	VkAttachment.colorBlendOp = BlendOpToVk(Attachment.colorBlendOp);
+	VkAttachment.srcAlphaBlendFactor = BlendFactorToVk(Attachment.srcAlphaBlendFactor);
+	VkAttachment.dstAlphaBlendFactor = BlendFactorToVk(Attachment.dstAlphaBlendFactor);
+	VkAttachment.alphaBlendOp = BlendOpToVk(Attachment.alphaBlendOp);
+	return VkAttachment;
+}
+
+VkPipelineColorBlendStateCreateInfo ColorBlendStateToVk(const BmRender_ColorBlendState& State)
+{
+	VkPipelineColorBlendStateCreateInfo VkState = {};
+	VkState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	VkState.logicOpEnable = State.logicOpEnable ? VK_TRUE : VK_FALSE;
+	VkState.attachmentCount = State.attachmentCount;
+	return VkState;
+}
+
+VkPipelineDepthStencilStateCreateInfo DepthStencilStateToVk(const BmRender_DepthStencilState& State)
+{
+	VkPipelineDepthStencilStateCreateInfo VkState = {};
+	VkState.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	VkState.depthTestEnable = State.depthTestEnable ? VK_TRUE : VK_FALSE;
+	VkState.depthWriteEnable = State.depthWriteEnable ? VK_TRUE : VK_FALSE;
+	VkState.depthCompareOp = CompareOpToVk(State.depthCompareOp);
+	VkState.depthBoundsTestEnable = State.depthBoundsTestEnable ? VK_TRUE : VK_FALSE;
+	VkState.stencilTestEnable = State.stencilTestEnable ? VK_TRUE : VK_FALSE;
+	return VkState;
+}
+
+VkPipelineMultisampleStateCreateInfo MultisampleStateToVk(const BmRender_MultisampleState& State)
+{
+	VkPipelineMultisampleStateCreateInfo VkState = {};
+	VkState.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	VkState.sampleShadingEnable = State.sampleShadingEnable ? VK_TRUE : VK_FALSE;
+	VkState.rasterizationSamples = SampleCountToVk(State.rasterizationSamples);
+	return VkState;
+}
+
+VkPipelineInputAssemblyStateCreateInfo InputAssemblyStateToVk(const BmRender_InputAssemblyState& State)
+{
+	VkPipelineInputAssemblyStateCreateInfo VkState = {};
+	VkState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	VkState.topology = PrimitiveTopologyToVk(State.topology);
+	VkState.primitiveRestartEnable = State.primitiveRestartEnable ? VK_TRUE : VK_FALSE;
+	return VkState;
+}
+
+VkPipelineViewportStateCreateInfo ViewportStateToVk(const BmRender_ViewportState& State)
+{
+	VkPipelineViewportStateCreateInfo VkState = {};
+	VkState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	VkState.viewportCount = State.viewportCount;
+	VkState.scissorCount = State.scissorCount;
+	return VkState;
+}
+
 bool CheckFormats(VkPhysicalDevice PhDevice)
 {
 	const u32 FormatPrioritySize = 3;

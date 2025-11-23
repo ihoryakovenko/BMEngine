@@ -153,3 +153,21 @@ VkShaderStageFlags ShaderStageFlagsToVk(BmRender_DescriptorShaderStage StageFlag
 BmRender_DescriptorShaderStage VkShaderStageFlagsToBmRender(VkShaderStageFlags StageFlags);
 VkPipelineStageFlags PipelineStageFlagsToVk(BmRender_PipelineSyncStage StageFlags);
 BmRender_PipelineSyncStage VkPipelineStageFlagsToBmRender(VkPipelineStageFlags StageFlags);
+
+// Pipeline state conversion functions
+VkPolygonMode PolygonModeToVk(BmRender_PolygonMode Mode);
+VkCullModeFlags CullModeFlagsToVk(BmRender_CullModeFlags Flags);
+VkFrontFace FrontFaceToVk(BmRender_FrontFace Face);
+VkColorComponentFlags ColorComponentFlagsToVk(BmRender_ColorComponentFlags Flags);
+VkBlendFactor BlendFactorToVk(BmRender_BlendFactor Factor);
+VkBlendOp BlendOpToVk(BmRender_BlendOp Op);
+VkPrimitiveTopology PrimitiveTopologyToVk(BmRender_PrimitiveTopology Topology);
+VkSampleCountFlagBits SampleCountToVk(BmRender_SampleCount Count);
+
+VkPipelineRasterizationStateCreateInfo RasterizationStateToVk(const BmRender_RasterizationState& State);
+VkPipelineColorBlendAttachmentState ColorBlendAttachmentToVk(const BmRender_ColorBlendAttachment& Attachment);
+VkPipelineColorBlendStateCreateInfo ColorBlendStateToVk(const BmRender_ColorBlendState& State);
+VkPipelineDepthStencilStateCreateInfo DepthStencilStateToVk(const BmRender_DepthStencilState& State);
+VkPipelineMultisampleStateCreateInfo MultisampleStateToVk(const BmRender_MultisampleState& State);
+VkPipelineInputAssemblyStateCreateInfo InputAssemblyStateToVk(const BmRender_InputAssemblyState& State);
+VkPipelineViewportStateCreateInfo ViewportStateToVk(const BmRender_ViewportState& State);

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vulkan/vulkan.h>
+
 #include <ShortTypes.h>
 
 #include "RenderInterface.h"
@@ -41,6 +43,7 @@ BmRender_Semaphore CreateSemaphoreHandle(VkSemaphore VulkanSemaphore, const BmRe
 BmRender_CommandPool CreateCommandPoolHandle(VkCommandPool VulkanCommandPool, const BmRender_CommandPoolData* Data);
 BmRender_CommandBuffer CreateCommandBufferHandle(VkCommandBuffer VulkanCommandBuffer, const BmRender_CommandBufferData* Data);
 BmRender_Queue CreateQueueHandle(VkQueue Queue, const BmRender_QueueData* Data);
+BmRender_DeviceMemory CreateDeviceMemoryHandle(VkDeviceMemory Memory);
 
 void DestroyDescriptorSetLayoutHandle(BmRender_DescriptorSetLayout Handle);
 void DestroyShaderHandle(BmRender_Shader Handle);
