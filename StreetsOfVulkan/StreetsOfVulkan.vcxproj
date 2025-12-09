@@ -14,7 +14,7 @@
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{43310985-ce08-45f5-8b12-5e2457f9a9f4}</ProjectGuid>
-    <RootNamespace>ApiTest</RootNamespace>
+    <RootNamespace>StreetsOfVulkan</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
     <ProjectName>StreetsOfVulkan</ProjectName>
   </PropertyGroup>
@@ -85,9 +85,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Source\main.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\BMEngine\Source\Engine\Systems\Render\RenderInterface.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
