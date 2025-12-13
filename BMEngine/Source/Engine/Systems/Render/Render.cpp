@@ -43,7 +43,7 @@ namespace Render
 		VkFormat* ColorAttachmentFormats = (VkFormat*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), AttachmentDataPtr->ColorAttachmentCount * sizeof(VkFormat));
 		for (u32 i = 0; i < AttachmentDataPtr->ColorAttachmentCount; ++i)
 		{
-			ColorAttachmentFormats[i] = FormatToVk(AttachmentDataPtr->ColorAttachmentFormats[i]);
+			ColorAttachmentFormats[i] = BmRender_FormatToVk(AttachmentDataPtr->ColorAttachmentFormats[i]);
 		}
 
 		VkPipelineRenderingCreateInfo RenderingInfo = { };
@@ -51,8 +51,8 @@ namespace Render
 		RenderingInfo.pNext = nullptr;
 		RenderingInfo.colorAttachmentCount = AttachmentDataPtr->ColorAttachmentCount;
 		RenderingInfo.pColorAttachmentFormats = ColorAttachmentFormats;
-		RenderingInfo.depthAttachmentFormat = FormatToVk(AttachmentDataPtr->DepthAttachmentFormat);
-		RenderingInfo.stencilAttachmentFormat = FormatToVk(AttachmentDataPtr->StencilAttachmentFormat);
+		RenderingInfo.depthAttachmentFormat = BmRender_FormatToVk(AttachmentDataPtr->DepthAttachmentFormat);
+		RenderingInfo.stencilAttachmentFormat = BmRender_FormatToVk(AttachmentDataPtr->StencilAttachmentFormat);
 
 		BmRender_DescriptorPoolSize PoolSizes[] =
 		{
@@ -76,7 +76,7 @@ namespace Render
 		InitInfo.ImageCount = 3;
 		InitInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 		InitInfo.PipelineRenderingCreateInfo = RenderingInfo;
-		//InitInfo.Allocator = GetVulkanAllocator();
+		InitInfo.Allocator = BmRender_GetVulkanAllocator();
 		ImGui_ImplVulkan_Init(&InitInfo);
 
 		ImGui_ImplVulkan_CreateFontsTexture();
