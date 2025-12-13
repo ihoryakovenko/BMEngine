@@ -904,7 +904,7 @@ VkIndexType IndexTypeToVk(BmRender_IndexType Type)
 	}
 }
 
-VkFormat FormatToVk(BmRender_Format Format)
+VkFormat BmRender_FormatToVk(BmRender_Format Format)
 {
 	switch (Format)
 	{
@@ -1163,6 +1163,11 @@ VkFormat FormatToVk(BmRender_Format Format)
 			assert(false);
 			return VK_FORMAT_UNDEFINED;
 	}
+}
+
+VkAllocationCallbacks* BmRender_GetVulkanAllocator()
+{
+	return GetVulkanAllocator();
 }
 
 BmRender_Format VkFormatToBmRender(VkFormat Format)
@@ -1428,7 +1433,7 @@ BmRender_Format VkFormatToBmRender(VkFormat Format)
 VkSurfaceFormatKHR SurfaceFormatToVk(BmRender_SurfaceFormat SurfaceFormat)
 {
 	VkSurfaceFormatKHR VkSurfaceFormat;
-	VkSurfaceFormat.format = FormatToVk(SurfaceFormat.Format);
+	VkSurfaceFormat.format = BmRender_FormatToVk(SurfaceFormat.Format);
 	//VkSurfaceFormat.colorSpace = SurfaceFormat.ColorSpace;
 	return VkSurfaceFormat;
 }
@@ -1880,7 +1885,7 @@ bool CheckFormats(VkPhysicalDevice PhDevice)
 	bool IsSupportedFormatFound = false;
 	for (u32 i = 0; i < FormatPrioritySize; ++i)
 	{
-		VkFormat FormatToCheck = FormatToVk(FormatPriority[i]);
+		VkFormat FormatToCheck = BmRender_FormatToVk(FormatPriority[i]);
 		if (CheckFormatSupport(PhDevice, FormatToCheck, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT))
 		{
 			IsSupportedFormatFound = true;
@@ -1902,7 +1907,7 @@ bool CheckFormats(VkPhysicalDevice PhDevice)
 
 u32 BmRender_GetFormatAlignment(BmRender_Format Format)
 {
-	VkFormat VkFormatValue = FormatToVk(Format);
+	VkFormat VkFormatValue = BmRender_FormatToVk(Format);
 	switch (VkFormatValue)
 	{
 		// 8-bit formats - 1 byte alignment

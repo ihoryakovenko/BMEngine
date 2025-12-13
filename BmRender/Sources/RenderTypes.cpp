@@ -36,7 +36,10 @@ static void VKAPI_CALL VulkanFreeCallback(
 	void* pUserData,
 	void* pMemory)
 {
-	free(pMemory);
+	if (pMemory)
+	{
+		free(pMemory);
+	}
 }
 
 static void VKAPI_CALL VulkanInternalAllocationNotification(
@@ -303,7 +306,7 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 	ImageCreateInfo.extent.depth = 1;
 	ImageCreateInfo.mipLevels = 1;
 	ImageCreateInfo.arrayLayers = Description->ArrayLayers;
-	ImageCreateInfo.format = FormatToVk(Description->Format);
+	ImageCreateInfo.format = BmRender_FormatToVk(Description->Format);
 	ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 	ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	ImageCreateInfo.usage = Usage;
@@ -336,7 +339,7 @@ static BmRender_ImageView CreateImageView(BmRender_Image Handle, u32 BaseArrayLa
 	ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	ViewCreateInfo.flags = 0;
 	ViewCreateInfo.viewType = ViewType;
-	ViewCreateInfo.format = FormatToVk(Resource.Format);
+	ViewCreateInfo.format = BmRender_FormatToVk(Resource.Format);
 	ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 	ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 	ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -437,7 +440,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 				VkAttribute = (VkVertexInputAttributeDescription*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkVertexInputAttributeDescription));
 				VkAttribute->binding = BindingIndex;
 				VkAttribute->location = CurrentLocation;
-				VkAttribute->format = FormatToVk(Format);
+				VkAttribute->format = BmRender_FormatToVk(Format);
 				VkAttribute->offset = attribute.Offset;
 
 				++CurrentLocation;
@@ -451,7 +454,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 					VkAttribute = (VkVertexInputAttributeDescription*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkVertexInputAttributeDescription));
 					VkAttribute->binding = BindingIndex;
 					VkAttribute->location = CurrentLocation;
-					VkAttribute->format = FormatToVk(BmRender_Format::R32G32B32A32_SFLOAT);
+					VkAttribute->format = BmRender_FormatToVk(BmRender_Format::R32G32B32A32_SFLOAT);
 					VkAttribute->offset = attribute.Offset + MatrixBindingOffset;
 
 					MatrixBindingOffset += 16;
@@ -489,7 +492,7 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	VkFormat* ColorAttachmentFormats = (VkFormat*)Memory_LinearAllocator_Alloc(GetFrameMemory(), Description->ResourceInfo.PipelineAttachmentData.ColorAttachmentCount * sizeof(VkFormat));
 	for (u32 i = 0; i < Description->ResourceInfo.PipelineAttachmentData.ColorAttachmentCount; ++i)
 	{
-		ColorAttachmentFormats[i] = FormatToVk(Description->ResourceInfo.PipelineAttachmentData.ColorAttachmentFormats[i]);
+		ColorAttachmentFormats[i] = BmRender_FormatToVk(Description->ResourceInfo.PipelineAttachmentData.ColorAttachmentFormats[i]);
 	}
 
 	VkPipelineRenderingCreateInfo RenderingInfo = { };
@@ -497,8 +500,8 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	RenderingInfo.pNext = nullptr;
 	RenderingInfo.colorAttachmentCount = Description->ResourceInfo.PipelineAttachmentData.ColorAttachmentCount;
 	RenderingInfo.pColorAttachmentFormats = ColorAttachmentFormats;
-	RenderingInfo.depthAttachmentFormat = FormatToVk(Description->ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat);
-	RenderingInfo.stencilAttachmentFormat = FormatToVk(Description->ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat);
+	RenderingInfo.depthAttachmentFormat = BmRender_FormatToVk(Description->ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat);
+	RenderingInfo.stencilAttachmentFormat = BmRender_FormatToVk(Description->ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat);
 
 	VkPipelineColorBlendAttachmentState VkColorBlendAttachment = ColorBlendAttachmentToVk(Description->ColorBlendAttachment);
 	VkPipelineColorBlendStateCreateInfo ColorBlendState = ColorBlendStateToVk(Description->ColorBlendState);
