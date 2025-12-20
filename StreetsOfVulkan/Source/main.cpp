@@ -526,6 +526,8 @@ int main()
 		PresentInfo.ImageIndices = &ImageIndex;
 
 		BmRender_SwapchainResult PresentResult = BmRender_QueuePresent(GraphicsQueue, &PresentInfo);
+
+		BmRender_FrameFree();
 	}
 
 	BmRender_QueueWaitIdle(GraphicsQueue);
