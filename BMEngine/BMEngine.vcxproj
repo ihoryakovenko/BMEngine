@@ -53,12 +53,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Scenes\TestScene.yaml" />
-    <None Include="Resources\Settings\DeferredPipeline.yaml" />
-    <None Include="Resources\Settings\DepthPipeline.yaml" />
     <None Include="Resources\Settings\RenderResources.yaml" />
-    <None Include="Resources\Settings\SkyBoxPipeline.yaml" />
-    <None Include="Resources\Settings\StaticMesh.yaml" />
-    <None Include="Resources\Settings\TerrainPipeline.yaml" />
     <None Include="Resources\Shaders\Second.frag" />
     <None Include="Resources\Shaders\Second.vert" />
     <None Include="Source\Engine\Systems\Render\Shaders\CompileShaders.bat" />

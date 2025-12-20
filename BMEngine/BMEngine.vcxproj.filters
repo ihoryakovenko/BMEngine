@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Resource Files">
@@ -50,11 +50,7 @@
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />
     <None Include="Resources\Shaders\Second.vert" />
-    <None Include="Resources\Settings\DeferredPipeline.yaml" />
-    <None Include="Resources\Settings\DepthPipeline.yaml" />
     <None Include="Resources\Settings\RenderResources.yaml" />
-    <None Include="Resources\Settings\SkyBoxPipeline.yaml" />
-    <None Include="Resources\Settings\StaticMesh.yaml" />
     <None Include="Source\Engine\Systems\Render\Shaders\CompileShaders.bat" />
     <None Include="Source\Engine\Systems\Render\Shaders\Deferred.frag.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\Deferred.vert.glsl" />
@@ -67,7 +63,6 @@
     <None Include="Source\Engine\Systems\Render\Shaders\SkyBox.vert.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\TerrainGenerator.frag.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\TerrainGenerator.vert.glsl" />
-    <None Include="Resources\Settings\TerrainPipeline.yaml" />
     <None Include="Resources\Scenes\TestScene.yaml" />
   </ItemGroup>
 </Project>

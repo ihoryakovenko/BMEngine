@@ -39,7 +39,7 @@ namespace Render
 	{
 		ImGui_ImplGlfw_InitForVulkan(Wnd, true);
 
-		AttachmentData* AttachmentDataPtr = DeferredPass::GetAttachmentData();
+		AttachmentData* AttachmentDataPtr = DeferredPassGetAttachmentData();
 		VkFormat* ColorAttachmentFormats = (VkFormat*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), AttachmentDataPtr->ColorAttachmentCount * sizeof(VkFormat));
 		for (u32 i = 0; i < AttachmentDataPtr->ColorAttachmentCount; ++i)
 		{
@@ -106,7 +106,7 @@ namespace Render
 		}
 
 		PipelineResourceInfo ResourceInfo = {};
-		ResourceInfo.PipelineAttachmentData = *MainPass::GetAttachmentData();
+		ResourceInfo.PipelineAttachmentData = *MainPassGetAttachmentData();
 
 		// Create vectors to hold pipeline data
 		std::vector<BmRender_ShaderStageDescription> shaderStages;
@@ -114,8 +114,140 @@ namespace Render
 		std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
 		std::vector<BmRender_PushConstant> pushConstantRanges;
 
-		BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/StaticMesh.yaml", MainScreenExtent, ResourceInfo, 
-			shaderStages, vertexBindings, descriptorSetLayouts, pushConstantRanges);
+		// Build shader stages
+		BmRender_ShaderStageDescription vertexStage = {};
+		vertexStage.Shader = Shaders["StaticMeshVertex"];
+		vertexStage.EntryPointFunction = "main";
+		shaderStages.push_back(vertexStage);
+
+		BmRender_ShaderStageDescription fragmentStage = {};
+		fragmentStage.Shader = Shaders["StaticMeshFragment"];
+		fragmentStage.EntryPointFunction = "main";
+		shaderStages.push_back(fragmentStage);
+
+		// Build descriptor set layouts
+		descriptorSetLayouts.push_back(DescriptorSetLayouts["FrameDataLayout"]);
+		descriptorSetLayouts.push_back(DescriptorSetLayouts["BindlesTexturesLayout"]);
+		descriptorSetLayouts.push_back(DescriptorSetLayouts["FrameDataLayout"]);
+		descriptorSetLayouts.push_back(DescriptorSetLayouts["MaterialLayout"]);
+		descriptorSetLayouts.push_back(DescriptorSetLayouts["ShadowMapArrayLayout"]);
+
+		// Build push constants
+		pushConstantRanges.push_back(PushConstants["MainConstant"]);
+
+		// Build vertex bindings from VBindings map
+		{
+			// StaticMeshVertex binding
+			Util::VertexBinding_depr& StaticMeshVertexBinding = VBindings["StaticMeshVertex"];
+			BmRender_VertexBinding BmRenderVertexBinding = {};
+			BmRenderVertexBinding.Stride = StaticMeshVertexBinding.Stride;
+			BmRenderVertexBinding.InputRate = StaticMeshVertexBinding.InputRate;
+			BmRenderVertexBinding.AttributesCount = 3; // Position, TextureCoords, Normal
+			BmRenderVertexBinding.Attributes = (VertexAttribute*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), sizeof(VertexAttribute) * BmRenderVertexBinding.AttributesCount);
+			BmRenderVertexBinding.Attributes[0] = StaticMeshVertexBinding.Attributes["Position"];
+			BmRenderVertexBinding.Attributes[1] = StaticMeshVertexBinding.Attributes["TextureCoords"];
+			BmRenderVertexBinding.Attributes[2] = StaticMeshVertexBinding.Attributes["Normal"];
+			vertexBindings.push_back(BmRenderVertexBinding);
+		}
+
+		{
+			// StaticMeshInstance binding
+			Util::VertexBinding_depr& StaticMeshInstanceBinding = VBindings["StaticMeshInstance"];
+			BmRender_VertexBinding BmRenderVertexBinding = {};
+			BmRenderVertexBinding.Stride = StaticMeshInstanceBinding.Stride;
+			BmRenderVertexBinding.InputRate = StaticMeshInstanceBinding.InputRate;
+			BmRenderVertexBinding.AttributesCount = 2; // InstanceModel, InstanceMaterialIndex
+			BmRenderVertexBinding.Attributes = (VertexAttribute*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), sizeof(VertexAttribute) * BmRenderVertexBinding.AttributesCount);
+			BmRenderVertexBinding.Attributes[0] = StaticMeshInstanceBinding.Attributes["InstanceModel"];
+			BmRenderVertexBinding.Attributes[1] = StaticMeshInstanceBinding.Attributes["InstanceMaterialIndex"];
+			vertexBindings.push_back(BmRenderVertexBinding);
+		}
+
+		// Build pipeline description
+		BmRender_PipelineDescription PipelineDesc = {};
+		PipelineDesc.Extent = MainScreenExtent;
+		PipelineDesc.ResourceInfo = ResourceInfo;
+
+		// Set shader stages
+		PipelineDesc.ShaderStages = shaderStages.data();
+		PipelineDesc.ShaderStagesCount = static_cast<u32>(shaderStages.size());
+
+		// Set vertex bindings
+		PipelineDesc.VertexBindings = vertexBindings.data();
+		PipelineDesc.VertexBindingsCount = static_cast<u32>(vertexBindings.size());
+
+		// Set descriptor set layouts
+		PipelineDesc.DescriptorSetLayouts = descriptorSetLayouts.data();
+		PipelineDesc.DescriptorSetLayoutsCount = static_cast<u32>(descriptorSetLayouts.size());
+
+		// Set push constants
+		PipelineDesc.PushConstantRanges = pushConstantRanges.data();
+		PipelineDesc.PushConstantRangesCount = static_cast<u32>(pushConstantRanges.size());
+
+		// Rasterization state
+		PipelineDesc.RasterizationState = {};
+		PipelineDesc.RasterizationState.depthClampEnable = false;
+		PipelineDesc.RasterizationState.rasterizerDiscardEnable = false;
+		PipelineDesc.RasterizationState.polygonMode = BmRender_PolygonMode::Fill;
+		PipelineDesc.RasterizationState.lineWidth = 1.0f;
+		PipelineDesc.RasterizationState.cullMode = BmRender_CullModeFlags::Back;
+		PipelineDesc.RasterizationState.frontFace = BmRender_FrontFace::CounterClockwise;
+		PipelineDesc.RasterizationState.depthBiasEnable = false;
+
+		// Color blend state
+		PipelineDesc.ColorBlendState = {};
+		PipelineDesc.ColorBlendState.logicOpEnable = false;
+		PipelineDesc.ColorBlendState.attachmentCount = 1;
+
+		// Color blend attachment
+		PipelineDesc.ColorBlendAttachment = {};
+		PipelineDesc.ColorBlendAttachment.colorWriteMask = BmRender_ColorComponentFlags::RGBA;
+		PipelineDesc.ColorBlendAttachment.blendEnable = true;
+		PipelineDesc.ColorBlendAttachment.srcColorBlendFactor = BmRender_BlendFactor::SrcAlpha;
+		PipelineDesc.ColorBlendAttachment.dstColorBlendFactor = BmRender_BlendFactor::OneMinusSrcAlpha;
+		PipelineDesc.ColorBlendAttachment.colorBlendOp = BmRender_BlendOp::Add;
+		PipelineDesc.ColorBlendAttachment.srcAlphaBlendFactor = BmRender_BlendFactor::One;
+		PipelineDesc.ColorBlendAttachment.dstAlphaBlendFactor = BmRender_BlendFactor::Zero;
+		PipelineDesc.ColorBlendAttachment.alphaBlendOp = BmRender_BlendOp::Add;
+
+		// Depth stencil state
+		PipelineDesc.DepthStencilState = {};
+		PipelineDesc.DepthStencilState.depthTestEnable = true;
+		PipelineDesc.DepthStencilState.depthWriteEnable = true;
+		PipelineDesc.DepthStencilState.depthCompareOp = BmRender_CompareOp::Less;
+		PipelineDesc.DepthStencilState.depthBoundsTestEnable = false;
+		PipelineDesc.DepthStencilState.stencilTestEnable = false;
+
+		// Multisample state
+		PipelineDesc.MultisampleState = {};
+		PipelineDesc.MultisampleState.sampleShadingEnable = false;
+		PipelineDesc.MultisampleState.rasterizationSamples = BmRender_SampleCount::Count1;
+
+		// Input assembly state
+		PipelineDesc.InputAssemblyState = {};
+		PipelineDesc.InputAssemblyState.topology = BmRender_PrimitiveTopology::TriangleList;
+		PipelineDesc.InputAssemblyState.primitiveRestartEnable = false;
+
+		// Viewport state
+		PipelineDesc.ViewportState = {};
+		PipelineDesc.ViewportState.viewportCount = 1;
+		PipelineDesc.ViewportState.scissorCount = 1;
+
+		// Viewport
+		PipelineDesc.Viewport = {};
+		PipelineDesc.Viewport.MinDepth = 0.0f;
+		PipelineDesc.Viewport.MaxDepth = 1.0f;
+		PipelineDesc.Viewport.X = 0.0f;
+		PipelineDesc.Viewport.Y = 0.0f;
+		PipelineDesc.Viewport.Width = static_cast<f32>(MainScreenExtent.Width);
+		PipelineDesc.Viewport.Height = static_cast<f32>(MainScreenExtent.Height);
+
+		// Scissor
+		PipelineDesc.Scissor = {};
+		PipelineDesc.Scissor.Offset.X = 0;
+		PipelineDesc.Scissor.Offset.Y = 0;
+		PipelineDesc.Scissor.Extent.Width = MainScreenExtent.Width;
+		PipelineDesc.Scissor.Extent.Height = MainScreenExtent.Height;
 
 		// Create pipeline layout from parsed descriptor set layouts
 		BmRender_PipelineLayoutDescription LayoutDesc = {};
@@ -161,6 +293,20 @@ namespace Render
 
 		DrawEntityBatch(CommandBuffer, Scene, Config);
 	}
+
+	static RenderState State;
+	static u32 CurrentImageIndex;
+
+	// DeferredPass static variables
+	static BmRender_Image DeferredInputDepthImage[MAX_DRAW_FRAMES];
+	static BmRender_Image DeferredInputColorImage[MAX_DRAW_FRAMES];
+
+	static BmRender_ImageView DeferredInputDepthImageInterface[MAX_DRAW_FRAMES];
+	static BmRender_ImageView DeferredInputColorImageInterface[MAX_DRAW_FRAMES];
+
+	static BmRender_DescriptorSet DeferredInputSet[MAX_DRAW_FRAMES];
+
+	static AttachmentData DeferredPassPipelineAttachmentData;
 
 	void DrawEntityBatch(BmRender_CommandBuffer CommandBuffer, DrawScene* Scene, const DrawEntityBatchConfig& Config)
 	{
@@ -229,9 +375,6 @@ namespace Render
 		}
 	}
 
-	static RenderState State;
-	static u32 CurrentImageIndex;
-
 	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferBinding* VpRegion, BmRender_GPUBufferBinding* EntityLightRegion, const DescriptorSetHandles& DescriptorSets, BmRender_DescriptorPool MainPool)
 	{		
 		InitCommandSystem(3);
@@ -242,9 +385,9 @@ namespace Render
 		State.DescriptorSets = DescriptorSets;
 		State.MainPool = MainPool;
 
-		DeferredPass::Init(State.MainPool);
-		MainPass::Init();
-		LightningPass::Init(State.MainPool);
+		DeferredPassInit(State.MainPool);
+		MainPassInit();
+		LightningPassInit(State.MainPool);
 
 		//TerrainRender::Init();
 		//DynamicMapSystem::Init();
@@ -263,8 +406,8 @@ namespace Render
 			BmRender_DestroyImageView(State.MeshPipeline.ShadowMapArrayImageInterface[i]);
 		}
 
-		DeferredPass::DeInit();
-		LightningPass::DeInit();
+		DeferredPassDeInit();
+		LightningPassDeInit();
 
 		for (auto& [name, pipeline] : Pipelines)
 		{
@@ -302,16 +445,16 @@ namespace Render
 
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(State.GraphicsCommandWorker);
 
-		LightningPass::Draw(Scene);
-		MainPass::BeginPass();
+		LightningPassDraw(Scene);
+		MainPassBeginPass();
 		//TerrainRender::Draw();
 		DrawStaticMeshes(SubmitPool->CommandBuffer, &State.MeshPipeline, Scene, State.DescriptorSets);
-		MainPass::EndPass();
-		DeferredPass::BeginPass();
-		DeferredPass::Draw();
+		MainPassEndPass();
+		DeferredPassBeginPass();
+		DeferredPassDraw();
 		ImGui::Render();
 		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), (VkCommandBuffer)SubmitPool->CommandBuffer);
-		DeferredPass::EndPass();
+		DeferredPassEndPass();
 
 		EndRecording(State.GraphicsCommandWorker);
 
@@ -353,33 +496,13 @@ namespace Render
 	{
 		return &State;
 	}
-}
 
-
-
-
-
-
-
-
-namespace DeferredPass
-{
-	static BmRender_Image DeferredInputDepthImage[MAX_DRAW_FRAMES];
-	static BmRender_Image DeferredInputColorImage[MAX_DRAW_FRAMES];
-		
-	static BmRender_ImageView DeferredInputDepthImageInterface[MAX_DRAW_FRAMES];
-	static BmRender_ImageView DeferredInputColorImageInterface[MAX_DRAW_FRAMES];
-
-	static BmRender_DescriptorSet DeferredInputSet[MAX_DRAW_FRAMES];
-
-	static AttachmentData PipelineAttachmentData;
-
-	void Init(BmRender_DescriptorPool MainPool)
+	void DeferredPassInit(BmRender_DescriptorPool MainPool)
 	{
-		PipelineAttachmentData.ColorAttachmentCount = 1;
-		PipelineAttachmentData.ColorAttachmentFormats[0] = BmRender_GetSurfaceFormat().Format;
-		PipelineAttachmentData.DepthAttachmentFormat = BmRender_Format::Undefined;
-		PipelineAttachmentData.StencilAttachmentFormat = BmRender_Format::Undefined;
+		DeferredPassPipelineAttachmentData.ColorAttachmentCount = 1;
+		DeferredPassPipelineAttachmentData.ColorAttachmentFormats[0] = BmRender_GetSurfaceFormat().Format;
+		DeferredPassPipelineAttachmentData.DepthAttachmentFormat = BmRender_Format::Undefined;
+		DeferredPassPipelineAttachmentData.StencilAttachmentFormat = BmRender_Format::Undefined;
 
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
@@ -411,7 +534,7 @@ namespace DeferredPass
 
 
 		PipelineResourceInfo ResourceInfo;
-		ResourceInfo.PipelineAttachmentData = PipelineAttachmentData;
+		ResourceInfo.PipelineAttachmentData = DeferredPassPipelineAttachmentData;
 
 		// Create vectors to hold pipeline data
 		std::vector<BmRender_ShaderStageDescription> shaderStages;
@@ -419,8 +542,105 @@ namespace DeferredPass
 		std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
 		std::vector<BmRender_PushConstant> pushConstantRanges;
 
-		BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/DeferredPipeline.yaml", MainScreenExtent, ResourceInfo, 
-			shaderStages, vertexBindings, descriptorSetLayouts, pushConstantRanges);
+		// Build shader stages
+		BmRender_ShaderStageDescription vertexStage = {};
+		vertexStage.Shader = Shaders["DeferredVertex"];
+		vertexStage.EntryPointFunction = "main";
+		shaderStages.push_back(vertexStage);
+
+		BmRender_ShaderStageDescription fragmentStage = {};
+		fragmentStage.Shader = Shaders["DeferredFragment"];
+		fragmentStage.EntryPointFunction = "main";
+		shaderStages.push_back(fragmentStage);
+
+		// Build descriptor set layouts
+		descriptorSetLayouts.push_back(DescriptorSetLayouts["MainPassOutputLayout"]);
+
+		// Build pipeline description
+		BmRender_PipelineDescription PipelineDesc = {};
+		PipelineDesc.Extent = MainScreenExtent;
+		PipelineDesc.ResourceInfo = ResourceInfo;
+
+		// Set shader stages
+		PipelineDesc.ShaderStages = shaderStages.data();
+		PipelineDesc.ShaderStagesCount = static_cast<u32>(shaderStages.size());
+
+		// Set vertex bindings (empty for deferred pass - fullscreen quad)
+		PipelineDesc.VertexBindings = nullptr;
+		PipelineDesc.VertexBindingsCount = 0;
+
+		// Set descriptor set layouts
+		PipelineDesc.DescriptorSetLayouts = descriptorSetLayouts.data();
+		PipelineDesc.DescriptorSetLayoutsCount = static_cast<u32>(descriptorSetLayouts.size());
+
+		// Set push constants (none)
+		PipelineDesc.PushConstantRanges = nullptr;
+		PipelineDesc.PushConstantRangesCount = 0;
+
+		// Rasterization state
+		PipelineDesc.RasterizationState = {};
+		PipelineDesc.RasterizationState.depthClampEnable = false;
+		PipelineDesc.RasterizationState.rasterizerDiscardEnable = false;
+		PipelineDesc.RasterizationState.polygonMode = BmRender_PolygonMode::Fill;
+		PipelineDesc.RasterizationState.lineWidth = 1.0f;
+		PipelineDesc.RasterizationState.cullMode = BmRender_CullModeFlags::None;
+		PipelineDesc.RasterizationState.frontFace = BmRender_FrontFace::CounterClockwise;
+		PipelineDesc.RasterizationState.depthBiasEnable = false;
+
+		// Color blend state
+		PipelineDesc.ColorBlendState = {};
+		PipelineDesc.ColorBlendState.logicOpEnable = false;
+		PipelineDesc.ColorBlendState.attachmentCount = 1;
+
+		// Color blend attachment
+		PipelineDesc.ColorBlendAttachment = {};
+		PipelineDesc.ColorBlendAttachment.colorWriteMask = BmRender_ColorComponentFlags::RGBA;
+		PipelineDesc.ColorBlendAttachment.blendEnable = false;
+		PipelineDesc.ColorBlendAttachment.srcColorBlendFactor = BmRender_BlendFactor::SrcAlpha;
+		PipelineDesc.ColorBlendAttachment.dstColorBlendFactor = BmRender_BlendFactor::OneMinusSrcAlpha;
+		PipelineDesc.ColorBlendAttachment.colorBlendOp = BmRender_BlendOp::Add;
+		PipelineDesc.ColorBlendAttachment.srcAlphaBlendFactor = BmRender_BlendFactor::One;
+		PipelineDesc.ColorBlendAttachment.dstAlphaBlendFactor = BmRender_BlendFactor::Zero;
+		PipelineDesc.ColorBlendAttachment.alphaBlendOp = BmRender_BlendOp::Add;
+
+		// Depth stencil state
+		PipelineDesc.DepthStencilState = {};
+		PipelineDesc.DepthStencilState.depthTestEnable = false;
+		PipelineDesc.DepthStencilState.depthWriteEnable = false;
+		PipelineDesc.DepthStencilState.depthCompareOp = BmRender_CompareOp::Less;
+		PipelineDesc.DepthStencilState.depthBoundsTestEnable = false;
+		PipelineDesc.DepthStencilState.stencilTestEnable = false;
+
+		// Multisample state
+		PipelineDesc.MultisampleState = {};
+		PipelineDesc.MultisampleState.sampleShadingEnable = false;
+		PipelineDesc.MultisampleState.rasterizationSamples = BmRender_SampleCount::Count1;
+
+		// Input assembly state
+		PipelineDesc.InputAssemblyState = {};
+		PipelineDesc.InputAssemblyState.topology = BmRender_PrimitiveTopology::TriangleList;
+		PipelineDesc.InputAssemblyState.primitiveRestartEnable = false;
+
+		// Viewport state
+		PipelineDesc.ViewportState = {};
+		PipelineDesc.ViewportState.viewportCount = 1;
+		PipelineDesc.ViewportState.scissorCount = 1;
+
+		// Viewport
+		PipelineDesc.Viewport = {};
+		PipelineDesc.Viewport.MinDepth = 0.0f;
+		PipelineDesc.Viewport.MaxDepth = 1.0f;
+		PipelineDesc.Viewport.X = 0.0f;
+		PipelineDesc.Viewport.Y = 0.0f;
+		PipelineDesc.Viewport.Width = static_cast<f32>(MainScreenExtent.Width);
+		PipelineDesc.Viewport.Height = static_cast<f32>(MainScreenExtent.Height);
+
+		// Scissor
+		PipelineDesc.Scissor = {};
+		PipelineDesc.Scissor.Offset.X = 0;
+		PipelineDesc.Scissor.Offset.Y = 0;
+		PipelineDesc.Scissor.Extent.Width = MainScreenExtent.Width;
+		PipelineDesc.Scissor.Extent.Height = MainScreenExtent.Height;
 
 		// Create pipeline layout from parsed descriptor set layouts
 		BmRender_PipelineLayoutDescription LayoutDesc = {};
@@ -437,9 +657,9 @@ namespace DeferredPass
 		Pipelines["Deferred"] = BmRender_CreatePipeline(&PipelineDesc);
 	}
 
-	void Draw()
+	void DeferredPassDraw()
 	{
-		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
+		CommandWorkerData* SubmitPool = GetSubmitPoolData(GetRenderState()->GraphicsCommandWorker);
 		BmRender_BindPipeline(SubmitPool->CommandBuffer, Pipelines["Deferred"]);
 
 		const BmRender_DescriptorSet DescriptorSet = DeferredInputSet[GetDrawSystemData()->CurrentFrame];
@@ -449,12 +669,12 @@ namespace DeferredPass
 		BmRender_Draw(SubmitPool->CommandBuffer, 3, 1, 0, 0); // 3 hardcoded vertices
 	}
 
-	void BeginPass()
+	void DeferredPassBeginPass()
 	{
-		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
+		CommandWorkerData* SubmitPool = GetSubmitPoolData(GetRenderState()->GraphicsCommandWorker);
 
 		BmRender_RenderingColorAttachment SwapchainColorAttachment = { };
-		SwapchainColorAttachment.ImageView = BmRender_GetSwapchainImageView(Render::CurrentImageIndex);
+		SwapchainColorAttachment.ImageView = BmRender_GetSwapchainImageView(CurrentImageIndex);
 		SwapchainColorAttachment.LoadOp = BmRender_AttachmentLoadOp::Clear;
 		SwapchainColorAttachment.StoreOp = BmRender_AttachmentStoreOp::Store;
 		SwapchainColorAttachment.ClearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -468,17 +688,17 @@ namespace DeferredPass
 
 		BmRender_TransitionImageForSampling(SubmitPool->CommandBuffer, DeferredInputColorImage[GetDrawSystemData()->CurrentFrame]);
 		BmRender_TransitionImageForSampling(SubmitPool->CommandBuffer, DeferredInputDepthImage[GetDrawSystemData()->CurrentFrame]);
-		BmRender_TransitionImageForRendering(SubmitPool->CommandBuffer, BmRender_GetSwapchainImage(Render::CurrentImageIndex));
+		BmRender_TransitionImageForRendering(SubmitPool->CommandBuffer, BmRender_GetSwapchainImage(CurrentImageIndex));
 
 		BmRender_BeginRendering(SubmitPool->CommandBuffer, &RenderingInfo);
 	}
 
-	void EndPass()
+	void DeferredPassEndPass()
 	{
-		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
+		CommandWorkerData* SubmitPool = GetSubmitPoolData(GetRenderState()->GraphicsCommandWorker);
 		BmRender_EndRendering(SubmitPool->CommandBuffer);
 
-		BmRender_TransitionImageForPresentation(SubmitPool->CommandBuffer, BmRender_GetSwapchainImage(Render::CurrentImageIndex));
+		BmRender_TransitionImageForPresentation(SubmitPool->CommandBuffer, BmRender_GetSwapchainImage(CurrentImageIndex));
 	}
 
 
@@ -505,12 +725,12 @@ namespace DeferredPass
 		return DeferredInputDepthImage;
 	}
 
-	AttachmentData* GetAttachmentData()
+	AttachmentData* DeferredPassGetAttachmentData()
 	{
-		return &PipelineAttachmentData;
+		return &DeferredPassPipelineAttachmentData;
 	}
 
-	void DeInit()
+	void DeferredPassDeInit()
 	{
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
@@ -520,10 +740,8 @@ namespace DeferredPass
 			BmRender_DestroyImage(DeferredInputDepthImage[i]);
 		}
 	}
-}
 
-namespace LightningPass
-{
+	// LightningPass static variables
 	static BmRender_DescriptorSet LightSpaceMatrixSet[MAX_DRAW_FRAMES];
 
 	static BmRender_GPUBufferBinding LightSpaceMatrixBufferRegion[MAX_DRAW_FRAMES];
@@ -534,7 +752,7 @@ namespace LightningPass
 	static BmRender_ImageView ShadowMapElement1ImageInterface[MAX_DRAW_FRAMES];
 	static BmRender_ImageView ShadowMapElement2ImageInterface[MAX_DRAW_FRAMES];
 
-	void Init(BmRender_DescriptorPool MainPool)
+	void LightningPassInit(BmRender_DescriptorPool MainPool)
 	{
 		ShadowMapArray = BmRender_CreateImage2DArray(DepthViewportExtent.Width, DepthViewportExtent.Height, DepthFormat,
 			BmRender_ImageType::DepthSamplad, MAX_LIGHT_SOURCES * BmRender_GetSwapchainImageCount());
@@ -570,8 +788,125 @@ namespace LightningPass
 		std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
 		std::vector<BmRender_PushConstant> pushConstantRanges;
 
-		BmRender_PipelineDescription PipelineDesc = Util::ParsePipelineFromYaml("./Resources/Settings/DepthPipeline.yaml", DepthViewportExtent, ResourceInfo, 
-			shaderStages, vertexBindings, descriptorSetLayouts, pushConstantRanges);
+		// Build shader stages
+		BmRender_ShaderStageDescription vertexStage = {};
+		vertexStage.Shader = Shaders["DepthVertex"];
+		vertexStage.EntryPointFunction = "main";
+		shaderStages.push_back(vertexStage);
+
+		// Build descriptor set layouts
+		descriptorSetLayouts.push_back(DescriptorSetLayouts["LightSpaceMatrixLayout"]);
+
+		// Build vertex bindings from VBindings map
+		{
+			// StaticMeshVertex binding (only Position attribute)
+			Util::VertexBinding_depr& StaticMeshVertexBinding = VBindings["StaticMeshVertex"];
+			BmRender_VertexBinding BmRenderVertexBinding = {};
+			BmRenderVertexBinding.Stride = StaticMeshVertexBinding.Stride;
+			BmRenderVertexBinding.InputRate = StaticMeshVertexBinding.InputRate;
+			BmRenderVertexBinding.AttributesCount = 1; // Position only
+			BmRenderVertexBinding.Attributes = (VertexAttribute*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), sizeof(VertexAttribute) * BmRenderVertexBinding.AttributesCount);
+			BmRenderVertexBinding.Attributes[0] = StaticMeshVertexBinding.Attributes["Position"];
+			vertexBindings.push_back(BmRenderVertexBinding);
+		}
+
+		{
+			// StaticMeshInstance binding (only InstanceModel attribute)
+			Util::VertexBinding_depr& StaticMeshInstanceBinding = VBindings["StaticMeshInstance"];
+			BmRender_VertexBinding BmRenderVertexBinding = {};
+			BmRenderVertexBinding.Stride = StaticMeshInstanceBinding.Stride;
+			BmRenderVertexBinding.InputRate = StaticMeshInstanceBinding.InputRate;
+			BmRenderVertexBinding.AttributesCount = 1; // InstanceModel only
+			BmRenderVertexBinding.Attributes = (VertexAttribute*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), sizeof(VertexAttribute) * BmRenderVertexBinding.AttributesCount);
+			BmRenderVertexBinding.Attributes[0] = StaticMeshInstanceBinding.Attributes["InstanceModel"];
+			vertexBindings.push_back(BmRenderVertexBinding);
+		}
+
+		// Build pipeline description
+		BmRender_PipelineDescription PipelineDesc = {};
+		PipelineDesc.Extent = DepthViewportExtent;
+		PipelineDesc.ResourceInfo = ResourceInfo;
+
+		// Set shader stages
+		PipelineDesc.ShaderStages = shaderStages.data();
+		PipelineDesc.ShaderStagesCount = static_cast<u32>(shaderStages.size());
+
+		// Set vertex bindings
+		PipelineDesc.VertexBindings = vertexBindings.data();
+		PipelineDesc.VertexBindingsCount = static_cast<u32>(vertexBindings.size());
+
+		// Set descriptor set layouts
+		PipelineDesc.DescriptorSetLayouts = descriptorSetLayouts.data();
+		PipelineDesc.DescriptorSetLayoutsCount = static_cast<u32>(descriptorSetLayouts.size());
+
+		// Set push constants (none)
+		PipelineDesc.PushConstantRanges = nullptr;
+		PipelineDesc.PushConstantRangesCount = 0;
+
+		// Rasterization state
+		PipelineDesc.RasterizationState = {};
+		PipelineDesc.RasterizationState.depthClampEnable = false;
+		PipelineDesc.RasterizationState.rasterizerDiscardEnable = false;
+		PipelineDesc.RasterizationState.polygonMode = BmRender_PolygonMode::Fill;
+		PipelineDesc.RasterizationState.lineWidth = 1.0f;
+		PipelineDesc.RasterizationState.cullMode = BmRender_CullModeFlags::Back;
+		PipelineDesc.RasterizationState.frontFace = BmRender_FrontFace::CounterClockwise;
+		PipelineDesc.RasterizationState.depthBiasEnable = false;
+
+		// Color blend state
+		PipelineDesc.ColorBlendState = {};
+		PipelineDesc.ColorBlendState.logicOpEnable = false;
+		PipelineDesc.ColorBlendState.attachmentCount = 1;
+
+		// Color blend attachment
+		PipelineDesc.ColorBlendAttachment = {};
+		PipelineDesc.ColorBlendAttachment.colorWriteMask = BmRender_ColorComponentFlags::RGBA;
+		PipelineDesc.ColorBlendAttachment.blendEnable = true;
+		PipelineDesc.ColorBlendAttachment.srcColorBlendFactor = BmRender_BlendFactor::SrcAlpha;
+		PipelineDesc.ColorBlendAttachment.dstColorBlendFactor = BmRender_BlendFactor::OneMinusSrcAlpha;
+		PipelineDesc.ColorBlendAttachment.colorBlendOp = BmRender_BlendOp::Add;
+		PipelineDesc.ColorBlendAttachment.srcAlphaBlendFactor = BmRender_BlendFactor::One;
+		PipelineDesc.ColorBlendAttachment.dstAlphaBlendFactor = BmRender_BlendFactor::Zero;
+		PipelineDesc.ColorBlendAttachment.alphaBlendOp = BmRender_BlendOp::Add;
+
+		// Depth stencil state
+		PipelineDesc.DepthStencilState = {};
+		PipelineDesc.DepthStencilState.depthTestEnable = true;
+		PipelineDesc.DepthStencilState.depthWriteEnable = true;
+		PipelineDesc.DepthStencilState.depthCompareOp = BmRender_CompareOp::Less;
+		PipelineDesc.DepthStencilState.depthBoundsTestEnable = false;
+		PipelineDesc.DepthStencilState.stencilTestEnable = false;
+
+		// Multisample state
+		PipelineDesc.MultisampleState = {};
+		PipelineDesc.MultisampleState.sampleShadingEnable = false;
+		PipelineDesc.MultisampleState.rasterizationSamples = BmRender_SampleCount::Count1;
+
+		// Input assembly state
+		PipelineDesc.InputAssemblyState = {};
+		PipelineDesc.InputAssemblyState.topology = BmRender_PrimitiveTopology::TriangleList;
+		PipelineDesc.InputAssemblyState.primitiveRestartEnable = false;
+
+		// Viewport state
+		PipelineDesc.ViewportState = {};
+		PipelineDesc.ViewportState.viewportCount = 1;
+		PipelineDesc.ViewportState.scissorCount = 1;
+
+		// Viewport
+		PipelineDesc.Viewport = {};
+		PipelineDesc.Viewport.MinDepth = 0.0f;
+		PipelineDesc.Viewport.MaxDepth = 1.0f;
+		PipelineDesc.Viewport.X = 0.0f;
+		PipelineDesc.Viewport.Y = 0.0f;
+		PipelineDesc.Viewport.Width = static_cast<f32>(DepthViewportExtent.Width);
+		PipelineDesc.Viewport.Height = static_cast<f32>(DepthViewportExtent.Height);
+
+		// Scissor
+		PipelineDesc.Scissor = {};
+		PipelineDesc.Scissor.Offset.X = 0;
+		PipelineDesc.Scissor.Offset.Y = 0;
+		PipelineDesc.Scissor.Extent.Width = DepthViewportExtent.Width;
+		PipelineDesc.Scissor.Extent.Height = DepthViewportExtent.Height;
 
 		// Create pipeline layout from parsed descriptor set layouts
 		BmRender_PipelineLayoutDescription LayoutDesc = {};
@@ -588,9 +923,9 @@ namespace LightningPass
 		Pipelines["Depth"] = BmRender_CreatePipeline(&PipelineDesc);
 	}
 
-	void Draw(Render::DrawScene* Scene)
+	void LightningPassDraw(DrawScene* Scene)
 	{
-		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
+		CommandWorkerData* SubmitPool = GetSubmitPoolData(GetRenderState()->GraphicsCommandWorker);
 
 		const glm::mat4* LightViews[] =
 		{
@@ -627,7 +962,7 @@ namespace LightningPass
 				LightSpaceMatrixSet[LightCaster],
 			};
 
-			Render::DrawEntityBatchConfig Config = {};
+			DrawEntityBatchConfig Config = {};
 			Config.Pipeline = Pipelines["Depth"];
 			Config.PipelineLayout = PipelineLayouts["Depth"];
 			Config.DescriptorSets = DescriptorSetGroup;
@@ -637,7 +972,7 @@ namespace LightningPass
 			Config.PushConstant = {};
 			Config.PushConstantData = nullptr;
 
-			Render::DrawEntityBatch(SubmitPool->CommandBuffer, Scene, Config);
+			DrawEntityBatch(SubmitPool->CommandBuffer, Scene, Config);
 
 			BmRender_EndRendering(SubmitPool->CommandBuffer);
 		}
@@ -646,7 +981,7 @@ namespace LightningPass
 		BmRender_TransitionImageForSampling(SubmitPool->CommandBuffer, ShadowMapArray, MAX_LIGHT_SOURCES * GetDrawSystemData()->CurrentFrame, MAX_LIGHT_SOURCES);
 	}
 
-	void DeInit()
+	void LightningPassDeInit()
 	{
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
@@ -656,31 +991,29 @@ namespace LightningPass
 		}
 		BmRender_DestroyImage(ShadowMapArray);
 	}
-}
 
-namespace MainPass
-{
-	static AttachmentData PipelineAttachmentData;
+	// MainPass static variables
+	static AttachmentData MainPassPipelineAttachmentData;
 
-	void Init()
+	void MainPassInit()
 	{
-		PipelineAttachmentData.ColorAttachmentCount = 1;
-		PipelineAttachmentData.ColorAttachmentFormats[0] = ColorFormat;
-		PipelineAttachmentData.DepthAttachmentFormat = DepthFormat;
+		MainPassPipelineAttachmentData.ColorAttachmentCount = 1;
+		MainPassPipelineAttachmentData.ColorAttachmentFormats[0] = ColorFormat;
+		MainPassPipelineAttachmentData.DepthAttachmentFormat = DepthFormat;
 	}
 
-	void BeginPass()
+	void MainPassBeginPass()
 	{
-		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
+		CommandWorkerData* SubmitPool = GetSubmitPoolData(GetRenderState()->GraphicsCommandWorker);
 
 		BmRender_RenderingColorAttachment ColorAttachment = { };
-		ColorAttachment.ImageView = DeferredPass::TestDeferredInputColorImageInterface()[GetDrawSystemData()->CurrentFrame];
+		ColorAttachment.ImageView = TestDeferredInputColorImageInterface()[GetDrawSystemData()->CurrentFrame];
 		ColorAttachment.LoadOp = BmRender_AttachmentLoadOp::Clear;
 		ColorAttachment.StoreOp = BmRender_AttachmentStoreOp::Store;
 		ColorAttachment.ClearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 		BmRender_RenderingDepthAttachment DepthAttachment = { };
-		DepthAttachment.ImageView = DeferredPass::TestDeferredInputDepthImageInterface()[GetDrawSystemData()->CurrentFrame];
+		DepthAttachment.ImageView = TestDeferredInputDepthImageInterface()[GetDrawSystemData()->CurrentFrame];
 		DepthAttachment.LoadOp = BmRender_AttachmentLoadOp::Clear;
 		DepthAttachment.StoreOp = BmRender_AttachmentStoreOp::Store;
 		DepthAttachment.ClearValue = { 1.0f, 0 };
@@ -692,20 +1025,20 @@ namespace MainPass
 		RenderingInfo.ColorAttachmentCount = 1;
 		RenderingInfo.DepthAttachment = &DepthAttachment;
 
-		BmRender_TransitionImageForRendering(SubmitPool->CommandBuffer, DeferredPass::TestDeferredInputColorImage()[GetDrawSystemData()->CurrentFrame]);
-		BmRender_TransitionImageForRendering(SubmitPool->CommandBuffer, DeferredPass::TestDeferredInputDepthImage()[GetDrawSystemData()->CurrentFrame]);
+		BmRender_TransitionImageForRendering(SubmitPool->CommandBuffer, TestDeferredInputColorImage()[GetDrawSystemData()->CurrentFrame]);
+		BmRender_TransitionImageForRendering(SubmitPool->CommandBuffer, TestDeferredInputDepthImage()[GetDrawSystemData()->CurrentFrame]);
 
 		BmRender_BeginRendering(SubmitPool->CommandBuffer, &RenderingInfo);
 	}
 
-	void EndPass()
+	void MainPassEndPass()
 	{
-		CommandWorkerData* SubmitPool = GetSubmitPoolData(Render::GetRenderState()->GraphicsCommandWorker);
+		CommandWorkerData* SubmitPool = GetSubmitPoolData(GetRenderState()->GraphicsCommandWorker);
 		BmRender_EndRendering(SubmitPool->CommandBuffer);
 	}
 
-	AttachmentData* GetAttachmentData()
+	AttachmentData* MainPassGetAttachmentData()
 	{
-		return &PipelineAttachmentData;
+		return &MainPassPipelineAttachmentData;
 	}
 }

@@ -214,24 +214,10 @@ namespace Util
 	Yaml::Node& GetVertexBindingNode(Yaml::Node& VertexNode);
 	Yaml::Node& GetVertexAttributesNode(Yaml::Node& VertexNode);
 	Yaml::Node& GetVertexAttributeTypeNode(Yaml::Node& AttributeNode);
-	Yaml::Node& GetPipelineNode(Yaml::Node& Root);
-	Yaml::Node& GetPipelineShadersNode(Yaml::Node& PipelineNode);
-	Yaml::Node& GetPipelineRasterizationNode(Yaml::Node& PipelineNode);
-	Yaml::Node& GetPipelineColorBlendStateNode(Yaml::Node& PipelineNode);
-	Yaml::Node& GetPipelineColorBlendAttachmentNode(Yaml::Node& PipelineNode);
-	Yaml::Node& GetPipelineDepthStencilNode(Yaml::Node& PipelineNode);
-	Yaml::Node& GetPipelineMultisampleNode(Yaml::Node& PipelineNode);
-	Yaml::Node& GetPipelineInputAssemblyNode(Yaml::Node& PipelineNode);
-	Yaml::Node& GetVertexAttributeLayoutNode(Yaml::Node& PipelineNode);
-	Yaml::Node& GetPipelineViewportStateNode(Yaml::Node& PipelineNode);
-	Yaml::Node& GetPipelineLayoutNode(Yaml::Node& PipelineNode);
-	Yaml::Node& GetPushConstantNode(Yaml::Node& PipelineNode);
 	Yaml::Node& GetPushConstantsFromResources(Yaml::Node& Root);
 
 	// Push constant management
 	void ParseAndCreatePushConstants(Yaml::Node& PushConstantsNode);
-	Yaml::Node& GetViewportNode(Yaml::Node& PipelineNode);
-	Yaml::Node& GetScissorNode(Yaml::Node& PipelineNode);
 
 	Yaml::Node& GetSceneResources(Yaml::Node& Root);
 	Yaml::Node& GetTextures(Yaml::Node& Root);
@@ -247,26 +233,7 @@ namespace Util
 	BmRender_DescriptorSetLayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode);
 	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, VertexAttribute* OutAttribute, std::string* OutAttributeName);
 	VertexBinding_depr ParseVertexBindingNode(Yaml::Node& BindingNode);
-	BmRender_RasterizationState ParsePipelineRasterizationNode(Yaml::Node& RasterizationNode);
-	BmRender_ColorBlendState ParsePipelineColorBlendStateNode(Yaml::Node& ColorBlendStateNode);
-	BmRender_ColorBlendAttachment ParsePipelineColorBlendAttachmentNode(Yaml::Node& ColorBlendAttachmentNode);
-	BmRender_DepthStencilState ParsePipelineDepthStencilNode(Yaml::Node& DepthStencilNode);
-	BmRender_MultisampleState ParsePipelineMultisampleNode(Yaml::Node& MultisampleNode);
-	BmRender_InputAssemblyState ParsePipelineInputAssemblyNode(Yaml::Node& InputAssemblyNode);
-	BmRender_ViewportState ParsePipelineViewportStateNode(Yaml::Node& ViewportStateNode);
-	BmRender_Viewport ParseViewportNode(Yaml::Node& ViewportNode);
-	BmRender_Rect2D ParseScissorNode(Yaml::Node& ScissorNode);
 
-	bool ParseBool(const char* Value, u32 Length);
-	BmRender_PolygonMode ParsePolygonMode(const char* Value, u32 Length);
-	BmRender_CullModeFlags ParseCullMode(const char* Value, u32 Length);
-	BmRender_FrontFace ParseFrontFace(const char* Value, u32 Length);
-	BmRender_ColorComponentFlags ParseColorWriteMask(const char* Value, u32 Length);
-	BmRender_BlendFactor ParseBlendFactor(const char* Value, u32 Length);
-	BmRender_BlendOp ParseBlendOp(const char* Value, u32 Length);
-	BmRender_CompareOp ParseCompareOp(const char* Value, u32 Length);
-	BmRender_SampleCount ParseSampleCount(const char* Value, u32 Length);
-	BmRender_PrimitiveTopology ParseTopology(const char* Value, u32 Length);
 	BmRender_PipelineShaderStage ParseShaderStage(const char* Value, u32 Length);
 
 	BmRender_Filter ParseFilter(const char* Value, u32 Length);
@@ -284,10 +251,4 @@ namespace Util
 
 	ShaderType ParseShaderType(const char* Value, u32 Length);
 	std::vector<DescriptorSetLayout> ParseDescriptorSetLayouts(Yaml::Node& DescriptorSetLayoutsNode);
-
-	BmRender_PipelineDescription ParsePipelineFromYaml(const std::string& YamlFilePath, BmRender_Extent2D Extent, const PipelineResourceInfo& ResourceInfo,
-		std::vector<BmRender_ShaderStageDescription>& ShaderStages,
-		std::vector<BmRender_VertexBinding>& VertexBindings,
-		std::vector<BmRender_DescriptorSetLayout>& DescriptorSetLayouts,
-		std::vector<BmRender_PushConstant>& PushConstantRanges);
 }

@@ -149,40 +149,27 @@ namespace Render
 	};
 
 	void DrawEntityBatch(BmRender_CommandBuffer CmdBuffer, DrawScene* Scene, const DrawEntityBatchConfig& Config);
-}
 
-namespace DeferredPass
-{
-	void Init(BmRender_DescriptorPool MainPool);
-	void DeInit();
-	void Draw();
-
-	void BeginPass();
-	void EndPass();
-
+	// DeferredPass functions
+	void DeferredPassInit(BmRender_DescriptorPool MainPool);
+	void DeferredPassDeInit();
+	void DeferredPassDraw();
+	void DeferredPassBeginPass();
+	void DeferredPassEndPass();
 	BmRender_ImageView* TestDeferredInputColorImageInterface();
 	BmRender_ImageView* TestDeferredInputDepthImageInterface();
-
 	BmRender_Image* TestDeferredInputColorImage();
 	BmRender_Image* TestDeferredInputDepthImage();
+	AttachmentData* DeferredPassGetAttachmentData();
 
-	AttachmentData* GetAttachmentData();
-}
+	// LightningPass functions
+	void LightningPassInit(BmRender_DescriptorPool MainPool);
+	void LightningPassDeInit();
+	void LightningPassDraw(DrawScene* Scene);
 
-namespace LightningPass
-{
-	void Init(BmRender_DescriptorPool MainPool);
-	void DeInit();
-
-	void Draw(Render::DrawScene* Scene);
-}
-
-namespace MainPass
-{
-	void Init();
-
-	void BeginPass();
-	void EndPass();
-
-	AttachmentData* GetAttachmentData();
+	// MainPass functions
+	void MainPassInit();
+	void MainPassBeginPass();
+	void MainPassEndPass();
+	AttachmentData* MainPassGetAttachmentData();
 }
