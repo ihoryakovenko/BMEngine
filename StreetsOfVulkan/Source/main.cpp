@@ -5,10 +5,72 @@
 #include <vector>
 #include <cstdio>
 #include <cstdlib>
+#include <cmath>
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <RenderInterface.h>
 
 #include <ShortTypes.h>
+
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+struct Vertex {
+	f32 pos[3];
+	f32 texCoord[2];
+};
+
+Vertex CubeVertices[36] = {
+	// Front face (z = 0.5, viewed from +Z, CCW)
+	{{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}},
+	{{ 0.5f,  0.5f,  0.5f}, {1.0f, 1.0f}},
+	{{ 0.5f, -0.5f,  0.5f}, {1.0f, 0.0f}},
+	{{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}},
+	{{-0.5f,  0.5f,  0.5f}, {0.0f, 1.0f}},
+	{{ 0.5f,  0.5f,  0.5f}, {1.0f, 1.0f}},
+
+	// Back face (z = -0.5, viewed from -Z, CCW)
+	{{ 0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
+	{{-0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}},
+	{{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f}},
+	{{ 0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
+	{{ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f}},
+	{{-0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}},
+
+	// Left face (x = -0.5, viewed from -X, CCW)
+	{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
+	{{-0.5f,  0.5f,  0.5f}, {1.0f, 1.0f}},
+	{{-0.5f, -0.5f,  0.5f}, {1.0f, 0.0f}},
+	{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
+	{{-0.5f,  0.5f, -0.5f}, {0.0f, 1.0f}},
+	{{-0.5f,  0.5f,  0.5f}, {1.0f, 1.0f}},
+
+	// Right face (x = 0.5, viewed from +X, CCW)
+	{{ 0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}},
+	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}},
+	{{ 0.5f, -0.5f, -0.5f}, {1.0f, 0.0f}},
+	{{ 0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}},
+	{{ 0.5f,  0.5f,  0.5f}, {0.0f, 1.0f}},
+	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}},
+
+	// Top face (y = 0.5, viewed from +Y, CCW)
+	{{-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f}},
+	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}},
+	{{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}},
+	{{-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f}},
+	{{-0.5f,  0.5f, -0.5f}, {0.0f, 1.0f}},
+	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}},
+
+	// Bottom face (y = -0.5, viewed from -Y, CCW)
+	{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
+	{{ 0.5f, -0.5f,  0.5f}, {1.0f, 1.0f}},
+	{{ 0.5f, -0.5f, -0.5f}, {1.0f, 0.0f}},
+	{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
+	{{-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f}},
+	{{ 0.5f, -0.5f,  0.5f}, {1.0f, 1.0f}},
+};
 
 static bool LoadShaderFile(const char* FilePath, char** OutCode, size_t* OutCodeSize)
 {
@@ -47,107 +109,6 @@ static bool LoadShaderFile(const char* FilePath, char** OutCode, size_t* OutCode
 	*OutCode = code;
 	*OutCodeSize = codeSize;
 	return true;
-}
-
-#include <cstdint>
-#include <array>
-#include <vector>
-#include <cstring>
-#include <vulkan/vulkan.h>
-
-using Tile8x8 = std::array<uint8_t, 64>;
-
-Tile8x8 DecodeGenesisTile4BPP(const uint8_t* d)
-{
-	Tile8x8 out{ };
-	const uint8_t* p0 = d + 0, * p1 = d + 8, * p2 = d + 16, * p3 = d + 24;
-
-	for (int y = 0; y < 8; y++)
-	{
-		uint8_t b0 = p0[y], b1 = p1[y], b2 = p2[y], b3 = p3[y];
-		for (int x = 0; x < 8; x++)
-		{
-			int bit = 7 - x;
-			uint8_t idx =
-				((b0 >> bit) & 1) |
-				(((b1 >> bit) & 1) << 1) |
-				(((b2 >> bit) & 1) << 2) |
-				(((b3 >> bit) & 1) << 3);
-			out[y * 8 + x] = idx;
-		}
-	}
-	return out;
-}
-
-inline uint8_t Expand3To8(int v) { return (v << 5) | (v << 2) | (v >> 1); }
-
-struct RGBA { uint8_t r, g, b, a; };
-
-RGBA DecodeGenesisColor(uint16_t c)
-{
-	int r = (c & 0x00E) >> 1;
-	int g = (c & 0x0E0) >> 5;
-	int b = (c & 0xE00) >> 9;
-	return { Expand3To8(r), Expand3To8(g), Expand3To8(b), 255 };
-}
-
-std::array<std::array<RGBA, 16>, 4> BuildPalettes(const uint16_t* cram)
-{
-	std::array<std::array<RGBA, 16>, 4> p{ };
-	for (int pal = 0; pal < 4; pal++)
-	{
-		for (int i = 0; i < 16; i++)
-			p[pal][i] = DecodeGenesisColor(cram[pal * 16 + i]);
-
-		p[pal][0].a = 0;
-	}
-	return p;
-}
-
-std::array<RGBA, 64> ApplyPalette(
-	const Tile8x8& t,
-	const std::array<std::array<RGBA, 16>, 4>& pal,
-	int pi)
-{
-	std::array<RGBA, 64> out{ };
-	const auto& p = pal[pi];
-	for (int i = 0; i < 64; i++) out[i] = p[t[i]];
-	return out;
-}
-
-constexpr int TILE_COUNT = 2048;
-constexpr int TILE_SIZE = 32;
-constexpr int GRID_W = 64;
-constexpr int GRID_H = 32;
-constexpr int ATLAS_W = GRID_W * 8;
-constexpr int ATLAS_H = GRID_H * 8;
-
-std::vector<RGBA> BuildVRAMAtlas(
-	const uint8_t* vram,
-	const uint16_t* cram)
-{
-	std::vector<RGBA> atlas(ATLAS_W * ATLAS_H);
-	auto palettes = BuildPalettes(cram);
-
-	for (int tile = 0; tile < TILE_COUNT; tile++)
-	{
-		const uint8_t* tdata = vram + tile * TILE_SIZE;
-		Tile8x8 t = DecodeGenesisTile4BPP(tdata);
-		auto rgba = ApplyPalette(t, palettes, 0);
-
-		int tx = tile % GRID_W;
-		int ty = tile / GRID_W;
-
-		for (int y = 0; y < 8; y++)
-			for (int x = 0; x < 8; x++)
-			{
-				int dx = tx * 8 + x;
-				int dy = ty * 8 + y;
-				atlas[dy * ATLAS_W + dx] = rgba[y * 8 + x];
-			}
-	}
-
-	return atlas;
 }
 
 u64 ReadFile(FILE* File, void** OutData)
@@ -215,11 +176,18 @@ int main()
 	DescriptorBinding.StageFlags = BmRender_DescriptorShaderStage::Fragment;
 	BmRender_DescriptorSetLayout DescriptorSetLayout = BmRender_CreateDescriptorSetLayout(&DescriptorBinding, 1);
 
+	// Push constant for MVP matrix (64 bytes for mat4)
+	BmRender_PushConstant PushConstantRange = BmRender_CreatePushConstant(
+		BmRender_DescriptorShaderStage::Vertex,
+		0,
+		64  // sizeof(mat4) = 16 floats * 4 bytes = 64 bytes
+	);
+
 	BmRender_PipelineLayoutDescription LayoutDesc = {};
 	LayoutDesc.SetLayoutCount = 1;
 	LayoutDesc.SetLayouts = &DescriptorSetLayout;
-	LayoutDesc.PushConstantRangeCount = 0;
-	LayoutDesc.PushConstantRanges = nullptr;
+	LayoutDesc.PushConstantRangeCount = 1;
+	LayoutDesc.PushConstantRanges = &PushConstantRange;
 	LayoutDesc.PipelineType = BmRender_PipelineType::Graphics;
 	BmRender_PipelineLayout PipelineLayout = BmRender_CreatePipelineLayout(&LayoutDesc);
 	
@@ -228,7 +196,7 @@ int main()
 
 	PipelineDesc.ResourceInfo.PipelineAttachmentData.ColorAttachmentCount = 1;
 	PipelineDesc.ResourceInfo.PipelineAttachmentData.ColorAttachmentFormats[0] = BmRender_GetSurfaceFormat().Format;
-	PipelineDesc.ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = BmRender_Format::Undefined;
+	PipelineDesc.ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = BmRender_Format::D32_SFLOAT;
 	PipelineDesc.ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = BmRender_Format::Undefined;
 
 	BmRender_ShaderStageDescription ShaderStages[2] = {};
@@ -239,20 +207,37 @@ int main()
 	PipelineDesc.ShaderStages = ShaderStages;
 	PipelineDesc.ShaderStagesCount = 2;
 
-	PipelineDesc.VertexBindings = nullptr;
-	PipelineDesc.VertexBindingsCount = 0;
+	// Define vertex bindings
+	VertexAttribute PositionAttribute = {};
+	PositionAttribute.Type = BmRender_AttributeType::Vec3;
+	PositionAttribute.Offset = 0;
+
+	VertexAttribute TexCoordAttribute = {};
+	TexCoordAttribute.Type = BmRender_AttributeType::Vec2;
+	TexCoordAttribute.Offset = sizeof(f32) * 3;  // After position (3 floats)
+
+	VertexAttribute VertexAttributes[2] = { PositionAttribute, TexCoordAttribute };
+
+	BmRender_VertexBinding VertexBinding = {};
+	VertexBinding.Attributes = VertexAttributes;
+	VertexBinding.AttributesCount = 2;
+	VertexBinding.Stride = sizeof(Vertex);
+	VertexBinding.InputRate = BmRender_VertexInputRate::Vertex;
+
+	PipelineDesc.VertexBindings = &VertexBinding;
+	PipelineDesc.VertexBindingsCount = 1;
 
 	PipelineDesc.DescriptorSetLayouts = &DescriptorSetLayout;
 	PipelineDesc.DescriptorSetLayoutsCount = 1;
-	PipelineDesc.PushConstantRanges = nullptr;
-	PipelineDesc.PushConstantRangesCount = 0;
+	PipelineDesc.PushConstantRanges = &PushConstantRange;
+	PipelineDesc.PushConstantRangesCount = 1;
 
 	PipelineDesc.RasterizationState = {};
 	PipelineDesc.RasterizationState.depthClampEnable = false;
 	PipelineDesc.RasterizationState.rasterizerDiscardEnable = false;
 	PipelineDesc.RasterizationState.polygonMode = BmRender_PolygonMode::Fill;
 	PipelineDesc.RasterizationState.lineWidth = 1.0f;
-	PipelineDesc.RasterizationState.cullMode = BmRender_CullModeFlags::None;
+	PipelineDesc.RasterizationState.cullMode = BmRender_CullModeFlags::Back;
 	PipelineDesc.RasterizationState.frontFace = BmRender_FrontFace::CounterClockwise;
 	PipelineDesc.RasterizationState.depthBiasEnable = false;
 
@@ -271,8 +256,8 @@ int main()
 	PipelineDesc.ColorBlendState.attachmentCount = 1;
 
 	PipelineDesc.DepthStencilState = {};
-	PipelineDesc.DepthStencilState.depthTestEnable = false;
-	PipelineDesc.DepthStencilState.depthWriteEnable = false;
+	PipelineDesc.DepthStencilState.depthTestEnable = true;
+	PipelineDesc.DepthStencilState.depthWriteEnable = true;
 	PipelineDesc.DepthStencilState.depthCompareOp = BmRender_CompareOp::Less;
 	PipelineDesc.DepthStencilState.depthBoundsTestEnable = false;
 	PipelineDesc.DepthStencilState.stencilTestEnable = false;
@@ -304,122 +289,21 @@ int main()
 	PipelineDesc.ViewportState.viewportCount = 1;
 	PipelineDesc.ViewportState.scissorCount = 1;
 
+	const u64 VertexBufferSize = sizeof(CubeVertices);
+	BmRender_GPUBuffer StagingBuffer = BmRender_CreateStagingBuffer(VertexBufferSize);
+	BmRender_GPUBuffer VertexBuffer = BmRender_CreateVertexStageBuffer(VertexBufferSize, MemoryPropertyFlag::GPULocal);
+
 	BmRender_Pipeline Pipeline = BmRender_CreatePipeline(&PipelineDesc);
-
 	BmRender_Queue GraphicsQueue = BmRender_CreateQueue(BmRender_QueueType::Graphic);
-
 	BmRender_CommandPool CommandPool = BmRender_CreateCommandPool(BmRender_QueueType::Graphic);
 	BmRender_CommandBuffer CommandBuffer = BmRender_AllocateCommandBuffer(CommandPool);
-
 	BmRender_Semaphore ImageAvailableSemaphore = BmRender_CreateSemaphore();
 	BmRender_Semaphore RenderFinishedSemaphore = BmRender_CreateSemaphore();
 	BmRender_Fence InFlightFence = BmRender_CreateFence();
 
-	u16* CRAMData = nullptr;
-	FILE* CRAM = fopen("./CRAM.ram", "rb");
-	if (!CRAM)
-	{
-		return 0;
-	}
-
-	u8* VRAMData = nullptr;
-	FILE* VRAM = fopen("./VRAM.ram", "rb");
-	if (!VRAM)
-	{
-		return 0;
-	}
-
-	ReadFile(CRAM, (void**)&CRAMData);
-	ReadFile(VRAM, (void**)&VRAMData);
-
-	fclose(CRAM);
-	fclose(VRAM);
-
-	std::vector<RGBA>VRAMAtlasData = BuildVRAMAtlas(VRAMData, CRAMData);
-
-	BmRender_Image VRAMAtlasImage = BmRender_CreateImage2D(ATLAS_W, ATLAS_H, BmRender_Format::R8G8B8A8_UNORM, BmRender_ImageType::TransferSampled);
-	BmRender_ImageView VRAMAtlasImageView = BmRender_CreateImageView2D(VRAMAtlasImage);
-
-	u64 AtlasDataSize = VRAMAtlasData.size() * sizeof(RGBA);
-	BmRender_GPUBuffer StagingBuffer = BmRender_CreateStagingBuffer(AtlasDataSize);
-	
-	BmRender_UpdateHostCompatibleBuffer(StagingBuffer, 0, AtlasDataSize, VRAMAtlasData.data());
-
-	BmRender_BeginCommandBuffer(CommandBuffer);
-	
-	VkImageMemoryBarrier2 TransferImageBarrier = {};
-	TransferImageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-	TransferImageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
-	TransferImageBarrier.srcAccessMask = 0;
-	TransferImageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-	TransferImageBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-	TransferImageBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	TransferImageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	TransferImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	TransferImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	TransferImageBarrier.image = (VkImage)VRAMAtlasImage;
-	TransferImageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	TransferImageBarrier.subresourceRange.baseMipLevel = 0;
-	TransferImageBarrier.subresourceRange.levelCount = 1;
-	TransferImageBarrier.subresourceRange.baseArrayLayer = 0;
-	TransferImageBarrier.subresourceRange.layerCount = 1;
-
-	VkDependencyInfo TransferDepInfo = {};
-	TransferDepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-	TransferDepInfo.imageMemoryBarrierCount = 1;
-	TransferDepInfo.pImageMemoryBarriers = &TransferImageBarrier;
-
-	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
-	
-	vkCmdPipelineBarrier2(VkCmdBuffer, &TransferDepInfo);
-
-	VkBufferImageCopy ImageRegion = {};
-	ImageRegion.bufferOffset = 0;
-	ImageRegion.bufferRowLength = 0;
-	ImageRegion.bufferImageHeight = 0;
-	ImageRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	ImageRegion.imageSubresource.mipLevel = 0;
-	ImageRegion.imageSubresource.baseArrayLayer = 0;
-	ImageRegion.imageSubresource.layerCount = 1;
-	ImageRegion.imageOffset = { 0, 0, 0 };
-	ImageRegion.imageExtent = { ATLAS_W, ATLAS_H, 1 };
-
-	vkCmdCopyBufferToImage(VkCmdBuffer, (VkBuffer)StagingBuffer, (VkImage)VRAMAtlasImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ImageRegion);
-
-	VkImageMemoryBarrier2 ShaderReadBarrier = {};
-	ShaderReadBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-	ShaderReadBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-	ShaderReadBarrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-	ShaderReadBarrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-	ShaderReadBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
-	ShaderReadBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	ShaderReadBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	ShaderReadBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	ShaderReadBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	ShaderReadBarrier.image = (VkImage)VRAMAtlasImage;
-	ShaderReadBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	ShaderReadBarrier.subresourceRange.baseMipLevel = 0;
-	ShaderReadBarrier.subresourceRange.levelCount = 1;
-	ShaderReadBarrier.subresourceRange.baseArrayLayer = 0;
-	ShaderReadBarrier.subresourceRange.layerCount = 1;
-
-	VkDependencyInfo ShaderReadDepInfo = {};
-	ShaderReadDepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-	ShaderReadDepInfo.imageMemoryBarrierCount = 1;
-	ShaderReadDepInfo.pImageMemoryBarriers = &ShaderReadBarrier;
-
-	vkCmdPipelineBarrier2(VkCmdBuffer, &ShaderReadDepInfo);
-	BmRender_EndCommandBuffer(CommandBuffer);
-
-	BmRender_SubmitInfo TransferSubmitInfo = {};
-	TransferSubmitInfo.CommandBuffers = &CommandBuffer;
-	TransferSubmitInfo.CommandBufferCount = 1;
-	TransferSubmitInfo.WaitSemaphoreCount = 0;
-	TransferSubmitInfo.SignalSemaphoreCount = 0;
-	BmRender_QueueSubmit(GraphicsQueue, 1, &TransferSubmitInfo, nullptr);
-	BmRender_QueueWaitIdle(GraphicsQueue);
-
-	BmRender_DestroyGPUBuffer(StagingBuffer);
+	BmRender_Extent2D SwapchainExtent = BmRender_GetSwapchainExtent();
+	BmRender_Image DepthImage = BmRender_CreateImage2D(SwapchainExtent.Width, SwapchainExtent.Height, BmRender_Format::D32_SFLOAT_S8_UINT, BmRender_ImageType::DepthSamplad);
+	BmRender_ImageView DepthImageView = BmRender_CreateImageView2D(DepthImage);
 
 	BmRHI_SamplerDescription SamplerDesc = {};
 	SamplerDesc.MagFilter = BmRender_Filter::Linear;
@@ -439,28 +323,53 @@ int main()
 	SamplerDesc.UnnormalizedCoordinates = false;
 	BmRender_Sampler AtlasSampler = BmRender_CreateSampler(&SamplerDesc);
 
-	BmRender_DescriptorPoolSize PoolSize = {};
-	PoolSize.Type = BmRender_DescriptorType::CombinedImageSampler;
-	PoolSize.DescriptorCount = 1;
-	BmRender_DescriptorPool DescriptorPool = BmRender_CreateDescriptorPool(&PoolSize, 1, 1, BmRender_DescriptorPoolType::UpdateAfterBind);
+	BmRender_UpdateHostCompatibleBuffer(StagingBuffer, 0, VertexBufferSize, CubeVertices);
 
-	BmRender_DescriptorSet DescriptorSet = BmRender_CreateDescriptorSet(DescriptorSetLayout, DescriptorPool);
+	BmRender_BeginCommandBuffer(CommandBuffer);
+	BmRender_RecordUpdateGPULocalBuffer(CommandBuffer, VertexBuffer, StagingBuffer, 0, 0, VertexBufferSize);
+	BmRender_EndCommandBuffer(CommandBuffer);
 
-	BmRender_ImageBinding ImageBinding = {};
-	ImageBinding.Sampler = AtlasSampler;
-	ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
-	ImageBinding.ImageView = VRAMAtlasImageView;
+	BmRender_SubmitInfo TransferSubmitInfo = {};
+	TransferSubmitInfo.CommandBuffers = &CommandBuffer;
+	TransferSubmitInfo.CommandBufferCount = 1;
+	TransferSubmitInfo.WaitDstStageFlags = nullptr;
+	TransferSubmitInfo.WaitSemaphores = nullptr;
+	TransferSubmitInfo.WaitSemaphoreCount = 0;
+	TransferSubmitInfo.SignalSemaphores = nullptr;
+	TransferSubmitInfo.SignalSemaphoreCount = 0;
+	TransferSubmitInfo.WaitTimelineSemaphores = nullptr;
+	TransferSubmitInfo.WaitTimelineSemaphoreCount = 0;
+	TransferSubmitInfo.SignalTimelineSemaphores = nullptr;
+	TransferSubmitInfo.SignalTimelineSemaphoreCount = 0;
 
-	BmRender_DescriptorSetBinding DescriptorSetBinding = {};
-	DescriptorSetBinding.BufferRegions = nullptr;
-	DescriptorSetBinding.ImageBinding = ImageBinding;
-	DescriptorSetBinding.BindingCount = 1;
-	DescriptorSetBinding.DstArrayElement = 0;
-	BmRender_UpdateDescriptorSet(DescriptorSet, &DescriptorSetBinding, 1);
+	BmRender_QueueSubmit(GraphicsQueue, 1, &TransferSubmitInfo, nullptr);
+	BmRender_DeviceWaitIdle();
+
+	f32 aspect = (f32)WindowWidth / (f32)WindowHeight;
+	f32 fov = glm::radians(45.0f);
+	f32 near = 0.1f;
+	f32 far = 100.0f;
+	glm::mat4 proj = glm::perspective(fov, aspect, near, far);
+	
+	glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, -3.0f);
+	glm::vec3 target = glm::vec3(0.0f, 0.0f, 0.0f);
+	glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+	glm::mat4 view = glm::lookAt(cameraPos, target, up);
+
+	f32 time = 0.0f;
 
 	while (!glfwWindowShouldClose(Window))
 	{
 		glfwPollEvents();
+		time += 0.016f * 0.01;
+
+		f32 rotY = time * 0.5f;
+		f32 rotX = time * 0.3f;
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::rotate(model, rotY, glm::vec3(0.0f, 1.0f, 0.0f));
+		model = glm::rotate(model, rotX, glm::vec3(1.0f, 0.0f, 0.0f));
+
+		glm::mat4 mvp = proj * view * model;
 
 		BmRender_WaitForFences(InFlightFence, true, UINT64_MAX);
 		BmRender_ResetFences(InFlightFence);
@@ -475,6 +384,7 @@ int main()
 
 		BmRender_BeginCommandBuffer(CommandBuffer);
 		BmRender_TransitionImageForRendering(CommandBuffer, BmRender_GetSwapchainImage(ImageIndex));
+		BmRender_TransitionImageForRendering(CommandBuffer, DepthImage);
 
 		BmRender_RenderingColorAttachment ColorAttachment = {};
 		ColorAttachment.ImageView = BmRender_GetSwapchainImageView(ImageIndex);
@@ -482,20 +392,28 @@ int main()
 		ColorAttachment.StoreOp = BmRender_AttachmentStoreOp::Store;
 		ColorAttachment.ClearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
 
+		BmRender_RenderingDepthAttachment DepthAttachment = {};
+		DepthAttachment.ImageView = DepthImageView;
+		DepthAttachment.LoadOp = BmRender_AttachmentLoadOp::Clear;
+		DepthAttachment.StoreOp = BmRender_AttachmentStoreOp::Store;
+		DepthAttachment.ClearValue = { 1.0f, 0 };  // Clear to max depth
+
 		BmRender_RenderingInfo RenderingInfo = {};
 		RenderingInfo.Offset = { 0, 0 };
 		RenderingInfo.Extent = BmRender_GetSwapchainExtent();
 		RenderingInfo.ColorAttachments = &ColorAttachment;
 		RenderingInfo.ColorAttachmentCount = 1;
-		RenderingInfo.DepthAttachment = nullptr;
+		RenderingInfo.DepthAttachment = &DepthAttachment;
 
 		BmRender_BeginRendering(CommandBuffer, &RenderingInfo);
 
 		BmRender_BindPipeline(CommandBuffer, Pipeline);
+		BmRender_RecordPushConstants(CommandBuffer, PipelineLayout, BmRender_DescriptorShaderStage::Vertex, 0, 64, glm::value_ptr(mvp));
 
-		BmRender_RecordBindDescriptorSets(CommandBuffer, PipelineLayout, 0, 1, &DescriptorSet, 0, nullptr);
+		u64 vertexOffset = 0;
+		BmRender_RecordBindVertexBuffers(CommandBuffer, 0, 1, &VertexBuffer, &vertexOffset);
 
-		BmRender_Draw(CommandBuffer, 6, 1, 0, 0);
+		BmRender_Draw(CommandBuffer, 36, 1, 0, 0);
 
 		BmRender_EndRendering(CommandBuffer);
 
@@ -532,10 +450,10 @@ int main()
 
 	BmRender_QueueWaitIdle(GraphicsQueue);
 
-	BmRender_DestroyImageView(VRAMAtlasImageView);
-	BmRender_DestroyImage(VRAMAtlasImage);
+	BmRender_DestroyImageView(DepthImageView);
+	BmRender_DestroyImage(DepthImage);
+	BmRender_DestroyGPUBuffer(VertexBuffer);
 	BmRender_DestroySampler(AtlasSampler);
-	BmRender_DestroyDescriptorPool(DescriptorPool);
 	BmRender_DestroyDescriptorSetLayout(DescriptorSetLayout);
 	BmRender_DestroyShader(VertexShader);
 	BmRender_DestroyShader(FragmentShader);

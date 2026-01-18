@@ -875,6 +875,7 @@ void BmRender_DeviceWaitIdle();
 void BmRender_TransitionImageForRendering(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer = 0,  u32 LayersCount = 1);
 void BmRender_TransitionImageForSampling(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer = 0, u32 LayersCount = 1);
 void BmRender_TransitionImageForPresentation(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer = 0, u32 LayersCount = 1);
+void BmRender_RecordUpdateGPULocalBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer DstBuffer, BmRender_GPUBuffer SrcBuffer, u64 SrcOffset, u64 DstOffset, u64 DataSize);
 void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRender_RenderingInfo* pRenderingInfo);
 void BmRender_EndRendering(BmRender_CommandBuffer CommandBuffer);
 void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline);

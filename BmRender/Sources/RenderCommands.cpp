@@ -233,6 +233,16 @@ void BmRender_TransitionImageForPresentation(BmRender_CommandBuffer CommandBuffe
 	vkCmdPipelineBarrier2((VkCommandBuffer)CommandBuffer, &DepInfo);
 }
 
+void BmRender_RecordUpdateGPULocalBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer DstBuffer, BmRender_GPUBuffer SrcBuffer, u64 SrcOffset, u64 DstOffset, u64 DataSize)
+{
+	VkBufferCopy CopyRegion = { };
+	CopyRegion.srcOffset = SrcOffset;
+	CopyRegion.dstOffset = DstOffset;
+	CopyRegion.size = DataSize;
+
+	vkCmdCopyBuffer((VkCommandBuffer)CommandBuffer, (VkBuffer)SrcBuffer, (VkBuffer)DstBuffer, 1, &CopyRegion);
+}
+
 void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRender_RenderingInfo* pRenderingInfo)
 {
 	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
