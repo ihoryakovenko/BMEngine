@@ -7,8 +7,6 @@ layout(set = 0, binding = 0) uniform sampler2D texSampler;
 
 void main()
 {
-	// Use a simple color gradient based on texcoords for now
-	// Since we don't have a texture bound, use a nice color
 	vec3 color = vec3(fragTexCoord, 0.5);
 	outColor = vec4(color, 1.0);
 }

@@ -176,12 +176,11 @@ int main()
 	DescriptorBinding.StageFlags = BmRender_DescriptorShaderStage::Fragment;
 	BmRender_DescriptorSetLayout DescriptorSetLayout = BmRender_CreateDescriptorSetLayout(&DescriptorBinding, 1);
 
-	// Push constant for MVP matrix (64 bytes for mat4)
-	BmRender_PushConstant PushConstantRange = BmRender_CreatePushConstant(
-		BmRender_DescriptorShaderStage::Vertex,
-		0,
-		64  // sizeof(mat4) = 16 floats * 4 bytes = 64 bytes
-	);
+	BmRender_PushConstant PushConstantRange = BmRender_CreatePushConstant(BmRender_DescriptorShaderStage::Vertex, 0, sizeof(glm::mat4));
+
+	BmRender_Extent2D SwapchainExtent = BmRender_GetSwapchainExtent();
+	BmRender_Image DepthImage = BmRender_CreateImage2D(SwapchainExtent.Width, SwapchainExtent.Height, BmRender_Format::D32_SFLOAT_S8_UINT, BmRender_ImageType::DepthSamplad);
+	BmRender_ImageView DepthImageView = BmRender_CreateImageView2D(DepthImage);
 
 	BmRender_PipelineLayoutDescription LayoutDesc = {};
 	LayoutDesc.SetLayoutCount = 1;
@@ -194,10 +193,13 @@ int main()
 	BmRender_PipelineDescription PipelineDesc = {};
 	PipelineDesc.PipelineLayout = PipelineLayout;
 
-	PipelineDesc.ResourceInfo.PipelineAttachmentData.ColorAttachmentCount = 1;
-	PipelineDesc.ResourceInfo.PipelineAttachmentData.ColorAttachmentFormats[0] = BmRender_GetSurfaceFormat().Format;
-	PipelineDesc.ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = BmRender_Format::D32_SFLOAT;
-	PipelineDesc.ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = BmRender_Format::Undefined;
+	BmRender_ImageView PipelineColorAttachments[1];
+	PipelineColorAttachments[0] = BmRender_GetSwapchainImageView(0);
+
+	PipelineDesc.Attachment.ColorAttachmentCount = 1;
+	PipelineDesc.Attachment.ColorAttachments = PipelineColorAttachments;
+	PipelineDesc.Attachment.DepthAttachment = DepthImageView;
+	PipelineDesc.Attachment.StencilAttachment = nullptr;
 
 	BmRender_ShaderStageDescription ShaderStages[2] = {};
 	ShaderStages[0].Shader = VertexShader;
@@ -301,10 +303,6 @@ int main()
 	BmRender_Semaphore RenderFinishedSemaphore = BmRender_CreateSemaphore();
 	BmRender_Fence InFlightFence = BmRender_CreateFence();
 
-	BmRender_Extent2D SwapchainExtent = BmRender_GetSwapchainExtent();
-	BmRender_Image DepthImage = BmRender_CreateImage2D(SwapchainExtent.Width, SwapchainExtent.Height, BmRender_Format::D32_SFLOAT_S8_UINT, BmRender_ImageType::DepthSamplad);
-	BmRender_ImageView DepthImageView = BmRender_CreateImageView2D(DepthImage);
-
 	BmRHI_SamplerDescription SamplerDesc = {};
 	SamplerDesc.MagFilter = BmRender_Filter::Linear;
 	SamplerDesc.MinFilter = BmRender_Filter::Linear;
@@ -349,19 +347,34 @@ int main()
 	f32 fov = glm::radians(45.0f);
 	f32 near = 0.1f;
 	f32 far = 100.0f;
-	glm::mat4 proj = glm::perspective(fov, aspect, near, far);
 	
 	glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, -3.0f);
-	glm::vec3 target = glm::vec3(0.0f, 0.0f, 0.0f);
-	glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-	glm::mat4 view = glm::lookAt(cameraPos, target, up);
+	glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, 1.0f);
+	glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+	f32 cameraSpeed = 0.05f;
 
 	f32 time = 0.0f;
 
 	while (!glfwWindowShouldClose(Window))
 	{
 		glfwPollEvents();
-		time += 0.016f * 0.01;
+		time += 0.016f;
+
+		if (glfwGetKey(Window, GLFW_KEY_W) == GLFW_PRESS)
+			cameraPos += cameraSpeed * cameraFront;
+		if (glfwGetKey(Window, GLFW_KEY_S) == GLFW_PRESS)
+			cameraPos -= cameraSpeed * cameraFront;
+		if (glfwGetKey(Window, GLFW_KEY_A) == GLFW_PRESS)
+			cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+		if (glfwGetKey(Window, GLFW_KEY_D) == GLFW_PRESS)
+			cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+		if (glfwGetKey(Window, GLFW_KEY_Q) == GLFW_PRESS)
+			cameraPos -= cameraUp * cameraSpeed;
+		if (glfwGetKey(Window, GLFW_KEY_E) == GLFW_PRESS)
+			cameraPos += cameraUp * cameraSpeed;
+
+		glm::mat4 proj = glm::perspective(fov, aspect, near, far);
+		glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 
 		f32 rotY = time * 0.5f;
 		f32 rotX = time * 0.3f;

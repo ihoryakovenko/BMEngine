@@ -25,6 +25,7 @@ void BmRender_Init(GLFWwindow* WindowHandler, u32 InMaxFramesInFly)
 	InitializeCommandBufferManager(32);
 	InitializeQueueManager(2);
 	InitializePipelineLayoutManager(32);
+	InitializeImageViewManager(32);
 
 	CreateCoreContext(WindowHandler);
 }
@@ -41,6 +42,7 @@ void BmRender_DeInit()
 	DeinitCommandBufferManager();
 	DeinitQueueManager();
 	DeinitPipelineLayoutManager();
+	DeinitImageViewManager();
 
 	DestroyCoreContext();
 	DeMemory_LinearAllocator_Init();

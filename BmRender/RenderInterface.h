@@ -496,21 +496,13 @@ struct BmRender_SurfaceFormat
 	//VkColorSpaceKHR ColorSpace;
 };
 
-// TODO: Check
 struct AttachmentData
 {
 	u32 ColorAttachmentCount;
-	BmRender_Format ColorAttachmentFormats[16]; // get max attachments from device
-	BmRender_Format DepthAttachmentFormat;
-	BmRender_Format StencilAttachmentFormat;
+	BmRender_ImageView* ColorAttachments;
+	BmRender_ImageView DepthAttachment;
+	BmRender_ImageView StencilAttachment;
 };
-
-struct PipelineResourceInfo
-{
-	AttachmentData PipelineAttachmentData;
-	BmRender_PipelineLayout PipelineLayout = {};
-};
-// Check
 
 struct BmRHI_SamplerDescription
 {
@@ -680,7 +672,7 @@ struct BmRender_ViewportState
 struct BmRender_PipelineDescription
 {
 	BmRender_PipelineLayout PipelineLayout;
-	PipelineResourceInfo ResourceInfo;
+	AttachmentData Attachment;
 
 	const BmRender_ShaderStageDescription* ShaderStages;
 	const BmRender_VertexBinding* VertexBindings;
@@ -813,6 +805,11 @@ struct BmRender_PipelineLayoutData
 	BmRender_PipelineType PipelineType;
 };
 
+struct BmRender_ImageViewData
+{
+	BmRender_Image Image;
+};
+
 void BmRender_Init(GLFWwindow* WindowHandler, u32 MaxFramesInFly);
 void BmRender_DeInit();
 
@@ -910,5 +907,6 @@ bool BmRender_GetCommandPoolData(BmRender_CommandPool Handle, BmRender_CommandPo
 bool BmRender_GetCommandBufferData(BmRender_CommandBuffer Handle, BmRender_CommandBufferData* OutData);
 bool BmRender_GetQueueData(BmRender_Queue Handle, BmRender_QueueData* OutData);
 bool BmRender_GetPipelineLayoutData(BmRender_PipelineLayout Handle, BmRender_PipelineLayoutData* OutData);
+bool BmRender_GetImageViewData(BmRender_ImageView Handle, BmRender_ImageViewData* OutData);
 
 void BmRender_FrameFree();

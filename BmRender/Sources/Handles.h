@@ -16,6 +16,7 @@ void InitializeCommandPoolManager(u32 Size);
 void InitializeCommandBufferManager(u32 Size);
 void InitializeQueueManager(u32 Size);
 void InitializePipelineLayoutManager(u32 Size);
+void InitializeImageViewManager(u32 Size);
 
 void DeinitDescriptorSetLayoutManager();
 void DeinitShaderManager();
@@ -27,6 +28,7 @@ void DeinitCommandPoolManager();
 void DeinitCommandBufferManager();
 void DeinitQueueManager();
 void DeinitPipelineLayoutManager();
+void DeinitImageViewManager();
 
 BmRender_Sampler CreateSamplerHandle(VkSampler Sampler);
 BmRender_Pipeline CreatePipelineHandle(VkPipeline Pipeline);
@@ -35,7 +37,7 @@ BmRender_DescriptorSetLayout CreateDescriptorSetLayoutHandle(VkDescriptorSetLayo
 BmRender_DescriptorPool CreateDescriptorPoolHandle(VkDescriptorPool DescriptorPool);
 BmRender_Shader CreateShaderHandle(VkShaderModule VulkanShaderModule, const BmRender_ShaderData* Data);
 BmRender_Image CreateImageHandle(VkImage Image, const BmRender_ImageResource* Data);
-BmRender_ImageView CreateImageViewHandle(VkImageView ImageView);
+BmRender_ImageView CreateImageViewHandle(VkImageView ImageView, const BmRender_ImageViewData* Data);
 BmRender_GPUBuffer CreateGPUBufferHandle(VkBuffer Buffer, const BmRender_GPUBufferData* Data);
 BmRender_DescriptorSet CreateDescriptorSetHandle(VkDescriptorSet Set, const BmRender_DescriptorSetData* Data);
 BmRender_Fence CreateFenceHandle(VkFence Fence);

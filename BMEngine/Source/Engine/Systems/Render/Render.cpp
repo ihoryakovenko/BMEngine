@@ -43,7 +43,42 @@ namespace Render
 		VkFormat* ColorAttachmentFormats = (VkFormat*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), AttachmentDataPtr->ColorAttachmentCount * sizeof(VkFormat));
 		for (u32 i = 0; i < AttachmentDataPtr->ColorAttachmentCount; ++i)
 		{
-			ColorAttachmentFormats[i] = BmRender_FormatToVk(AttachmentDataPtr->ColorAttachmentFormats[i]);
+			BmRender_ImageViewData ImageViewData;
+			BmRender_ImageResource ImageResource;
+			if (AttachmentDataPtr->ColorAttachments[i] != nullptr && 
+				BmRender_GetImageViewData(AttachmentDataPtr->ColorAttachments[i], &ImageViewData) &&
+				BmRender_GetImageData(ImageViewData.Image, &ImageResource))
+			{
+				ColorAttachmentFormats[i] = BmRender_FormatToVk(ImageResource.Format);
+			}
+			else
+			{
+				ColorAttachmentFormats[i] = VK_FORMAT_UNDEFINED;
+			}
+		}
+
+		VkFormat DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
+		if (AttachmentDataPtr->DepthAttachment != nullptr)
+		{
+			BmRender_ImageViewData ImageViewData;
+			BmRender_ImageResource ImageResource;
+			if (BmRender_GetImageViewData(AttachmentDataPtr->DepthAttachment, &ImageViewData) &&
+				BmRender_GetImageData(ImageViewData.Image, &ImageResource))
+			{
+				DepthAttachmentFormat = BmRender_FormatToVk(ImageResource.Format);
+			}
+		}
+
+		VkFormat StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+		if (AttachmentDataPtr->StencilAttachment != nullptr)
+		{
+			BmRender_ImageViewData ImageViewData;
+			BmRender_ImageResource ImageResource;
+			if (BmRender_GetImageViewData(AttachmentDataPtr->StencilAttachment, &ImageViewData) &&
+				BmRender_GetImageData(ImageViewData.Image, &ImageResource))
+			{
+				StencilAttachmentFormat = BmRender_FormatToVk(ImageResource.Format);
+			}
 		}
 
 		VkPipelineRenderingCreateInfo RenderingInfo = { };
@@ -51,8 +86,8 @@ namespace Render
 		RenderingInfo.pNext = nullptr;
 		RenderingInfo.colorAttachmentCount = AttachmentDataPtr->ColorAttachmentCount;
 		RenderingInfo.pColorAttachmentFormats = ColorAttachmentFormats;
-		RenderingInfo.depthAttachmentFormat = BmRender_FormatToVk(AttachmentDataPtr->DepthAttachmentFormat);
-		RenderingInfo.stencilAttachmentFormat = BmRender_FormatToVk(AttachmentDataPtr->StencilAttachmentFormat);
+		RenderingInfo.depthAttachmentFormat = DepthAttachmentFormat;
+		RenderingInfo.stencilAttachmentFormat = StencilAttachmentFormat;
 
 		BmRender_DescriptorPoolSize PoolSizes[] =
 		{
@@ -105,8 +140,13 @@ namespace Render
 			BmRender_UpdateDescriptorSet(MeshPipeline->ShadowMapArraySet[i], &ShadowMapBinding, 1);
 		}
 
-		PipelineResourceInfo ResourceInfo = {};
-		ResourceInfo.PipelineAttachmentData = *MainPassGetAttachmentData();
+		AttachmentData ResourceInfo = *MainPassGetAttachmentData();
+		BmRender_ImageView ResourceInfoColorAttachments[16];
+		ResourceInfo.ColorAttachments = ResourceInfoColorAttachments;
+		for (u32 i = 0; i < ResourceInfo.ColorAttachmentCount; ++i)
+		{
+			ResourceInfoColorAttachments[i] = MainPassGetAttachmentData()->ColorAttachments[i];
+		}
 
 		// Create vectors to hold pipeline data
 		std::vector<BmRender_ShaderStageDescription> shaderStages;
@@ -166,7 +206,7 @@ namespace Render
 		// Build pipeline description
 		BmRender_PipelineDescription PipelineDesc = {};
 		PipelineDesc.Extent = MainScreenExtent;
-		PipelineDesc.ResourceInfo = ResourceInfo;
+		PipelineDesc.Attachment = ResourceInfo;
 
 		// Set shader stages
 		PipelineDesc.ShaderStages = shaderStages.data();
@@ -259,7 +299,6 @@ namespace Render
 
 		PipelineLayouts["StaticMesh"] = BmRender_CreatePipelineLayout(&LayoutDesc);
 		PipelineDesc.PipelineLayout = PipelineLayouts["StaticMesh"];
-		ResourceInfo.PipelineLayout = PipelineDesc.PipelineLayout;
 
 		Pipelines["StaticMesh"] = BmRender_CreatePipeline(&PipelineDesc);
 	}
@@ -307,6 +346,7 @@ namespace Render
 	static BmRender_DescriptorSet DeferredInputSet[MAX_DRAW_FRAMES];
 
 	static AttachmentData DeferredPassPipelineAttachmentData;
+	static BmRender_ImageView DeferredPassColorAttachments[16];
 
 	void DrawEntityBatch(BmRender_CommandBuffer CommandBuffer, DrawScene* Scene, const DrawEntityBatchConfig& Config)
 	{
@@ -499,11 +539,6 @@ namespace Render
 
 	void DeferredPassInit(BmRender_DescriptorPool MainPool)
 	{
-		DeferredPassPipelineAttachmentData.ColorAttachmentCount = 1;
-		DeferredPassPipelineAttachmentData.ColorAttachmentFormats[0] = BmRender_GetSurfaceFormat().Format;
-		DeferredPassPipelineAttachmentData.DepthAttachmentFormat = BmRender_Format::Undefined;
-		DeferredPassPipelineAttachmentData.StencilAttachmentFormat = BmRender_Format::Undefined;
-
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
 			DeferredInputColorImage[i] = BmRender_CreateImage2D(MainScreenExtent.Width, MainScreenExtent.Height, ColorFormat, BmRender_ImageType::ColorAttachmentSampled);
@@ -511,7 +546,16 @@ namespace Render
 			
 			DeferredInputColorImageInterface[i] = BmRender_CreateImageView2D(DeferredInputColorImage[i]);
 			DeferredInputDepthImageInterface[i] = BmRender_CreateImageView2D(DeferredInputDepthImage[i]);
-			
+		}
+
+		DeferredPassPipelineAttachmentData.ColorAttachmentCount = 1;
+		DeferredPassPipelineAttachmentData.ColorAttachments = DeferredPassColorAttachments;
+		DeferredPassColorAttachments[0] = DeferredInputColorImageInterface[0];
+		DeferredPassPipelineAttachmentData.DepthAttachment = DeferredInputDepthImageInterface[0];
+		DeferredPassPipelineAttachmentData.StencilAttachment = nullptr;
+
+		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
+		{
 			BmRender_DescriptorSetBinding ColorBinding;
 			ColorBinding.ImageBinding.Sampler = Samplers["ColorAttachment"];
 			ColorBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
@@ -531,10 +575,6 @@ namespace Render
 			DeferredInputSet[i] = BmRender_CreateDescriptorSet(DescriptorSetLayouts["MainPassOutputLayout"], MainPool);
 			BmRender_UpdateDescriptorSet(DeferredInputSet[i], Bindings, 2);
 		}
-
-
-		PipelineResourceInfo ResourceInfo;
-		ResourceInfo.PipelineAttachmentData = DeferredPassPipelineAttachmentData;
 
 		// Create vectors to hold pipeline data
 		std::vector<BmRender_ShaderStageDescription> shaderStages;
@@ -559,7 +599,7 @@ namespace Render
 		// Build pipeline description
 		BmRender_PipelineDescription PipelineDesc = {};
 		PipelineDesc.Extent = MainScreenExtent;
-		PipelineDesc.ResourceInfo = ResourceInfo;
+		PipelineDesc.Attachment = DeferredPassPipelineAttachmentData;
 
 		// Set shader stages
 		PipelineDesc.ShaderStages = shaderStages.data();
@@ -652,7 +692,6 @@ namespace Render
 
 		PipelineLayouts["Deferred"] = BmRender_CreatePipelineLayout(&LayoutDesc);
 		PipelineDesc.PipelineLayout = PipelineLayouts["Deferred"];
-		ResourceInfo.PipelineLayout = PipelineDesc.PipelineLayout;
 
 		Pipelines["Deferred"] = BmRender_CreatePipeline(&PipelineDesc);
 	}
@@ -777,10 +816,11 @@ namespace Render
 			ShadowMapElement2ImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_LIGHT_SOURCES * i + 1, 1);
 		}
 
-		PipelineResourceInfo ResourceInfo;
-		ResourceInfo.PipelineAttachmentData.ColorAttachmentCount = 0;
-		ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat = DepthFormat;
-		ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat = BmRender_Format::Undefined;
+		AttachmentData ResourceInfo;
+		ResourceInfo.ColorAttachmentCount = 0;
+		ResourceInfo.ColorAttachments = nullptr;
+		ResourceInfo.DepthAttachment = ShadowMapElement1ImageInterface[0];
+		ResourceInfo.StencilAttachment = nullptr;
 
 		// Create vectors to hold pipeline data
 		std::vector<BmRender_ShaderStageDescription> shaderStages;
@@ -825,7 +865,7 @@ namespace Render
 		// Build pipeline description
 		BmRender_PipelineDescription PipelineDesc = {};
 		PipelineDesc.Extent = DepthViewportExtent;
-		PipelineDesc.ResourceInfo = ResourceInfo;
+		PipelineDesc.Attachment = ResourceInfo;
 
 		// Set shader stages
 		PipelineDesc.ShaderStages = shaderStages.data();
@@ -918,7 +958,6 @@ namespace Render
 
 		PipelineLayouts["Depth"] = BmRender_CreatePipelineLayout(&LayoutDesc);
 		PipelineDesc.PipelineLayout = PipelineLayouts["Depth"];
-		ResourceInfo.PipelineLayout = PipelineDesc.PipelineLayout;
 
 		Pipelines["Depth"] = BmRender_CreatePipeline(&PipelineDesc);
 	}
@@ -994,12 +1033,15 @@ namespace Render
 
 	// MainPass static variables
 	static AttachmentData MainPassPipelineAttachmentData;
+	static BmRender_ImageView MainPassColorAttachments[16];
 
 	void MainPassInit()
 	{
 		MainPassPipelineAttachmentData.ColorAttachmentCount = 1;
-		MainPassPipelineAttachmentData.ColorAttachmentFormats[0] = ColorFormat;
-		MainPassPipelineAttachmentData.DepthAttachmentFormat = DepthFormat;
+		MainPassPipelineAttachmentData.ColorAttachments = MainPassColorAttachments;
+		MainPassColorAttachments[0] = TestDeferredInputColorImageInterface()[0];
+		MainPassPipelineAttachmentData.DepthAttachment = TestDeferredInputDepthImageInterface()[0];
+		MainPassPipelineAttachmentData.StencilAttachment = nullptr;
 	}
 
 	void MainPassBeginPass()

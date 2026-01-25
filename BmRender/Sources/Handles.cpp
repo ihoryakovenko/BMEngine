@@ -21,6 +21,7 @@ static StoragePair CommandPoolStorage;
 static StoragePair CommandBufferStorage;
 static StoragePair QueueStorage;
 static StoragePair PipelineLayoutStorage;
+static StoragePair ImageViewStorage;
 
 // INIT
 void InitializeDescriptorSetLayoutManager(u32 Size)
@@ -81,6 +82,12 @@ void InitializePipelineLayoutManager(u32 Size)
 {
 	Memory_PoolAllocator_Init(&PipelineLayoutStorage.Allocator, Size, sizeof(BmRender_PipelineLayoutData));
 	Systems_SparceHashMap_Init(&PipelineLayoutStorage.HashMap, Size);
+}
+
+void InitializeImageViewManager(u32 Size)
+{
+	Memory_PoolAllocator_Init(&ImageViewStorage.Allocator, Size, sizeof(BmRender_ImageViewData));
+	Systems_SparceHashMap_Init(&ImageViewStorage.HashMap, Size);
 }
 // INIT
 
@@ -144,6 +151,12 @@ void DeinitPipelineLayoutManager()
 	Systems_SparceHashMap_Free(&PipelineLayoutStorage.HashMap);
 	Memory_PoolAllocator_Free(&PipelineLayoutStorage.Allocator);
 }
+
+void DeinitImageViewManager()
+{
+	Systems_SparceHashMap_Free(&ImageViewStorage.HashMap);
+	Memory_PoolAllocator_Free(&ImageViewStorage.Allocator);
+}
 // DEINIT
 
 // CREATE
@@ -194,8 +207,11 @@ BmRender_Image CreateImageHandle(VkImage Image, const BmRender_ImageResource* Da
 	return (BmRender_Image)Image;
 }
 
-BmRender_ImageView CreateImageViewHandle(VkImageView ImageView)
+BmRender_ImageView CreateImageViewHandle(VkImageView ImageView, const BmRender_ImageViewData* Data)
 {
+	const u32 Index = Memory_PoolAllocator_PushData(&ImageViewStorage.Allocator, Data);
+	Systems_SparceHashMap_Insert(&ImageViewStorage.HashMap, (u64)ImageView, Index);
+	
 	return (BmRender_ImageView)ImageView;
 }
 
@@ -436,6 +452,18 @@ bool BmRender_GetPipelineLayoutData(BmRender_PipelineLayout Handle, BmRender_Pip
 	if (Systems_SparceHashMap_Get(&PipelineLayoutStorage.HashMap, (u64)PipelineLayout, &Index))
 	{
 		Memory_PoolAllocator_GetData(&PipelineLayoutStorage.Allocator, Index, OutData);
+		return true;
+	}
+	return false;
+}
+
+bool BmRender_GetImageViewData(BmRender_ImageView Handle, BmRender_ImageViewData* OutData)
+{
+	VkImageView ImageView = (VkImageView)Handle;
+	u32 Index;
+	if (Systems_SparceHashMap_Get(&ImageViewStorage.HashMap, (u64)ImageView, &Index))
+	{
+		Memory_PoolAllocator_GetData(&ImageViewStorage.Allocator, Index, OutData);
 		return true;
 	}
 	return false;

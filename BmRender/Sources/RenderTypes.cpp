@@ -354,7 +354,10 @@ static BmRender_ImageView CreateImageView(BmRender_Image Handle, u32 BaseArrayLa
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	VULKAN_CHECK_RESULT(vkCreateImageView(Device, &ViewCreateInfo, GetVulkanAllocator(), &View));
 
-	return CreateImageViewHandle(View);
+	BmRender_ImageViewData ImageViewData;
+	ImageViewData.Image = Handle;
+
+	return CreateImageViewHandle(View, &ImageViewData);
 }
 
 BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description)
@@ -489,19 +492,54 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	VertexInputState.vertexAttributeDescriptionCount = TotalAttributes;
 	VertexInputState.pVertexAttributeDescriptions = TotalAttributes == 0 ? nullptr : VkVertexAttributes;
 
-	VkFormat* ColorAttachmentFormats = (VkFormat*)Memory_LinearAllocator_Alloc(GetFrameMemory(), Description->ResourceInfo.PipelineAttachmentData.ColorAttachmentCount * sizeof(VkFormat));
-	for (u32 i = 0; i < Description->ResourceInfo.PipelineAttachmentData.ColorAttachmentCount; ++i)
+	VkFormat* ColorAttachmentFormats = (VkFormat*)Memory_LinearAllocator_Alloc(GetFrameMemory(), Description->Attachment.ColorAttachmentCount * sizeof(VkFormat));
+	for (u32 i = 0; i < Description->Attachment.ColorAttachmentCount; ++i)
 	{
-		ColorAttachmentFormats[i] = BmRender_FormatToVk(Description->ResourceInfo.PipelineAttachmentData.ColorAttachmentFormats[i]);
+		BmRender_ImageViewData ImageViewData;
+		BmRender_ImageResource ImageResource;
+		if (Description->Attachment.ColorAttachments[i] != nullptr && 
+			BmRender_GetImageViewData(Description->Attachment.ColorAttachments[i], &ImageViewData) &&
+			BmRender_GetImageData(ImageViewData.Image, &ImageResource))
+		{
+			ColorAttachmentFormats[i] = BmRender_FormatToVk(ImageResource.Format);
+		}
+		else
+		{
+			ColorAttachmentFormats[i] = VK_FORMAT_UNDEFINED;
+		}
+	}
+
+	VkFormat DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
+	if (Description->Attachment.DepthAttachment != nullptr)
+	{
+		BmRender_ImageViewData ImageViewData;
+		BmRender_ImageResource ImageResource;
+		if (BmRender_GetImageViewData(Description->Attachment.DepthAttachment, &ImageViewData) &&
+			BmRender_GetImageData(ImageViewData.Image, &ImageResource))
+		{
+			DepthAttachmentFormat = BmRender_FormatToVk(ImageResource.Format);
+		}
+	}
+
+	VkFormat StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+	if (Description->Attachment.StencilAttachment != nullptr)
+	{
+		BmRender_ImageViewData ImageViewData;
+		BmRender_ImageResource ImageResource;
+		if (BmRender_GetImageViewData(Description->Attachment.StencilAttachment, &ImageViewData) &&
+			BmRender_GetImageData(ImageViewData.Image, &ImageResource))
+		{
+			StencilAttachmentFormat = BmRender_FormatToVk(ImageResource.Format);
+		}
 	}
 
 	VkPipelineRenderingCreateInfo RenderingInfo = { };
 	RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
 	RenderingInfo.pNext = nullptr;
-	RenderingInfo.colorAttachmentCount = Description->ResourceInfo.PipelineAttachmentData.ColorAttachmentCount;
+	RenderingInfo.colorAttachmentCount = Description->Attachment.ColorAttachmentCount;
 	RenderingInfo.pColorAttachmentFormats = ColorAttachmentFormats;
-	RenderingInfo.depthAttachmentFormat = BmRender_FormatToVk(Description->ResourceInfo.PipelineAttachmentData.DepthAttachmentFormat);
-	RenderingInfo.stencilAttachmentFormat = BmRender_FormatToVk(Description->ResourceInfo.PipelineAttachmentData.StencilAttachmentFormat);
+	RenderingInfo.depthAttachmentFormat = DepthAttachmentFormat;
+	RenderingInfo.stencilAttachmentFormat = StencilAttachmentFormat;
 
 	VkPipelineColorBlendAttachmentState VkColorBlendAttachment = ColorBlendAttachmentToVk(Description->ColorBlendAttachment);
 	VkPipelineColorBlendStateCreateInfo ColorBlendState = ColorBlendStateToVk(Description->ColorBlendState);

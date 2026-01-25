@@ -255,11 +255,12 @@ namespace Engine
 			{			
 				EngineResources::Update(&Scene, DescriptorSets.BindlesTexturesSet);
 
-				TaskSystem::TaskLambda Task = [&]() { TransferSystem::Transfer(); };
-				TaskSystem::AddTask(&Task, &Group);
+				//TaskSystem::TaskLambda Task = [&]() { TransferSystem::Transfer(); };
+				//TaskSystem::AddTask(&Task, &Group);
+				TransferSystem::Transfer();
 				Render::Draw(&Scene, LastTransfer);
 
-				TaskSystem::WaitForGroup(&Group);
+				//TaskSystem::WaitForGroup(&Group);
 			}
 
 			Memory_LinearAllocator_FreeMemory(Memory::GetGeneralFrameMemory());
@@ -323,7 +324,7 @@ namespace Engine
 		TotalPassPoolSizes[7] = { BmRender_DescriptorType::UniformBuffer, 3 };
 		TotalPassPoolSizes[8] = { BmRender_DescriptorType::UniformBuffer, 3 };
 		TotalPassPoolSizes[9] = { BmRender_DescriptorType::CombinedImageSampler, 256 };
-		TotalPassPoolSizes[10] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[10] = { BmRender_DescriptorType::UniformBufferDynamic, 3 };
 
 		u32 TotalDescriptorCount = TotalDescriptorLayouts * 3;
 		TotalDescriptorCount += 256;
