@@ -862,6 +862,8 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, co
 
 BmRender_FenceStatus BmRender_GetFenceStatus(BmRender_Fence Handle);
 BmRender_WaitResult BmRender_WaitForFences(BmRender_Fence Handle, bool WaitAll, u64 Timeout);
+u64 BmRender_GetBufferDeviceAddress(BmRender_GPUBuffer Buffer);
+
 void BmRender_ResetFences(BmRender_Fence Handle);
 void BmRender_GetSemaphoreCounterValue(BmRender_Semaphore Handle, u64* pValue);
 void BmRender_BeginCommandBuffer(BmRender_CommandBuffer Handle);

@@ -18,8 +18,8 @@
 #include <glm/gtc/type_ptr.hpp>
 
 struct Vertex {
-	f32 pos[3];
-	f32 texCoord[2];
+	f32 pos[4];
+	f32 texCoord[4];
 };
 
 Vertex CubeVertices[36] = {
@@ -176,7 +176,7 @@ int main()
 	DescriptorBinding.StageFlags = BmRender_DescriptorShaderStage::Fragment;
 	BmRender_DescriptorSetLayout DescriptorSetLayout = BmRender_CreateDescriptorSetLayout(&DescriptorBinding, 1);
 
-	BmRender_PushConstant PushConstantRange = BmRender_CreatePushConstant(BmRender_DescriptorShaderStage::Vertex, 0, sizeof(glm::mat4));
+	BmRender_PushConstant PushConstantRange = BmRender_CreatePushConstant(BmRender_DescriptorShaderStage::Vertex, 0, sizeof(glm::mat4) + sizeof(u64));
 
 	BmRender_Extent2D SwapchainExtent = BmRender_GetSwapchainExtent();
 	BmRender_Image DepthImage = BmRender_CreateImage2D(SwapchainExtent.Width, SwapchainExtent.Height, BmRender_Format::D32_SFLOAT_S8_UINT, BmRender_ImageType::DepthSamplad);
@@ -209,25 +209,8 @@ int main()
 	PipelineDesc.ShaderStages = ShaderStages;
 	PipelineDesc.ShaderStagesCount = 2;
 
-	// Define vertex bindings
-	VertexAttribute PositionAttribute = {};
-	PositionAttribute.Type = BmRender_AttributeType::Vec3;
-	PositionAttribute.Offset = 0;
-
-	VertexAttribute TexCoordAttribute = {};
-	TexCoordAttribute.Type = BmRender_AttributeType::Vec2;
-	TexCoordAttribute.Offset = sizeof(f32) * 3;  // After position (3 floats)
-
-	VertexAttribute VertexAttributes[2] = { PositionAttribute, TexCoordAttribute };
-
-	BmRender_VertexBinding VertexBinding = {};
-	VertexBinding.Attributes = VertexAttributes;
-	VertexBinding.AttributesCount = 2;
-	VertexBinding.Stride = sizeof(Vertex);
-	VertexBinding.InputRate = BmRender_VertexInputRate::Vertex;
-
-	PipelineDesc.VertexBindings = &VertexBinding;
-	PipelineDesc.VertexBindingsCount = 1;
+	PipelineDesc.VertexBindings = nullptr;
+	PipelineDesc.VertexBindingsCount = 0;
 
 	PipelineDesc.DescriptorSetLayouts = &DescriptorSetLayout;
 	PipelineDesc.DescriptorSetLayoutsCount = 1;
@@ -421,10 +404,15 @@ int main()
 		BmRender_BeginRendering(CommandBuffer, &RenderingInfo);
 
 		BmRender_BindPipeline(CommandBuffer, Pipeline);
-		BmRender_RecordPushConstants(CommandBuffer, PipelineLayout, BmRender_DescriptorShaderStage::Vertex, 0, 64, glm::value_ptr(mvp));
-
-		u64 vertexOffset = 0;
-		BmRender_RecordBindVertexBuffers(CommandBuffer, 0, 1, &VertexBuffer, &vertexOffset);
+		
+		struct PushConstants {
+			glm::mat4 mvp;
+			u64 vertexBufferAddress;
+		};
+		PushConstants pc;
+		pc.mvp = mvp;
+		pc.vertexBufferAddress = BmRender_GetBufferDeviceAddress(VertexBuffer);
+		BmRender_RecordPushConstants(CommandBuffer, PipelineLayout, BmRender_DescriptorShaderStage::Vertex, 0, sizeof(PushConstants), &pc);
 
 		BmRender_Draw(CommandBuffer, 36, 1, 0, 0);
 

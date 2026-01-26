@@ -52,6 +52,18 @@ BmRender_WaitResult BmRender_WaitForFences(BmRender_Fence Handle, bool WaitAll, 
 	}
 }
 
+u64 BmRender_GetBufferDeviceAddress(BmRender_GPUBuffer Buffer)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+	VkBuffer VkBufferHandle = (VkBuffer)Buffer;
+
+	VkBufferDeviceAddressInfo AddressInfo = {};
+	AddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+	AddressInfo.buffer = VkBufferHandle;
+
+	return vkGetBufferDeviceAddress(Device, &AddressInfo);
+}
+
 void BmRender_ResetFences(BmRender_Fence Handle)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
