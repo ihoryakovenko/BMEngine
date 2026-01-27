@@ -236,7 +236,7 @@ BmRender_PushConstant BmRender_CreatePushConstant(BmRender_DescriptorShaderStage
 	return Constant;
 }
 
-static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, MemoryPropertyFlag MemoryFlag, BmRender_PipelineSyncStage BufferStage, BufferUsageFlag Flag)
+static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, MemoryPropertyFlag MemoryFlag, BufferUsageFlag Flag)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	VkPhysicalDevice PhysicalDevice = GetCoreContext()->PhysicalDevice;
@@ -255,7 +255,6 @@ static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, MemoryPropertyFlag Memor
 	}
 
 	NewBuffer.PropertyFlag = MemoryFlag;
-	NewBuffer.BufferStage = BufferStage;
 
 	VkBuffer Buffer = CreateBuffer(Device, Capacity, Flag, GetVulkanAllocator());
 
@@ -700,32 +699,32 @@ BmRender_ImageView BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 Ba
 
 BmRender_GPUBuffer BmRender_CreateVertexStageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag)
 {
-	return CreateGPUBuffer(Size, MemoryFlag, BmRender_PipelineSyncStage::VertexShader, BufferUsageFlag::CombinedVertexIndexFlag);
+	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::CombinedVertexIndexFlag);
 }
 
 BmRender_GPUBuffer BmRender_CreateInstanceBuffer(u64 Size, MemoryPropertyFlag MemoryFlag)
 {
-	return CreateGPUBuffer(Size, MemoryFlag, BmRender_PipelineSyncStage::VertexShader, BufferUsageFlag::InstanceFlag);
+	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::InstanceFlag);
 }
 
-BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, BmRender_PipelineSyncStage BufferStage)
+BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, MemoryPropertyFlag MemoryFlag)
 {
-	return CreateGPUBuffer(Size, MemoryFlag, BufferStage, BufferUsageFlag::UniformFlag);
+	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::UniformFlag);
 }
 
-BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, BmRender_PipelineSyncStage BufferStage)
+BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag)
 {
-	return CreateGPUBuffer(Size, MemoryFlag, BufferStage, BufferUsageFlag::StorageFlag);
+	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::StorageFlag);
 }
 
 BmRender_GPUBuffer BmRender_CreateIndirectDrawBuffer(u64 Size, MemoryPropertyFlag MemoryFlag)
 {
-	return CreateGPUBuffer(Size, MemoryFlag, BmRender_PipelineSyncStage::VertexShader, BufferUsageFlag::IndirectDrawBufferFlag);
+	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::IndirectDrawBufferFlag);
 }
 
 BmRender_GPUBuffer BmRender_CreateStagingBuffer(u64 Size)
 {
-	return CreateGPUBuffer(Size, MemoryPropertyFlag::HostCompatible, BmRender_PipelineSyncStage::None, BufferUsageFlag::StagingFlag);
+	return CreateGPUBuffer(Size, MemoryPropertyFlag::HostCompatible, BufferUsageFlag::StagingFlag);
 }
 
 BmRender_Fence BmRender_CreateFence()

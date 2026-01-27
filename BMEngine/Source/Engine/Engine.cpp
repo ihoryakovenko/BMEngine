@@ -332,8 +332,8 @@ namespace Engine
 		BmRender_DescriptorPool MainPool = BmRender_CreateDescriptorPool(TotalPassPoolSizes, TotalDescriptorCount, PoolSizeCount, BmRender_DescriptorPoolType::UpdateAfterBind);
 		VertexStageBuffer = BmRender_CreateVertexStageBuffer(MB4, MemoryPropertyFlag::GPULocal);
 		InstanceBuffer = BmRender_CreateInstanceBuffer(MB4, MemoryPropertyFlag::GPULocal);
-		FrameDataBuffer = BmRender_CreateUniformBuffer(65536, MemoryPropertyFlag::HostCompatible, BmRender_PipelineSyncStage::FragmentShader);
-		MaterialBuffer = BmRender_CreateStorageBuffer(MB4, MemoryPropertyFlag::GPULocal, BmRender_PipelineSyncStage::FragmentShader);
+		FrameDataBuffer = BmRender_CreateUniformBuffer(65536, MemoryPropertyFlag::HostCompatible);
+		MaterialBuffer = BmRender_CreateStorageBuffer(MB4, MemoryPropertyFlag::GPULocal);
 
 		VpRegion[0] = { FrameDataBuffer, 0, 128 };
 		VpRegion[1] = { FrameDataBuffer, 128, 128 };

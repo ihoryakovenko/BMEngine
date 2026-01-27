@@ -772,7 +772,6 @@ struct BmRender_GPUBufferData
 {
 	BmRender_DeviceMemory Memory;
 	MemoryPropertyFlag PropertyFlag;
-	BmRender_PipelineSyncStage BufferStage;
 };
 
 struct BmRender_DescriptorSetData
@@ -810,6 +809,15 @@ struct BmRender_ImageViewData
 	BmRender_Image Image;
 };
 
+struct BmRender_DrawIndexedIndirectCommand
+{
+	u32 IndexCount;
+	u32 InstanceCount;
+	u32 FirstIndex;
+	s32 VertexOffset;
+	u32 FirstInstance;
+};
+
 void BmRender_Init(GLFWwindow* WindowHandler, u32 MaxFramesInFly);
 void BmRender_DeInit();
 
@@ -841,8 +849,8 @@ BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Descript
 BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout LayoutHandle, BmRender_DescriptorPool PoolHandle);
 BmRender_GPUBuffer BmRender_CreateVertexStageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag);
 BmRender_GPUBuffer BmRender_CreateInstanceBuffer(u64 Size, MemoryPropertyFlag MemoryFlag);
-BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, BmRender_PipelineSyncStage BufferStage);
-BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, BmRender_PipelineSyncStage BufferStage);
+BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, MemoryPropertyFlag MemoryFlag);
+BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag);
 BmRender_GPUBuffer BmRender_CreateIndirectDrawBuffer(u64 Size, MemoryPropertyFlag MemoryFlag);
 BmRender_GPUBuffer BmRender_CreateStagingBuffer(u64 Size);
 BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type);
@@ -884,6 +892,7 @@ void BmRender_RecordBindVertexBuffers(BmRender_CommandBuffer CommandBuffer, u32 
 void BmRender_RecordBindIndexBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer Buffer, u64 Offset, BmRender_IndexType IndexType);
 void BmRender_Draw(BmRender_CommandBuffer CommandBuffer, u32 VertexCount, u32 InstanceCount, u32 FirstVertex, u32 FirstInstance);
 void BmRender_DrawIndexed(BmRender_CommandBuffer CommandBuffer, u32 IndexCount, u32 InstanceCount, u32 FirstIndex, u32 VertexOffset, u32 FirstInstance);
+void BmRender_RecordDrawIndexedIndirect(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer IndirectBuffer, u64 Offset, u32 DrawCount, u32 Stride);
 
 void BmRender_DestroySampler(BmRender_Sampler Handle);
 void BmRender_DestroyPipeline(BmRender_Pipeline Handle);

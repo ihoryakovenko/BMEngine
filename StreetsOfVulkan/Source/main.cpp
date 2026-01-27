@@ -18,58 +18,45 @@
 #include <glm/gtc/type_ptr.hpp>
 
 struct Vertex {
-	f32 pos[4];
-	f32 texCoord[4];
+	f32 pos[3];
+	f32 texCoord[2];
 };
 
-Vertex CubeVertices[36] = {
-	// Front face (z = 0.5, viewed from +Z, CCW)
-	{{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}},
-	{{ 0.5f,  0.5f,  0.5f}, {1.0f, 1.0f}},
-	{{ 0.5f, -0.5f,  0.5f}, {1.0f, 0.0f}},
-	{{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}},
-	{{-0.5f,  0.5f,  0.5f}, {0.0f, 1.0f}},
-	{{ 0.5f,  0.5f,  0.5f}, {1.0f, 1.0f}},
-
-	// Back face (z = -0.5, viewed from -Z, CCW)
-	{{ 0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
-	{{-0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}},
-	{{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f}},
-	{{ 0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
-	{{ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f}},
-	{{-0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}},
-
-	// Left face (x = -0.5, viewed from -X, CCW)
+Vertex CubeVertices[8] = {
 	{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
-	{{-0.5f,  0.5f,  0.5f}, {1.0f, 1.0f}},
-	{{-0.5f, -0.5f,  0.5f}, {1.0f, 0.0f}},
-	{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
-	{{-0.5f,  0.5f, -0.5f}, {0.0f, 1.0f}},
-	{{-0.5f,  0.5f,  0.5f}, {1.0f, 1.0f}},
-
-	// Right face (x = 0.5, viewed from +X, CCW)
-	{{ 0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}},
-	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}},
 	{{ 0.5f, -0.5f, -0.5f}, {1.0f, 0.0f}},
-	{{ 0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}},
-	{{ 0.5f,  0.5f,  0.5f}, {0.0f, 1.0f}},
-	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}},
-
-	// Top face (y = 0.5, viewed from +Y, CCW)
-	{{-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f}},
-	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}},
-	{{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}},
-	{{-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f}},
-	{{-0.5f,  0.5f, -0.5f}, {0.0f, 1.0f}},
-	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}},
-
-	// Bottom face (y = -0.5, viewed from -Y, CCW)
-	{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
 	{{ 0.5f, -0.5f,  0.5f}, {1.0f, 1.0f}},
-	{{ 0.5f, -0.5f, -0.5f}, {1.0f, 0.0f}},
-	{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
 	{{-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f}},
-	{{ 0.5f, -0.5f,  0.5f}, {1.0f, 1.0f}},
+	{{-0.5f,  0.5f, -0.5f}, {0.0f, 0.0f}},
+	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 0.0f}},
+	{{ 0.5f,  0.5f,  0.5f}, {1.0f, 1.0f}},
+	{{-0.5f,  0.5f,  0.5f}, {0.0f, 1.0f}},
+};
+
+u32 CubeIndices[36] = {
+	// Bottom (-Y)
+	0, 1, 2,
+	0, 2, 3,
+
+	// Top (+Y)
+	4, 6, 5,
+	4, 7, 6,
+
+	// Front (+Z)
+	3, 2, 6,
+	3, 6, 7,
+
+	// Back (-Z)
+	0, 5, 1,
+	0, 4, 5,
+
+	// Right (+X)
+	1, 5, 6,
+	1, 6, 2,
+
+	// Left (-X)
+	0, 3, 7,
+	0, 7, 4
 };
 
 static bool LoadShaderFile(const char* FilePath, char** OutCode, size_t* OutCodeSize)
@@ -176,7 +163,7 @@ int main()
 	DescriptorBinding.StageFlags = BmRender_DescriptorShaderStage::Fragment;
 	BmRender_DescriptorSetLayout DescriptorSetLayout = BmRender_CreateDescriptorSetLayout(&DescriptorBinding, 1);
 
-	BmRender_PushConstant PushConstantRange = BmRender_CreatePushConstant(BmRender_DescriptorShaderStage::Vertex, 0, sizeof(glm::mat4) + sizeof(u64));
+	BmRender_PushConstant PushConstantRange = BmRender_CreatePushConstant(BmRender_DescriptorShaderStage::Vertex, 0, sizeof(glm::mat4));
 
 	BmRender_Extent2D SwapchainExtent = BmRender_GetSwapchainExtent();
 	BmRender_Image DepthImage = BmRender_CreateImage2D(SwapchainExtent.Width, SwapchainExtent.Height, BmRender_Format::D32_SFLOAT_S8_UINT, BmRender_ImageType::DepthSamplad);
@@ -209,8 +196,25 @@ int main()
 	PipelineDesc.ShaderStages = ShaderStages;
 	PipelineDesc.ShaderStagesCount = 2;
 
-	PipelineDesc.VertexBindings = nullptr;
-	PipelineDesc.VertexBindingsCount = 0;
+	// Define vertex bindings
+	VertexAttribute PositionAttribute = {};
+	PositionAttribute.Type = BmRender_AttributeType::Vec3;
+	PositionAttribute.Offset = 0;
+
+	VertexAttribute TexCoordAttribute = {};
+	TexCoordAttribute.Type = BmRender_AttributeType::Vec2;
+	TexCoordAttribute.Offset = sizeof(f32) * 3;  // After position (3 floats)
+
+	VertexAttribute VertexAttributes[2] = { PositionAttribute, TexCoordAttribute };
+
+	BmRender_VertexBinding VertexBinding = {};
+	VertexBinding.Attributes = VertexAttributes;
+	VertexBinding.AttributesCount = 2;
+	VertexBinding.Stride = sizeof(Vertex);
+	VertexBinding.InputRate = BmRender_VertexInputRate::Vertex;
+
+	PipelineDesc.VertexBindings = &VertexBinding;
+	PipelineDesc.VertexBindingsCount = 1;
 
 	PipelineDesc.DescriptorSetLayouts = &DescriptorSetLayout;
 	PipelineDesc.DescriptorSetLayoutsCount = 1;
@@ -274,9 +278,18 @@ int main()
 	PipelineDesc.ViewportState.viewportCount = 1;
 	PipelineDesc.ViewportState.scissorCount = 1;
 
+	BmRender_DrawIndexedIndirectCommand IndirectCommand = {};
+	IndirectCommand.IndexCount = 36;
+	IndirectCommand.InstanceCount = 1;
+
 	const u64 VertexBufferSize = sizeof(CubeVertices);
-	BmRender_GPUBuffer StagingBuffer = BmRender_CreateStagingBuffer(VertexBufferSize);
+	const u64 IndexBufferSize = sizeof(CubeIndices);
+	const u64 IndirectCommandSize = sizeof(IndirectCommand);
+
+	BmRender_GPUBuffer StagingBuffer = BmRender_CreateStagingBuffer(VertexBufferSize + IndexBufferSize + IndirectCommandSize);
 	BmRender_GPUBuffer VertexBuffer = BmRender_CreateVertexStageBuffer(VertexBufferSize, MemoryPropertyFlag::GPULocal);
+	BmRender_GPUBuffer IndexBuffer = BmRender_CreateVertexStageBuffer(IndexBufferSize, MemoryPropertyFlag::GPULocal);
+	BmRender_GPUBuffer IndirectBuffer = BmRender_CreateIndirectDrawBuffer(IndirectCommandSize, MemoryPropertyFlag::GPULocal);
 
 	BmRender_Pipeline Pipeline = BmRender_CreatePipeline(&PipelineDesc);
 	BmRender_Queue GraphicsQueue = BmRender_CreateQueue(BmRender_QueueType::Graphic);
@@ -305,9 +318,13 @@ int main()
 	BmRender_Sampler AtlasSampler = BmRender_CreateSampler(&SamplerDesc);
 
 	BmRender_UpdateHostCompatibleBuffer(StagingBuffer, 0, VertexBufferSize, CubeVertices);
+	BmRender_UpdateHostCompatibleBuffer(StagingBuffer, VertexBufferSize, IndexBufferSize, CubeIndices);
+	BmRender_UpdateHostCompatibleBuffer(StagingBuffer, VertexBufferSize + IndexBufferSize, IndirectCommandSize, &IndirectCommand);
 
 	BmRender_BeginCommandBuffer(CommandBuffer);
 	BmRender_RecordUpdateGPULocalBuffer(CommandBuffer, VertexBuffer, StagingBuffer, 0, 0, VertexBufferSize);
+	BmRender_RecordUpdateGPULocalBuffer(CommandBuffer, IndexBuffer, StagingBuffer, VertexBufferSize, 0, IndexBufferSize);
+	BmRender_RecordUpdateGPULocalBuffer(CommandBuffer, IndirectBuffer, StagingBuffer, VertexBufferSize + IndexBufferSize, 0, IndirectCommandSize);
 	BmRender_EndCommandBuffer(CommandBuffer);
 
 	BmRender_SubmitInfo TransferSubmitInfo = {};
@@ -357,6 +374,7 @@ int main()
 			cameraPos += cameraUp * cameraSpeed;
 
 		glm::mat4 proj = glm::perspective(fov, aspect, near, far);
+		proj[1][1] *= -1;
 		glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 
 		f32 rotY = time * 0.5f;
@@ -402,19 +420,15 @@ int main()
 		RenderingInfo.DepthAttachment = &DepthAttachment;
 
 		BmRender_BeginRendering(CommandBuffer, &RenderingInfo);
-
-		BmRender_BindPipeline(CommandBuffer, Pipeline);
 		
-		struct PushConstants {
-			glm::mat4 mvp;
-			u64 vertexBufferAddress;
-		};
-		PushConstants pc;
-		pc.mvp = mvp;
-		pc.vertexBufferAddress = BmRender_GetBufferDeviceAddress(VertexBuffer);
-		BmRender_RecordPushConstants(CommandBuffer, PipelineLayout, BmRender_DescriptorShaderStage::Vertex, 0, sizeof(PushConstants), &pc);
+		BmRender_BindPipeline(CommandBuffer, Pipeline);
+		BmRender_RecordPushConstants(CommandBuffer, PipelineLayout, BmRender_DescriptorShaderStage::Vertex, 0, 64, glm::value_ptr(mvp));
 
-		BmRender_Draw(CommandBuffer, 36, 1, 0, 0);
+		u64 vertexOffset = 0;
+		BmRender_RecordBindVertexBuffers(CommandBuffer, 0, 1, &VertexBuffer, &vertexOffset);
+		BmRender_RecordBindIndexBuffer(CommandBuffer, IndexBuffer, 0, BmRender_IndexType::Uint32);
+
+		BmRender_RecordDrawIndexedIndirect(CommandBuffer, IndirectBuffer, 0, 1, sizeof(BmRender_DrawIndexedIndirectCommand));
 
 		BmRender_EndRendering(CommandBuffer);
 
@@ -454,6 +468,8 @@ int main()
 	BmRender_DestroyImageView(DepthImageView);
 	BmRender_DestroyImage(DepthImage);
 	BmRender_DestroyGPUBuffer(VertexBuffer);
+	BmRender_DestroyGPUBuffer(IndexBuffer);
+	BmRender_DestroyGPUBuffer(IndirectBuffer);
 	BmRender_DestroySampler(AtlasSampler);
 	BmRender_DestroyDescriptorSetLayout(DescriptorSetLayout);
 	BmRender_DestroyShader(VertexShader);

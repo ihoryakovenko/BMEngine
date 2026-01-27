@@ -360,6 +360,14 @@ void BmRender_DrawIndexed(BmRender_CommandBuffer CommandBuffer, u32 IndexCount, 
 	vkCmdDrawIndexed(VkCmdBuffer, IndexCount, InstanceCount, FirstIndex, VertexOffset, FirstInstance);
 }
 
+void BmRender_RecordDrawIndexedIndirect(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer IndirectBuffer, u64 Offset, u32 DrawCount, u32 Stride)
+{
+	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
+	VkBuffer VkIndirectBuffer = (VkBuffer)IndirectBuffer;
+	vkCmdDrawIndexedIndirect(VkCmdBuffer, VkIndirectBuffer, Offset, DrawCount, Stride);
+
+}
+
 void BmRender_EndRendering(BmRender_CommandBuffer CommandBuffer)
 {
 	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;

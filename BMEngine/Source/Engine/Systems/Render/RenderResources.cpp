@@ -35,7 +35,7 @@ namespace RenderResources
 			Task.Alignment = 1;
 			Task.RawData = TransferMemory;
 			Task.DataDescr.Handle = Handle;
-			Task.DataDescr.StageBarrier = Buffer.BufferStage;
+			Task.DataDescr.StageBarrier = BmRender_PipelineSyncStage::TopOfPipe; // TODO: FIX SHIT!
 			Task.Type = TransferSystem::TaskType::Data;
 
 			TransferSystem::AddTask(&Task);
