@@ -308,7 +308,7 @@ namespace Engine
 		Yaml::Node Root;
 		Yaml::Parse(Root, "./Resources/Settings/RenderResources.yaml");
 
-		BmRender_Init(Window, 3);
+		BmRender_Init(Window);
 		
 		// Create MainPool using stack array
 		const u32 PoolSizeCount = 11;

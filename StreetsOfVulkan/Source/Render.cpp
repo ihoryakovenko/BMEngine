@@ -1,53 +1,13 @@
 #include "Render.h"
 
+#include <RenderInterface.h>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <RenderInterface.h>
-
 #include <glm/gtc/type_ptr.hpp>
 
-struct Vertex {
-	f32 pos[3];
-	f32 texCoord[2];
-};
-
-Vertex CubeVertices[8] = {
-	{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
-	{{ 0.5f, -0.5f, -0.5f}, {1.0f, 0.0f}},
-	{{ 0.5f, -0.5f,  0.5f}, {1.0f, 1.0f}},
-	{{-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f}},
-	{{-0.5f,  0.5f, -0.5f}, {0.0f, 0.0f}},
-	{{ 0.5f,  0.5f, -0.5f}, {1.0f, 0.0f}},
-	{{ 0.5f,  0.5f,  0.5f}, {1.0f, 1.0f}},
-	{{-0.5f,  0.5f,  0.5f}, {0.0f, 1.0f}},
-};
-
-u32 CubeIndices[36] = {
-	// Bottom (-Y)
-	0, 1, 2,
-	0, 2, 3,
-
-	// Top (+Y)
-	4, 6, 5,
-	4, 7, 6,
-
-	// Front (+Z)
-	3, 2, 6,
-	3, 6, 7,
-
-	// Back (-Z)
-	0, 5, 1,
-	0, 4, 5,
-
-	// Right (+X)
-	1, 5, 6,
-	1, 6, 2,
-
-	// Left (-X)
-	0, 3, 7,
-	0, 7, 4
-};
+#define MAX_SWAPCHAIN_IMAGES 4
 
 static BmRender_Shader VertexShader;
 static BmRender_Shader FragmentShader;
@@ -60,12 +20,14 @@ static BmRender_Queue GraphicsQueue;
 static BmRender_CommandPool CommandPool;
 static BmRender_CommandBuffer CommandBuffer;
 static BmRender_Semaphore ImageAvailableSemaphore;
-static BmRender_Semaphore RenderFinishedSemaphore;
+static BmRender_Semaphore RenderFinishedSemaphores[MAX_SWAPCHAIN_IMAGES];
+static u32 SwapchainImageCount;
 static BmRender_Fence InFlightFence;
-static BmRender_GPUBuffer VertexBuffer;
-static BmRender_GPUBuffer IndexBuffer;
 static BmRender_GPUBuffer IndirectBuffer;
+static BmRender_GPUBuffer StagingBuffer;
 static BmRender_Sampler AtlasSampler;
+
+static u64 StagingBufferSize;
 
 static bool LoadShaderFile(const char* FilePath, char** OutCode, size_t* OutCodeSize)
 {
@@ -106,9 +68,9 @@ static bool LoadShaderFile(const char* FilePath, char** OutCode, size_t* OutCode
 	return true;
 }
 
-int StreetRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
+int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 {
-	BmRender_Init(Window, 1);
+	BmRender_Init(Window);
 
 	char* VertexShaderCode = nullptr;
 	size_t VertexShaderCodeSize = 0;
@@ -184,16 +146,12 @@ int StreetRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	PositionAttribute.Type = BmRender_AttributeType::Vec3;
 	PositionAttribute.Offset = 0;
 
-	VertexAttribute TexCoordAttribute = {};
-	TexCoordAttribute.Type = BmRender_AttributeType::Vec2;
-	TexCoordAttribute.Offset = sizeof(f32) * 3;  // After position (3 floats)
-
-	VertexAttribute VertexAttributes[2] = { PositionAttribute, TexCoordAttribute };
+	VertexAttribute VertexAttributes[1] = { PositionAttribute };
 
 	BmRender_VertexBinding VertexBinding = {};
 	VertexBinding.Attributes = VertexAttributes;
-	VertexBinding.AttributesCount = 2;
-	VertexBinding.Stride = sizeof(Vertex);
+	VertexBinding.AttributesCount = 1;
+	VertexBinding.Stride = sizeof(StreetsRender_Vertex);
 	VertexBinding.InputRate = BmRender_VertexInputRate::Vertex;
 
 	PipelineDesc.VertexBindings = &VertexBinding;
@@ -210,7 +168,7 @@ int StreetRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	PipelineDesc.RasterizationState.polygonMode = BmRender_PolygonMode::Fill;
 	PipelineDesc.RasterizationState.lineWidth = 1.0f;
 	PipelineDesc.RasterizationState.cullMode = BmRender_CullModeFlags::Back;
-	PipelineDesc.RasterizationState.frontFace = BmRender_FrontFace::CounterClockwise;
+	PipelineDesc.RasterizationState.frontFace = BmRender_FrontFace::Clockwise;
 	PipelineDesc.RasterizationState.depthBiasEnable = false;
 
 	PipelineDesc.ColorBlendAttachment = {};
@@ -261,25 +219,25 @@ int StreetRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	PipelineDesc.ViewportState.viewportCount = 1;
 	PipelineDesc.ViewportState.scissorCount = 1;
 
-	BmRender_DrawIndexedIndirectCommand IndirectCommand = {};
-	IndirectCommand.IndexCount = 36;
-	IndirectCommand.InstanceCount = 1;
+	// BmRender_DrawIndexedIndirectCommand IndirectCommand = {};
+	// IndirectCommand.IndexCount = 36;
+	// IndirectCommand.InstanceCount = 1;
 
-	const u64 VertexBufferSize = sizeof(CubeVertices);
-	const u64 IndexBufferSize = sizeof(CubeIndices);
-	const u64 IndirectCommandSize = sizeof(IndirectCommand);
+	// const u64 IndexBufferSize = sizeof(CubeIndices);
+	// const u64 IndirectCommandSize = sizeof(IndirectCommand);
 
-	BmRender_GPUBuffer StagingBuffer = BmRender_CreateStagingBuffer(VertexBufferSize + IndexBufferSize + IndirectCommandSize);
-	VertexBuffer = BmRender_CreateVertexStageBuffer(VertexBufferSize, MemoryPropertyFlag::GPULocal);
-	IndexBuffer = BmRender_CreateVertexStageBuffer(IndexBufferSize, MemoryPropertyFlag::GPULocal);
-	IndirectBuffer = BmRender_CreateIndirectDrawBuffer(IndirectCommandSize, MemoryPropertyFlag::GPULocal);
+	StagingBufferSize = sizeof(StreetsRender_Vertex) * 500;
+	StagingBuffer = BmRender_CreateStagingBuffer(StagingBufferSize); // + IndexBufferSize + IndirectCommandSize);
+	// IndirectBuffer = BmRender_CreateIndirectDrawBuffer(IndirectCommandSize, MemoryPropertyFlag::GPULocal);
 
 	Pipeline = BmRender_CreatePipeline(&PipelineDesc);
 	GraphicsQueue = BmRender_CreateQueue(BmRender_QueueType::Graphic);
 	CommandPool = BmRender_CreateCommandPool(BmRender_QueueType::Graphic);
 	CommandBuffer = BmRender_AllocateCommandBuffer(CommandPool);
 	ImageAvailableSemaphore = BmRender_CreateSemaphore();
-	RenderFinishedSemaphore = BmRender_CreateSemaphore();
+	SwapchainImageCount = BmRender_GetSwapchainImageCount();
+	for (u32 i = 0; i < SwapchainImageCount; ++i)
+		RenderFinishedSemaphores[i] = BmRender_CreateSemaphore();
 	InFlightFence = BmRender_CreateFence();
 
 	BmRHI_SamplerDescription SamplerDesc = {};
@@ -300,34 +258,17 @@ int StreetRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	SamplerDesc.UnnormalizedCoordinates = false;
 	AtlasSampler = BmRender_CreateSampler(&SamplerDesc);
 
-	BmRender_UpdateHostCompatibleBuffer(StagingBuffer, 0, VertexBufferSize, CubeVertices);
-	BmRender_UpdateHostCompatibleBuffer(StagingBuffer, VertexBufferSize, IndexBufferSize, CubeIndices);
-	BmRender_UpdateHostCompatibleBuffer(StagingBuffer, VertexBufferSize + IndexBufferSize, IndirectCommandSize, &IndirectCommand);
+	//BmRender_UpdateHostCompatibleBuffer(StagingBuffer, 0, VertexBufferSize, CubeOutlineVertices);
+	// BmRender_UpdateHostCompatibleBuffer(StagingBuffer, VertexBufferSize, IndexBufferSize, CubeIndices);
+	// BmRender_UpdateHostCompatibleBuffer(StagingBuffer, VertexBufferSize + IndexBufferSize, IndirectCommandSize, &IndirectCommand);
 
-	BmRender_BeginCommandBuffer(CommandBuffer);
-	BmRender_RecordUpdateGPULocalBuffer(CommandBuffer, VertexBuffer, StagingBuffer, 0, 0, VertexBufferSize);
-	BmRender_RecordUpdateGPULocalBuffer(CommandBuffer, IndexBuffer, StagingBuffer, VertexBufferSize, 0, IndexBufferSize);
-	BmRender_RecordUpdateGPULocalBuffer(CommandBuffer, IndirectBuffer, StagingBuffer, VertexBufferSize + IndexBufferSize, 0, IndirectCommandSize);
-	BmRender_EndCommandBuffer(CommandBuffer);
-
-	BmRender_SubmitInfo TransferSubmitInfo = {};
-	TransferSubmitInfo.CommandBuffers = &CommandBuffer;
-	TransferSubmitInfo.CommandBufferCount = 1;
-	TransferSubmitInfo.WaitDstStageFlags = nullptr;
-	TransferSubmitInfo.WaitSemaphores = nullptr;
-	TransferSubmitInfo.WaitSemaphoreCount = 0;
-	TransferSubmitInfo.SignalSemaphores = nullptr;
-	TransferSubmitInfo.SignalSemaphoreCount = 0;
-	TransferSubmitInfo.WaitTimelineSemaphores = nullptr;
-	TransferSubmitInfo.WaitTimelineSemaphoreCount = 0;
-	TransferSubmitInfo.SignalTimelineSemaphores = nullptr;
-	TransferSubmitInfo.SignalTimelineSemaphoreCount = 0;
-
-	BmRender_QueueSubmit(GraphicsQueue, 1, &TransferSubmitInfo, nullptr);
-	BmRender_DeviceWaitIdle();
+	//BmRender_BeginCommandBuffer(CommandBuffer);
+	// BmRender_RecordUpdateGPULocalBuffer(CommandBuffer, IndexBuffer, StagingBuffer, VertexBufferSize, 0, IndexBufferSize);
+	// BmRender_RecordUpdateGPULocalBuffer(CommandBuffer, IndirectBuffer, StagingBuffer, VertexBufferSize + IndexBufferSize, 0, IndirectCommandSize);
+	//BmRender_EndCommandBuffer(CommandBuffer);
 }
 
-void StreetRender_Draw(glm::mat4 mvp)
+void StreetsRender_Draw(glm::mat4 vp, StreetsRender_Mesh* Meshes, u32 MeshCount)
 {
 	BmRender_WaitForFences(InFlightFence, true, UINT64_MAX);
 	BmRender_ResetFences(InFlightFence);
@@ -366,13 +307,19 @@ void StreetRender_Draw(glm::mat4 mvp)
 	BmRender_BeginRendering(CommandBuffer, &RenderingInfo);
 
 	BmRender_BindPipeline(CommandBuffer, Pipeline);
-	BmRender_RecordPushConstants(CommandBuffer, PipelineLayout, BmRender_DescriptorShaderStage::Vertex, 0, 64, glm::value_ptr(mvp));
+	BmRender_RecordPushConstants(CommandBuffer, PipelineLayout, BmRender_DescriptorShaderStage::Vertex, 0, 64, glm::value_ptr(vp));
 
-	u64 vertexOffset = 0;
-	BmRender_RecordBindVertexBuffers(CommandBuffer, 0, 1, &VertexBuffer, &vertexOffset);
-	BmRender_RecordBindIndexBuffer(CommandBuffer, IndexBuffer, 0, BmRender_IndexType::Uint32);
+	for (u32 i = 0; i < MeshCount; ++i)
+	{
+		u64 vertexOffset = 0;
+		BmRender_RecordBindVertexBuffers(CommandBuffer, 0, 1, &Meshes[i].VertexBuffer, &vertexOffset);
+		BmRender_RecordBindIndexBuffer(CommandBuffer, Meshes[i].IndexBuffer, 0, BmRender_IndexType::Uint16);
 
-	BmRender_RecordDrawIndexedIndirect(CommandBuffer, IndirectBuffer, 0, 1, sizeof(BmRender_DrawIndexedIndirectCommand));
+
+		BmRender_DrawIndexed(CommandBuffer, Meshes[i].IndexCount, 1, 0, 0, 0);
+		//BmRender_Draw(CommandBuffer, Meshes[i].VertexCount, 1, 0, 0); // cube outline: 24 vertices (12 lines)
+		// BmRender_RecordDrawIndexedIndirect(CommandBuffer, IndirectBuffer, 0, 1, sizeof(BmRender_DrawIndexedIndirectCommand));
+	}
 
 	BmRender_EndRendering(CommandBuffer);
 
@@ -386,7 +333,7 @@ void StreetRender_Draw(glm::mat4 mvp)
 	SubmitInfo.WaitDstStageFlags = WaitStages;
 	SubmitInfo.WaitSemaphores = &ImageAvailableSemaphore;
 	SubmitInfo.WaitSemaphoreCount = 1;
-	SubmitInfo.SignalSemaphores = &RenderFinishedSemaphore;
+	SubmitInfo.SignalSemaphores = &RenderFinishedSemaphores[ImageIndex];
 	SubmitInfo.SignalSemaphoreCount = 1;
 	SubmitInfo.CommandBuffers = &CommandBuffer;
 	SubmitInfo.CommandBufferCount = 1;
@@ -398,7 +345,7 @@ void StreetRender_Draw(glm::mat4 mvp)
 	BmRender_QueueSubmit(GraphicsQueue, 1, &SubmitInfo, InFlightFence);
 
 	BmRender_PresentInfo PresentInfo = {};
-	PresentInfo.WaitSemaphores = &RenderFinishedSemaphore;
+	PresentInfo.WaitSemaphores = &RenderFinishedSemaphores[ImageIndex];
 	PresentInfo.WaitSemaphoreCount = 1;
 	PresentInfo.ImageIndices = &ImageIndex;
 
@@ -407,21 +354,69 @@ void StreetRender_Draw(glm::mat4 mvp)
 	BmRender_FrameFree();
 }
 
-void StreetRender_DeInit()
+StreetsRender_Mesh StreetsRender_CreateMesh(StreetsRender_Vertex* Vertices, u32 VertexCount, u16* Indices, u32 IndexCount)
+{
+	const u64 VertexBufferSize = sizeof(StreetsRender_Vertex) * VertexCount;
+	const u64 IndexBufferSize = sizeof(u16) * IndexCount;
+
+	assert(StagingBufferSize > VertexBufferSize + IndexBufferSize);
+
+	StreetsRender_Mesh Mesh;
+	Mesh.VertexBuffer = BmRender_CreateVertexStageBuffer(VertexBufferSize, MemoryPropertyFlag::GPULocal);
+	Mesh.IndexBuffer = BmRender_CreateVertexStageBuffer(IndexBufferSize, MemoryPropertyFlag::GPULocal);
+	Mesh.VertexCount = VertexCount;
+	Mesh.IndexCount = IndexCount;
+
+	BmRender_UpdateHostCompatibleBuffer(StagingBuffer, 0, VertexBufferSize, Vertices);
+	BmRender_UpdateHostCompatibleBuffer(StagingBuffer, VertexBufferSize, IndexBufferSize, Indices);
+
+	BmRender_BeginCommandBuffer(CommandBuffer);
+	BmRender_RecordUpdateGPULocalBuffer(CommandBuffer, Mesh.VertexBuffer, StagingBuffer, 0, 0, VertexBufferSize);
+	BmRender_RecordUpdateGPULocalBuffer(CommandBuffer, Mesh.IndexBuffer, StagingBuffer, VertexBufferSize, 0, IndexBufferSize);
+	BmRender_EndCommandBuffer(CommandBuffer);
+
+	BmRender_SubmitInfo TransferSubmitInfo = {};
+	TransferSubmitInfo.CommandBuffers = &CommandBuffer;
+	TransferSubmitInfo.CommandBufferCount = 1;
+	TransferSubmitInfo.WaitDstStageFlags = nullptr;
+	TransferSubmitInfo.WaitSemaphores = nullptr;
+	TransferSubmitInfo.WaitSemaphoreCount = 0;
+	TransferSubmitInfo.SignalSemaphores = nullptr;
+	TransferSubmitInfo.SignalSemaphoreCount = 0;
+	TransferSubmitInfo.WaitTimelineSemaphores = nullptr;
+	TransferSubmitInfo.WaitTimelineSemaphoreCount = 0;
+	TransferSubmitInfo.SignalTimelineSemaphores = nullptr;
+	TransferSubmitInfo.SignalTimelineSemaphoreCount = 0;
+
+	BmRender_QueueSubmit(GraphicsQueue, 1, &TransferSubmitInfo, nullptr);
+	BmRender_DeviceWaitIdle();
+
+	return Mesh;
+}
+
+void StreetsRender_DestroyMesh(StreetsRender_Mesh* Mesh)
+{
+	BmRender_QueueWaitIdle(GraphicsQueue);
+	BmRender_DestroyGPUBuffer(Mesh->VertexBuffer);
+	BmRender_DestroyGPUBuffer(Mesh->IndexBuffer);
+}
+
+void StreetsRender_DeInit()
 {
 	BmRender_QueueWaitIdle(GraphicsQueue);
 
 	BmRender_DestroyImageView(DepthImageView);
 	BmRender_DestroyImage(DepthImage);
-	BmRender_DestroyGPUBuffer(VertexBuffer);
-	BmRender_DestroyGPUBuffer(IndexBuffer);
-	BmRender_DestroyGPUBuffer(IndirectBuffer);
+	BmRender_DestroyGPUBuffer(StagingBuffer);
+	// BmRender_DestroyGPUBuffer(IndexBuffer);
+	// BmRender_DestroyGPUBuffer(IndirectBuffer);
 	BmRender_DestroySampler(AtlasSampler);
 	BmRender_DestroyDescriptorSetLayout(DescriptorSetLayout);
 	BmRender_DestroyShader(VertexShader);
 	BmRender_DestroyShader(FragmentShader);
 	BmRender_DestroySemaphore(ImageAvailableSemaphore);
-	BmRender_DestroySemaphore(RenderFinishedSemaphore);
+	for (u32 i = 0; i < SwapchainImageCount; ++i)
+		BmRender_DestroySemaphore(RenderFinishedSemaphores[i]);
 	BmRender_DestroyCommandPool(CommandPool);
 	BmRender_DestroyFence(InFlightFence);
 	BmRender_DestroyPipeline(Pipeline);

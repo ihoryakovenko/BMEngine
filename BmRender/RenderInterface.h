@@ -818,7 +818,7 @@ struct BmRender_DrawIndexedIndirectCommand
 	u32 FirstInstance;
 };
 
-void BmRender_Init(GLFWwindow* WindowHandler, u32 MaxFramesInFly);
+void BmRender_Init(GLFWwindow* WindowHandler);
 void BmRender_DeInit();
 
 u32 BmRender_GetSwapchainImageCount();
