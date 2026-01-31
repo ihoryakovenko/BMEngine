@@ -25,5 +25,5 @@ void StreetsRender_DeInit();
 
 void StreetsRender_Draw(glm::mat4 vp, StreetsRender_Mesh* Meshes, u32 MeshCount);
 
-StreetsRender_Mesh StreetsRender_CreateMesh(StreetsRender_Vertex* Vertices, u32 VertexCount, u16* Indices, u32 IndexCount);
+StreetsRender_Mesh StreetsRender_CreateMesh(StreetsRender_Vertex* Vertices, u32 VertexCount, u32* Indices, u32 IndexCount);
 void StreetsRender_DestroyMesh(StreetsRender_Mesh* Mesh);

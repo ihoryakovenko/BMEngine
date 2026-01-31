@@ -34,165 +34,173 @@
 
 #include <earcut.hpp>
 
-//double computeSignedArea(const QVector<PointI>& points)
-//{
-//	double area = 0.0;
-//	const int n = points.size();
-//	for (int i = 0; i < n; ++i)
-//	{
-//		const auto& p0 = points[i];
-//		const auto& p1 = points[(i + 1) % n];
-//		area += static_cast<double>(p0.x) * p1.y - static_cast<double>(p1.x) * p0.y;
-//	}
-//
-//	return 0.5 * area;
-//}
-
 struct Mesh
 {
 	std::vector<StreetsRender_Vertex> vertices;
-	std::vector<u16> Indices;
+	std::vector<u32> Indices;
 };
 
-std::vector<Mesh> objects;
+Mesh TestMesh;
 
 using index_type = osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, osmium::Location>;
 
 using location_handler_type = osmium::handler::NodeLocationsForWays<index_type>;
 
-s32 center_m_x;
-s32 center_m_y;
+constexpr f64 R = 6378137.0; // Earth radius
+constexpr f64 DEG_TO_RAD = glm::pi<f64>() / 180.0;
 
-constexpr double R = 6378137.0; // Earth radius
-constexpr double DEG_TO_RAD = 3.14159265358979323846 / 180.0;
+// Tile info
+s32 center_nanodeg_x;
+s32 center_nanodeg_y;
+
+f64 lat_rad;
+
+f64 meters_per_nanodeg_lat;
+f64 meters_per_nanodeg_lon;
+
+s32 limit_lat_nd;
+s32 limit_lon_nd;
+// Tile info
+
+
 
 struct BuildingHandler : public osmium::handler::Handler
 {
 
-	std::unordered_map<osmium::object_id_type, const osmium::Way*> ways;
+	std::unordered_map<osmium::object_id_type, const osmium::Way*> Ways;
 
-	bool build_ring(const osmium::Way& way, std::vector<std::array<float, 2>>& ring)
+	void way(const osmium::Way& Way)
 	{
-		for (const osmium::NodeRef& nr : way.nodes()) {
-			const osmium::Location& loc = nr.location();
-			if (!loc.valid()) {
-				return false;
-			}
+		Ways[Way.id()] = &Way;
 
-			int32_t dx = loc.x() - center_m_x;
-			int32_t dy = loc.y() - center_m_y;
-
-			double lon_scale = R * DEG_TO_RAD * std::cos(center_m_y / 1e7 * DEG_TO_RAD) / 1e7;
-			double lat_scale = R * DEG_TO_RAD / 1e7;
-
-			float x = float(dx * lon_scale);
-			float y = float(dy * lat_scale);
-
-			if (x < -500 || x > 500 || y < -500 || y > 500) {
-				continue;
-			}
-
-			ring.push_back({ x, y });
+		if (!Way.tags().has_key("building"))
+		{
+			return;
 		}
-		return !ring.empty();
+
+		if (!Way.is_closed())
+		{
+			return;
+		}
+
+		const u32 BaseVertex = TestMesh.vertices.size();
+		const u64 NodeCount = Way.nodes().size();
+
+		std::vector<std::array<s32, 2>> Ring;
+		Ring.reserve(NodeCount);
+
+		u64 Area = 0.0;
+
+		for (u64 i = 0; i < NodeCount; ++i)
+		{
+			const osmium::NodeRef& CurrentNode = Way.nodes()[i];
+			const osmium::NodeRef& NextNode = Way.nodes()[(i + 1) % NodeCount];
+
+			const osmium::Location& CurrentLoc = CurrentNode.location();
+			const osmium::Location& NextLoc = NextNode.location();
+
+			if (!CurrentLoc.valid() || !NextLoc.valid())
+			{
+				assert(false);
+				return;
+			}
+
+			Area += (u64)CurrentLoc.x() * (u64)NextLoc.y() - (u64)NextLoc.x() * (u64)CurrentLoc.y();
+
+			Ring.push_back({ CurrentLoc.x(), CurrentLoc.y() });
+		}
+
+		const f32 Height = 30.0f;
+
+		const bool IsClockwise = (Area < 0.0);
+		if (IsClockwise)
+		{
+			Ring.reserve(Ring.size());
+		}
+
+		for (u32 i = 0; i < Ring.size(); ++i)
+		{
+			const s32 dx = Ring[i][0] - center_nanodeg_x;
+			const s32 dy = Ring[i][1] - center_nanodeg_y;
+
+			const f32 x = f32(dx * meters_per_nanodeg_lon);
+			const f32 y = f32(dy * meters_per_nanodeg_lat);
+
+			TestMesh.vertices.push_back({ glm::vec3(y, Height, x) });
+		}
+
+		std::vector<std::vector<std::array<s32, 2>>> Polygon;
+		Polygon.push_back(std::move(Ring));
+
+		std::vector<u32> Indices = mapbox::earcut<u32>(Polygon);
+
+		for (u32 i = 0; i < Indices.size(); ++i)
+		{
+			TestMesh.Indices.push_back(Indices[i] + BaseVertex);
+		}
+
+		//for (u32 i = 0; i < Ring.size(); ++i)
+		//{
+		//	const s32 CurrentNanoDegX = Ring[i][0];
+		//	const s32 CurrentNanoDegY = Ring[i][1];
+
+		//	const s32 NextNanoDegX = Ring[(i + 1) % NodeCount][0];
+		//	const s32 NextNanoDegY = Ring[(i + 1) % NodeCount][1];
+
+
+		//}
 	}
 
-	void emit_mesh(const std::vector<std::vector<std::array<float, 2>>>& polygon)
-	{
-		Mesh mesh;
-		mesh.Indices = mapbox::earcut<u16>(polygon);
-		if (mesh.Indices.empty())
-		{
-			return;
-		}
+	//void relation(const osmium::Relation& rel)
+	//{
+	//	if (!rel.tags().has_tag("type", "multipolygon"))
+	//	{
+	//		return;
+	//	}
 
-		for (const auto& ring : polygon)
-		{
-			for (const auto& p : ring)
-			{
-				mesh.vertices.push_back({ glm::vec3(p[0], 0.0f, p[1]) });
-			}
-		}
+	//	if (!rel.tags().has_key("building"))
+	//	{
+	//		return;
+	//	}
 
-		objects.push_back(std::move(mesh));
-	}
+	//	std::vector<std::vector<std::array<f32, 2>>> polygon;
 
-	void way(const osmium::Way& way)
-	{
-		ways[way.id()] = &way;
+	//	for (const osmium::RelationMember& member : rel.members())
+	//	{
+	//		if (member.type() != osmium::item_type::way)
+	//		{
+	//			continue;
+	//		}
 
-		if (!way.tags().has_key("building"))
-		{
-			return;
-		}
+	//		auto it = ways.find(member.ref());
+	//		if (it == ways.end())
+	//		{
+	//			continue;
+	//		}
 
-		if (!way.is_closed())
-		{
-			return;
-		}
+	//		const osmium::Way& way = *it->second;
+	//		if (!way.is_closed())
+	//		{
+	//			continue;
+	//		}
 
-		std::vector<std::array<float, 2>> ring;
-		if (!build_ring(way, ring))
-		{
-			return;
-		}
+	//		std::vector<std::array<f32, 2>> ring;
+	//		if (build_ring(way, ring))
+	//		{
+	//			polygon.push_back(std::move(ring));
+	//		}
+	//	}
 
-		std::vector<std::vector<std::array<float, 2>>> polygon;
-		polygon.push_back(std::move(ring));
+	//	if (polygon.empty())
+	//	{
+	//		return;
+	//	}
 
-		emit_mesh(polygon);
-	}
-
-	void relation(const osmium::Relation& rel)
-	{
-		if (!rel.tags().has_tag("type", "multipolygon"))
-		{
-			return;
-		}
-
-		if (!rel.tags().has_key("building"))
-		{
-			return;
-		}
-
-		std::vector<std::vector<std::array<float, 2>>> polygon;
-
-		for (const osmium::RelationMember& member : rel.members())
-		{
-			if (member.type() != osmium::item_type::way)
-			{
-				continue;
-			}
-
-			auto it = ways.find(member.ref());
-			if (it == ways.end())
-			{
-				continue;
-			}
-
-			const osmium::Way& way = *it->second;
-			if (!way.is_closed())
-			{
-				continue;
-			}
-
-			std::vector<std::array<float, 2>> ring;
-			if (build_ring(way, ring))
-			{
-				polygon.push_back(std::move(ring));
-			}
-		}
-
-		if (polygon.empty())
-		{
-			return;
-		}
-
-		emit_mesh(polygon);
-	}
+	//	emit_mesh(polygon);
+	//}
 };
 
-int main()
+u32 main()
 {
 	osmium::io::Reader reader("", osmium::osm_entity_bits::node | osmium::osm_entity_bits::way);
 
@@ -201,8 +209,16 @@ int main()
 
 	if (box.valid())
 	{
-		center_m_x = (box.bottom_left().x() + box.top_right().x()) / 2;
-		center_m_y = (box.bottom_left().y() + box.top_right().y()) / 2;
+		center_nanodeg_x = (box.bottom_left().x() + box.top_right().x()) / 2;
+		center_nanodeg_y = (box.bottom_left().y() + box.top_right().y()) / 2;
+
+		lat_rad = (center_nanodeg_y / 1e7) * DEG_TO_RAD;
+
+		meters_per_nanodeg_lat = R * DEG_TO_RAD / 1e7;
+		meters_per_nanodeg_lon = R * DEG_TO_RAD * std::cos(lat_rad) / 1e7;
+
+		limit_lat_nd = s32(5000.0f / meters_per_nanodeg_lat);
+		limit_lon_nd = s32(5000.0f / meters_per_nanodeg_lon);
 	}
 	else
 	{
@@ -217,26 +233,6 @@ int main()
 
 	osmium::apply(reader, location_handler, building_handler);
 	reader.close();
-
-	//Mesh TestMesh;
-
-	//std::vector<std::array<float, 2>> wayObject = {
-	//	{10.0, -10.0},
-	//	{10.0, 10.0},
-	//	{-10.0, 10.0},
-	//	{-10.0, -10.0}
-	//};
-
-	//std::vector<std::vector<std::array<float, 2>>> polygon;
-	//polygon.push_back(wayObject);
-	//
-	//TestMesh.Indices = mapbox::earcut<uint16_t>(polygon);
-	//for (u32 i = 0; i < wayObject.size(); ++i)
-	//{
-	//	TestMesh.vertices.push_back({ glm::vec3(wayObject[i][0], 0.0f, wayObject[i][1])});
-	//}
-	//
-	//objects.push_back(TestMesh);
 
 	s32 WindowWidth = 1920;
 	s32 WindowHeight = 1080;
@@ -256,7 +252,7 @@ int main()
 	f32 nearPlane = 0.1f;
 	f32 farPlane = 10000.0f;
 
-	glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, -3.0f);
+	glm::vec3 cameraPos = glm::vec3(0.0f, 100.0f, 0.0f);
 	glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 	f32 cameraSpeed = 0.05f;
 	f32 mouseSensitivity = 0.001f;
@@ -272,13 +268,9 @@ int main()
 	f32 time = 0.0f;
 
 	std::vector<StreetsRender_Mesh> Meshes;
-	Meshes.reserve(objects.size());
 
-	for (u32 i = 0; i < objects.size(); ++i)
-	{
-		auto& mesh = objects[i];
-		Meshes.push_back(StreetsRender_CreateMesh(mesh.vertices.data(), mesh.vertices.size(), mesh.Indices.data(), mesh.Indices.size()));
-	}
+
+	Meshes.push_back(StreetsRender_CreateMesh(TestMesh.vertices.data(), TestMesh.vertices.size(), TestMesh.Indices.data(), TestMesh.Indices.size()));
 
 	while (!glfwWindowShouldClose(Window))
 	{
@@ -320,7 +312,7 @@ int main()
 		if (glfwGetKey(Window, GLFW_KEY_SPACE) == GLFW_PRESS) movement += cameraUp;
 		if (glfwGetKey(Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) movement -= cameraUp;
 
-		cameraPos += movement * 3.0f;
+		cameraPos += movement * 10.0f;
 
 		glm::mat4 proj = glm::perspective(fov, aspect, nearPlane, farPlane);
 		proj[1][1] *= -1;

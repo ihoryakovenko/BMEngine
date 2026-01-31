@@ -7,6 +7,8 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
+#include <Util/EngineTypes.h>
+
 #define MAX_SWAPCHAIN_IMAGES 4
 
 static BmRender_Shader VertexShader;
@@ -168,7 +170,7 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	PipelineDesc.RasterizationState.polygonMode = BmRender_PolygonMode::Fill;
 	PipelineDesc.RasterizationState.lineWidth = 1.0f;
 	PipelineDesc.RasterizationState.cullMode = BmRender_CullModeFlags::Back;
-	PipelineDesc.RasterizationState.frontFace = BmRender_FrontFace::Clockwise;
+	PipelineDesc.RasterizationState.frontFace = BmRender_FrontFace::CounterClockwise;
 	PipelineDesc.RasterizationState.depthBiasEnable = false;
 
 	PipelineDesc.ColorBlendAttachment = {};
@@ -226,7 +228,7 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	// const u64 IndexBufferSize = sizeof(CubeIndices);
 	// const u64 IndirectCommandSize = sizeof(IndirectCommand);
 
-	StagingBufferSize = sizeof(StreetsRender_Vertex) * 500;
+	StagingBufferSize = MB256;
 	StagingBuffer = BmRender_CreateStagingBuffer(StagingBufferSize); // + IndexBufferSize + IndirectCommandSize);
 	// IndirectBuffer = BmRender_CreateIndirectDrawBuffer(IndirectCommandSize, MemoryPropertyFlag::GPULocal);
 
@@ -313,7 +315,7 @@ void StreetsRender_Draw(glm::mat4 vp, StreetsRender_Mesh* Meshes, u32 MeshCount)
 	{
 		u64 vertexOffset = 0;
 		BmRender_RecordBindVertexBuffers(CommandBuffer, 0, 1, &Meshes[i].VertexBuffer, &vertexOffset);
-		BmRender_RecordBindIndexBuffer(CommandBuffer, Meshes[i].IndexBuffer, 0, BmRender_IndexType::Uint16);
+		BmRender_RecordBindIndexBuffer(CommandBuffer, Meshes[i].IndexBuffer, 0, BmRender_IndexType::Uint32);
 
 
 		BmRender_DrawIndexed(CommandBuffer, Meshes[i].IndexCount, 1, 0, 0, 0);
@@ -354,10 +356,10 @@ void StreetsRender_Draw(glm::mat4 vp, StreetsRender_Mesh* Meshes, u32 MeshCount)
 	BmRender_FrameFree();
 }
 
-StreetsRender_Mesh StreetsRender_CreateMesh(StreetsRender_Vertex* Vertices, u32 VertexCount, u16* Indices, u32 IndexCount)
+StreetsRender_Mesh StreetsRender_CreateMesh(StreetsRender_Vertex* Vertices, u32 VertexCount, u32* Indices, u32 IndexCount)
 {
 	const u64 VertexBufferSize = sizeof(StreetsRender_Vertex) * VertexCount;
-	const u64 IndexBufferSize = sizeof(u16) * IndexCount;
+	const u64 IndexBufferSize = sizeof(u32) * IndexCount;
 
 	assert(StagingBufferSize > VertexBufferSize + IndexBufferSize);
 
