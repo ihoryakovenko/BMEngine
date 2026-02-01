@@ -1,5 +1,6 @@
 #include "Render.h"
 
+#include <cstddef>
 #include <RenderInterface.h>
 
 #include <glm/glm.hpp>
@@ -110,7 +111,9 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	DescriptorBinding.StageFlags = BmRender_DescriptorShaderStage::Fragment;
 	DescriptorSetLayout = BmRender_CreateDescriptorSetLayout(&DescriptorBinding, 1);
 
-	BmRender_PushConstant PushConstantRange = BmRender_CreatePushConstant(BmRender_DescriptorShaderStage::Vertex, 0, sizeof(glm::mat4));
+	// Push constants: mat4 vp (64) + ivec3 WorldCameraPosition (12) + pad (4) + vec2 metersPerNanodegLonLat (8) = 88
+	constexpr u32 PUSH_CONSTANT_SIZE = 88;
+	BmRender_PushConstant PushConstantRange = BmRender_CreatePushConstant(BmRender_DescriptorShaderStage::Vertex, 0, PUSH_CONSTANT_SIZE);
 
 	BmRender_Extent2D SwapchainExtent = BmRender_GetSwapchainExtent();
 	DepthImage = BmRender_CreateImage2D(SwapchainExtent.Width, SwapchainExtent.Height, BmRender_Format::D32_SFLOAT_S8_UINT, BmRender_ImageType::DepthSamplad);
@@ -143,16 +146,20 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	PipelineDesc.ShaderStages = ShaderStages;
 	PipelineDesc.ShaderStagesCount = 2;
 
-	// Define vertex bindings
-	VertexAttribute PositionAttribute = {};
-	PositionAttribute.Type = BmRender_AttributeType::Vec3;
-	PositionAttribute.Offset = 0;
+	// Define vertex bindings: location 0 = ivec2 InNanodegPosition, location 1 = float AltitudeMeters
+	VertexAttribute NanodegAttr = {};
+	NanodegAttr.Type = BmRender_AttributeType::Ivec2;
+	NanodegAttr.Offset = 0;
 
-	VertexAttribute VertexAttributes[1] = { PositionAttribute };
+	VertexAttribute AltitudeAttr = {};
+	AltitudeAttr.Type = BmRender_AttributeType::Float;
+	AltitudeAttr.Offset = offsetof(StreetsRender_Vertex, AltitudeMeters);
+
+	VertexAttribute VertexAttributes[2] = { NanodegAttr, AltitudeAttr };
 
 	BmRender_VertexBinding VertexBinding = {};
 	VertexBinding.Attributes = VertexAttributes;
-	VertexBinding.AttributesCount = 1;
+	VertexBinding.AttributesCount = 2;
 	VertexBinding.Stride = sizeof(StreetsRender_Vertex);
 	VertexBinding.InputRate = BmRender_VertexInputRate::Vertex;
 
@@ -270,7 +277,7 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	//BmRender_EndCommandBuffer(CommandBuffer);
 }
 
-void StreetsRender_Draw(glm::mat4 vp, StreetsRender_Mesh* Meshes, u32 MeshCount)
+void StreetsRender_Draw(StreetsRender_FrameData* FrameData, StreetsRender_Mesh* Meshes, u32 MeshCount)
 {
 	BmRender_WaitForFences(InFlightFence, true, UINT64_MAX);
 	BmRender_ResetFences(InFlightFence);
@@ -309,7 +316,7 @@ void StreetsRender_Draw(glm::mat4 vp, StreetsRender_Mesh* Meshes, u32 MeshCount)
 	BmRender_BeginRendering(CommandBuffer, &RenderingInfo);
 
 	BmRender_BindPipeline(CommandBuffer, Pipeline);
-	BmRender_RecordPushConstants(CommandBuffer, PipelineLayout, BmRender_DescriptorShaderStage::Vertex, 0, 64, glm::value_ptr(vp));
+	BmRender_RecordPushConstants(CommandBuffer, PipelineLayout, BmRender_DescriptorShaderStage::Vertex, 0, sizeof(StreetsRender_FrameData), FrameData);
 
 	for (u32 i = 0; i < MeshCount; ++i)
 	{

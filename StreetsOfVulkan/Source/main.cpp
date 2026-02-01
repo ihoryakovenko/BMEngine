@@ -57,9 +57,6 @@ f64 lat_rad;
 
 f64 meters_per_nanodeg_lat;
 f64 meters_per_nanodeg_lon;
-
-s32 limit_lat_nd;
-s32 limit_lon_nd;
 // Tile info
 
 
@@ -83,7 +80,7 @@ struct BuildingHandler : public osmium::handler::Handler
 			return;
 		}
 
-		const u32 BaseVertex = TestMesh.vertices.size();
+		u32 BaseVertex = TestMesh.vertices.size();
 		const u64 NodeCount = Way.nodes().size();
 
 		std::vector<std::array<s32, 2>> Ring;
@@ -120,17 +117,14 @@ struct BuildingHandler : public osmium::handler::Handler
 
 		for (u32 i = 0; i < Ring.size(); ++i)
 		{
-			const s32 dx = Ring[i][0] - center_nanodeg_x;
-			const s32 dy = Ring[i][1] - center_nanodeg_y;
+			const s32 CurrentNanoDegX = Ring[i][0];
+			const s32 CurrentNanoDegY = Ring[i][1];
 
-			const f32 x = f32(dx * meters_per_nanodeg_lon);
-			const f32 y = f32(dy * meters_per_nanodeg_lat);
-
-			TestMesh.vertices.push_back({ glm::vec3(y, Height, x) });
+			TestMesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), Height });
 		}
 
 		std::vector<std::vector<std::array<s32, 2>>> Polygon;
-		Polygon.push_back(std::move(Ring));
+		Polygon.push_back(Ring);
 
 		std::vector<u32> Indices = mapbox::earcut<u32>(Polygon);
 
@@ -139,16 +133,30 @@ struct BuildingHandler : public osmium::handler::Handler
 			TestMesh.Indices.push_back(Indices[i] + BaseVertex);
 		}
 
-		//for (u32 i = 0; i < Ring.size(); ++i)
-		//{
-		//	const s32 CurrentNanoDegX = Ring[i][0];
-		//	const s32 CurrentNanoDegY = Ring[i][1];
+		for (u32 i = 0; i < NodeCount; ++i)
+		{
+			BaseVertex = TestMesh.vertices.size();
 
-		//	const s32 NextNanoDegX = Ring[(i + 1) % NodeCount][0];
-		//	const s32 NextNanoDegY = Ring[(i + 1) % NodeCount][1];
+			const s32 CurrentNanoDegX = Ring[i][0];
+			const s32 CurrentNanoDegY = Ring[i][1];
 
+			const s32 NextNanoDegX = Ring[(i + 1) % NodeCount][0];
+			const s32 NextNanoDegY = Ring[(i + 1) % NodeCount][1];
 
-		//}
+			TestMesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), Height });
+			TestMesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), 0.0f });
+
+			TestMesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), 0.0f });
+			TestMesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), Height });
+
+			TestMesh.Indices.push_back(BaseVertex + 2);
+			TestMesh.Indices.push_back(BaseVertex + 3);
+			TestMesh.Indices.push_back(BaseVertex + 0);
+
+			TestMesh.Indices.push_back(BaseVertex + 0);
+			TestMesh.Indices.push_back(BaseVertex + 1);
+			TestMesh.Indices.push_back(BaseVertex + 2);
+		}
 	}
 
 	//void relation(const osmium::Relation& rel)
@@ -200,9 +208,23 @@ struct BuildingHandler : public osmium::handler::Handler
 	//}
 };
 
+struct FlyCamera
+{
+	glm::ivec2 WorldNanoDegPosition;
+	f32 Altitude;
+
+	f32 Yaw;
+	f32 Pitch;
+
+	f32 Aspect;
+	f32 FOV;
+	f32 NearPlane;
+	f32 FarPlane;
+};
+
 u32 main()
 {
-	osmium::io::Reader reader("", osmium::osm_entity_bits::node | osmium::osm_entity_bits::way);
+	osmium::io::Reader reader("C:/Users/igor_/Desktop/planet_19.91022,50.0482_19.97117,50.07131.osm.pbf", osmium::osm_entity_bits::node | osmium::osm_entity_bits::way);
 
 	const auto& header = reader.header();
 	const osmium::Box& box = header.box();
@@ -216,9 +238,6 @@ u32 main()
 
 		meters_per_nanodeg_lat = R * DEG_TO_RAD / 1e7;
 		meters_per_nanodeg_lon = R * DEG_TO_RAD * std::cos(lat_rad) / 1e7;
-
-		limit_lat_nd = s32(5000.0f / meters_per_nanodeg_lat);
-		limit_lon_nd = s32(5000.0f / meters_per_nanodeg_lon);
 	}
 	else
 	{
@@ -245,20 +264,21 @@ u32 main()
 	GLFWwindow* Window = glfwCreateWindow(WindowWidth, WindowHeight, "BMEngine", nullptr, nullptr);
 	StreetsRender_Init(Window, WindowWidth, WindowHeight);
 
+	FlyCamera Camera;
+	Camera.WorldNanoDegPosition = glm::ivec2(center_nanodeg_x, center_nanodeg_y);
+	Camera.Altitude = 100.0f;
 
+	Camera.Yaw = glm::radians(90.0f);
+	Camera.Pitch = 0.0f;
 
-	f32 aspect = (f32)WindowWidth / (f32)WindowHeight;
-	f32 fov = glm::radians(45.0f);
-	f32 nearPlane = 0.1f;
-	f32 farPlane = 10000.0f;
+	Camera.Aspect = (f32)WindowWidth / (f32)WindowHeight;
+	Camera.FOV = glm::radians(45.0f);
+	Camera.NearPlane = 0.1f;
+	Camera.FarPlane = 10000.0f;
 
-	glm::vec3 cameraPos = glm::vec3(0.0f, 100.0f, 0.0f);
-	glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
-	f32 cameraSpeed = 0.05f;
+	glm::vec3 WorldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+
 	f32 mouseSensitivity = 0.001f;
-
-	f32 yaw = glm::radians(90.0f);
-	f32 pitch = 0.0f;
 	f64 lastCursorX = (f64)WindowWidth / 2.0;
 	f64 lastCursorY = (f64)WindowHeight / 2.0;
 	bool firstMouse = true;
@@ -292,41 +312,45 @@ u32 main()
 		lastCursorX = cursorX;
 		lastCursorY = cursorY;
 
-		yaw += deltaX * mouseSensitivity;
-		pitch -= deltaY * mouseSensitivity;
+		Camera.Yaw += deltaX * mouseSensitivity;
+		Camera.Pitch -= deltaY * mouseSensitivity;
 		f32 pitchLimit = glm::radians(89.0f);
-		if (pitch > pitchLimit)  pitch = pitchLimit;
-		if (pitch < -pitchLimit) pitch = -pitchLimit;
+		if (Camera.Pitch > pitchLimit)  Camera.Pitch = pitchLimit;
+		if (Camera.Pitch < -pitchLimit) Camera.Pitch = -pitchLimit;
 
-		glm::vec3 cameraFront;
-		cameraFront.x = std::cos(pitch) * std::cos(yaw);
-		cameraFront.y = std::sin(pitch);
-		cameraFront.z = std::cos(pitch) * std::sin(yaw);
-		cameraFront = glm::normalize(cameraFront);
+		glm::vec3 CameraFront;
+		CameraFront.x = std::cos(Camera.Pitch) * std::cos(Camera.Yaw);
+		CameraFront.y = std::sin(Camera.Pitch);
+		CameraFront.z = std::cos(Camera.Pitch) * std::sin(Camera.Yaw);
+
+		const glm::vec3 CameraRight = glm::normalize(glm::cross(CameraFront, WorldUp));
 
 		glm::vec3 movement = glm::vec3(0.0f);
-		if (glfwGetKey(Window, GLFW_KEY_W) == GLFW_PRESS) movement += cameraFront;
-		if (glfwGetKey(Window, GLFW_KEY_S) == GLFW_PRESS) movement -= cameraFront;
-		if (glfwGetKey(Window, GLFW_KEY_A) == GLFW_PRESS) movement -= glm::normalize(glm::cross(cameraFront, cameraUp));
-		if (glfwGetKey(Window, GLFW_KEY_D) == GLFW_PRESS) movement += glm::normalize(glm::cross(cameraFront, cameraUp));
-		if (glfwGetKey(Window, GLFW_KEY_SPACE) == GLFW_PRESS) movement += cameraUp;
-		if (glfwGetKey(Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) movement -= cameraUp;
+		if (glfwGetKey(Window, GLFW_KEY_W) == GLFW_PRESS) movement += CameraFront;
+		if (glfwGetKey(Window, GLFW_KEY_S) == GLFW_PRESS) movement -= CameraFront;
+		if (glfwGetKey(Window, GLFW_KEY_A) == GLFW_PRESS) movement -= CameraRight;
+		if (glfwGetKey(Window, GLFW_KEY_D) == GLFW_PRESS) movement += CameraRight;
 
-		cameraPos += movement * 10.0f;
+		if (glfwGetKey(Window, GLFW_KEY_SPACE) == GLFW_PRESS) movement += WorldUp;
+		if (glfwGetKey(Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) movement -= WorldUp;
 
-		glm::mat4 proj = glm::perspective(fov, aspect, nearPlane, farPlane);
+		movement *= 10.0f;
+		Camera.WorldNanoDegPosition.x += (s32)std::round(movement.z / meters_per_nanodeg_lon);
+		Camera.WorldNanoDegPosition.y += (s32)std::round(movement.x / meters_per_nanodeg_lat);
+		Camera.Altitude += (s32)std::round(movement.y);
+
+		glm::mat4 proj = glm::perspective(Camera.FOV, Camera.Aspect, Camera.NearPlane, Camera.FarPlane);
 		proj[1][1] *= -1;
-		glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-
-		f32 rotY = time * 0.5f;
-		f32 rotX = time * 0.3f;
-		glm::mat4 model = glm::mat4(1.0f);
-		//model = glm::rotate(model, rotY, glm::vec3(0.0f, 1.0f, 0.0f));
-		//model = glm::rotate(model, rotX, glm::vec3(1.0f, 0.0f, 0.0f));
+		glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), CameraFront, WorldUp);
 
 		glm::mat4 vp = proj * view;
 
-		StreetsRender_Draw(vp, Meshes.data(), Meshes.size());
+		StreetsRender_FrameData FrameData;
+		FrameData.CameraWorldAltitudeMeters = Camera.Altitude;
+		FrameData.CameraWorldNanoDegPosition = Camera.WorldNanoDegPosition;
+		FrameData.MetersPerNanoDegLonLat = glm::vec2((f32)meters_per_nanodeg_lon, (f32)meters_per_nanodeg_lat);
+		FrameData.vp = vp;
+		StreetsRender_Draw(&FrameData, Meshes.data(), Meshes.size());
 	}
 
 	for (u32 i = 0; i < Meshes.size(); ++i)

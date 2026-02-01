@@ -32,6 +32,7 @@ enum class BmRender_AttributeType : u8
 	Int,
 	Uint,
 	Float,
+	Ivec2,
 	Vec2,
 	Vec3,
 	Vec4,

@@ -426,6 +426,9 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 					case BmRender_AttributeType::Float:
 						Format = BmRender_Format::R32_SFLOAT;
 						break;
+					case BmRender_AttributeType::Ivec2:
+						Format = BmRender_Format::R32G32_SINT;
+						break;
 					case BmRender_AttributeType::Vec2:
 						Format = BmRender_Format::R32G32_SFLOAT;
 						break;
