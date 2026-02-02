@@ -146,21 +146,25 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	PipelineDesc.ShaderStages = ShaderStages;
 	PipelineDesc.ShaderStagesCount = 2;
 
-	// Define vertex bindings: location 0 = ivec2 InNanodegPosition, location 1 = float AltitudeMeters
+	// Define vertex bindings: location 0 = ivec2 InNanoDegPosition, location 1 = float InAltitudeMeters, location 2 = vec3 Color
 	VertexAttribute NanodegAttr = {};
 	NanodegAttr.Type = BmRender_AttributeType::Ivec2;
 	NanodegAttr.Offset = 0;
 
 	VertexAttribute AltitudeAttr = {};
 	AltitudeAttr.Type = BmRender_AttributeType::Float;
-	AltitudeAttr.Offset = offsetof(StreetsRender_Vertex, AltitudeMeters);
+	AltitudeAttr.Offset = offsetof(StreetsRender_BuildingVertex, AltitudeMeters);
 
-	VertexAttribute VertexAttributes[2] = { NanodegAttr, AltitudeAttr };
+	VertexAttribute ColorAttr = {};
+	ColorAttr.Type = BmRender_AttributeType::Vec3;
+	ColorAttr.Offset = offsetof(StreetsRender_BuildingVertex, Color);
+
+	VertexAttribute VertexAttributes[3] = { NanodegAttr, AltitudeAttr, ColorAttr };
 
 	BmRender_VertexBinding VertexBinding = {};
 	VertexBinding.Attributes = VertexAttributes;
-	VertexBinding.AttributesCount = 2;
-	VertexBinding.Stride = sizeof(StreetsRender_Vertex);
+	VertexBinding.AttributesCount = 3;
+	VertexBinding.Stride = sizeof(StreetsRender_BuildingVertex);
 	VertexBinding.InputRate = BmRender_VertexInputRate::Vertex;
 
 	PipelineDesc.VertexBindings = &VertexBinding;
@@ -277,7 +281,7 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	//BmRender_EndCommandBuffer(CommandBuffer);
 }
 
-void StreetsRender_Draw(StreetsRender_FrameData* FrameData, StreetsRender_Mesh* Meshes, u32 MeshCount)
+void StreetsRender_Draw(StreetsRender_FrameData* FrameData, StreetsRender_BuildingsMesh* Meshes, u32 MeshCount)
 {
 	BmRender_WaitForFences(InFlightFence, true, UINT64_MAX);
 	BmRender_ResetFences(InFlightFence);
@@ -363,14 +367,14 @@ void StreetsRender_Draw(StreetsRender_FrameData* FrameData, StreetsRender_Mesh* 
 	BmRender_FrameFree();
 }
 
-StreetsRender_Mesh StreetsRender_CreateMesh(StreetsRender_Vertex* Vertices, u32 VertexCount, u32* Indices, u32 IndexCount)
+StreetsRender_BuildingsMesh StreetsRender_CreateBuildingsMesh(StreetsRender_BuildingVertex* Vertices, u32 VertexCount, u32* Indices, u32 IndexCount)
 {
-	const u64 VertexBufferSize = sizeof(StreetsRender_Vertex) * VertexCount;
+	const u64 VertexBufferSize = sizeof(StreetsRender_BuildingVertex) * VertexCount;
 	const u64 IndexBufferSize = sizeof(u32) * IndexCount;
 
 	assert(StagingBufferSize > VertexBufferSize + IndexBufferSize);
 
-	StreetsRender_Mesh Mesh;
+	StreetsRender_BuildingsMesh Mesh;
 	Mesh.VertexBuffer = BmRender_CreateVertexStageBuffer(VertexBufferSize, MemoryPropertyFlag::GPULocal);
 	Mesh.IndexBuffer = BmRender_CreateVertexStageBuffer(IndexBufferSize, MemoryPropertyFlag::GPULocal);
 	Mesh.VertexCount = VertexCount;
@@ -403,7 +407,7 @@ StreetsRender_Mesh StreetsRender_CreateMesh(StreetsRender_Vertex* Vertices, u32 
 	return Mesh;
 }
 
-void StreetsRender_DestroyMesh(StreetsRender_Mesh* Mesh)
+void StreetsRender_DestroyBuildingsMesh(StreetsRender_BuildingsMesh* Mesh)
 {
 	BmRender_QueueWaitIdle(GraphicsQueue);
 	BmRender_DestroyGPUBuffer(Mesh->VertexBuffer);

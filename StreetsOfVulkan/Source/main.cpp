@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <cmath>
 
 #include <glm/glm.hpp>
@@ -36,7 +37,7 @@
 
 struct Mesh
 {
-	std::vector<StreetsRender_Vertex> vertices;
+	std::vector<StreetsRender_BuildingVertex> vertices;
 	std::vector<u32> Indices;
 };
 
@@ -70,14 +71,47 @@ struct BuildingHandler : public osmium::handler::Handler
 	{
 		Ways[Way.id()] = &Way;
 
-		if (!Way.tags().has_key("building"))
+		if (!Way.tags().has_key("building") && !Way.tags().has_key("building:part"))
 		{
 			return;
 		}
 
+		//for (const auto& tag : Way.tags())
+		//{
+		//	std::cout << "  " << tag.key() << " = " << tag.value() << "\n";
+		//}
+
 		if (!Way.is_closed())
 		{
 			return;
+		}
+
+		const f32 LevelHeight = 3.0f;
+		f32 Height = 3.0f;
+		f32 MinHeight = 0.0f;
+
+		//min_height
+
+		if (Way.tags().has_key("height"))
+		{
+			const char* HeightStr = Way.tags().get_value_by_key("height");
+			Height = atof(HeightStr);
+		}
+		else if (Way.tags().has_key("building:levels"))
+		{
+			const char* LevelStr = Way.tags().get_value_by_key("building:levels");
+			Height = atoi(LevelStr) * LevelHeight;
+		}
+
+		if (Way.tags().has_key("min_height"))
+		{
+			const char* HeightStr = Way.tags().get_value_by_key("min_height");
+			MinHeight = atof(HeightStr);
+		}
+		else if (Way.tags().has_key("building:min_level"))
+		{
+			const char* LevelStr = Way.tags().get_value_by_key("building:min_level");
+			MinHeight = atoi(LevelStr) * LevelHeight;
 		}
 
 		u32 BaseVertex = TestMesh.vertices.size();
@@ -86,7 +120,7 @@ struct BuildingHandler : public osmium::handler::Handler
 		std::vector<std::array<s32, 2>> Ring;
 		Ring.reserve(NodeCount);
 
-		u64 Area = 0.0;
+		int64_t Area = 0;
 
 		for (u64 i = 0; i < NodeCount; ++i)
 		{
@@ -102,25 +136,29 @@ struct BuildingHandler : public osmium::handler::Handler
 				return;
 			}
 
-			Area += (u64)CurrentLoc.x() * (u64)NextLoc.y() - (u64)NextLoc.x() * (u64)CurrentLoc.y();
+			Area += (int64_t)CurrentLoc.x() * (int64_t)NextLoc.y() - (int64_t)NextLoc.x() * (int64_t)CurrentLoc.y();
 
 			Ring.push_back({ CurrentLoc.x(), CurrentLoc.y() });
 		}
 
-		const f32 Height = 30.0f;
-
-		const bool IsClockwise = (Area < 0.0);
+		const bool IsClockwise = (Area < 0);
 		if (IsClockwise)
 		{
-			Ring.reserve(Ring.size());
+			std::reverse(Ring.begin(), Ring.end());
 		}
+
+		const glm::vec3 roofColor(
+			(f32)(rand() % 256) / 255.0f,
+			(f32)(rand() % 256) / 255.0f,
+			(f32)(rand() % 256) / 255.0f
+		);
 
 		for (u32 i = 0; i < Ring.size(); ++i)
 		{
 			const s32 CurrentNanoDegX = Ring[i][0];
 			const s32 CurrentNanoDegY = Ring[i][1];
 
-			TestMesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), Height });
+			TestMesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), Height, roofColor });
 		}
 
 		std::vector<std::vector<std::array<s32, 2>>> Polygon;
@@ -137,17 +175,23 @@ struct BuildingHandler : public osmium::handler::Handler
 		{
 			BaseVertex = TestMesh.vertices.size();
 
+			const glm::vec3 wallColor(
+				(f32)(rand() % 256) / 255.0f,
+				(f32)(rand() % 256) / 255.0f,
+				(f32)(rand() % 256) / 255.0f
+			);
+
 			const s32 CurrentNanoDegX = Ring[i][0];
 			const s32 CurrentNanoDegY = Ring[i][1];
 
 			const s32 NextNanoDegX = Ring[(i + 1) % NodeCount][0];
 			const s32 NextNanoDegY = Ring[(i + 1) % NodeCount][1];
 
-			TestMesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), Height });
-			TestMesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), 0.0f });
+			TestMesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), Height, wallColor });
+			TestMesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), MinHeight, wallColor });
 
-			TestMesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), 0.0f });
-			TestMesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), Height });
+			TestMesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), MinHeight, wallColor });
+			TestMesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), Height, wallColor });
 
 			TestMesh.Indices.push_back(BaseVertex + 2);
 			TestMesh.Indices.push_back(BaseVertex + 3);
@@ -159,19 +203,24 @@ struct BuildingHandler : public osmium::handler::Handler
 		}
 	}
 
-	//void relation(const osmium::Relation& rel)
-	//{
-	//	if (!rel.tags().has_tag("type", "multipolygon"))
-	//	{
-	//		return;
-	//	}
+	void relation(const osmium::Relation& rel)
+	{
+		if (!rel.tags().has_tag("type", "multipolygon"))
+		{
+			return;
+		}
 
-	//	if (!rel.tags().has_key("building"))
-	//	{
-	//		return;
-	//	}
+		if (!rel.tags().has_key("building"))
+		{
+			return;
+		}
 
-	//	std::vector<std::vector<std::array<f32, 2>>> polygon;
+		for (const auto& tag : rel.tags())
+		{
+			std::cout << "  " << tag.key() << " = " << tag.value() << "\n";
+		}
+
+		std::vector<std::vector<std::array<f32, 2>>> polygon;
 
 	//	for (const osmium::RelationMember& member : rel.members())
 	//	{
@@ -205,7 +254,7 @@ struct BuildingHandler : public osmium::handler::Handler
 	//	}
 
 	//	emit_mesh(polygon);
-	//}
+	}
 };
 
 struct FlyCamera
@@ -224,7 +273,11 @@ struct FlyCamera
 
 u32 main()
 {
-	osmium::io::Reader reader("C:/Users/igor_/Desktop/planet_19.91022,50.0482_19.97117,50.07131.osm.pbf", osmium::osm_entity_bits::node | osmium::osm_entity_bits::way);
+	srand((unsigned)time(nullptr));
+
+	const osmium::osm_entity_bits::type ReadTypes = osmium::osm_entity_bits::node | osmium::osm_entity_bits::way | osmium::osm_entity_bits::relation;
+
+	osmium::io::Reader reader("C:/Users/igor_/Desktop/planet_19.91022,50.0482_19.97117,50.07131.osm.pbf", ReadTypes);
 
 	const auto& header = reader.header();
 	const osmium::Box& box = header.box();
@@ -287,10 +340,10 @@ u32 main()
 
 	f32 time = 0.0f;
 
-	std::vector<StreetsRender_Mesh> Meshes;
+	std::vector<StreetsRender_BuildingsMesh> Meshes;
 
 
-	Meshes.push_back(StreetsRender_CreateMesh(TestMesh.vertices.data(), TestMesh.vertices.size(), TestMesh.Indices.data(), TestMesh.Indices.size()));
+	Meshes.push_back(StreetsRender_CreateBuildingsMesh(TestMesh.vertices.data(), TestMesh.vertices.size(), TestMesh.Indices.data(), TestMesh.Indices.size()));
 
 	while (!glfwWindowShouldClose(Window))
 	{
@@ -355,7 +408,7 @@ u32 main()
 
 	for (u32 i = 0; i < Meshes.size(); ++i)
 	{
-		StreetsRender_DestroyMesh(&Meshes[i]);
+		StreetsRender_DestroyBuildingsMesh(&Meshes[i]);
 	}
 
 	StreetsRender_DeInit();
