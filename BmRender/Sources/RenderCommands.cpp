@@ -118,6 +118,7 @@ void BmRender_TransitionImageForRendering(BmRender_CommandBuffer CommandBuffer, 
 	{
 		case BmRender_ImageType::ColorAttachmentSampled:
 		case BmRender_ImageType::TransferSampled:
+		case BmRender_ImageType::MultiSampledColorAttachment:
 			DstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
 			DstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
 			AspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -125,6 +126,7 @@ void BmRender_TransitionImageForRendering(BmRender_CommandBuffer CommandBuffer, 
 			break;
 
 		case BmRender_ImageType::DepthSamplad:
+		case BmRender_ImageType::MultiSampledDepthAttachment:
 			DstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
 			DstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			AspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
@@ -275,6 +277,10 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 		VkAttachment->loadOp = AttachmentLoadOpToVk(Attachment.LoadOp);
 		VkAttachment->storeOp = AttachmentStoreOpToVk(Attachment.StoreOp);
 		VkAttachment->clearValue.color = ClearColorValueToVk(Attachment.ClearValue);
+
+		VkAttachment->resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		VkAttachment->resolveImageView = (VkImageView)Attachment.ResolveImageView;
+		VkAttachment->resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
 	}
 
 	VkRenderingAttachmentInfo DepthAttachmentInfo = { };

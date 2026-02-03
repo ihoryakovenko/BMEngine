@@ -85,9 +85,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Source\main.cpp" />
+    <ClCompile Include="Source\OSMBuilder.cpp" />
     <ClCompile Include="Source\Render.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Source\OSMBuilder.h" />
     <ClInclude Include="Source\Render.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

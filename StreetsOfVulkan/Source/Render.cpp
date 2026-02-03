@@ -15,6 +15,8 @@
 static BmRender_Shader VertexShader;
 static BmRender_Shader FragmentShader;
 static BmRender_DescriptorSetLayout DescriptorSetLayout;
+static BmRender_Image ColorImage;
+static BmRender_ImageView ColorImageView;
 static BmRender_Image DepthImage;
 static BmRender_ImageView DepthImageView;
 static BmRender_PipelineLayout PipelineLayout;
@@ -77,7 +79,7 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 
 	char* VertexShaderCode = nullptr;
 	size_t VertexShaderCodeSize = 0;
-	if (!LoadShaderFile("./test_vertex.vert.spv", &VertexShaderCode, &VertexShaderCodeSize))
+	if (!LoadShaderFile("./Map3DObject.vert.spv", &VertexShaderCode, &VertexShaderCodeSize))
 	{
 		return -1;
 	}
@@ -92,13 +94,13 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 
 	char* FragmentShaderCode = nullptr;
 	size_t FragmentShaderCodeSize = 0;
-	if (!LoadShaderFile("./test_fragment.frag.spv", &FragmentShaderCode, &FragmentShaderCodeSize))
+	if (!LoadShaderFile("./Map3DObject.frag.spv", &FragmentShaderCode, &FragmentShaderCodeSize))
 	{
 		return -1;
 	}
 
 	BmRender_ShaderDescription FragShaderDesc = {};
-	FragShaderDesc.Code = reinterpret_cast<const u32*>(FragmentShaderCode);
+	FragShaderDesc.Code = (const u32*)FragmentShaderCode;
 	FragShaderDesc.CodeSize = FragmentShaderCodeSize;
 	FragShaderDesc.Stage = BmRender_PipelineShaderStage::Fragment;
 	FragmentShader = BmRender_CreateShader(&FragShaderDesc);
@@ -116,7 +118,11 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	BmRender_PushConstant PushConstantRange = BmRender_CreatePushConstant(BmRender_DescriptorShaderStage::Vertex, 0, PUSH_CONSTANT_SIZE);
 
 	BmRender_Extent2D SwapchainExtent = BmRender_GetSwapchainExtent();
-	DepthImage = BmRender_CreateImage2D(SwapchainExtent.Width, SwapchainExtent.Height, BmRender_Format::D32_SFLOAT_S8_UINT, BmRender_ImageType::DepthSamplad);
+
+	ColorImage = BmRender_CreateImage2D(SwapchainExtent.Width, SwapchainExtent.Height, BmRender_Format::R8G8B8A8_UNORM, BmRender_ImageType::MultiSampledColorAttachment, BmRender_SampleCount::Count4);
+	ColorImageView = BmRender_CreateImageView2D(ColorImage);
+
+	DepthImage = BmRender_CreateImage2D(SwapchainExtent.Width, SwapchainExtent.Height, BmRender_Format::D32_SFLOAT_S8_UINT, BmRender_ImageType::MultiSampledDepthAttachment, BmRender_SampleCount::Count4);
 	DepthImageView = BmRender_CreateImageView2D(DepthImage);
 
 	BmRender_PipelineLayoutDescription LayoutDesc = {};
@@ -131,7 +137,7 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	PipelineDesc.PipelineLayout = PipelineLayout;
 
 	BmRender_ImageView PipelineColorAttachments[1];
-	PipelineColorAttachments[0] = BmRender_GetSwapchainImageView(0);
+	PipelineColorAttachments[0] = ColorImageView;
 
 	PipelineDesc.Attachment.ColorAttachmentCount = 1;
 	PipelineDesc.Attachment.ColorAttachments = PipelineColorAttachments;
@@ -176,42 +182,42 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	PipelineDesc.PushConstantRangesCount = 1;
 
 	PipelineDesc.RasterizationState = {};
-	PipelineDesc.RasterizationState.depthClampEnable = false;
-	PipelineDesc.RasterizationState.rasterizerDiscardEnable = false;
-	PipelineDesc.RasterizationState.polygonMode = BmRender_PolygonMode::Fill;
-	PipelineDesc.RasterizationState.lineWidth = 1.0f;
-	PipelineDesc.RasterizationState.cullMode = BmRender_CullModeFlags::Back;
-	PipelineDesc.RasterizationState.frontFace = BmRender_FrontFace::CounterClockwise;
-	PipelineDesc.RasterizationState.depthBiasEnable = false;
+	PipelineDesc.RasterizationState.DepthClampEnable = false;
+	PipelineDesc.RasterizationState.RasterizerDiscardEnable = false;
+	PipelineDesc.RasterizationState.PolygonMode = BmRender_PolygonMode::Fill;
+	PipelineDesc.RasterizationState.LineWidth = 1.0f;
+	PipelineDesc.RasterizationState.CullMode = BmRender_CullModeFlags::Back;
+	PipelineDesc.RasterizationState.FrontFace = BmRender_FrontFace::CounterClockwise;
+	PipelineDesc.RasterizationState.DepthBiasEnable = false;
 
 	PipelineDesc.ColorBlendAttachment = {};
-	PipelineDesc.ColorBlendAttachment.colorWriteMask = BmRender_ColorComponentFlags::RGBA;
-	PipelineDesc.ColorBlendAttachment.blendEnable = false;
-	PipelineDesc.ColorBlendAttachment.srcColorBlendFactor = BmRender_BlendFactor::SrcAlpha;
-	PipelineDesc.ColorBlendAttachment.dstColorBlendFactor = BmRender_BlendFactor::OneMinusSrcAlpha;
-	PipelineDesc.ColorBlendAttachment.colorBlendOp = BmRender_BlendOp::Add;
-	PipelineDesc.ColorBlendAttachment.srcAlphaBlendFactor = BmRender_BlendFactor::One;
-	PipelineDesc.ColorBlendAttachment.dstAlphaBlendFactor = BmRender_BlendFactor::Zero;
-	PipelineDesc.ColorBlendAttachment.alphaBlendOp = BmRender_BlendOp::Add;
+	PipelineDesc.ColorBlendAttachment.ColorWriteMask = BmRender_ColorComponentFlags::RGBA;
+	PipelineDesc.ColorBlendAttachment.BlendEnable = false;
+	PipelineDesc.ColorBlendAttachment.SrcColorBlendFactor = BmRender_BlendFactor::SrcAlpha;
+	PipelineDesc.ColorBlendAttachment.DstColorBlendFactor = BmRender_BlendFactor::OneMinusSrcAlpha;
+	PipelineDesc.ColorBlendAttachment.ColorBlendOp = BmRender_BlendOp::Add;
+	PipelineDesc.ColorBlendAttachment.SrcAlphaBlendFactor = BmRender_BlendFactor::One;
+	PipelineDesc.ColorBlendAttachment.DstAlphaBlendFactor = BmRender_BlendFactor::Zero;
+	PipelineDesc.ColorBlendAttachment.AlphaBlendOp = BmRender_BlendOp::Add;
 
 	PipelineDesc.ColorBlendState = {};
-	PipelineDesc.ColorBlendState.logicOpEnable = false;
-	PipelineDesc.ColorBlendState.attachmentCount = 1;
+	PipelineDesc.ColorBlendState.LogicOpEnable = false;
+	PipelineDesc.ColorBlendState.AttachmentCount = 1;
 
 	PipelineDesc.DepthStencilState = {};
-	PipelineDesc.DepthStencilState.depthTestEnable = true;
-	PipelineDesc.DepthStencilState.depthWriteEnable = true;
-	PipelineDesc.DepthStencilState.depthCompareOp = BmRender_CompareOp::Less;
-	PipelineDesc.DepthStencilState.depthBoundsTestEnable = false;
-	PipelineDesc.DepthStencilState.stencilTestEnable = false;
+	PipelineDesc.DepthStencilState.DepthTestEnable = true;
+	PipelineDesc.DepthStencilState.DepthWriteEnable = true;
+	PipelineDesc.DepthStencilState.DepthCompareOp = BmRender_CompareOp::Less;
+	PipelineDesc.DepthStencilState.DepthBoundsTestEnable = false;
+	PipelineDesc.DepthStencilState.StencilTestEnable = false;
 
+	// TODO: Delete
 	PipelineDesc.MultisampleState = {};
-	PipelineDesc.MultisampleState.sampleShadingEnable = false;
-	PipelineDesc.MultisampleState.rasterizationSamples = BmRender_SampleCount::Count1;
+	PipelineDesc.MultisampleState.SampleShadingEnable = false;
 
 	PipelineDesc.InputAssemblyState = {};
-	PipelineDesc.InputAssemblyState.topology = BmRender_PrimitiveTopology::TriangleList;
-	PipelineDesc.InputAssemblyState.primitiveRestartEnable = false;
+	PipelineDesc.InputAssemblyState.Topology = BmRender_PrimitiveTopology::TriangleList;
+	PipelineDesc.InputAssemblyState.PrimitiveRestartEnable = false;
 
 	PipelineDesc.Extent = { (u32)WindowWidth, (u32)WindowHeight };
 	BmRender_Viewport Viewport = {};
@@ -229,8 +235,8 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	PipelineDesc.Scissor = Scissor;
 
 	PipelineDesc.ViewportState = {};
-	PipelineDesc.ViewportState.viewportCount = 1;
-	PipelineDesc.ViewportState.scissorCount = 1;
+	PipelineDesc.ViewportState.ViewportCount = 1;
+	PipelineDesc.ViewportState.ScissorCount = 1;
 
 	// BmRender_DrawIndexedIndirectCommand IndirectCommand = {};
 	// IndirectCommand.IndexCount = 36;
@@ -295,11 +301,13 @@ void StreetsRender_Draw(StreetsRender_FrameData* FrameData, StreetsRender_Buildi
 	}
 
 	BmRender_BeginCommandBuffer(CommandBuffer);
+	BmRender_TransitionImageForRendering(CommandBuffer, ColorImage);
 	BmRender_TransitionImageForRendering(CommandBuffer, BmRender_GetSwapchainImage(ImageIndex));
 	BmRender_TransitionImageForRendering(CommandBuffer, DepthImage);
 
 	BmRender_RenderingColorAttachment ColorAttachment = {};
-	ColorAttachment.ImageView = BmRender_GetSwapchainImageView(ImageIndex);
+	ColorAttachment.ImageView = ColorImageView;
+	ColorAttachment.ResolveImageView = BmRender_GetSwapchainImageView(ImageIndex);
 	ColorAttachment.LoadOp = BmRender_AttachmentLoadOp::Clear;
 	ColorAttachment.StoreOp = BmRender_AttachmentStoreOp::Store;
 	ColorAttachment.ClearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -420,8 +428,8 @@ void StreetsRender_DeInit()
 
 	BmRender_DestroyImageView(DepthImageView);
 	BmRender_DestroyImage(DepthImage);
+	BmRender_DestroyImage(ColorImage);
 	BmRender_DestroyGPUBuffer(StagingBuffer);
-	// BmRender_DestroyGPUBuffer(IndexBuffer);
 	// BmRender_DestroyGPUBuffer(IndirectBuffer);
 	BmRender_DestroySampler(AtlasSampler);
 	BmRender_DestroyDescriptorSetLayout(DescriptorSetLayout);

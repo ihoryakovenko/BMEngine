@@ -229,9 +229,9 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, co
 BmRender_PushConstant BmRender_CreatePushConstant(BmRender_DescriptorShaderStage Stage, u32 Offset, u32 Size)
 {
 	BmRender_PushConstant Constant;
-	Constant.offset = Offset;
-	Constant.size = Size;
-	Constant.stageFlags = Stage; // Now uses BmRender_DescriptorShaderStage directly
+	Constant.Offset = Offset;
+	Constant.Size = Size;
+	Constant.StageFlags = Stage; // Now uses BmRender_DescriptorShaderStage directly
 
 	return Constant;
 }
@@ -278,6 +278,12 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 
 	VkImageUsageFlags Usage;
 
+	if ((Description->Type == BmRender_ImageType::MultiSampledDepthAttachment || Description->Type == BmRender_ImageType::MultiSampledColorAttachment) &&
+		((u32)Description->SampleCount & (u32)BmRender_SampleCount::Count1))
+	{
+		assert(false || "The iamge type is multisampled, but sample count is 1");
+	}
+
 	switch (Description->Type)
 	{
 		case BmRender_ImageType::TransferSampled:
@@ -290,6 +296,14 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 
 		case BmRender_ImageType::ColorAttachmentSampled:
 			Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+			break;
+
+		case BmRender_ImageType::MultiSampledDepthAttachment:
+			Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+			break;
+
+		case BmRender_ImageType::MultiSampledColorAttachment:
+			Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
 			break;
 
 		default:
@@ -309,7 +323,7 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 	ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 	ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	ImageCreateInfo.usage = Usage;
-	ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	ImageCreateInfo.samples = (VkSampleCountFlagBits)Description->SampleCount;
 	ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	ImageCreateInfo.flags = 0;
 
@@ -323,6 +337,7 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 	Resource.Width = Description->Width;
 	Resource.Height = Description->Height;
 	Resource.Size = AllocResult.Size;
+	Resource.SampleCount = Description->SampleCount;
 
 	VULKAN_CHECK_RESULT(vkBindImageMemory(Device, Image, (VkDeviceMemory)Resource.Memory, 0));
 	return CreateImageHandle(Image, &Resource);
@@ -494,16 +509,23 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	VertexInputState.vertexAttributeDescriptionCount = TotalAttributes;
 	VertexInputState.pVertexAttributeDescriptions = TotalAttributes == 0 ? nullptr : VkVertexAttributes;
 
+	bool SampleCountFound = false;
+	VkSampleCountFlagBits SampleCount = VK_SAMPLE_COUNT_1_BIT;
+
 	VkFormat* ColorAttachmentFormats = (VkFormat*)Memory_LinearAllocator_Alloc(GetFrameMemory(), Description->Attachment.ColorAttachmentCount * sizeof(VkFormat));
 	for (u32 i = 0; i < Description->Attachment.ColorAttachmentCount; ++i)
 	{
 		BmRender_ImageViewData ImageViewData;
 		BmRender_ImageResource ImageResource;
-		if (Description->Attachment.ColorAttachments[i] != nullptr && 
-			BmRender_GetImageViewData(Description->Attachment.ColorAttachments[i], &ImageViewData) &&
-			BmRender_GetImageData(ImageViewData.Image, &ImageResource))
+
+		if (Description->Attachment.ColorAttachments[i] != nullptr &&  BmRender_GetImageViewData(Description->Attachment.ColorAttachments[i], &ImageViewData) && BmRender_GetImageData(ImageViewData.Image, &ImageResource))
 		{
 			ColorAttachmentFormats[i] = BmRender_FormatToVk(ImageResource.Format);
+
+			if (!SampleCountFound)
+			{
+				SampleCount = SampleCountToVk(ImageResource.SampleCount);
+			}
 		}
 		else
 		{
@@ -516,10 +538,15 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	{
 		BmRender_ImageViewData ImageViewData;
 		BmRender_ImageResource ImageResource;
-		if (BmRender_GetImageViewData(Description->Attachment.DepthAttachment, &ImageViewData) &&
-			BmRender_GetImageData(ImageViewData.Image, &ImageResource))
+
+		if (BmRender_GetImageViewData(Description->Attachment.DepthAttachment, &ImageViewData) && BmRender_GetImageData(ImageViewData.Image, &ImageResource))
 		{
 			DepthAttachmentFormat = BmRender_FormatToVk(ImageResource.Format);
+
+			if (!SampleCountFound)
+			{
+				SampleCount = SampleCountToVk(ImageResource.SampleCount);
+			}
 		}
 	}
 
@@ -528,10 +555,15 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	{
 		BmRender_ImageViewData ImageViewData;
 		BmRender_ImageResource ImageResource;
-		if (BmRender_GetImageViewData(Description->Attachment.StencilAttachment, &ImageViewData) &&
-			BmRender_GetImageData(ImageViewData.Image, &ImageResource))
+
+		if (BmRender_GetImageViewData(Description->Attachment.StencilAttachment, &ImageViewData) && BmRender_GetImageData(ImageViewData.Image, &ImageResource))
 		{
 			StencilAttachmentFormat = BmRender_FormatToVk(ImageResource.Format);
+
+			if (!SampleCountFound)
+			{
+				SampleCount = SampleCountToVk(ImageResource.SampleCount);
+			}
 		}
 	}
 
@@ -558,6 +590,8 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	VkPipelineMultisampleStateCreateInfo MultisampleState = MultisampleStateToVk(Description->MultisampleState);
 	VkPipelineInputAssemblyStateCreateInfo InputAssemblyState = InputAssemblyStateToVk(Description->InputAssemblyState);
 	VkPipelineDepthStencilStateCreateInfo DepthStencilState = DepthStencilStateToVk(Description->DepthStencilState);
+
+	MultisampleState.rasterizationSamples = SampleCount;
 
 	auto PipelineCreateInfo = (VkGraphicsPipelineCreateInfo*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkGraphicsPipelineCreateInfo));
 	*PipelineCreateInfo = { };
@@ -599,9 +633,9 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 	VkPushConstantRange* VkPushConstantRanges = (VkPushConstantRange*)Memory_LinearAllocator_Alloc(GetFrameMemory(), Description->PushConstantRangeCount * sizeof(VkPushConstantRange));
 	for (u32 i = 0; i < Description->PushConstantRangeCount; ++i)
 	{
-		VkPushConstantRanges[i].offset = Description->PushConstantRanges[i].offset;
-		VkPushConstantRanges[i].size = Description->PushConstantRanges[i].size;
-		VkPushConstantRanges[i].stageFlags = ShaderStageFlagsToVk(Description->PushConstantRanges[i].stageFlags);
+		VkPushConstantRanges[i].offset = Description->PushConstantRanges[i].Offset;
+		VkPushConstantRanges[i].size = Description->PushConstantRanges[i].Size;
+		VkPushConstantRanges[i].stageFlags = ShaderStageFlagsToVk(Description->PushConstantRanges[i].StageFlags);
 	}
 
 	VkPipelineLayoutCreateInfo CreateInfo = { };
@@ -666,7 +700,7 @@ BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Descript
 }
 
 
-BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type)
+BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, BmRender_SampleCount SampleCount)
 {
 	BmRender_ImageDescription Descr;
 	Descr.ArrayLayers = 1;
@@ -674,11 +708,12 @@ BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, BmRender_Format For
 	Descr.Width = Width;
 	Descr.Height = Height;
 	Descr.Type = Type;
+	Descr.SampleCount = SampleCount;
 
 	return CreateImageResource(&Descr);
 }
 
-BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, u32 ArrayLayers)
+BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, u32 ArrayLayers, BmRender_SampleCount SampleCount)
 {
 	BmRender_ImageDescription Descr;
 	Descr.ArrayLayers = ArrayLayers;
@@ -686,6 +721,7 @@ BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, BmRender_Forma
 	Descr.Width = Width;
 	Descr.Height = Height;
 	Descr.Type = Type;
+	Descr.SampleCount = SampleCount;
 
 	return CreateImageResource(&Descr);
 }

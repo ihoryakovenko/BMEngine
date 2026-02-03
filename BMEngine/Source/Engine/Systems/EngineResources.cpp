@@ -44,8 +44,9 @@ namespace EngineResources
 		TextureDescription.Format = Util::GliFormatToVkFormat(Texture.format());
 		TextureDescription.ArrayLayers = 1;
 		TextureDescription.Type = BmRender_ImageType::TransferSampled;
+		TextureDescription.SampleCount = BmRender_SampleCount::Count1;
 
-		BmRender_Image ImageHandle = BmRender_CreateImage2D(Extent.x, Extent.y, Util::GliFormatToVkFormat(Texture.format()), BmRender_ImageType::TransferSampled);
+		BmRender_Image ImageHandle = BmRender_CreateImage2D(Extent.x, Extent.y, Util::GliFormatToVkFormat(Texture.format()), BmRender_ImageType::TransferSampled, BmRender_SampleCount::Count1);
 		Asset.RenderImageHandle = ImageHandle;
 		RenderResources::UpdateImageResource(Asset.RenderImageHandle, &TextureDescription, Texture.data());
 		BmRender_ImageView ViewHandle = BmRender_CreateImageView2D(Asset.RenderImageHandle);
@@ -74,8 +75,9 @@ namespace EngineResources
 		DefaultTextureDescription.Format = Util::GliFormatToVkFormat(DefaultTexture.format());
 		DefaultTextureDescription.ArrayLayers = 1;
 		DefaultTextureDescription.Type = BmRender_ImageType::TransferSampled;
+		DefaultTextureDescription.SampleCount = BmRender_SampleCount::Count1;
 
-		BmRender_Image DefaultImageHandle = BmRender_CreateImage2D(DefaultAssetExtent.x, DefaultAssetExtent.y, Util::GliFormatToVkFormat(DefaultTexture.format()), BmRender_ImageType::TransferSampled);
+		BmRender_Image DefaultImageHandle = BmRender_CreateImage2D(DefaultAssetExtent.x, DefaultAssetExtent.y, Util::GliFormatToVkFormat(DefaultTexture.format()), BmRender_ImageType::TransferSampled, BmRender_SampleCount::Count1);
 		DefaultAsset.RenderImageHandle = DefaultImageHandle;
 		DefaultAsset.IsCreated = true;
 

@@ -73,6 +73,8 @@ enum class BmRender_ImageType : u8
 	TransferSampled,
 	DepthSamplad,
 	ColorAttachmentSampled,
+	MultiSampledDepthAttachment,
+	MultiSampledColorAttachment,
 };
 
 enum class BmRender_FenceStatus : u8
@@ -431,13 +433,13 @@ enum class BmRender_PrimitiveTopology : u32
 
 enum class BmRender_SampleCount : u32
 {
-	Count1,
-	Count2,
-	Count4,
-	Count8,
-	Count16,
-	Count32,
-	Count64,
+	Count1 = 1,
+	Count2 = 2,
+	Count4 = 4,
+	Count8 = 8,
+	Count16 = 16,
+	Count32 = 32,
+	Count64 = 64,
 };
 
 
@@ -531,13 +533,14 @@ struct BmRender_ImageDescription
 	BmRender_Format Format;
 	u32 ArrayLayers;
 	BmRender_ImageType Type;
+	BmRender_SampleCount SampleCount;
 };
 
 struct BmRender_PushConstant
 {
-	u32 offset;
-	u32 size;
-	BmRender_DescriptorShaderStage stageFlags; // Use existing BmRender_DescriptorShaderStage
+	u32 Offset;
+	u32 Size;
+	BmRender_DescriptorShaderStage StageFlags;
 };
 
 struct BmRender_DescriptorSetLayoutBinding
@@ -564,6 +567,7 @@ struct BmRender_GPUBufferBinding
 struct BmRender_RenderingColorAttachment
 {
 	BmRender_ImageView ImageView;
+	BmRender_ImageView ResolveImageView;
 	BmRender_AttachmentLoadOp LoadOp;
 	BmRender_AttachmentStoreOp StoreOp;
 	BmRender_ClearColorValue ClearValue;
@@ -616,58 +620,57 @@ struct BmRender_ShaderStageDescription
 
 struct BmRender_RasterizationState
 {
-	bool depthClampEnable;
-	bool rasterizerDiscardEnable;
-	BmRender_PolygonMode polygonMode;
-	f32 lineWidth;
-	BmRender_CullModeFlags cullMode;
-	BmRender_FrontFace frontFace;
-	bool depthBiasEnable;
+	bool DepthClampEnable;
+	bool RasterizerDiscardEnable;
+	BmRender_PolygonMode PolygonMode;
+	f32 LineWidth;
+	BmRender_CullModeFlags CullMode;
+	BmRender_FrontFace FrontFace;
+	bool DepthBiasEnable;
 };
 
 struct BmRender_ColorBlendAttachment
 {
-	BmRender_ColorComponentFlags colorWriteMask;
-	bool blendEnable;
-	BmRender_BlendFactor srcColorBlendFactor;
-	BmRender_BlendFactor dstColorBlendFactor;
-	BmRender_BlendOp colorBlendOp;
-	BmRender_BlendFactor srcAlphaBlendFactor;
-	BmRender_BlendFactor dstAlphaBlendFactor;
-	BmRender_BlendOp alphaBlendOp;
+	BmRender_ColorComponentFlags ColorWriteMask;
+	bool BlendEnable;
+	BmRender_BlendFactor SrcColorBlendFactor;
+	BmRender_BlendFactor DstColorBlendFactor;
+	BmRender_BlendOp ColorBlendOp;
+	BmRender_BlendFactor SrcAlphaBlendFactor;
+	BmRender_BlendFactor DstAlphaBlendFactor;
+	BmRender_BlendOp AlphaBlendOp;
 };
 
 struct BmRender_ColorBlendState
 {
-	bool logicOpEnable;
-	u32 attachmentCount;
+	bool LogicOpEnable;
+	u32 AttachmentCount;
 };
 
 struct BmRender_DepthStencilState
 {
-	bool depthTestEnable;
-	bool depthWriteEnable;
-	BmRender_CompareOp depthCompareOp;
-	bool depthBoundsTestEnable;
-	bool stencilTestEnable;
+	bool DepthTestEnable;
+	bool DepthWriteEnable;
+	BmRender_CompareOp DepthCompareOp;
+	bool DepthBoundsTestEnable;
+	bool StencilTestEnable;
 };
 
 struct BmRender_MultisampleState
 {
-	bool sampleShadingEnable;
-	BmRender_SampleCount rasterizationSamples;
+	bool SampleShadingEnable;
 };
 
 struct BmRender_InputAssemblyState
 {
-	BmRender_PrimitiveTopology topology;
-	bool primitiveRestartEnable;
+	BmRender_PrimitiveTopology Topology;
+	bool PrimitiveRestartEnable;
 };
 
 struct BmRender_ViewportState
 {
-	u32 viewportCount;
-	u32 scissorCount;
+	u32 ViewportCount;
+	u32 ScissorCount;
 };
 
 struct BmRender_PipelineDescription
@@ -767,6 +770,7 @@ struct BmRender_ImageResource
 	BmRender_ImageType Type;
 	u32 Width;
 	u32 Height;
+	BmRender_SampleCount SampleCount;
 };
 
 struct BmRender_GPUBufferData
@@ -854,8 +858,8 @@ BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, MemoryPropertyFlag Mem
 BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag);
 BmRender_GPUBuffer BmRender_CreateIndirectDrawBuffer(u64 Size, MemoryPropertyFlag MemoryFlag);
 BmRender_GPUBuffer BmRender_CreateStagingBuffer(u64 Size);
-BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type);
-BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, u32 ArrayLayers);
+BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, BmRender_SampleCount SampleCount);
+BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, u32 ArrayLayers, BmRender_SampleCount SampleCount);
 BmRender_ImageView BmRender_CreateImageView2D(BmRender_Image Handle);
 BmRender_ImageView BmRender_CreateImageView2DArray(BmRender_Image Handle, u32 BaseLayer, u32 LayerCount);
 BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout LayoutHandle, BmRender_DescriptorPool PoolHandle);

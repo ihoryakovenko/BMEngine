@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include <cmath>
 
@@ -13,35 +14,20 @@
 
 #include "Render.h"
 
-#pragma warning(disable : 4996)
+
 
 #include <iostream>
 
-#define NOMINMAX
-#include <osmium/io/any_input.hpp>
-#include <osmium/handler.hpp>
-#include <osmium/visitor.hpp>
 
-#include <osmium/index/map/sparse_mem_array.hpp>
-#include <osmium/handler/node_locations_for_ways.hpp>
 
-#include <osmium/tags/filter.hpp>
-#include <osmium/geom/wkt.hpp>
+
 
 #include <vector>
 #include <limits>
 #include <algorithm>
 #include <glm/glm.hpp>
 
-#include <earcut.hpp>
-
-struct Mesh
-{
-	std::vector<StreetsRender_BuildingVertex> vertices;
-	std::vector<u32> Indices;
-};
-
-Mesh TestMesh;
+#include "OSMBuilder.h"
 
 using index_type = osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, osmium::Location>;
 
@@ -62,200 +48,7 @@ f64 meters_per_nanodeg_lon;
 
 
 
-struct BuildingHandler : public osmium::handler::Handler
-{
 
-	std::unordered_map<osmium::object_id_type, const osmium::Way*> Ways;
-
-	void way(const osmium::Way& Way)
-	{
-		Ways[Way.id()] = &Way;
-
-		if (!Way.tags().has_key("building") && !Way.tags().has_key("building:part"))
-		{
-			return;
-		}
-
-		//for (const auto& tag : Way.tags())
-		//{
-		//	std::cout << "  " << tag.key() << " = " << tag.value() << "\n";
-		//}
-
-		if (!Way.is_closed())
-		{
-			return;
-		}
-
-		const f32 LevelHeight = 3.0f;
-		f32 Height = 3.0f;
-		f32 MinHeight = 0.0f;
-
-		//min_height
-
-		if (Way.tags().has_key("height"))
-		{
-			const char* HeightStr = Way.tags().get_value_by_key("height");
-			Height = atof(HeightStr);
-		}
-		else if (Way.tags().has_key("building:levels"))
-		{
-			const char* LevelStr = Way.tags().get_value_by_key("building:levels");
-			Height = atoi(LevelStr) * LevelHeight;
-		}
-
-		if (Way.tags().has_key("min_height"))
-		{
-			const char* HeightStr = Way.tags().get_value_by_key("min_height");
-			MinHeight = atof(HeightStr);
-		}
-		else if (Way.tags().has_key("building:min_level"))
-		{
-			const char* LevelStr = Way.tags().get_value_by_key("building:min_level");
-			MinHeight = atoi(LevelStr) * LevelHeight;
-		}
-
-		u32 BaseVertex = TestMesh.vertices.size();
-		const u64 NodeCount = Way.nodes().size();
-
-		std::vector<std::array<s32, 2>> Ring;
-		Ring.reserve(NodeCount);
-
-		int64_t Area = 0;
-
-		for (u64 i = 0; i < NodeCount; ++i)
-		{
-			const osmium::NodeRef& CurrentNode = Way.nodes()[i];
-			const osmium::NodeRef& NextNode = Way.nodes()[(i + 1) % NodeCount];
-
-			const osmium::Location& CurrentLoc = CurrentNode.location();
-			const osmium::Location& NextLoc = NextNode.location();
-
-			if (!CurrentLoc.valid() || !NextLoc.valid())
-			{
-				assert(false);
-				return;
-			}
-
-			Area += (int64_t)CurrentLoc.x() * (int64_t)NextLoc.y() - (int64_t)NextLoc.x() * (int64_t)CurrentLoc.y();
-
-			Ring.push_back({ CurrentLoc.x(), CurrentLoc.y() });
-		}
-
-		const bool IsClockwise = (Area < 0);
-		if (IsClockwise)
-		{
-			std::reverse(Ring.begin(), Ring.end());
-		}
-
-		const glm::vec3 roofColor(
-			(f32)(rand() % 256) / 255.0f,
-			(f32)(rand() % 256) / 255.0f,
-			(f32)(rand() % 256) / 255.0f
-		);
-
-		for (u32 i = 0; i < Ring.size(); ++i)
-		{
-			const s32 CurrentNanoDegX = Ring[i][0];
-			const s32 CurrentNanoDegY = Ring[i][1];
-
-			TestMesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), Height, roofColor });
-		}
-
-		std::vector<std::vector<std::array<s32, 2>>> Polygon;
-		Polygon.push_back(Ring);
-
-		std::vector<u32> Indices = mapbox::earcut<u32>(Polygon);
-
-		for (u32 i = 0; i < Indices.size(); ++i)
-		{
-			TestMesh.Indices.push_back(Indices[i] + BaseVertex);
-		}
-
-		for (u32 i = 0; i < NodeCount; ++i)
-		{
-			BaseVertex = TestMesh.vertices.size();
-
-			const glm::vec3 wallColor(
-				(f32)(rand() % 256) / 255.0f,
-				(f32)(rand() % 256) / 255.0f,
-				(f32)(rand() % 256) / 255.0f
-			);
-
-			const s32 CurrentNanoDegX = Ring[i][0];
-			const s32 CurrentNanoDegY = Ring[i][1];
-
-			const s32 NextNanoDegX = Ring[(i + 1) % NodeCount][0];
-			const s32 NextNanoDegY = Ring[(i + 1) % NodeCount][1];
-
-			TestMesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), Height, wallColor });
-			TestMesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), MinHeight, wallColor });
-
-			TestMesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), MinHeight, wallColor });
-			TestMesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), Height, wallColor });
-
-			TestMesh.Indices.push_back(BaseVertex + 2);
-			TestMesh.Indices.push_back(BaseVertex + 3);
-			TestMesh.Indices.push_back(BaseVertex + 0);
-
-			TestMesh.Indices.push_back(BaseVertex + 0);
-			TestMesh.Indices.push_back(BaseVertex + 1);
-			TestMesh.Indices.push_back(BaseVertex + 2);
-		}
-	}
-
-	void relation(const osmium::Relation& rel)
-	{
-		if (!rel.tags().has_tag("type", "multipolygon"))
-		{
-			return;
-		}
-
-		if (!rel.tags().has_key("building"))
-		{
-			return;
-		}
-
-		for (const auto& tag : rel.tags())
-		{
-			std::cout << "  " << tag.key() << " = " << tag.value() << "\n";
-		}
-
-		std::vector<std::vector<std::array<f32, 2>>> polygon;
-
-	//	for (const osmium::RelationMember& member : rel.members())
-	//	{
-	//		if (member.type() != osmium::item_type::way)
-	//		{
-	//			continue;
-	//		}
-
-	//		auto it = ways.find(member.ref());
-	//		if (it == ways.end())
-	//		{
-	//			continue;
-	//		}
-
-	//		const osmium::Way& way = *it->second;
-	//		if (!way.is_closed())
-	//		{
-	//			continue;
-	//		}
-
-	//		std::vector<std::array<f32, 2>> ring;
-	//		if (build_ring(way, ring))
-	//		{
-	//			polygon.push_back(std::move(ring));
-	//		}
-	//	}
-
-	//	if (polygon.empty())
-	//	{
-	//		return;
-	//	}
-
-	//	emit_mesh(polygon);
-	}
-};
 
 struct FlyCamera
 {
@@ -343,7 +136,7 @@ u32 main()
 	std::vector<StreetsRender_BuildingsMesh> Meshes;
 
 
-	Meshes.push_back(StreetsRender_CreateBuildingsMesh(TestMesh.vertices.data(), TestMesh.vertices.size(), TestMesh.Indices.data(), TestMesh.Indices.size()));
+	Meshes.push_back(StreetsRender_CreateBuildingsMesh(building_handler.TestMesh.vertices.data(), building_handler.TestMesh.vertices.size(), building_handler.TestMesh.Indices.data(), building_handler.TestMesh.Indices.size()));
 
 	while (!glfwWindowShouldClose(Window))
 	{

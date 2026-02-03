@@ -226,52 +226,52 @@ namespace Render
 
 		// Rasterization state
 		PipelineDesc.RasterizationState = {};
-		PipelineDesc.RasterizationState.depthClampEnable = false;
-		PipelineDesc.RasterizationState.rasterizerDiscardEnable = false;
-		PipelineDesc.RasterizationState.polygonMode = BmRender_PolygonMode::Fill;
-		PipelineDesc.RasterizationState.lineWidth = 1.0f;
-		PipelineDesc.RasterizationState.cullMode = BmRender_CullModeFlags::Back;
-		PipelineDesc.RasterizationState.frontFace = BmRender_FrontFace::CounterClockwise;
-		PipelineDesc.RasterizationState.depthBiasEnable = false;
+		PipelineDesc.RasterizationState.DepthClampEnable = false;
+		PipelineDesc.RasterizationState.RasterizerDiscardEnable = false;
+		PipelineDesc.RasterizationState.PolygonMode = BmRender_PolygonMode::Fill;
+		PipelineDesc.RasterizationState.LineWidth = 1.0f;
+		PipelineDesc.RasterizationState.CullMode = BmRender_CullModeFlags::Back;
+		PipelineDesc.RasterizationState.FrontFace = BmRender_FrontFace::CounterClockwise;
+		PipelineDesc.RasterizationState.DepthBiasEnable = false;
 
 		// Color blend state
 		PipelineDesc.ColorBlendState = {};
-		PipelineDesc.ColorBlendState.logicOpEnable = false;
-		PipelineDesc.ColorBlendState.attachmentCount = 1;
+		PipelineDesc.ColorBlendState.LogicOpEnable = false;
+		PipelineDesc.ColorBlendState.AttachmentCount = 1;
 
 		// Color blend attachment
 		PipelineDesc.ColorBlendAttachment = {};
-		PipelineDesc.ColorBlendAttachment.colorWriteMask = BmRender_ColorComponentFlags::RGBA;
-		PipelineDesc.ColorBlendAttachment.blendEnable = true;
-		PipelineDesc.ColorBlendAttachment.srcColorBlendFactor = BmRender_BlendFactor::SrcAlpha;
-		PipelineDesc.ColorBlendAttachment.dstColorBlendFactor = BmRender_BlendFactor::OneMinusSrcAlpha;
-		PipelineDesc.ColorBlendAttachment.colorBlendOp = BmRender_BlendOp::Add;
-		PipelineDesc.ColorBlendAttachment.srcAlphaBlendFactor = BmRender_BlendFactor::One;
-		PipelineDesc.ColorBlendAttachment.dstAlphaBlendFactor = BmRender_BlendFactor::Zero;
-		PipelineDesc.ColorBlendAttachment.alphaBlendOp = BmRender_BlendOp::Add;
+		PipelineDesc.ColorBlendAttachment.ColorWriteMask = BmRender_ColorComponentFlags::RGBA;
+		PipelineDesc.ColorBlendAttachment.BlendEnable = true;
+		PipelineDesc.ColorBlendAttachment.SrcColorBlendFactor = BmRender_BlendFactor::SrcAlpha;
+		PipelineDesc.ColorBlendAttachment.DstColorBlendFactor = BmRender_BlendFactor::OneMinusSrcAlpha;
+		PipelineDesc.ColorBlendAttachment.ColorBlendOp = BmRender_BlendOp::Add;
+		PipelineDesc.ColorBlendAttachment.SrcAlphaBlendFactor = BmRender_BlendFactor::One;
+		PipelineDesc.ColorBlendAttachment.DstAlphaBlendFactor = BmRender_BlendFactor::Zero;
+		PipelineDesc.ColorBlendAttachment.AlphaBlendOp = BmRender_BlendOp::Add;
 
 		// Depth stencil state
 		PipelineDesc.DepthStencilState = {};
-		PipelineDesc.DepthStencilState.depthTestEnable = true;
-		PipelineDesc.DepthStencilState.depthWriteEnable = true;
-		PipelineDesc.DepthStencilState.depthCompareOp = BmRender_CompareOp::Less;
-		PipelineDesc.DepthStencilState.depthBoundsTestEnable = false;
-		PipelineDesc.DepthStencilState.stencilTestEnable = false;
+		PipelineDesc.DepthStencilState.DepthTestEnable = true;
+		PipelineDesc.DepthStencilState.DepthWriteEnable = true;
+		PipelineDesc.DepthStencilState.DepthCompareOp = BmRender_CompareOp::Less;
+		PipelineDesc.DepthStencilState.DepthBoundsTestEnable = false;
+		PipelineDesc.DepthStencilState.StencilTestEnable = false;
 
 		// Multisample state
 		PipelineDesc.MultisampleState = {};
-		PipelineDesc.MultisampleState.sampleShadingEnable = false;
+		PipelineDesc.MultisampleState.SampleShadingEnable = false;
 		PipelineDesc.MultisampleState.rasterizationSamples = BmRender_SampleCount::Count1;
 
 		// Input assembly state
 		PipelineDesc.InputAssemblyState = {};
-		PipelineDesc.InputAssemblyState.topology = BmRender_PrimitiveTopology::TriangleList;
-		PipelineDesc.InputAssemblyState.primitiveRestartEnable = false;
+		PipelineDesc.InputAssemblyState.Topology = BmRender_PrimitiveTopology::TriangleList;
+		PipelineDesc.InputAssemblyState.PrimitiveRestartEnable = false;
 
 		// Viewport state
 		PipelineDesc.ViewportState = {};
-		PipelineDesc.ViewportState.viewportCount = 1;
-		PipelineDesc.ViewportState.scissorCount = 1;
+		PipelineDesc.ViewportState.ViewportCount = 1;
+		PipelineDesc.ViewportState.ScissorCount = 1;
 
 		// Viewport
 		PipelineDesc.Viewport = {};
@@ -352,10 +352,10 @@ namespace Render
 	{
 		BmRender_BindPipeline(CommandBuffer, Config.Pipeline);
 
-		if (Config.PushConstant.offset != 0 || Config.PushConstant.size != 0)
+		if (Config.PushConstant.Offset != 0 || Config.PushConstant.Size != 0)
 		{
-			BmRender_RecordPushConstants(CommandBuffer, Config.PipelineLayout, Config.PushConstant.stageFlags,
-				Config.PushConstant.offset, Config.PushConstant.size, Config.PushConstantData);
+			BmRender_RecordPushConstants(CommandBuffer, Config.PipelineLayout, Config.PushConstant.StageFlags,
+				Config.PushConstant.Offset, Config.PushConstant.Size, Config.PushConstantData);
 		}
 
 		if (Config.DescriptorSetCount > 0)
@@ -541,8 +541,8 @@ namespace Render
 	{
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
-			DeferredInputColorImage[i] = BmRender_CreateImage2D(MainScreenExtent.Width, MainScreenExtent.Height, ColorFormat, BmRender_ImageType::ColorAttachmentSampled);
-			DeferredInputDepthImage[i] = BmRender_CreateImage2D(MainScreenExtent.Width, MainScreenExtent.Height, DepthFormat, BmRender_ImageType::DepthSamplad);
+			DeferredInputColorImage[i] = BmRender_CreateImage2D(MainScreenExtent.Width, MainScreenExtent.Height, ColorFormat, BmRender_ImageType::ColorAttachmentSampled, BmRender_SampleCount::Count1);
+			DeferredInputDepthImage[i] = BmRender_CreateImage2D(MainScreenExtent.Width, MainScreenExtent.Height, DepthFormat, BmRender_ImageType::DepthSamplad, BmRender_SampleCount::Count1);
 			
 			DeferredInputColorImageInterface[i] = BmRender_CreateImageView2D(DeferredInputColorImage[i]);
 			DeferredInputDepthImageInterface[i] = BmRender_CreateImageView2D(DeferredInputDepthImage[i]);
@@ -619,52 +619,52 @@ namespace Render
 
 		// Rasterization state
 		PipelineDesc.RasterizationState = {};
-		PipelineDesc.RasterizationState.depthClampEnable = false;
-		PipelineDesc.RasterizationState.rasterizerDiscardEnable = false;
-		PipelineDesc.RasterizationState.polygonMode = BmRender_PolygonMode::Fill;
-		PipelineDesc.RasterizationState.lineWidth = 1.0f;
-		PipelineDesc.RasterizationState.cullMode = BmRender_CullModeFlags::None;
-		PipelineDesc.RasterizationState.frontFace = BmRender_FrontFace::CounterClockwise;
-		PipelineDesc.RasterizationState.depthBiasEnable = false;
+		PipelineDesc.RasterizationState.DepthClampEnable = false;
+		PipelineDesc.RasterizationState.RasterizerDiscardEnable = false;
+		PipelineDesc.RasterizationState.PolygonMode = BmRender_PolygonMode::Fill;
+		PipelineDesc.RasterizationState.LineWidth = 1.0f;
+		PipelineDesc.RasterizationState.CullMode = BmRender_CullModeFlags::None;
+		PipelineDesc.RasterizationState.FrontFace = BmRender_FrontFace::CounterClockwise;
+		PipelineDesc.RasterizationState.DepthBiasEnable = false;
 
 		// Color blend state
 		PipelineDesc.ColorBlendState = {};
-		PipelineDesc.ColorBlendState.logicOpEnable = false;
-		PipelineDesc.ColorBlendState.attachmentCount = 1;
+		PipelineDesc.ColorBlendState.LogicOpEnable = false;
+		PipelineDesc.ColorBlendState.AttachmentCount = 1;
 
 		// Color blend attachment
 		PipelineDesc.ColorBlendAttachment = {};
-		PipelineDesc.ColorBlendAttachment.colorWriteMask = BmRender_ColorComponentFlags::RGBA;
-		PipelineDesc.ColorBlendAttachment.blendEnable = false;
-		PipelineDesc.ColorBlendAttachment.srcColorBlendFactor = BmRender_BlendFactor::SrcAlpha;
-		PipelineDesc.ColorBlendAttachment.dstColorBlendFactor = BmRender_BlendFactor::OneMinusSrcAlpha;
-		PipelineDesc.ColorBlendAttachment.colorBlendOp = BmRender_BlendOp::Add;
-		PipelineDesc.ColorBlendAttachment.srcAlphaBlendFactor = BmRender_BlendFactor::One;
-		PipelineDesc.ColorBlendAttachment.dstAlphaBlendFactor = BmRender_BlendFactor::Zero;
-		PipelineDesc.ColorBlendAttachment.alphaBlendOp = BmRender_BlendOp::Add;
+		PipelineDesc.ColorBlendAttachment.ColorWriteMask = BmRender_ColorComponentFlags::RGBA;
+		PipelineDesc.ColorBlendAttachment.BlendEnable = false;
+		PipelineDesc.ColorBlendAttachment.SrcColorBlendFactor = BmRender_BlendFactor::SrcAlpha;
+		PipelineDesc.ColorBlendAttachment.DstColorBlendFactor = BmRender_BlendFactor::OneMinusSrcAlpha;
+		PipelineDesc.ColorBlendAttachment.ColorBlendOp = BmRender_BlendOp::Add;
+		PipelineDesc.ColorBlendAttachment.SrcAlphaBlendFactor = BmRender_BlendFactor::One;
+		PipelineDesc.ColorBlendAttachment.DstAlphaBlendFactor = BmRender_BlendFactor::Zero;
+		PipelineDesc.ColorBlendAttachment.AlphaBlendOp = BmRender_BlendOp::Add;
 
 		// Depth stencil state
 		PipelineDesc.DepthStencilState = {};
-		PipelineDesc.DepthStencilState.depthTestEnable = false;
-		PipelineDesc.DepthStencilState.depthWriteEnable = false;
-		PipelineDesc.DepthStencilState.depthCompareOp = BmRender_CompareOp::Less;
-		PipelineDesc.DepthStencilState.depthBoundsTestEnable = false;
-		PipelineDesc.DepthStencilState.stencilTestEnable = false;
+		PipelineDesc.DepthStencilState.DepthTestEnable = false;
+		PipelineDesc.DepthStencilState.DepthWriteEnable = false;
+		PipelineDesc.DepthStencilState.DepthCompareOp = BmRender_CompareOp::Less;
+		PipelineDesc.DepthStencilState.DepthBoundsTestEnable = false;
+		PipelineDesc.DepthStencilState.StencilTestEnable = false;
 
 		// Multisample state
 		PipelineDesc.MultisampleState = {};
-		PipelineDesc.MultisampleState.sampleShadingEnable = false;
+		PipelineDesc.MultisampleState.SampleShadingEnable = false;
 		PipelineDesc.MultisampleState.rasterizationSamples = BmRender_SampleCount::Count1;
 
 		// Input assembly state
 		PipelineDesc.InputAssemblyState = {};
-		PipelineDesc.InputAssemblyState.topology = BmRender_PrimitiveTopology::TriangleList;
-		PipelineDesc.InputAssemblyState.primitiveRestartEnable = false;
+		PipelineDesc.InputAssemblyState.Topology = BmRender_PrimitiveTopology::TriangleList;
+		PipelineDesc.InputAssemblyState.PrimitiveRestartEnable = false;
 
 		// Viewport state
 		PipelineDesc.ViewportState = {};
-		PipelineDesc.ViewportState.viewportCount = 1;
-		PipelineDesc.ViewportState.scissorCount = 1;
+		PipelineDesc.ViewportState.ViewportCount = 1;
+		PipelineDesc.ViewportState.ScissorCount = 1;
 
 		// Viewport
 		PipelineDesc.Viewport = {};
@@ -794,7 +794,7 @@ namespace Render
 	void LightningPassInit(BmRender_DescriptorPool MainPool)
 	{
 		ShadowMapArray = BmRender_CreateImage2DArray(DepthViewportExtent.Width, DepthViewportExtent.Height, DepthFormat,
-			BmRender_ImageType::DepthSamplad, MAX_LIGHT_SOURCES * BmRender_GetSwapchainImageCount());
+			BmRender_ImageType::DepthSamplad, MAX_LIGHT_SOURCES * BmRender_GetSwapchainImageCount(), BmRender_SampleCount::Count1);
 
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
@@ -885,52 +885,52 @@ namespace Render
 
 		// Rasterization state
 		PipelineDesc.RasterizationState = {};
-		PipelineDesc.RasterizationState.depthClampEnable = false;
-		PipelineDesc.RasterizationState.rasterizerDiscardEnable = false;
-		PipelineDesc.RasterizationState.polygonMode = BmRender_PolygonMode::Fill;
-		PipelineDesc.RasterizationState.lineWidth = 1.0f;
-		PipelineDesc.RasterizationState.cullMode = BmRender_CullModeFlags::Back;
-		PipelineDesc.RasterizationState.frontFace = BmRender_FrontFace::CounterClockwise;
-		PipelineDesc.RasterizationState.depthBiasEnable = false;
+		PipelineDesc.RasterizationState.DepthClampEnable = false;
+		PipelineDesc.RasterizationState.RasterizerDiscardEnable = false;
+		PipelineDesc.RasterizationState.PolygonMode = BmRender_PolygonMode::Fill;
+		PipelineDesc.RasterizationState.LineWidth = 1.0f;
+		PipelineDesc.RasterizationState.CullMode = BmRender_CullModeFlags::Back;
+		PipelineDesc.RasterizationState.FrontFace = BmRender_FrontFace::CounterClockwise;
+		PipelineDesc.RasterizationState.DepthBiasEnable = false;
 
 		// Color blend state
 		PipelineDesc.ColorBlendState = {};
-		PipelineDesc.ColorBlendState.logicOpEnable = false;
-		PipelineDesc.ColorBlendState.attachmentCount = 1;
+		PipelineDesc.ColorBlendState.LogicOpEnable = false;
+		PipelineDesc.ColorBlendState.AttachmentCount = 1;
 
 		// Color blend attachment
 		PipelineDesc.ColorBlendAttachment = {};
-		PipelineDesc.ColorBlendAttachment.colorWriteMask = BmRender_ColorComponentFlags::RGBA;
-		PipelineDesc.ColorBlendAttachment.blendEnable = true;
-		PipelineDesc.ColorBlendAttachment.srcColorBlendFactor = BmRender_BlendFactor::SrcAlpha;
-		PipelineDesc.ColorBlendAttachment.dstColorBlendFactor = BmRender_BlendFactor::OneMinusSrcAlpha;
-		PipelineDesc.ColorBlendAttachment.colorBlendOp = BmRender_BlendOp::Add;
-		PipelineDesc.ColorBlendAttachment.srcAlphaBlendFactor = BmRender_BlendFactor::One;
-		PipelineDesc.ColorBlendAttachment.dstAlphaBlendFactor = BmRender_BlendFactor::Zero;
-		PipelineDesc.ColorBlendAttachment.alphaBlendOp = BmRender_BlendOp::Add;
+		PipelineDesc.ColorBlendAttachment.ColorWriteMask = BmRender_ColorComponentFlags::RGBA;
+		PipelineDesc.ColorBlendAttachment.BlendEnable = true;
+		PipelineDesc.ColorBlendAttachment.SrcColorBlendFactor = BmRender_BlendFactor::SrcAlpha;
+		PipelineDesc.ColorBlendAttachment.DstColorBlendFactor = BmRender_BlendFactor::OneMinusSrcAlpha;
+		PipelineDesc.ColorBlendAttachment.ColorBlendOp = BmRender_BlendOp::Add;
+		PipelineDesc.ColorBlendAttachment.SrcAlphaBlendFactor = BmRender_BlendFactor::One;
+		PipelineDesc.ColorBlendAttachment.DstAlphaBlendFactor = BmRender_BlendFactor::Zero;
+		PipelineDesc.ColorBlendAttachment.AlphaBlendOp = BmRender_BlendOp::Add;
 
 		// Depth stencil state
 		PipelineDesc.DepthStencilState = {};
-		PipelineDesc.DepthStencilState.depthTestEnable = true;
-		PipelineDesc.DepthStencilState.depthWriteEnable = true;
-		PipelineDesc.DepthStencilState.depthCompareOp = BmRender_CompareOp::Less;
-		PipelineDesc.DepthStencilState.depthBoundsTestEnable = false;
-		PipelineDesc.DepthStencilState.stencilTestEnable = false;
+		PipelineDesc.DepthStencilState.DepthTestEnable = true;
+		PipelineDesc.DepthStencilState.DepthWriteEnable = true;
+		PipelineDesc.DepthStencilState.DepthCompareOp = BmRender_CompareOp::Less;
+		PipelineDesc.DepthStencilState.DepthBoundsTestEnable = false;
+		PipelineDesc.DepthStencilState.StencilTestEnable = false;
 
 		// Multisample state
 		PipelineDesc.MultisampleState = {};
-		PipelineDesc.MultisampleState.sampleShadingEnable = false;
+		PipelineDesc.MultisampleState.SampleShadingEnable = false;
 		PipelineDesc.MultisampleState.rasterizationSamples = BmRender_SampleCount::Count1;
 
 		// Input assembly state
 		PipelineDesc.InputAssemblyState = {};
-		PipelineDesc.InputAssemblyState.topology = BmRender_PrimitiveTopology::TriangleList;
-		PipelineDesc.InputAssemblyState.primitiveRestartEnable = false;
+		PipelineDesc.InputAssemblyState.Topology = BmRender_PrimitiveTopology::TriangleList;
+		PipelineDesc.InputAssemblyState.PrimitiveRestartEnable = false;
 
 		// Viewport state
 		PipelineDesc.ViewportState = {};
-		PipelineDesc.ViewportState.viewportCount = 1;
-		PipelineDesc.ViewportState.scissorCount = 1;
+		PipelineDesc.ViewportState.ViewportCount = 1;
+		PipelineDesc.ViewportState.ScissorCount = 1;
 
 		// Viewport
 		PipelineDesc.Viewport = {};

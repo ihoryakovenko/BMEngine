@@ -645,9 +645,11 @@ VkImageAspectFlags ImageTypeToVkImageAspectFlags(BmRender_ImageType Type)
 	{
 		case BmRender_ImageType::TransferSampled:
 		case BmRender_ImageType::ColorAttachmentSampled:
+		case BmRender_ImageType::MultiSampledColorAttachment:
 			return VK_IMAGE_ASPECT_COLOR_BIT;
 
 		case BmRender_ImageType::DepthSamplad:
+		case BmRender_ImageType::MultiSampledDepthAttachment:
 			return VK_IMAGE_ASPECT_DEPTH_BIT;
 
 		default:
@@ -1805,27 +1807,27 @@ VkPipelineRasterizationStateCreateInfo RasterizationStateToVk(const BmRender_Ras
 {
 	VkPipelineRasterizationStateCreateInfo VkState = {};
 	VkState.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	VkState.depthClampEnable = State.depthClampEnable ? VK_TRUE : VK_FALSE;
-	VkState.rasterizerDiscardEnable = State.rasterizerDiscardEnable ? VK_TRUE : VK_FALSE;
-	VkState.polygonMode = PolygonModeToVk(State.polygonMode);
-	VkState.lineWidth = State.lineWidth;
-	VkState.cullMode = CullModeFlagsToVk(State.cullMode);
-	VkState.frontFace = FrontFaceToVk(State.frontFace);
-	VkState.depthBiasEnable = State.depthBiasEnable ? VK_TRUE : VK_FALSE;
+	VkState.depthClampEnable = State.DepthClampEnable ? VK_TRUE : VK_FALSE;
+	VkState.rasterizerDiscardEnable = State.RasterizerDiscardEnable ? VK_TRUE : VK_FALSE;
+	VkState.polygonMode = PolygonModeToVk(State.PolygonMode);
+	VkState.lineWidth = State.LineWidth;
+	VkState.cullMode = CullModeFlagsToVk(State.CullMode);
+	VkState.frontFace = FrontFaceToVk(State.FrontFace);
+	VkState.depthBiasEnable = State.DepthBiasEnable ? VK_TRUE : VK_FALSE;
 	return VkState;
 }
 
 VkPipelineColorBlendAttachmentState ColorBlendAttachmentToVk(const BmRender_ColorBlendAttachment& Attachment)
 {
 	VkPipelineColorBlendAttachmentState VkAttachment = {};
-	VkAttachment.colorWriteMask = ColorComponentFlagsToVk(Attachment.colorWriteMask);
-	VkAttachment.blendEnable = Attachment.blendEnable ? VK_TRUE : VK_FALSE;
-	VkAttachment.srcColorBlendFactor = BlendFactorToVk(Attachment.srcColorBlendFactor);
-	VkAttachment.dstColorBlendFactor = BlendFactorToVk(Attachment.dstColorBlendFactor);
-	VkAttachment.colorBlendOp = BlendOpToVk(Attachment.colorBlendOp);
-	VkAttachment.srcAlphaBlendFactor = BlendFactorToVk(Attachment.srcAlphaBlendFactor);
-	VkAttachment.dstAlphaBlendFactor = BlendFactorToVk(Attachment.dstAlphaBlendFactor);
-	VkAttachment.alphaBlendOp = BlendOpToVk(Attachment.alphaBlendOp);
+	VkAttachment.colorWriteMask = ColorComponentFlagsToVk(Attachment.ColorWriteMask);
+	VkAttachment.blendEnable = Attachment.BlendEnable ? VK_TRUE : VK_FALSE;
+	VkAttachment.srcColorBlendFactor = BlendFactorToVk(Attachment.SrcColorBlendFactor);
+	VkAttachment.dstColorBlendFactor = BlendFactorToVk(Attachment.DstColorBlendFactor);
+	VkAttachment.colorBlendOp = BlendOpToVk(Attachment.ColorBlendOp);
+	VkAttachment.srcAlphaBlendFactor = BlendFactorToVk(Attachment.SrcAlphaBlendFactor);
+	VkAttachment.dstAlphaBlendFactor = BlendFactorToVk(Attachment.DstAlphaBlendFactor);
+	VkAttachment.alphaBlendOp = BlendOpToVk(Attachment.AlphaBlendOp);
 	return VkAttachment;
 }
 
@@ -1833,8 +1835,8 @@ VkPipelineColorBlendStateCreateInfo ColorBlendStateToVk(const BmRender_ColorBlen
 {
 	VkPipelineColorBlendStateCreateInfo VkState = {};
 	VkState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	VkState.logicOpEnable = State.logicOpEnable ? VK_TRUE : VK_FALSE;
-	VkState.attachmentCount = State.attachmentCount;
+	VkState.logicOpEnable = State.LogicOpEnable ? VK_TRUE : VK_FALSE;
+	VkState.attachmentCount = State.AttachmentCount;
 	return VkState;
 }
 
@@ -1842,11 +1844,11 @@ VkPipelineDepthStencilStateCreateInfo DepthStencilStateToVk(const BmRender_Depth
 {
 	VkPipelineDepthStencilStateCreateInfo VkState = {};
 	VkState.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-	VkState.depthTestEnable = State.depthTestEnable ? VK_TRUE : VK_FALSE;
-	VkState.depthWriteEnable = State.depthWriteEnable ? VK_TRUE : VK_FALSE;
-	VkState.depthCompareOp = CompareOpToVk(State.depthCompareOp);
-	VkState.depthBoundsTestEnable = State.depthBoundsTestEnable ? VK_TRUE : VK_FALSE;
-	VkState.stencilTestEnable = State.stencilTestEnable ? VK_TRUE : VK_FALSE;
+	VkState.depthTestEnable = State.DepthTestEnable ? VK_TRUE : VK_FALSE;
+	VkState.depthWriteEnable = State.DepthWriteEnable ? VK_TRUE : VK_FALSE;
+	VkState.depthCompareOp = CompareOpToVk(State.DepthCompareOp);
+	VkState.depthBoundsTestEnable = State.DepthBoundsTestEnable ? VK_TRUE : VK_FALSE;
+	VkState.stencilTestEnable = State.StencilTestEnable ? VK_TRUE : VK_FALSE;
 	return VkState;
 }
 
@@ -1854,8 +1856,7 @@ VkPipelineMultisampleStateCreateInfo MultisampleStateToVk(const BmRender_Multisa
 {
 	VkPipelineMultisampleStateCreateInfo VkState = {};
 	VkState.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	VkState.sampleShadingEnable = State.sampleShadingEnable ? VK_TRUE : VK_FALSE;
-	VkState.rasterizationSamples = SampleCountToVk(State.rasterizationSamples);
+	VkState.sampleShadingEnable = State.SampleShadingEnable ? VK_TRUE : VK_FALSE;
 	return VkState;
 }
 
@@ -1863,8 +1864,8 @@ VkPipelineInputAssemblyStateCreateInfo InputAssemblyStateToVk(const BmRender_Inp
 {
 	VkPipelineInputAssemblyStateCreateInfo VkState = {};
 	VkState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	VkState.topology = PrimitiveTopologyToVk(State.topology);
-	VkState.primitiveRestartEnable = State.primitiveRestartEnable ? VK_TRUE : VK_FALSE;
+	VkState.topology = PrimitiveTopologyToVk(State.Topology);
+	VkState.primitiveRestartEnable = State.PrimitiveRestartEnable ? VK_TRUE : VK_FALSE;
 	return VkState;
 }
 
@@ -1872,8 +1873,8 @@ VkPipelineViewportStateCreateInfo ViewportStateToVk(const BmRender_ViewportState
 {
 	VkPipelineViewportStateCreateInfo VkState = {};
 	VkState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-	VkState.viewportCount = State.viewportCount;
-	VkState.scissorCount = State.scissorCount;
+	VkState.viewportCount = State.ViewportCount;
+	VkState.scissorCount = State.ScissorCount;
 	return VkState;
 }
 
