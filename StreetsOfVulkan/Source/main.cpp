@@ -99,6 +99,8 @@ u32 main()
 	osmium::apply(reader, location_handler, building_handler);
 	reader.close();
 
+	building_handler.ConstructObjects();
+
 	s32 WindowWidth = 1920;
 	s32 WindowHeight = 1080;
 
@@ -133,10 +135,16 @@ u32 main()
 
 	f32 time = 0.0f;
 
-	std::vector<StreetsRender_BuildingsMesh> Meshes;
+	StreetsRender_3DObjectsTileCreateData Tile;
+	Tile.Vertices = building_handler.TestMesh.vertices.data();
+	Tile.VertexCount = building_handler.TestMesh.vertices.size();
+	Tile.Indices = building_handler.TestMesh.Indices.data();
+	Tile.IndexCount = building_handler.TestMesh.Indices.size();
+	Tile.Ranges = building_handler.TestMesh.Ranges.data();
+	Tile.RangesCount = building_handler.TestMesh.Ranges.size();
 
-
-	Meshes.push_back(StreetsRender_CreateBuildingsMesh(building_handler.TestMesh.vertices.data(), building_handler.TestMesh.vertices.size(), building_handler.TestMesh.Indices.data(), building_handler.TestMesh.Indices.size()));
+	std::vector<StreetsRender_3DObjectsTile> Meshes;
+	Meshes.push_back(StreetsRender_Create3DObjectsTile(&Tile));
 
 	while (!glfwWindowShouldClose(Window))
 	{
@@ -201,7 +209,7 @@ u32 main()
 
 	for (u32 i = 0; i < Meshes.size(); ++i)
 	{
-		StreetsRender_DestroyBuildingsMesh(&Meshes[i]);
+		StreetsRender_Destroy3DObjectsTile(&Meshes[i]);
 	}
 
 	StreetsRender_DeInit();

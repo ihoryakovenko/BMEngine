@@ -24,18 +24,36 @@ struct StreetsRender_FrameData
 	glm::vec2 MetersPerNanoDegLonLat;
 };
 
-struct StreetsRender_BuildingsMesh
+struct StreetsRender_3DObjectsTile
 {
 	BmRender_GPUBuffer VertexBuffer;
 	BmRender_GPUBuffer IndexBuffer;
+	BmRender_GPUBuffer IndirectBuffer;
 	u32 VertexCount;
 	u32 IndexCount;
+	u32 CommandCount;
+};
+
+struct StreetsRender_3DObjectRange
+{
+	u32 FirstIndex;
+	u32 IndexCount;
+};
+
+struct StreetsRender_3DObjectsTileCreateData
+{
+	StreetsRender_BuildingVertex* Vertices;
+	u32* Indices;
+	StreetsRender_3DObjectRange* Ranges;
+	u32 VertexCount;
+	u32 IndexCount;
+	u32 RangesCount;
 };
 
 int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight);
 void StreetsRender_DeInit();
 
-void StreetsRender_Draw(StreetsRender_FrameData* FrameData, StreetsRender_BuildingsMesh* Buildings, u32 MeshCount);
+void StreetsRender_Draw(StreetsRender_FrameData* FrameData, StreetsRender_3DObjectsTile* Buildings, u32 MeshCount);
 
-StreetsRender_BuildingsMesh StreetsRender_CreateBuildingsMesh(StreetsRender_BuildingVertex* Vertices, u32 VertexCount, u32* Indices, u32 IndexCount);
-void StreetsRender_DestroyBuildingsMesh(StreetsRender_BuildingsMesh* Mesh);
+StreetsRender_3DObjectsTile StreetsRender_Create3DObjectsTile(StreetsRender_3DObjectsTileCreateData* TileData);
+void StreetsRender_Destroy3DObjectsTile(StreetsRender_3DObjectsTile* Mesh);

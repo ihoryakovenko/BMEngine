@@ -20,25 +20,41 @@
 
 struct WayGeometry
 {
-	bool IsClockwise = false;
+	bool IsClockwise;
 	std::vector<std::array<s32, 2>> Ring;
+};
+
+struct BuildingWay
+{
+	WayGeometry Way;
+	f32 Height;
+	f32 MinHeight;
+	bool IsOutline;
 };
 
 struct Mesh
 {
 	std::vector<StreetsRender_BuildingVertex> vertices;
 	std::vector<u32> Indices;
+	std::vector<StreetsRender_3DObjectRange> Ranges;
 };
 
 struct BuildingHandler : public osmium::handler::Handler
 {
 	Mesh TestMesh;
 	std::unordered_map<osmium::object_id_type, WayGeometry> Ways;
+	std::unordered_map<osmium::object_id_type, BuildingWay> BuildingWays;
 
+	void ConstructObjects();
+
+	void ProcessMultipolygonRelation(const osmium::Relation& Rel);
 	void GenerateBuildingWall(Mesh& mesh, s32 CurrentNanoDegX, s32 CurrentNanoDegY, s32 NextNanoDegX, s32 NextNanoDegY, f32 Height, f32 MinHeight);
 	bool GetBuildingData(const osmium::OSMObject& Object, f32& OutHeight, f32& OutMinHeight);
+	void RemoveColinearPoints(std::vector<std::array<s32, 2>>& Ring);
 
 	void way(const osmium::Way& Way);
 
 	void relation(const osmium::Relation& rel);
+
+	const f32 LevelHeight = 3.0f;
 };
