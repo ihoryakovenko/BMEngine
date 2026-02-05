@@ -95,6 +95,7 @@ u32 main()
 	location_handler.ignore_errors();
 
 	BuildingHandler building_handler;
+	building_handler.InitializeMaterials();
 
 	osmium::apply(reader, location_handler, building_handler);
 	reader.close();
@@ -111,6 +112,8 @@ u32 main()
 
 	GLFWwindow* Window = glfwCreateWindow(WindowWidth, WindowHeight, "BMEngine", nullptr, nullptr);
 	StreetsRender_Init(Window, WindowWidth, WindowHeight);
+
+	StreetsRender_CreateMaterials(BuildingMaterials, (u32)BuildingMaterial::MAX);
 
 	FlyCamera Camera;
 	Camera.WorldNanoDegPosition = glm::ivec2(center_nanodeg_x, center_nanodeg_y);
@@ -140,15 +143,25 @@ u32 main()
 	Tile.VertexCount = building_handler.TestMesh.vertices.size();
 	Tile.Indices = building_handler.TestMesh.Indices.data();
 	Tile.IndexCount = building_handler.TestMesh.Indices.size();
+	Tile.Instances = building_handler.TestMesh.Instances.data();
 	Tile.Ranges = building_handler.TestMesh.Ranges.data();
 	Tile.RangesCount = building_handler.TestMesh.Ranges.size();
 
 	std::vector<StreetsRender_3DObjectsTile> Meshes;
 	Meshes.push_back(StreetsRender_Create3DObjectsTile(&Tile));
 
+	s32 DebugMode = 0;
+
 	while (!glfwWindowShouldClose(Window))
 	{
 		if (glfwGetKey(Window, GLFW_KEY_ESCAPE) == GLFW_PRESS) break;
+
+		if (glfwGetKey(Window, GLFW_KEY_0) == GLFW_PRESS) DebugMode = 0;
+		if (glfwGetKey(Window, GLFW_KEY_1) == GLFW_PRESS) DebugMode = 1;
+		if (glfwGetKey(Window, GLFW_KEY_2) == GLFW_PRESS) DebugMode = 2;
+		if (glfwGetKey(Window, GLFW_KEY_3) == GLFW_PRESS) DebugMode = 3;
+		if (glfwGetKey(Window, GLFW_KEY_4) == GLFW_PRESS) DebugMode = 4;
+		if (glfwGetKey(Window, GLFW_KEY_5) == GLFW_PRESS) DebugMode = 5;
 
 		glfwPollEvents();
 		time += 0.016f;
@@ -204,6 +217,7 @@ u32 main()
 		FrameData.CameraWorldNanoDegPosition = Camera.WorldNanoDegPosition;
 		FrameData.MetersPerNanoDegLonLat = glm::vec2((f32)meters_per_nanodeg_lon, (f32)meters_per_nanodeg_lat);
 		FrameData.vp = vp;
+		FrameData.DebugMode = DebugMode;
 		StreetsRender_Draw(&FrameData, Meshes.data(), Meshes.size());
 	}
 

@@ -18,6 +18,9 @@ static Memory_LinearAllocator FrameMemory;
 static BmRender_Shader VertexShader;
 static BmRender_Shader FragmentShader;
 static BmRender_DescriptorSetLayout DescriptorSetLayout;
+static BmRender_DescriptorPool MaterialDescriptorPool;
+static BmRender_DescriptorSet MaterialDescriptorSet;
+static BmRender_GPUBuffer MaterialBuffer;
 static BmRender_Image ColorImage;
 static BmRender_ImageView ColorImageView;
 static BmRender_Image DepthImage;
@@ -112,14 +115,14 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	free(FragmentShaderCode);
 
 	BmRender_DescriptorSetLayoutBinding DescriptorBinding = {};
-	DescriptorBinding.DescriptorType = BmRender_DescriptorType::CombinedImageSampler;
+	DescriptorBinding.DescriptorType = BmRender_DescriptorType::StorageBuffer;
 	DescriptorBinding.DescriptorCount = 1;
 	DescriptorBinding.StageFlags = BmRender_DescriptorShaderStage::Fragment;
 	DescriptorSetLayout = BmRender_CreateDescriptorSetLayout(&DescriptorBinding, 1);
 
-	// Push constants: mat4 vp (64) + ivec3 WorldCameraPosition (12) + pad (4) + vec2 metersPerNanodegLonLat (8) = 88
-	constexpr u32 PUSH_CONSTANT_SIZE = 88;
-	BmRender_PushConstant PushConstantRange = BmRender_CreatePushConstant(BmRender_DescriptorShaderStage::Vertex, 0, PUSH_CONSTANT_SIZE);
+	// Push constants: mat4 vp (64) + ivec2 (8) + float (4) + float (4) + vec2 (8) + int debugMode (4) = 92	constexpr u32 PUSH_CONSTANT_SIZE = sizeof(StreetsRender_FrameData);
+	BmRender_PushConstant PushConstantRange = BmRender_CreatePushConstant(
+		(BmRender_DescriptorShaderStage)((u64)BmRender_DescriptorShaderStage::Vertex | (u64)BmRender_DescriptorShaderStage::Fragment), 0, sizeof(StreetsRender_FrameData));
 
 	BmRender_Extent2D SwapchainExtent = BmRender_GetSwapchainExtent();
 
@@ -156,7 +159,6 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	PipelineDesc.ShaderStages = ShaderStages;
 	PipelineDesc.ShaderStagesCount = 2;
 
-	// Define vertex bindings: location 0 = ivec2 InNanoDegPosition, location 1 = float InAltitudeMeters, location 2 = vec3 Color
 	VertexAttribute NanodegAttr = {};
 	NanodegAttr.Type = BmRender_AttributeType::Ivec2;
 	NanodegAttr.Offset = 0;
@@ -169,16 +171,31 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	ColorAttr.Type = BmRender_AttributeType::Vec3;
 	ColorAttr.Offset = offsetof(StreetsRender_BuildingVertex, Color);
 
-	VertexAttribute VertexAttributes[3] = { NanodegAttr, AltitudeAttr, ColorAttr };
+	VertexAttribute NormalAttr = {};
+	NormalAttr.Type = BmRender_AttributeType::Vec3;
+	NormalAttr.Offset = offsetof(StreetsRender_BuildingVertex, Normal);
+
+	VertexAttribute VertexAttributes[4] = { NanodegAttr, AltitudeAttr, ColorAttr, NormalAttr };
 
 	BmRender_VertexBinding VertexBinding = {};
 	VertexBinding.Attributes = VertexAttributes;
-	VertexBinding.AttributesCount = 3;
+	VertexBinding.AttributesCount = 4;
 	VertexBinding.Stride = sizeof(StreetsRender_BuildingVertex);
 	VertexBinding.InputRate = BmRender_VertexInputRate::Vertex;
 
-	PipelineDesc.VertexBindings = &VertexBinding;
-	PipelineDesc.VertexBindingsCount = 1;
+	VertexAttribute MaterialIndexAttr = {};
+	MaterialIndexAttr.Type = BmRender_AttributeType::Uint;
+	MaterialIndexAttr.Offset = offsetof(StreetsRender_3DObjectInstance, MaterialIndex);
+
+	BmRender_VertexBinding InstanceBinding = {};
+	InstanceBinding.Attributes = &MaterialIndexAttr;
+	InstanceBinding.AttributesCount = 1;
+	InstanceBinding.Stride = sizeof(StreetsRender_3DObjectInstance);
+	InstanceBinding.InputRate = BmRender_VertexInputRate::Instance;
+
+	BmRender_VertexBinding Bindings[2] = { VertexBinding, InstanceBinding };
+	PipelineDesc.VertexBindings = Bindings;
+	PipelineDesc.VertexBindingsCount = 2;
 
 	PipelineDesc.DescriptorSetLayouts = &DescriptorSetLayout;
 	PipelineDesc.DescriptorSetLayoutsCount = 1;
@@ -215,7 +232,6 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	PipelineDesc.DepthStencilState.DepthBoundsTestEnable = false;
 	PipelineDesc.DepthStencilState.StencilTestEnable = false;
 
-	// TODO: Delete
 	PipelineDesc.MultisampleState = {};
 	PipelineDesc.MultisampleState.SampleShadingEnable = false;
 
@@ -242,12 +258,8 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	PipelineDesc.ViewportState.ViewportCount = 1;
 	PipelineDesc.ViewportState.ScissorCount = 1;
 
-
-
-
-
 	StagingBufferSize = MB256;
-	StagingBuffer = BmRender_CreateStagingBuffer(StagingBufferSize); // + IndexBufferSize + IndirectCommandSize);
+	StagingBuffer = BmRender_CreateStagingBuffer(StagingBufferSize);
 
 	Pipeline = BmRender_CreatePipeline(&PipelineDesc);
 	GraphicsQueue = BmRender_CreateQueue(BmRender_QueueType::Graphic);
@@ -258,24 +270,37 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	for (u32 i = 0; i < SwapchainImageCount; ++i)
 		RenderFinishedSemaphores[i] = BmRender_CreateSemaphore();
 	InFlightFence = BmRender_CreateFence();
+}
 
-	BmRHI_SamplerDescription SamplerDesc = {};
-	SamplerDesc.MagFilter = BmRender_Filter::Linear;
-	SamplerDesc.MinFilter = BmRender_Filter::Linear;
-	SamplerDesc.MipmapMode = BmRender_SamplerMipmapMode::Linear;
-	SamplerDesc.AddressModeU = BmRender_SamplerAddressMode::ClampToEdge;
-	SamplerDesc.AddressModeV = BmRender_SamplerAddressMode::ClampToEdge;
-	SamplerDesc.AddressModeW = BmRender_SamplerAddressMode::ClampToEdge;
-	SamplerDesc.MipLodBias = 0.0f;
-	SamplerDesc.AnisotropyEnable = false;
-	SamplerDesc.MaxAnisotropy = 1.0f;
-	SamplerDesc.CompareEnable = false;
-	SamplerDesc.CompareOp = BmRender_CompareOp::Always;
-	SamplerDesc.MinLod = 0.0f;
-	SamplerDesc.MaxLod = 0.0f;
-	SamplerDesc.BorderColor = BmRender_BorderColor::FloatOpaqueBlack;
-	SamplerDesc.UnnormalizedCoordinates = false;
-	AtlasSampler = BmRender_CreateSampler(&SamplerDesc);
+void StreetsRender_CreateMaterials(StreetsRender_Material* Materials, u32 MaterialsCount)
+{
+	const u64 MaterialBufferSize = sizeof(StreetsRender_Material) * MaterialsCount;
+	MaterialBuffer = BmRender_CreateStorageBuffer(MaterialBufferSize, MemoryPropertyFlag::HostCompatible);
+	BmRender_UpdateHostCompatibleBuffer(MaterialBuffer, 0, MaterialBufferSize, Materials);
+
+	BmRender_DescriptorPoolSize PoolSize = {};
+	PoolSize.Type = BmRender_DescriptorType::StorageBuffer;
+	PoolSize.DescriptorCount = 1;
+	MaterialDescriptorPool = BmRender_CreateDescriptorPool(&PoolSize, 1, 1, BmRender_DescriptorPoolType::None);
+
+	BmRender_GPUBufferBinding MaterialRegion = {};
+	MaterialRegion.GPUBufferHandle = MaterialBuffer;
+	MaterialRegion.BufferOffset = 0;
+	MaterialRegion.Size = MaterialBufferSize;
+
+	BmRender_DescriptorSetBinding MaterialBinding = {};
+	MaterialBinding.BufferRegions = &MaterialRegion;
+	MaterialBinding.BindingCount = 1;
+	MaterialBinding.DstArrayElement = 0;
+
+	MaterialDescriptorSet = BmRender_CreateDescriptorSet(DescriptorSetLayout, MaterialDescriptorPool);
+	BmRender_UpdateDescriptorSet(MaterialDescriptorSet, &MaterialBinding, 1);
+}
+
+void StreetsRender_DestroyMaterials()
+{
+	BmRender_DestroyDescriptorPool(MaterialDescriptorPool);
+	BmRender_DestroyGPUBuffer(MaterialBuffer);
 }
 
 void StreetsRender_Draw(StreetsRender_FrameData* FrameData, StreetsRender_3DObjectsTile* Meshes, u32 MeshCount)
@@ -319,12 +344,14 @@ void StreetsRender_Draw(StreetsRender_FrameData* FrameData, StreetsRender_3DObje
 	BmRender_BeginRendering(CommandBuffer, &RenderingInfo);
 
 	BmRender_BindPipeline(CommandBuffer, Pipeline);
-	BmRender_RecordPushConstants(CommandBuffer, PipelineLayout, BmRender_DescriptorShaderStage::Vertex, 0, sizeof(StreetsRender_FrameData), FrameData);
+	BmRender_RecordPushConstants(CommandBuffer, PipelineLayout, (BmRender_DescriptorShaderStage)((u64)BmRender_DescriptorShaderStage::Vertex | (u64)BmRender_DescriptorShaderStage::Fragment), 0, sizeof(StreetsRender_FrameData), FrameData);
+	BmRender_RecordBindDescriptorSets(CommandBuffer, PipelineLayout, 0, 1, &MaterialDescriptorSet, 0, nullptr);
 
 	for (u32 i = 0; i < MeshCount; ++i)
 	{
-		u64 vertexOffset = 0;
-		BmRender_RecordBindVertexBuffers(CommandBuffer, 0, 1, &Meshes[i].VertexBuffer, &vertexOffset);
+		BmRender_GPUBuffer VertexBuffers[2] = { Meshes[i].VertexBuffer, Meshes[i].InstanceBuffer };
+		u64 VertexOffsets[2] = { 0, 0 };
+		BmRender_RecordBindVertexBuffers(CommandBuffer, 0, 2, VertexBuffers, VertexOffsets);
 		BmRender_RecordBindIndexBuffer(CommandBuffer, Meshes[i].IndexBuffer, 0, BmRender_IndexType::Uint32);
 
 		BmRender_RecordDrawIndexedIndirect(CommandBuffer, Meshes[i].IndirectBuffer, 0, Meshes[i].CommandCount, sizeof(BmRender_DrawIndexedIndirectCommand));
@@ -368,8 +395,9 @@ StreetsRender_3DObjectsTile StreetsRender_Create3DObjectsTile(StreetsRender_3DOb
 	const u64 VertexBufferSize = sizeof(StreetsRender_BuildingVertex) * TileData->VertexCount;
 	const u64 IndexBufferSize = sizeof(u32) * TileData->IndexCount;
 	const u64 IndirectBufferSize = sizeof(BmRender_DrawIndexedIndirectCommand) * TileData->RangesCount;
+	const u64 InstanceBufferSize = sizeof(StreetsRender_3DObjectInstance) * TileData->RangesCount;
 
-	assert(StagingBufferSize > VertexBufferSize + IndexBufferSize + IndirectBufferSize);
+	assert(StagingBufferSize > VertexBufferSize + IndexBufferSize + IndirectBufferSize + InstanceBufferSize);
 
 	BmRender_DrawIndexedIndirectCommand* IndirectCommands = (BmRender_DrawIndexedIndirectCommand*)Memory_LinearAllocator_Alloc(&FrameMemory, IndirectBufferSize);
 	for (u32 IndirectCommandIndex = 0; IndirectCommandIndex < TileData->RangesCount; ++IndirectCommandIndex)
@@ -380,26 +408,30 @@ StreetsRender_3DObjectsTile StreetsRender_Create3DObjectsTile(StreetsRender_3DOb
 		Command->FirstIndex = Range->FirstIndex;
 		Command->IndexCount = Range->IndexCount;
 		Command->VertexOffset = 0;
-		Command->FirstInstance = 0;
+		Command->FirstInstance = IndirectCommandIndex;
 		Command->InstanceCount = 1;
 	}
 
 	StreetsRender_3DObjectsTile Mesh;
 	Mesh.VertexBuffer = BmRender_CreateVertexStageBuffer(VertexBufferSize, MemoryPropertyFlag::GPULocal);
 	Mesh.IndexBuffer = BmRender_CreateVertexStageBuffer(IndexBufferSize, MemoryPropertyFlag::GPULocal);
+	Mesh.InstanceBuffer = BmRender_CreateInstanceBuffer(InstanceBufferSize, MemoryPropertyFlag::GPULocal);
 	Mesh.IndirectBuffer = BmRender_CreateIndirectDrawBuffer(IndirectBufferSize, MemoryPropertyFlag::GPULocal);
 	Mesh.VertexCount = TileData->VertexCount;
 	Mesh.IndexCount = TileData->IndexCount;
 	Mesh.CommandCount = TileData->RangesCount;
 
+	const u64 StagingInstanceOffset = VertexBufferSize + IndexBufferSize + IndirectBufferSize;
 	BmRender_UpdateHostCompatibleBuffer(StagingBuffer, 0, VertexBufferSize, TileData->Vertices);
 	BmRender_UpdateHostCompatibleBuffer(StagingBuffer, VertexBufferSize, IndexBufferSize, TileData->Indices);
 	BmRender_UpdateHostCompatibleBuffer(StagingBuffer, VertexBufferSize + IndexBufferSize, IndirectBufferSize, IndirectCommands);
+	BmRender_UpdateHostCompatibleBuffer(StagingBuffer, StagingInstanceOffset, InstanceBufferSize, TileData->Instances);
 
 	BmRender_BeginCommandBuffer(CommandBuffer);
 	BmRender_RecordUpdateGPULocalBuffer(CommandBuffer, Mesh.VertexBuffer, StagingBuffer, 0, 0, VertexBufferSize);
 	BmRender_RecordUpdateGPULocalBuffer(CommandBuffer, Mesh.IndexBuffer, StagingBuffer, VertexBufferSize, 0, IndexBufferSize);
 	BmRender_RecordUpdateGPULocalBuffer(CommandBuffer, Mesh.IndirectBuffer, StagingBuffer, VertexBufferSize + IndexBufferSize, 0, IndirectBufferSize);
+	BmRender_RecordUpdateGPULocalBuffer(CommandBuffer, Mesh.InstanceBuffer, StagingBuffer, StagingInstanceOffset, 0, InstanceBufferSize);
 	BmRender_EndCommandBuffer(CommandBuffer);
 
 	BmRender_SubmitInfo TransferSubmitInfo = {};
@@ -426,7 +458,8 @@ void StreetsRender_Destroy3DObjectsTile(StreetsRender_3DObjectsTile* Mesh)
 	BmRender_QueueWaitIdle(GraphicsQueue);
 	BmRender_DestroyGPUBuffer(Mesh->VertexBuffer);
 	BmRender_DestroyGPUBuffer(Mesh->IndexBuffer);
-	BmRender_DestroyGPUBuffer(Mesh->IndexBuffer);
+	BmRender_DestroyGPUBuffer(Mesh->InstanceBuffer);
+	BmRender_DestroyGPUBuffer(Mesh->IndirectBuffer);
 }
 
 void StreetsRender_DeInit()
@@ -438,7 +471,7 @@ void StreetsRender_DeInit()
 	BmRender_DestroyImage(ColorImage);
 	BmRender_DestroyGPUBuffer(StagingBuffer);
 	// BmRender_DestroyGPUBuffer(IndirectBuffer);
-	BmRender_DestroySampler(AtlasSampler);
+	StreetsRender_DestroyMaterials();
 	BmRender_DestroyDescriptorSetLayout(DescriptorSetLayout);
 	BmRender_DestroyShader(VertexShader);
 	BmRender_DestroyShader(FragmentShader);

@@ -1,5 +1,42 @@
 #include "OSMBuilder.h"
 
+StreetsRender_Material BuildingMaterials[(u32)BuildingMaterial::MAX] =
+{
+	{ glm::vec3(0.0f, 0.0f, 0.0f),  0.0f, 0.0f }, // Empty
+	{ glm::vec3(0.55f, 0.52f, 0.5f),  0.0f, 0.92f }, // CementBlock
+	{ glm::vec3(0.6f, 0.2f, 0.15f),   0.0f, 0.9f },  // Brick
+	{ glm::vec3(0.9f, 0.88f, 0.85f),  0.0f, 0.85f }, // Plaster
+	{ glm::vec3(0.45f, 0.3f, 0.2f),   0.0f, 0.8f },  // Wood
+	{ glm::vec3(0.5f, 0.5f, 0.5f),    0.0f, 0.95f }, // Concrete
+	{ glm::vec3(0.75f, 0.75f, 0.78f), 1.0f, 0.4f },  // Metal
+	{ glm::vec3(0.4f, 0.4f, 0.45f),   1.0f, 0.5f },  // Steel
+	{ glm::vec3(0.5f, 0.48f, 0.45f),  0.0f, 0.9f },  // Stone
+	{ glm::vec3(0.85f, 0.9f, 0.95f),  0.0f, 0.05f }, // Glass
+	{ glm::vec3(0.88f, 0.9f, 0.92f),  1.0f, 0.02f }, // Mirror
+	{ glm::vec3(0.4f, 0.32f, 0.25f),  0.0f, 0.95f }, // Mud
+	{ glm::vec3(0.7f, 0.6f, 0.5f),    0.0f, 0.85f }, // Masonry
+	{ glm::vec3(0.65f, 0.65f, 0.68f), 1.0f, 0.45f }, // Tin
+	{ glm::vec3(0.7f, 0.72f, 0.75f),  0.0f, 0.35f }, // Plastic
+	{ glm::vec3(0.5f, 0.38f, 0.25f),  0.0f, 0.82f }, // TimberFraming
+	{ glm::vec3(0.76f, 0.65f, 0.5f),  0.0f, 0.85f }, // Sandstone
+	{ glm::vec3(0.6f, 0.45f, 0.35f),  0.0f, 0.9f },  // Clay
+	{ glm::vec3(0.72f, 0.6f, 0.4f),  0.0f, 0.88f }, // Reed
+	{ glm::vec3(0.52f, 0.42f, 0.32f), 0.0f, 0.95f }, // Loam
+	{ glm::vec3(0.9f, 0.89f, 0.88f),  0.0f, 0.3f },  // Marble
+	{ glm::vec3(0.72f, 0.45f, 0.2f),  1.0f, 0.3f },  // Copper
+	{ glm::vec3(0.3f, 0.32f, 0.35f),  0.0f, 0.8f },  // Slate
+	{ glm::vec3(0.85f, 0.85f, 0.88f), 0.0f, 0.25f }, // Vinyl
+	{ glm::vec3(0.78f, 0.75f, 0.68f), 0.0f, 0.88f }, // Limestone
+	{ glm::vec3(0.8f, 0.4f, 0.3f),   0.0f, 0.6f },  // Tiles
+	{ glm::vec3(0.62f, 0.58f, 0.52f), 0.0f, 0.9f }, // Pebbledash
+	{ glm::vec3(0.6f, 0.62f, 0.65f),  1.0f, 0.5f },  // MetalPlates
+	{ glm::vec3(0.68f, 0.55f, 0.35f), 0.0f, 0.8f }, // Bamboo
+	{ glm::vec3(0.55f, 0.4f, 0.3f),   0.0f, 0.95f }, // Adobe
+	{ glm::vec3(0.58f, 0.48f, 0.38f), 0.0f, 0.92f }, // RammedEarth
+	{ glm::vec3(0.15f, 0.18f, 0.22f), 1.0f, 0.2f }, // SolarPanels
+	{ glm::vec3(0.12f, 0.12f, 0.12f), 0.0f, 0.95f }, // Tyres
+};
+
 void BuildingHandler::ProcessMultipolygonRelation(const osmium::Relation& Rel)
 {
 	if (!Rel.tags().has_key("building"))
@@ -9,8 +46,9 @@ void BuildingHandler::ProcessMultipolygonRelation(const osmium::Relation& Rel)
 
 	f32 Height = 3.0f;
 	f32 MinHeight = 0.0f;
+	BuildingMaterial Material = (BuildingMaterial)(rand() % (u32)BuildingMaterial::MAX);
 
-	GetBuildingData(Rel, Height, MinHeight);
+	GetBuildingData(Rel, Height, MinHeight, Material);
 
 	std::vector<std::vector<std::array<s32, 2>>> OuterRings;
 	std::vector<std::vector<std::array<s32, 2>>> InnerRings;
@@ -88,7 +126,7 @@ void BuildingHandler::ProcessMultipolygonRelation(const osmium::Relation& Rel)
 		{
 			for (size_t i = 0; i < ring.size(); ++i)
 			{
-				TestMesh.vertices.push_back({ glm::ivec2(ring[i][0], ring[i][1]), Height, roofColor });
+				TestMesh.vertices.push_back({ glm::ivec2(ring[i][0], ring[i][1]), Height, roofColor, glm::vec3(0.0f, 1.0f, 0.0f) });
 			}
 		}
 
@@ -127,11 +165,12 @@ void BuildingHandler::ProcessMultipolygonRelation(const osmium::Relation& Rel)
 
 	Range.IndexCount = TestMesh.Indices.size() - Range.FirstIndex;
 	TestMesh.Ranges.push_back(Range);
+	TestMesh.Instances.push_back({ (u32)Material });
 }
 
-void BuildingHandler::GenerateBuildingWall(Mesh& mesh, s32 CurrentNanoDegX, s32 CurrentNanoDegY, s32 NextNanoDegX, s32 NextNanoDegY, f32 Height, f32 MinHeight)
+void BuildingHandler::GenerateBuildingWall(Mesh& Mesh, s32 CurrentNanoDegX, s32 CurrentNanoDegY, s32 NextNanoDegX, s32 NextNanoDegY, f32 Height, f32 MinHeight)
 {
-	const u32 BaseVertex = (u32)mesh.vertices.size();
+	const u32 BaseVertex = (u32)Mesh.vertices.size();
 
 	const glm::vec3 wallColor(
 		(f32)(rand() % 256) / 255.0f,
@@ -139,20 +178,28 @@ void BuildingHandler::GenerateBuildingWall(Mesh& mesh, s32 CurrentNanoDegX, s32 
 		(f32)(rand() % 256) / 255.0f
 	);
 
-	mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), Height, wallColor });
-	mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), MinHeight, wallColor });
-	mesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), MinHeight, wallColor });
-	mesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), Height, wallColor });
+	const s32 dx = NextNanoDegX - CurrentNanoDegX;
+	const s32 dy = NextNanoDegY - CurrentNanoDegY;
 
-	mesh.Indices.push_back(BaseVertex + 2);
-	mesh.Indices.push_back(BaseVertex + 3);
-	mesh.Indices.push_back(BaseVertex + 0);
-	mesh.Indices.push_back(BaseVertex + 0);
-	mesh.Indices.push_back(BaseVertex + 1);
-	mesh.Indices.push_back(BaseVertex + 2);
+	glm::vec3 Normal(-(f32)dy, 0.0f, (f32)dx);
+
+	const f32 Len = glm::length(Normal);
+	Normal = Len > 0.0f ? Normal / Len : glm::vec3(0.0f, 0.0f, 1.0f);
+
+	Mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), Height, wallColor, Normal });
+	Mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), MinHeight, wallColor, Normal });
+	Mesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), MinHeight, wallColor, Normal });
+	Mesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), Height, wallColor, Normal });
+
+	Mesh.Indices.push_back(BaseVertex + 2);
+	Mesh.Indices.push_back(BaseVertex + 3);
+	Mesh.Indices.push_back(BaseVertex + 0);
+	Mesh.Indices.push_back(BaseVertex + 0);
+	Mesh.Indices.push_back(BaseVertex + 1);
+	Mesh.Indices.push_back(BaseVertex + 2);
 }
 
-bool BuildingHandler::GetBuildingData(const osmium::OSMObject& Object, f32& OutHeight, f32& OutMinHeight)
+bool BuildingHandler::GetBuildingData(const osmium::OSMObject& Object, f32& OutHeight, f32& OutMinHeight, BuildingMaterial& OutMaterial)
 {
 	if (!Object.tags().has_key("building") && !Object.tags().has_key("building:part"))
 	{
@@ -172,6 +219,11 @@ bool BuildingHandler::GetBuildingData(const osmium::OSMObject& Object, f32& OutH
 		OutHeight = atoi(LevelStr) * LevelHeight;
 	}
 
+	if (OutHeight == 0.0f)
+	{
+		return false;
+	}
+
 	if (Object.tags().has_key("min_height"))
 	{
 		const char* HeightStr = Object.tags().get_value_by_key("min_height");
@@ -183,9 +235,10 @@ bool BuildingHandler::GetBuildingData(const osmium::OSMObject& Object, f32& OutH
 		OutMinHeight = atoi(LevelStr) * LevelHeight;
 	}
 
-	if (OutHeight == 0.0f)
+	if (Object.tags().has_key("building:material"))
 	{
-		return false;
+		const char* MaterialStr = Object.tags().get_value_by_key("building:material");
+		OutMaterial = MaterialTable[MaterialStr];
 	}
 
 	return true;
@@ -265,13 +318,15 @@ void BuildingHandler::way(const osmium::Way& Way)
 	{
 		f32 Height = 3.0f;
 		f32 MinHeight = 0.0f;
+		BuildingMaterial Material = (BuildingMaterial)(rand() % (u32)BuildingMaterial::MAX);
 
-		GetBuildingData(Way, Height, MinHeight);
+		GetBuildingData(Way, Height, MinHeight, Material);
 
 		BuildingWay BWay;
 		BWay.Way = WayGeometry{ IsClockwise, Ring };
 		BWay.Height = Height;
 		BWay.MinHeight = MinHeight;
+		BWay.Material = Material;
 		BWay.IsOutline = false;
 
 		BuildingWays[Way.id()] = BWay;
@@ -322,6 +377,42 @@ void BuildingHandler::relation(const osmium::Relation& Rel)
 	}
 }
 
+void BuildingHandler::InitializeMaterials()
+{
+	MaterialTable["cement_block"] = BuildingMaterial::CementBlock;
+	MaterialTable["brick"] = BuildingMaterial::Brick;
+	MaterialTable["plaster"] = BuildingMaterial::Plaster;
+	MaterialTable["wood"] = BuildingMaterial::Wood;
+	MaterialTable["concrete"] = BuildingMaterial::Concrete;
+	MaterialTable["metal"] = BuildingMaterial::Metal;
+	MaterialTable["steel"] = BuildingMaterial::Steel;
+	MaterialTable["stone"] = BuildingMaterial::Stone;
+	MaterialTable["glass"] = BuildingMaterial::Glass;
+	MaterialTable["mirror"] = BuildingMaterial::Mirror;
+	MaterialTable["mud"] = BuildingMaterial::Mud;
+	MaterialTable["masonry"] = BuildingMaterial::Masonry;
+	MaterialTable["tin"] = BuildingMaterial::Tin;
+	MaterialTable["plastic"] = BuildingMaterial::Plastic;
+	MaterialTable["timber_framing"] = BuildingMaterial::TimberFraming;
+	MaterialTable["sandstone"] = BuildingMaterial::Sandstone;
+	MaterialTable["clay"] = BuildingMaterial::Clay;
+	MaterialTable["reed"] = BuildingMaterial::Reed;
+	MaterialTable["loam"] = BuildingMaterial::Loam;
+	MaterialTable["marble"] = BuildingMaterial::Marble;
+	MaterialTable["copper"] = BuildingMaterial::Copper;
+	MaterialTable["slate"] = BuildingMaterial::Slate;
+	MaterialTable["vinyl"] = BuildingMaterial::Vinyl;
+	MaterialTable["limestone"] = BuildingMaterial::Limestone;
+	MaterialTable["tiles"] = BuildingMaterial::Tiles;
+	MaterialTable["pebbledash"] = BuildingMaterial::Pebbledash;
+	MaterialTable["metal_plates"] = BuildingMaterial::MetalPlates;
+	MaterialTable["bamboo"] = BuildingMaterial::Bamboo;
+	MaterialTable["adobe"] = BuildingMaterial::Adobe;
+	MaterialTable["rammed_earth"] = BuildingMaterial::RammedEarth;
+	MaterialTable["solar_panels"] = BuildingMaterial::SolarPanels;
+	MaterialTable["tyres"] = BuildingMaterial::Tyres;
+}
+
 void BuildingHandler::ConstructObjects()
 {
 	for (auto& BWayIter : BuildingWays)
@@ -355,7 +446,7 @@ void BuildingHandler::ConstructObjects()
 			const s32 CurrentNanoDegX = BWay.Way.Ring[i][0];
 			const s32 CurrentNanoDegY = BWay.Way.Ring[i][1];
 
-			TestMesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), BWay.Height, RoofColor });
+			TestMesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), BWay.Height, RoofColor, glm::vec3(0.0f, 1.0f, 0.0f) });
 		}
 
 		std::vector<std::vector<std::array<s32, 2>>> Polygon;
@@ -381,5 +472,6 @@ void BuildingHandler::ConstructObjects()
 
 		Range.IndexCount = TestMesh.Indices.size() - Range.FirstIndex;
 		TestMesh.Ranges.push_back(Range);
+		TestMesh.Instances.push_back({ (u32)BWay.Material });
 	}
 }
