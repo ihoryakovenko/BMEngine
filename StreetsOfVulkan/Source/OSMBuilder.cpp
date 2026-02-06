@@ -110,62 +110,51 @@ void BuildingHandler::ProcessMultipolygonRelation(const osmium::Relation& Rel)
 	for (size_t o = 0; o < OuterRings.size(); ++o)
 	{
 		std::vector<std::vector<std::array<s32, 2>>> Polygon;
+		Polygon.push_back(OuterRings[o]);
 
-		const std::vector<std::array<s32, 2>>& OuterRing = OuterRings[o];
-
-		Polygon.push_back(OuterRing);
 		for (const auto& inner : InnerRings)
 		{
 			Polygon.push_back(inner);
 		}
 
-		std::vector<u32> Indices = mapbox::earcut<u32>(Polygon);
-
-		u32 BaseVertex = TestMesh.vertices.size();
-		for (const auto& ring : Polygon)
-		{
-			for (size_t i = 0; i < ring.size(); ++i)
-			{
-				TestMesh.vertices.push_back({ glm::ivec2(ring[i][0], ring[i][1]), Height, roofColor, glm::vec3(0.0f, 1.0f, 0.0f) });
-			}
-		}
-
-		for (size_t i = 0; i < Indices.size(); ++i)
-		{
-			TestMesh.Indices.push_back(Indices[i] + BaseVertex);
-		}
-
-		u32 NodeCount = (u32)OuterRing.size();
-		for (u32 i = 0; i < NodeCount; ++i)
-		{
-			const s32 CurrentNanoDegX = OuterRing[i][0];
-			const s32 CurrentNanoDegY = OuterRing[i][1];
-
-			const s32 NextNanoDegX = OuterRing[(i + 1) % NodeCount][0];
-			const s32 NextNanoDegY = OuterRing[(i + 1) % NodeCount][1];
-
-			GenerateBuildingWall(TestMesh, CurrentNanoDegX, CurrentNanoDegY, NextNanoDegX, NextNanoDegY, Height, MinHeight);
-		}
-
-		for (const auto& innerRing : InnerRings)
-		{
-			NodeCount = (u32)innerRing.size();
-			for (u32 i = 0; i < NodeCount; ++i)
-			{
-				const s32 CurrentNanoDegX = innerRing[i][0];
-				const s32 CurrentNanoDegY = innerRing[i][1];
-
-				const s32 NextNanoDegX = innerRing[(i + 1) % NodeCount][0];
-				const s32 NextNanoDegY = innerRing[(i + 1) % NodeCount][1];
-
-				GenerateBuildingWall(TestMesh, CurrentNanoDegX, CurrentNanoDegY, NextNanoDegX, NextNanoDegY, Height, MinHeight);
-			}
-		}
+		AddBuildingPolygonGeometry(TestMesh, Polygon, Height, MinHeight, roofColor);
 	}
 
 	Range.IndexCount = TestMesh.Indices.size() - Range.FirstIndex;
 	TestMesh.Ranges.push_back(Range);
 	TestMesh.Instances.push_back({ (u32)Material });
+}
+
+void BuildingHandler::AddBuildingPolygonGeometry(Mesh& mesh, const std::vector<std::vector<std::array<s32, 2>>>& Polygon, f32 Height, f32 MinHeight, const glm::vec3& RoofColor)
+{
+	const u32 BaseVertex = (u32)mesh.vertices.size();
+
+	for (const auto& ring : Polygon)
+	{
+		for (size_t i = 0; i < ring.size(); ++i)
+		{
+			mesh.vertices.push_back({ glm::ivec2(ring[i][0], ring[i][1]), Height, RoofColor, glm::vec3(0.0f, 1.0f, 0.0f) });
+		}
+	}
+
+	std::vector<u32> Indices = mapbox::earcut<u32>(Polygon);
+	for (size_t i = 0; i < Indices.size(); ++i)
+	{
+		mesh.Indices.push_back(Indices[i] + BaseVertex);
+	}
+
+	for (const auto& ring : Polygon)
+	{
+		const u32 NodeCount = (u32)ring.size();
+		for (u32 i = 0; i < NodeCount; ++i)
+		{
+			const s32 CurrentNanoDegX = ring[i][0];
+			const s32 CurrentNanoDegY = ring[i][1];
+			const s32 NextNanoDegX = ring[(i + 1) % NodeCount][0];
+			const s32 NextNanoDegY = ring[(i + 1) % NodeCount][1];
+			GenerateBuildingWall(mesh, CurrentNanoDegX, CurrentNanoDegY, NextNanoDegX, NextNanoDegY, Height, MinHeight);
+		}
+	}
 }
 
 void BuildingHandler::GenerateBuildingWall(Mesh& Mesh, s32 CurrentNanoDegX, s32 CurrentNanoDegY, s32 NextNanoDegX, s32 NextNanoDegY, f32 Height, f32 MinHeight)
@@ -420,20 +409,13 @@ void BuildingHandler::ConstructObjects()
 		BuildingWay& BWay = BWayIter.second;
 
 		if (BWay.IsOutline)
-		{
 			continue;
-		}
 
 		if (BWay.Way.IsClockwise)
-		{
 			std::reverse(BWay.Way.Ring.begin(), BWay.Way.Ring.end());
-		}
-
-		const u32 RingPoints = BWay.Way.Ring.size();
-		u32 BaseVertex = TestMesh.vertices.size();
 
 		StreetsRender_3DObjectRange Range;
-		Range.FirstIndex = TestMesh.Indices.size();
+		Range.FirstIndex = (u32)TestMesh.Indices.size();
 
 		const glm::vec3 RoofColor(
 			(f32)(rand() % 256) / 255.0f,
@@ -441,36 +423,12 @@ void BuildingHandler::ConstructObjects()
 			(f32)(rand() % 256) / 255.0f
 		);
 
-		for (u32 i = 0; i < BWay.Way.Ring.size(); ++i)
-		{
-			const s32 CurrentNanoDegX = BWay.Way.Ring[i][0];
-			const s32 CurrentNanoDegY = BWay.Way.Ring[i][1];
-
-			TestMesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), BWay.Height, RoofColor, glm::vec3(0.0f, 1.0f, 0.0f) });
-		}
-
 		std::vector<std::vector<std::array<s32, 2>>> Polygon;
 		Polygon.push_back(BWay.Way.Ring);
 
-		std::vector<u32> Indices = mapbox::earcut<u32>(Polygon);
+		AddBuildingPolygonGeometry(TestMesh, Polygon, BWay.Height, BWay.MinHeight, RoofColor);
 
-		for (u32 i = 0; i < Indices.size(); ++i)
-		{
-			TestMesh.Indices.push_back(Indices[i] + BaseVertex);
-		}
-
-		for (u32 i = 0; i < RingPoints; ++i)
-		{
-			const s32 CurrentNanoDegX = BWay.Way.Ring[i][0];
-			const s32 CurrentNanoDegY = BWay.Way.Ring[i][1];
-
-			const s32 NextNanoDegX = BWay.Way.Ring[(i + 1) % RingPoints][0];
-			const s32 NextNanoDegY = BWay.Way.Ring[(i + 1) % RingPoints][1];
-
-			GenerateBuildingWall(TestMesh, CurrentNanoDegX, CurrentNanoDegY, NextNanoDegX, NextNanoDegY, BWay.Height, BWay.MinHeight);
-		}
-
-		Range.IndexCount = TestMesh.Indices.size() - Range.FirstIndex;
+		Range.IndexCount = (u32)TestMesh.Indices.size() - Range.FirstIndex;
 		TestMesh.Ranges.push_back(Range);
 		TestMesh.Instances.push_back({ (u32)BWay.Material });
 	}
