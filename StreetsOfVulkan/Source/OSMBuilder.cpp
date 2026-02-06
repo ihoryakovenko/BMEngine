@@ -125,67 +125,91 @@ void BuildingHandler::ProcessMultipolygonRelation(const osmium::Relation& Rel)
 	TestMesh.Instances.push_back({ (u32)Material });
 }
 
-void BuildingHandler::AddBuildingPolygonGeometry(Mesh& mesh, const std::vector<std::vector<std::array<s32, 2>>>& Polygon, f32 Height, f32 MinHeight, const glm::vec3& RoofColor)
+void BuildingHandler::AddBuildingPolygonGeometry(Mesh& Mesh, const std::vector<std::vector<std::array<s32, 2>>>& Polygon, f32 Height, f32 MinHeight, const glm::vec3& RoofColor)
 {
-	const u32 BaseVertex = (u32)mesh.vertices.size();
+	const u32 BaseVertex = (u32)Mesh.vertices.size();
 
 	for (const auto& ring : Polygon)
 	{
 		for (size_t i = 0; i < ring.size(); ++i)
 		{
-			mesh.vertices.push_back({ glm::ivec2(ring[i][0], ring[i][1]), Height, RoofColor, glm::vec3(0.0f, 1.0f, 0.0f) });
+			Mesh.vertices.push_back({ glm::ivec2(ring[i][0], ring[i][1]), Height, RoofColor, glm::vec3(0.0f, 1.0f, 0.0f) });
 		}
 	}
 
 	std::vector<u32> Indices = mapbox::earcut<u32>(Polygon);
 	for (size_t i = 0; i < Indices.size(); ++i)
 	{
-		mesh.Indices.push_back(Indices[i] + BaseVertex);
+		Mesh.Indices.push_back(Indices[i] + BaseVertex);
 	}
 
 	for (const auto& ring : Polygon)
 	{
-		const u32 NodeCount = (u32)ring.size();
-		for (u32 i = 0; i < NodeCount; ++i)
+		const u32 N = (u32)ring.size();
+		if (N < 3) continue;
+
+		// One color per ring; shared vertices get same color
+		const glm::vec3 VertexColor(
+			(f32)(rand() % 256) / 255.0f,
+			(f32)(rand() % 256) / 255.0f,
+			(f32)(rand() % 256) / 255.0f
+		);
+
+		u32 BaseVertex = (u32)Mesh.vertices.size();
+
+		for (u32 i = 0; i < N; ++i)
 		{
+			const u32 Prev = (i + N - 1) % N;
+			const u32 Next = (i + 1) % N;
+
+			const s32 PrevNanoDegX = ring[Prev][0];
+			const s32 PrevNanoDegY = ring[Prev][1];
+
 			const s32 CurrentNanoDegX = ring[i][0];
 			const s32 CurrentNanoDegY = ring[i][1];
-			const s32 NextNanoDegX = ring[(i + 1) % NodeCount][0];
-			const s32 NextNanoDegY = ring[(i + 1) % NodeCount][1];
-			GenerateBuildingWall(mesh, CurrentNanoDegX, CurrentNanoDegY, NextNanoDegX, NextNanoDegY, Height, MinHeight);
+
+			const s32 NextNanoDegX = ring[Next][0];
+			const s32 NextNanoDegY = ring[Next][1];
+
+			{
+				//const glm::vec3 n1 = WallNormal(PrevNanoDegX, PrevNanoDegY, CurrentNanoDegX, CurrentNanoDegY);
+				//const glm::vec3 n2 = WallNormal(CurrentNanoDegX, CurrentNanoDegY, NextNanoDegX, NextNanoDegY);
+				//const glm::vec3 nAv = glm::normalize(n1 + n2);
+
+				//Mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), MinHeight, VertexColor, nAv });
+				//Mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), Height, VertexColor, nAv });
+
+				//const u32 a = BaseVertex + 2 * i;      // current bottom
+				//const u32 b = BaseVertex + 2 * i + 1;  // current top
+				//const u32 c = BaseVertex + 2 * Next;    // next bottom
+				//const u32 d = BaseVertex + 2 * Next + 1; // next top
+				//// Quad (current top, current bottom, next bottom, next top) -> two triangles
+				//Mesh.Indices.push_back(c);
+				//Mesh.Indices.push_back(d);
+				//Mesh.Indices.push_back(b);
+				//Mesh.Indices.push_back(b);
+				//Mesh.Indices.push_back(a);
+				//Mesh.Indices.push_back(c);
+			}
+
+			{
+				glm::vec3 Normal = WallNormal(CurrentNanoDegX, CurrentNanoDegY, NextNanoDegX, NextNanoDegY);
+
+				Mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), Height, VertexColor, Normal });
+				Mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), MinHeight, VertexColor, Normal });
+				Mesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), MinHeight, VertexColor, Normal });
+				Mesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), Height, VertexColor, Normal });
+
+				const u32 q = BaseVertex + 4 * i;
+				Mesh.Indices.push_back(q + 2);
+				Mesh.Indices.push_back(q + 3);
+				Mesh.Indices.push_back(q + 0);
+				Mesh.Indices.push_back(q + 0);
+				Mesh.Indices.push_back(q + 1);
+				Mesh.Indices.push_back(q + 2);
+			}
 		}
 	}
-}
-
-void BuildingHandler::GenerateBuildingWall(Mesh& Mesh, s32 CurrentNanoDegX, s32 CurrentNanoDegY, s32 NextNanoDegX, s32 NextNanoDegY, f32 Height, f32 MinHeight)
-{
-	const u32 BaseVertex = (u32)Mesh.vertices.size();
-
-	const glm::vec3 wallColor(
-		(f32)(rand() % 256) / 255.0f,
-		(f32)(rand() % 256) / 255.0f,
-		(f32)(rand() % 256) / 255.0f
-	);
-
-	const s32 dx = NextNanoDegX - CurrentNanoDegX;
-	const s32 dy = NextNanoDegY - CurrentNanoDegY;
-
-	glm::vec3 Normal(-(f32)dy, 0.0f, (f32)dx);
-
-	const f32 Len = glm::length(Normal);
-	Normal = Len > 0.0f ? Normal / Len : glm::vec3(0.0f, 0.0f, 1.0f);
-
-	Mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), Height, wallColor, Normal });
-	Mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), MinHeight, wallColor, Normal });
-	Mesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), MinHeight, wallColor, Normal });
-	Mesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), Height, wallColor, Normal });
-
-	Mesh.Indices.push_back(BaseVertex + 2);
-	Mesh.Indices.push_back(BaseVertex + 3);
-	Mesh.Indices.push_back(BaseVertex + 0);
-	Mesh.Indices.push_back(BaseVertex + 0);
-	Mesh.Indices.push_back(BaseVertex + 1);
-	Mesh.Indices.push_back(BaseVertex + 2);
 }
 
 bool BuildingHandler::GetBuildingData(const osmium::OSMObject& Object, f32& OutHeight, f32& OutMinHeight, BuildingMaterial& OutMaterial)
@@ -264,6 +288,19 @@ void BuildingHandler::RemoveColinearPoints(std::vector<std::array<s32, 2>>& Ring
 	{
 		Ring = std::move(Simplified);
 	}
+}
+
+glm::vec3 BuildingHandler::WallNormal(s32 Ax, s32 Ay, s32 Bx, s32 By)
+{
+	const s32 dx = Bx - Ax;
+	const s32 dy = By - Ay;
+
+	glm::vec3 Normal(-(f32)dy, 0.0f, (f32)dx);
+
+	const f32 Len = glm::length(Normal);
+	Normal = Len > 0.0f ? Normal / Len : glm::vec3(0.0f, 0.0f, 1.0f);
+
+	return Normal;
 }
 
 void BuildingHandler::way(const osmium::Way& Way)

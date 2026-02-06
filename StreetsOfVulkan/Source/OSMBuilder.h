@@ -95,10 +95,10 @@ struct BuildingHandler : public osmium::handler::Handler
 	void ConstructObjects();
 
 	void ProcessMultipolygonRelation(const osmium::Relation& Rel);
-	void GenerateBuildingWall(Mesh& mesh, s32 CurrentNanoDegX, s32 CurrentNanoDegY, s32 NextNanoDegX, s32 NextNanoDegY, f32 Height, f32 MinHeight);
 	void AddBuildingPolygonGeometry(Mesh& mesh, const std::vector<std::vector<std::array<s32, 2>>>& Polygon, f32 Height, f32 MinHeight, const glm::vec3& RoofColor);
 	bool GetBuildingData(const osmium::OSMObject& Object, f32& OutHeight, f32& OutMinHeight, BuildingMaterial& OutMaterial);
 	void RemoveColinearPoints(std::vector<std::array<s32, 2>>& Ring);
+	glm::vec3 WallNormal(s32 Ax, s32 Ay, s32 Bx, s32 By);
 
 	void way(const osmium::Way& Way);
 
