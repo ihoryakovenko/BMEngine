@@ -148,17 +148,18 @@ void BuildingHandler::AddBuildingPolygonGeometry(Mesh& Mesh, const std::vector<s
 		const u32 N = (u32)ring.size();
 		if (N < 3) continue;
 
-		// One color per ring; shared vertices get same color
-		const glm::vec3 VertexColor(
-			(f32)(rand() % 256) / 255.0f,
-			(f32)(rand() % 256) / 255.0f,
-			(f32)(rand() % 256) / 255.0f
-		);
-
-		u32 BaseVertex = (u32)Mesh.vertices.size();
+		const u32 FirstWallVertex = (u32)Mesh.vertices.size();
 
 		for (u32 i = 0; i < N; ++i)
 		{
+			const glm::vec3 VertexColor(
+				(f32)(rand() % 256) / 255.0f,
+				(f32)(rand() % 256) / 255.0f,
+				(f32)(rand() % 256) / 255.0f
+			);
+
+			const u32 BaseWallVertex = (u32)Mesh.vertices.size();
+
 			const u32 Prev = (i + N - 1) % N;
 			const u32 Next = (i + 1) % N;
 
@@ -171,43 +172,50 @@ void BuildingHandler::AddBuildingPolygonGeometry(Mesh& Mesh, const std::vector<s
 			const s32 NextNanoDegX = ring[Next][0];
 			const s32 NextNanoDegY = ring[Next][1];
 
+			glm::vec2 v0((f32)(PrevNanoDegX - CurrentNanoDegX), (f32)(PrevNanoDegY - CurrentNanoDegY));
+			glm::vec2 v1((f32)(NextNanoDegX - CurrentNanoDegX),	(f32)(NextNanoDegY - CurrentNanoDegY));
+
+			v0 = glm::normalize(v0);
+			v1 = glm::normalize(v1);
+
+			f32 cosAngle = glm::abs(glm::dot(v0, v1));
+			cosAngle = glm::clamp(cosAngle, -1.0f, 1.0f);
+
+			f32 CreaseAngleDeg = 30.0f;
+			f32 CosThreshold = glm::cos(glm::radians(CreaseAngleDeg));
+
+			const u32 a = BaseWallVertex;										// current top 0
+			const u32 b = BaseWallVertex + 1;									// current bottom 1
+			const u32 c = Next == 0 ? FirstWallVertex : BaseWallVertex + 2;		// next top 3
+			const u32 d = Next == 0 ? FirstWallVertex + 1 : BaseWallVertex + 3;	// next bottom 2
+
+			bool smoothCorner = cosAngle > CosThreshold;
+			smoothCorner = false;
+			if (smoothCorner)
 			{
-				//const glm::vec3 n1 = WallNormal(PrevNanoDegX, PrevNanoDegY, CurrentNanoDegX, CurrentNanoDegY);
-				//const glm::vec3 n2 = WallNormal(CurrentNanoDegX, CurrentNanoDegY, NextNanoDegX, NextNanoDegY);
-				//const glm::vec3 nAv = glm::normalize(n1 + n2);
+				const glm::vec3 n1 = WallNormal(PrevNanoDegX, PrevNanoDegY, CurrentNanoDegX, CurrentNanoDegY);
+				const glm::vec3 n2 = WallNormal(CurrentNanoDegX, CurrentNanoDegY, NextNanoDegX, NextNanoDegY);
+				const glm::vec3 nAv = glm::normalize(n1 + n2);
 
-				//Mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), MinHeight, VertexColor, nAv });
-				//Mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), Height, VertexColor, nAv });
-
-				//const u32 a = BaseVertex + 2 * i;      // current bottom
-				//const u32 b = BaseVertex + 2 * i + 1;  // current top
-				//const u32 c = BaseVertex + 2 * Next;    // next bottom
-				//const u32 d = BaseVertex + 2 * Next + 1; // next top
-				//// Quad (current top, current bottom, next bottom, next top) -> two triangles
-				//Mesh.Indices.push_back(c);
-				//Mesh.Indices.push_back(d);
-				//Mesh.Indices.push_back(b);
-				//Mesh.Indices.push_back(b);
-				//Mesh.Indices.push_back(a);
-				//Mesh.Indices.push_back(c);
+				Mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), Height, VertexColor, nAv });
+				Mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), MinHeight, VertexColor, nAv });
 			}
-
+			else
 			{
-				glm::vec3 Normal = WallNormal(CurrentNanoDegX, CurrentNanoDegY, NextNanoDegX, NextNanoDegY);
+				const glm::vec3 Normal = WallNormal(CurrentNanoDegX, CurrentNanoDegY, NextNanoDegX, NextNanoDegY);
 
 				Mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), Height, VertexColor, Normal });
 				Mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), MinHeight, VertexColor, Normal });
-				Mesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), MinHeight, VertexColor, Normal });
 				Mesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), Height, VertexColor, Normal });
-
-				const u32 q = BaseVertex + 4 * i;
-				Mesh.Indices.push_back(q + 2);
-				Mesh.Indices.push_back(q + 3);
-				Mesh.Indices.push_back(q + 0);
-				Mesh.Indices.push_back(q + 0);
-				Mesh.Indices.push_back(q + 1);
-				Mesh.Indices.push_back(q + 2);
+				Mesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), MinHeight, VertexColor, Normal });
 			}
+
+			Mesh.Indices.push_back(d);
+			Mesh.Indices.push_back(c);
+			Mesh.Indices.push_back(a);
+			Mesh.Indices.push_back(a);
+			Mesh.Indices.push_back(b);
+			Mesh.Indices.push_back(d);
 		}
 	}
 }
