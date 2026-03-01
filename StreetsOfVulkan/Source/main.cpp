@@ -80,6 +80,9 @@ u32 main()
 		center_nanodeg_x = (box.bottom_left().x() + box.top_right().x()) / 2;
 		center_nanodeg_y = (box.bottom_left().y() + box.top_right().y()) / 2;
 
+		//center_nanodeg_x = 0;
+		//center_nanodeg_y = 0;
+
 		lat_rad = (center_nanodeg_y / 1e7) * DEG_TO_RAD;
 
 		meters_per_nanodeg_lat = R * DEG_TO_RAD / 1e7;
@@ -99,6 +102,24 @@ u32 main()
 
 	osmium::apply(reader, location_handler, building_handler);
 	reader.close();
+
+	//WayGeometry Way;
+	//Way.IsClockwise = false;
+	//Way.Ring.push_back({ -1000, -1000 });
+	//Way.Ring.push_back({ 0, -1000 }); //
+	//Way.Ring.push_back({ 1000, -1000 });
+	//Way.Ring.push_back({ 1000, 1000 });
+	//Way.Ring.push_back({ -1000, 1000 });
+	//Way.Ring.push_back({ -1000, -1000 });
+
+	//BuildingWay BWay;
+	//BWay.Height = 50;
+	//BWay.IsOutline = false;
+	//BWay.Material = BuildingMaterial::Brick;
+	//BWay.MinHeight = 0;
+	//BWay.Way = Way;
+
+	//building_handler.BuildingWays[osmium::object_id_type{}] = BWay;
 
 	building_handler.ConstructObjects();
 

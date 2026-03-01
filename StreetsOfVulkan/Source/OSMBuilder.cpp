@@ -1,5 +1,117 @@
 #include "OSMBuilder.h"
 
+#include <vector>
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <algorithm>
+
+using Point2i = std::array<s32, 2>;
+
+static double PerpendicularDistanceSq(
+	const Point2i& p,
+	const Point2i& a,
+	const Point2i& b)
+{
+	const double ax = a[0];
+	const double ay = a[1];
+	const double bx = b[0];
+	const double by = b[1];
+	const double px = p[0];
+	const double py = p[1];
+
+	const double abx = bx - ax;
+	const double aby = by - ay;
+	const double apx = px - ax;
+	const double apy = py - ay;
+
+	const double ab_len_sq = abx * abx + aby * aby;
+
+	if (ab_len_sq == 0.0) {
+		const double dx = px - ax;
+		const double dy = py - ay;
+		return dx * dx + dy * dy;
+	}
+
+	double t = (apx * abx + apy * aby) / ab_len_sq;
+	t = std::clamp(t, 0.0, 1.0);
+
+	const double cx = ax + t * abx;
+	const double cy = ay + t * aby;
+
+	const double dx = px - cx;
+	const double dy = py - cy;
+
+	return dx * dx + dy * dy;
+}
+
+static void DouglasPeuckerRecursive(
+	const std::vector<Point2i>& input,
+	size_t first,
+	size_t last,
+	double epsilon_sq,
+	std::vector<bool>& keep)
+{
+	if (last <= first + 1)
+		return;
+
+	double max_dist_sq = 0.0;
+	size_t index = first;
+
+	for (size_t i = first + 1; i < last; ++i) {
+		double d = PerpendicularDistanceSq(
+			input[i], input[first], input[last]);
+
+		if (d > max_dist_sq) {
+			max_dist_sq = d;
+			index = i;
+		}
+	}
+
+	if (max_dist_sq > epsilon_sq) {
+		keep[index] = true;
+		DouglasPeuckerRecursive(input, first, index, epsilon_sq, keep);
+		DouglasPeuckerRecursive(input, index, last, epsilon_sq, keep);
+	}
+}
+
+void SimplifyDouglasPeucker( std::vector<Point2i>& points, double epsilon)
+{
+	if (points.size() < 3)
+		return;
+
+	const double epsilon_sq = epsilon * epsilon;
+
+	std::vector<bool> keep(points.size(), false);
+	keep.front() = true;
+	keep.back() = true;
+
+	DouglasPeuckerRecursive(
+		points, 0, points.size() - 1, epsilon_sq, keep);
+
+	std::vector<Point2i> result;
+	result.reserve(points.size());
+
+	for (size_t i = 0; i < points.size(); ++i) {
+		if (keep[i])
+			result.push_back(points[i]);
+	}
+
+	points.swap(result);
+}
+
+bool IsCollinear(
+	const Point2i& a,
+	const Point2i& b,
+	const Point2i& c)
+{
+	const s32 abx = b[0] - a[0];
+	const s32 aby = b[1] - a[1];
+	const s32 bcx = c[0] - b[0];
+	const s32 bcy = c[1] - b[1];
+	return (int64_t)abx * bcy - (int64_t)aby * bcx == 0;
+}
+
 StreetsRender_Material BuildingMaterials[(u32)BuildingMaterial::MAX] =
 {
 	{ glm::vec3(0.0f, 0.0f, 0.0f),  0.0f, 0.0f }, // Empty
@@ -149,6 +261,7 @@ void BuildingHandler::AddBuildingPolygonGeometry(Mesh& Mesh, const std::vector<s
 		if (N < 3) continue;
 
 		const u32 FirstWallVertex = (u32)Mesh.vertices.size();
+		bool WasSmooth = false;
 
 		for (u32 i = 0; i < N; ++i)
 		{
@@ -157,8 +270,6 @@ void BuildingHandler::AddBuildingPolygonGeometry(Mesh& Mesh, const std::vector<s
 				(f32)(rand() % 256) / 255.0f,
 				(f32)(rand() % 256) / 255.0f
 			);
-
-			const u32 BaseWallVertex = (u32)Mesh.vertices.size();
 
 			const u32 Prev = (i + N - 1) % N;
 			const u32 Next = (i + 1) % N;
@@ -184,24 +295,54 @@ void BuildingHandler::AddBuildingPolygonGeometry(Mesh& Mesh, const std::vector<s
 			f32 CreaseAngleDeg = 30.0f;
 			f32 CosThreshold = glm::cos(glm::radians(CreaseAngleDeg));
 
-			const u32 a = BaseWallVertex;										// current top 0
-			const u32 b = BaseWallVertex + 1;									// current bottom 1
-			const u32 c = Next == 0 ? FirstWallVertex : BaseWallVertex + 2;		// next top 3
-			const u32 d = Next == 0 ? FirstWallVertex + 1 : BaseWallVertex + 3;	// next bottom 2
 
-			bool smoothCorner = cosAngle > CosThreshold;
-			smoothCorner = false;
-			if (smoothCorner)
+
+			bool SmoothCorner = cosAngle > CosThreshold;
+			if (SmoothCorner)
 			{
+				if (WasSmooth)
+				{
+					Mesh.vertices.pop_back();
+					Mesh.vertices.pop_back();
+				}
+
 				const glm::vec3 n1 = WallNormal(PrevNanoDegX, PrevNanoDegY, CurrentNanoDegX, CurrentNanoDegY);
 				const glm::vec3 n2 = WallNormal(CurrentNanoDegX, CurrentNanoDegY, NextNanoDegX, NextNanoDegY);
 				const glm::vec3 nAv = glm::normalize(n1 + n2);
 
+				const u32 BaseWallVertex = (u32)Mesh.vertices.size();
+				const u32 a = BaseWallVertex;										// current top 0
+				const u32 b = BaseWallVertex + 1;									// current bottom 1
+				const u32 c = Next == 0 ? FirstWallVertex : BaseWallVertex + 2;		// next top 3
+				const u32 d = Next == 0 ? FirstWallVertex + 1 : BaseWallVertex + 3;	// next bottom 2
+
+				Mesh.Indices.push_back(d);
+				Mesh.Indices.push_back(c);
+				Mesh.Indices.push_back(a);
+				Mesh.Indices.push_back(a);
+				Mesh.Indices.push_back(b);
+				Mesh.Indices.push_back(d);
+
 				Mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), Height, VertexColor, nAv });
 				Mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), MinHeight, VertexColor, nAv });
+				Mesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), Height, VertexColor, n2 });
+				Mesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), MinHeight, VertexColor, n2 });
 			}
 			else
 			{
+				const u32 BaseWallVertex = (u32)Mesh.vertices.size();
+				const u32 a = BaseWallVertex;										// current top 0
+				const u32 b = BaseWallVertex + 1;									// current bottom 1
+				const u32 c = Next == 0 ? FirstWallVertex : BaseWallVertex + 2;		// next top 3
+				const u32 d = Next == 0 ? FirstWallVertex + 1 : BaseWallVertex + 3;	// next bottom 2
+
+				Mesh.Indices.push_back(d);
+				Mesh.Indices.push_back(c);
+				Mesh.Indices.push_back(a);
+				Mesh.Indices.push_back(a);
+				Mesh.Indices.push_back(b);
+				Mesh.Indices.push_back(d);
+
 				const glm::vec3 Normal = WallNormal(CurrentNanoDegX, CurrentNanoDegY, NextNanoDegX, NextNanoDegY);
 
 				Mesh.vertices.push_back({ glm::ivec2(CurrentNanoDegX, CurrentNanoDegY), Height, VertexColor, Normal });
@@ -210,12 +351,7 @@ void BuildingHandler::AddBuildingPolygonGeometry(Mesh& Mesh, const std::vector<s
 				Mesh.vertices.push_back({ glm::ivec2(NextNanoDegX, NextNanoDegY), MinHeight, VertexColor, Normal });
 			}
 
-			Mesh.Indices.push_back(d);
-			Mesh.Indices.push_back(c);
-			Mesh.Indices.push_back(a);
-			Mesh.Indices.push_back(a);
-			Mesh.Indices.push_back(b);
-			Mesh.Indices.push_back(d);
+			WasSmooth = SmoothCorner;
 		}
 	}
 }
@@ -344,12 +480,24 @@ void BuildingHandler::way(const osmium::Way& Way)
 		return;
 	}
 
-	RemoveColinearPoints(Ring);
+	//Ring = simplify_douglas_peucker(Ring, 10, Way.is_closed());
+
+	//RemoveColinearPoints(Ring);
 
 	const bool IsClockwise = (Area < 0);
 
 	if (Way.tags().has_key("building") || Way.tags().has_key("building:part"))
 	{
+		if (Way.is_closed())
+		{
+			Ring.pop_back();
+		}
+
+		SimplifyDouglasPeucker(Ring, 10);
+
+		if (Way.is_closed())
+			Ring.push_back(Ring.front());
+
 		f32 Height = 3.0f;
 		f32 MinHeight = 0.0f;
 		BuildingMaterial Material = (BuildingMaterial)(rand() % (u32)BuildingMaterial::MAX);
