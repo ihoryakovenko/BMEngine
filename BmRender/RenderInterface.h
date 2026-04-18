@@ -5,6 +5,7 @@
 struct GLFWwindow;
 
 inline constexpr u32 MAX_DRAW_FRAMES = 3;
+inline constexpr u32 MAX_DESCRIPTOR_SET_LAYOUT_BUINDINGS = 3;
 
 typedef struct BmRender_Instance_T* BmRender_Instance;
 typedef struct BmRender_PhysicalDevice_T* BmRender_PhysicalDevice;
@@ -753,7 +754,7 @@ struct BmRender_DescriptorSetLayoutBindingData
 
 struct BmRender_DescriptorSetLayoutData
 {
-	BmRender_DescriptorSetLayoutBindingData* LayoutBindings;
+	BmRender_DescriptorSetLayoutBindingData LayoutBindings[MAX_DESCRIPTOR_SET_LAYOUT_BUINDINGS];
 	u32 BindingsCount;
 };
 

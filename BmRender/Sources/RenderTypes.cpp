@@ -8,11 +8,6 @@
 #include "VulkanCoreContext.h"
 #include "RenderHelper.h"
 
-#include <SharedLib.h>
-
-#define FORGE_MEMORY_DEBUG
-#include <forge_memory_debugger.h>
-
 static void* VKAPI_CALL VulkanAllocationCallback(
 	void* UserData,
 	size_t Size,
@@ -136,11 +131,11 @@ BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout
 
 BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutBinding* Bindings, u32 BindingsCount)
 {
+	assert(BindingsCount <= MAX_DESCRIPTOR_SET_LAYOUT_BUINDINGS);
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 
 	BmRender_DescriptorSetLayoutData Layout = { };
 	Layout.BindingsCount = BindingsCount;
-	Layout.LayoutBindings = (BmRender_DescriptorSetLayoutBindingData*)malloc(sizeof(BmRender_DescriptorSetLayoutBindingData) * BindingsCount);
 
 	VkDescriptorSetLayoutBinding* NewLayoutBindings = (VkDescriptorSetLayoutBinding*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkDescriptorSetLayoutBinding) * BindingsCount);
 	for (u32 i = 0; i < BindingsCount; ++i)
@@ -936,7 +931,6 @@ void BmRender_DestroyDescriptorSetLayout(BmRender_DescriptorSetLayout Handle)
 
 	BmRender_DescriptorSetLayoutData Data;
 	BmRender_GetDescriptorSetLayoutData(Handle, &Data);
-	free(Data.LayoutBindings);
 
 	vkDestroyDescriptorSetLayout(Device, (VkDescriptorSetLayout)Handle, GetVulkanAllocator());
 	DestroyDescriptorSetLayoutHandle(Handle);	

@@ -10,9 +10,6 @@
 #include "RenderTypes.h"
 #include "RenderHelper.h"
 
-#define FORGE_MEMORY_DEBUG
-#include <forge_memory_debugger.h>
-
 VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface, const VkSurfaceFormatKHR* AvailableFormats, u32 Count)
 {
 	VkSurfaceFormatKHR SurfaceFormat = { VK_FORMAT_UNDEFINED, static_cast<VkColorSpaceKHR>(0) };

@@ -9,9 +9,6 @@
 #include "RenderTypes.h"
 #include "Handles.h"
 
-#define FORGE_MEMORY_DEBUG
-#include <forge_memory_debugger.h>
-
 static VkDevice CreateLogicalDevice(VkPhysicalDevice PhDevice, PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
 	u32 DeviceExtensionsSize)
 {

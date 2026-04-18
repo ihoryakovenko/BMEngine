@@ -10,7 +10,6 @@
 #include "Util/EngineTypes.h"
 #include "Util/Math.h"
 
-#define FORGE_MEMORY_DEBUG
 #include <forge_memory_debugger.h>
 
 struct Memory_LinearAllocator;

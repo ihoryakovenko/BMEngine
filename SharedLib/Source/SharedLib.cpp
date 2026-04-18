@@ -3,7 +3,6 @@
 #include <cstring>
 #include <cassert>
 
-#define FORGE_MEMORY_DEBUG
 #include <forge_memory_debugger.h>
 
 // Memory_PoolAllocator

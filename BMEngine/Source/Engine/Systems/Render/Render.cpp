@@ -261,7 +261,6 @@ namespace Render
 		// Multisample state
 		PipelineDesc.MultisampleState = {};
 		PipelineDesc.MultisampleState.SampleShadingEnable = false;
-		PipelineDesc.MultisampleState.rasterizationSamples = BmRender_SampleCount::Count1;
 
 		// Input assembly state
 		PipelineDesc.InputAssemblyState = {};
@@ -654,7 +653,6 @@ namespace Render
 		// Multisample state
 		PipelineDesc.MultisampleState = {};
 		PipelineDesc.MultisampleState.SampleShadingEnable = false;
-		PipelineDesc.MultisampleState.rasterizationSamples = BmRender_SampleCount::Count1;
 
 		// Input assembly state
 		PipelineDesc.InputAssemblyState = {};
@@ -920,7 +918,6 @@ namespace Render
 		// Multisample state
 		PipelineDesc.MultisampleState = {};
 		PipelineDesc.MultisampleState.SampleShadingEnable = false;
-		PipelineDesc.MultisampleState.rasterizationSamples = BmRender_SampleCount::Count1;
 
 		// Input assembly state
 		PipelineDesc.InputAssemblyState = {};

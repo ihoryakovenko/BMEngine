@@ -3,8 +3,6 @@
 #include <atomic>
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
-FORGE_MEMORY_DEBUG
-#include <forge_memory_debugger.h>
 #include "Util/Util.h"
 #include "Util/Math.h"
 #include "RenderInterface.h"

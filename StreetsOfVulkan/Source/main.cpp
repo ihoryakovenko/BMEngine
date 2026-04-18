@@ -27,6 +27,8 @@
 #include <algorithm>
 #include <glm/glm.hpp>
 
+#include <forge_memory_debugger.h>
+
 #include "OSMBuilder.h"
 
 using index_type = osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, osmium::Location>;
@@ -47,7 +49,7 @@ f64 meters_per_nanodeg_lon;
 // Tile info
 
 
-
+static std::recursive_mutex MemoryDebugMutex;
 
 
 struct FlyCamera
@@ -64,8 +66,22 @@ struct FlyCamera
 	f32 FarPlane;
 };
 
+static int Lock(std::mutex* Mutex)
+{
+	Mutex->lock();
+	return 0;
+}
+
+static int Unlock(std::mutex* Mutex)
+{
+	Mutex->unlock();
+	return 0;
+}
+
 u32 main()
 {
+	f_debug_mem_thread_safe_init((int(*)(void*))Lock, (int(*)(void*))Unlock, &MemoryDebugMutex);
+
 	srand((unsigned)time(nullptr));
 
 	const osmium::osm_entity_bits::type ReadTypes = osmium::osm_entity_bits::node | osmium::osm_entity_bits::way | osmium::osm_entity_bits::relation;
@@ -248,6 +264,11 @@ u32 main()
 	}
 
 	StreetsRender_DeInit();
+
+	f_debug_mem_print(0);
+	f_debug_mem_check_bounds();
+	f_debug_mem_check_stack_reference();
+	f_debug_mem_check_heap_reference(0);
 
 	return 0;
 }

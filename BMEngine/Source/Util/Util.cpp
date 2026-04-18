@@ -7,7 +7,6 @@
 #include "EngineTypes.h"
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
-FORGE_MEMORY_DEBUG
 #include <forge_memory_debugger.h>
 
 #include "Engine/Systems/Render/Render.h"

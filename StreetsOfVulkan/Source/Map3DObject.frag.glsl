@@ -73,7 +73,7 @@ void main()
     vec3 L = normalize(vec3(0.5, 1.0, 0.3));
     vec3 H = normalize(V + L);
 
-    vec3 lightColor = vec3(5.0); // bright for testing
+    vec3 lightColor = vec3(1.0); // bright for testing
 
     float NoL = max(dot(N, L), 0.0);
     float NoV = max(dot(N, V), 0.001); // NEVER allow 0

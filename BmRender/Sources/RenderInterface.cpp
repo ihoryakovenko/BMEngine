@@ -8,9 +8,6 @@
 
 #include "VulkanCoreContext.h"
 
-#define FORGE_MEMORY_DEBUG
-#include <forge_memory_debugger.h>
-
 void BmRender_Init(GLFWwindow* WindowHandler)
 {
 	InitializeFrameMemory();

@@ -2,9 +2,6 @@
 
 #include <SharedLib.h>
 
-#define FORGE_MEMORY_DEBUG
-#include <forge_memory_debugger.h>
-
 struct StoragePair
 {
 	Memory_PoolAllocator Allocator;

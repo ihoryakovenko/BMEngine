@@ -8,9 +8,6 @@
 #include "VulkanHelper.h"
 #include "VulkanCoreContext.h"
 
-#define FORGE_MEMORY_DEBUG
-#include <forge_memory_debugger.h>
-
 BmRender_FenceStatus BmRender_GetFenceStatus(BmRender_Fence Handle)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
