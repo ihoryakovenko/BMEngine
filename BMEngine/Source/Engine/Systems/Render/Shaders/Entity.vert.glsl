@@ -18,17 +18,14 @@ layout(set = 0, binding = 0) uniform UboViewProjection
 
 layout(location = 0) out vec2 FragmentTexture;
 layout(location = 1) out vec3 FragmentNormal;
-layout(location = 2) out vec4 WorldFragPos;
+layout(location = 2) out vec3 WorldFragPos;
 layout(location = 3) out flat uint FragmentMaterialIndex;
 
 void main()
 {
-	int idx = int(Constants.FrameIndex);
-	int prev = (idx + 3 - 1) % 3;
-
 	FragmentTexture = TextureCoords;
-	WorldFragPos = ModelMatrix * vec4(Position, 1.0);
-	FragmentNormal = normalize(mat3(transpose(inverse(ViewProjection.View * ModelMatrix))) * Normal);
+	WorldFragPos = vec3(ModelMatrix * vec4(Position, 1.0));
+	FragmentNormal = normalize(mat3(transpose(inverse(ModelMatrix))) * Normal);
 	FragmentMaterialIndex = MaterialIndex;
 
 	gl_Position = ViewProjection.Projection * ViewProjection.View * ModelMatrix * vec4(Position, 1.0);

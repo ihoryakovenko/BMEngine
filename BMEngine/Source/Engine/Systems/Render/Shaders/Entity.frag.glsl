@@ -50,7 +50,7 @@ struct Material {
 
 layout(location = 0) in vec2 FragmentTexture;
 layout(location = 1) in vec3 FragmentNormal;
-layout(location = 2) in vec4 WorldFragPos;
+layout(location = 2) in vec3 WorldFragPos;
 layout(location = 3) in flat uint FragmentMaterialIndex;
 
 layout(push_constant) uniform PushConstants {
@@ -83,25 +83,73 @@ layout(set = 4, binding = 0) uniform sampler2DArray ShadowMaps;
 
 layout(location = 0) out vec4 OutColor;
 
-vec3 Diffuse(vec3 LightDirection, vec3 Color, vec3 Texture)
+
+const float PI = 3.14159265359;
+
+float DistributionGGX(vec3 N, vec3 H, float roughness)
 {
-	float DiffuseImpact = max(dot(FragmentNormal, LightDirection), 0.0);
-	return Color * DiffuseImpact * Texture;
+	float a      = roughness * roughness;
+	float a2     = a * a;
+	float NdotH  = max(dot(N, H), 0.0);
+	float NdotH2 = NdotH * NdotH;
+
+	float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+	denom = PI * denom * denom;
+
+	return a2 / max(denom, 0.000001);
 }
 
-vec3 Specular(vec3 FragmentPosition, vec3 LightDirection, vec3 Color, vec3 Texture, float Shininess)
+float GeometrySchlickGGX(float NdotV, float roughness)
 {
-	vec3 ViewDirection = normalize(-FragmentPosition);
-	vec3 HalfwayDirection = normalize(LightDirection + ViewDirection);
+	float r = roughness + 1.0;
+	float k = (r * r) / 8.0;
 
-	float SpecularImpact = pow(max(dot(FragmentNormal, HalfwayDirection), 0.0), Shininess);
-	return Color * SpecularImpact * Texture; 
+	float denom = NdotV * (1.0 - k) + k;
+	return NdotV / max(denom, 0.000001);
 }
 
-float LightDistanceAttenuation(vec3 FragmentPosition, vec3 LightPosition, float Constant, float Linear, float Quadratic)
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 {
-	float Distance = length(LightPosition - FragmentPosition);
-	return 1.0 / (Constant + Linear * Distance + Quadratic * (Distance * Distance)); 
+	float NdotV = max(dot(N, V), 0.0);
+	float NdotL = max(dot(N, L), 0.0);
+
+	float ggx1 = GeometrySchlickGGX(NdotV, roughness);
+	float ggx2 = GeometrySchlickGGX(NdotL, roughness);
+
+	return ggx1 * ggx2;
+}
+
+vec3 FresnelSchlick(float cosTheta, vec3 F0)
+{
+	return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
+}
+
+vec3 CookTorranceBRDF(vec3 N, vec3 V, vec3 L, vec3 albedo, float metallic, float roughness)
+{
+	vec3 H = normalize(V + L);
+
+	float NdotL = max(dot(N, L), 0.0);
+	float NdotV = max(dot(N, V), 0.0);
+	float HdotV = max(dot(H, V), 0.0);
+
+	vec3 F0 = mix(vec3(0.04), albedo, metallic);
+
+	float D = DistributionGGX(N, H, roughness);
+	float G = GeometrySmith(N, V, L, roughness);
+	vec3  F = FresnelSchlick(HdotV, F0);
+
+	vec3 numerator = D * G * F;
+	float denominator = 4.0 * NdotV * NdotL + 0.0001;
+
+	vec3 specular = numerator / denominator;
+
+	vec3 kS = F;
+	vec3 kD = vec3(1.0) - kS;
+	kD *= (1.0 - metallic);
+
+	vec3 diffuse = kD * albedo / PI;
+	
+	return (diffuse + specular) * NdotL;
 }
 
 float LinearizeDepth(float depth, vec2 Planes)
@@ -112,7 +160,7 @@ float LinearizeDepth(float depth, vec2 Planes)
 
 float ApplyShadow(mat4 LightSpaceMatrix, float ShadowMapLayer, bool Linearize, vec2 Planes)
 {
-	vec4 FragPosLightSpace = LightSpaceMatrix * WorldFragPos;
+	vec4 FragPosLightSpace = LightSpaceMatrix * vec4(WorldFragPos, 1.0);
 	vec3 projCoords = FragPosLightSpace.xyz / FragPosLightSpace.w;
 	if (projCoords.z > 1.0f)
 	{
@@ -141,77 +189,75 @@ float ApplyShadow(mat4 LightSpaceMatrix, float ShadowMapLayer, bool Linearize, v
 	return shadow /= 9.0;
 }
 
-vec3 CastDirectionLight(mat4 View, DirectionLight directionLight, vec3 FragmentPosition, vec3 DiffuseTexture, vec3 SpecularTexture, float Shininess)
+vec3 CastDirectionLight(DirectionLight directionLight, vec3 albedo, vec3 V, vec3 N)
 {
-	vec3 LightDirection = normalize(mat3(View) * (-directionLight.Direction));
+	vec3 L = normalize(-directionLight.Direction);
+	vec3 radiance = directionLight.Diffuse * 1.0;
 
-	vec3 AmbientColor = directionLight.Ambient * DiffuseTexture;
-	vec3 DiffuseColor = Diffuse(LightDirection, directionLight.Diffuse, DiffuseTexture);
-	vec3 SpecularColor = Specular(FragmentPosition, LightDirection, directionLight.Specular, SpecularTexture, Shininess);
+	vec3 brdf = CookTorranceBRDF(N, V, L, albedo, 0.5, 0.5);
+	float Shadow = ApplyShadow(directionLight.LightSpaceMatrix, DIRECTIONAL_LIGHT_SHADOW_TEXTURE_INDEX, false, vec2(1.0));
 
-	float Shadow = ApplyShadow(directionLight.LightSpaceMatrix,
-	DIRECTIONAL_LIGHT_SHADOW_TEXTURE_INDEX, false, vec2(1.0));
-
-	return AmbientColor + (1.0 - Shadow) * (DiffuseColor + SpecularColor);
+	return (1.0 - Shadow) * (brdf * radiance);
 }
 
-vec3 CastPointLight(mat4 View, PointLight pointlight, vec3 FragmentPosition, vec3 DiffuseTexture, vec3 SpecularTexture, float Shininess)
+vec3 CastPointLight(PointLight pointlight, vec3 FragmentPosition, vec3 albedo, vec3 V, vec3 N)
 {
-	vec3 LightPosition = vec3(View * pointlight.Position);
-	vec3 LightDirection = normalize(LightPosition - FragmentPosition);
+	vec3 LightPosition = vec3(pointlight.Position);
 
-	vec3 AmbientColor = pointlight.Ambient * DiffuseTexture;
-	vec3 DiffuseColor = Diffuse(LightDirection, pointlight.Diffuse, DiffuseTexture);
-	vec3 SpecularColor = Specular(FragmentPosition, LightDirection, pointlight.Specular, SpecularTexture, Shininess);
+    vec3 Lvec = LightPosition - FragmentPosition;
+    float distance = length(Lvec);
+    vec3 L = Lvec / distance;
 
-	float Attenuation = LightDistanceAttenuation(FragmentPosition, LightPosition, pointlight.Constant, 
-		pointlight.Linear, pointlight.Quadratic);
+	float Intensity = 20.0;
+    vec3 radiance = pointlight.Diffuse * Intensity / (distance * distance);
 
-	return AmbientColor * Attenuation + DiffuseColor * Attenuation + SpecularColor * Attenuation;
+    vec3 brdf = CookTorranceBRDF(N, V, L, albedo, 0.5, 0.5);
+    return brdf * radiance;
 }
 
-vec3 CastSpotLigh(mat4 View, SpotLight spotlight, vec3 FragmentPosition, vec3 DiffuseTexture, vec3 SpecularTexture, float Shininess)
+vec3 CastSpotLigh(SpotLight spotlight,
+    vec3 FragmentPosition,
+    vec3 albedo,
+    vec3 V,
+    vec3 N)
 {
-	vec3 ViewLightPosition = vec3(View * vec4(spotlight.Position, 1.0));
-	vec3 ViewLightDirection = normalize(mat3(View) * (-spotlight.Direction));
+    vec3 LightPosition = spotlight.Position;
+    vec3 LightDir = normalize(-spotlight.Direction);
 
-	vec3 AmbientColor = spotlight.Ambient * DiffuseTexture;
-	vec3 DiffuseColor = Diffuse(ViewLightDirection, spotlight.Diffuse, DiffuseTexture);
-	vec3 SpecularColor = Specular(FragmentPosition, ViewLightDirection, spotlight.Specular, SpecularTexture, Shininess);
+    vec3 Lvec = LightPosition - FragmentPosition;
+    float distance = length(Lvec);
+    vec3 L = Lvec / distance;
 
-	// Soft edges
-	vec3 LightDirection = normalize(ViewLightPosition - FragmentPosition);
-	float Theta = dot(LightDirection, ViewLightDirection);
-	float Intensity = smoothstep(0.0, 1.0, (Theta - spotlight.OuterCutOff) /
-		(spotlight.CutOff - spotlight.OuterCutOff));
+    float attenuation = 1.0 / (distance * distance);
 
-	float Attenuation = LightDistanceAttenuation(FragmentPosition, ViewLightPosition, spotlight.Constant, 
-	spotlight.Linear, spotlight.Quadratic);
+    float theta = dot(L, LightDir);
+
+    float cone = smoothstep(spotlight.OuterCutOff, spotlight.CutOff, theta);
+
+
+	float Intensity = 20.0;
+    vec3 radiance = spotlight.Diffuse * Intensity * attenuation * cone;
+
+    vec3 brdf = CookTorranceBRDF(N, V, L, albedo, 0.5, 0.5);
 
 	float Shadow = ApplyShadow(spotlight.LightSpaceMatrix,
 	SPOT_LIGHT_SHADOW_TEXTURE_INDEX, true, spotlight.Planes);
 
-	AmbientColor *= Attenuation * Intensity;
-	DiffuseColor *= Attenuation * Intensity;
-	SpecularColor *= Attenuation * Intensity;
-
-	//return AmbientColor + (1.0 - Shadow) * (DiffuseColor + SpecularColor);
-	return AmbientColor + (DiffuseColor + SpecularColor);
+    //return (1.0 - Shadow) * brdf * radiance;
+    return brdf * radiance;
 }
 
 void main()
 {
-	int idx = int(Constants.FrameIndex);
-
-	vec3 FragmentPosition = vec3(ViewProjection.View * WorldFragPos);
-
 	Material Mat = Materials.materials[FragmentMaterialIndex];
-	vec4 DiffuseTexture = texture(DiffuseTexture[nonuniformEXT(Mat.AlbedoTexIndex)], FragmentTexture);
-	vec3 SpecularTexture = vec3(texture(SpecularTexture[nonuniformEXT(Mat.SpecularTexIndex)], FragmentTexture));
+	vec4 albedo = texture(DiffuseTexture[nonuniformEXT(Mat.AlbedoTexIndex)], FragmentTexture);
 
-	vec3 ResultLightColor = vec3(0.0);
-	ResultLightColor += CastDirectionLight(ViewProjection.View, lightCasters.directionLight, FragmentPosition, vec3(DiffuseTexture), SpecularTexture, Mat.Shininess);
-	ResultLightColor += CastPointLight(ViewProjection.View, lightCasters.pointlight, FragmentPosition, vec3(DiffuseTexture), SpecularTexture, Mat.Shininess);
-	ResultLightColor += CastSpotLigh(ViewProjection.View, lightCasters.spotlight, FragmentPosition, vec3(DiffuseTexture), SpecularTexture, Mat.Shininess);
-	OutColor = vec4(ResultLightColor, DiffuseTexture.a);
+	vec3 N = normalize(FragmentNormal);
+	vec3 V = normalize(-WorldFragPos);
+	
+	vec3 Lo = vec3(0.0);
+	Lo += CastDirectionLight(lightCasters.directionLight, albedo.rgb, V, N);
+	Lo += CastPointLight(lightCasters.pointlight, WorldFragPos, albedo.rgb, V, N);
+	Lo += CastSpotLigh(lightCasters.spotlight, WorldFragPos, albedo.rgb, V, N);
+	OutColor = vec4(Lo, albedo.a);
 }

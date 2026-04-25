@@ -18,10 +18,7 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\BMEngine\Source\Util\Util.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\External\mini-yaml\yaml\Yaml.cpp">
+    <ClCompile Include="..\..\BMEngine\Source\Util\Util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
