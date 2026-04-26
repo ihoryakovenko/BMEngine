@@ -53,7 +53,7 @@ echo. >> "%TEMP_META_FILE%"
 
 echo Compiling shaders in "%SHADER_PATH%"...
 
-for %%f in ("%SHADER_PATH%"*.glsl) do (
+for /f "delims=" %%f in ('dir /b "%SHADER_PATH%*.vect.glsl" "%SHADER_PATH%*.frag.glsl" "%SHADER_PATH%*.vert.slang" "%SHADER_PATH%*.frag.slang"') do (
     set "FULLFILE=%%~nxf"
     setlocal enabledelayedexpansion
     set "FILENAME=%%~nf"
@@ -107,7 +107,14 @@ for %%f in ("%SHADER_PATH%"*.glsl) do (
         
         if !NEED_COMPILE!==1 (
             echo Compiling !SHADER_FILE! to !OUTPUT_FILE! ...
-            "%VULKAN_SDK%\Bin\glslangValidator.exe" -V "%SHADER_PATH%!SHADER_FILE!" -o "!OUTPUT_FILE!"
+
+            echo !SHADER_FILE! | findstr /i "\.glsl" >nul
+            if !errorlevel! == 0 (
+                "%VULKAN_SDK%\Bin\glslangValidator.exe" -V "%SHADER_PATH%!SHADER_FILE!" -o "!OUTPUT_FILE!"
+            ) else (
+            "slangc" "%SHADER_PATH%!SHADER_FILE!" -o "!OUTPUT_FILE!"
+            )
+
             if errorlevel 1 (
                 echo Failed to compile !SHADER_FILE!
             ) else (

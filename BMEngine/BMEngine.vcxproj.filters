@@ -55,8 +55,6 @@
     <None Include="Source\Engine\Systems\Render\Shaders\Deferred.frag.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\Deferred.vert.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\Depth.vert.glsl" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Entity.frag.glsl" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Entity.vert.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\QuadBasedSphere.frag.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\QuadBasedSphere.vert.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\SkyBox.frag.glsl" />
@@ -64,5 +62,8 @@
     <None Include="Source\Engine\Systems\Render\Shaders\TerrainGenerator.frag.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\TerrainGenerator.vert.glsl" />
     <None Include="Resources\Scenes\TestScene.yaml" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Entity.frag.slang" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Entity.vert.slang" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Common.slang" />
   </ItemGroup>
 </Project>
