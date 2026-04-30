@@ -6,22 +6,15 @@ static const int SPOT_LIGHT_SHADOW_TEXTURE_INDEX = 1;
 
 struct PointLight
 {
-    float4 Position;
-    float3 Ambient;
-    float Constant;
-    float3 Diffuse;
-    float Linear;
-    float3 Specular;
-    float Quadratic;
+    float3 Position;
+    float3 Color;
 };
 
 struct DirectionLight
 {
     float4x4 LightSpaceMatrix;
     float3 Direction;
-    float3 Ambient;
-    float3 Diffuse;
-    float3 Specular;
+    float3 Color;
 };
 
 struct SpotLight
@@ -31,12 +24,7 @@ struct SpotLight
     float CutOff;
     float3 Direction;
     float OuterCutOff;
-    float3 Ambient;
-    float Constant;
-    float3 Diffuse;
-    float Linear;
-    float3 Specular;
-    float Quadratic;
+    float3 Color;
     float2 Planes;
 };
 
@@ -79,10 +67,7 @@ ConstantBuffer<PushConstants> Constants;
 ConstantBuffer<UboViewProjection> ViewProjection;
 
 [[vk::binding(0,1)]]
-Sampler2D DiffuseTexture[];
-
-[[vk::binding(1,1)]]
-Sampler2D SpecularTexture[];
+Sampler2D AlbedoTexture[];
 
 [[vk::binding(0,2)]]
 ConstantBuffer<LightCastersData> lightCasters;
@@ -210,7 +195,7 @@ float ApplyShadow(float4x4 LightSpaceMatrix, float ShadowMapLayer, bool doLinear
 float3 CastDirectionLight(DirectionLight light, float3 albedo, float3 V, float3 N, float3 worldPos)
 {
     float3 L = normalize(-light.Direction);
-    float3 radiance = light.Diffuse;
+    float3 radiance = light.Color;
 
     float3 brdf = CookTorranceBRDF(N,V,L,albedo,0.5,0.5);
 
@@ -228,7 +213,7 @@ float3 CastPointLight(PointLight light, float3 fragPos, float3 albedo, float3 V,
     float3 L = Lvec / distance;
 
     float intensity = 20.0;
-    float3 radiance = light.Diffuse * intensity / (distance * distance);
+    float3 radiance = light.Color * intensity / (distance * distance);
 
     float3 brdf = CookTorranceBRDF(N,V,L,albedo,0.5,0.5);
     return brdf * radiance;
@@ -249,7 +234,7 @@ float3 CastSpotLight(SpotLight light, float3 fragPos, float3 albedo, float3 V, f
     float cone = smoothstep(light.OuterCutOff, light.CutOff, theta);
 
     float intensity = 20.0;
-    float3 radiance = light.Diffuse * intensity * attenuation * cone;
+    float3 radiance = light.Color * intensity * attenuation * cone;
 
     float3 brdf = CookTorranceBRDF(N,V,L,albedo,0.5,0.5);
 
@@ -263,7 +248,7 @@ FragmentOutput main(FragmentInput input)
 
     Material Mat = Materials[input.FragmentMaterialIndex];
 
-    float4 albedo = DiffuseTexture[Mat.AlbedoTexIndex].Sample(input.FragmentTexture);
+    float4 albedo = AlbedoTexture[Mat.AlbedoTexIndex].Sample(input.FragmentTexture);
 
     float3 N = normalize(input.FragmentNormal);
     float3 V = normalize(-input.WorldFragPos);

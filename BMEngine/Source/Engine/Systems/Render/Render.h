@@ -67,50 +67,44 @@ namespace Render
 		BmRender_GPUBufferBinding* EntityLightBufferHandle;
 	};
 
-	struct PointLight
+	struct alignas(16) PointLight
 	{
 		glm::vec4 Position;
-		glm::vec3 Ambient;
-		f32 Constant;
-		glm::vec3 Diffuse;
-		f32 Linear;
-		glm::vec3 Specular;
-		f32 Quadratic;
+
+		glm::vec3 Color;
 	};
 
-	struct DirectionLight
+	struct alignas(16) DirectionLight
 	{
 		glm::mat4 LightSpaceMatrix;
-		alignas(16) glm::vec3 Direction;
-		alignas(16) glm::vec3 Ambient;
-		alignas(16) glm::vec3 Diffuse;
-		alignas(16) glm::vec3 Specular;
+
+		glm::vec3 Direction;
+		f32 pad1;
+
+		glm::vec3 Color;
 	};
 
-	struct SpotLight
+	struct alignas(16) SpotLight
 	{
 		glm::mat4 LightSpaceMatrix;
+
 		glm::vec3 Position;
 		f32 CutOff;
+
 		glm::vec3 Direction;
 		f32 OuterCutOff;
-		glm::vec3 Ambient;
-		f32 Constant;
-		glm::vec3 Diffuse;
-		f32 Linear;
-		glm::vec3 Specular;
-		f32 Quadratic;
-		alignas(16) glm::vec2 Planes;
+
+		glm::vec3 Color;
+		f32 pad1;
+
+		glm::vec2 Planes;
 	};
 
-	struct LightBuffer
+	struct alignas(16) LightBuffer
 	{
 		PointLight PointLight;
 		DirectionLight DirectionLight;
 		SpotLight SpotLight;
-
-		glm::vec4 tmp;
-		glm::vec4 tmp2;
 	};
 
 	struct DrawScene

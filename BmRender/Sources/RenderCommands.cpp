@@ -277,7 +277,17 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 
 		VkAttachment->resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		VkAttachment->resolveImageView = (VkImageView)Attachment.ResolveImageView;
-		VkAttachment->resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+
+		BmRender_ImageViewData ViewData;
+		BmRender_GetImageViewData(Attachment.ImageView, &ViewData);
+
+		BmRender_ImageResource ImageData;
+		BmRender_GetImageData(ViewData.Image, &ImageData);
+
+		if (ImageData.SampleCount > BmRender_SampleCount::Count1)
+		{
+			VkAttachment->resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+		}
 	}
 
 	VkRenderingAttachmentInfo DepthAttachmentInfo = { };

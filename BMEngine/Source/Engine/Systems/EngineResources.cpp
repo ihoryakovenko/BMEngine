@@ -92,16 +92,9 @@ namespace EngineResources
 		DiffuseBinding.DstArrayElement = 0;
 		DiffuseBinding.BindingCount = 1;
 
-		BmRender_DescriptorSetBinding SpecularBinding;
-		SpecularBinding.ImageBinding.Sampler = Samplers["SpecularTexture"];
-		SpecularBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
-		SpecularBinding.ImageBinding.ImageView = DefaultAsset.RenderViewHandle;
-		SpecularBinding.DstArrayElement = 0;
-		SpecularBinding.BindingCount = 1;
+		BmRender_DescriptorSetBinding Bindings[] = { DiffuseBinding };
 
-		BmRender_DescriptorSetBinding Bindings[] = { DiffuseBinding, SpecularBinding };
-
-		BmRender_UpdateDescriptorSet(BindlesTexturesSetHandle, Bindings, 2);
+		BmRender_UpdateDescriptorSet(BindlesTexturesSetHandle, Bindings, 1);
 	}
 
 	void DeInit()
@@ -153,7 +146,6 @@ namespace EngineResources
 				const u32 IndicesCount = Model.IndicesCounts[i];
 
 				BmRender_Image AlbedoTextureHandle = DefaultAsset.RenderImageHandle;
-				BmRender_Image SpecularTextureHandle = DefaultAsset.RenderImageHandle;
 				u32 TextureGPUIndex = 0;
 
 				if (Model.Header.MaterialCount > 0)
@@ -173,7 +165,6 @@ namespace EngineResources
 							it->second.TextureGPUIndex = TextureGPUIndex;
 
 							AlbedoTextureHandle = it->second.RenderImageHandle;
-							SpecularTextureHandle = AlbedoTextureHandle;
 
 							BmRender_DescriptorSetBinding DiffuseBinding;
 							DiffuseBinding.ImageBinding.Sampler = Samplers["DiffuseTexture"];
@@ -182,16 +173,9 @@ namespace EngineResources
 							DiffuseBinding.DstArrayElement = TexturesGPUIndexCounter;
 							DiffuseBinding.BindingCount = 1;
 
-							BmRender_DescriptorSetBinding SpecularBinding;
-							SpecularBinding.ImageBinding.Sampler = Samplers["SpecularTexture"];
-							SpecularBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
-							SpecularBinding.ImageBinding.ImageView = it->second.RenderViewHandle;
-							SpecularBinding.DstArrayElement = TexturesGPUIndexCounter;
-							SpecularBinding.BindingCount = 1;
+							BmRender_DescriptorSetBinding Bindings[] = { DiffuseBinding };
 
-							BmRender_DescriptorSetBinding Bindings[] = { DiffuseBinding, SpecularBinding };
-
-							BmRender_UpdateDescriptorSet(BindlesTexturesSetHandle, Bindings, 2);
+							BmRender_UpdateDescriptorSet(BindlesTexturesSetHandle, Bindings, 1);
 
 							++TexturesGPUIndexCounter;
 						}
@@ -252,7 +236,6 @@ namespace EngineResources
 				Entity.IndicesCount = IndicesCount;
 				Entity.Instances = 1;
 				Entity.ImageDependency.push_back(AlbedoTextureHandle);
-				Entity.ImageDependency.push_back(SpecularTextureHandle);
 				Entity.ResourceDependency.push_back(MaterialHandle);
 
 				std::unique_lock Lock(TmpScene->TempLock);

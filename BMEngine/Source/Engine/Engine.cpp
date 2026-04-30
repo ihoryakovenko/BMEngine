@@ -335,13 +335,17 @@ namespace Engine
 		FrameDataBuffer = BmRender_CreateUniformBuffer(65536, MemoryPropertyFlag::HostCompatible);
 		MaterialBuffer = BmRender_CreateStorageBuffer(MB4, MemoryPropertyFlag::GPULocal);
 
-		VpRegion[0] = { FrameDataBuffer, 0, 128 };
-		VpRegion[1] = { FrameDataBuffer, 128, 128 };
-		VpRegion[2] = { FrameDataBuffer, 128 * 2, 128 };
+		const u32 ViewProjectionBufferSize = sizeof(Render::ViewProjectionBuffer);
 
-		EntityLightRegion[0] = { FrameDataBuffer, 384, 384 };
-		EntityLightRegion[1] = { FrameDataBuffer, 384 + 384, 384 };
-		EntityLightRegion[2] = { FrameDataBuffer, 384 + 384 * 2, 384 };
+		VpRegion[0] = { FrameDataBuffer, 0, ViewProjectionBufferSize };
+		VpRegion[1] = { FrameDataBuffer, ViewProjectionBufferSize, ViewProjectionBufferSize };
+		VpRegion[2] = { FrameDataBuffer, ViewProjectionBufferSize * 2, ViewProjectionBufferSize };
+
+		const u32 LightBufferSize = sizeof(Render::LightBuffer);
+
+		EntityLightRegion[0] = { FrameDataBuffer, ViewProjectionBufferSize * 3, LightBufferSize };
+		EntityLightRegion[1] = { FrameDataBuffer, ViewProjectionBufferSize * 3 + LightBufferSize, LightBufferSize };
+		EntityLightRegion[2] = { FrameDataBuffer, ViewProjectionBufferSize * 3 + LightBufferSize + LightBufferSize, LightBufferSize };
 
 		ParseAndCreateVertices(Util::GetVertices(Root));
 		ParseAndCreateShaders(Util::GetShaders(Root));
@@ -516,25 +520,13 @@ namespace Engine
 		ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 		LightData.PointLight.Position = glm::vec4(0.0f, 0.0f, 2.0f, 1.0f);
-		LightData.PointLight.Ambient = glm::vec3(0.01f, 0.01f, 0.01f);
-		LightData.PointLight.Diffuse = glm::vec3(1.0f, 1.0f, 1.0f);
-		LightData.PointLight.Specular = glm::vec3(1.0f, 1.0f, 1.0f);
-		LightData.PointLight.Constant = 1.0f;
-		LightData.PointLight.Linear = 0.09;
-		LightData.PointLight.Quadratic = 0.032;
+		LightData.PointLight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
 
 		LightData.DirectionLight.Direction = glm::vec3(0.0f, -1.0f, 0.0f);
-		LightData.DirectionLight.Ambient = glm::vec3(0.01f, 0.01f, 0.01f);
-		LightData.DirectionLight.Diffuse = glm::vec3(1.0f, 1.0f, 1.0f);
-		LightData.DirectionLight.Specular = glm::vec3(1.0f, 1.0f, 1.0f);
+		LightData.DirectionLight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
 
 		LightData.SpotLight.Position = glm::vec4(0.0f, 0.0f, 10.0f, 1.0f);
-		LightData.SpotLight.Ambient = glm::vec3(0.01f, 0.01f, 0.01f);
-		LightData.SpotLight.Diffuse = glm::vec3(1.0f, 1.0f, 1.0f);
-		LightData.SpotLight.Specular = glm::vec3(1.0f, 1.0f, 1.0f);
-		LightData.SpotLight.Constant = 1.0f;
-		LightData.SpotLight.Linear = 0.09;
-		LightData.SpotLight.Quadratic = 0.032;
+		LightData.SpotLight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
 		LightData.SpotLight.CutOff = glm::cos(glm::radians(12.5f));
 		LightData.SpotLight.OuterCutOff = glm::cos(glm::radians(17.5f));
 

@@ -64,21 +64,6 @@ samplers:
     anisotropyEnable: true
     maxAnisotropy: 16
 
-  SpecularTexture:
-    magFilter: LINEAR
-    minFilter: LINEAR
-    addressModeU: CLAMP_TO_EDGE
-    addressModeV: CLAMP_TO_EDGE
-    addressModeW: CLAMP_TO_EDGE
-    borderColor: INT_OPAQUE_BLACK
-    unnormalizedCoordinates: false
-    mipmapMode: LINEAR
-    mipLodBias: 0.0
-    minLod: 0.0
-    maxLod: 0.0
-    anisotropyEnable: true
-    maxAnisotropy: 1
-
   ColorAttachment:
     magFilter: LINEAR
     minFilter: LINEAR
@@ -167,9 +152,6 @@ DescriptorSetLayouts:
 
   BindlesTexturesLayout:
     bindings:
-      - type: sampler2DArray
-        updateFrequency: Static
-        stages: FRAGMENT
       - type: sampler2DArray
         updateFrequency: Static
         stages: FRAGMENT
