@@ -42,13 +42,10 @@ namespace Render
 		VkFormat* ColorAttachmentFormats = (VkFormat*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), AttachmentDataPtr->ColorAttachmentCount * sizeof(VkFormat));
 		for (u32 i = 0; i < AttachmentDataPtr->ColorAttachmentCount; ++i)
 		{
-			BmRender_ImageViewData ImageViewData;
-			BmRender_ImageResource ImageResource;
-			if (AttachmentDataPtr->ColorAttachments[i] != nullptr && 
-				BmRender_GetImageViewData(AttachmentDataPtr->ColorAttachments[i], &ImageViewData) &&
-				BmRender_GetImageData(ImageViewData.Image, &ImageResource))
+			const BmRender_Format Format = BmRender_GetOwningImageFormat(AttachmentDataPtr->ColorAttachments[i]);
+			if (Format != BmRender_Format::Undefined)
 			{
-				ColorAttachmentFormats[i] = BmRender_FormatToVk(ImageResource.Format);
+				ColorAttachmentFormats[i] = BmRender_FormatToVk(Format);
 			}
 			else
 			{
@@ -59,24 +56,20 @@ namespace Render
 		VkFormat DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
 		if (AttachmentDataPtr->DepthAttachment != nullptr)
 		{
-			BmRender_ImageViewData ImageViewData;
-			BmRender_ImageResource ImageResource;
-			if (BmRender_GetImageViewData(AttachmentDataPtr->DepthAttachment, &ImageViewData) &&
-				BmRender_GetImageData(ImageViewData.Image, &ImageResource))
+			const BmRender_Format Format = BmRender_GetOwningImageFormat(AttachmentDataPtr->DepthAttachment);
+			if (Format != BmRender_Format::Undefined)
 			{
-				DepthAttachmentFormat = BmRender_FormatToVk(ImageResource.Format);
+				DepthAttachmentFormat = BmRender_FormatToVk(Format);
 			}
 		}
 
 		VkFormat StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 		if (AttachmentDataPtr->StencilAttachment != nullptr)
 		{
-			BmRender_ImageViewData ImageViewData;
-			BmRender_ImageResource ImageResource;
-			if (BmRender_GetImageViewData(AttachmentDataPtr->StencilAttachment, &ImageViewData) &&
-				BmRender_GetImageData(ImageViewData.Image, &ImageResource))
+			const BmRender_Format Format = BmRender_GetOwningImageFormat(AttachmentDataPtr->StencilAttachment);
+			if (Format != BmRender_Format::Undefined)
 			{
-				StencilAttachmentFormat = BmRender_FormatToVk(ImageResource.Format);
+				StencilAttachmentFormat = BmRender_FormatToVk(Format);
 			}
 		}
 

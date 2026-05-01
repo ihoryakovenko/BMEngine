@@ -329,8 +329,8 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 		Image, MemoryPropertyFlag::GPULocal, GetVulkanAllocator());
 
 	Resource.Memory = CreateDeviceMemoryHandle(AllocResult.Memory);
-	Resource.Width = Description->Width;
-	Resource.Height = Description->Height;
+	Resource.Dimensions.Width = Description->Width;
+	Resource.Dimensions.Height = Description->Height;
 	Resource.Size = AllocResult.Size;
 	Resource.SampleCount = Description->SampleCount;
 
@@ -365,6 +365,7 @@ static BmRender_ImageView CreateImageView(BmRender_Image Handle, u32 BaseArrayLa
 
 	BmRender_ImageViewData ImageViewData;
 	ImageViewData.Image = Handle;
+	ImageViewData.Format = Resource.Format;
 
 	return CreateImageViewHandle(View, &ImageViewData);
 }
@@ -1022,4 +1023,70 @@ void BmRender_FreeCommandBuffer(BmRender_CommandBuffer Handle)
 
 	vkFreeCommandBuffers(Device, VulkanCommandPool, 1, &VulkanCommandBuffer);
 	DestroyCommandBufferHandle(Handle);
+}
+
+BmRender_Format BmRender_GetImageFormat(BmRender_Image Handle)
+{
+	BmRender_ImageResource ImageData;
+	if (BmRender_GetImageData(Handle, &ImageData))
+	{
+		return ImageData.Format;
+	}
+
+	return BmRender_Format::Undefined;
+}
+
+u64 BmRender_GetImageSize(BmRender_Image Handle)
+{
+	BmRender_ImageResource ImageData;
+	if (BmRender_GetImageData(Handle, &ImageData))
+	{
+		return ImageData.Size;
+	}
+
+	return 0;
+}
+
+BmRender_Dimensions BmRender_GetImageDimensions(BmRender_Image Handle)
+{
+	BmRender_ImageResource ImageData;
+	if (BmRender_GetImageData(Handle, &ImageData))
+	{
+		return ImageData.Dimensions;
+	}
+
+	return {};
+}
+
+BmRender_Image BmRender_GetOwningImage(BmRender_ImageView Handle)
+{
+	BmRender_ImageViewData ImageViewData;
+	if (BmRender_GetImageViewData(Handle, &ImageViewData))
+	{
+		return ImageViewData.Image;
+	}
+
+	return nullptr;
+}
+
+BmRender_Format BmRender_GetOwningImageFormat(BmRender_ImageView Handle)
+{
+	BmRender_ImageViewData ImageViewData;
+	if (BmRender_GetImageViewData(Handle, &ImageViewData))
+	{
+		return ImageViewData.Format;
+	}
+
+	return BmRender_Format::Undefined;
+}
+
+MemoryPropertyFlag BmRender_GetGpuBufferMemoryPropertyFlag(BmRender_GPUBuffer Handle)
+{
+	BmRender_GPUBufferData Buffer;
+	if (BmRender_GetGPUBufferData(Handle, &Buffer))
+	{
+		return Buffer.PropertyFlag;
+	}
+
+	return MemoryPropertyFlag::None;
 }

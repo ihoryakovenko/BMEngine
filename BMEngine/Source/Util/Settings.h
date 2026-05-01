@@ -9,8 +9,8 @@ struct SkyBoxVertex
 	glm::vec3 Position;
 };
 
-extern BmRender_Extent2D MainScreenExtent;
-extern BmRender_Extent2D DepthViewportExtent;
+extern BmRender_Dimensions MainScreenExtent;
+extern BmRender_Dimensions DepthViewportExtent;
 
 extern BmRender_Format ColorFormat;
 extern BmRender_Format DepthFormat;

@@ -24,10 +24,6 @@ void InitCommandSystem(u32 WorkerCount)
 
 	CommandSystemCommandPool = BmRender_CreateCommandPool(BmRender_QueueType::Graphic);
 
-	BmRender_CommandPoolData PoolData;
-	BmRender_GetCommandPoolData(CommandSystemCommandPool, &PoolData);
-
-
 	for (u32 i = 0; i < WorkerCount; ++i)
 	{
 		CommandWorkerData WorkerData = { };

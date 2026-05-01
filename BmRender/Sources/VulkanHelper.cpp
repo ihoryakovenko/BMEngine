@@ -1462,7 +1462,7 @@ BmRender_Offset2D VkOffset2DToBmRender(VkOffset2D Offset)
 	return BmOffset;
 }
 
-VkExtent2D Extent2DToVk(BmRender_Extent2D Extent)
+VkExtent2D Extent2DToVk(BmRender_Dimensions Extent)
 {
 	VkExtent2D VkExtent;
 	VkExtent.width = Extent.Width;
@@ -1470,9 +1470,9 @@ VkExtent2D Extent2DToVk(BmRender_Extent2D Extent)
 	return VkExtent;
 }
 
-BmRender_Extent2D VkExtent2DToBmRender(VkExtent2D Extent)
+BmRender_Dimensions VkExtent2DToBmRender(VkExtent2D Extent)
 {
-	BmRender_Extent2D BmExtent;
+	BmRender_Dimensions BmExtent;
 	BmExtent.Width = Extent.width;
 	BmExtent.Height = Extent.height;
 	return BmExtent;

@@ -125,8 +125,9 @@ enum class BmRender_DescriptorPoolType : u32
 
 enum class MemoryPropertyFlag : u32
 {
-	GPULocal = 0,
-	HostCompatible = 1,
+	None,
+	GPULocal = 1,
+	HostCompatible = 2,
 };
 
 enum class BmRender_Filter : u32
@@ -450,7 +451,7 @@ struct BmRender_Offset2D
 	s32 Y;
 };
 
-struct BmRender_Extent2D
+struct BmRender_Dimensions
 {
 	u32 Width;
 	u32 Height;
@@ -469,7 +470,7 @@ struct BmRender_Viewport
 struct BmRender_Rect2D
 {
 	BmRender_Offset2D Offset;
-	BmRender_Extent2D Extent;
+	BmRender_Dimensions Extent;
 };
 
 struct BmRender_ClearColorValue
@@ -585,7 +586,7 @@ struct BmRender_RenderingDepthAttachment
 struct BmRender_RenderingInfo
 {
 	BmRender_Offset2D Offset;
-	BmRender_Extent2D Extent;
+	BmRender_Dimensions Extent;
 	const BmRender_RenderingColorAttachment* ColorAttachments;
 	u32 ColorAttachmentCount;
 	const BmRender_RenderingDepthAttachment* DepthAttachment;
@@ -697,7 +698,7 @@ struct BmRender_PipelineDescription
 	BmRender_InputAssemblyState InputAssemblyState;
 	BmRender_ViewportState ViewportState;
 
-	BmRender_Extent2D Extent;
+	BmRender_Dimensions Extent;
 	BmRender_Viewport Viewport;
 	BmRender_Rect2D Scissor;
 };
@@ -747,74 +748,6 @@ struct BmRender_PresentInfo
 	const u32* ImageIndices;
 };
 
-struct BmRender_DescriptorSetLayoutBindingData
-{
-	BmRender_DescriptorType DescriptorType;
-};
-
-struct BmRender_DescriptorSetLayoutData
-{
-	BmRender_DescriptorSetLayoutBindingData LayoutBindings[MAX_DESCRIPTOR_SET_LAYOUT_BUINDINGS];
-	u32 BindingsCount;
-};
-
-struct BmRender_ShaderData
-{
-	BmRender_PipelineShaderStage Stage;
-};
-
-struct BmRender_ImageResource
-{
-	BmRender_DeviceMemory Memory;
-	BmRender_Format Format;
-	u64 Size;
-	BmRender_ImageType Type;
-	u32 Width;
-	u32 Height;
-	BmRender_SampleCount SampleCount;
-};
-
-struct BmRender_GPUBufferData
-{
-	BmRender_DeviceMemory Memory;
-	MemoryPropertyFlag PropertyFlag;
-};
-
-struct BmRender_DescriptorSetData
-{
-	BmRender_DescriptorSetLayout Layout;
-};
-
-struct BmRender_SemaphoreData
-{
-	BmRender_SemaphoreType Type;
-};
-
-struct BmRender_CommandPoolData
-{
-	u32 QueueFamilyIndex;
-};
-
-struct BmRender_CommandBufferData
-{
-	BmRender_CommandPool CommandPool;
-};
-
-struct BmRender_QueueData
-{
-	BmRender_QueueType QueueType;
-};
-
-struct BmRender_PipelineLayoutData
-{
-	BmRender_PipelineType PipelineType;
-};
-
-struct BmRender_ImageViewData
-{
-	BmRender_Image Image;
-};
-
 struct BmRender_DrawIndexedIndirectCommand
 {
 	u32 IndexCount;
@@ -837,7 +770,7 @@ BmRender_SwapchainResult BmRender_AcquireNextSwapchainImage(u64 Timeout, BmRende
 BmRender_SurfaceFormat BmRender_GetSurfaceFormat();
 BmRender_Image BmRender_GetSwapchainImage(u32 Index);
 BmRender_ImageView BmRender_GetSwapchainImageView(u32 Index);
-BmRender_Extent2D BmRender_GetSwapchainExtent();
+BmRender_Dimensions BmRender_GetSwapchainExtent();
 
 BmRender_Instance BmRender_GetVulkanInstance();
 BmRender_PhysicalDevice BmRender_GetPhysicalDevice();
@@ -914,16 +847,13 @@ void BmRender_DestroySemaphore(BmRender_Semaphore Handle);
 void BmRender_DestroyCommandPool(BmRender_CommandPool Handle);
 void BmRender_FreeCommandBuffer(BmRender_CommandBuffer Handle);
 
-void BmRender_GetDescriptorSetLayoutData(BmRender_DescriptorSetLayout Handle, BmRender_DescriptorSetLayoutData* OutData);
-bool BmRender_GetShaderData(BmRender_Shader Handle, BmRender_ShaderData* OutData);
-bool BmRender_GetImageData(BmRender_Image Handle, BmRender_ImageResource* OutData);
-bool BmRender_GetGPUBufferData(BmRender_GPUBuffer Handle, BmRender_GPUBufferData* OutData);
-bool BmRender_GetDescriptorSetData(BmRender_DescriptorSet Handle, BmRender_DescriptorSetData* OutData);
-bool BmRender_GetSemaphoreData(BmRender_Semaphore Handle, BmRender_SemaphoreData* OutData);
-bool BmRender_GetCommandPoolData(BmRender_CommandPool Handle, BmRender_CommandPoolData* OutData);
-bool BmRender_GetCommandBufferData(BmRender_CommandBuffer Handle, BmRender_CommandBufferData* OutData);
-bool BmRender_GetQueueData(BmRender_Queue Handle, BmRender_QueueData* OutData);
-bool BmRender_GetPipelineLayoutData(BmRender_PipelineLayout Handle, BmRender_PipelineLayoutData* OutData);
-bool BmRender_GetImageViewData(BmRender_ImageView Handle, BmRender_ImageViewData* OutData);
+BmRender_Format BmRender_GetImageFormat(BmRender_Image Handle);
+u64 BmRender_GetImageSize(BmRender_Image Handle);
+BmRender_Dimensions BmRender_GetImageDimensions(BmRender_Image Handle);
+
+BmRender_Image BmRender_GetOwningImage(BmRender_ImageView Handle);
+BmRender_Format BmRender_GetOwningImageFormat(BmRender_ImageView Handle);
+
+MemoryPropertyFlag BmRender_GetGpuBufferMemoryPropertyFlag(BmRender_GPUBuffer Handle);
 
 void BmRender_FrameFree();

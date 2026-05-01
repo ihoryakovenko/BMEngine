@@ -75,7 +75,7 @@ BmRender_ImageView BmRender_GetSwapchainImageView(u32 Index)
 	return CoreContext->ImageViews[Index];
 }
 
-BmRender_Extent2D BmRender_GetSwapchainExtent()
+BmRender_Dimensions BmRender_GetSwapchainExtent()
 {
 	return VkExtent2DToBmRender(GetCoreContext()->SwapExtent);
 }

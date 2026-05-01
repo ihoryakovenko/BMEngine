@@ -5,6 +5,7 @@
 #include <ShortTypes.h>
 
 #include "RenderInterface.h"
+#include "RenderTypes.h"
 
 void InitializeDescriptorSetLayoutManager(u32 Size);
 void InitializeShaderManager(u32 Size);
@@ -46,6 +47,18 @@ BmRender_CommandPool CreateCommandPoolHandle(VkCommandPool VulkanCommandPool, co
 BmRender_CommandBuffer CreateCommandBufferHandle(VkCommandBuffer VulkanCommandBuffer, const BmRender_CommandBufferData* Data);
 BmRender_Queue CreateQueueHandle(VkQueue Queue, const BmRender_QueueData* Data);
 BmRender_DeviceMemory CreateDeviceMemoryHandle(VkDeviceMemory Memory);
+
+void BmRender_GetDescriptorSetLayoutData(BmRender_DescriptorSetLayout Handle, BmRender_DescriptorSetLayoutData* OutData);
+bool BmRender_GetShaderData(BmRender_Shader Handle, BmRender_ShaderData* OutData);
+bool BmRender_GetImageData(BmRender_Image Handle, BmRender_ImageResource* OutData);
+bool BmRender_GetGPUBufferData(BmRender_GPUBuffer Handle, BmRender_GPUBufferData* OutData);
+bool BmRender_GetDescriptorSetData(BmRender_DescriptorSet Handle, BmRender_DescriptorSetData* OutData);
+bool BmRender_GetSemaphoreData(BmRender_Semaphore Handle, BmRender_SemaphoreData* OutData);
+bool BmRender_GetCommandPoolData(BmRender_CommandPool Handle, BmRender_CommandPoolData* OutData);
+bool BmRender_GetCommandBufferData(BmRender_CommandBuffer Handle, BmRender_CommandBufferData* OutData);
+bool BmRender_GetQueueData(BmRender_Queue Handle, BmRender_QueueData* OutData);
+bool BmRender_GetPipelineLayoutData(BmRender_PipelineLayout Handle, BmRender_PipelineLayoutData* OutData);
+bool BmRender_GetImageViewData(BmRender_ImageView Handle, BmRender_ImageViewData* OutData);
 
 void DestroyDescriptorSetLayoutHandle(BmRender_DescriptorSetLayout Handle);
 void DestroyShaderHandle(BmRender_Shader Handle);

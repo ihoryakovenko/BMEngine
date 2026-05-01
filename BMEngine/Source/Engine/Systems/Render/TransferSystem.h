@@ -16,6 +16,8 @@ namespace TransferSystem
 	struct ImageTaskDescription
 	{
 		BmRender_Image Handle;
+		u32 Width;
+		u32 Height;
 	};
 
 	struct DataTaskDescription

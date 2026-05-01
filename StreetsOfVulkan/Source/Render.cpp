@@ -124,7 +124,7 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	BmRender_PushConstant PushConstantRange = BmRender_CreatePushConstant(
 		(BmRender_DescriptorShaderStage)((u64)BmRender_DescriptorShaderStage::Vertex | (u64)BmRender_DescriptorShaderStage::Fragment), 0, sizeof(StreetsRender_FrameData));
 
-	BmRender_Extent2D SwapchainExtent = BmRender_GetSwapchainExtent();
+	BmRender_Dimensions SwapchainExtent = BmRender_GetSwapchainExtent();
 
 	ColorImage = BmRender_CreateImage2D(SwapchainExtent.Width, SwapchainExtent.Height, BmRender_Format::R8G8B8A8_UNORM, BmRender_ImageType::MultiSampledColorAttachment, BmRender_SampleCount::Count4);
 	ColorImageView = BmRender_CreateImageView2D(ColorImage);

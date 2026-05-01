@@ -166,8 +166,6 @@ namespace TransferSystem
 				case TaskType::Data:
 				{
 					const BmRender_GPUBufferBinding& Entry = Task->DataDescr.Handle;
-					BmRender_GPUBufferData BufferData;
-					BmRender_GetGPUBufferData(Entry.GPUBufferHandle, &BufferData);
 
 					//BufferData.ReadyValue = TransferState.CompletedTransfer + 1; // TODO: fix
 
@@ -197,8 +195,6 @@ namespace TransferSystem
 				}
 				case TaskType::Image:
 				{
-					BmRender_ImageResource Image;
-					BmRender_GetImageData(Task->TextureDescr.Handle, &Image);
 					//Image.ReadyValue = TransferState.CompletedTransfer + 1; // TODO: fix
 
 					VkImageMemoryBarrier2 TransferImageBarrier = { };
@@ -239,7 +235,7 @@ namespace TransferSystem
 					ImageRegion.imageSubresource.baseArrayLayer = 0;
 					ImageRegion.imageSubresource.layerCount = 1;
 					ImageRegion.imageOffset = { 0, 0, 0 };
-					ImageRegion.imageExtent = { Image.Width, Image.Height, 1 };
+					ImageRegion.imageExtent = { Task->TextureDescr.Width, Task->TextureDescr.Height, 1 };
 
 					VkImageMemoryBarrier2 PresentationBarrier = { };
 					PresentationBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -376,8 +372,6 @@ namespace TransferSystem
 		u64 CompletedValue = 0;
 		BmRender_GetSemaphoreCounterValue(TransferState.TransferSemaphore, &CompletedValue);
 
-		BmRender_GPUBufferData BufferData;
-		BmRender_GetGPUBufferData(Handle, &BufferData);
 		return false; // TODO: fix
 		//return CompletedValue < BufferData.ReadyValue;
 	}
@@ -387,8 +381,6 @@ namespace TransferSystem
 		u64 CompletedValue = 0;
 		BmRender_GetSemaphoreCounterValue(TransferState.TransferSemaphore, &CompletedValue);
 
-		BmRender_ImageResource ImageData;
-		BmRender_GetImageData(Handle, &ImageData);
 		return false; // TODO: fix
 		//return CompletedValue < ImageData.ReadyValue;
 	}

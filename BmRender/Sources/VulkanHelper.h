@@ -131,8 +131,8 @@ BmRender_SurfaceFormat VkSurfaceFormatToBmRender(VkSurfaceFormatKHR SurfaceForma
 // 2D types conversions
 VkOffset2D Offset2DToVk(BmRender_Offset2D Offset);
 BmRender_Offset2D VkOffset2DToBmRender(VkOffset2D Offset);
-VkExtent2D Extent2DToVk(BmRender_Extent2D Extent);
-BmRender_Extent2D VkExtent2DToBmRender(VkExtent2D Extent);
+VkExtent2D Extent2DToVk(BmRender_Dimensions Extent);
+BmRender_Dimensions VkExtent2DToBmRender(VkExtent2D Extent);
 VkViewport ViewportToVk(BmRender_Viewport Viewport);
 BmRender_Viewport VkViewportToBmRender(VkViewport Viewport);
 VkRect2D Rect2DToVk(BmRender_Rect2D Rect);
