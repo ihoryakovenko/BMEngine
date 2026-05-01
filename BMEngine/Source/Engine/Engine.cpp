@@ -29,7 +29,6 @@
 #include <gli/gli.hpp>
 
 // Global resource maps
-std::unordered_map<std::string, Util::VertexBinding_depr> VBindings;
 std::unordered_map<std::string, BmRender_Sampler> Samplers;
 std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 std::unordered_map<std::string, BmRender_Shader> Shaders;
@@ -39,41 +38,6 @@ std::unordered_map<std::string, BmRender_PushConstant> PushConstants;
 
 namespace Engine
 {
-	static void ParseAndCreateVertices(Yaml::Node& VerticesNode)
-	{
-		for (auto VertexIt = VerticesNode.Begin(); VertexIt != VerticesNode.End(); VertexIt++)
-		{
-			Yaml::Node& VertexNode = (*VertexIt).second;
-
-			Util::VertexBinding_depr Binding = Util::ParseVertexBindingNode(Util::GetVertexBindingNode(VertexNode));
-
-			Yaml::Node& AttributesNode = Util::GetVertexAttributesNode(VertexNode);
-
-			u32 Offset = 0;
-			u32 Stride = 0;
-			for (auto AttributeIt = AttributesNode.Begin(); AttributeIt != AttributesNode.End(); AttributeIt++)
-			{
-				Yaml::Node& TypeNode = Util::GetVertexAttributeTypeNode((*AttributeIt).second);
-				std::string TypeStr = TypeNode.As<std::string>();
-
-				VertexAttribute Attribute = { };
-				std::string AttributeName;
-				Util::ParseVertexAttributeNode((*AttributeIt).second, &Attribute, &AttributeName);
-
-				u32 Size = Util::GetAttributeTypeSize(Attribute.Type);
-
-				Attribute.Offset = Offset;
-				Offset += Size;
-				Stride += Size;
-
-				Binding.Attributes[AttributeName] = Attribute;
-			}
-
-			Binding.Stride = Stride;
-			VBindings[(*VertexIt).first] = Binding;
-		}
-	}
-
 	static void ParseAndCreateShaders(Yaml::Node& ShadersNode)
 	{
 		for (auto It = ShadersNode.Begin(); It != ShadersNode.End(); It++)
@@ -348,7 +312,6 @@ namespace Engine
 		EntityLightRegion[1] = { FrameDataBuffer, ViewProjectionBufferSize * 3 + LightBufferSize, LightBufferSize };
 		EntityLightRegion[2] = { FrameDataBuffer, ViewProjectionBufferSize * 3 + LightBufferSize + LightBufferSize, LightBufferSize };
 
-		ParseAndCreateVertices(Util::GetVertices(Root));
 		ParseAndCreateShaders(Util::GetShaders(Root));
 		ParseAndCreateSamplers(Util::GetSamplers(Root));
 		ParseAndCreateDescriptorSetLayouts(Util::GetDescriptorSetLayouts(Root));

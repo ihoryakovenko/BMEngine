@@ -23,7 +23,6 @@
 #include <SharedLib.h>
 
 // Extern declarations for global resource maps
-extern std::unordered_map<std::string, Util::VertexBinding_depr> VBindings;
 extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
 extern std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 extern std::unordered_map<std::string, BmRender_Shader> Shaders;
@@ -177,29 +176,50 @@ namespace Render
 
 		// Build vertex bindings from VBindings map
 		{
-			// StaticMeshVertex binding
-			Util::VertexBinding_depr& StaticMeshVertexBinding = VBindings["StaticMeshVertex"];
 			BmRender_VertexBinding BmRenderVertexBinding = {};
-			BmRenderVertexBinding.Stride = StaticMeshVertexBinding.Stride;
-			BmRenderVertexBinding.InputRate = StaticMeshVertexBinding.InputRate;
-			BmRenderVertexBinding.AttributesCount = 3; // Position, TextureCoords, Normal
-			BmRenderVertexBinding.Attributes = (VertexAttribute*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), sizeof(VertexAttribute) * BmRenderVertexBinding.AttributesCount);
-			BmRenderVertexBinding.Attributes[0] = StaticMeshVertexBinding.Attributes["Position"];
-			BmRenderVertexBinding.Attributes[1] = StaticMeshVertexBinding.Attributes["TextureCoords"];
-			BmRenderVertexBinding.Attributes[2] = StaticMeshVertexBinding.Attributes["Normal"];
+
+			VertexAttribute AttributePosition;
+			AttributePosition.Type = BmRender_AttributeType::Vec3;
+			AttributePosition.Offset = offsetof(StaticMeshVertex, Position);
+
+			VertexAttribute AttributeTexCoords;
+			AttributeTexCoords.Type = BmRender_AttributeType::Vec2;
+			AttributeTexCoords.Offset = offsetof(StaticMeshVertex, TextureCoords);
+
+			VertexAttribute AttributeNormal;
+			AttributeNormal.Type = BmRender_AttributeType::Vec3;
+			AttributeNormal.Offset = offsetof(StaticMeshVertex, Normal);
+
+			VertexAttribute Attributes[] = { AttributePosition, AttributeTexCoords, AttributeNormal };
+			const u32 AttributesCount = sizeof(Attributes) / sizeof(Attributes[0]);
+
+			BmRenderVertexBinding.Stride = sizeof(StaticMeshVertex);
+			BmRenderVertexBinding.InputRate = BmRender_VertexInputRate::Vertex;
+			BmRenderVertexBinding.AttributesCount = AttributesCount;
+			BmRenderVertexBinding.Attributes = Attributes;
+
 			vertexBindings.push_back(BmRenderVertexBinding);
 		}
 
 		{
-			// StaticMeshInstance binding
-			Util::VertexBinding_depr& StaticMeshInstanceBinding = VBindings["StaticMeshInstance"];
 			BmRender_VertexBinding BmRenderVertexBinding = {};
-			BmRenderVertexBinding.Stride = StaticMeshInstanceBinding.Stride;
-			BmRenderVertexBinding.InputRate = StaticMeshInstanceBinding.InputRate;
-			BmRenderVertexBinding.AttributesCount = 2; // InstanceModel, InstanceMaterialIndex
-			BmRenderVertexBinding.Attributes = (VertexAttribute*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), sizeof(VertexAttribute) * BmRenderVertexBinding.AttributesCount);
-			BmRenderVertexBinding.Attributes[0] = StaticMeshInstanceBinding.Attributes["InstanceModel"];
-			BmRenderVertexBinding.Attributes[1] = StaticMeshInstanceBinding.Attributes["InstanceMaterialIndex"];
+
+			VertexAttribute ModelMatrixAttribute;
+			ModelMatrixAttribute.Type = BmRender_AttributeType::Mat4;
+			ModelMatrixAttribute.Offset = offsetof(StaticMeshInstance, ModelMatrix);
+
+			VertexAttribute MaterialIndexAttribute;
+			MaterialIndexAttribute.Type = BmRender_AttributeType::Uint;
+			MaterialIndexAttribute.Offset = offsetof(StaticMeshInstance, MaterialIndex);
+
+			VertexAttribute Attributes[] = { ModelMatrixAttribute, MaterialIndexAttribute };
+			const u32 AttributesCount = sizeof(Attributes) / sizeof(Attributes[0]);
+
+			BmRenderVertexBinding.Stride = sizeof(StaticMeshInstance);
+			BmRenderVertexBinding.InputRate = BmRender_VertexInputRate::Instance;
+			BmRenderVertexBinding.AttributesCount = AttributesCount;
+			BmRenderVertexBinding.Attributes = Attributes;
+
 			vertexBindings.push_back(BmRenderVertexBinding);
 		}
 
@@ -835,28 +855,51 @@ namespace Render
 		// Build descriptor set layouts
 		descriptorSetLayouts.push_back(DescriptorSetLayouts["LightSpaceMatrixLayout"]);
 
-		// Build vertex bindings from VBindings map
 		{
-			// StaticMeshVertex binding (only Position attribute)
-			Util::VertexBinding_depr& StaticMeshVertexBinding = VBindings["StaticMeshVertex"];
 			BmRender_VertexBinding BmRenderVertexBinding = {};
-			BmRenderVertexBinding.Stride = StaticMeshVertexBinding.Stride;
-			BmRenderVertexBinding.InputRate = StaticMeshVertexBinding.InputRate;
-			BmRenderVertexBinding.AttributesCount = 1; // Position only
-			BmRenderVertexBinding.Attributes = (VertexAttribute*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), sizeof(VertexAttribute) * BmRenderVertexBinding.AttributesCount);
-			BmRenderVertexBinding.Attributes[0] = StaticMeshVertexBinding.Attributes["Position"];
+
+			VertexAttribute AttributePosition;
+			AttributePosition.Type = BmRender_AttributeType::Vec3;
+			AttributePosition.Offset = offsetof(StaticMeshVertex, Position);
+
+			VertexAttribute AttributeTexCoords;
+			AttributeTexCoords.Type = BmRender_AttributeType::Vec2;
+			AttributeTexCoords.Offset = offsetof(StaticMeshVertex, TextureCoords);
+
+			VertexAttribute AttributeNormal;
+			AttributeNormal.Type = BmRender_AttributeType::Vec3;
+			AttributeNormal.Offset = offsetof(StaticMeshVertex, Normal);
+
+			VertexAttribute Attributes[] = { AttributePosition, AttributeTexCoords, AttributeNormal };
+			const u32 AttributesCount = sizeof(Attributes) / sizeof(Attributes[0]);
+
+			BmRenderVertexBinding.Stride = sizeof(StaticMeshVertex);
+			BmRenderVertexBinding.InputRate = BmRender_VertexInputRate::Vertex;
+			BmRenderVertexBinding.AttributesCount = AttributesCount;
+			BmRenderVertexBinding.Attributes = Attributes;
+
 			vertexBindings.push_back(BmRenderVertexBinding);
 		}
 
 		{
-			// StaticMeshInstance binding (only InstanceModel attribute)
-			Util::VertexBinding_depr& StaticMeshInstanceBinding = VBindings["StaticMeshInstance"];
 			BmRender_VertexBinding BmRenderVertexBinding = {};
-			BmRenderVertexBinding.Stride = StaticMeshInstanceBinding.Stride;
-			BmRenderVertexBinding.InputRate = StaticMeshInstanceBinding.InputRate;
-			BmRenderVertexBinding.AttributesCount = 1; // InstanceModel only
-			BmRenderVertexBinding.Attributes = (VertexAttribute*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), sizeof(VertexAttribute) * BmRenderVertexBinding.AttributesCount);
-			BmRenderVertexBinding.Attributes[0] = StaticMeshInstanceBinding.Attributes["InstanceModel"];
+
+			VertexAttribute ModelMatrixAttribute;
+			ModelMatrixAttribute.Type = BmRender_AttributeType::Mat4;
+			ModelMatrixAttribute.Offset = offsetof(StaticMeshInstance, ModelMatrix);
+
+			VertexAttribute MaterialIndexAttribute;
+			MaterialIndexAttribute.Type = BmRender_AttributeType::Uint;
+			MaterialIndexAttribute.Offset = offsetof(StaticMeshInstance, MaterialIndex);
+
+			VertexAttribute Attributes[] = { ModelMatrixAttribute, MaterialIndexAttribute };
+			const u32 AttributesCount = sizeof(Attributes) / sizeof(Attributes[0]);
+
+			BmRenderVertexBinding.Stride = sizeof(StaticMeshInstance);
+			BmRenderVertexBinding.InputRate = BmRender_VertexInputRate::Instance;
+			BmRenderVertexBinding.AttributesCount = AttributesCount;
+			BmRenderVertexBinding.Attributes = Attributes;
+
 			vertexBindings.push_back(BmRenderVertexBinding);
 		}
 

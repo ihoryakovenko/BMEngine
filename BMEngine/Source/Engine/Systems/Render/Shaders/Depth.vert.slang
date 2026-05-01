@@ -1,10 +1,4 @@
-struct VSInput
-{
-    [[vk::location(0)]] float3 Position;
-
-    // mat4 occupies locations 1,2,3,4
-    [[vk::location(1)]] float4x4 ModelMatrix;
-};
+#include "ShaderTypes.h"
 
 struct LightSpaceMatrixData
 {
@@ -20,11 +14,14 @@ struct VSOutput
 };
 
 [shader("vertex")]
-VSOutput main(VSInput input)
+VSOutput main(StaticMeshVertexInput input)
 {
+    StaticMeshVertex vertex = input.Vertex;
+    StaticMeshInstance instance = input.Instance;
+
     VSOutput output;
 
-    output.Position = mul(lightSpaceMatrix.Matrix, mul(input.ModelMatrix, float4(input.Position, 1.0)));
+    output.Position = mul(lightSpaceMatrix.Matrix, mul(instance.ModelMatrix, float4(vertex.Position, 1.0)));
 
     return output;
 }

@@ -4,7 +4,6 @@
 
 #include <Engine/Systems/Memory/MemoryManagmentSystem.h>
 
-extern std::unordered_map<std::string, Util::VertexBinding_depr> VBindings;
 extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
 extern std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 extern std::unordered_map<std::string, BmRender_Shader> Shaders;
@@ -250,18 +249,6 @@ namespace Util
 		}
 
 		return OutBinding;
-	}
-
-	Yaml::Node& GetVertices(Yaml::Node& Root)
-	{
-		if (!Root["vertices"].IsNone())
-		{
-			return Root["vertices"];
-		}
-
-		assert(false);
-		static Yaml::Node Empty;
-		return Empty;
 	}
 
 	Yaml::Node& GetVertexBindingNode(Yaml::Node& VertexNode)

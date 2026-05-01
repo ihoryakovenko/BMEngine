@@ -5,7 +5,6 @@
 
 static const float PI = 3.14159265359;
 
-[[vk::binding(0, 0)]]
-ConstantBuffer<UboViewProjection> ViewProjection;
+[[vk::binding(0, 0)]] ParameterBlock<UboViewProjection> ViewProjection;
 
 #endif

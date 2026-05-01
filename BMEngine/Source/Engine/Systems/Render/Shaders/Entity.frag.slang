@@ -23,20 +23,11 @@ struct PushConstants
     uint FrameIndex;
 };
 
-[[vk::push_constant]]
-ConstantBuffer<PushConstants> Constants;
-
-[[vk::binding(0,1)]]
-Sampler2D AlbedoTexture[];
-
-[[vk::binding(0,2)]]
-ConstantBuffer<LightCastersData> lightCasters;
-
-[[vk::binding(0,3)]]
-StructuredBuffer<Material> Materials;
-
-[[vk::binding(0,4)]]
-Sampler2DArray ShadowMaps;
+[[vk::push_constant]] ParameterBlock<PushConstants> Constants;
+[[vk::binding(0, 1)]] Sampler2D AlbedoTexture[];
+[[vk::binding(0, 2)]] ParameterBlock<LightCastersData> lightCasters;
+[[vk::binding(0,3)]] StructuredBuffer<Material> Materials;
+[[vk::binding(0,4)]] Sampler2DArray ShadowMaps;
 
 float DistributionGGX(float3 N, float3 H, float roughness)
 {

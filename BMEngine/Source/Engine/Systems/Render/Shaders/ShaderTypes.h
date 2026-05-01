@@ -67,4 +67,23 @@ struct SHADER_ALIGNAS Material
     float Shininess;
 };
 
+struct StaticMeshVertex
+{
+    float3 Position;
+    float2 TextureCoords;
+    float3 Normal;
+};
+
+struct StaticMeshInstance
+{
+    float4x4 ModelMatrix;
+    uint MaterialIndex;
+};
+
+struct StaticMeshVertexInput
+{
+    [[vk::location(0)]] StaticMeshVertex Vertex;
+    [[vk::location(3)]] StaticMeshInstance Instance;
+};
+
 #endif

@@ -1,38 +1,3 @@
-vertices:
-  StaticMeshVertex:
-    binding:
-      inputRate: VERTEX
-    attributes:
-      - name: Position
-        type: vec3
-      - name: TextureCoords
-        type: vec2
-      - name: Normal
-        type: vec3
-
-  StaticMeshInstance:
-    binding:
-      inputRate: INSTANCE
-    attributes:
-      - name: InstanceModel
-        type: mat4
-      - name: InstanceMaterialIndex
-        type: uint
-
-  SkyBoxVertex:
-    binding:
-      inputRate: VERTEX
-    attributes:
-      - name: Position
-        type: vec3
-
-  TerrainVertex:
-    binding:
-      inputRate: VERTEX
-    attributes:
-      - name: Altitude
-        type: float
-
 samplers:
   ShadowMap:
     magFilter: LINEAR
