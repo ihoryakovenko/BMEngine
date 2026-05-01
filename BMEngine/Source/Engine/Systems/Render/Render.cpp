@@ -315,8 +315,8 @@ namespace Render
 			MeshPipeline->ShadowMapArraySet[CurrentImageIndex],
 		};
 
-		const u32 VpDynamicOffset = CurrentImageIndex * sizeof(ViewProjectionBuffer);
-		const u32 LightDynamicOffset = CurrentImageIndex * sizeof(LightBuffer);
+		const u32 VpDynamicOffset = CurrentImageIndex * sizeof(UboViewProjection);
+		const u32 LightDynamicOffset = CurrentImageIndex * sizeof(LightCastersData);
 		const u32 DynamicOffsets[] = { VpDynamicOffset, LightDynamicOffset };
 
 		DrawEntityBatchConfig Config = {};
@@ -473,8 +473,8 @@ namespace Render
 	{
 		const u32 CurrentFrame = GetCurrentFrameIndex();
 
-		RenderResources::UpdateBufferRegion(State.VpHandle[CurrentFrame], 0, &Scene->ViewProjection, sizeof(ViewProjectionBuffer));
-		RenderResources::UpdateBufferRegion(State.EntityLightBufferHandle[CurrentFrame], 0, Scene->LightEntity, sizeof(LightBuffer));
+		RenderResources::UpdateBufferRegion(State.VpHandle[CurrentFrame], 0, &Scene->ViewProjection, sizeof(UboViewProjection));
+		RenderResources::UpdateBufferRegion(State.EntityLightBufferHandle[CurrentFrame], 0, Scene->LightEntity, sizeof(LightCastersData));
 
 		const u32 ImageIndex = AcquireNextSwapchainImage(CurrentFrame);
 		CurrentImageIndex = ImageIndex;
@@ -965,8 +965,8 @@ namespace Render
 
 		const glm::mat4* LightViews[] =
 		{
-			&Scene->LightEntity->DirectionLight.LightSpaceMatrix,
-			&Scene->LightEntity->SpotLight.LightSpaceMatrix,
+			&Scene->LightEntity->directionLight.LightSpaceMatrix,
+			&Scene->LightEntity->spotlight.LightSpaceMatrix,
 		};
 
 		BmRender_TransitionImageForRendering(SubmitPool->CommandBuffer, ShadowMapArray, MAX_LIGHT_SOURCES * GetDrawSystemData()->CurrentFrame, MAX_LIGHT_SOURCES);

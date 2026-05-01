@@ -1,4 +1,5 @@
 #include "Common.slang"
+#include "ShaderTypes.h"
 
 struct VertexInput
 {
@@ -28,9 +29,6 @@ struct PushConstants
 
 [[vk::push_constant]]
 ConstantBuffer<PushConstants> Constants;
-
-[[vk::binding(0,0)]]
-ConstantBuffer<UboViewProjection> ViewProjection;
 
 float3x3 inverse(float3x3 m)
 {

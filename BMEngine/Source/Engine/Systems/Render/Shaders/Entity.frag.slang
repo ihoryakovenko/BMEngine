@@ -1,46 +1,9 @@
 #include "Common.slang"
+#include "ShaderTypes.h"
 
 static const int MAX_SHADOW_TEXTURES = 2;
 static const int DIRECTIONAL_LIGHT_SHADOW_TEXTURE_INDEX = 0;
 static const int SPOT_LIGHT_SHADOW_TEXTURE_INDEX = 1;
-
-struct PointLight
-{
-    float3 Position;
-    float3 Color;
-};
-
-struct DirectionLight
-{
-    float4x4 LightSpaceMatrix;
-    float3 Direction;
-    float3 Color;
-};
-
-struct SpotLight
-{
-    float4x4 LightSpaceMatrix;
-    float3 Position;
-    float CutOff;
-    float3 Direction;
-    float OuterCutOff;
-    float3 Color;
-    float2 Planes;
-};
-
-struct LightCastersData
-{
-    PointLight pointlight;
-    DirectionLight directionLight;
-    SpotLight spotlight;
-};
-
-struct Material
-{
-    uint AlbedoTexIndex;
-    uint SpecularTexIndex;
-    float Shininess;
-};
 
 struct FragmentInput
 {
@@ -62,9 +25,6 @@ struct PushConstants
 
 [[vk::push_constant]]
 ConstantBuffer<PushConstants> Constants;
-
-[[vk::binding(0,0)]]
-ConstantBuffer<UboViewProjection> ViewProjection;
 
 [[vk::binding(0,1)]]
 Sampler2D AlbedoTexture[];

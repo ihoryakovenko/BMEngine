@@ -1,12 +1,11 @@
 #ifndef COMMON_SLANG
 #define COMMON_SLANG
 
+#include "ShaderTypes.h"
+
 static const float PI = 3.14159265359;
 
-struct UboViewProjection
-{
-    float4x4 View;
-    float4x4 Projection;
-};
+[[vk::binding(0, 0)]]
+ConstantBuffer<UboViewProjection> ViewProjection;
 
 #endif

@@ -109,27 +109,9 @@ shaders:
   DeferredFragment:
     path: "./Resources/Shaders/Deferred_frag.spv"
     PipelineStage: Fragment
-  TerrainGeneratorVertex:
-    path: "./Resources/Shaders/TerrainGenerator_vert.spv"
-    PipelineStage: Vertex
-  TerrainGeneratorFragment:
-    path: "./Resources/Shaders/TerrainGenerator_frag.spv"
-    PipelineStage: Fragment
-  SkyBoxVertex:
-    path: "./Resources/Shaders/SkyBox_vert.spv"
-    PipelineStage: Vertex
-  SkyBoxFragment:
-    path: "./Resources/Shaders/SkyBox_frag.spv"
-    PipelineStage: Fragment
   DepthVertex:
     path: "./Resources/Shaders/Depth_vert.spv"
     PipelineStage: Vertex
-  QuadBasedSphereVertex:
-    path: "./Resources/Shaders/QuadBasedSphere_vert.spv"
-    PipelineStage: Vertex
-  QuadBasedSphereFragment:
-    path: "./Resources/Shaders/QuadBasedSphere_frag.spv"
-    PipelineStage: Fragment
 
 DescriptorSetLayouts:
   FrameDataLayout:

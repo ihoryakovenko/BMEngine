@@ -24,6 +24,7 @@
 #include "Engine/Systems/EngineResources.h"
 #include "Engine/Systems/Render/TransferSystem.h"
 #include "Engine/Systems/Concurrency/TaskSystem.h"
+#include <Engine/Systems/Render/Shaders/ShaderTypes.h>
 
 #include <gli/gli.hpp>
 
@@ -193,7 +194,7 @@ namespace Engine
 	static const f32 Far = 5000.0f;
 
 	static Render::DrawEntity SkyBox;
-	static Render::LightBuffer LightData;
+	static LightCastersData LightData;
 
 	static UI::GuiData GuiData;
 
@@ -203,7 +204,7 @@ namespace Engine
 	static glm::vec3 CameraSphericalPosition = glm::vec3(0.0f, 0.0f, 6371.0f);
 	static s32 Zoom = 4;
 
-	static Render::ViewProjectionBuffer ViewProjection;
+	static UboViewProjection ViewProjection;
 
 
 
@@ -335,13 +336,13 @@ namespace Engine
 		FrameDataBuffer = BmRender_CreateUniformBuffer(65536, MemoryPropertyFlag::HostCompatible);
 		MaterialBuffer = BmRender_CreateStorageBuffer(MB4, MemoryPropertyFlag::GPULocal);
 
-		const u32 ViewProjectionBufferSize = sizeof(Render::ViewProjectionBuffer);
+		const u32 ViewProjectionBufferSize = sizeof(UboViewProjection);
 
 		VpRegion[0] = { FrameDataBuffer, 0, ViewProjectionBufferSize };
 		VpRegion[1] = { FrameDataBuffer, ViewProjectionBufferSize, ViewProjectionBufferSize };
 		VpRegion[2] = { FrameDataBuffer, ViewProjectionBufferSize * 2, ViewProjectionBufferSize };
 
-		const u32 LightBufferSize = sizeof(Render::LightBuffer);
+		const u32 LightBufferSize = sizeof(LightCastersData);
 
 		EntityLightRegion[0] = { FrameDataBuffer, ViewProjectionBufferSize * 3, LightBufferSize };
 		EntityLightRegion[1] = { FrameDataBuffer, ViewProjectionBufferSize * 3 + LightBufferSize, LightBufferSize };
@@ -482,18 +483,18 @@ namespace Engine
 		float HalfSize = 30.0f;
 		glm::mat4 LightProjection = glm::ortho(-HalfSize, HalfSize, -HalfSize, HalfSize, NearPlane, FarPlane);
 
-		glm::vec3 Center = Eye + LightData.DirectionLight.Direction;
+		glm::vec3 Center = Eye + LightData.directionLight.Direction;
 		glm::mat4 LightView = glm::lookAt(Eye, Center, Up);
 
-		LightData.DirectionLight.LightSpaceMatrix = LightProjection * LightView;
-		LightData.SpotLight.Direction = MainCamera.Front;
-		LightData.SpotLight.Position = MainCamera.Position;
-		LightData.SpotLight.Planes = glm::vec2(Near, Far);
-		LightData.SpotLight.LightSpaceMatrix = ViewProjection.Projection * ViewProjection.View;
+		LightData.directionLight.LightSpaceMatrix = LightProjection * LightView;
+		LightData.spotlight.Direction = MainCamera.Front;
+		LightData.spotlight.Position = MainCamera.Position;
+		LightData.spotlight.Planes = glm::vec2(Near, Far);
+		LightData.spotlight.LightSpaceMatrix = ViewProjection.Projection * ViewProjection.View;
 
 		Scene.LightEntity = &LightData;
 
-		GuiData.DirectionLightDirection = &LightData.DirectionLight.Direction;
+		GuiData.DirectionLightDirection = &LightData.directionLight.Direction;
 		GuiData.Eye = &Eye;
 
 		Scene.ViewProjection = ViewProjection;
@@ -519,18 +520,18 @@ namespace Engine
 		ViewProjection.Projection[1][1] *= -1;
 		ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
-		LightData.PointLight.Position = glm::vec4(0.0f, 0.0f, 2.0f, 1.0f);
-		LightData.PointLight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
+		LightData.pointlight.Position = glm::vec4(0.0f, 0.0f, 2.0f, 1.0f);
+		LightData.pointlight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
 
-		LightData.DirectionLight.Direction = glm::vec3(0.0f, -1.0f, 0.0f);
-		LightData.DirectionLight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
+		LightData.directionLight.Direction = glm::vec3(0.0f, -1.0f, 0.0f);
+		LightData.directionLight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
 
-		LightData.SpotLight.Position = glm::vec4(0.0f, 0.0f, 10.0f, 1.0f);
-		LightData.SpotLight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
-		LightData.SpotLight.CutOff = glm::cos(glm::radians(12.5f));
-		LightData.SpotLight.OuterCutOff = glm::cos(glm::radians(17.5f));
+		LightData.spotlight.Position = glm::vec4(0.0f, 0.0f, 10.0f, 1.0f);
+		LightData.spotlight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
+		LightData.spotlight.CutOff = glm::cos(glm::radians(12.5f));
+		LightData.spotlight.OuterCutOff = glm::cos(glm::radians(17.5f));
 
-		GuiData.DirectionLightDirection = &LightData.DirectionLight.Direction;
+		GuiData.DirectionLightDirection = &LightData.directionLight.Direction;
 		GuiData.Eye = &Eye;
 		GuiData.CameraMercatorPosition = &CameraSphericalPosition;
 		GuiData.Zoom = &Zoom;

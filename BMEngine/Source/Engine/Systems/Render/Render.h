@@ -17,16 +17,12 @@
 #include <unordered_map>
 #include <vector>
 
+#include <Engine/Systems/Render/Shaders/ShaderTypes.h>
+
 #include "RenderInterface.h"
 
 namespace Render
 {
-	struct ViewProjectionBuffer
-	{
-		glm::mat4 View;
-		glm::mat4 Projection;
-	};
-
 	struct DrawEntity
 	{
 		BmRender_GPUBufferBinding VertexBufferEntry;
@@ -67,49 +63,9 @@ namespace Render
 		BmRender_GPUBufferBinding* EntityLightBufferHandle;
 	};
 
-	struct alignas(16) PointLight
-	{
-		glm::vec4 Position;
-
-		glm::vec3 Color;
-	};
-
-	struct alignas(16) DirectionLight
-	{
-		glm::mat4 LightSpaceMatrix;
-
-		glm::vec3 Direction;
-		f32 pad1;
-
-		glm::vec3 Color;
-	};
-
-	struct alignas(16) SpotLight
-	{
-		glm::mat4 LightSpaceMatrix;
-
-		glm::vec3 Position;
-		f32 CutOff;
-
-		glm::vec3 Direction;
-		f32 OuterCutOff;
-
-		glm::vec3 Color;
-		f32 pad1;
-
-		glm::vec2 Planes;
-	};
-
-	struct alignas(16) LightBuffer
-	{
-		PointLight PointLight;
-		DirectionLight DirectionLight;
-		SpotLight SpotLight;
-	};
-
 	struct DrawScene
 	{
-		ViewProjectionBuffer ViewProjection;
+		UboViewProjection ViewProjection;
 
 		DrawEntity* DrawTransparentEntities = nullptr;
 		u32 DrawTransparentEntitiesCount = 0;
@@ -117,7 +73,7 @@ namespace Render
 		DrawEntity SkyBox;
 		bool DrawSkyBox = false;
 
-		LightBuffer* LightEntity = nullptr;
+		LightCastersData* LightEntity = nullptr;
 
 		std::mutex TempLock;
 		std::vector<DrawEntity> DrawEntities;

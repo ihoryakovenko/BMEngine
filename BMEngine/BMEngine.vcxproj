@@ -57,14 +57,14 @@
     <None Include="Resources\Shaders\Second.frag" />
     <None Include="Resources\Shaders\Second.vert" />
     <None Include="Source\Engine\Systems\Render\Shaders\Common.slang" />
-    <None Include="Source\Engine\Systems\Render\Shaders\CompileShaders.bat" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Deferred.frag.glsl" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Deferred.vert.glsl" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Depth.vert.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Deferred.frag.slang" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Deferred.vert.slang" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Depth.vert.slang" />
     <None Include="Source\Engine\Systems\Render\Shaders\Entity.frag.slang" />
     <None Include="Source\Engine\Systems\Render\Shaders\Entity.vert.slang" />
     <None Include="Source\Engine\Systems\Render\Shaders\QuadBasedSphere.frag.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\QuadBasedSphere.vert.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\ShaderTypes.h" />
     <None Include="Source\Engine\Systems\Render\Shaders\SkyBox.frag.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\SkyBox.vert.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\TerrainGenerator.frag.glsl" />
@@ -76,6 +76,12 @@
     </ProjectReference>
     <ProjectReference Include="..\SharedLib\SharedLib.vcxproj">
       <Project>{90865b4c-29f1-46b5-9711-3353435ae322}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\Tools\CompileShaders\CompileShaders.vcxproj">
+      <Project>{caffe9d4-4e8d-435f-84f9-8d9d7f849e1f}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\Tools\Converter\Converter.vcxproj">
+      <Project>{ae0c3971-99f2-47bf-8261-914e31e3d352}</Project>
     </ProjectReference>
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -155,7 +161,7 @@
       <Message>1</Message>
     </PostBuildEvent>
     <CustomBuildStep>
-      <Command>call $(SolutionDir)$(ProjectName)\Source\Engine\Systems\Render\Shaders\CompileShaders.bat $(ProjectDir)</Command>
+      <Command>$(SolutionDir)$(Platform)\$(Configuration)\CompileShaders.exe "$(ProjectDir)Source\Engine\Systems\Render\Shaders" "$(ProjectDir)Resources\Shaders" "slangc"</Command>
       <Outputs>1</Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>
@@ -189,7 +195,7 @@
       <Message>1</Message>
     </PostBuildEvent>
     <CustomBuildStep>
-      <Command>call $(SolutionDir)$(ProjectName)\Source\Engine\Systems\Render\Shaders\CompileShaders.bat $(ProjectDir)</Command>
+      <Command>$(SolutionDir)$(Platform)\$(Configuration)\CompileShaders.exe "$(ProjectDir)Source\Engine\Systems\Render\Shaders" "$(ProjectDir)Resources\Shaders" "slangc"</Command>
       <Outputs>1</Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>

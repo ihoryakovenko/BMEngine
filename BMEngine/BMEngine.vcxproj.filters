@@ -51,10 +51,8 @@
     <None Include="Resources\Shaders\Second.frag" />
     <None Include="Resources\Shaders\Second.vert" />
     <None Include="Resources\Settings\RenderResources.yaml" />
-    <None Include="Source\Engine\Systems\Render\Shaders\CompileShaders.bat" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Deferred.frag.glsl" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Deferred.vert.glsl" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Depth.vert.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Deferred.frag.slang" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Deferred.vert.slang" />
     <None Include="Source\Engine\Systems\Render\Shaders\QuadBasedSphere.frag.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\QuadBasedSphere.vert.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\SkyBox.frag.glsl" />
@@ -65,5 +63,7 @@
     <None Include="Source\Engine\Systems\Render\Shaders\Entity.frag.slang" />
     <None Include="Source\Engine\Systems\Render\Shaders\Entity.vert.slang" />
     <None Include="Source\Engine\Systems\Render\Shaders\Common.slang" />
+    <None Include="Source\Engine\Systems\Render\Shaders\ShaderTypes.h" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Depth.vert.slang" />
   </ItemGroup>
 </Project>
