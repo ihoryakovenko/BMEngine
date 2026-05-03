@@ -329,13 +329,13 @@ namespace Render
 
 		const BmRender_DescriptorSet DescriptorSetGroup[] =
 		{
-			DescriptorSets.FrameDataSet,
+			FrameBufferDescriptor.Set,
 			DescriptorSets.BindlesTexturesSet,
-			DescriptorSets.MaterialSet,
+			MaterialsDescriptor.Set,
 			MeshPipeline->ShadowMapArraySet[CurrentFrame],
 		};
 
-		const u32 FrameDynamicOffset = CurrentFrame * sizeof(FrameBuffer);
+		const u32 FrameDynamicOffset = CurrentFrame * FrameBufferBlock::DataSize;
 		const u32 DynamicOffsets[] = { FrameDynamicOffset };
 
 		DrawEntityBatchConfig Config = {};
@@ -464,9 +464,7 @@ namespace Render
 		InitCommandSystem(3);
 		InitDrawSystem(3);
 
-		const u32 FrameBufferSize = sizeof(FrameBuffer);
-
-		FrameBufferBinding[0] = { FrameDataBuffer, 0, FrameBufferSize };
+		FrameBufferBinding[0] = { FrameDataBuffer, 0, FrameBufferBlock::DataSize };
 
 		DescriptorSets = Render::DescriptorSetHandles();
 
@@ -476,8 +474,8 @@ namespace Render
 			Binding.BindingCount = 1;
 			Binding.DstArrayElement = 0;
 
-			DescriptorSets.FrameDataSet = BmRender_CreateDescriptorSet(DescriptorSetLayouts["FrameDataLayout"], MainPool);
-			BmRender_UpdateDescriptorSet(DescriptorSets.FrameDataSet, &Binding, 1);
+			FrameBufferDescriptor.Set = BmRender_CreateDescriptorSet(DescriptorSetLayouts["FrameDataLayout"], MainPool);
+			BmRender_UpdateDescriptorSet(FrameBufferDescriptor.Set, &Binding, 1);
 		}
 
 		{
@@ -488,8 +486,8 @@ namespace Render
 			Binding.BindingCount = 1;
 			Binding.DstArrayElement = 0;
 
-			DescriptorSets.MaterialSet = BmRender_CreateDescriptorSet(DescriptorSetLayouts["MaterialLayout"], MainPool);
-			BmRender_UpdateDescriptorSet(DescriptorSets.MaterialSet, &Binding, 1);
+			MaterialsDescriptor.Set = BmRender_CreateDescriptorSet(DescriptorSetLayouts["MaterialLayout"], MainPool);
+			BmRender_UpdateDescriptorSet(MaterialsDescriptor.Set, &Binding, 1);
 		}
 
 		{
@@ -554,9 +552,7 @@ namespace Render
 	{
 		const u32 CurrentFrame = GetCurrentFrameIndex();
 
-		const u32 FrameDataSize = sizeof(FrameBuffer);
-
-		RenderResources::UpdateBuffer(FrameDataBuffer, FrameDataSize * CurrentFrame, &Scene->FrameData, FrameDataSize);
+		RenderResources::UpdateBuffer(FrameDataBuffer, FrameBufferBlock::DataSize * CurrentFrame, &FrameBufferDescriptor.Data, FrameBufferBlock::DataSize);
 
 		const u32 ImageIndex = AcquireNextSwapchainImage(CurrentFrame);
 		CurrentImageIndex = ImageIndex;
@@ -1070,8 +1066,8 @@ namespace Render
 
 		const glm::mat4* LightViews[] =
 		{
-			&Scene->FrameData.directionLight.LightSpaceMatrix,
-			&Scene->FrameData.spotlight.LightSpaceMatrix,
+			&FrameBufferDescriptor.Data.directionLight.LightSpaceMatrix,
+			& FrameBufferDescriptor.Data.spotlight.LightSpaceMatrix,
 		};
 
 		BmRender_TransitionImageForRendering(SubmitPool->CommandBuffer, ShadowMapArray, MAX_LIGHT_SOURCES * GetDrawSystemData()->CurrentFrame, MAX_LIGHT_SOURCES);

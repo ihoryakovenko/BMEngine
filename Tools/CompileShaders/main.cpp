@@ -77,22 +77,14 @@ int main(int argc, char* argv[])
 
                 fs::path outPath = outputDir / (baseName + SPV_EXT);
 
-                bool needsCompile = true;
-                if (fs::exists(outPath))
+                if (fs::exists(outPath) && fs::last_write_time(filePath) <= fs::last_write_time(outPath))
                 {
-                    if (fs::last_write_time(filePath) <= fs::last_write_time(outPath))
-                    {
-                        needsCompile = false;
-                    }
-                }
-
-                if (needsCompile)
-                {
-                    compile_slang(filePath, outPath);
+                    std::cout << "Up to date: " << fileName << std::endl;
                 }
                 else
                 {
-                    std::cout << "Up to date: " << fileName << std::endl;
+                    fs::remove(outPath);
+                    compile_slang(filePath, outPath);
                 }
             }
         }

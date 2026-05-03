@@ -56,7 +56,7 @@
     <None Include="Resources\Settings\RenderResources.yaml" />
     <None Include="Resources\Shaders\Second.frag" />
     <None Include="Resources\Shaders\Second.vert" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Common.slang" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Common.h" />
     <None Include="Source\Engine\Systems\Render\Shaders\Deferred.frag.slang" />
     <None Include="Source\Engine\Systems\Render\Shaders\Deferred.vert.slang" />
     <None Include="Source\Engine\Systems\Render\Shaders\Depth.vert.slang" />

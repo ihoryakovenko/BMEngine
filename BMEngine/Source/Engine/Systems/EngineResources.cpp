@@ -206,7 +206,7 @@ namespace EngineResources
 				const BmRender_GPUBufferBinding MaterialHandle = { Render::GetMaterialBuffer(), MateriaIndex * sizeof(Mat), sizeof(Mat) };
 				RenderResources::UpdateBufferRegion(MaterialHandle, 0, &Mat, sizeof(Mat));
 
-				InstanceData Instance;
+				StaticMeshInstance Instance;
 				Instance.MaterialIndex = MateriaIndex;
 				Instance.ModelMatrix = glm::translate(glm::mat4(1), Request.Position);
 

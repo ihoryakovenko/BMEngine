@@ -1,4 +1,4 @@
-#include "Common.slang"
+#include "Common.h"
 #include "ShaderTypes.h"
 
 struct VertexOutput
@@ -41,7 +41,7 @@ VertexOutput main(StaticMeshVertexInput input)
 
     output.FragmentNormal = normalize(mul(normalMatrix, vertex.Normal));
     output.FragmentMaterialIndex = instance.MaterialIndex;
-    output.Position = mul(FrameData.Projection, mul(FrameData.View, worldPos));
+    output.Position = mul(FrameBufferDescriptor.Projection, mul(FrameBufferDescriptor.View, worldPos));
 
     return output;
 }

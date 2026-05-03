@@ -16,26 +16,6 @@ namespace Render
 
 namespace EngineResources
 {
-	struct StaticMeshVertex
-	{
-		glm::vec3 Position;
-		glm::vec2 TextureCoords;
-		glm::vec3 Normal;
-	};
-
-	struct Material
-	{
-		u32 AlbedoTexIndex;
-		u32 SpecularTexIndex;
-		f32 Shininess;
-	};
-
-	struct InstanceData
-	{
-		glm::mat4 ModelMatrix;
-		u32 MaterialIndex;
-	};
-
 	struct TextureAsset
 	{
 		std::string TexturePath;

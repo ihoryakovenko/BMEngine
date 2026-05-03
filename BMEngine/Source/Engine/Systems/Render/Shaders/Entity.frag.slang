@@ -1,4 +1,4 @@
-#include "Common.slang"
+#include "Common.h"
 #include "ShaderTypes.h"
 
 static const int MAX_SHADOW_TEXTURES = 2;
@@ -19,7 +19,7 @@ struct FragmentOutput
 };
 
 [[vk::binding(0, 1)]] Sampler2D AlbedoTexture[];
-[[vk::binding(0, 2)]] StructuredBuffer<Material> Materials;
+
 [[vk::binding(0, 3)]] Sampler2DArray ShadowMaps;
 
 float DistributionGGX(float3 N, float3 H, float roughness)
@@ -179,7 +179,7 @@ float3 CastSpotLight(SpotLight light, float3 fragPos, float3 albedo, float3 V, f
 
     float intensity = 20.0;
     float3 radiance = light.Color * intensity * attenuation * cone;
-
+    
     float3 brdf = CookTorranceBRDF(N,V,L,albedo,0.5,0.5);
 
     return brdf * radiance;
@@ -190,7 +190,7 @@ FragmentOutput main(FragmentInput input)
 {
     FragmentOutput output;
 
-    Material Mat = Materials[input.FragmentMaterialIndex];
+    Material Mat = MaterialsDescriptor[input.FragmentMaterialIndex];
 
     float4 albedo = AlbedoTexture[Mat.AlbedoTexIndex].Sample(input.FragmentTexture);
 
@@ -199,9 +199,9 @@ FragmentOutput main(FragmentInput input)
 
     float3 Lo = 0.0;
 
-    Lo += CastDirectionLight(FrameData.directionLight, albedo.rgb, V, N, input.WorldFragPos);
-    Lo += CastPointLight(FrameData.pointlight, input.WorldFragPos, albedo.rgb, V, N);
-    Lo += CastSpotLight(FrameData.spotlight, input.WorldFragPos, albedo.rgb, V, N);
+    Lo += CastDirectionLight(FrameBufferDescriptor.directionLight, albedo.rgb, V, N, input.WorldFragPos);
+    Lo += CastPointLight(FrameBufferDescriptor.pointlight, input.WorldFragPos, albedo.rgb, V, N);
+    Lo += CastSpotLight(FrameBufferDescriptor.spotlight, input.WorldFragPos, albedo.rgb, V, N);
 
     output.OutColor = float4(Lo, albedo.a);
     return output;

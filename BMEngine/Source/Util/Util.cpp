@@ -7,6 +7,7 @@
 #include "EngineTypes.h"
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
+#include <Engine/Systems/Render/Shaders/ShaderTypes.h>
 #include <forge_memory_debugger.h>
 
 #include "Engine/Systems/Render/Render.h"
@@ -38,15 +39,15 @@ extern 	std::unordered_map<std::string, BmRender_PushConstant> PushConstants;
 
 struct VertexEqual
 {
-	bool operator()(const EngineResources::StaticMeshVertex& lhs, const EngineResources::StaticMeshVertex& rhs) const
+	bool operator()(const StaticMeshVertex& lhs, const StaticMeshVertex& rhs) const
 	{
 		return lhs.Position == rhs.Position && lhs.TextureCoords == rhs.TextureCoords;
 	}
 };
 
-template<> struct std::hash<EngineResources::StaticMeshVertex>
+template<> struct std::hash<StaticMeshVertex>
 {
-	size_t operator()(EngineResources::StaticMeshVertex const& vertex) const
+	size_t operator()(StaticMeshVertex const& vertex) const
 	{
 		size_t hashPosition = std::hash<glm::vec3>()(vertex.Position);
 		size_t hashTextureCoords = std::hash<glm::vec2>()(vertex.TextureCoords);
@@ -131,8 +132,8 @@ namespace Util
 		u64* VerticesCounts = (u64*)malloc(Shapes.size() * sizeof(u64));
 		u32* IndicesCounts = (u32*)malloc(Shapes.size() * sizeof(u32));
 
-		std::unordered_map<EngineResources::StaticMeshVertex, u32,
-			std::hash<EngineResources::StaticMeshVertex>, VertexEqual> uniqueVertices{ };
+		std::unordered_map<StaticMeshVertex, u32,
+			std::hash<StaticMeshVertex>, VertexEqual> uniqueVertices{ };
 
 		std::hash<std::string> Hasher;
 
@@ -141,7 +142,7 @@ namespace Util
 		std::vector<u32> meshMaterialIndices;
 		std::vector<u64> uniqueTextureHashes;
 		std::vector<u8> VerticesAndIndices;
-		std::vector<EngineResources::StaticMeshVertex> Vertices;
+		std::vector<StaticMeshVertex> Vertices;
 		std::vector<u32> Indices;
 
 		std::unordered_set<u64> textureHashes;
@@ -187,7 +188,7 @@ namespace Util
 			{
 				tinyobj::index_t Index = Shape->mesh.indices[j];
 
-				EngineResources::StaticMeshVertex vertex = { };
+				StaticMeshVertex vertex = { };
 
 				vertex.Position =
 				{
@@ -224,7 +225,7 @@ namespace Util
 			VerticesCounts[i] = Vertices.size();
 			IndicesCounts[i] = Indices.size();
 
-			u64 VertexBytes = Vertices.size() * sizeof(EngineResources::StaticMeshVertex);
+			u64 VertexBytes = Vertices.size() * sizeof(StaticMeshVertex);
 			u64 IndexBytes = Indices.size() * sizeof(u32);
 
 			u64 CurrentOffset = VerticesAndIndices.size();
