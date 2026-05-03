@@ -18,16 +18,9 @@ struct FragmentOutput
     [[vk::location(0)]] float4 OutColor;
 };
 
-struct PushConstants
-{
-    uint FrameIndex;
-};
-
-[[vk::push_constant]] ParameterBlock<PushConstants> Constants;
 [[vk::binding(0, 1)]] Sampler2D AlbedoTexture[];
-[[vk::binding(0, 2)]] ParameterBlock<LightCastersData> lightCasters;
-[[vk::binding(0,3)]] StructuredBuffer<Material> Materials;
-[[vk::binding(0,4)]] Sampler2DArray ShadowMaps;
+[[vk::binding(0, 2)]] StructuredBuffer<Material> Materials;
+[[vk::binding(0, 3)]] Sampler2DArray ShadowMaps;
 
 float DistributionGGX(float3 N, float3 H, float roughness)
 {
@@ -206,9 +199,9 @@ FragmentOutput main(FragmentInput input)
 
     float3 Lo = 0.0;
 
-    Lo += CastDirectionLight(lightCasters.directionLight, albedo.rgb, V, N, input.WorldFragPos);
-    Lo += CastPointLight(lightCasters.pointlight, input.WorldFragPos, albedo.rgb, V, N);
-    Lo += CastSpotLight(lightCasters.spotlight, input.WorldFragPos, albedo.rgb, V, N);
+    Lo += CastDirectionLight(FrameData.directionLight, albedo.rgb, V, N, input.WorldFragPos);
+    Lo += CastPointLight(FrameData.pointlight, input.WorldFragPos, albedo.rgb, V, N);
+    Lo += CastSpotLight(FrameData.spotlight, input.WorldFragPos, albedo.rgb, V, N);
 
     output.OutColor = float4(Lo, albedo.a);
     return output;

@@ -32,6 +32,15 @@ extern std::unordered_map<std::string, BmRender_PushConstant> PushConstants;
 
 static BmRender_Image ShadowMapArray;
 
+BmRender_GPUBuffer FrameDataBuffer;
+BmRender_GPUBuffer VertexStageBuffer;
+BmRender_GPUBuffer InstanceBuffer;
+BmRender_GPUBuffer MaterialBuffer;
+
+Render::DescriptorSetHandles DescriptorSets;
+
+BmRender_GPUBufferBinding FrameBufferBinding[1];
+
 namespace Render
 {
 	static void InitImGuiPipeline(BmRender_DescriptorPool* ImGuiPool, GLFWwindow* Wnd)
@@ -160,7 +169,6 @@ namespace Render
 		// Build descriptor set layouts
 		descriptorSetLayouts.push_back(DescriptorSetLayouts["FrameDataLayout"]);
 		descriptorSetLayouts.push_back(DescriptorSetLayouts["BindlesTexturesLayout"]);
-		descriptorSetLayouts.push_back(DescriptorSetLayouts["FrameDataLayout"]);
 		descriptorSetLayouts.push_back(DescriptorSetLayouts["MaterialLayout"]);
 		descriptorSetLayouts.push_back(DescriptorSetLayouts["ShadowMapArrayLayout"]);
 
@@ -317,20 +325,18 @@ namespace Render
 
 	static void DrawStaticMeshes(BmRender_CommandBuffer CommandBuffer, StaticMeshPipeline* MeshPipeline, DrawScene* Scene, const DescriptorSetHandles& DescriptorSets)
 	{
-		u32 CurrentImageIndex = GetDrawSystemData()->CurrentFrame;
+		u32 CurrentFrame = GetDrawSystemData()->CurrentFrame;
 
 		const BmRender_DescriptorSet DescriptorSetGroup[] =
 		{
-			DescriptorSets.VpSet,
+			DescriptorSets.FrameDataSet,
 			DescriptorSets.BindlesTexturesSet,
-			DescriptorSets.StaticMeshLightSet,
 			DescriptorSets.MaterialSet,
-			MeshPipeline->ShadowMapArraySet[CurrentImageIndex],
+			MeshPipeline->ShadowMapArraySet[CurrentFrame],
 		};
 
-		const u32 VpDynamicOffset = CurrentImageIndex * sizeof(UboViewProjection);
-		const u32 LightDynamicOffset = CurrentImageIndex * sizeof(LightCastersData);
-		const u32 DynamicOffsets[] = { VpDynamicOffset, LightDynamicOffset };
+		const u32 FrameDynamicOffset = CurrentFrame * sizeof(FrameBuffer);
+		const u32 DynamicOffsets[] = { FrameDynamicOffset };
 
 		DrawEntityBatchConfig Config = {};
 		Config.Pipeline = Pipelines["StaticMesh"];
@@ -340,7 +346,7 @@ namespace Render
 		Config.DynamicOffsetCount = sizeof(DynamicOffsets) / sizeof(DynamicOffsets[0]);
 		Config.DynamicOffsets = DynamicOffsets;
 		Config.PushConstant = PushConstants["MainConstant"];
-		Config.PushConstantData = &CurrentImageIndex;
+		Config.PushConstantData = &CurrentFrame;
 
 		DrawEntityBatch(CommandBuffer, Scene, Config);
 	}
@@ -427,13 +433,69 @@ namespace Render
 		}
 	}
 
-	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferBinding* VpRegion, BmRender_GPUBufferBinding* EntityLightRegion, const DescriptorSetHandles& DescriptorSets, BmRender_DescriptorPool MainPool)
-	{		
+	void Init(GLFWwindow* WindowHandler)
+	{
+		// Create MainPool using stack array
+		const u32 PoolSizeCount = 11;
+		BmRender_DescriptorPoolSize TotalPassPoolSizes[PoolSizeCount];
+		u32 TotalDescriptorLayouts = 21;
+		TotalPassPoolSizes[0] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[1] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[2] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[3] = { BmRender_DescriptorType::InputAttachment, 3 };
+		TotalPassPoolSizes[4] = { BmRender_DescriptorType::InputAttachment, 3 };
+		TotalPassPoolSizes[5] = { BmRender_DescriptorType::InputAttachment, 3 };
+		TotalPassPoolSizes[6] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[7] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[8] = { BmRender_DescriptorType::UniformBuffer, 3 };
+		TotalPassPoolSizes[9] = { BmRender_DescriptorType::CombinedImageSampler, 256 };
+		TotalPassPoolSizes[10] = { BmRender_DescriptorType::UniformBufferDynamic, 3 };
+
+		u32 TotalDescriptorCount = TotalDescriptorLayouts * 3;
+		TotalDescriptorCount += 256;
+
+		BmRender_DescriptorPool MainPool = BmRender_CreateDescriptorPool(TotalPassPoolSizes, TotalDescriptorCount, PoolSizeCount, BmRender_DescriptorPoolType::UpdateAfterBind);
+
+		FrameDataBuffer = BmRender_CreateUniformBuffer(65536, MemoryPropertyFlag::HostCompatible);
+		VertexStageBuffer = BmRender_CreateVertexStageBuffer(MB4, MemoryPropertyFlag::GPULocal);
+		InstanceBuffer = BmRender_CreateInstanceBuffer(MB4, MemoryPropertyFlag::GPULocal);
+		MaterialBuffer = BmRender_CreateStorageBuffer(MB4, MemoryPropertyFlag::GPULocal);
+
 		InitCommandSystem(3);
 		InitDrawSystem(3);
 
-		State.VpHandle = VpRegion;
-		State.EntityLightBufferHandle = EntityLightRegion;
+		const u32 FrameBufferSize = sizeof(FrameBuffer);
+
+		FrameBufferBinding[0] = { FrameDataBuffer, 0, FrameBufferSize };
+
+		DescriptorSets = Render::DescriptorSetHandles();
+
+		{
+			BmRender_DescriptorSetBinding Binding;
+			Binding.BufferRegions = FrameBufferBinding;
+			Binding.BindingCount = 1;
+			Binding.DstArrayElement = 0;
+
+			DescriptorSets.FrameDataSet = BmRender_CreateDescriptorSet(DescriptorSetLayouts["FrameDataLayout"], MainPool);
+			BmRender_UpdateDescriptorSet(DescriptorSets.FrameDataSet, &Binding, 1);
+		}
+
+		{
+			BmRender_GPUBufferBinding MaterialBufferRegion = { MaterialBuffer, 0, VK_WHOLE_SIZE };
+
+			BmRender_DescriptorSetBinding Binding;
+			Binding.BufferRegions = &MaterialBufferRegion;
+			Binding.BindingCount = 1;
+			Binding.DstArrayElement = 0;
+
+			DescriptorSets.MaterialSet = BmRender_CreateDescriptorSet(DescriptorSetLayouts["MaterialLayout"], MainPool);
+			BmRender_UpdateDescriptorSet(DescriptorSets.MaterialSet, &Binding, 1);
+		}
+
+		{
+			DescriptorSets.BindlesTexturesSet = BmRender_CreateDescriptorSet(DescriptorSetLayouts["BindlesTexturesLayout"], MainPool);
+		}
+
 		State.DescriptorSets = DescriptorSets;
 		State.MainPool = MainPool;
 
@@ -480,14 +542,21 @@ namespace Render
 
 		DeInitDrawSystem();
 		DeInitCommandSystem();
+
+		// Destroy GPUBuffers
+		BmRender_DestroyGPUBuffer(VertexStageBuffer);
+		BmRender_DestroyGPUBuffer(InstanceBuffer);
+		BmRender_DestroyGPUBuffer(MaterialBuffer);
+		BmRender_DestroyGPUBuffer(FrameDataBuffer);
 	}
 
 	void Draw(DrawScene* Scene, u64 WaitSemaphoreValue)
 	{
 		const u32 CurrentFrame = GetCurrentFrameIndex();
 
-		RenderResources::UpdateBufferRegion(State.VpHandle[CurrentFrame], 0, &Scene->ViewProjection, sizeof(UboViewProjection));
-		RenderResources::UpdateBufferRegion(State.EntityLightBufferHandle[CurrentFrame], 0, Scene->LightEntity, sizeof(LightCastersData));
+		const u32 FrameDataSize = sizeof(FrameBuffer);
+
+		RenderResources::UpdateBuffer(FrameDataBuffer, FrameDataSize * CurrentFrame, &Scene->FrameData, FrameDataSize);
 
 		const u32 ImageIndex = AcquireNextSwapchainImage(CurrentFrame);
 		CurrentImageIndex = ImageIndex;
@@ -1001,8 +1070,8 @@ namespace Render
 
 		const glm::mat4* LightViews[] =
 		{
-			&Scene->LightEntity->directionLight.LightSpaceMatrix,
-			&Scene->LightEntity->spotlight.LightSpaceMatrix,
+			&Scene->FrameData.directionLight.LightSpaceMatrix,
+			&Scene->FrameData.spotlight.LightSpaceMatrix,
 		};
 
 		BmRender_TransitionImageForRendering(SubmitPool->CommandBuffer, ShadowMapArray, MAX_LIGHT_SOURCES * GetDrawSystemData()->CurrentFrame, MAX_LIGHT_SOURCES);
@@ -1115,5 +1184,25 @@ namespace Render
 	AttachmentData* MainPassGetAttachmentData()
 	{
 		return &MainPassPipelineAttachmentData;
+	}
+
+	Render::DescriptorSetHandles* GetHandles()
+	{
+		return &DescriptorSets;
+	}
+
+	BmRender_GPUBuffer GetVertexBuffer()
+	{
+		return VertexStageBuffer;
+	}
+
+	BmRender_GPUBuffer GetInstanceBuffer()
+	{
+		return InstanceBuffer;
+	}
+
+	BmRender_GPUBuffer GetMaterialBuffer()
+	{
+		return MaterialBuffer;
 	}
 }

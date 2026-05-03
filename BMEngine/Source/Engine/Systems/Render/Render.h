@@ -46,9 +46,8 @@ namespace Render
 
 	struct DescriptorSetHandles
 	{
-		BmRender_DescriptorSet VpSet;
+		BmRender_DescriptorSet FrameDataSet;
 		BmRender_DescriptorSet BindlesTexturesSet;
-		BmRender_DescriptorSet StaticMeshLightSet;
 		BmRender_DescriptorSet MaterialSet;
 	};
 
@@ -59,13 +58,11 @@ namespace Render
 		DescriptorSetHandles DescriptorSets;
 		BmRender_DescriptorPool MainPool;
 		BmRender_DescriptorPool DebugUiPool; // TODO: ?
-		BmRender_GPUBufferBinding* VpHandle;
-		BmRender_GPUBufferBinding* EntityLightBufferHandle;
 	};
 
 	struct DrawScene
 	{
-		UboViewProjection ViewProjection;
+		FrameBuffer FrameData;
 
 		DrawEntity* DrawTransparentEntities = nullptr;
 		u32 DrawTransparentEntitiesCount = 0;
@@ -73,13 +70,11 @@ namespace Render
 		DrawEntity SkyBox;
 		bool DrawSkyBox = false;
 
-		LightCastersData* LightEntity = nullptr;
-
 		std::mutex TempLock;
 		std::vector<DrawEntity> DrawEntities;
 	};
 
-	void Init(GLFWwindow* WindowHandler, BmRender_GPUBufferBinding* VpRegion, BmRender_GPUBufferBinding* EntityLightRegion, const DescriptorSetHandles& DescriptorSets, BmRender_DescriptorPool MainPool);
+	void Init(GLFWwindow* WindowHandler);
 	void DeInit();
 
 	void Draw(DrawScene* Data, u64 WaitSemaphoreValue);
@@ -122,4 +117,9 @@ namespace Render
 	void MainPassBeginPass();
 	void MainPassEndPass();
 	AttachmentData* MainPassGetAttachmentData();
+
+	Render::DescriptorSetHandles* GetHandles();
+	BmRender_GPUBuffer GetVertexBuffer();
+	BmRender_GPUBuffer GetInstanceBuffer();
+	BmRender_GPUBuffer GetMaterialBuffer();
 }

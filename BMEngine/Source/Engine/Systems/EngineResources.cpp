@@ -21,12 +21,6 @@ namespace EngineResources
 	static std::mutex ModelLoadMutex;
 	static TextureAsset DefaultAsset;
 	
-	// Buffer handles
-	static BmRender_GPUBuffer VertexStageBuffer;
-	static BmRender_GPUBuffer InstanceBuffer;
-	static BmRender_GPUBuffer FrameDataBuffer;
-	static BmRender_GPUBuffer MaterialBuffer;
-
 	static void CreateTexture(TextureAsset& Asset)
 	{
 		gli::texture Texture = gli::load(Asset.TexturePath);
@@ -52,13 +46,9 @@ namespace EngineResources
 		Asset.RenderViewHandle = ViewHandle;
 	}
 
-	void Init(BmRender_DescriptorSet BindlesTexturesSetHandle, BmRender_GPUBuffer InVertexStageBuffer, BmRender_GPUBuffer InInstanceBuffer, BmRender_GPUBuffer InFrameDataBuffer, BmRender_GPUBuffer InMaterialBuffer)
+	void Init()
 	{
 		// Store buffer handles
-		VertexStageBuffer = InVertexStageBuffer;
-		InstanceBuffer = InInstanceBuffer;
-		FrameDataBuffer = InFrameDataBuffer;
-		MaterialBuffer = InMaterialBuffer;
 		const u64 DefaultTextureDataCount = sizeof(DefaultTextureData) / sizeof(DefaultTextureData[0]);
 		gli::texture DefaultTexture = gli::load((char const*)DefaultTextureData, DefaultTextureDataCount);
 		if (DefaultTexture.empty())
@@ -93,7 +83,7 @@ namespace EngineResources
 
 		BmRender_DescriptorSetBinding Bindings[] = { DiffuseBinding };
 
-		BmRender_UpdateDescriptorSet(BindlesTexturesSetHandle, Bindings, 1);
+		BmRender_UpdateDescriptorSet(Render::GetHandles()->BindlesTexturesSet, Bindings, 1);
 	}
 
 	void DeInit()
@@ -122,7 +112,7 @@ namespace EngineResources
 		}
 	}
 
-	void Update(Render::DrawScene* TmpScene, BmRender_DescriptorSet BindlesTexturesSetHandle)
+	void Update(Render::DrawScene* TmpScene)
 	{
 		std::lock_guard Lock(ModelLoadMutex);
 
@@ -174,7 +164,7 @@ namespace EngineResources
 
 							BmRender_DescriptorSetBinding Bindings[] = { DiffuseBinding };
 
-							BmRender_UpdateDescriptorSet(BindlesTexturesSetHandle, Bindings, 1);
+							BmRender_UpdateDescriptorSet(Render::GetHandles()->BindlesTexturesSet, Bindings, 1);
 
 							++TexturesGPUIndexCounter;
 						}
@@ -202,18 +192,18 @@ namespace EngineResources
 				const u64 VerticesSize = sizeof(StaticMeshVertex) * VerticesCount;
 				const u64 IndicesSize = IndicesCount * sizeof(u32);
 					
-				BmRender_GPUBufferBinding MeshHandle = { VertexStageBuffer, ModelVertexByteOffset, VertexDataSize };
+				BmRender_GPUBufferBinding MeshHandle = { Render::GetVertexBuffer(), ModelVertexByteOffset, VertexDataSize};
 				RenderResources::UpdateBufferRegion(MeshHandle, 0, Model.VertexData + ModelVertexByteOffset, VertexDataSize);
 
-				const BmRender_GPUBufferBinding VertexBufferEntry = { VertexStageBuffer, ModelVertexByteOffset, VerticesSize };
-				const BmRender_GPUBufferBinding IndexBufferEntry = { VertexStageBuffer, ModelVertexByteOffset + VerticesSize, IndicesSize };
+				const BmRender_GPUBufferBinding VertexBufferEntry = { Render::GetVertexBuffer(), ModelVertexByteOffset, VerticesSize };
+				const BmRender_GPUBufferBinding IndexBufferEntry = { Render::GetVertexBuffer(), ModelVertexByteOffset + VerticesSize, IndicesSize };
 
 				Material Mat;
 				Mat.AlbedoTexIndex = TextureGPUIndex;
 				Mat.SpecularTexIndex = TextureGPUIndex;
 				Mat.Shininess = 32.0f;
 
-				const BmRender_GPUBufferBinding MaterialHandle = { MaterialBuffer, MateriaIndex * sizeof(Mat), sizeof(Mat) };
+				const BmRender_GPUBufferBinding MaterialHandle = { Render::GetMaterialBuffer(), MateriaIndex * sizeof(Mat), sizeof(Mat) };
 				RenderResources::UpdateBufferRegion(MaterialHandle, 0, &Mat, sizeof(Mat));
 
 				InstanceData Instance;
@@ -223,7 +213,7 @@ namespace EngineResources
 				++MateriaIndex;
 
 				const u64 InstanceOffset = InstanceIndex * sizeof(Instance);
-				const BmRender_GPUBufferBinding InstanceHandle = { InstanceBuffer, InstanceOffset, sizeof(Instance) };
+				const BmRender_GPUBufferBinding InstanceHandle = { Render::GetInstanceBuffer(), InstanceOffset, sizeof(Instance) };
 				RenderResources::UpdateBufferRegion(InstanceHandle, 0, &Instance, sizeof(Instance));
 
 				++InstanceIndex;

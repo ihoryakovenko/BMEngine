@@ -158,7 +158,6 @@ namespace Engine
 	static const f32 Far = 5000.0f;
 
 	static Render::DrawEntity SkyBox;
-	static LightCastersData LightData;
 
 	static UI::GuiData GuiData;
 
@@ -168,22 +167,16 @@ namespace Engine
 	static glm::vec3 CameraSphericalPosition = glm::vec3(0.0f, 0.0f, 6371.0f);
 	static s32 Zoom = 4;
 
-	static UboViewProjection ViewProjection;
-
 
 
 	static Render::DrawScene Scene;
 
-	static Render::DescriptorSetHandles DescriptorSets;
 
-	BmRender_GPUBufferBinding VpRegion[3];
-	BmRender_GPUBufferBinding EntityLightRegion[3];
+
+
 	
 	// Buffer handles
-	BmRender_GPUBuffer VertexStageBuffer;
-	BmRender_GPUBuffer InstanceBuffer;
-	BmRender_GPUBuffer FrameDataBuffer;
-	BmRender_GPUBuffer MaterialBuffer;
+
 
 	void WindowIconifyCallback(GLFWwindow* window, int iconified)
 	{
@@ -218,7 +211,7 @@ namespace Engine
 
 			if (!IsMinimized)
 			{			
-				EngineResources::Update(&Scene, DescriptorSets.BindlesTexturesSet);
+				EngineResources::Update(&Scene);
 
 				//TaskSystem::TaskLambda Task = [&]() { TransferSystem::Transfer(); };
 				//TaskSystem::AddTask(&Task, &Group);
@@ -275,90 +268,18 @@ namespace Engine
 
 		BmRender_Init(Window);
 		
-		// Create MainPool using stack array
-		const u32 PoolSizeCount = 11;
-		BmRender_DescriptorPoolSize TotalPassPoolSizes[PoolSizeCount];
-		u32 TotalDescriptorLayouts = 21;
-		TotalPassPoolSizes[0] = { BmRender_DescriptorType::UniformBuffer, 3 };
-		TotalPassPoolSizes[1] = { BmRender_DescriptorType::UniformBuffer, 3 };
-		TotalPassPoolSizes[2] = { BmRender_DescriptorType::UniformBuffer, 3 };
-		TotalPassPoolSizes[3] = { BmRender_DescriptorType::InputAttachment, 3 };
-		TotalPassPoolSizes[4] = { BmRender_DescriptorType::InputAttachment, 3 };
-		TotalPassPoolSizes[5] = { BmRender_DescriptorType::InputAttachment, 3 };
-		TotalPassPoolSizes[6] = { BmRender_DescriptorType::UniformBuffer, 3 };
-		TotalPassPoolSizes[7] = { BmRender_DescriptorType::UniformBuffer, 3 };
-		TotalPassPoolSizes[8] = { BmRender_DescriptorType::UniformBuffer, 3 };
-		TotalPassPoolSizes[9] = { BmRender_DescriptorType::CombinedImageSampler, 256 };
-		TotalPassPoolSizes[10] = { BmRender_DescriptorType::UniformBufferDynamic, 3 };
 
-		u32 TotalDescriptorCount = TotalDescriptorLayouts * 3;
-		TotalDescriptorCount += 256;
 
-		BmRender_DescriptorPool MainPool = BmRender_CreateDescriptorPool(TotalPassPoolSizes, TotalDescriptorCount, PoolSizeCount, BmRender_DescriptorPoolType::UpdateAfterBind);
-		VertexStageBuffer = BmRender_CreateVertexStageBuffer(MB4, MemoryPropertyFlag::GPULocal);
-		InstanceBuffer = BmRender_CreateInstanceBuffer(MB4, MemoryPropertyFlag::GPULocal);
-		FrameDataBuffer = BmRender_CreateUniformBuffer(65536, MemoryPropertyFlag::HostCompatible);
-		MaterialBuffer = BmRender_CreateStorageBuffer(MB4, MemoryPropertyFlag::GPULocal);
-
-		const u32 ViewProjectionBufferSize = sizeof(UboViewProjection);
-
-		VpRegion[0] = { FrameDataBuffer, 0, ViewProjectionBufferSize };
-		VpRegion[1] = { FrameDataBuffer, ViewProjectionBufferSize, ViewProjectionBufferSize };
-		VpRegion[2] = { FrameDataBuffer, ViewProjectionBufferSize * 2, ViewProjectionBufferSize };
-
-		const u32 LightBufferSize = sizeof(LightCastersData);
-
-		EntityLightRegion[0] = { FrameDataBuffer, ViewProjectionBufferSize * 3, LightBufferSize };
-		EntityLightRegion[1] = { FrameDataBuffer, ViewProjectionBufferSize * 3 + LightBufferSize, LightBufferSize };
-		EntityLightRegion[2] = { FrameDataBuffer, ViewProjectionBufferSize * 3 + LightBufferSize + LightBufferSize, LightBufferSize };
 
 		ParseAndCreateShaders(Util::GetShaders(Root));
 		ParseAndCreateSamplers(Util::GetSamplers(Root));
 		ParseAndCreateDescriptorSetLayouts(Util::GetDescriptorSetLayouts(Root));
 		Util::ParseAndCreatePushConstants(Util::GetPushConstantsFromResources(Root));
 
-		DescriptorSets = Render::DescriptorSetHandles();
-		
-		{
-			BmRender_DescriptorSetBinding Binding;
-			Binding.BufferRegions = VpRegion;
-			Binding.BindingCount = 1;
-			Binding.DstArrayElement = 0;
-
-			DescriptorSets.VpSet = BmRender_CreateDescriptorSet(DescriptorSetLayouts["FrameDataLayout"], MainPool);
-			BmRender_UpdateDescriptorSet(DescriptorSets.VpSet, &Binding, 1);
-		}
-
-		{
-			BmRender_DescriptorSetBinding Binding;
-			Binding.BufferRegions = EntityLightRegion;
-			Binding.BindingCount = 1;
-			Binding.DstArrayElement = 0;
-
-			DescriptorSets.StaticMeshLightSet = BmRender_CreateDescriptorSet(DescriptorSetLayouts["FrameDataLayout"], MainPool);
-			BmRender_UpdateDescriptorSet(DescriptorSets.StaticMeshLightSet, &Binding, 1);
-		}
-
-		{
-			BmRender_GPUBufferBinding MaterialBufferRegion = { MaterialBuffer, 0, VK_WHOLE_SIZE };
-
-			BmRender_DescriptorSetBinding Binding;
-			Binding.BufferRegions = &MaterialBufferRegion;
-			Binding.BindingCount = 1;
-			Binding.DstArrayElement = 0;
-
-			DescriptorSets.MaterialSet = BmRender_CreateDescriptorSet(DescriptorSetLayouts["MaterialLayout"], MainPool);
-			BmRender_UpdateDescriptorSet(DescriptorSets.MaterialSet, &Binding, 1);
-		}
-
-		{
-			DescriptorSets.BindlesTexturesSet = BmRender_CreateDescriptorSet(DescriptorSetLayouts["BindlesTexturesLayout"], MainPool);
-		}
-
 		TransferSystem::Init();
-		Render::Init(Window, VpRegion, EntityLightRegion, DescriptorSets, MainPool);
+		Render::Init(Window);
 
-		EngineResources::Init(DescriptorSets.BindlesTexturesSet, VertexStageBuffer, InstanceBuffer, FrameDataBuffer, MaterialBuffer);
+		EngineResources::Init();
 
 		Yaml::Node TestScene;
 		Yaml::Parse(TestScene, "./Resources/Scenes/TestScene.yaml");
@@ -392,12 +313,6 @@ namespace Engine
 		TransferSystem::DeInit();
 		EngineResources::DeInit();
 		UI::DeInit();
-
-		// Destroy GPUBuffers
-		BmRender_DestroyGPUBuffer(VertexStageBuffer);
-		BmRender_DestroyGPUBuffer(InstanceBuffer);
-		BmRender_DestroyGPUBuffer(FrameDataBuffer);
-		BmRender_DestroyGPUBuffer(MaterialBuffer);
 
 		for (auto& [name, layout] : DescriptorSetLayouts)
 		{
@@ -440,27 +355,23 @@ namespace Engine
 		//	glm::mat4 TestMat = glm::rotate(Scene.DrawEntities[i].Model, glm::radians(0.5f), glm::vec3(0.0f, 1.0f, 0.0f));
 		//}
 
-		ViewProjection.View = glm::lookAt(MainCamera.Position, MainCamera.Position + MainCamera.Front, MainCamera.Up);
+		Scene.FrameData.View = glm::lookAt(MainCamera.Position, MainCamera.Position + MainCamera.Front, MainCamera.Up);
 
 		float NearPlane = 0.1f, FarPlane = 100.0f;
 		float HalfSize = 30.0f;
 		glm::mat4 LightProjection = glm::ortho(-HalfSize, HalfSize, -HalfSize, HalfSize, NearPlane, FarPlane);
 
-		glm::vec3 Center = Eye + LightData.directionLight.Direction;
+		glm::vec3 Center = Eye + Scene.FrameData.directionLight.Direction;
 		glm::mat4 LightView = glm::lookAt(Eye, Center, Up);
 
-		LightData.directionLight.LightSpaceMatrix = LightProjection * LightView;
-		LightData.spotlight.Direction = MainCamera.Front;
-		LightData.spotlight.Position = MainCamera.Position;
-		LightData.spotlight.Planes = glm::vec2(Near, Far);
-		LightData.spotlight.LightSpaceMatrix = ViewProjection.Projection * ViewProjection.View;
+		Scene.FrameData.directionLight.LightSpaceMatrix = LightProjection * LightView;
+		Scene.FrameData.spotlight.Direction = MainCamera.Front;
+		Scene.FrameData.spotlight.Position = MainCamera.Position;
+		Scene.FrameData.spotlight.Planes = glm::vec2(Near, Far);
+		Scene.FrameData.spotlight.LightSpaceMatrix = Scene.FrameData.Projection * Scene.FrameData.View;
 
-		Scene.LightEntity = &LightData;
-
-		GuiData.DirectionLightDirection = &LightData.directionLight.Direction;
+		GuiData.DirectionLightDirection = &Scene.FrameData.directionLight.Direction;
 		GuiData.Eye = &Eye;
-
-		Scene.ViewProjection = ViewProjection;
 
 		UI::Update();
 	}
@@ -478,23 +389,23 @@ namespace Engine
 		//Scene.DrawSkyBox = true;
 		Scene.DrawSkyBox = false;
 
-		ViewProjection.Projection = glm::perspective(glm::radians(MainCamera.Fov),
+		Scene.FrameData.Projection = glm::perspective(glm::radians(MainCamera.Fov),
 			MainCamera.AspectRatio, Near, Far);
-		ViewProjection.Projection[1][1] *= -1;
-		ViewProjection.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		Scene.FrameData.Projection[1][1] *= -1;
+		Scene.FrameData.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
-		LightData.pointlight.Position = glm::vec4(0.0f, 0.0f, 2.0f, 1.0f);
-		LightData.pointlight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
+		Scene.FrameData.pointlight.Position = glm::vec4(0.0f, 0.0f, 2.0f, 1.0f);
+		Scene.FrameData.pointlight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
 
-		LightData.directionLight.Direction = glm::vec3(0.0f, -1.0f, 0.0f);
-		LightData.directionLight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
+		Scene.FrameData.directionLight.Direction = glm::vec3(0.0f, -1.0f, 0.0f);
+		Scene.FrameData.directionLight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
 
-		LightData.spotlight.Position = glm::vec4(0.0f, 0.0f, 10.0f, 1.0f);
-		LightData.spotlight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
-		LightData.spotlight.CutOff = glm::cos(glm::radians(12.5f));
-		LightData.spotlight.OuterCutOff = glm::cos(glm::radians(17.5f));
+		Scene.FrameData.spotlight.Position = glm::vec4(0.0f, 0.0f, 10.0f, 1.0f);
+		Scene.FrameData.spotlight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
+		Scene.FrameData.spotlight.CutOff = glm::cos(glm::radians(12.5f));
+		Scene.FrameData.spotlight.OuterCutOff = glm::cos(glm::radians(17.5f));
 
-		GuiData.DirectionLightDirection = &LightData.directionLight.Direction;
+		GuiData.DirectionLightDirection = &Scene.FrameData.directionLight.Direction;
 		GuiData.Eye = &Eye;
 		GuiData.CameraMercatorPosition = &CameraSphericalPosition;
 		GuiData.Zoom = &Zoom;

@@ -44,6 +44,16 @@ namespace RenderResources
 		}
 	}
 
+	void UpdateBuffer(BmRender_GPUBuffer BufferHandle, u64 Offset, const void* Data, u32 DataSize)
+	{
+		const MemoryPropertyFlag Flag = BmRender_GetGpuBufferMemoryPropertyFlag(BufferHandle);
+
+		if (Flag == MemoryPropertyFlag::HostCompatible)
+		{
+			BmRender_UpdateHostCompatibleBuffer(BufferHandle, Offset, DataSize, Data);
+		}
+	}
+
 	void UpdateImageResource(BmRender_Image Handle, BmRender_ImageDescription* Description, void* Data)
 	{
 		const u64 Size = BmRender_GetImageSize(Handle);

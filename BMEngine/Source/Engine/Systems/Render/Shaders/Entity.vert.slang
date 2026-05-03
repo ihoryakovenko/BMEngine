@@ -11,13 +11,6 @@ struct VertexOutput
     float4 Position : SV_Position;
 };
 
-struct PushConstants
-{
-    uint FrameIndex;
-};
-
-[[vk::push_constant]] ConstantBuffer<PushConstants> Constants;
-
 float3x3 inverse(float3x3 m)
 {
     float3 a = m[0];
@@ -48,7 +41,7 @@ VertexOutput main(StaticMeshVertexInput input)
 
     output.FragmentNormal = normalize(mul(normalMatrix, vertex.Normal));
     output.FragmentMaterialIndex = instance.MaterialIndex;
-    output.Position = mul(ViewProjection.Projection, mul(ViewProjection.View, worldPos));
+    output.Position = mul(FrameData.Projection, mul(FrameData.View, worldPos));
 
     return output;
 }

@@ -6,7 +6,8 @@
 #include <cstdint>
 #include <glm/glm.hpp>
 
-#define SHADER_ALIGNAS alignas(16)
+#define SHADER_BUFFER_ALIGNAS alignas(16)
+#define SHADER_VERTEX_ALIGNAS alignas(4)
 
 #define float4x4 glm::mat4
 #define float4 glm::vec4
@@ -16,24 +17,19 @@
 
 #else
 
-#define SHADER_ALIGNAS
+#define SHADER_BUFFER_ALIGNAS
+#define SHADER_VERTEX_ALIGNAS
 
 #endif
 
-struct SHADER_ALIGNAS UboViewProjection
-{
-    float4x4 View;
-    float4x4 Projection;
-};
-
-struct SHADER_ALIGNAS PointLight
+struct SHADER_BUFFER_ALIGNAS PointLight
 {
     float3 Position;
     float pad1;
     float3 Color;
 };
 
-struct SHADER_ALIGNAS DirectionLight
+struct SHADER_BUFFER_ALIGNAS DirectionLight
 {
     float4x4 LightSpaceMatrix;
     float3 Direction;
@@ -41,7 +37,7 @@ struct SHADER_ALIGNAS DirectionLight
     float3 Color;
 };
 
-struct SHADER_ALIGNAS SpotLight
+struct SHADER_BUFFER_ALIGNAS SpotLight
 {
     float4x4 LightSpaceMatrix;
     float3 Position;
@@ -53,34 +49,36 @@ struct SHADER_ALIGNAS SpotLight
     float2 Planes;
 };
 
-struct SHADER_ALIGNAS LightCastersData
+struct SHADER_BUFFER_ALIGNAS FrameBuffer
 {
+    float4x4 View;
+    float4x4 Projection;
     PointLight pointlight;
     DirectionLight directionLight;
     SpotLight spotlight;
 };
 
-struct SHADER_ALIGNAS Material
+struct SHADER_BUFFER_ALIGNAS Material
 {
     uint AlbedoTexIndex;
     uint SpecularTexIndex;
     float Shininess;
 };
 
-struct StaticMeshVertex
+struct SHADER_VERTEX_ALIGNAS StaticMeshVertex
 {
     float3 Position;
     float2 TextureCoords;
     float3 Normal;
 };
 
-struct StaticMeshInstance
+struct SHADER_VERTEX_ALIGNAS StaticMeshInstance
 {
     float4x4 ModelMatrix;
     uint MaterialIndex;
 };
 
-struct StaticMeshVertexInput
+struct SHADER_VERTEX_ALIGNAS StaticMeshVertexInput
 {
     [[vk::location(0)]] StaticMeshVertex Vertex;
     [[vk::location(3)]] StaticMeshInstance Instance;

@@ -51,10 +51,10 @@ namespace EngineResources
 		std::string Path;
 	};
 
-	void Init(BmRender_DescriptorSet BindlesTexturesSetHandle, BmRender_GPUBuffer VertexStageBuffer, BmRender_GPUBuffer InstanceBuffer, BmRender_GPUBuffer FrameDataBuffer, BmRender_GPUBuffer MaterialBuffer);
+	void Init();
 	void DeInit();
 
-	void Update(Render::DrawScene* TmpScene, BmRender_DescriptorSet BindlesTexturesSetHandle);
+	void Update(Render::DrawScene* TmpScene);
 
 	void RegisterTextureAsset(const std::string& Name, const std::string& Path);
 	void RequestModelLoad(const ModelLoadRequest& Request);
