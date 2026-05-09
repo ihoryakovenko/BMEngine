@@ -140,7 +140,7 @@ BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_D
 	VkDescriptorSetLayoutBinding* NewLayoutBindings = (VkDescriptorSetLayoutBinding*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkDescriptorSetLayoutBinding) * BindingsCount);
 	for (u32 i = 0; i < BindingsCount; ++i)
 	{
-		NewLayoutBindings[i].binding = i;
+		NewLayoutBindings[i].binding = Bindings[i].Binding;
 		NewLayoutBindings[i].descriptorCount = Bindings[i].DescriptorCount;
 		NewLayoutBindings[i].descriptorType = DescriptorTypeToVk(Bindings[i].DescriptorType);
 		NewLayoutBindings[i].stageFlags = DescriptorShaderStageToVkShaderStage(Bindings[i].StageFlags);

@@ -79,30 +79,6 @@ shaders:
     PipelineStage: Vertex
 
 DescriptorSetLayouts:
-  FrameDataLayout:
-    bindings:
-      - type: uniform
-        updateFrequency: PerFrame
-        stages: VERTEX | FRAGMENT
-
-  ShadowMapArrayLayout:
-    bindings:
-      - type: sampler2d
-        updateFrequency: Static
-        stages: VERTEX | FRAGMENT
-
-  MaterialLayout:
-    bindings:
-      - type: buffer
-        updateFrequency: Static
-        stages: VERTEX | FRAGMENT
-
-  BindlesTexturesLayout:
-    bindings:
-      - type: sampler2DArray
-        updateFrequency: Static
-        stages: FRAGMENT
-
   MainPassOutputLayout:
     bindings:
       - type: sampler2d
@@ -117,8 +93,3 @@ DescriptorSetLayouts:
       - type: uniform
         updateFrequency: Static
         stages: VERTEX | FRAGMENT
-
-PushConstants:
-  MainConstant:
-    - type: uint
-      stages: VERTEX | FRAGMENT

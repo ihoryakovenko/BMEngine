@@ -18,10 +18,6 @@ struct FragmentOutput
     [[vk::location(0)]] float4 OutColor;
 };
 
-[[vk::binding(0, 1)]] Sampler2D AlbedoTexture[];
-
-[[vk::binding(0, 3)]] Sampler2DArray ShadowMaps;
-
 float DistributionGGX(float3 N, float3 H, float roughness)
 {
     float a = roughness * roughness;

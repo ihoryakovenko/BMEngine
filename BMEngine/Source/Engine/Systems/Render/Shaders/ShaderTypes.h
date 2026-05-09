@@ -6,8 +6,39 @@
 #include <ShortTypes.h>
 #include <glm/glm.hpp>
 #include <glm/gtx/type_aligned.hpp>
+#include <RenderInterface.h>
 
-#define INLINE_GLOBAL inline
+struct Descriptor
+{
+    u32 Binding;
+    u32 Set;
+    BmRender_DescriptorShaderStage Stage;
+    BmRender_DescriptorType Type;
+};
+
+struct DescriptorSet
+{
+    u32 Set;
+    std::vector<Descriptor> Descriptors;
+};
+
+#define DECLARE_UNIFORM_BUFFER_DYNAMIC_DESCRIPTOR(T, Binding, Set, Stage, Name) \
+inline Descriptor Name = { Binding, Set, Stage, BmRender_DescriptorType::UniformBufferDynamic } \
+
+#define DECLARE_STORAGE_BUFFER_DESCRIPTOR(T, Binding, Set, Stage, Name) \
+inline Descriptor Name = { Binding, Set, Stage, BmRender_DescriptorType::StorageBuffer } \
+
+#define DECLARE_IMAGE_SAMPLER2D_BINDLESS_DESCRIPTOR(Binding, Set, Stage, Name) \
+inline Descriptor Name = { Binding, Set, Stage, BmRender_DescriptorType::CombinedImageSampler } \
+
+#define DECLARE_IMAGE_SAMPLER2D_ARRAY_DESCRIPTOR(Binding, Set, Stage, Name) \
+inline Descriptor Name = { Binding, Set, Stage, BmRender_DescriptorType::CombinedImageSampler } \
+
+#define START_DESCRIPTOR_SET(SetIndex, Name) \
+inline DescriptorSet Name = { SetIndex, {
+
+#define END_DESCRIPTOR_SET() \
+} };
 
 typedef glm::mat4 float4x4;
 typedef glm::vec4 float4;
@@ -20,31 +51,19 @@ typedef glm::aligned_vec4 float4_16;
 typedef glm::aligned_vec3 float3_16;
 typedef glm::aligned_vec2 float2_8;
 
-template<typename T>
-struct ParameterBlock
-{
-    static_assert(sizeof(T) % 16 == 0, "T size must be a multiple of 16 for alignment.");
-    static_assert(alignof(T) >= 16, "T must be aligned to at least 16 bytes.");
-
-    T Data;
-    BmRender_DescriptorSet Set;
-    static constexpr u64 DataSize = (sizeof(T) + 15) & ~u64(15);
-};
-
-template<typename T>
-struct StructuredBuffer
-{
-    static_assert(sizeof(T) % 4 == 0, "T size must be a multiple of 4 for alignment.");
-    static_assert(alignof(T) >= 4, "T must be aligned to at least 4 bytes.");
-
-    T Data;
-    BmRender_DescriptorSet Set;
-    static constexpr u64 DataSize = (sizeof(T) + 15) & ~u64(15);
-};
-
 #else
 
-#define INLINE_GLOBAL
+#define DECLARE_UNIFORM_BUFFER_DYNAMIC_DESCRIPTOR(T, Binding, Set, Stage, Name) \
+[[vk::binding(Binding, Set)]] ParameterBlock<T> Name \
+
+#define DECLARE_STORAGE_BUFFER_DESCRIPTOR(T, Binding, Set, Stage, Name) \
+[[vk::binding(Binding, Set)]] StructuredBuffer<T> Name \
+
+#define DECLARE_IMAGE_SAMPLER2D_BINDLESS_DESCRIPTOR(Binding, Set, Stage, Name) \
+[[vk::binding(Binding, Set)]] Sampler2D Name[]; \
+
+#define DECLARE_IMAGE_SAMPLER2D_ARRAY_DESCRIPTOR(Binding, Set, Stage, Name) \
+[[vk::binding(Binding, Set)]] Sampler2DArray Name; \
 
 typedef float4x4 float4x4_16;
 typedef float4 float4_16;
@@ -52,6 +71,8 @@ typedef float3 float3_16;
 typedef float2 float2_8;
 
 #endif
+
+
 
 struct PointLight
 {

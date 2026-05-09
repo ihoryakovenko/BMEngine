@@ -3,13 +3,11 @@
 
 #include "ShaderTypes.h"
 
-typedef ParameterBlock<FrameData> FrameBufferBlock;
-typedef StructuredBuffer<Material> MaterialsStructuredBuffer;
-
 static const float PI = 3.14159265359;
 
-[[vk::binding(0, 0)]] INLINE_GLOBAL FrameBufferBlock FrameBufferDescriptor;
-
-[[vk::binding(0, 2)]] INLINE_GLOBAL MaterialsStructuredBuffer MaterialsDescriptor;
+DECLARE_UNIFORM_BUFFER_DYNAMIC_DESCRIPTOR(FrameData, 0, 0, BmRender_DescriptorShaderStage::Vertex | BmRender_DescriptorShaderStage::Fragment, FrameBufferDescriptor);
+DECLARE_IMAGE_SAMPLER2D_BINDLESS_DESCRIPTOR(0, 1, BmRender_DescriptorShaderStage::Fragment, AlbedoTexture);
+DECLARE_STORAGE_BUFFER_DESCRIPTOR(Material, 0, 2, BmRender_DescriptorShaderStage::Vertex | BmRender_DescriptorShaderStage::Fragment, MaterialsDescriptor);
+DECLARE_IMAGE_SAMPLER2D_ARRAY_DESCRIPTOR(0, 3, BmRender_DescriptorShaderStage::Fragment, ShadowMaps);
 
 #endif

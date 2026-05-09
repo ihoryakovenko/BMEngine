@@ -41,6 +41,11 @@ Render::DescriptorSetHandles DescriptorSets;
 
 BmRender_GPUBufferBinding FrameBufferBinding[1];
 
+BmRender_DescriptorSetLayout FrameDataLayout;
+BmRender_DescriptorSetLayout MaterialLayout;
+BmRender_DescriptorSetLayout BindlesTexturesLayout;
+BmRender_DescriptorSetLayout ShadowMapArrayLayout;
+
 namespace Render
 {
 	static void InitImGuiPipeline(BmRender_DescriptorPool* ImGuiPool, GLFWwindow* Wnd)
@@ -137,7 +142,7 @@ namespace Render
 			ShadowMapBinding.BindingCount = 1;
 			ShadowMapBinding.DstArrayElement = 0;
 
-			MeshPipeline->ShadowMapArraySet[i] = BmRender_CreateDescriptorSet(DescriptorSetLayouts["ShadowMapArrayLayout"], MainPool);
+			MeshPipeline->ShadowMapArraySet[i] = BmRender_CreateDescriptorSet(ShadowMapArrayLayout, MainPool);
 			BmRender_UpdateDescriptorSet(MeshPipeline->ShadowMapArraySet[i], &ShadowMapBinding, 1);
 		}
 
@@ -167,13 +172,10 @@ namespace Render
 		shaderStages.push_back(fragmentStage);
 
 		// Build descriptor set layouts
-		descriptorSetLayouts.push_back(DescriptorSetLayouts["FrameDataLayout"]);
-		descriptorSetLayouts.push_back(DescriptorSetLayouts["BindlesTexturesLayout"]);
-		descriptorSetLayouts.push_back(DescriptorSetLayouts["MaterialLayout"]);
-		descriptorSetLayouts.push_back(DescriptorSetLayouts["ShadowMapArrayLayout"]);
-
-		// Build push constants
-		pushConstantRanges.push_back(PushConstants["MainConstant"]);
+		descriptorSetLayouts.push_back(FrameDataLayout);
+		descriptorSetLayouts.push_back(BindlesTexturesLayout);
+		descriptorSetLayouts.push_back(MaterialLayout);
+		descriptorSetLayouts.push_back(ShadowMapArrayLayout);
 
 		// Build vertex bindings from VBindings map
 		{
@@ -329,13 +331,13 @@ namespace Render
 
 		const BmRender_DescriptorSet DescriptorSetGroup[] =
 		{
-			FrameBufferDescriptor.Set,
+			DescriptorSets.FrameBufferSet,
 			DescriptorSets.BindlesTexturesSet,
-			MaterialsDescriptor.Set,
+			DescriptorSets.MaterialsSet,
 			MeshPipeline->ShadowMapArraySet[CurrentFrame],
 		};
 
-		const u32 FrameDynamicOffset = CurrentFrame * FrameBufferBlock::DataSize;
+		const u32 FrameDynamicOffset = CurrentFrame * sizeof(FrameData);
 		const u32 DynamicOffsets[] = { FrameDynamicOffset };
 
 		DrawEntityBatchConfig Config = {};
@@ -345,7 +347,7 @@ namespace Render
 		Config.DescriptorSetCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 		Config.DynamicOffsetCount = sizeof(DynamicOffsets) / sizeof(DynamicOffsets[0]);
 		Config.DynamicOffsets = DynamicOffsets;
-		Config.PushConstant = PushConstants["MainConstant"];
+		//Config.PushConstant = PushConstants["MainConstant"];
 		Config.PushConstantData = &CurrentFrame;
 
 		DrawEntityBatch(CommandBuffer, Scene, Config);
@@ -388,7 +390,7 @@ namespace Render
 		{
 			DrawEntity* Entity = Scene->DrawEntities.data() + i;
 		
-			bool AreDependenciesReady = true;
+			//bool AreDependenciesReady = true;
 			//for (u32 j = 0; j < Entity->ImageDependency.size(); ++j)
 			//{
 			//	if (TransferSystem::IsImageLocked(Entity->ImageDependency[j]))
@@ -398,24 +400,24 @@ namespace Render
 			//	}
 			//}
 
-			if (!AreDependenciesReady)
-			{
-				continue;
-			}
+			//if (!AreDependenciesReady)
+			//{
+			//	continue;
+			//}
 		
-			for (u32 j = 0; j < Entity->ResourceDependency.size(); ++j)
-			{
-				if (TransferSystem::IsBufferLocked(Entity->ResourceDependency[j].GPUBufferHandle))
-				{
-					AreDependenciesReady = false;
-					break;
-				}
-			}
+			//for (u32 j = 0; j < Entity->ResourceDependency.size(); ++j)
+			//{
+			//	if (TransferSystem::IsBufferLocked(Entity->ResourceDependency[j].GPUBufferHandle))
+			//	{
+			//		AreDependenciesReady = false;
+			//		break;
+			//	}
+			//}
 
-			if (!AreDependenciesReady)
-			{
-				continue;
-			}
+			//if (!AreDependenciesReady)
+			//{
+			//	continue;
+			//}
 
 			const BmRender_GPUBuffer Buffers[] = {
 				Entity->VertexBufferEntry.GPUBufferHandle,
@@ -464,21 +466,44 @@ namespace Render
 		InitCommandSystem(3);
 		InitDrawSystem(3);
 
-		FrameBufferBinding[0] = { FrameDataBuffer, 0, FrameBufferBlock::DataSize };
+		FrameBufferBinding[0] = { FrameDataBuffer, 0, sizeof(FrameData) };
 
 		DescriptorSets = Render::DescriptorSetHandles();
 
 		{
+			BmRender_DescriptorSetLayoutBinding LayoutBinding;
+			LayoutBinding.DescriptorCount = 1;
+			LayoutBinding.DescriptorType = ShadowMaps.Type;
+			LayoutBinding.StageFlags = ShadowMaps.Stage;
+			LayoutBinding.Binding = ShadowMaps.Binding;
+			ShadowMapArrayLayout = BmRender_CreateDescriptorSetLayout(&LayoutBinding, 1);
+		}
+
+		{
+			BmRender_DescriptorSetLayoutBinding LayoutBinding;
+			LayoutBinding.DescriptorCount = 1;
+			LayoutBinding.DescriptorType = FrameBufferDescriptor.Type;
+			LayoutBinding.StageFlags = FrameBufferDescriptor.Stage;
+			LayoutBinding.Binding = FrameBufferDescriptor.Binding;
+			FrameDataLayout = BmRender_CreateDescriptorSetLayout(&LayoutBinding, 1);
+
 			BmRender_DescriptorSetBinding Binding;
 			Binding.BufferRegions = FrameBufferBinding;
 			Binding.BindingCount = 1;
 			Binding.DstArrayElement = 0;
 
-			FrameBufferDescriptor.Set = BmRender_CreateDescriptorSet(DescriptorSetLayouts["FrameDataLayout"], MainPool);
-			BmRender_UpdateDescriptorSet(FrameBufferDescriptor.Set, &Binding, 1);
+			DescriptorSets.FrameBufferSet = BmRender_CreateDescriptorSet(FrameDataLayout, MainPool);
+			BmRender_UpdateDescriptorSet(DescriptorSets.FrameBufferSet, &Binding, 1);
 		}
 
 		{
+			BmRender_DescriptorSetLayoutBinding LayoutBinding;
+			LayoutBinding.DescriptorCount = 1;
+			LayoutBinding.DescriptorType = MaterialsDescriptor.Type;
+			LayoutBinding.StageFlags = MaterialsDescriptor.Stage;
+			LayoutBinding.Binding = MaterialsDescriptor.Binding;
+			MaterialLayout = BmRender_CreateDescriptorSetLayout(&LayoutBinding, 1);
+
 			BmRender_GPUBufferBinding MaterialBufferRegion = { MaterialBuffer, 0, VK_WHOLE_SIZE };
 
 			BmRender_DescriptorSetBinding Binding;
@@ -486,12 +511,20 @@ namespace Render
 			Binding.BindingCount = 1;
 			Binding.DstArrayElement = 0;
 
-			MaterialsDescriptor.Set = BmRender_CreateDescriptorSet(DescriptorSetLayouts["MaterialLayout"], MainPool);
-			BmRender_UpdateDescriptorSet(MaterialsDescriptor.Set, &Binding, 1);
+			DescriptorSets.MaterialsSet = BmRender_CreateDescriptorSet(MaterialLayout, MainPool);
+			BmRender_UpdateDescriptorSet(DescriptorSets.MaterialsSet, &Binding, 1);
 		}
 
 		{
-			DescriptorSets.BindlesTexturesSet = BmRender_CreateDescriptorSet(DescriptorSetLayouts["BindlesTexturesLayout"], MainPool);
+			BmRender_DescriptorSetLayoutBinding LayoutBinding;
+			LayoutBinding.DescriptorCount = 64;
+			LayoutBinding.DescriptorType = AlbedoTexture.Type;
+			LayoutBinding.StageFlags = AlbedoTexture.Stage;
+			LayoutBinding.Binding = AlbedoTexture.Binding;
+
+			BindlesTexturesLayout = BmRender_CreateDescriptorSetLayout(&LayoutBinding, 1);
+
+			DescriptorSets.BindlesTexturesSet = BmRender_CreateDescriptorSet(BindlesTexturesLayout, MainPool);
 		}
 
 		State.DescriptorSets = DescriptorSets;
@@ -510,6 +543,11 @@ namespace Render
 	void DeInit()
 	{
 		BmRender_DeviceWaitIdle();
+
+		BmRender_DestroyDescriptorSetLayout(FrameDataLayout);
+		BmRender_DestroyDescriptorSetLayout(MaterialLayout);
+		BmRender_DestroyDescriptorSetLayout(BindlesTexturesLayout);
+		BmRender_DestroyDescriptorSetLayout(ShadowMapArrayLayout);
 
 		DeInitImGuiPipeline(State.DebugUiPool);
 		
@@ -552,7 +590,7 @@ namespace Render
 	{
 		const u32 CurrentFrame = GetCurrentFrameIndex();
 
-		RenderResources::UpdateBuffer(FrameDataBuffer, FrameBufferBlock::DataSize * CurrentFrame, &FrameBufferDescriptor.Data, FrameBufferBlock::DataSize);
+		RenderResources::UpdateBuffer(FrameDataBuffer, sizeof(FrameData) * CurrentFrame, &Scene->FrameDataBuffer, sizeof(FrameData));
 
 		const u32 ImageIndex = AcquireNextSwapchainImage(CurrentFrame);
 		CurrentImageIndex = ImageIndex;
@@ -1066,8 +1104,8 @@ namespace Render
 
 		const glm::mat4* LightViews[] =
 		{
-			&FrameBufferDescriptor.Data.directionLight.LightSpaceMatrix,
-			& FrameBufferDescriptor.Data.spotlight.LightSpaceMatrix,
+			&Scene->FrameDataBuffer.directionLight.LightSpaceMatrix,
+			&Scene->FrameDataBuffer.spotlight.LightSpaceMatrix,
 		};
 
 		BmRender_TransitionImageForRendering(SubmitPool->CommandBuffer, ShadowMapArray, MAX_LIGHT_SOURCES * GetDrawSystemData()->CurrentFrame, MAX_LIGHT_SOURCES);

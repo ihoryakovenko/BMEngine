@@ -31,9 +31,6 @@ namespace Render
 		BmRender_GPUBufferBinding InstanceBufferEntry;
 		u32 IndicesCount;
 		u32 Instances;
-		
-		std::vector<BmRender_Image> ImageDependency;
-		std::vector<BmRender_GPUBufferBinding> ResourceDependency;
 	};
 
 	struct StaticMeshPipeline
@@ -47,6 +44,8 @@ namespace Render
 
 	struct DescriptorSetHandles
 	{
+		BmRender_DescriptorSet MaterialsSet;
+		BmRender_DescriptorSet FrameBufferSet;
 		BmRender_DescriptorSet BindlesTexturesSet;
 	};
 
@@ -61,6 +60,8 @@ namespace Render
 
 	struct DrawScene
 	{
+		FrameData FrameDataBuffer;
+
 		DrawEntity* DrawTransparentEntities = nullptr;
 		u32 DrawTransparentEntitiesCount = 0;
 

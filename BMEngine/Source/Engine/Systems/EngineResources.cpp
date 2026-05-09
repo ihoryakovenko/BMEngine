@@ -224,8 +224,6 @@ namespace EngineResources
 				Entity.InstanceBufferEntry = InstanceHandle;
 				Entity.IndicesCount = IndicesCount;
 				Entity.Instances = 1;
-				Entity.ImageDependency.push_back(AlbedoTextureHandle);
-				Entity.ResourceDependency.push_back(MaterialHandle);
 
 				std::unique_lock Lock(TmpScene->TempLock);
 				TmpScene->DrawEntities.push_back(Entity);

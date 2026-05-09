@@ -28,6 +28,8 @@ typedef struct BmRender_CommandBuffer_T* BmRender_CommandBuffer;
 typedef struct BmRender_Queue_T* BmRender_Queue;
 typedef struct BmRender_DeviceMemory_T* BmRender_DeviceMemory;
 
+#define DEFINE_ENUM_OR(EnumType) inline EnumType operator| (EnumType lhs, EnumType rhs) { return (EnumType)((u64)(lhs) | (u64)(rhs)); }
+
 enum class BmRender_AttributeType : u8
 {
 	Int,
@@ -47,6 +49,7 @@ enum class BmRender_DescriptorShaderStage : u64
 	Fragment = 1 << 1,
 	Compute = 1 << 2,
 };
+DEFINE_ENUM_OR(BmRender_DescriptorShaderStage);
 
 enum class BmRender_PipelineShaderStage : u8
 {
@@ -550,6 +553,7 @@ struct BmRender_DescriptorSetLayoutBinding
 	BmRender_DescriptorType DescriptorType;
 	u32 DescriptorCount;
 	BmRender_DescriptorShaderStage StageFlags;
+	u32 Binding;
 };
 
 struct BmRender_ImageBinding

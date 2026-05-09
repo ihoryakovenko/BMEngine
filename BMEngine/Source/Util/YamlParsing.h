@@ -217,7 +217,6 @@ namespace Util
 	Yaml::Node& GetPushConstantsFromResources(Yaml::Node& Root);
 
 	// Push constant management
-	void ParseAndCreatePushConstants(Yaml::Node& PushConstantsNode);
 
 	Yaml::Node& GetSceneResources(Yaml::Node& Root);
 	Yaml::Node& GetTextures(Yaml::Node& Root);

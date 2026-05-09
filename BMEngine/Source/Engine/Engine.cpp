@@ -87,6 +87,7 @@ namespace Engine
 				
 				BmRender_DescriptorSetLayoutBinding VkBinding = {};
 				VkBinding.StageFlags = Binding.StageFlags;
+				VkBinding.Binding = i;
 				
 				// Map shader types to Vulkan descriptor types
 				switch (Binding.Type)
@@ -276,7 +277,6 @@ namespace Engine
 		ParseAndCreateShaders(Util::GetShaders(Root));
 		ParseAndCreateSamplers(Util::GetSamplers(Root));
 		ParseAndCreateDescriptorSetLayouts(Util::GetDescriptorSetLayouts(Root));
-		Util::ParseAndCreatePushConstants(Util::GetPushConstantsFromResources(Root));
 
 		TransferSystem::Init();
 		Render::Init(Window);
@@ -357,22 +357,22 @@ namespace Engine
 		//	glm::mat4 TestMat = glm::rotate(Scene.DrawEntities[i].Model, glm::radians(0.5f), glm::vec3(0.0f, 1.0f, 0.0f));
 		//}
 
-		FrameBufferDescriptor.Data.View = glm::lookAt(MainCamera.Position, MainCamera.Position + MainCamera.Front, MainCamera.Up);
+		Scene.FrameDataBuffer.View = glm::lookAt(MainCamera.Position, MainCamera.Position + MainCamera.Front, MainCamera.Up);
 
 		float NearPlane = 0.1f, FarPlane = 100.0f;
 		float HalfSize = 30.0f;
 		glm::mat4 LightProjection = glm::ortho(-HalfSize, HalfSize, -HalfSize, HalfSize, NearPlane, FarPlane);
 
-		glm::vec3 Center = Eye + FrameBufferDescriptor.Data.directionLight.Direction;
+		glm::vec3 Center = Eye + Scene.FrameDataBuffer.directionLight.Direction;
 		glm::mat4 LightView = glm::lookAt(Eye, Center, Up);
 		
-		FrameBufferDescriptor.Data.directionLight.LightSpaceMatrix = LightProjection * LightView;
-		FrameBufferDescriptor.Data.spotlight.Direction = MainCamera.Front;
-		FrameBufferDescriptor.Data.spotlight.Position = MainCamera.Position;
-		FrameBufferDescriptor.Data.spotlight.Planes = glm::vec2(Near, Far);
-		FrameBufferDescriptor.Data.spotlight.LightSpaceMatrix = FrameBufferDescriptor.Data.Projection * FrameBufferDescriptor.Data.View;
+		Scene.FrameDataBuffer.directionLight.LightSpaceMatrix = LightProjection * LightView;
+		Scene.FrameDataBuffer.spotlight.Direction = MainCamera.Front;
+		Scene.FrameDataBuffer.spotlight.Position = MainCamera.Position;
+		Scene.FrameDataBuffer.spotlight.Planes = glm::vec2(Near, Far);
+		Scene.FrameDataBuffer.spotlight.LightSpaceMatrix = Scene.FrameDataBuffer.Projection * Scene.FrameDataBuffer.View;
 
-		GuiData.DirectionLightDirection = &FrameBufferDescriptor.Data.directionLight.Direction;
+		GuiData.DirectionLightDirection = &Scene.FrameDataBuffer.directionLight.Direction;
 		GuiData.Eye = &Eye;
 
 		UI::Update();
@@ -391,23 +391,23 @@ namespace Engine
 		//Scene.DrawSkyBox = true;
 		Scene.DrawSkyBox = false;
 
-		FrameBufferDescriptor.Data.Projection = glm::perspective(glm::radians(MainCamera.Fov),
+		Scene.FrameDataBuffer.Projection = glm::perspective(glm::radians(MainCamera.Fov),
 			MainCamera.AspectRatio, Near, Far);
-		FrameBufferDescriptor.Data.Projection[1][1] *= -1;
-		FrameBufferDescriptor.Data.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		Scene.FrameDataBuffer.Projection[1][1] *= -1;
+		Scene.FrameDataBuffer.View = glm::lookAt(glm::vec3(0.0f, 0.0f, 20.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
-		FrameBufferDescriptor.Data.pointlight.Position = glm::vec4(0.0f, 0.0f, 2.0f, 1.0f);
-		FrameBufferDescriptor.Data.pointlight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
+		Scene.FrameDataBuffer.pointlight.Position = glm::vec4(0.0f, 0.0f, 2.0f, 1.0f);
+		Scene.FrameDataBuffer.pointlight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
 
-		FrameBufferDescriptor.Data.directionLight.Direction = glm::vec3(0.0f, -1.0f, 0.0f);
-		FrameBufferDescriptor.Data.directionLight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
+		Scene.FrameDataBuffer.directionLight.Direction = glm::vec3(0.0f, -1.0f, 0.0f);
+		Scene.FrameDataBuffer.directionLight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
 
-		FrameBufferDescriptor.Data.spotlight.Position = glm::vec4(0.0f, 0.0f, 10.0f, 1.0f);
-		FrameBufferDescriptor.Data.spotlight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
-		FrameBufferDescriptor.Data.spotlight.CutOff = glm::cos(glm::radians(12.5f));
-		FrameBufferDescriptor.Data.spotlight.OuterCutOff = glm::cos(glm::radians(17.5f));
+		Scene.FrameDataBuffer.spotlight.Position = glm::vec4(0.0f, 0.0f, 10.0f, 1.0f);
+		Scene.FrameDataBuffer.spotlight.Color = glm::vec3(1.0f, 1.0f, 1.0f);
+		Scene.FrameDataBuffer.spotlight.CutOff = glm::cos(glm::radians(12.5f));
+		Scene.FrameDataBuffer.spotlight.OuterCutOff = glm::cos(glm::radians(17.5f));
 
-		GuiData.DirectionLightDirection = &FrameBufferDescriptor.Data.directionLight.Direction;
+		GuiData.DirectionLightDirection = &Scene.FrameDataBuffer.directionLight.Direction;
 		GuiData.Eye = &Eye;
 		GuiData.CameraMercatorPosition = &CameraSphericalPosition;
 		GuiData.Zoom = &Zoom;
