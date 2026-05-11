@@ -47,6 +47,7 @@ namespace Render
 		BmRender_DescriptorSet MaterialsSet;
 		BmRender_DescriptorSet FrameBufferSet;
 		BmRender_DescriptorSet BindlesTexturesSet;
+		BmRender_DescriptorSet VertexInputSet;
 	};
 
 	struct RenderState
@@ -118,6 +119,7 @@ namespace Render
 
 	Render::DescriptorSetHandles* GetHandles();
 	BmRender_GPUBuffer GetVertexBuffer();
+	BmRender_GPUBuffer GetIndexBuffer();
 	BmRender_GPUBuffer GetInstanceBuffer();
 	BmRender_GPUBuffer GetMaterialBuffer();
 }

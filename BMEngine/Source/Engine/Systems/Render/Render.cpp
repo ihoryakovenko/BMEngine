@@ -33,7 +33,8 @@ extern std::unordered_map<std::string, BmRender_PushConstant> PushConstants;
 static BmRender_Image ShadowMapArray;
 
 BmRender_GPUBuffer FrameDataBuffer;
-BmRender_GPUBuffer VertexStageBuffer;
+BmRender_GPUBuffer VertexBuffer;
+BmRender_GPUBuffer IndexBuffer;
 BmRender_GPUBuffer InstanceBuffer;
 BmRender_GPUBuffer MaterialBuffer;
 
@@ -45,6 +46,7 @@ BmRender_DescriptorSetLayout FrameDataLayout;
 BmRender_DescriptorSetLayout MaterialLayout;
 BmRender_DescriptorSetLayout BindlesTexturesLayout;
 BmRender_DescriptorSetLayout ShadowMapArrayLayout;
+BmRender_DescriptorSetLayout VertexLayout;
 
 namespace Render
 {
@@ -156,7 +158,6 @@ namespace Render
 
 		// Create vectors to hold pipeline data
 		std::vector<BmRender_ShaderStageDescription> shaderStages;
-		std::vector<BmRender_VertexBinding> vertexBindings;
 		std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
 		std::vector<BmRender_PushConstant> pushConstantRanges;
 
@@ -176,55 +177,7 @@ namespace Render
 		descriptorSetLayouts.push_back(BindlesTexturesLayout);
 		descriptorSetLayouts.push_back(MaterialLayout);
 		descriptorSetLayouts.push_back(ShadowMapArrayLayout);
-
-		// Build vertex bindings from VBindings map
-		{
-			BmRender_VertexBinding BmRenderVertexBinding = {};
-
-			VertexAttribute AttributePosition;
-			AttributePosition.Type = BmRender_AttributeType::Vec3;
-			AttributePosition.Offset = offsetof(StaticMeshVertex, Position);
-
-			VertexAttribute AttributeTexCoords;
-			AttributeTexCoords.Type = BmRender_AttributeType::Vec2;
-			AttributeTexCoords.Offset = offsetof(StaticMeshVertex, TextureCoords);
-
-			VertexAttribute AttributeNormal;
-			AttributeNormal.Type = BmRender_AttributeType::Vec3;
-			AttributeNormal.Offset = offsetof(StaticMeshVertex, Normal);
-
-			VertexAttribute Attributes[] = { AttributePosition, AttributeTexCoords, AttributeNormal };
-			const u32 AttributesCount = sizeof(Attributes) / sizeof(Attributes[0]);
-
-			BmRenderVertexBinding.Stride = sizeof(StaticMeshVertex);
-			BmRenderVertexBinding.InputRate = BmRender_VertexInputRate::Vertex;
-			BmRenderVertexBinding.AttributesCount = AttributesCount;
-			BmRenderVertexBinding.Attributes = Attributes;
-
-			vertexBindings.push_back(BmRenderVertexBinding);
-		}
-
-		{
-			BmRender_VertexBinding BmRenderVertexBinding = {};
-
-			VertexAttribute ModelMatrixAttribute;
-			ModelMatrixAttribute.Type = BmRender_AttributeType::Mat4;
-			ModelMatrixAttribute.Offset = offsetof(StaticMeshInstance, ModelMatrix);
-
-			VertexAttribute MaterialIndexAttribute;
-			MaterialIndexAttribute.Type = BmRender_AttributeType::Uint;
-			MaterialIndexAttribute.Offset = offsetof(StaticMeshInstance, MaterialIndex);
-
-			VertexAttribute Attributes[] = { ModelMatrixAttribute, MaterialIndexAttribute };
-			const u32 AttributesCount = sizeof(Attributes) / sizeof(Attributes[0]);
-
-			BmRenderVertexBinding.Stride = sizeof(StaticMeshInstance);
-			BmRenderVertexBinding.InputRate = BmRender_VertexInputRate::Instance;
-			BmRenderVertexBinding.AttributesCount = AttributesCount;
-			BmRenderVertexBinding.Attributes = Attributes;
-
-			vertexBindings.push_back(BmRenderVertexBinding);
-		}
+		descriptorSetLayouts.push_back(VertexLayout);
 
 		// Build pipeline description
 		BmRender_PipelineDescription PipelineDesc = {};
@@ -236,8 +189,8 @@ namespace Render
 		PipelineDesc.ShaderStagesCount = static_cast<u32>(shaderStages.size());
 
 		// Set vertex bindings
-		PipelineDesc.VertexBindings = vertexBindings.data();
-		PipelineDesc.VertexBindingsCount = static_cast<u32>(vertexBindings.size());
+		PipelineDesc.VertexBindings = nullptr;
+		PipelineDesc.VertexBindingsCount = 0;
 
 		// Set descriptor set layouts
 		PipelineDesc.DescriptorSetLayouts = descriptorSetLayouts.data();
@@ -335,6 +288,7 @@ namespace Render
 			DescriptorSets.BindlesTexturesSet,
 			DescriptorSets.MaterialsSet,
 			MeshPipeline->ShadowMapArraySet[CurrentFrame],
+			DescriptorSets.VertexInputSet,
 		};
 
 		const u32 FrameDynamicOffset = CurrentFrame * sizeof(FrameData);
@@ -419,19 +373,8 @@ namespace Render
 			//	continue;
 			//}
 
-			const BmRender_GPUBuffer Buffers[] = {
-				Entity->VertexBufferEntry.GPUBufferHandle,
-				Entity->InstanceBufferEntry.GPUBufferHandle
-			};
-	
-			const u64 Offsets[] = {
-				Entity->VertexBufferEntry.BufferOffset,
-				Entity->InstanceBufferEntry.BufferOffset
-			};
-	
-			BmRender_RecordBindVertexBuffers(CommandBuffer, 0, 2, Buffers, Offsets);
 			BmRender_RecordBindIndexBuffer(CommandBuffer, Entity->IndexBufferEntry.GPUBufferHandle, Entity->IndexBufferEntry.BufferOffset, BmRender_IndexType::Uint32);
-			BmRender_DrawIndexed(CommandBuffer, Entity->IndicesCount, Entity->Instances, 0, 0, 0);
+			BmRender_DrawIndexed(CommandBuffer, Entity->IndicesCount, Entity->Instances, 0, 0, i);
 		}
 	}
 
@@ -459,16 +402,48 @@ namespace Render
 		BmRender_DescriptorPool MainPool = BmRender_CreateDescriptorPool(TotalPassPoolSizes, TotalDescriptorCount, PoolSizeCount, BmRender_DescriptorPoolType::UpdateAfterBind);
 
 		FrameDataBuffer = BmRender_CreateUniformBuffer(65536, MemoryPropertyFlag::HostCompatible);
-		VertexStageBuffer = BmRender_CreateVertexStageBuffer(MB4, MemoryPropertyFlag::GPULocal);
-		InstanceBuffer = BmRender_CreateInstanceBuffer(MB4, MemoryPropertyFlag::GPULocal);
+		VertexBuffer = BmRender_CreateStorageBuffer(MB4, MemoryPropertyFlag::GPULocal);
+		IndexBuffer = BmRender_CreateVertexStageBuffer(MB4, MemoryPropertyFlag::GPULocal);
+		InstanceBuffer = BmRender_CreateStorageBuffer(MB4, MemoryPropertyFlag::GPULocal);
 		MaterialBuffer = BmRender_CreateStorageBuffer(MB4, MemoryPropertyFlag::GPULocal);
 
 		InitCommandSystem(3);
 		InitDrawSystem(3);
 
-		FrameBufferBinding[0] = { FrameDataBuffer, 0, sizeof(FrameData) };
+		
 
 		DescriptorSets = Render::DescriptorSetHandles();
+
+		{
+			BmRender_DescriptorSetLayoutBinding LayoutBindings[2];
+			LayoutBindings[0].DescriptorCount = 1;
+			LayoutBindings[0].DescriptorType = VertexDescriptor.Type;
+			LayoutBindings[0].StageFlags = VertexDescriptor.Stage;
+			LayoutBindings[0].Binding = VertexDescriptor.Binding;
+
+			LayoutBindings[1].DescriptorCount = 1;
+			LayoutBindings[1].DescriptorType = InstanceDescriptor.Type;
+			LayoutBindings[1].StageFlags = InstanceDescriptor.Stage;
+			LayoutBindings[1].Binding = InstanceDescriptor.Binding;
+
+
+			VertexLayout = BmRender_CreateDescriptorSetLayout(LayoutBindings, 2);
+
+			BmRender_GPUBufferBinding VertexBufferRegion = { VertexBuffer, 0, VK_WHOLE_SIZE };
+			BmRender_GPUBufferBinding InstanceBufferRegion = { InstanceBuffer, 0, VK_WHOLE_SIZE };
+
+			BmRender_DescriptorSetBinding Bindings[2];
+			Bindings[0].BufferRegions = &VertexBufferRegion;
+			Bindings[0].BindingCount = 1;
+			Bindings[0].DstArrayElement = 0;
+
+			Bindings[1].BufferRegions = &InstanceBufferRegion;
+			Bindings[1].BindingCount = 1;
+			Bindings[1].DstArrayElement = 0;
+
+			DescriptorSets.VertexInputSet = BmRender_CreateDescriptorSet(VertexLayout, MainPool);
+			BmRender_UpdateDescriptorSet(DescriptorSets.VertexInputSet, Bindings, 2);
+		}
 
 		{
 			BmRender_DescriptorSetLayoutBinding LayoutBinding;
@@ -486,6 +461,8 @@ namespace Render
 			LayoutBinding.StageFlags = FrameBufferDescriptor.Stage;
 			LayoutBinding.Binding = FrameBufferDescriptor.Binding;
 			FrameDataLayout = BmRender_CreateDescriptorSetLayout(&LayoutBinding, 1);
+
+			FrameBufferBinding[0] = { FrameDataBuffer, 0, sizeof(FrameData) };
 
 			BmRender_DescriptorSetBinding Binding;
 			Binding.BufferRegions = FrameBufferBinding;
@@ -580,7 +557,8 @@ namespace Render
 		DeInitCommandSystem();
 
 		// Destroy GPUBuffers
-		BmRender_DestroyGPUBuffer(VertexStageBuffer);
+		BmRender_DestroyGPUBuffer(VertexBuffer);
+		BmRender_DestroyGPUBuffer(IndexBuffer);
 		BmRender_DestroyGPUBuffer(InstanceBuffer);
 		BmRender_DestroyGPUBuffer(MaterialBuffer);
 		BmRender_DestroyGPUBuffer(FrameDataBuffer);
@@ -938,7 +916,6 @@ namespace Render
 
 		// Create vectors to hold pipeline data
 		std::vector<BmRender_ShaderStageDescription> shaderStages;
-		std::vector<BmRender_VertexBinding> vertexBindings;
 		std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
 		std::vector<BmRender_PushConstant> pushConstantRanges;
 
@@ -950,32 +927,7 @@ namespace Render
 
 		// Build descriptor set layouts
 		descriptorSetLayouts.push_back(DescriptorSetLayouts["LightSpaceMatrixLayout"]);
-
-		{
-			BmRender_VertexBinding BmRenderVertexBinding = {};
-
-			VertexAttribute AttributePosition;
-			AttributePosition.Type = BmRender_AttributeType::Vec3;
-			AttributePosition.Offset = offsetof(StaticMeshVertex, Position);
-
-			VertexAttribute AttributeTexCoords;
-			AttributeTexCoords.Type = BmRender_AttributeType::Vec2;
-			AttributeTexCoords.Offset = offsetof(StaticMeshVertex, TextureCoords);
-
-			VertexAttribute AttributeNormal;
-			AttributeNormal.Type = BmRender_AttributeType::Vec3;
-			AttributeNormal.Offset = offsetof(StaticMeshVertex, Normal);
-
-			VertexAttribute Attributes[] = { AttributePosition, AttributeTexCoords, AttributeNormal };
-			const u32 AttributesCount = sizeof(Attributes) / sizeof(Attributes[0]);
-
-			BmRenderVertexBinding.Stride = sizeof(StaticMeshVertex);
-			BmRenderVertexBinding.InputRate = BmRender_VertexInputRate::Vertex;
-			BmRenderVertexBinding.AttributesCount = AttributesCount;
-			BmRenderVertexBinding.Attributes = Attributes;
-
-			vertexBindings.push_back(BmRenderVertexBinding);
-		}
+		descriptorSetLayouts.push_back(VertexLayout);
 
 		{
 			BmRender_VertexBinding BmRenderVertexBinding = {};
@@ -995,8 +947,6 @@ namespace Render
 			BmRenderVertexBinding.InputRate = BmRender_VertexInputRate::Instance;
 			BmRenderVertexBinding.AttributesCount = AttributesCount;
 			BmRenderVertexBinding.Attributes = Attributes;
-
-			vertexBindings.push_back(BmRenderVertexBinding);
 		}
 
 		// Build pipeline description
@@ -1009,8 +959,8 @@ namespace Render
 		PipelineDesc.ShaderStagesCount = static_cast<u32>(shaderStages.size());
 
 		// Set vertex bindings
-		PipelineDesc.VertexBindings = vertexBindings.data();
-		PipelineDesc.VertexBindingsCount = static_cast<u32>(vertexBindings.size());
+		PipelineDesc.VertexBindings = nullptr;
+		PipelineDesc.VertexBindingsCount = 0;
 
 		// Set descriptor set layouts
 		PipelineDesc.DescriptorSetLayouts = descriptorSetLayouts.data();
@@ -1135,13 +1085,14 @@ namespace Render
 
 			const BmRender_DescriptorSet DescriptorSetGroup[] = {
 				LightSpaceMatrixSet[LightCaster],
+				DescriptorSets.VertexInputSet
 			};
 
 			DrawEntityBatchConfig Config = {};
 			Config.Pipeline = Pipelines["Depth"];
 			Config.PipelineLayout = PipelineLayouts["Depth"];
 			Config.DescriptorSets = DescriptorSetGroup;
-			Config.DescriptorSetCount = 1;
+			Config.DescriptorSetCount = 2;
 			Config.DynamicOffsetCount = 0;
 			Config.DynamicOffsets = nullptr;
 			Config.PushConstant = {};
@@ -1227,7 +1178,12 @@ namespace Render
 
 	BmRender_GPUBuffer GetVertexBuffer()
 	{
-		return VertexStageBuffer;
+		return VertexBuffer;
+	}
+
+	BmRender_GPUBuffer GetIndexBuffer()
+	{
+		return IndexBuffer;
 	}
 
 	BmRender_GPUBuffer GetInstanceBuffer()

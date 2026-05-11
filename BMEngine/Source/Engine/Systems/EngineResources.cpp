@@ -129,6 +129,9 @@ namespace EngineResources
 			u32 MateriaIndex = 0;
 			u32 InstanceIndex = 0;
 			u64 ModelVertexByteOffset = 0;
+			u64 VertexBufferOffset = 0;
+			u64 IndexBufferOffset = 0;
+
 			for (u32 i = 0; i < Model.Header.MeshCount; i++)
 			{
 				const u64 VerticesCount = Model.VerticesCounts[i];
@@ -188,15 +191,15 @@ namespace EngineResources
 					//}
 				}
 
-				const u64 VertexDataSize = VerticesCount * sizeof(StaticMeshVertex) + IndicesCount * sizeof(u32);
+				const u64 VertexDataSize = VerticesCount * sizeof(StaticMeshVertex);
 				const u64 VerticesSize = sizeof(StaticMeshVertex) * VerticesCount;
 				const u64 IndicesSize = IndicesCount * sizeof(u32);
 					
-				BmRender_GPUBufferBinding MeshHandle = { Render::GetVertexBuffer(), ModelVertexByteOffset, VertexDataSize};
-				RenderResources::UpdateBufferRegion(MeshHandle, 0, Model.VertexData + ModelVertexByteOffset, VertexDataSize);
+				BmRender_GPUBufferBinding VertexHandle = { Render::GetVertexBuffer(), VertexBufferOffset, VertexDataSize };
+				BmRender_GPUBufferBinding IndexHandle = { Render::GetIndexBuffer(), IndexBufferOffset, IndicesSize };
 
-				const BmRender_GPUBufferBinding VertexBufferEntry = { Render::GetVertexBuffer(), ModelVertexByteOffset, VerticesSize };
-				const BmRender_GPUBufferBinding IndexBufferEntry = { Render::GetVertexBuffer(), ModelVertexByteOffset + VerticesSize, IndicesSize };
+				RenderResources::UpdateBufferRegion(VertexHandle, 0, Model.VertexData + ModelVertexByteOffset, VertexDataSize);
+				RenderResources::UpdateBufferRegion(IndexHandle, 0, Model.VertexData + ModelVertexByteOffset + VertexDataSize, IndicesSize);
 
 				Material Mat;
 				Mat.AlbedoTexIndex = TextureGPUIndex;
@@ -219,8 +222,8 @@ namespace EngineResources
 				++InstanceIndex;
 
 				Render::DrawEntity Entity = { };
-				Entity.VertexBufferEntry = VertexBufferEntry;
-				Entity.IndexBufferEntry = IndexBufferEntry;
+				Entity.VertexBufferEntry = VertexHandle;
+				Entity.IndexBufferEntry = IndexHandle;
 				Entity.InstanceBufferEntry = InstanceHandle;
 				Entity.IndicesCount = IndicesCount;
 				Entity.Instances = 1;
@@ -229,7 +232,9 @@ namespace EngineResources
 				TmpScene->DrawEntities.push_back(Entity);
 				Lock.unlock();
 
-				ModelVertexByteOffset += VertexDataSize;
+				VertexBufferOffset += VertexDataSize;
+				IndexBufferOffset += IndicesSize;
+				ModelVertexByteOffset += VertexDataSize + IndicesSize;
 			}
 
 			Util::ClearModel3DData(ModelData);

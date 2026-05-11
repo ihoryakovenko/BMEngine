@@ -147,6 +147,8 @@ namespace Util
 
 		std::unordered_set<u64> textureHashes;
 
+		u64 VertexShift = 0;
+
 		uniqueMaterials.reserve(Materials.size());
 		uniqueTextureHashes.reserve(Materials.size());
 
@@ -219,9 +221,11 @@ namespace Util
 					Vertices.push_back(vertex);
 				}
 
-				Indices.push_back(uniqueVertices[vertex]);
+				Indices.push_back(uniqueVertices[vertex] + VertexShift);
+				//Indices.push_back(uniqueVertices[vertex]);
 			}
 
+			VertexShift += Vertices.size();
 			VerticesCounts[i] = Vertices.size();
 			IndicesCounts[i] = Indices.size();
 

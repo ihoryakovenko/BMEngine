@@ -8,16 +8,19 @@ struct LightSpaceMatrixData
 [[vk::binding(0,0)]]
 ConstantBuffer<LightSpaceMatrixData> lightSpaceMatrix;
 
+DECLARE_STORAGE_BUFFER_DESCRIPTOR(StaticMeshVertex, 0, 1, BmRender_DescriptorShaderStage::Vertex, VertexDescriptor);
+DECLARE_STORAGE_BUFFER_DESCRIPTOR(StaticMeshInstance, 1, 1, BmRender_DescriptorShaderStage::Vertex, InstanceDescriptor);
+
 struct VSOutput
 {
     float4 Position : SV_Position;
 };
 
 [shader("vertex")]
-VSOutput main(StaticMeshVertexInput input)
+VSOutput main(uint vID: SV_VertexID, uint iID: SV_InstanceID)
 {
-    StaticMeshVertex vertex = input.Vertex;
-    StaticMeshInstance instance = input.Instance;
+    StaticMeshVertex vertex = VertexDescriptor[vID];
+    StaticMeshInstance instance = InstanceDescriptor[iID];
 
     VSOutput output;
 

@@ -90,11 +90,16 @@ static VkDevice CreateLogicalDevice(VkPhysicalDevice PhDevice, PhysicalDeviceInd
 	DeviceFeatures.multiDrawIndirect = QueryDeviceFeatures.multiDrawIndirect ? VK_TRUE : VK_FALSE;
 	DeviceFeatures.drawIndirectFirstInstance = QueryDeviceFeatures.drawIndirectFirstInstance ? VK_TRUE : VK_FALSE;
 
+	VkPhysicalDeviceVulkan11Features features11 = {};
+	features11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+	features11.shaderDrawParameters = VK_TRUE;
+
 	DeviceFeatures2.pNext = &TimelineSemaphoreFeatures;
 	TimelineSemaphoreFeatures.pNext = &IndexingFeatures;
 	IndexingFeatures.pNext = &Sync2Features;
 	Sync2Features.pNext = &DynamicRenderingFeatures;
 	DynamicRenderingFeatures.pNext = &BufferDeviceAddressFeatures;
+	BufferDeviceAddressFeatures.pNext = &features11;
 
 
 	VkDeviceCreateInfo DeviceCreateInfo = { };

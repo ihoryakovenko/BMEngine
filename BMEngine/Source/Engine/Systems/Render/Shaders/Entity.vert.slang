@@ -26,10 +26,10 @@ float3x3 inverse(float3x3 m)
 }
 
 [shader("vertex")]
-VertexOutput main(StaticMeshVertexInput input)
+VertexOutput main(uint vID: SV_VertexID, uint iID: SV_StartInstanceLocation)
 {
-    StaticMeshVertex vertex = input.Vertex;
-    StaticMeshInstance instance = input.Instance;
+    StaticMeshVertex vertex = VertexDescriptor[vID];
+    StaticMeshInstance instance = InstanceDescriptor[iID];
 
     VertexOutput output;
     output.FragmentTexture = vertex.TextureCoords;

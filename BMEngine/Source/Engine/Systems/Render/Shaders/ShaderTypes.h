@@ -43,7 +43,9 @@ inline DescriptorSet Name = { SetIndex, {
 typedef glm::mat4 float4x4;
 typedef glm::vec4 float4;
 typedef glm::vec3 float3;
+typedef glm::ivec3 uint3;
 typedef glm::vec2 float2;
+typedef glm::ivec2 uint2;
 typedef u32 uint;
 
 typedef glm::aligned_mat4 float4x4_16;
@@ -117,20 +119,25 @@ struct Material
 struct StaticMeshVertex
 {
     float3 Position;
+    uint pad1;
     float2 TextureCoords;
+    uint2 pad2;
     float3 Normal;
+    uint pad3;
 };
 
 struct StaticMeshInstance
 {
     float4x4 ModelMatrix;
+    uint3 pad1;
     uint MaterialIndex;
+    
 };
 
 struct StaticMeshVertexInput
 {
-    [[vk::location(0)]] StaticMeshVertex Vertex;
-    [[vk::location(3)]] StaticMeshInstance Instance;
+    StaticMeshVertex Vertex;
+    StaticMeshInstance Instance;
 };
 
 #endif
