@@ -1,5 +1,4 @@
-[[vk::binding(0,0)]] Sampler2D InputColor;
-[[vk::binding(1,0)]] Sampler2D InputDepth;
+#include "Deferred.h"
 
 struct PSInput
 {

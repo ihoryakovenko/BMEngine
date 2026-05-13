@@ -18,7 +18,6 @@
 #include <vector>
 
 #include <Engine/Systems/Render/Shaders/ShaderTypes.h>
-#include <Engine/Systems/Render/Shaders/Common.h>
 
 #include "RenderInterface.h"
 
@@ -47,7 +46,7 @@ namespace Render
 		BmRender_DescriptorSet MaterialsSet;
 		BmRender_DescriptorSet FrameBufferSet;
 		BmRender_DescriptorSet BindlesTexturesSet;
-		BmRender_DescriptorSet VertexInputSet;
+		BmRender_DescriptorSet EmptySet;
 	};
 
 	struct RenderState
@@ -61,7 +60,7 @@ namespace Render
 
 	struct DrawScene
 	{
-		FrameData FrameDataBuffer;
+		Shader_FrameData FrameDataBuffer;
 
 		DrawEntity* DrawTransparentEntities = nullptr;
 		u32 DrawTransparentEntitiesCount = 0;

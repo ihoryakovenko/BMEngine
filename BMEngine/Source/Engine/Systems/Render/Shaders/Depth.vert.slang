@@ -1,15 +1,6 @@
+#include "Common.h"
+#include "Depth.h"
 #include "ShaderTypes.h"
-
-struct LightSpaceMatrixData
-{
-    float4x4 Matrix;
-};
-
-[[vk::binding(0,0)]]
-ConstantBuffer<LightSpaceMatrixData> lightSpaceMatrix;
-
-DECLARE_STORAGE_BUFFER_DESCRIPTOR(StaticMeshVertex, 0, 1, BmRender_DescriptorShaderStage::Vertex, VertexDescriptor);
-DECLARE_STORAGE_BUFFER_DESCRIPTOR(StaticMeshInstance, 1, 1, BmRender_DescriptorShaderStage::Vertex, InstanceDescriptor);
 
 struct VSOutput
 {

@@ -25,14 +25,12 @@
 #include "Engine/Systems/Render/TransferSystem.h"
 #include "Engine/Systems/Concurrency/TaskSystem.h"
 #include <Engine/Systems/Render/Shaders/ShaderTypes.h>
-#include <Engine/Systems/Render/Shaders/Common.h>
 
 
 #include <gli/gli.hpp>
 
 // Global resource maps
 std::unordered_map<std::string, BmRender_Sampler> Samplers;
-std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 std::unordered_map<std::string, BmRender_Shader> Shaders;
 std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
 std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
@@ -69,57 +67,6 @@ namespace Engine
 		{
 			BmRHI_SamplerDescription Data = Util::ParseSamplerNode((*It).second);
 			Samplers[(*It).first] = BmRender_CreateSampler(&Data);
-		}
-	}
-
-	static void ParseAndCreateDescriptorSetLayouts(Yaml::Node& DescriptorSetLayoutsNode)
-	{
-		std::vector<Util::DescriptorSetLayout> Layouts = Util::ParseDescriptorSetLayouts(DescriptorSetLayoutsNode);
-		
-		for (const auto& Layout : Layouts)
-		{
-			std::vector<BmRender_DescriptorSetLayoutBinding> Bindings;
-			
-			// Convert our simple structs to Vulkan structures
-			for (u32 i = 0; i < Layout.Bindings.size(); ++i)
-			{
-				const auto& Binding = Layout.Bindings[i];
-				
-				BmRender_DescriptorSetLayoutBinding VkBinding = {};
-				VkBinding.StageFlags = Binding.StageFlags;
-				VkBinding.Binding = i;
-				
-				// Map shader types to Vulkan descriptor types
-				switch (Binding.Type)
-				{
-				case Util::ShaderType::Uniform:
-					VkBinding.DescriptorType = (Binding.MemoryFlag == MemoryPropertyFlag::HostCompatible) ?
-						BmRender_DescriptorType::UniformBufferDynamic : BmRender_DescriptorType::UniformBuffer;
-					VkBinding.DescriptorCount = 1;
-
-					break;
-				case Util::ShaderType::Buffer:
-					VkBinding.DescriptorType = (Binding.MemoryFlag == MemoryPropertyFlag::HostCompatible) ?
-						BmRender_DescriptorType::StorageBufferDynamic : BmRender_DescriptorType::StorageBuffer;
-					VkBinding.DescriptorCount = 1;
-
-						break;
-					case Util::ShaderType::Sampler2D:
-						VkBinding.DescriptorType = BmRender_DescriptorType::CombinedImageSampler;
-						VkBinding.DescriptorCount = 1;
-
-						break;
-					case Util::ShaderType::Sampler2DArray:
-						VkBinding.DescriptorType = BmRender_DescriptorType::CombinedImageSampler;
-						VkBinding.DescriptorCount = 64;
-
-						break;
-				}
-				
-				Bindings.push_back(VkBinding);
-			}
-			
-			DescriptorSetLayouts[Layout.Name] = BmRender_CreateDescriptorSetLayout(Bindings.data(), static_cast<u32>(Bindings.size()));
 		}
 	}
 
@@ -276,7 +223,6 @@ namespace Engine
 
 		ParseAndCreateShaders(Util::GetShaders(Root));
 		ParseAndCreateSamplers(Util::GetSamplers(Root));
-		ParseAndCreateDescriptorSetLayouts(Util::GetDescriptorSetLayouts(Root));
 
 		TransferSystem::Init();
 		Render::Init(Window);
@@ -315,12 +261,6 @@ namespace Engine
 		TransferSystem::DeInit();
 		EngineResources::DeInit();
 		UI::DeInit();
-
-		for (auto& [name, layout] : DescriptorSetLayouts)
-		{
-			BmRender_DestroyDescriptorSetLayout(layout);
-		}
-		DescriptorSetLayouts.clear();
 
 		for (auto& [name, shader] : Shaders)
 		{

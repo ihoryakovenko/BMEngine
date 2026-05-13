@@ -120,7 +120,6 @@ VkBorderColor BorderColorToVk(BmRender_BorderColor Color);
 VkImageLayout ImageLayoutToVk(BmRender_ImageLayout Layout);
 VkAttachmentLoadOp AttachmentLoadOpToVk(BmRender_AttachmentLoadOp Op);
 VkAttachmentStoreOp AttachmentStoreOpToVk(BmRender_AttachmentStoreOp Op);
-VkVertexInputRate VertexInputRateToVk(BmRender_VertexInputRate Rate);
 VkDescriptorType DescriptorTypeToVk(BmRender_DescriptorType Type);
 BmRender_DescriptorType VkDescriptorTypeToBmRender(VkDescriptorType Type);
 VkIndexType IndexTypeToVk(BmRender_IndexType Type);

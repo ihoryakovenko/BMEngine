@@ -404,83 +404,6 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 
-	VkVertexInputBindingDescription* VkVertexBindings = (VkVertexInputBindingDescription*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkVertexInputBindingDescription) * Description->VertexBindingsCount);
-
-	u32 TotalAttributes = 0;
-	VkVertexInputAttributeDescription* VkVertexAttributes = (VkVertexInputAttributeDescription*)Memory_LinearAllocator_GetHead(GetFrameMemory());
-	VkVertexInputAttributeDescription* VkAttribute = nullptr;
-
-	u32 CurrentLocation = 0;
-	for (u32 BindingIndex = 0; BindingIndex < Description->VertexBindingsCount; ++BindingIndex)
-	{
-		const BmRender_VertexBinding& VertexBinding = Description->VertexBindings[BindingIndex];
-
-		VkVertexInputBindingDescription* VkBinding = VkVertexBindings + BindingIndex;
-		VkBinding->binding = BindingIndex;
-		VkBinding->stride = VertexBinding.Stride;
-		VkBinding->inputRate = VertexInputRateToVk(VertexBinding.InputRate);
-
-		for (u32 AttrIndex = 0; AttrIndex < VertexBinding.AttributesCount; ++AttrIndex)
-		{
-			const VertexAttribute& attribute = VertexBinding.Attributes[AttrIndex];
-			if (attribute.Type != BmRender_AttributeType::Mat4)
-			{
-				BmRender_Format Format;
-				switch (attribute.Type)
-				{
-					case BmRender_AttributeType::Int:
-						Format = BmRender_Format::R32_SINT;
-						break;
-					case BmRender_AttributeType::Uint:
-						Format = BmRender_Format::R32_UINT;
-						break;
-					case BmRender_AttributeType::Float:
-						Format = BmRender_Format::R32_SFLOAT;
-						break;
-					case BmRender_AttributeType::Ivec2:
-						Format = BmRender_Format::R32G32_SINT;
-						break;
-					case BmRender_AttributeType::Vec2:
-						Format = BmRender_Format::R32G32_SFLOAT;
-						break;
-					case BmRender_AttributeType::Vec3:
-						Format = BmRender_Format::R32G32B32_SFLOAT;
-						break;
-					case BmRender_AttributeType::Vec4:
-						Format = BmRender_Format::R32G32B32A32_SFLOAT;
-						break;
-					default:
-						assert(false);
-				}
-
-				VkAttribute = (VkVertexInputAttributeDescription*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkVertexInputAttributeDescription));
-				VkAttribute->binding = BindingIndex;
-				VkAttribute->location = CurrentLocation;
-				VkAttribute->format = BmRender_FormatToVk(Format);
-				VkAttribute->offset = attribute.Offset;
-
-				++CurrentLocation;
-				++TotalAttributes;
-			}
-			else
-			{
-				u32 MatrixBindingOffset = 0;
-				for (u32 i = 0; i < 4; ++i)
-				{
-					VkAttribute = (VkVertexInputAttributeDescription*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkVertexInputAttributeDescription));
-					VkAttribute->binding = BindingIndex;
-					VkAttribute->location = CurrentLocation;
-					VkAttribute->format = BmRender_FormatToVk(BmRender_Format::R32G32B32A32_SFLOAT);
-					VkAttribute->offset = attribute.Offset + MatrixBindingOffset;
-
-					MatrixBindingOffset += 16;
-					++CurrentLocation;
-					++TotalAttributes;
-				}
-			}
-		}
-	}
-
 	VkPipelineShaderStageCreateInfo* VkShaderStages = (VkPipelineShaderStageCreateInfo*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkPipelineShaderStageCreateInfo) * Description->ShaderStagesCount);
 	for (u32 i = 0; i < Description->ShaderStagesCount; ++i)
 	{
@@ -500,10 +423,6 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 
 	VkPipelineVertexInputStateCreateInfo VertexInputState = { };
 	VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	VertexInputState.vertexBindingDescriptionCount = Description->VertexBindingsCount;
-	VertexInputState.pVertexBindingDescriptions = VkVertexBindings;
-	VertexInputState.vertexAttributeDescriptionCount = TotalAttributes;
-	VertexInputState.pVertexAttributeDescriptions = TotalAttributes == 0 ? nullptr : VkVertexAttributes;
 
 	bool SampleCountFound = false;
 	VkSampleCountFlagBits SampleCount = VK_SAMPLE_COUNT_1_BIT;

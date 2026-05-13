@@ -5,7 +5,6 @@
 #include <Engine/Systems/Memory/MemoryManagmentSystem.h>
 
 extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
-extern std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 extern std::unordered_map<std::string, BmRender_Shader> Shaders;
 extern std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
 extern std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
@@ -284,33 +283,6 @@ namespace Util
 		return Empty;
 	}
 
-	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, VertexAttribute* OutAttribute, std::string* OutAttributeName)
-	{
-		*OutAttribute = { };
-
-		if (!AttributeNode["type"].IsNone())
-		{
-			std::string typeStr = AttributeNode["type"].As<std::string>();
-			OutAttribute->Type = ParseShaderTypeToAttributeType(typeStr.c_str(), typeStr.length());
-		}
-
-		*OutAttributeName = ParseNameNode(AttributeNode);
-	}
-
-	VertexBinding_depr ParseVertexBindingNode(Yaml::Node& BindingNode)
-	{
-		VertexBinding_depr OutBinding = { };
-
-		if (!BindingNode["inputRate"].IsNone())
-		{
-			std::string inputRateStr = BindingNode["inputRate"].As<std::string>();
-			OutBinding.InputRate = ParseVertexInputRate(inputRateStr.c_str(), inputRateStr.length());
-		}
-
-		return OutBinding;
-	}
-
-
 	BmRender_PipelineShaderStage ParseShaderStage(const char* Value, u32 Length)
 	{
 		if (StringMatches(Value, Length, ParseStrings::VERTEX_SHADER_STRINGS))
@@ -432,29 +404,6 @@ namespace Util
 		}
 
 		return static_cast<BmRender_DescriptorShaderStage>(flags);
-	}
-
-	BmRender_AttributeType ParseShaderTypeToAttributeType(const char* Value, u32 Length)
-	{
-		if (strncmp(Value, "int", Length) == 0) return BmRender_AttributeType::Int;
-		if (strncmp(Value, "uint", Length) == 0) return BmRender_AttributeType::Uint;
-		if (strncmp(Value, "float", Length) == 0) return BmRender_AttributeType::Float;
-		if (strncmp(Value, "vec2", Length) == 0) return BmRender_AttributeType::Vec2;
-		if (strncmp(Value, "vec3", Length) == 0) return BmRender_AttributeType::Vec3;
-		if (strncmp(Value, "vec4", Length) == 0) return BmRender_AttributeType::Vec4;
-		if (strncmp(Value, "mat4", Length) == 0) return BmRender_AttributeType::Mat4;
-
-		assert(false);
-		return BmRender_AttributeType::Float;
-	}
-
-	BmRender_VertexInputRate ParseVertexInputRate(const char* Value, u32 Length)
-	{
-		if (StringMatches(Value, Length, ParseStrings::VERTEX_STRINGS)) return BmRender_VertexInputRate::Vertex;
-		if (StringMatches(Value, Length, ParseStrings::INSTANCE_STRINGS)) return BmRender_VertexInputRate::Instance;
-
-		assert(false);
-		return BmRender_VertexInputRate::Vertex;
 	}
 
 	MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length)

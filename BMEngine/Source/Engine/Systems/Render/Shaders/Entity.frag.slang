@@ -1,5 +1,6 @@
 #include "Common.h"
 #include "ShaderTypes.h"
+#include "Entity.h"
 
 static const int MAX_SHADOW_TEXTURES = 2;
 static const int DIRECTIONAL_LIGHT_SHADOW_TEXTURE_INDEX = 0;
@@ -7,15 +8,12 @@ static const int SPOT_LIGHT_SHADOW_TEXTURE_INDEX = 1;
 
 struct FragmentInput
 {
-    [[vk::location(0)]] float2 FragmentTexture;
-    [[vk::location(1)]] float3 FragmentNormal;
-    [[vk::location(2)]] float3 WorldFragPos;
-    [[vk::location(3)]] nointerpolation uint FragmentMaterialIndex;
+    ShaderLayout layout;
 };
 
 struct FragmentOutput
 {
-    [[vk::location(0)]] float4 OutColor;
+    float4 OutColor;
 };
 
 float DistributionGGX(float3 N, float3 H, float roughness)
@@ -186,18 +184,18 @@ FragmentOutput main(FragmentInput input)
 {
     FragmentOutput output;
 
-    Material Mat = MaterialsDescriptor[input.FragmentMaterialIndex];
+    Material Mat = MaterialsDescriptor[input.layout.FragmentMaterialIndex];
 
-    float4 albedo = AlbedoTexture[Mat.AlbedoTexIndex].Sample(input.FragmentTexture);
+    float4 albedo = AlbedoTexture[Mat.AlbedoTexIndex].Sample(input.layout.FragmentTexture);
 
-    float3 N = normalize(input.FragmentNormal);
-    float3 V = normalize(-input.WorldFragPos);
+    float3 N = normalize(input.layout.FragmentNormal);
+    float3 V = normalize(-input.layout.WorldFragPos);
 
     float3 Lo = 0.0;
 
-    Lo += CastDirectionLight(FrameBufferDescriptor.directionLight, albedo.rgb, V, N, input.WorldFragPos);
-    Lo += CastPointLight(FrameBufferDescriptor.pointlight, input.WorldFragPos, albedo.rgb, V, N);
-    Lo += CastSpotLight(FrameBufferDescriptor.spotlight, input.WorldFragPos, albedo.rgb, V, N);
+    Lo += CastDirectionLight(FrameBufferDescriptor.directionLight, albedo.rgb, V, N, input.layout.WorldFragPos);
+    Lo += CastPointLight(FrameBufferDescriptor.pointlight, input.layout.WorldFragPos, albedo.rgb, V, N);
+    Lo += CastSpotLight(FrameBufferDescriptor.spotlight, input.layout.WorldFragPos, albedo.rgb, V, N);
 
     output.OutColor = float4(Lo, albedo.a);
     return output;

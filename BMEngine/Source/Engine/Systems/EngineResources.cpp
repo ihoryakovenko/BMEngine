@@ -9,7 +9,6 @@
 
 // Extern declarations for global resource maps
 extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
-extern std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 extern std::unordered_map<std::string, BmRender_Shader> Shaders;
 extern std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
 extern std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
@@ -191,8 +190,8 @@ namespace EngineResources
 					//}
 				}
 
-				const u64 VertexDataSize = VerticesCount * sizeof(StaticMeshVertex);
-				const u64 VerticesSize = sizeof(StaticMeshVertex) * VerticesCount;
+				const u64 VertexDataSize = VerticesCount * sizeof(Shader_StaticMeshVertex);
+				const u64 VerticesSize = sizeof(Shader_StaticMeshVertex) * VerticesCount;
 				const u64 IndicesSize = IndicesCount * sizeof(u32);
 					
 				BmRender_GPUBufferBinding VertexHandle = { Render::GetVertexBuffer(), VertexBufferOffset, VertexDataSize };
@@ -201,7 +200,7 @@ namespace EngineResources
 				RenderResources::UpdateBufferRegion(VertexHandle, 0, Model.VertexData + ModelVertexByteOffset, VertexDataSize);
 				RenderResources::UpdateBufferRegion(IndexHandle, 0, Model.VertexData + ModelVertexByteOffset + VertexDataSize, IndicesSize);
 
-				Material Mat;
+				Shader_Material Mat;
 				Mat.AlbedoTexIndex = TextureGPUIndex;
 				Mat.SpecularTexIndex = TextureGPUIndex;
 				Mat.Shininess = 32.0f;
@@ -209,7 +208,7 @@ namespace EngineResources
 				const BmRender_GPUBufferBinding MaterialHandle = { Render::GetMaterialBuffer(), MateriaIndex * sizeof(Mat), sizeof(Mat) };
 				RenderResources::UpdateBufferRegion(MaterialHandle, 0, &Mat, sizeof(Mat));
 
-				StaticMeshInstance Instance;
+				Shader_StaticMeshInstance Instance;
 				Instance.MaterialIndex = MateriaIndex;
 				Instance.ModelMatrix = glm::translate(glm::mat4(1), Request.Position);
 

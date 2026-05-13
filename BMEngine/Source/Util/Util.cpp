@@ -17,7 +17,6 @@
 
 // Extern declarations for global resource maps
 extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
-extern std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 extern std::unordered_map<std::string, BmRender_Shader> Shaders;
 extern std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
 extern std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
@@ -39,15 +38,15 @@ extern 	std::unordered_map<std::string, BmRender_PushConstant> PushConstants;
 
 struct VertexEqual
 {
-	bool operator()(const StaticMeshVertex& lhs, const StaticMeshVertex& rhs) const
+	bool operator()(const Shader_StaticMeshVertex& lhs, const Shader_StaticMeshVertex& rhs) const
 	{
 		return lhs.Position == rhs.Position && lhs.TextureCoords == rhs.TextureCoords;
 	}
 };
 
-template<> struct std::hash<StaticMeshVertex>
+template<> struct std::hash<Shader_StaticMeshVertex>
 {
-	size_t operator()(StaticMeshVertex const& vertex) const
+	size_t operator()(Shader_StaticMeshVertex const& vertex) const
 	{
 		size_t hashPosition = std::hash<glm::vec3>()(vertex.Position);
 		size_t hashTextureCoords = std::hash<glm::vec2>()(vertex.TextureCoords);
@@ -132,8 +131,8 @@ namespace Util
 		u64* VerticesCounts = (u64*)malloc(Shapes.size() * sizeof(u64));
 		u32* IndicesCounts = (u32*)malloc(Shapes.size() * sizeof(u32));
 
-		std::unordered_map<StaticMeshVertex, u32,
-			std::hash<StaticMeshVertex>, VertexEqual> uniqueVertices{ };
+		std::unordered_map<Shader_StaticMeshVertex, u32,
+			std::hash<Shader_StaticMeshVertex>, VertexEqual> uniqueVertices{ };
 
 		std::hash<std::string> Hasher;
 
@@ -142,7 +141,7 @@ namespace Util
 		std::vector<u32> meshMaterialIndices;
 		std::vector<u64> uniqueTextureHashes;
 		std::vector<u8> VerticesAndIndices;
-		std::vector<StaticMeshVertex> Vertices;
+		std::vector<Shader_StaticMeshVertex> Vertices;
 		std::vector<u32> Indices;
 
 		std::unordered_set<u64> textureHashes;
@@ -190,7 +189,7 @@ namespace Util
 			{
 				tinyobj::index_t Index = Shape->mesh.indices[j];
 
-				StaticMeshVertex vertex = { };
+				Shader_StaticMeshVertex vertex = { };
 
 				vertex.Position =
 				{
@@ -229,7 +228,7 @@ namespace Util
 			VerticesCounts[i] = Vertices.size();
 			IndicesCounts[i] = Indices.size();
 
-			u64 VertexBytes = Vertices.size() * sizeof(StaticMeshVertex);
+			u64 VertexBytes = Vertices.size() * sizeof(Shader_StaticMeshVertex);
 			u64 IndexBytes = Indices.size() * sizeof(u32);
 
 			u64 CurrentOffset = VerticesAndIndices.size();
@@ -328,28 +327,6 @@ namespace Util
 		Model.UniqueTextureHashes = (u64*)Data;
 
 		return Model;
-	}
-
-
-
-	u32 GetAttributeTypeSize(BmRender_AttributeType Attribute)
-	{
-		switch (Attribute)
-		{
-			case BmRender_AttributeType::Int:
-			case BmRender_AttributeType::Uint:
-			case BmRender_AttributeType::Float:
-				return 4;
-			case BmRender_AttributeType::Vec2:
-				return 8;
-			case BmRender_AttributeType::Vec3:
-				return 12;
-			case BmRender_AttributeType::Vec4:
-				return 16;
-			case BmRender_AttributeType::Mat4:
-				return 64;
-			default: assert(false);
-		}
 	}
 
 	BmRender_Format GliFormatToVkFormat(gli::format Format)

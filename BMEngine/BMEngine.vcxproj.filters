@@ -46,6 +46,9 @@
     <ClInclude Include="Source\Engine\Systems\Concurrency\TaskSystem.h" />
     <ClInclude Include="Source\Util\YamlParsing.h" />
     <ClInclude Include="Source\Engine\Systems\Render\Systems.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\Shaders\Entity.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\Shaders\Depth.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\Shaders\Deferred.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />

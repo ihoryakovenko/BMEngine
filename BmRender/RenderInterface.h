@@ -28,19 +28,7 @@ typedef struct BmRender_CommandBuffer_T* BmRender_CommandBuffer;
 typedef struct BmRender_Queue_T* BmRender_Queue;
 typedef struct BmRender_DeviceMemory_T* BmRender_DeviceMemory;
 
-#define DEFINE_ENUM_OR(EnumType) inline EnumType operator| (EnumType lhs, EnumType rhs) { return (EnumType)((u64)(lhs) | (u64)(rhs)); }
-
-enum class BmRender_AttributeType : u8
-{
-	Int,
-	Uint,
-	Float,
-	Ivec2,
-	Vec2,
-	Vec3,
-	Vec4,
-	Mat4
-};
+#define DEFINE_ENUM_OR(EnumType) constexpr inline EnumType operator| (EnumType lhs, EnumType rhs) { return (EnumType)((u64)(lhs) | (u64)(rhs)); }
 
 enum class BmRender_DescriptorShaderStage : u64
 {
@@ -201,12 +189,6 @@ enum class BmRender_AttachmentStoreOp : u32
 {
 	Store,
 	DontCare,
-};
-
-enum class BmRender_VertexInputRate : u32
-{
-	Vertex,
-	Instance,
 };
 
 enum class BmRender_DescriptorType : u32
@@ -604,20 +586,6 @@ struct BmRender_DescriptorSetBinding
 	u32 DstArrayElement;
 };
 
-struct VertexAttribute
-{
-	BmRender_AttributeType Type;
-	u32 Offset;
-};
-
-struct BmRender_VertexBinding
-{
-	VertexAttribute* Attributes;
-	u32 AttributesCount;
-	u32 Stride;
-	BmRender_VertexInputRate InputRate;
-};
-
 struct BmRender_ShaderStageDescription
 {
 	BmRender_Shader Shader;
@@ -685,12 +653,10 @@ struct BmRender_PipelineDescription
 	AttachmentData Attachment;
 
 	const BmRender_ShaderStageDescription* ShaderStages;
-	const BmRender_VertexBinding* VertexBindings;
 	const BmRender_PushConstant* PushConstantRanges;
 	const BmRender_DescriptorSetLayout* DescriptorSetLayouts;
 
 	u32 ShaderStagesCount;
-	u32 VertexBindingsCount;
 	u32 DescriptorSetLayoutsCount;
 	u32 PushConstantRangesCount;
 

@@ -159,43 +159,43 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	PipelineDesc.ShaderStages = ShaderStages;
 	PipelineDesc.ShaderStagesCount = 2;
 
-	VertexAttribute NanodegAttr = {};
-	NanodegAttr.Type = BmRender_AttributeType::Ivec2;
-	NanodegAttr.Offset = 0;
+	//VertexAttribute NanodegAttr = {};
+	//NanodegAttr.Type = BmRender_AttributeType::Ivec2;
+	//NanodegAttr.Offset = 0;
 
-	VertexAttribute AltitudeAttr = {};
-	AltitudeAttr.Type = BmRender_AttributeType::Float;
-	AltitudeAttr.Offset = offsetof(StreetsRender_BuildingVertex, AltitudeMeters);
+	//VertexAttribute AltitudeAttr = {};
+	//AltitudeAttr.Type = BmRender_AttributeType::Float;
+	//AltitudeAttr.Offset = offsetof(StreetsRender_BuildingVertex, AltitudeMeters);
 
-	VertexAttribute ColorAttr = {};
-	ColorAttr.Type = BmRender_AttributeType::Vec3;
-	ColorAttr.Offset = offsetof(StreetsRender_BuildingVertex, Color);
+	//VertexAttribute ColorAttr = {};
+	//ColorAttr.Type = BmRender_AttributeType::Vec3;
+	//ColorAttr.Offset = offsetof(StreetsRender_BuildingVertex, Color);
 
-	VertexAttribute NormalAttr = {};
-	NormalAttr.Type = BmRender_AttributeType::Vec3;
-	NormalAttr.Offset = offsetof(StreetsRender_BuildingVertex, Normal);
+	//VertexAttribute NormalAttr = {};
+	//NormalAttr.Type = BmRender_AttributeType::Vec3;
+	//NormalAttr.Offset = offsetof(StreetsRender_BuildingVertex, Normal);
 
-	VertexAttribute VertexAttributes[4] = { NanodegAttr, AltitudeAttr, ColorAttr, NormalAttr };
+	//VertexAttribute VertexAttributes[4] = { NanodegAttr, AltitudeAttr, ColorAttr, NormalAttr };
 
-	BmRender_VertexBinding VertexBinding = {};
-	VertexBinding.Attributes = VertexAttributes;
-	VertexBinding.AttributesCount = 4;
-	VertexBinding.Stride = sizeof(StreetsRender_BuildingVertex);
-	VertexBinding.InputRate = BmRender_VertexInputRate::Vertex;
+	//BmRender_VertexBinding VertexBinding = {};
+	//VertexBinding.Attributes = VertexAttributes;
+	//VertexBinding.AttributesCount = 4;
+	//VertexBinding.Stride = sizeof(StreetsRender_BuildingVertex);
+	//VertexBinding.InputRate = BmRender_VertexInputRate::Vertex;
 
-	VertexAttribute MaterialIndexAttr = {};
-	MaterialIndexAttr.Type = BmRender_AttributeType::Uint;
-	MaterialIndexAttr.Offset = offsetof(StreetsRender_3DObjectInstance, MaterialIndex);
+	//VertexAttribute MaterialIndexAttr = {};
+	//MaterialIndexAttr.Type = BmRender_AttributeType::Uint;
+	//MaterialIndexAttr.Offset = offsetof(StreetsRender_3DObjectInstance, MaterialIndex);
 
-	BmRender_VertexBinding InstanceBinding = {};
-	InstanceBinding.Attributes = &MaterialIndexAttr;
-	InstanceBinding.AttributesCount = 1;
-	InstanceBinding.Stride = sizeof(StreetsRender_3DObjectInstance);
-	InstanceBinding.InputRate = BmRender_VertexInputRate::Instance;
+	//BmRender_VertexBinding InstanceBinding = {};
+	//InstanceBinding.Attributes = &MaterialIndexAttr;
+	//InstanceBinding.AttributesCount = 1;
+	//InstanceBinding.Stride = sizeof(StreetsRender_3DObjectInstance);
+	//InstanceBinding.InputRate = BmRender_VertexInputRate::Instance;
 
-	BmRender_VertexBinding Bindings[2] = { VertexBinding, InstanceBinding };
-	PipelineDesc.VertexBindings = Bindings;
-	PipelineDesc.VertexBindingsCount = 2;
+	//BmRender_VertexBinding Bindings[2] = { VertexBinding, InstanceBinding };
+	//PipelineDesc.VertexBindings = Bindings;
+	//PipelineDesc.VertexBindingsCount = 2;
 
 	PipelineDesc.DescriptorSetLayouts = &DescriptorSetLayout;
 	PipelineDesc.DescriptorSetLayoutsCount = 1;

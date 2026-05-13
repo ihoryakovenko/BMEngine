@@ -31,13 +31,6 @@ namespace Util
 		std::vector<DescriptorBinding> Bindings;
 	};
 
-	struct VertexBinding_depr
-	{
-		u32 Stride;
-		BmRender_VertexInputRate InputRate;
-		std::unordered_map<std::string, VertexAttribute> Attributes;
-	};
-
 	namespace ParseStrings
 	{
 		// Boolean values
@@ -230,8 +223,6 @@ namespace Util
 	BmRender_PipelineShaderStage ParseShaderPipelineStage(Yaml::Node& ShaderNode);
 	BmRHI_SamplerDescription ParseSamplerNode(Yaml::Node& SamplerNode);
 	BmRender_DescriptorSetLayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode);
-	void ParseVertexAttributeNode(Yaml::Node& AttributeNode, VertexAttribute* OutAttribute, std::string* OutAttributeName);
-	VertexBinding_depr ParseVertexBindingNode(Yaml::Node& BindingNode);
 
 	BmRender_PipelineShaderStage ParseShaderStage(const char* Value, u32 Length);
 
@@ -241,9 +232,6 @@ namespace Util
 	BmRender_SamplerMipmapMode ParseMipmapMode(const char* Value, u32 Length);
 	BmRender_DescriptorType ParseDescriptorType(const char* Value, u32 Length);
 	BmRender_DescriptorShaderStage ParseShaderStageFlags(const char* Value, u32 Length);
-
-	BmRender_AttributeType ParseShaderTypeToAttributeType(const char* Value, u32 Length);
-	BmRender_VertexInputRate ParseVertexInputRate(const char* Value, u32 Length);
 
 	MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length);
 	std::string GetBufferName(Yaml::Node& BufferNode);

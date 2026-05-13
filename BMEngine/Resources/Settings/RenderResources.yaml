@@ -77,19 +77,3 @@ shaders:
   DepthVertex:
     path: "./Resources/Shaders/Depth_vert.spv"
     PipelineStage: Vertex
-
-DescriptorSetLayouts:
-  MainPassOutputLayout:
-    bindings:
-      - type: sampler2d
-        updateFrequency: Static
-        stages: FRAGMENT
-      - type: sampler2d
-        updateFrequency: Static
-        stages: FRAGMENT
-
-  LightSpaceMatrixLayout:
-    bindings:
-      - type: uniform
-        updateFrequency: Static
-        stages: VERTEX | FRAGMENT

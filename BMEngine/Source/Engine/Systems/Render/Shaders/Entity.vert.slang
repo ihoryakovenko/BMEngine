@@ -1,12 +1,10 @@
 #include "Common.h"
 #include "ShaderTypes.h"
+#include "Entity.h"
 
 struct VertexOutput
 {
-    [[vk::location(0)]] float2 FragmentTexture;
-    [[vk::location(1)]] float3 FragmentNormal;
-    [[vk::location(2)]] float3 WorldFragPos;
-    [[vk::location(3)]] nointerpolation uint FragmentMaterialIndex;
+    ShaderLayout layout;
 
     float4 Position : SV_Position;
 };
@@ -32,15 +30,15 @@ VertexOutput main(uint vID: SV_VertexID, uint iID: SV_StartInstanceLocation)
     StaticMeshInstance instance = InstanceDescriptor[iID];
 
     VertexOutput output;
-    output.FragmentTexture = vertex.TextureCoords;
+    output.layout.FragmentTexture = vertex.TextureCoords;
 
     float4 worldPos = mul(instance.ModelMatrix, float4(vertex.Position, 1.0));
-    output.WorldFragPos = worldPos.xyz;
+    output.layout.WorldFragPos = worldPos.xyz;
 
     float3x3 normalMatrix = (float3x3)transpose(inverse((float3x3)instance.ModelMatrix));
 
-    output.FragmentNormal = normalize(mul(normalMatrix, vertex.Normal));
-    output.FragmentMaterialIndex = instance.MaterialIndex;
+    output.layout.FragmentNormal = normalize(mul(normalMatrix, vertex.Normal));
+    output.layout.FragmentMaterialIndex = instance.MaterialIndex;
     output.Position = mul(FrameBufferDescriptor.Projection, mul(FrameBufferDescriptor.View, worldPos));
 
     return output;

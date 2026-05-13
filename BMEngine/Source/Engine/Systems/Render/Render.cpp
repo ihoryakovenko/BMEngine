@@ -15,6 +15,12 @@
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 
+#include <Engine/Systems/Render/Shaders/ShaderTypes.h>
+#include <Engine/Systems/Render/Shaders/Common.h>
+#include <Engine/Systems/Render/Shaders/Entity.h>
+#include <Engine/Systems/Render/Shaders/Depth.h>
+#include <Engine/Systems/Render/Shaders/Deferred.h>
+
 #include <RenderHelper.h>
 
 #include <random>
@@ -24,7 +30,6 @@
 
 // Extern declarations for global resource maps
 extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
-extern std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
 extern std::unordered_map<std::string, BmRender_Shader> Shaders;
 extern std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
 extern std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
@@ -46,10 +51,24 @@ BmRender_DescriptorSetLayout FrameDataLayout;
 BmRender_DescriptorSetLayout MaterialLayout;
 BmRender_DescriptorSetLayout BindlesTexturesLayout;
 BmRender_DescriptorSetLayout ShadowMapArrayLayout;
-BmRender_DescriptorSetLayout VertexLayout;
+BmRender_DescriptorSetLayout LightSpaceMatrixLayout;
+BmRender_DescriptorSetLayout MainPassOutputLayout;
+BmRender_DescriptorSetLayout EmptyLayout;
 
 namespace Render
 {
+	template<u32 N>
+	static void ConvertShaderDescriptorToBindings(const Shader_DescriptorSet<N>* ShaderSet, BmRender_DescriptorSetLayoutBinding* OutBindings)
+	{
+		for (u32 i = 0; i < N; ++i)
+		{
+			OutBindings[i].DescriptorCount = (ShaderSet->Descriptors[i].Type == BmRender_DescriptorType::CombinedImageSampler) && ShaderSet->Descriptors[i].IsBindless ? 64 : 1;
+			OutBindings[i].Binding = ShaderSet->Descriptors[i].Binding;
+			OutBindings[i].StageFlags = ShaderSet->Descriptors[i].Stage;
+			OutBindings[i].DescriptorType = ShaderSet->Descriptors[i].Type;
+		}
+	}
+
 	static void InitImGuiPipeline(BmRender_DescriptorPool* ImGuiPool, GLFWwindow* Wnd)
 	{
 		ImGui_ImplGlfw_InitForVulkan(Wnd, true);
@@ -177,7 +196,6 @@ namespace Render
 		descriptorSetLayouts.push_back(BindlesTexturesLayout);
 		descriptorSetLayouts.push_back(MaterialLayout);
 		descriptorSetLayouts.push_back(ShadowMapArrayLayout);
-		descriptorSetLayouts.push_back(VertexLayout);
 
 		// Build pipeline description
 		BmRender_PipelineDescription PipelineDesc = {};
@@ -187,10 +205,6 @@ namespace Render
 		// Set shader stages
 		PipelineDesc.ShaderStages = shaderStages.data();
 		PipelineDesc.ShaderStagesCount = static_cast<u32>(shaderStages.size());
-
-		// Set vertex bindings
-		PipelineDesc.VertexBindings = nullptr;
-		PipelineDesc.VertexBindingsCount = 0;
 
 		// Set descriptor set layouts
 		PipelineDesc.DescriptorSetLayouts = descriptorSetLayouts.data();
@@ -288,10 +302,9 @@ namespace Render
 			DescriptorSets.BindlesTexturesSet,
 			DescriptorSets.MaterialsSet,
 			MeshPipeline->ShadowMapArraySet[CurrentFrame],
-			DescriptorSets.VertexInputSet,
 		};
 
-		const u32 FrameDynamicOffset = CurrentFrame * sizeof(FrameData);
+		const u32 FrameDynamicOffset = CurrentFrame * sizeof(Shader_FrameData);
 		const u32 DynamicOffsets[] = { FrameDynamicOffset };
 
 		DrawEntityBatchConfig Config = {};
@@ -415,71 +428,49 @@ namespace Render
 		DescriptorSets = Render::DescriptorSetHandles();
 
 		{
-			BmRender_DescriptorSetLayoutBinding LayoutBindings[2];
-			LayoutBindings[0].DescriptorCount = 1;
-			LayoutBindings[0].DescriptorType = VertexDescriptor.Type;
-			LayoutBindings[0].StageFlags = VertexDescriptor.Stage;
-			LayoutBindings[0].Binding = VertexDescriptor.Binding;
+			EmptyLayout = BmRender_CreateDescriptorSetLayout(nullptr, 0);
+			DescriptorSets.EmptySet = BmRender_CreateDescriptorSet(EmptyLayout, MainPool);
+		}
 
-			LayoutBindings[1].DescriptorCount = 1;
-			LayoutBindings[1].DescriptorType = InstanceDescriptor.Type;
-			LayoutBindings[1].StageFlags = InstanceDescriptor.Stage;
-			LayoutBindings[1].Binding = InstanceDescriptor.Binding;
+		{
+			BmRender_DescriptorSetLayoutBinding LayoutBindings[Shader_ShadowMapsDescriptorSet.Descriptors.size()];
+			ConvertShaderDescriptorToBindings(&Shader_ShadowMapsDescriptorSet, LayoutBindings);
 
+			ShadowMapArrayLayout = BmRender_CreateDescriptorSetLayout(LayoutBindings, Shader_ShadowMapsDescriptorSet.Descriptors.size());
+		}
 
-			VertexLayout = BmRender_CreateDescriptorSetLayout(LayoutBindings, 2);
+		{
+			BmRender_DescriptorSetLayoutBinding LayoutBindings[Shader_FrameBufferDescriptorSet.Descriptors.size()];
+			ConvertShaderDescriptorToBindings(&Shader_FrameBufferDescriptorSet, LayoutBindings);
 
+			FrameDataLayout = BmRender_CreateDescriptorSetLayout(LayoutBindings, Shader_FrameBufferDescriptorSet.Descriptors.size());
+
+			FrameBufferBinding[0] = { FrameDataBuffer, 0, sizeof(Shader_FrameData) };
 			BmRender_GPUBufferBinding VertexBufferRegion = { VertexBuffer, 0, VK_WHOLE_SIZE };
 			BmRender_GPUBufferBinding InstanceBufferRegion = { InstanceBuffer, 0, VK_WHOLE_SIZE };
 
-			BmRender_DescriptorSetBinding Bindings[2];
-			Bindings[0].BufferRegions = &VertexBufferRegion;
+			BmRender_DescriptorSetBinding Bindings[3];
+			Bindings[0].BufferRegions = FrameBufferBinding;
 			Bindings[0].BindingCount = 1;
 			Bindings[0].DstArrayElement = 0;
 
-			Bindings[1].BufferRegions = &InstanceBufferRegion;
+			Bindings[1].BufferRegions = &VertexBufferRegion;
 			Bindings[1].BindingCount = 1;
 			Bindings[1].DstArrayElement = 0;
 
-			DescriptorSets.VertexInputSet = BmRender_CreateDescriptorSet(VertexLayout, MainPool);
-			BmRender_UpdateDescriptorSet(DescriptorSets.VertexInputSet, Bindings, 2);
-		}
-
-		{
-			BmRender_DescriptorSetLayoutBinding LayoutBinding;
-			LayoutBinding.DescriptorCount = 1;
-			LayoutBinding.DescriptorType = ShadowMaps.Type;
-			LayoutBinding.StageFlags = ShadowMaps.Stage;
-			LayoutBinding.Binding = ShadowMaps.Binding;
-			ShadowMapArrayLayout = BmRender_CreateDescriptorSetLayout(&LayoutBinding, 1);
-		}
-
-		{
-			BmRender_DescriptorSetLayoutBinding LayoutBinding;
-			LayoutBinding.DescriptorCount = 1;
-			LayoutBinding.DescriptorType = FrameBufferDescriptor.Type;
-			LayoutBinding.StageFlags = FrameBufferDescriptor.Stage;
-			LayoutBinding.Binding = FrameBufferDescriptor.Binding;
-			FrameDataLayout = BmRender_CreateDescriptorSetLayout(&LayoutBinding, 1);
-
-			FrameBufferBinding[0] = { FrameDataBuffer, 0, sizeof(FrameData) };
-
-			BmRender_DescriptorSetBinding Binding;
-			Binding.BufferRegions = FrameBufferBinding;
-			Binding.BindingCount = 1;
-			Binding.DstArrayElement = 0;
+			Bindings[2].BufferRegions = &InstanceBufferRegion;
+			Bindings[2].BindingCount = 1;
+			Bindings[2].DstArrayElement = 0;
 
 			DescriptorSets.FrameBufferSet = BmRender_CreateDescriptorSet(FrameDataLayout, MainPool);
-			BmRender_UpdateDescriptorSet(DescriptorSets.FrameBufferSet, &Binding, 1);
+			BmRender_UpdateDescriptorSet(DescriptorSets.FrameBufferSet, Bindings, 3);
 		}
 
 		{
-			BmRender_DescriptorSetLayoutBinding LayoutBinding;
-			LayoutBinding.DescriptorCount = 1;
-			LayoutBinding.DescriptorType = MaterialsDescriptor.Type;
-			LayoutBinding.StageFlags = MaterialsDescriptor.Stage;
-			LayoutBinding.Binding = MaterialsDescriptor.Binding;
-			MaterialLayout = BmRender_CreateDescriptorSetLayout(&LayoutBinding, 1);
+			BmRender_DescriptorSetLayoutBinding LayoutBindings[Shader_MaterialsDescriptorSet.Descriptors.size()];
+			ConvertShaderDescriptorToBindings(&Shader_MaterialsDescriptorSet, LayoutBindings);
+
+			MaterialLayout = BmRender_CreateDescriptorSetLayout(LayoutBindings, Shader_MaterialsDescriptorSet.Descriptors.size());
 
 			BmRender_GPUBufferBinding MaterialBufferRegion = { MaterialBuffer, 0, VK_WHOLE_SIZE };
 
@@ -493,13 +484,10 @@ namespace Render
 		}
 
 		{
-			BmRender_DescriptorSetLayoutBinding LayoutBinding;
-			LayoutBinding.DescriptorCount = 64;
-			LayoutBinding.DescriptorType = AlbedoTexture.Type;
-			LayoutBinding.StageFlags = AlbedoTexture.Stage;
-			LayoutBinding.Binding = AlbedoTexture.Binding;
+			BmRender_DescriptorSetLayoutBinding LayoutBindings[Shader_AlbedoTextureDescriptorSet.Descriptors.size()];
+			ConvertShaderDescriptorToBindings(&Shader_AlbedoTextureDescriptorSet, LayoutBindings);
 
-			BindlesTexturesLayout = BmRender_CreateDescriptorSetLayout(&LayoutBinding, 1);
+			BindlesTexturesLayout = BmRender_CreateDescriptorSetLayout(LayoutBindings, Shader_AlbedoTextureDescriptorSet.Descriptors.size());
 
 			DescriptorSets.BindlesTexturesSet = BmRender_CreateDescriptorSet(BindlesTexturesLayout, MainPool);
 		}
@@ -525,6 +513,9 @@ namespace Render
 		BmRender_DestroyDescriptorSetLayout(MaterialLayout);
 		BmRender_DestroyDescriptorSetLayout(BindlesTexturesLayout);
 		BmRender_DestroyDescriptorSetLayout(ShadowMapArrayLayout);
+		BmRender_DestroyDescriptorSetLayout(MainPassOutputLayout);
+		BmRender_DestroyDescriptorSetLayout(LightSpaceMatrixLayout);
+		BmRender_DestroyDescriptorSetLayout(EmptyLayout);
 
 		DeInitImGuiPipeline(State.DebugUiPool);
 		
@@ -568,7 +559,7 @@ namespace Render
 	{
 		const u32 CurrentFrame = GetCurrentFrameIndex();
 
-		RenderResources::UpdateBuffer(FrameDataBuffer, sizeof(FrameData) * CurrentFrame, &Scene->FrameDataBuffer, sizeof(FrameData));
+		RenderResources::UpdateBuffer(FrameDataBuffer, sizeof(Shader_FrameData) * CurrentFrame, &Scene->FrameDataBuffer, sizeof(Shader_FrameData));
 
 		const u32 ImageIndex = AcquireNextSwapchainImage(CurrentFrame);
 		CurrentImageIndex = ImageIndex;
@@ -647,6 +638,13 @@ namespace Render
 		DeferredPassPipelineAttachmentData.DepthAttachment = DeferredInputDepthImageInterface[0];
 		DeferredPassPipelineAttachmentData.StencilAttachment = nullptr;
 
+		{
+			BmRender_DescriptorSetLayoutBinding LayoutBindings[Shader_DeferredInputDescriptorSet.Descriptors.size()];
+			ConvertShaderDescriptorToBindings(&Shader_DeferredInputDescriptorSet, LayoutBindings);
+
+			MainPassOutputLayout = BmRender_CreateDescriptorSetLayout(LayoutBindings, Shader_DeferredInputDescriptorSet.Descriptors.size());
+		}
+
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
 			BmRender_DescriptorSetBinding ColorBinding;
@@ -665,13 +663,12 @@ namespace Render
 
 			BmRender_DescriptorSetBinding Bindings[] = { ColorBinding, DepthBinding };
 
-			DeferredInputSet[i] = BmRender_CreateDescriptorSet(DescriptorSetLayouts["MainPassOutputLayout"], MainPool);
+			DeferredInputSet[i] = BmRender_CreateDescriptorSet(MainPassOutputLayout, MainPool);
 			BmRender_UpdateDescriptorSet(DeferredInputSet[i], Bindings, 2);
 		}
 
 		// Create vectors to hold pipeline data
 		std::vector<BmRender_ShaderStageDescription> shaderStages;
-		std::vector<BmRender_VertexBinding> vertexBindings;
 		std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
 		std::vector<BmRender_PushConstant> pushConstantRanges;
 
@@ -687,7 +684,8 @@ namespace Render
 		shaderStages.push_back(fragmentStage);
 
 		// Build descriptor set layouts
-		descriptorSetLayouts.push_back(DescriptorSetLayouts["MainPassOutputLayout"]);
+		descriptorSetLayouts.push_back(FrameDataLayout);
+		descriptorSetLayouts.push_back(MainPassOutputLayout);
 
 		// Build pipeline description
 		BmRender_PipelineDescription PipelineDesc = {};
@@ -697,10 +695,6 @@ namespace Render
 		// Set shader stages
 		PipelineDesc.ShaderStages = shaderStages.data();
 		PipelineDesc.ShaderStagesCount = static_cast<u32>(shaderStages.size());
-
-		// Set vertex bindings (empty for deferred pass - fullscreen quad)
-		PipelineDesc.VertexBindings = nullptr;
-		PipelineDesc.VertexBindingsCount = 0;
 
 		// Set descriptor set layouts
 		PipelineDesc.DescriptorSetLayouts = descriptorSetLayouts.data();
@@ -793,9 +787,18 @@ namespace Render
 		CommandWorkerData* SubmitPool = GetSubmitPoolData(GetRenderState()->GraphicsCommandWorker);
 		BmRender_BindPipeline(SubmitPool->CommandBuffer, Pipelines["Deferred"]);
 
-		const BmRender_DescriptorSet DescriptorSet = DeferredInputSet[GetDrawSystemData()->CurrentFrame];
+		const u32 CurrentFrame = GetDrawSystemData()->CurrentFrame;
+
+		const BmRender_DescriptorSet Sets[2] = {
+			DescriptorSets.FrameBufferSet,
+			DeferredInputSet[CurrentFrame],
+		};
+
+		const u32 FrameDynamicOffset = CurrentFrame * sizeof(Shader_FrameData);
+		const u32 DynamicOffsets[] = { FrameDynamicOffset };
+
 		BmRender_RecordBindDescriptorSets(SubmitPool->CommandBuffer, PipelineLayouts["Deferred"],
-			0, 1, &DescriptorSet, 0, nullptr);
+			0, 2, Sets, 1, DynamicOffsets);
 
 		BmRender_Draw(SubmitPool->CommandBuffer, 3, 1, 0, 0); // 3 hardcoded vertices
 	}
@@ -888,6 +891,13 @@ namespace Render
 		ShadowMapArray = BmRender_CreateImage2DArray(DepthViewportExtent.Width, DepthViewportExtent.Height, DepthFormat,
 			BmRender_ImageType::DepthSamplad, MAX_LIGHT_SOURCES * BmRender_GetSwapchainImageCount(), BmRender_SampleCount::Count1);
 
+		{
+			BmRender_DescriptorSetLayoutBinding LayoutBindings[Shader_LightSpaceMatrixDescriptorSet.Descriptors.size()];
+			ConvertShaderDescriptorToBindings(&Shader_LightSpaceMatrixDescriptorSet, LayoutBindings);
+
+			LightSpaceMatrixLayout = BmRender_CreateDescriptorSetLayout(LayoutBindings, Shader_LightSpaceMatrixDescriptorSet.Descriptors.size());
+		}
+
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
 			const u64 LightSpaceMatrixSize = sizeof(glm::mat4);
@@ -895,7 +905,7 @@ namespace Render
 			LightSpaceMatrixBuffers[i] = BmRender_CreateUniformBuffer(LightSpaceMatrixSize, MemoryPropertyFlag::HostCompatible);
 			LightSpaceMatrixBufferRegion[i] = { LightSpaceMatrixBuffers[i], 0, LightSpaceMatrixSize };
 
-			LightSpaceMatrixSet[i] = BmRender_CreateDescriptorSet(DescriptorSetLayouts["LightSpaceMatrixLayout"], MainPool);
+			LightSpaceMatrixSet[i] = BmRender_CreateDescriptorSet(LightSpaceMatrixLayout, MainPool);
 
 			BmRender_DescriptorSetBinding LightSpaceMatrixBinding;
 			LightSpaceMatrixBinding.BufferRegions = &LightSpaceMatrixBufferRegion[i];
@@ -926,28 +936,8 @@ namespace Render
 		shaderStages.push_back(vertexStage);
 
 		// Build descriptor set layouts
-		descriptorSetLayouts.push_back(DescriptorSetLayouts["LightSpaceMatrixLayout"]);
-		descriptorSetLayouts.push_back(VertexLayout);
-
-		{
-			BmRender_VertexBinding BmRenderVertexBinding = {};
-
-			VertexAttribute ModelMatrixAttribute;
-			ModelMatrixAttribute.Type = BmRender_AttributeType::Mat4;
-			ModelMatrixAttribute.Offset = offsetof(StaticMeshInstance, ModelMatrix);
-
-			VertexAttribute MaterialIndexAttribute;
-			MaterialIndexAttribute.Type = BmRender_AttributeType::Uint;
-			MaterialIndexAttribute.Offset = offsetof(StaticMeshInstance, MaterialIndex);
-
-			VertexAttribute Attributes[] = { ModelMatrixAttribute, MaterialIndexAttribute };
-			const u32 AttributesCount = sizeof(Attributes) / sizeof(Attributes[0]);
-
-			BmRenderVertexBinding.Stride = sizeof(StaticMeshInstance);
-			BmRenderVertexBinding.InputRate = BmRender_VertexInputRate::Instance;
-			BmRenderVertexBinding.AttributesCount = AttributesCount;
-			BmRenderVertexBinding.Attributes = Attributes;
-		}
+		descriptorSetLayouts.push_back(FrameDataLayout);
+		descriptorSetLayouts.push_back(LightSpaceMatrixLayout);
 
 		// Build pipeline description
 		BmRender_PipelineDescription PipelineDesc = {};
@@ -957,10 +947,6 @@ namespace Render
 		// Set shader stages
 		PipelineDesc.ShaderStages = shaderStages.data();
 		PipelineDesc.ShaderStagesCount = static_cast<u32>(shaderStages.size());
-
-		// Set vertex bindings
-		PipelineDesc.VertexBindings = nullptr;
-		PipelineDesc.VertexBindingsCount = 0;
 
 		// Set descriptor set layouts
 		PipelineDesc.DescriptorSetLayouts = descriptorSetLayouts.data();
@@ -1084,17 +1070,22 @@ namespace Render
 			BmRender_BeginRendering(SubmitPool->CommandBuffer, &RenderingInfo);
 
 			const BmRender_DescriptorSet DescriptorSetGroup[] = {
+				DescriptorSets.FrameBufferSet,
 				LightSpaceMatrixSet[LightCaster],
-				DescriptorSets.VertexInputSet
 			};
+
+			u32 CurrentFrame = GetDrawSystemData()->CurrentFrame;
+
+			const u32 FrameDynamicOffset = CurrentFrame * sizeof(Shader_FrameData);
+			const u32 DynamicOffsets[] = { FrameDynamicOffset };
 
 			DrawEntityBatchConfig Config = {};
 			Config.Pipeline = Pipelines["Depth"];
 			Config.PipelineLayout = PipelineLayouts["Depth"];
 			Config.DescriptorSets = DescriptorSetGroup;
-			Config.DescriptorSetCount = 2;
-			Config.DynamicOffsetCount = 0;
-			Config.DynamicOffsets = nullptr;
+			Config.DescriptorSetCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
+			Config.DynamicOffsetCount = sizeof(DynamicOffsets) / sizeof(DynamicOffsets[0]);
+			Config.DynamicOffsets = DynamicOffsets;
 			Config.PushConstant = {};
 			Config.PushConstantData = nullptr;
 
