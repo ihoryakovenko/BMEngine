@@ -154,7 +154,7 @@ namespace Render
 	{
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
-			MeshPipeline->ShadowMapArrayImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_LIGHT_SOURCES * i, MAX_LIGHT_SOURCES);
+			MeshPipeline->ShadowMapArrayImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_SHADOW_TEXTURES * i, MAX_SHADOW_TEXTURES);
 			
 			BmRender_DescriptorSetBinding ShadowMapBinding;
 			ShadowMapBinding.ImageBinding.Sampler = Samplers["ShadowMap"];
@@ -889,7 +889,7 @@ namespace Render
 	void LightningPassInit(BmRender_DescriptorPool MainPool)
 	{
 		ShadowMapArray = BmRender_CreateImage2DArray(DepthViewportExtent.Width, DepthViewportExtent.Height, DepthFormat,
-			BmRender_ImageType::DepthSamplad, MAX_LIGHT_SOURCES * BmRender_GetSwapchainImageCount(), BmRender_SampleCount::Count1);
+			BmRender_ImageType::DepthSamplad, MAX_SHADOW_TEXTURES * BmRender_GetSwapchainImageCount(), BmRender_SampleCount::Count1);
 
 		{
 			BmRender_DescriptorSetLayoutBinding LayoutBindings[Shader_LightSpaceMatrixDescriptorSet.Descriptors.size()];
@@ -914,8 +914,8 @@ namespace Render
 
 			BmRender_UpdateDescriptorSet(LightSpaceMatrixSet[i], &LightSpaceMatrixBinding, 1);
 
-			ShadowMapElement1ImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_LIGHT_SOURCES * i, 1);
-			ShadowMapElement2ImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_LIGHT_SOURCES * i + 1, 1);
+			ShadowMapElement1ImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_SHADOW_TEXTURES * i, 1);
+			ShadowMapElement2ImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_SHADOW_TEXTURES * i + 1, 1);
 		}
 
 		AttachmentData ResourceInfo;
@@ -1044,9 +1044,9 @@ namespace Render
 			&Scene->FrameDataBuffer.spotlight.LightSpaceMatrix,
 		};
 
-		BmRender_TransitionImageForRendering(SubmitPool->CommandBuffer, ShadowMapArray, MAX_LIGHT_SOURCES * GetDrawSystemData()->CurrentFrame, MAX_LIGHT_SOURCES);
+		BmRender_TransitionImageForRendering(SubmitPool->CommandBuffer, ShadowMapArray, MAX_SHADOW_TEXTURES * GetDrawSystemData()->CurrentFrame, MAX_SHADOW_TEXTURES);
 
-		for (u32 LightCaster = 0; LightCaster < MAX_LIGHT_SOURCES; ++LightCaster)
+		for (u32 LightCaster = 0; LightCaster < MAX_SHADOW_TEXTURES; ++LightCaster)
 		{
 			RenderResources::UpdateBufferRegion(LightSpaceMatrixBufferRegion[LightCaster], 0, LightViews[LightCaster], sizeof(glm::mat4));
 
@@ -1095,7 +1095,7 @@ namespace Render
 		}
 
 		// TODO: move to Main pass?
-		BmRender_TransitionImageForSampling(SubmitPool->CommandBuffer, ShadowMapArray, MAX_LIGHT_SOURCES * GetDrawSystemData()->CurrentFrame, MAX_LIGHT_SOURCES);
+		BmRender_TransitionImageForSampling(SubmitPool->CommandBuffer, ShadowMapArray, MAX_SHADOW_TEXTURES * GetDrawSystemData()->CurrentFrame, MAX_SHADOW_TEXTURES);
 	}
 
 	void LightningPassDeInit()

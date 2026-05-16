@@ -2,13 +2,12 @@
 #include "ShaderTypes.h"
 #include "Entity.h"
 
-static const int MAX_SHADOW_TEXTURES = 2;
 static const int DIRECTIONAL_LIGHT_SHADOW_TEXTURE_INDEX = 0;
 static const int SPOT_LIGHT_SHADOW_TEXTURE_INDEX = 1;
 
 struct FragmentInput
 {
-    ShaderLayout layout;
+    Shader_EntityLayout layout;
 };
 
 struct FragmentOutput
@@ -130,7 +129,7 @@ float ApplyShadow(float4x4 LightSpaceMatrix, float ShadowMapLayer, bool doLinear
     return shadow / 9.0;
 }
 
-float3 CastDirectionLight(DirectionLight light, float3 albedo, float3 V, float3 N, float3 worldPos)
+float3 CastDirectionLight(Shader_DirectionLight light, float3 albedo, float3 V, float3 N, float3 worldPos)
 {
     float3 L = normalize(-light.Direction);
     float3 radiance = light.Color;
@@ -142,7 +141,7 @@ float3 CastDirectionLight(DirectionLight light, float3 albedo, float3 V, float3 
     return (1.0 - shadow) * brdf * radiance;
 }
 
-float3 CastPointLight(PointLight light, float3 fragPos, float3 albedo, float3 V, float3 N)
+float3 CastPointLight(Shader_PointLight light, float3 fragPos, float3 albedo, float3 V, float3 N)
 {
     float3 lightPos = light.Position.xyz;
 
@@ -157,7 +156,7 @@ float3 CastPointLight(PointLight light, float3 fragPos, float3 albedo, float3 V,
     return brdf * radiance;
 }
 
-float3 CastSpotLight(SpotLight light, float3 fragPos, float3 albedo, float3 V, float3 N)
+float3 CastSpotLight(Shader_SpotLight light, float3 fragPos, float3 albedo, float3 V, float3 N)
 {
     float3 lightPos = light.Position;
     float3 lightDir = normalize(-light.Direction);
@@ -184,7 +183,7 @@ FragmentOutput main(FragmentInput input)
 {
     FragmentOutput output;
 
-    Material Mat = MaterialsDescriptor[input.layout.FragmentMaterialIndex];
+    Shader_Material Mat = MaterialsDescriptor[input.layout.FragmentMaterialIndex];
 
     float4 albedo = AlbedoTexture[Mat.AlbedoTexIndex].Sample(input.layout.FragmentTexture);
 

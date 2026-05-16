@@ -10,8 +10,8 @@ struct VSOutput
 [shader("vertex")]
 VSOutput main(uint vID: SV_VertexID, uint iID: SV_InstanceID)
 {
-    StaticMeshVertex vertex = VertexDescriptor[vID];
-    StaticMeshInstance instance = InstanceDescriptor[iID];
+    Shader_StaticMeshVertex vertex = VertexDescriptor[vID];
+    Shader_StaticMeshInstance instance = InstanceDescriptor[iID];
 
     VSOutput output;
 

@@ -4,7 +4,7 @@
 
 struct VertexOutput
 {
-    ShaderLayout layout;
+    Shader_EntityLayout layout;
 
     float4 Position : SV_Position;
 };
@@ -26,8 +26,8 @@ float3x3 inverse(float3x3 m)
 [shader("vertex")]
 VertexOutput main(uint vID: SV_VertexID, uint iID: SV_StartInstanceLocation)
 {
-    StaticMeshVertex vertex = VertexDescriptor[vID];
-    StaticMeshInstance instance = InstanceDescriptor[iID];
+    Shader_StaticMeshVertex vertex = VertexDescriptor[vID];
+    Shader_StaticMeshInstance instance = InstanceDescriptor[iID];
 
     VertexOutput output;
     output.layout.FragmentTexture = vertex.TextureCoords;
