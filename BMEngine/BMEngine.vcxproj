@@ -164,7 +164,7 @@
       <Message>1</Message>
     </PostBuildEvent>
     <CustomBuildStep>
-      <Command>$(SolutionDir)$(Platform)\$(Configuration)\CompileShaders.exe "$(ProjectDir)Source\Engine\Systems\Render\Shaders" "$(ProjectDir)Resources\Shaders" "slangc"</Command>
+      <Command>$(SolutionDir)$(Platform)\$(Configuration)\CompileShaders.exe "$(ProjectDir)Source\Engine\Systems\Render\Shaders" "$(ProjectDir)Resources\Shaders" -fr</Command>
       <Outputs>1</Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>
@@ -198,7 +198,7 @@
       <Message>1</Message>
     </PostBuildEvent>
     <CustomBuildStep>
-      <Command>$(SolutionDir)$(Platform)\$(Configuration)\CompileShaders.exe "$(ProjectDir)Source\Engine\Systems\Render\Shaders" "$(ProjectDir)Resources\Shaders" "slangc"</Command>
+      <Command>$(SolutionDir)$(Platform)\$(Configuration)\CompileShaders.exe "$(ProjectDir)Source\Engine\Systems\Render\Shaders" "$(ProjectDir)Resources\Shaders" -fr</Command>
       <Outputs>1</Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>

@@ -80,10 +80,10 @@ typedef u32 uint;
 #else
 
 #define DECLARE_UNIFORM_BUFFER_DYNAMIC_DESCRIPTOR(T, Binding, Set, Stage, Name) \
-[[vk::binding(Binding, Set)]] ParameterBlock<T> Name;
+[[vk::binding(Binding, Set)]] ConstantBuffer<T> Name;
 
 #define DECLARE_UNIFORM_BUFFER_DESCRIPTOR(T, Binding, Set, Stage, Name) \
-[[vk::binding(Binding, Set)]] ParameterBlock<T> Name;
+[[vk::binding(Binding, Set)]] ConstantBuffer<T> Name;
 
 #define DECLARE_STORAGE_BUFFER_DESCRIPTOR(T, Binding, Set, Stage, Name) \
 [[vk::binding(Binding, Set)]] StructuredBuffer<T> Name;

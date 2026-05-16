@@ -1,2 +1,2 @@
-1. Save descriptors set in the layout
-2. Save view in image
+Preprocess shaders
+Render scheema

@@ -1,3 +1,132 @@
+//void printConstantBuffer(slang::VariableLayoutReflection* cbLayout)
+//{
+//	slang::VariableReflection* cbVar = cbLayout->getVariable();
+//	slang::TypeLayoutReflection* cbTypeLayout = cbLayout->getTypeLayout();
+//
+//	// 1. Get Binding Info (e.g., b0 in DX12, or binding = X in Vulkan)
+//	// Constant buffers use the UNIFORM category for their descriptor binding slot
+//	uint32_t bindingIndex = cbLayout->getBindingIndex();
+//	uint32_t spaceIndex = cbLayout->getBindingSpace(SLANG_PARAMETER_CATEGORY_UNIFORM);
+//
+//	// 2. Get the layout of the struct inside the ConstantBuffer
+//	slang::TypeLayoutReflection* elementLayout = cbTypeLayout->getElementTypeLayout();
+//
+//	// 3. Get total byte size of the constant buffer
+//	size_t bufferSize = elementLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
+//
+//	printf("==================================================\n");
+//	printf("CONSTANT BUFFER: %s\n", cbVar->getName());
+//	printf("  Binding Slot : register(b%u, space%u)\n", bindingIndex, spaceIndex);
+//	printf("  Total Size   : %llu bytes\n", bufferSize);
+//	printf("--------------------------------------------------\n");
+//
+//	// 4. Iterate and print all fields inside the constant buffer
+//	slang::TypeReflection* elementType = elementLayout->getType();
+//	uint32_t fieldCount = elementType->getFieldCount();
+//
+//	for (uint32_t i = 0; i < fieldCount; ++i)
+//	{
+//		slang::VariableLayoutReflection* fieldLayout = elementLayout->getFieldByIndex(i);
+//		slang::VariableReflection* field = fieldLayout->getVariable();
+//
+//		// Get the field's local offset relative to the start of the constant buffer
+//		size_t offset = fieldLayout->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM);
+//
+//		// Get type name (e.g., "float4", "int", "MyCustomStruct")
+//		const char* typeName = field->getType()->getName();
+//
+//		printf("  Offset: %4llu | Field: %-20s | Type: %s\n",
+//			offset,
+//			field->getName(),
+//			typeName);
+//
+//		// Optional: If a field is a nested struct, you can recursively print it
+//		if (field->getType()->getKind() == slang::TypeReflection::Kind::Struct)
+//		{
+//			printf("    [Nested Structure Detected]\n");
+//		}
+//	}
+//	printf("==================================================\n\n");
+//}
+//
+//void reflectResource(slang::VariableLayoutReflection* varLayout)
+//{
+//	slang::TypeLayoutReflection* typeLayout = varLayout->getTypeLayout();
+//	slang::TypeReflection* type = typeLayout->getType();
+//
+//	// Check the Resource Shape (e.g., StructuredBuffer, Texture2D)
+//	SlangResourceShape shape = type->getResourceShape();
+//
+//	// Check if it's a structured buffer
+//	if (shape == SLANG_STRUCTURED_BUFFER)
+//	{
+//		printf("    Type: StructuredBuffer\n");
+//
+//		// Query the inner element type layout (the "T" in StructuredBuffer<T>)
+//		slang::TypeLayoutReflection* elementLayout = typeLayout->getElementTypeLayout();
+//		size_t stride = elementLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
+//
+//		printf("    Element Type: %s\n", elementLayout->getType()->getName());
+//		printf("    Element Stride: %llu bytes\n", stride);
+//	}
+//
+//	// Get API Bindings (descriptor sets / spaces)
+//	// Slang organizes slots by SlangParameterCategory
+//	auto category = varLayout->getCategory();
+//
+//	// For structured buffers / textures, this is usually SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE
+//	// or SLANG_PARAMETER_CATEGORY_UNIFORM depending on the exact target context.
+//
+//	uint32_t bindingIndex = varLayout->getBindingIndex();
+//	uint32_t spaceIndex = varLayout->getBindingSpace(category);
+//
+//	printf("    API Binding -> Space/Set: %u, Binding/Register: %u\n", spaceIndex, bindingIndex);
+//}
+//
+//std::vector<Slang::ComPtr<slang::IComponentType>> GetEntryPoints(Slang::ComPtr<slang::IModule> module)
+//{
+//	std::vector<Slang::ComPtr<slang::IComponentType>> componentsToLink;
+//	const int definedEntryPointCount = module->getDefinedEntryPointCount();
+//
+//	for (int i = 0; i < definedEntryPointCount; i++)
+//	{
+//		Slang::ComPtr<slang::IEntryPoint> entryPoint;
+//		module->getDefinedEntryPoint(i, entryPoint.writeRef());
+//		printf("Entry point: %s \n", entryPoint->getFunctionReflection()->getName());
+//		componentsToLink.push_back(Slang::ComPtr<slang::IComponentType>(entryPoint.get()));
+//	}
+//
+//	return componentsToLink;
+//}
+//
+//void reflectStruct(slang::TypeLayoutReflection* typeLayout)
+//{
+//	// The logical type info
+//	slang::TypeReflection* type = typeLayout->getType();
+//
+//	// Total byte size of the uniform struct
+//	size_t totalSize = typeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
+//	printf("  Total Struct Size: %llu bytes\n", totalSize);
+//
+//	uint32_t fieldCount = type->getFieldCount();
+//	for (uint32_t i = 0; i < fieldCount; ++i)
+//	{
+//		slang::VariableLayoutReflection* fieldLayout = typeLayout->getFieldByIndex(i);
+//		slang::VariableReflection* field = fieldLayout->getVariable();
+//
+//		// Get the memory offset of this specific field relative to the struct start
+//		size_t offset = fieldLayout->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM);
+//
+//		printf("    Field: %s | Offset: %llu bytes | Type: %s\n",
+//			field->getName(),
+//			offset,
+//			field->getType()->getName());
+//	}
+//}
+
+
+
+
 //struct RecyclingCommandPool
 //{
 //	VkCommandPool CommandPool;
