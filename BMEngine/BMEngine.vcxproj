@@ -60,18 +60,12 @@
     <None Include="Resources\Shaders\Second.frag" />
     <None Include="Resources\Shaders\Second.vert" />
     <None Include="Source\Engine\Systems\Render\Shaders\Common.h" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Deferred.frag.slang" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Deferred.vert.slang" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Deferred.slang" />
     <None Include="Source\Engine\Systems\Render\Shaders\Depth.vert.slang" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Entity.frag.slang" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Entity.vert.slang" />
-    <None Include="Source\Engine\Systems\Render\Shaders\QuadBasedSphere.frag.glsl" />
-    <None Include="Source\Engine\Systems\Render\Shaders\QuadBasedSphere.vert.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Entity.slang" />
     <None Include="Source\Engine\Systems\Render\Shaders\ShaderTypes.h" />
     <None Include="Source\Engine\Systems\Render\Shaders\SkyBox.frag.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\SkyBox.vert.glsl" />
-    <None Include="Source\Engine\Systems\Render\Shaders\TerrainGenerator.frag.glsl" />
-    <None Include="Source\Engine\Systems\Render\Shaders\TerrainGenerator.vert.glsl" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\BmRender\BmRender.vcxproj">
@@ -145,7 +139,7 @@
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;GLM_FORCE_DEPTH_ZERO_TO_ONE;GLM_FORCE_RADIANS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_NONSTDC_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)External\GLFW\include;$(VULKAN_SDK)\Include;$(ProjectDir)Source;$(SolutionDir)External;$(SolutionDir)External\imgui;$(SolutionDir)External\imgui\backends;%(AdditionalIncludeDirectories);$(SolutionDir)SharedLib;$(SolutionDir)BmRender</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Shared\;$(SolutionDir)External\GLFW\include;$(VULKAN_SDK)\Include;$(ProjectDir)Source;$(SolutionDir)External;$(SolutionDir)External\imgui;$(SolutionDir)External\imgui\backends;%(AdditionalIncludeDirectories);$(SolutionDir)SharedLib;$(SolutionDir)BmRender</AdditionalIncludeDirectories>
       <TreatWarningAsError>false</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -164,7 +158,7 @@
       <Message>1</Message>
     </PostBuildEvent>
     <CustomBuildStep>
-      <Command>$(SolutionDir)$(Platform)\$(Configuration)\CompileShaders.exe "$(ProjectDir)Source\Engine\Systems\Render\Shaders" "$(ProjectDir)Resources\Shaders" -fr</Command>
+      <Command>$(SolutionDir)$(Platform)\$(Configuration)\CompileShaders.exe "$(ProjectDir)Source\Engine\Systems\Render\Shaders" "$(ProjectDir)Resources\Shaders" "$(ProjectDir)Source\Engine\Generated" -fr</Command>
       <Outputs>1</Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>
@@ -177,7 +171,7 @@
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;GLM_FORCE_DEPTH_ZERO_TO_ONE;GLM_FORCE_RADIANS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_NONSTDC_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)External\GLFW\include;$(VULKAN_SDK)\Include;$(ProjectDir)Source;$(SolutionDir)External;$(SolutionDir)External\imgui;$(SolutionDir)External\imgui\backends;%(AdditionalIncludeDirectories);$(SolutionDir)BmRender;$(SolutionDir)BmRender;$(SolutionDir)SharedLib;$(SolutionDir)SharedLib;$(SolutionDir)BmRender</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Shared\;$(SolutionDir)External\GLFW\include;$(VULKAN_SDK)\Include;$(ProjectDir)Source;$(SolutionDir)External;$(SolutionDir)External\imgui;$(SolutionDir)External\imgui\backends;%(AdditionalIncludeDirectories);$(SolutionDir)BmRender;$(SolutionDir)BmRender;$(SolutionDir)SharedLib;$(SolutionDir)SharedLib;$(SolutionDir)BmRender</AdditionalIncludeDirectories>
       <TreatWarningAsError>false</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -198,7 +192,7 @@
       <Message>1</Message>
     </PostBuildEvent>
     <CustomBuildStep>
-      <Command>$(SolutionDir)$(Platform)\$(Configuration)\CompileShaders.exe "$(ProjectDir)Source\Engine\Systems\Render\Shaders" "$(ProjectDir)Resources\Shaders" -fr</Command>
+      <Command>$(SolutionDir)$(Platform)\$(Configuration)\CompileShaders.exe "$(ProjectDir)Source\Engine\Systems\Render\Shaders" "$(ProjectDir)Resources\Shaders" "$(ProjectDir)Source\Engine\Generated" -fr</Command>
       <Outputs>1</Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>

@@ -590,6 +590,7 @@ struct BmRender_ShaderStageDescription
 {
 	BmRender_Shader Shader;
 	const char* EntryPointFunction;
+	BmRender_PipelineShaderStage Stage;
 };
 
 struct BmRender_RasterizationState
@@ -686,7 +687,6 @@ struct BmRender_ShaderDescription
 {
 	const u32* Code;
 	u64 CodeSize;
-	BmRender_PipelineShaderStage Stage;
 };
 
 struct BmRender_TimelineSemaphoreSubmit

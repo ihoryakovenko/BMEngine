@@ -19,7 +19,6 @@
 
 #include <Engine/Systems/Render/Shaders/ShaderTypes.h>
 
-#include "RenderInterface.h"
 
 namespace Render
 {

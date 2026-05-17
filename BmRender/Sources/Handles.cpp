@@ -9,7 +9,6 @@ struct StoragePair
 };
 
 static StoragePair DescriptorSetLayoutStorage;
-static StoragePair ShaderStorage;
 static StoragePair ImageStorage;
 static StoragePair GPUBufferStorage;
 static StoragePair DescriptorSetStorage;
@@ -25,12 +24,6 @@ void InitializeDescriptorSetLayoutManager(u32 Size)
 {
 	Memory_PoolAllocator_Init(&DescriptorSetLayoutStorage.Allocator, Size, sizeof(BmRender_DescriptorSetLayoutData));
 	Systems_SparceHashMap_Init(&DescriptorSetLayoutStorage.HashMap, Size);
-}
-
-void InitializeShaderManager(u32 Size)
-{
-	Memory_PoolAllocator_Init(&ShaderStorage.Allocator, Size, sizeof(BmRender_ShaderData));
-	Systems_SparceHashMap_Init(&ShaderStorage.HashMap, Size);
 }
 
 void InitializeImageManager(u32 Size)
@@ -93,12 +86,6 @@ void DeinitDescriptorSetLayoutManager()
 {
 	Systems_SparceHashMap_Free(&DescriptorSetLayoutStorage.HashMap);
 	Memory_PoolAllocator_Free(&DescriptorSetLayoutStorage.Allocator);
-}
-
-void DeinitShaderManager()
-{
-	Systems_SparceHashMap_Free(&ShaderStorage.HashMap);
-	Memory_PoolAllocator_Free(&ShaderStorage.Allocator);
 }
 
 void DeinitImageManager()
@@ -188,11 +175,8 @@ BmRender_DescriptorPool CreateDescriptorPoolHandle(VkDescriptorPool DescriptorPo
 	return (BmRender_DescriptorPool)DescriptorPool;
 }
 
-BmRender_Shader CreateShaderHandle(VkShaderModule VulkanShaderModule, const BmRender_ShaderData* Data)
+BmRender_Shader CreateShaderHandle(VkShaderModule VulkanShaderModule)
 {
-	const u32 Index = Memory_PoolAllocator_PushData(&ShaderStorage.Allocator, Data);
-	Systems_SparceHashMap_Insert(&ShaderStorage.HashMap, (u64)VulkanShaderModule, Index);
-	
 	return (BmRender_Shader)VulkanShaderModule;
 }
 
@@ -282,16 +266,6 @@ void DestroyDescriptorSetLayoutHandle(BmRender_DescriptorSetLayout Handle)
 	}
 }
 
-void DestroyShaderHandle(BmRender_Shader Handle)
-{
-	VkShaderModule ShaderModule = (VkShaderModule)Handle;
-	u32 Index;
-	if (Systems_SparceHashMap_Remove(&ShaderStorage.HashMap, (u64)ShaderModule, &Index))
-	{
-		Memory_PoolAllocator_FreeData(&ShaderStorage.Allocator, Index);
-	}
-}
-
 void DestroyImageHandle(BmRender_Image Handle)
 {
 	VkImage Image = (VkImage)Handle;
@@ -352,17 +326,6 @@ void BmRender_GetDescriptorSetLayoutData(BmRender_DescriptorSetLayout Handle, Bm
 	{
 		Memory_PoolAllocator_GetData(&DescriptorSetLayoutStorage.Allocator, Index, OutData);
 	}
-}
-
-bool BmRender_GetShaderData(BmRender_Shader Handle, BmRender_ShaderData* OutData)
-{
-	u32 Index;
-	if (Systems_SparceHashMap_Get(&ShaderStorage.HashMap, (u64)Handle, &Index))
-	{
-		Memory_PoolAllocator_GetData(&ShaderStorage.Allocator, Index, OutData);
-		return true;
-	}
-	return false;
 }
 
 bool BmRender_GetImageData(BmRender_Image Handle, BmRender_ImageResource* OutData)

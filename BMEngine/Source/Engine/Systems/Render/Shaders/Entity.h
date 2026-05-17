@@ -16,12 +16,4 @@ START_DESCRIPTOR_SET(Shader_ShadowMapsDescriptorSet)
 DECLARE_IMAGE_SAMPLER2D_ARRAY_DESCRIPTOR(0, 3, BmRender_DescriptorShaderStage::Fragment, ShadowMaps)
 END_DESCRIPTOR_SET()
 
-struct Shader_EntityLayout
-{
-    float2 FragmentTexture;
-    float3 FragmentNormal;
-    float3 WorldFragPos;
-    NOINTERPOLATION uint FragmentMaterialIndex;
-};
-
 #endif 

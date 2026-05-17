@@ -1,5 +1,11 @@
 #include "Deferred.h"
 
+struct VSOutput
+{
+    float4 position : SV_Position;
+    float2 uv : TEXCOORD0;
+};
+
 struct PSInput
 {
     float2 vUV : TEXCOORD0;
@@ -21,8 +27,26 @@ float3 Grayscale(float3 Color)
     return float3(Average, Average, Average);
 }
 
+[shader("vertex")]
+VSOutput MainVertex(uint vertexIndex: SV_VulkanVertexID)
+{
+    const float2 positions[3] = {
+        float2(3.0, -1.0),
+        float2(-1.0, -1.0),
+        float2(-1.0, 3.0)
+    };
+
+    float2 pos = positions[vertexIndex];
+
+    VSOutput output;
+    output.position = float4(pos, 0.0, 1.0);
+    output.uv = pos * 0.5 + 0.5;
+
+    return output;
+}
+
 [shader("fragment")]
-PSOutput main(PSInput input)
+PSOutput MainFragment(PSInput input)
 {
     PSOutput output;
 
@@ -38,10 +62,9 @@ PSOutput main(PSInput input)
         float lowerBound = 0.99;
         float upperBound = 1.0;
 
-        float depthColorScaled =  1.0 - ((depth - lowerBound) / (upperBound - lowerBound));
+        float depthColorScaled = 1.0 - ((depth - lowerBound) / (upperBound - lowerBound));
 
-        output.Color =
-            float4(0.0, depthColorScaled, 0.0, SceneColor.a);
+        output.Color = float4(0.0, depthColorScaled, 0.0, SceneColor.a);
     }
     else
     {

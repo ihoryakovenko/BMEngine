@@ -545,16 +545,4 @@ namespace Util
 			return ShaderNode.As<std::string>();
 		}
 	}
-
-	BmRender_PipelineShaderStage ParseShaderPipelineStage(Yaml::Node& ShaderNode)
-	{
-		// Check if it's the new format (with path and PipelineStage)
-		if (!ShaderNode["PipelineStage"].IsNone())
-		{
-			std::string StageStr = ShaderNode["PipelineStage"].As<std::string>();
-			return ParseShaderStage(StageStr.c_str(), StageStr.length());
-		}
-		// Fallback: try to determine stage from shader name
-		assert(false);
-	}
 }

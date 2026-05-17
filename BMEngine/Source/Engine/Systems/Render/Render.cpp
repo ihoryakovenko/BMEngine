@@ -21,7 +21,12 @@
 #include <Engine/Systems/Render/Shaders/Depth.h>
 #include <Engine/Systems/Render/Shaders/Deferred.h>
 
+#include <Engine/Generated/Deferred.generated.h>
+#include <Engine/Generated/Entity.generated.h>
+#include <Engine/Generated/Depth_vert.generated.h>
+
 #include <RenderHelper.h>
+#include <PipelineMetadata.h>
 
 #include <random>
 #include <mutex>
@@ -57,6 +62,17 @@ BmRender_DescriptorSetLayout EmptyLayout;
 
 namespace Render
 {
+	void FillStageDescriptionFromMetadata(const Metadata_Pipeline* Metadata, BmRender_ShaderStageDescription* OutStageDescriptions)
+	{
+		for (u32 i = 0; i < Metadata->StageCount; ++i)
+		{
+			BmRender_ShaderStageDescription* Stage = OutStageDescriptions + i;
+			Stage->Shader = Shaders[Metadata->ModuleName];
+			Stage->EntryPointFunction = Metadata->Stages[i].EntryPoint;
+			Stage->Stage = Metadata->Stages[i].Stage;
+		}
+	}
+
 	template<u32 N>
 	static void ConvertShaderDescriptorToBindings(const Shader_DescriptorSet<N>* ShaderSet, BmRender_DescriptorSetLayoutBinding* OutBindings)
 	{
@@ -176,20 +192,11 @@ namespace Render
 		}
 
 		// Create vectors to hold pipeline data
-		std::vector<BmRender_ShaderStageDescription> shaderStages;
 		std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
 		std::vector<BmRender_PushConstant> pushConstantRanges;
-
-		// Build shader stages
-		BmRender_ShaderStageDescription vertexStage = {};
-		vertexStage.Shader = Shaders["StaticMeshVertex"];
-		vertexStage.EntryPointFunction = "main";
-		shaderStages.push_back(vertexStage);
-
-		BmRender_ShaderStageDescription fragmentStage = {};
-		fragmentStage.Shader = Shaders["StaticMeshFragment"];
-		fragmentStage.EntryPointFunction = "main";
-		shaderStages.push_back(fragmentStage);
+		
+		BmRender_ShaderStageDescription StageDescriptions[Metadata_EntityPipeline.StageCount];
+		FillStageDescriptionFromMetadata(&Metadata_EntityPipeline, StageDescriptions);
 
 		// Build descriptor set layouts
 		descriptorSetLayouts.push_back(FrameDataLayout);
@@ -203,8 +210,8 @@ namespace Render
 		PipelineDesc.Attachment = ResourceInfo;
 
 		// Set shader stages
-		PipelineDesc.ShaderStages = shaderStages.data();
-		PipelineDesc.ShaderStagesCount = static_cast<u32>(shaderStages.size());
+		PipelineDesc.ShaderStages = StageDescriptions;
+		PipelineDesc.ShaderStagesCount = Metadata_EntityPipeline.StageCount;
 
 		// Set descriptor set layouts
 		PipelineDesc.DescriptorSetLayouts = descriptorSetLayouts.data();
@@ -668,20 +675,11 @@ namespace Render
 		}
 
 		// Create vectors to hold pipeline data
-		std::vector<BmRender_ShaderStageDescription> shaderStages;
 		std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
 		std::vector<BmRender_PushConstant> pushConstantRanges;
 
-		// Build shader stages
-		BmRender_ShaderStageDescription vertexStage = {};
-		vertexStage.Shader = Shaders["DeferredVertex"];
-		vertexStage.EntryPointFunction = "main";
-		shaderStages.push_back(vertexStage);
-
-		BmRender_ShaderStageDescription fragmentStage = {};
-		fragmentStage.Shader = Shaders["DeferredFragment"];
-		fragmentStage.EntryPointFunction = "main";
-		shaderStages.push_back(fragmentStage);
+		BmRender_ShaderStageDescription StageDescriptions[Metadata_DeferredPipeline.StageCount];
+		FillStageDescriptionFromMetadata(&Metadata_DeferredPipeline, StageDescriptions);
 
 		// Build descriptor set layouts
 		descriptorSetLayouts.push_back(FrameDataLayout);
@@ -693,8 +691,8 @@ namespace Render
 		PipelineDesc.Attachment = DeferredPassPipelineAttachmentData;
 
 		// Set shader stages
-		PipelineDesc.ShaderStages = shaderStages.data();
-		PipelineDesc.ShaderStagesCount = static_cast<u32>(shaderStages.size());
+		PipelineDesc.ShaderStages = StageDescriptions;
+		PipelineDesc.ShaderStagesCount = Metadata_DeferredPipeline.StageCount;
 
 		// Set descriptor set layouts
 		PipelineDesc.DescriptorSetLayouts = descriptorSetLayouts.data();
@@ -931,7 +929,8 @@ namespace Render
 
 		// Build shader stages
 		BmRender_ShaderStageDescription vertexStage = {};
-		vertexStage.Shader = Shaders["DepthVertex"];
+		vertexStage.Shader = Shaders["Depth_vert"];
+		vertexStage.Stage = BmRender_PipelineShaderStage::Vertex;
 		vertexStage.EntryPointFunction = "main";
 		shaderStages.push_back(vertexStage);
 

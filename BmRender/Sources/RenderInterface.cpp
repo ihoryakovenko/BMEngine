@@ -13,7 +13,6 @@ void BmRender_Init(GLFWwindow* WindowHandler)
 	InitializeFrameMemory();
 
 	InitializeDescriptorSetLayoutManager(32);
-	InitializeShaderManager(32);
 	InitializeImageManager(32);
 	InitializeGPUBufferManager(4);
 	InitializeDescriptorSetManager(32);
@@ -30,7 +29,6 @@ void BmRender_Init(GLFWwindow* WindowHandler)
 void BmRender_DeInit()
 {
 	DeinitDescriptorSetLayoutManager();
-	DeinitShaderManager();
 	DeinitImageManager();
 	DeinitGPUBufferManager();
 	DeinitDescriptorSetManager();

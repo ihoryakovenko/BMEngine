@@ -25,11 +25,6 @@ struct BmRender_DescriptorSetLayoutData
 	u32 BindingsCount;
 };
 
-struct BmRender_ShaderData
-{
-	BmRender_PipelineShaderStage Stage;
-};
-
 struct BmRender_ImageResource
 {
 	BmRender_DeviceMemory Memory;

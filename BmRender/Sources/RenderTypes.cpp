@@ -408,14 +408,12 @@ BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* De
 	for (u32 i = 0; i < Description->ShaderStagesCount; ++i)
 	{
 		const BmRender_ShaderStageDescription* ShaderStageDesc = Description->ShaderStages + i;
-		BmRender_ShaderData ShaderData;
-		BmRender_GetShaderData(ShaderStageDesc->Shader, &ShaderData);
 
 		VkPipelineShaderStageCreateInfo* VkStage = VkShaderStages + i;
 		VkStage->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		VkStage->pNext = nullptr;
 		VkStage->flags = 0;
-		VkStage->stage = PipelineShaderStageToVkShaderStage(ShaderData.Stage);
+		VkStage->stage = PipelineShaderStageToVkShaderStage(ShaderStageDesc->Stage);
 		VkStage->module = (VkShaderModule)ShaderStageDesc->Shader;
 		VkStage->pName = ShaderStageDesc->EntryPointFunction;
 		VkStage->pSpecializationInfo = nullptr;
@@ -608,10 +606,7 @@ BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Descript
 	VkShaderModule ShaderModule;
 	VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &CreateInfo, GetVulkanAllocator(), &ShaderModule));
 
-	BmRender_ShaderData Data;
-	Data.Stage = Description->Stage;
-
-	return CreateShaderHandle(ShaderModule, &Data);
+	return CreateShaderHandle(ShaderModule);
 }
 
 
@@ -873,7 +868,6 @@ void BmRender_DestroyShader(BmRender_Shader Handle)
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	VkShaderModule ShaderModule = (VkShaderModule)Handle;
 	vkDestroyShaderModule(Device, ShaderModule, GetVulkanAllocator());
-	DestroyShaderHandle(Handle);
 }
 
 void BmRender_DestroyImage(BmRender_Image Handle)

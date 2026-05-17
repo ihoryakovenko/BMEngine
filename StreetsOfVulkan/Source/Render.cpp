@@ -94,7 +94,7 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	BmRender_ShaderDescription ShaderDesc = {};
 	ShaderDesc.Code = reinterpret_cast<const u32*>(VertexShaderCode);
 	ShaderDesc.CodeSize = VertexShaderCodeSize;
-	ShaderDesc.Stage = BmRender_PipelineShaderStage::Vertex;
+	//ShaderDesc.Stage = BmRender_PipelineShaderStage::Vertex;
 	VertexShader = BmRender_CreateShader(&ShaderDesc);
 
 	free(VertexShaderCode);
@@ -109,7 +109,7 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	BmRender_ShaderDescription FragShaderDesc = {};
 	FragShaderDesc.Code = (const u32*)FragmentShaderCode;
 	FragShaderDesc.CodeSize = FragmentShaderCodeSize;
-	FragShaderDesc.Stage = BmRender_PipelineShaderStage::Fragment;
+	//FragShaderDesc.Stage = BmRender_PipelineShaderStage::Fragment;
 	FragmentShader = BmRender_CreateShader(&FragShaderDesc);
 
 	free(FragmentShaderCode);
