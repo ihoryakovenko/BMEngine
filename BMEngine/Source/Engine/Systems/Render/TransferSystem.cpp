@@ -165,7 +165,7 @@ namespace TransferSystem
 			{
 				case TaskType::Data:
 				{
-					const BmRender_GPUBufferBinding& Entry = Task->DataDescr.Handle;
+					const BmRender_GPUBufferUpdateData& Entry = Task->DataDescr.Handle;
 
 					//BufferData.ReadyValue = TransferState.CompletedTransfer + 1; // TODO: fix
 

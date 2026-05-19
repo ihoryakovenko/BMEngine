@@ -140,7 +140,7 @@ BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_D
 	VkDescriptorSetLayoutBinding* NewLayoutBindings = (VkDescriptorSetLayoutBinding*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkDescriptorSetLayoutBinding) * BindingsCount);
 	for (u32 i = 0; i < BindingsCount; ++i)
 	{
-		NewLayoutBindings[i].binding = Bindings[i].Binding;
+		NewLayoutBindings[i].binding = i;
 		NewLayoutBindings[i].descriptorCount = Bindings[i].DescriptorCount;
 		NewLayoutBindings[i].descriptorType = DescriptorTypeToVk(Bindings[i].DescriptorType);
 		NewLayoutBindings[i].stageFlags = DescriptorShaderStageToVkShaderStage(Bindings[i].StageFlags);
@@ -162,7 +162,7 @@ BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_D
 	return CreateDescriptorSetLayoutHandle(VkLayout, &Layout);
 }
 
-void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, const BmRender_DescriptorSetBinding* Bindings, u32 BindingsCount)
+void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, const BmRender_DescriptorSetUpdateData* Bindings, u32 BindingsCount)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 
@@ -175,15 +175,15 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, co
 
 	for (u32 i = 0; i < BindingsCount; i++)
 	{
-		const BmRender_DescriptorSetBinding& Binding = Bindings[i];
+		const BmRender_DescriptorSetUpdateData& Binding = Bindings[i];
 
-		BmRender_DescriptorType DescriptorType = Layout.LayoutBindings[i].DescriptorType;
+		BmRender_DescriptorType DescriptorType = Layout.LayoutBindings[Binding.DstBinding].DescriptorType;
 		VkDescriptorType VkDescriptorType = DescriptorTypeToVk(DescriptorType);
 
 		WriteDescriptorSets[i] = { };
 		WriteDescriptorSets[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		WriteDescriptorSets[i].dstSet = (VkDescriptorSet)DescriptorSetHandle;
-		WriteDescriptorSets[i].dstBinding = i;
+		WriteDescriptorSets[i].dstBinding = Binding.DstBinding;
 		WriteDescriptorSets[i].dstArrayElement = Binding.DstArrayElement;
 		WriteDescriptorSets[i].descriptorType = VkDescriptorType;
 		WriteDescriptorSets[i].descriptorCount = Binding.BindingCount;
@@ -194,7 +194,7 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, co
 			VkDescriptorBufferInfo* BufferInfo = (VkDescriptorBufferInfo*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkDescriptorBufferInfo) * Binding.BindingCount);
 			for (u32 j = 0; j < Binding.BindingCount; ++j)
 			{
-				const BmRender_GPUBufferBinding& Entry = Binding.BufferRegions[j];
+				const BmRender_GPUBufferUpdateData& Entry = Binding.BufferRegions[j];
 
 				BufferInfo[j].buffer = (VkBuffer)Entry.GPUBufferHandle;
 				BufferInfo[j].offset = Entry.BufferOffset;

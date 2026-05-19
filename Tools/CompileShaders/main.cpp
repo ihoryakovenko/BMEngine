@@ -49,7 +49,7 @@ std::string GenerateMetadata(slang::IComponentType* LinkedProgram, const std::st
 
 	std::unordered_map<u32, DescriptorSetGenerationHelper> DescriptorSetGenerationMap;
 
-	std::string DescriptorsVariableName = "Metadata_" + ModuleName + "Descriptors";
+	std::string DescriptorsVariableName = "Private_Metadata_" + ModuleName + "Descriptors";
 	std::string DescriptorArrayGeneration = "inline constexpr Metadata_Descriptor " + DescriptorsVariableName + "[] = { ";
 	
 	u32 DescriptorCount = 0;
@@ -136,7 +136,7 @@ std::string GenerateMetadata(slang::IComponentType* LinkedProgram, const std::st
 		DescriptorGenerationIt->second.Text += " },";
 	}
 
-	std::string DescriptorsSetVariableName = "Metadata_" + ModuleName + "DescriptorSets";
+	std::string DescriptorsSetVariableName = "Private_Metadata_" + ModuleName + "DescriptorSets";
 	std::string DescriptorSetArrayGeneration = "inline constexpr Metadata_DescriptorSet " + DescriptorsSetVariableName + "[] = { ";
 
 	if (DescriptorCount > 0)
@@ -156,7 +156,7 @@ std::string GenerateMetadata(slang::IComponentType* LinkedProgram, const std::st
 		DescriptorSetArrayGeneration += "\n};";
 	}
 
-	std::string StageVariableName = "Metadata_" + ModuleName + "Stages";
+	std::string StageVariableName = "Private_Metadata_" + ModuleName + "Stages";
 	std::string StageArrayGeneration = "inline constexpr Metadata_Stage " + StageVariableName + "[] = { ";
 
 	const u32 EntryPointsCount = ProgramLayout->getEntryPointCount();

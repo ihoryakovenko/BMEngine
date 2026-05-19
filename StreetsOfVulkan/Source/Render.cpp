@@ -283,12 +283,12 @@ void StreetsRender_CreateMaterials(StreetsRender_Material* Materials, u32 Materi
 	PoolSize.DescriptorCount = 1;
 	MaterialDescriptorPool = BmRender_CreateDescriptorPool(&PoolSize, 1, 1, BmRender_DescriptorPoolType::None);
 
-	BmRender_GPUBufferBinding MaterialRegion = {};
+	BmRender_GPUBufferUpdateData MaterialRegion = {};
 	MaterialRegion.GPUBufferHandle = MaterialBuffer;
 	MaterialRegion.BufferOffset = 0;
 	MaterialRegion.Size = MaterialBufferSize;
 
-	BmRender_DescriptorSetBinding MaterialBinding = {};
+	BmRender_DescriptorSetUpdateData MaterialBinding = {};
 	MaterialBinding.BufferRegions = &MaterialRegion;
 	MaterialBinding.BindingCount = 1;
 	MaterialBinding.DstArrayElement = 0;

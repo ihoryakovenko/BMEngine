@@ -5,7 +5,7 @@
 struct GLFWwindow;
 
 inline constexpr u32 MAX_DRAW_FRAMES = 3;
-inline constexpr u32 MAX_DESCRIPTOR_SET_LAYOUT_BUINDINGS = 3;
+inline constexpr u32 MAX_DESCRIPTOR_SET_LAYOUT_BUINDINGS = 16;
 
 typedef struct BmRender_Instance_T* BmRender_Instance;
 typedef struct BmRender_PhysicalDevice_T* BmRender_PhysicalDevice;
@@ -535,17 +535,16 @@ struct BmRender_DescriptorSetLayoutBinding
 	BmRender_DescriptorType DescriptorType;
 	u32 DescriptorCount;
 	BmRender_DescriptorShaderStage StageFlags;
-	u32 Binding;
 };
 
-struct BmRender_ImageBinding
+struct BmRender_ImageUpdateData
 {
 	BmRender_Sampler Sampler;
 	BmRender_ImageLayout ImageLayout; // Check if can store layout with Image resource as target layout and use instead this
 	BmRender_ImageView ImageView;
 };
 
-struct BmRender_GPUBufferBinding
+struct BmRender_GPUBufferUpdateData
 {
 	BmRender_GPUBuffer GPUBufferHandle;
 	u64 BufferOffset;
@@ -578,12 +577,13 @@ struct BmRender_RenderingInfo
 	const BmRender_RenderingDepthAttachment* DepthAttachment;
 };
 
-struct BmRender_DescriptorSetBinding
+struct BmRender_DescriptorSetUpdateData
 {
-	BmRender_GPUBufferBinding* BufferRegions;
-	BmRender_ImageBinding ImageBinding;
+	BmRender_GPUBufferUpdateData* BufferRegions;
+	BmRender_ImageUpdateData ImageBinding;
 	u32 BindingCount;
 	u32 DstArrayElement;
+	u32 DstBinding;
 };
 
 struct BmRender_ShaderStageDescription
@@ -775,7 +775,7 @@ BmRender_CommandPool BmRender_CreateCommandPool(BmRender_QueueType BmRender_Queu
 BmRender_CommandBuffer BmRender_AllocateCommandBuffer(BmRender_CommandPool CommandPool);
 
 void BmRender_UpdateHostCompatibleBuffer(BmRender_GPUBuffer Buffer, u64 BufferOffset, u64 DataSize, const void* Data);
-void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, const BmRender_DescriptorSetBinding* Bindings, u32 BindingsCount);
+void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, const BmRender_DescriptorSetUpdateData* Bindings, u32 BindingsCount);
 
 BmRender_FenceStatus BmRender_GetFenceStatus(BmRender_Fence Handle);
 BmRender_WaitResult BmRender_WaitForFences(BmRender_Fence Handle, bool WaitAll, u64 Timeout);

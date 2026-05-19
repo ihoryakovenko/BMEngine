@@ -24,9 +24,9 @@ namespace Render
 {
 	struct DrawEntity
 	{
-		BmRender_GPUBufferBinding VertexBufferEntry;
-		BmRender_GPUBufferBinding IndexBufferEntry;
-		BmRender_GPUBufferBinding InstanceBufferEntry;
+		BmRender_GPUBufferUpdateData VertexBufferEntry;
+		BmRender_GPUBufferUpdateData IndexBufferEntry;
+		BmRender_GPUBufferUpdateData InstanceBufferEntry;
 		u32 IndicesCount;
 		u32 Instances;
 	};
@@ -42,10 +42,7 @@ namespace Render
 
 	struct DescriptorSetHandles
 	{
-		BmRender_DescriptorSet MaterialsSet;
 		BmRender_DescriptorSet FrameBufferSet;
-		BmRender_DescriptorSet BindlesTexturesSet;
-		BmRender_DescriptorSet EmptySet;
 	};
 
 	struct RenderState
