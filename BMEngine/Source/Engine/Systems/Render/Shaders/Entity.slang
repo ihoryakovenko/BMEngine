@@ -1,6 +1,5 @@
-#include "Common.h"
+#include "Common.slang"
 #include "ShaderTypes.h"
-#include "Entity.h"
 
 static const int DIRECTIONAL_LIGHT_SHADOW_TEXTURE_INDEX = 0;
 static const int SPOT_LIGHT_SHADOW_TEXTURE_INDEX = 1;
@@ -28,6 +27,8 @@ struct VertexOutput
     Shader_EntityLayout layout;
     float4 Position : SV_Position;
 };
+
+[[vk::binding(0, 1)]] Sampler2DArray ShadowMaps;
 
 float3x3 inverse(float3x3 m)
 {

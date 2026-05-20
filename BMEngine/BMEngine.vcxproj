@@ -38,9 +38,6 @@
     <ClInclude Include="Source\Engine\Systems\Concurrency\TaskSystem.h" />
     <ClInclude Include="Source\Engine\Systems\EngineResources.h" />
     <ClInclude Include="Source\Engine\Systems\Render\RenderResources.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\Shaders\Deferred.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\Shaders\Depth.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\Shaders\Entity.h" />
     <ClInclude Include="Source\Engine\Systems\Render\Systems.h" />
     <ClInclude Include="Source\Engine\Systems\Render\TransferSystem.h" />
     <ClInclude Include="Source\Engine\Systems\UI\UI.h" />
@@ -59,7 +56,7 @@
     <None Include="Resources\Settings\RenderResources.yaml" />
     <None Include="Resources\Shaders\Second.frag" />
     <None Include="Resources\Shaders\Second.vert" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Common.h" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Common.slang" />
     <None Include="Source\Engine\Systems\Render\Shaders\Deferred.slang" />
     <None Include="Source\Engine\Systems\Render\Shaders\Depth.vert.slang" />
     <None Include="Source\Engine\Systems\Render\Shaders\Entity.slang" />

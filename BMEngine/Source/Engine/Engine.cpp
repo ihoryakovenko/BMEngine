@@ -34,7 +34,6 @@ std::unordered_map<std::string, BmRender_Sampler> Samplers;
 std::unordered_map<std::string, BmRender_Shader> Shaders;
 std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
 std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
-std::unordered_map<std::string, BmRender_PushConstant> PushConstants;
 
 namespace Engine
 {

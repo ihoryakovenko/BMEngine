@@ -1,4 +1,3 @@
-#include "Deferred.h"
 
 struct VSOutput
 {
@@ -26,6 +25,9 @@ float3 Grayscale(float3 Color)
     float Average = 0.2126 * Color.r + 0.7152 * Color.g + 0.0722 * Color.b;
     return float3(Average, Average, Average);
 }
+
+[[vk::binding(0, 1)]] Sampler2D InputColor;
+[[vk::binding(1, 1)]] Sampler2D InputDepth;
 
 [shader("vertex")]
 VSOutput MainVertex(uint vertexIndex: SV_VulkanVertexID)

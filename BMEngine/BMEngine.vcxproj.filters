@@ -46,9 +46,6 @@
     <ClInclude Include="Source\Engine\Systems\Concurrency\TaskSystem.h" />
     <ClInclude Include="Source\Util\YamlParsing.h" />
     <ClInclude Include="Source\Engine\Systems\Render\Systems.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\Shaders\Entity.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\Shaders\Depth.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\Shaders\Deferred.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />
@@ -57,7 +54,7 @@
     <None Include="Source\Engine\Systems\Render\Shaders\SkyBox.frag.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\SkyBox.vert.glsl" />
     <None Include="Resources\Scenes\TestScene.yaml" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Common.h" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Common.slang" />
     <None Include="Source\Engine\Systems\Render\Shaders\ShaderTypes.h" />
     <None Include="Source\Engine\Systems\Render\Shaders\Depth.vert.slang" />
     <None Include="Source\Engine\Systems\Render\Shaders\Entity.slang" />

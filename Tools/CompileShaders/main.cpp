@@ -304,6 +304,11 @@ int main(int argc, const char* argv[])
 		CheckDiagnostics(diagnostics);
 
 		const int definedEntryPointCount = module->getDefinedEntryPointCount();
+		if (definedEntryPointCount == 0)
+		{
+			continue;
+		}
+
 		for (int i = 0; i < definedEntryPointCount; i++)
 		{
 			Slang::ComPtr<slang::IEntryPoint> entryPoint;

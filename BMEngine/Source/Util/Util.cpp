@@ -20,7 +20,6 @@ extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
 extern std::unordered_map<std::string, BmRender_Shader> Shaders;
 extern std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
 extern std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
-extern 	std::unordered_map<std::string, BmRender_PushConstant> PushConstants;
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>

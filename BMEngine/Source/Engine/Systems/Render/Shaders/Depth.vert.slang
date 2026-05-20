@@ -1,11 +1,12 @@
-#include "Common.h"
-#include "Depth.h"
+#include "Common.slang"
 #include "ShaderTypes.h"
 
 struct VSOutput
 {
     float4 Position : SV_Position;
 };
+
+[[vk::binding(0, 1)]] ConstantBuffer<LightSpaceMatrixData> lightSpaceMatrix;
 
 [shader("vertex")]
 VSOutput main(uint vID: SV_VertexID, uint iID: SV_InstanceID)

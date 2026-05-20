@@ -31,7 +31,7 @@ namespace Render
 		u32 Instances;
 	};
 
-	struct StaticMeshPipeline
+	struct StaticMeshPipelineDepr
 	{
 		BmRender_ImageView ShadowMapArrayImageInterface[MAX_DRAW_FRAMES];
 
@@ -48,7 +48,7 @@ namespace Render
 	struct RenderState
 	{
 		BmRender_CommandWorker GraphicsCommandWorker;
-		StaticMeshPipeline MeshPipeline;
+		StaticMeshPipelineDepr MeshPipeline;
 		DescriptorSetHandles DescriptorSets;
 		BmRender_DescriptorPool MainPool;
 		BmRender_DescriptorPool DebugUiPool; // TODO: ?
@@ -74,20 +74,6 @@ namespace Render
 	void Draw(DrawScene* Data, u64 WaitSemaphoreValue);
 
 	RenderState* GetRenderState();
-
-	struct DrawEntityBatchConfig
-	{
-		BmRender_Pipeline Pipeline;
-		BmRender_PipelineLayout PipelineLayout;
-		const BmRender_DescriptorSet* DescriptorSets;
-		u32 DescriptorSetCount;
-		u32 DynamicOffsetCount;
-		const u32* DynamicOffsets;
-		BmRender_PushConstant PushConstant;
-		const void* PushConstantData;
-	};
-
-	void DrawEntityBatch(BmRender_CommandBuffer CmdBuffer, DrawScene* Scene, const DrawEntityBatchConfig& Config);
 
 	// DeferredPass functions
 	void DeferredPassInit(BmRender_DescriptorPool MainPool);
