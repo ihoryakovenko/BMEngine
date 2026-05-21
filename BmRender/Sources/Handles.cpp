@@ -18,66 +18,72 @@ static StoragePair CommandBufferStorage;
 static StoragePair QueueStorage;
 static StoragePair PipelineLayoutStorage;
 static StoragePair ImageViewStorage;
+static StoragePair PipelineStorage;
 
 // INIT
 void InitializeDescriptorSetLayoutManager(u32 Size)
 {
-	Memory_PoolAllocator_Init(&DescriptorSetLayoutStorage.Allocator, Size, sizeof(BmRender_DescriptorSetLayoutData));
+	Memory_PoolAllocator_Init(&DescriptorSetLayoutStorage.Allocator, Size, sizeof(DescriptorSetLayoutData));
 	Systems_SparceHashMap_Init(&DescriptorSetLayoutStorage.HashMap, Size);
 }
 
 void InitializeImageManager(u32 Size)
 {
-	Memory_PoolAllocator_Init(&ImageStorage.Allocator, Size, sizeof(BmRender_ImageResource));
+	Memory_PoolAllocator_Init(&ImageStorage.Allocator, Size, sizeof(ImageData));
 	Systems_SparceHashMap_Init(&ImageStorage.HashMap, Size);
 }
 
 void InitializeGPUBufferManager(u32 Size)
 {
-	Memory_PoolAllocator_Init(&GPUBufferStorage.Allocator, Size, sizeof(BmRender_GPUBufferData));
+	Memory_PoolAllocator_Init(&GPUBufferStorage.Allocator, Size, sizeof(BufferData));
 	Systems_SparceHashMap_Init(&GPUBufferStorage.HashMap, Size);
 }
 
 void InitializeDescriptorSetManager(u32 Size)
 {
-	Memory_PoolAllocator_Init(&DescriptorSetStorage.Allocator, Size, sizeof(BmRender_DescriptorSetData));
+	Memory_PoolAllocator_Init(&DescriptorSetStorage.Allocator, Size, sizeof(DescriptorSetData));
 	Systems_SparceHashMap_Init(&DescriptorSetStorage.HashMap, Size);
 }
 
 void InitializeSemaphoreManager(u32 Size)
 {
-	Memory_PoolAllocator_Init(&SemaphoreStorage.Allocator, Size, sizeof(BmRender_SemaphoreData));
+	Memory_PoolAllocator_Init(&SemaphoreStorage.Allocator, Size, sizeof(SemaphoreData));
 	Systems_SparceHashMap_Init(&SemaphoreStorage.HashMap, Size);
 }
 
 void InitializeCommandPoolManager(u32 Size)
 {
-	Memory_PoolAllocator_Init(&CommandPoolStorage.Allocator, Size, sizeof(BmRender_CommandPoolData));
+	Memory_PoolAllocator_Init(&CommandPoolStorage.Allocator, Size, sizeof(CommandPoolData));
 	Systems_SparceHashMap_Init(&CommandPoolStorage.HashMap, Size);
 }
 
 void InitializeCommandBufferManager(u32 Size)
 {
-	Memory_PoolAllocator_Init(&CommandBufferStorage.Allocator, Size, sizeof(BmRender_CommandBufferData));
+	Memory_PoolAllocator_Init(&CommandBufferStorage.Allocator, Size, sizeof(CommandBufferData));
 	Systems_SparceHashMap_Init(&CommandBufferStorage.HashMap, Size);
 }
 
 void InitializeQueueManager(u32 Size)
 {
-	Memory_PoolAllocator_Init(&QueueStorage.Allocator, Size, sizeof(BmRender_QueueData));
+	Memory_PoolAllocator_Init(&QueueStorage.Allocator, Size, sizeof(QueueData));
 	Systems_SparceHashMap_Init(&QueueStorage.HashMap, Size);
 }
 
 void InitializePipelineLayoutManager(u32 Size)
 {
-	Memory_PoolAllocator_Init(&PipelineLayoutStorage.Allocator, Size, sizeof(BmRender_PipelineLayoutData));
+	Memory_PoolAllocator_Init(&PipelineLayoutStorage.Allocator, Size, sizeof(PipelineLayoutData));
 	Systems_SparceHashMap_Init(&PipelineLayoutStorage.HashMap, Size);
 }
 
 void InitializeImageViewManager(u32 Size)
 {
-	Memory_PoolAllocator_Init(&ImageViewStorage.Allocator, Size, sizeof(BmRender_ImageViewData));
+	Memory_PoolAllocator_Init(&ImageViewStorage.Allocator, Size, sizeof(ImageViewData));
 	Systems_SparceHashMap_Init(&ImageViewStorage.HashMap, Size);
+}
+void InitializePipelineManager(u32 Size)
+{
+	Memory_PoolAllocator_Init(&PipelineStorage.Allocator, Size, sizeof(PipelineData));
+	Systems_SparceHashMap_Init(&PipelineStorage.HashMap, Size);
 }
 // INIT
 
@@ -141,6 +147,12 @@ void DeinitImageViewManager()
 	Systems_SparceHashMap_Free(&ImageViewStorage.HashMap);
 	Memory_PoolAllocator_Free(&ImageViewStorage.Allocator);
 }
+
+void DeinitPipelineManager()
+{
+	Systems_SparceHashMap_Free(&PipelineStorage.HashMap);
+	Memory_PoolAllocator_Free(&PipelineStorage.Allocator);
+}
 // DEINIT
 
 // CREATE
@@ -149,12 +161,15 @@ BmRender_Sampler CreateSamplerHandle(VkSampler Sampler)
 	return (BmRender_Sampler)Sampler;
 }
 
-BmRender_Pipeline CreatePipelineHandle(VkPipeline Pipeline)
+BmRender_Pipeline CreatePipelineHandle(VkPipeline Pipeline, const PipelineData* Data)
 {
+	const u32 Index = Memory_PoolAllocator_PushData(&PipelineStorage.Allocator, Data);
+	Systems_SparceHashMap_Insert(&PipelineStorage.HashMap, (u64)Pipeline, Index);
+
 	return (BmRender_Pipeline)Pipeline;
 }
 
-BmRender_PipelineLayout CreatePipelineLayoutHandle(VkPipelineLayout PipelineLayout, const BmRender_PipelineLayoutData* Data)
+BmRender_PipelineLayout CreatePipelineLayoutHandle(VkPipelineLayout PipelineLayout, const PipelineLayoutData* Data)
 {
 	const u32 Index = Memory_PoolAllocator_PushData(&PipelineLayoutStorage.Allocator, Data);
 	Systems_SparceHashMap_Insert(&PipelineLayoutStorage.HashMap, (u64)PipelineLayout, Index);
@@ -162,7 +177,7 @@ BmRender_PipelineLayout CreatePipelineLayoutHandle(VkPipelineLayout PipelineLayo
 	return (BmRender_PipelineLayout)PipelineLayout;
 }
 
-BmRender_DescriptorSetLayout CreateDescriptorSetLayoutHandle(VkDescriptorSetLayout Layout, const BmRender_DescriptorSetLayoutData* Data)
+BmRender_DescriptorSetLayout CreateDescriptorSetLayoutHandle(VkDescriptorSetLayout Layout, const DescriptorSetLayoutData* Data)
 {
 	const u32 Index = Memory_PoolAllocator_PushData(&DescriptorSetLayoutStorage.Allocator, Data);
 	Systems_SparceHashMap_Insert(&DescriptorSetLayoutStorage.HashMap, (u64)Layout, Index);
@@ -180,7 +195,7 @@ BmRender_Shader CreateShaderHandle(VkShaderModule VulkanShaderModule)
 	return (BmRender_Shader)VulkanShaderModule;
 }
 
-BmRender_Image CreateImageHandle(VkImage Image, const BmRender_ImageResource* Data)
+BmRender_Image CreateImageHandle(VkImage Image, const ImageData* Data)
 {
 	const u32 Index = Memory_PoolAllocator_PushData(&ImageStorage.Allocator, Data);
 	Systems_SparceHashMap_Insert(&ImageStorage.HashMap, (u64)Image, Index);
@@ -188,7 +203,7 @@ BmRender_Image CreateImageHandle(VkImage Image, const BmRender_ImageResource* Da
 	return (BmRender_Image)Image;
 }
 
-BmRender_ImageView CreateImageViewHandle(VkImageView ImageView, const BmRender_ImageViewData* Data)
+BmRender_ImageView CreateImageViewHandle(VkImageView ImageView, const ImageViewData* Data)
 {
 	const u32 Index = Memory_PoolAllocator_PushData(&ImageViewStorage.Allocator, Data);
 	Systems_SparceHashMap_Insert(&ImageViewStorage.HashMap, (u64)ImageView, Index);
@@ -196,7 +211,7 @@ BmRender_ImageView CreateImageViewHandle(VkImageView ImageView, const BmRender_I
 	return (BmRender_ImageView)ImageView;
 }
 
-BmRender_GPUBuffer CreateGPUBufferHandle(VkBuffer Buffer, const BmRender_GPUBufferData* Data)
+BmRender_GPUBuffer CreateGPUBufferHandle(VkBuffer Buffer, const BufferData* Data)
 {
 	const u32 Index = Memory_PoolAllocator_PushData(&GPUBufferStorage.Allocator, Data);
 	Systems_SparceHashMap_Insert(&GPUBufferStorage.HashMap, (u64)Buffer, Index);
@@ -204,7 +219,7 @@ BmRender_GPUBuffer CreateGPUBufferHandle(VkBuffer Buffer, const BmRender_GPUBuff
 	return (BmRender_GPUBuffer)Buffer;
 }
 
-BmRender_DescriptorSet CreateDescriptorSetHandle(VkDescriptorSet Set, const BmRender_DescriptorSetData* Data)
+BmRender_DescriptorSet CreateDescriptorSetHandle(VkDescriptorSet Set, const DescriptorSetData* Data)
 {
 	const u32 Index = Memory_PoolAllocator_PushData(&DescriptorSetStorage.Allocator, Data);
 	Systems_SparceHashMap_Insert(&DescriptorSetStorage.HashMap, (u64)Set, Index);
@@ -217,7 +232,7 @@ BmRender_Fence CreateFenceHandle(VkFence Fence)
 	return (BmRender_Fence)Fence;
 }
 
-BmRender_Queue CreateQueueHandle(VkQueue Queue, const BmRender_QueueData* Data)
+BmRender_Queue CreateQueueHandle(VkQueue Queue, const QueueData* Data)
 {
 	const u32 Index = Memory_PoolAllocator_PushData(&QueueStorage.Allocator, Data);
 	Systems_SparceHashMap_Insert(&QueueStorage.HashMap, (u64)Queue, Index);
@@ -230,7 +245,7 @@ BmRender_DeviceMemory CreateDeviceMemoryHandle(VkDeviceMemory Memory)
 	return (BmRender_DeviceMemory)Memory;
 }
 
-BmRender_Semaphore CreateSemaphoreHandle(VkSemaphore VulkanSemaphore, const BmRender_SemaphoreData* Data)
+BmRender_Semaphore CreateSemaphoreHandle(VkSemaphore VulkanSemaphore, const SemaphoreData* Data)
 {
 	const u32 Index = Memory_PoolAllocator_PushData(&SemaphoreStorage.Allocator, Data);
 	Systems_SparceHashMap_Insert(&SemaphoreStorage.HashMap, (u64)VulkanSemaphore, Index);
@@ -238,7 +253,7 @@ BmRender_Semaphore CreateSemaphoreHandle(VkSemaphore VulkanSemaphore, const BmRe
 	return (BmRender_Semaphore)VulkanSemaphore;
 }
 
-BmRender_CommandPool CreateCommandPoolHandle(VkCommandPool VulkanCommandPool, const BmRender_CommandPoolData* Data)
+BmRender_CommandPool CreateCommandPoolHandle(VkCommandPool VulkanCommandPool, const CommandPoolData* Data)
 {
 	const u32 Index = Memory_PoolAllocator_PushData(&CommandPoolStorage.Allocator, Data);
 	Systems_SparceHashMap_Insert(&CommandPoolStorage.HashMap, (u64)VulkanCommandPool, Index);
@@ -246,7 +261,7 @@ BmRender_CommandPool CreateCommandPoolHandle(VkCommandPool VulkanCommandPool, co
 	return (BmRender_CommandPool)VulkanCommandPool;
 }
 
-BmRender_CommandBuffer CreateCommandBufferHandle(VkCommandBuffer VulkanCommandBuffer, const BmRender_CommandBufferData* Data)
+BmRender_CommandBuffer CreateCommandBufferHandle(VkCommandBuffer VulkanCommandBuffer, const CommandBufferData* Data)
 {
 	const u32 Index = Memory_PoolAllocator_PushData(&CommandBufferStorage.Allocator, Data);
 	Systems_SparceHashMap_Insert(&CommandBufferStorage.HashMap, (u64)VulkanCommandBuffer, Index);
@@ -318,7 +333,7 @@ void DestroyCommandBufferHandle(BmRender_CommandBuffer Handle)
 // DESTROY
 
 // GET
-void BmRender_GetDescriptorSetLayoutData(BmRender_DescriptorSetLayout Handle, BmRender_DescriptorSetLayoutData* OutData)
+void BmRender_GetDescriptorSetLayoutData(BmRender_DescriptorSetLayout Handle, DescriptorSetLayoutData* OutData)
 {
 	VkDescriptorSetLayout Layout = (VkDescriptorSetLayout)Handle;
 	u32 Index;
@@ -328,7 +343,7 @@ void BmRender_GetDescriptorSetLayoutData(BmRender_DescriptorSetLayout Handle, Bm
 	}
 }
 
-bool BmRender_GetImageData(BmRender_Image Handle, BmRender_ImageResource* OutData)
+bool BmRender_GetImageData(BmRender_Image Handle, ImageData* OutData)
 {
 	u32 Index;
 	if (Systems_SparceHashMap_Get(&ImageStorage.HashMap, (u64)Handle, &Index))
@@ -339,7 +354,7 @@ bool BmRender_GetImageData(BmRender_Image Handle, BmRender_ImageResource* OutDat
 	return false;
 }
 
-bool BmRender_GetGPUBufferData(BmRender_GPUBuffer Handle, BmRender_GPUBufferData* OutData)
+bool BmRender_GetGPUBufferData(BmRender_GPUBuffer Handle, BufferData* OutData)
 {
 	u32 Index;
 	if (Systems_SparceHashMap_Get(&GPUBufferStorage.HashMap, (u64)Handle, &Index))
@@ -350,7 +365,7 @@ bool BmRender_GetGPUBufferData(BmRender_GPUBuffer Handle, BmRender_GPUBufferData
 	return false;
 }
 
-bool BmRender_GetDescriptorSetData(BmRender_DescriptorSet Handle, BmRender_DescriptorSetData* OutData)
+bool BmRender_GetDescriptorSetData(BmRender_DescriptorSet Handle, DescriptorSetData* OutData)
 {
 	u32 Index;
 	if (Systems_SparceHashMap_Get(&DescriptorSetStorage.HashMap, (u64)Handle, &Index))
@@ -361,7 +376,7 @@ bool BmRender_GetDescriptorSetData(BmRender_DescriptorSet Handle, BmRender_Descr
 	return false;
 }
 
-bool BmRender_GetSemaphoreData(BmRender_Semaphore Handle, BmRender_SemaphoreData* OutData)
+bool BmRender_GetSemaphoreData(BmRender_Semaphore Handle, SemaphoreData* OutData)
 {
 	u32 Index;
 	if (Systems_SparceHashMap_Get(&SemaphoreStorage.HashMap, (u64)Handle, &Index))
@@ -372,7 +387,7 @@ bool BmRender_GetSemaphoreData(BmRender_Semaphore Handle, BmRender_SemaphoreData
 	return false;
 }
 
-bool BmRender_GetCommandPoolData(BmRender_CommandPool Handle, BmRender_CommandPoolData* OutData)
+bool BmRender_GetCommandPoolData(BmRender_CommandPool Handle, CommandPoolData* OutData)
 {
 	u32 Index;
 	if (Systems_SparceHashMap_Get(&CommandPoolStorage.HashMap, (u64)Handle, &Index))
@@ -383,7 +398,7 @@ bool BmRender_GetCommandPoolData(BmRender_CommandPool Handle, BmRender_CommandPo
 	return false;
 }
 
-bool BmRender_GetCommandBufferData(BmRender_CommandBuffer Handle, BmRender_CommandBufferData* OutData)
+bool BmRender_GetCommandBufferData(BmRender_CommandBuffer Handle, CommandBufferData* OutData)
 {
 	u32 Index;
 	if (Systems_SparceHashMap_Get(&CommandBufferStorage.HashMap, (u64)Handle, &Index))
@@ -394,7 +409,7 @@ bool BmRender_GetCommandBufferData(BmRender_CommandBuffer Handle, BmRender_Comma
 	return false;
 }
 
-bool BmRender_GetQueueData(BmRender_Queue Handle, BmRender_QueueData* OutData)
+bool BmRender_GetQueueData(BmRender_Queue Handle, QueueData* OutData)
 {
 	u32 Index;
 	if (Systems_SparceHashMap_Get(&QueueStorage.HashMap, (u64)Handle, &Index))
@@ -405,11 +420,10 @@ bool BmRender_GetQueueData(BmRender_Queue Handle, BmRender_QueueData* OutData)
 	return false;
 }
 
-bool BmRender_GetPipelineLayoutData(BmRender_PipelineLayout Handle, BmRender_PipelineLayoutData* OutData)
+bool BmRender_GetPipelineLayoutData(BmRender_PipelineLayout Handle, PipelineLayoutData* OutData)
 {
-	VkPipelineLayout PipelineLayout = (VkPipelineLayout)Handle;
 	u32 Index;
-	if (Systems_SparceHashMap_Get(&PipelineLayoutStorage.HashMap, (u64)PipelineLayout, &Index))
+	if (Systems_SparceHashMap_Get(&PipelineLayoutStorage.HashMap, (u64)Handle, &Index))
 	{
 		Memory_PoolAllocator_GetData(&PipelineLayoutStorage.Allocator, Index, OutData);
 		return true;
@@ -417,13 +431,22 @@ bool BmRender_GetPipelineLayoutData(BmRender_PipelineLayout Handle, BmRender_Pip
 	return false;
 }
 
-bool BmRender_GetImageViewData(BmRender_ImageView Handle, BmRender_ImageViewData* OutData)
+bool BmRender_GetImageViewData(BmRender_ImageView Handle, ImageViewData* OutData)
 {
-	VkImageView ImageView = (VkImageView)Handle;
 	u32 Index;
-	if (Systems_SparceHashMap_Get(&ImageViewStorage.HashMap, (u64)ImageView, &Index))
+	if (Systems_SparceHashMap_Get(&ImageViewStorage.HashMap, (u64)Handle, &Index))
 	{
 		Memory_PoolAllocator_GetData(&ImageViewStorage.Allocator, Index, OutData);
+		return true;
+	}
+	return false;
+}
+bool BmRender_GetPipelineData(BmRender_Pipeline Handle, PipelineData* OutData)
+{
+	u32 Index;
+	if (Systems_SparceHashMap_Get(&PipelineStorage.HashMap, (u64)Handle, &Index))
+	{
+		Memory_PoolAllocator_GetData(&PipelineStorage.Allocator, Index, OutData);
 		return true;
 	}
 	return false;

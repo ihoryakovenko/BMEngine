@@ -22,6 +22,7 @@ void BmRender_Init(GLFWwindow* WindowHandler)
 	InitializeQueueManager(2);
 	InitializePipelineLayoutManager(32);
 	InitializeImageViewManager(32);
+	InitializePipelineManager(4);
 
 	CreateCoreContext(WindowHandler);
 }
@@ -38,6 +39,7 @@ void BmRender_DeInit()
 	DeinitQueueManager();
 	DeinitPipelineLayoutManager();
 	DeinitImageViewManager();
+	DeinitPipelineManager();
 
 	DestroyCoreContext();
 	DeMemory_LinearAllocator_Init();
@@ -100,7 +102,7 @@ u32 BmRender_GetGraphicsQueueFamily()
 
 BmRender_QueueType BmRender_GetQueueType(BmRender_Queue Queue)
 {
-	BmRender_QueueData Data;
+	QueueData Data;
 	if (BmRender_GetQueueData(Queue, &Data))
 	{
 		return Data.QueueType;
@@ -110,7 +112,7 @@ BmRender_QueueType BmRender_GetQueueType(BmRender_Queue Queue)
 
 u32 BmRender_GetQueueFamily(BmRender_Queue Queue)
 {
-	BmRender_QueueData Data;
+	QueueData Data;
 	if (BmRender_GetQueueData(Queue, &Data))
 	{
 		VulkanCoreContext* CoreContext = GetCoreContext();

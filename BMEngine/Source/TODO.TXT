@@ -1,1 +1,1 @@
-Simplification
+Pipeleine should have layout handle

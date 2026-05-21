@@ -140,7 +140,7 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	LayoutDesc.PipelineType = BmRender_PipelineType::Graphics;
 	PipelineLayout = BmRender_CreatePipelineLayout(&LayoutDesc);
 
-	BmRender_PipelineDescription PipelineDesc = {};
+	BmRender_PipelineSettings PipelineDesc = {};
 	PipelineDesc.PipelineLayout = PipelineLayout;
 
 	BmRender_ImageView PipelineColorAttachments[1];

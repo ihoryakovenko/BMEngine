@@ -13,6 +13,8 @@
 #include "Util/Settings.h"
 #include "Util/Math.h"
 
+#include "PipelineSettings.h"
+
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 
 #include <Engine/Systems/Render/Shaders/ShaderTypes.h>
@@ -65,7 +67,7 @@ namespace Render
 		}
 	}
 
-	static void GenericDraw(BmRender_CommandBuffer CommandBuffer, DrawScene* Scene, BmRender_PipelineLayout Layout, BmRender_Pipeline Pipeline,
+	static void GenericDraw(BmRender_CommandBuffer CommandBuffer, DrawScene* Scene, BmRender_Pipeline Pipeline,
 		const BmRender_DescriptorSet* Sets, u32 SetsCount, const u32* DynamicOffsets, u32 DynamicOffsetsCount)
 	{
 		const u32 CurrentFrame = GetDrawSystemData()->CurrentFrame;
@@ -73,8 +75,8 @@ namespace Render
 
 		BmRender_BindPipeline(CommandBuffer, Pipeline);
 
-		BmRender_RecordBindDescriptorSets(CommandBuffer, Layout, 0, 1, &DescriptorSets.FrameBufferSet, 1, &FrameDynamicOffset);
-		BmRender_RecordBindDescriptorSets(CommandBuffer, Layout, 1, SetsCount, Sets, DynamicOffsetsCount, DynamicOffsets);
+		BmRender_RecordBindDescriptorSets(CommandBuffer, Pipeline, 0, 1, &DescriptorSets.FrameBufferSet, 1, &FrameDynamicOffset);
+		BmRender_RecordBindDescriptorSets(CommandBuffer, Pipeline, 1, SetsCount, Sets, DynamicOffsetsCount, DynamicOffsets);
 
 		std::unique_lock Lock(Scene->TempLock);
 
@@ -203,7 +205,6 @@ namespace Render
 
 		// Create vectors to hold pipeline data
 		std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
-		std::vector<BmRender_PushConstant> pushConstantRanges;
 		
 		BmRender_ShaderStageDescription StageDescriptions[Metadata_EntityPipeline.StageCount];
 		FillStageDescriptionsFromMetadata(&Metadata_EntityPipeline, StageDescriptions);
@@ -211,100 +212,19 @@ namespace Render
 		// Build descriptor set layouts
 		descriptorSetLayouts.push_back(FrameDataLayout);
 		descriptorSetLayouts.push_back(ShadowMapArrayLayout);
-			
-		// Build pipeline description
-		BmRender_PipelineDescription PipelineDesc = {};
-		PipelineDesc.Extent = MainScreenExtent;
-		PipelineDesc.Attachment = ResourceInfo;
-
-		// Set shader stages
-		PipelineDesc.ShaderStages = StageDescriptions;
-		PipelineDesc.ShaderStagesCount = Metadata_EntityPipeline.StageCount;
-
-		// Set descriptor set layouts
-		PipelineDesc.DescriptorSetLayouts = descriptorSetLayouts.data();
-		PipelineDesc.DescriptorSetLayoutsCount = static_cast<u32>(descriptorSetLayouts.size());
-
-		// Set push constants
-		PipelineDesc.PushConstantRanges = pushConstantRanges.data();
-		PipelineDesc.PushConstantRangesCount = static_cast<u32>(pushConstantRanges.size());
-
-		// Rasterization state
-		PipelineDesc.RasterizationState = {};
-		PipelineDesc.RasterizationState.DepthClampEnable = false;
-		PipelineDesc.RasterizationState.RasterizerDiscardEnable = false;
-		PipelineDesc.RasterizationState.PolygonMode = BmRender_PolygonMode::Fill;
-		PipelineDesc.RasterizationState.LineWidth = 1.0f;
-		PipelineDesc.RasterizationState.CullMode = BmRender_CullModeFlags::Back;
-		PipelineDesc.RasterizationState.FrontFace = BmRender_FrontFace::CounterClockwise;
-		PipelineDesc.RasterizationState.DepthBiasEnable = false;
-
-		// Color blend state
-		PipelineDesc.ColorBlendState = {};
-		PipelineDesc.ColorBlendState.LogicOpEnable = false;
-		PipelineDesc.ColorBlendState.AttachmentCount = 1;
-
-		// Color blend attachment
-		PipelineDesc.ColorBlendAttachment = {};
-		PipelineDesc.ColorBlendAttachment.ColorWriteMask = BmRender_ColorComponentFlags::RGBA;
-		PipelineDesc.ColorBlendAttachment.BlendEnable = true;
-		PipelineDesc.ColorBlendAttachment.SrcColorBlendFactor = BmRender_BlendFactor::SrcAlpha;
-		PipelineDesc.ColorBlendAttachment.DstColorBlendFactor = BmRender_BlendFactor::OneMinusSrcAlpha;
-		PipelineDesc.ColorBlendAttachment.ColorBlendOp = BmRender_BlendOp::Add;
-		PipelineDesc.ColorBlendAttachment.SrcAlphaBlendFactor = BmRender_BlendFactor::One;
-		PipelineDesc.ColorBlendAttachment.DstAlphaBlendFactor = BmRender_BlendFactor::Zero;
-		PipelineDesc.ColorBlendAttachment.AlphaBlendOp = BmRender_BlendOp::Add;
-
-		// Depth stencil state
-		PipelineDesc.DepthStencilState = {};
-		PipelineDesc.DepthStencilState.DepthTestEnable = true;
-		PipelineDesc.DepthStencilState.DepthWriteEnable = true;
-		PipelineDesc.DepthStencilState.DepthCompareOp = BmRender_CompareOp::Less;
-		PipelineDesc.DepthStencilState.DepthBoundsTestEnable = false;
-		PipelineDesc.DepthStencilState.StencilTestEnable = false;
-
-		// Multisample state
-		PipelineDesc.MultisampleState = {};
-		PipelineDesc.MultisampleState.SampleShadingEnable = false;
-
-		// Input assembly state
-		PipelineDesc.InputAssemblyState = {};
-		PipelineDesc.InputAssemblyState.Topology = BmRender_PrimitiveTopology::TriangleList;
-		PipelineDesc.InputAssemblyState.PrimitiveRestartEnable = false;
-
-		// Viewport state
-		PipelineDesc.ViewportState = {};
-		PipelineDesc.ViewportState.ViewportCount = 1;
-		PipelineDesc.ViewportState.ScissorCount = 1;
-
-		// Viewport
-		PipelineDesc.Viewport = {};
-		PipelineDesc.Viewport.MinDepth = 0.0f;
-		PipelineDesc.Viewport.MaxDepth = 1.0f;
-		PipelineDesc.Viewport.X = 0.0f;
-		PipelineDesc.Viewport.Y = 0.0f;
-		PipelineDesc.Viewport.Width = static_cast<f32>(MainScreenExtent.Width);
-		PipelineDesc.Viewport.Height = static_cast<f32>(MainScreenExtent.Height);
-
-		// Scissor
-		PipelineDesc.Scissor = {};
-		PipelineDesc.Scissor.Offset.X = 0;
-		PipelineDesc.Scissor.Offset.Y = 0;
-		PipelineDesc.Scissor.Extent.Width = MainScreenExtent.Width;
-		PipelineDesc.Scissor.Extent.Height = MainScreenExtent.Height;
 
 		// Create pipeline layout from parsed descriptor set layouts
 		BmRender_PipelineLayoutDescription LayoutDesc = {};
-		LayoutDesc.SetLayoutCount = PipelineDesc.DescriptorSetLayoutsCount;
-		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts;
-		LayoutDesc.PushConstantRangeCount = PipelineDesc.PushConstantRangesCount;
-		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges;
+		LayoutDesc.SetLayoutCount = descriptorSetLayouts.size();
+		LayoutDesc.SetLayouts = descriptorSetLayouts.data();
+		LayoutDesc.PushConstantRangeCount = 0;
+		LayoutDesc.PushConstantRanges = {};
 		LayoutDesc.PipelineType = BmRender_PipelineType::Graphics;
 
-		PipelineLayouts["StaticMesh"] = BmRender_CreatePipelineLayout(&LayoutDesc);
-		PipelineDesc.PipelineLayout = PipelineLayouts["StaticMesh"];
+		BmRender_PipelineSettings Settings = GetStaticPipelineDescription();
 
-		Pipelines["StaticMesh"] = BmRender_CreatePipeline(&PipelineDesc);
+		PipelineLayouts["StaticMesh"] = BmRender_CreatePipelineLayout(&LayoutDesc);
+		Pipelines["StaticMesh"] = BmRender_CreatePipeline(PipelineLayouts["StaticMesh"], &Settings, StageDescriptions, Metadata_EntityPipeline.StageCount, &ResourceInfo);
 	}
 
 	static void DrawStaticMeshes(BmRender_CommandBuffer CommandBuffer, StaticMeshPipelineDepr* MeshPipeline, DrawScene* Scene, const DescriptorSetHandles& DescriptorSets)
@@ -318,7 +238,7 @@ namespace Render
 
 		const u32 SetsCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
-		GenericDraw(CommandBuffer, Scene, PipelineLayouts["StaticMesh"], Pipelines["StaticMesh"], DescriptorSetGroup, SetsCount, nullptr, 0);
+		GenericDraw(CommandBuffer, Scene, Pipelines["StaticMesh"], DescriptorSetGroup, SetsCount, nullptr, 0);
 	}
 
 	static RenderState State;
@@ -435,8 +355,6 @@ namespace Render
 		MainPassInit();
 		LightningPassInit(State.MainPool);
 
-		//TerrainRender::Init();
-		//DynamicMapSystem::Init();
 		InitStaticMeshPipeline(&State.MeshPipeline, State.MainPool);
 		InitImGuiPipeline(&State.DebugUiPool, WindowHandler);
 	}
@@ -620,99 +538,18 @@ namespace Render
 		descriptorSetLayouts.push_back(FrameDataLayout);
 		descriptorSetLayouts.push_back(MainPassOutputLayout);
 
-		// Build pipeline description
-		BmRender_PipelineDescription PipelineDesc = {};
-		PipelineDesc.Extent = MainScreenExtent;
-		PipelineDesc.Attachment = DeferredPassPipelineAttachmentData;
-
-		// Set shader stages
-		PipelineDesc.ShaderStages = StageDescriptions;
-		PipelineDesc.ShaderStagesCount = Metadata_DeferredPipeline.StageCount;
-
-		// Set descriptor set layouts
-		PipelineDesc.DescriptorSetLayouts = descriptorSetLayouts.data();
-		PipelineDesc.DescriptorSetLayoutsCount = static_cast<u32>(descriptorSetLayouts.size());
-
-		// Set push constants (none)
-		PipelineDesc.PushConstantRanges = nullptr;
-		PipelineDesc.PushConstantRangesCount = 0;
-
-		// Rasterization state
-		PipelineDesc.RasterizationState = {};
-		PipelineDesc.RasterizationState.DepthClampEnable = false;
-		PipelineDesc.RasterizationState.RasterizerDiscardEnable = false;
-		PipelineDesc.RasterizationState.PolygonMode = BmRender_PolygonMode::Fill;
-		PipelineDesc.RasterizationState.LineWidth = 1.0f;
-		PipelineDesc.RasterizationState.CullMode = BmRender_CullModeFlags::None;
-		PipelineDesc.RasterizationState.FrontFace = BmRender_FrontFace::CounterClockwise;
-		PipelineDesc.RasterizationState.DepthBiasEnable = false;
-
-		// Color blend state
-		PipelineDesc.ColorBlendState = {};
-		PipelineDesc.ColorBlendState.LogicOpEnable = false;
-		PipelineDesc.ColorBlendState.AttachmentCount = 1;
-
-		// Color blend attachment
-		PipelineDesc.ColorBlendAttachment = {};
-		PipelineDesc.ColorBlendAttachment.ColorWriteMask = BmRender_ColorComponentFlags::RGBA;
-		PipelineDesc.ColorBlendAttachment.BlendEnable = false;
-		PipelineDesc.ColorBlendAttachment.SrcColorBlendFactor = BmRender_BlendFactor::SrcAlpha;
-		PipelineDesc.ColorBlendAttachment.DstColorBlendFactor = BmRender_BlendFactor::OneMinusSrcAlpha;
-		PipelineDesc.ColorBlendAttachment.ColorBlendOp = BmRender_BlendOp::Add;
-		PipelineDesc.ColorBlendAttachment.SrcAlphaBlendFactor = BmRender_BlendFactor::One;
-		PipelineDesc.ColorBlendAttachment.DstAlphaBlendFactor = BmRender_BlendFactor::Zero;
-		PipelineDesc.ColorBlendAttachment.AlphaBlendOp = BmRender_BlendOp::Add;
-
-		// Depth stencil state
-		PipelineDesc.DepthStencilState = {};
-		PipelineDesc.DepthStencilState.DepthTestEnable = false;
-		PipelineDesc.DepthStencilState.DepthWriteEnable = false;
-		PipelineDesc.DepthStencilState.DepthCompareOp = BmRender_CompareOp::Less;
-		PipelineDesc.DepthStencilState.DepthBoundsTestEnable = false;
-		PipelineDesc.DepthStencilState.StencilTestEnable = false;
-
-		// Multisample state
-		PipelineDesc.MultisampleState = {};
-		PipelineDesc.MultisampleState.SampleShadingEnable = false;
-
-		// Input assembly state
-		PipelineDesc.InputAssemblyState = {};
-		PipelineDesc.InputAssemblyState.Topology = BmRender_PrimitiveTopology::TriangleList;
-		PipelineDesc.InputAssemblyState.PrimitiveRestartEnable = false;
-
-		// Viewport state
-		PipelineDesc.ViewportState = {};
-		PipelineDesc.ViewportState.ViewportCount = 1;
-		PipelineDesc.ViewportState.ScissorCount = 1;
-
-		// Viewport
-		PipelineDesc.Viewport = {};
-		PipelineDesc.Viewport.MinDepth = 0.0f;
-		PipelineDesc.Viewport.MaxDepth = 1.0f;
-		PipelineDesc.Viewport.X = 0.0f;
-		PipelineDesc.Viewport.Y = 0.0f;
-		PipelineDesc.Viewport.Width = static_cast<f32>(MainScreenExtent.Width);
-		PipelineDesc.Viewport.Height = static_cast<f32>(MainScreenExtent.Height);
-
-		// Scissor
-		PipelineDesc.Scissor = {};
-		PipelineDesc.Scissor.Offset.X = 0;
-		PipelineDesc.Scissor.Offset.Y = 0;
-		PipelineDesc.Scissor.Extent.Width = MainScreenExtent.Width;
-		PipelineDesc.Scissor.Extent.Height = MainScreenExtent.Height;
-
 		// Create pipeline layout from parsed descriptor set layouts
 		BmRender_PipelineLayoutDescription LayoutDesc = {};
-		LayoutDesc.SetLayoutCount = PipelineDesc.DescriptorSetLayoutsCount;
-		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts;
-		LayoutDesc.PushConstantRangeCount = PipelineDesc.PushConstantRangesCount;
-		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges;
+		LayoutDesc.SetLayoutCount = descriptorSetLayouts.size();
+		LayoutDesc.SetLayouts = descriptorSetLayouts.data();
+		LayoutDesc.PushConstantRangeCount = 0;
+		LayoutDesc.PushConstantRanges = {};
 		LayoutDesc.PipelineType = BmRender_PipelineType::Graphics;
 
-		PipelineLayouts["Deferred"] = BmRender_CreatePipelineLayout(&LayoutDesc);
-		PipelineDesc.PipelineLayout = PipelineLayouts["Deferred"];
+		BmRender_PipelineSettings PipelineDesc = GetDeferredPipelineDescription();
 
-		Pipelines["Deferred"] = BmRender_CreatePipeline(&PipelineDesc);
+		PipelineLayouts["Deferred"] = BmRender_CreatePipelineLayout(&LayoutDesc);
+		Pipelines["Deferred"] = BmRender_CreatePipeline(PipelineLayouts["Deferred"], &PipelineDesc, StageDescriptions, Metadata_DeferredPipeline.StageCount, &DeferredPassPipelineAttachmentData);
 	}
 
 	void DeferredPassDraw()
@@ -730,7 +567,7 @@ namespace Render
 		const u32 FrameDynamicOffset = CurrentFrame * sizeof(Shader_FrameData);
 		const u32 DynamicOffsets[] = { FrameDynamicOffset };
 
-		BmRender_RecordBindDescriptorSets(SubmitPool->CommandBuffer, PipelineLayouts["Deferred"],
+		BmRender_RecordBindDescriptorSets(SubmitPool->CommandBuffer, Pipelines["Deferred"],
 			0, 2, Sets, 1, DynamicOffsets);
 
 		BmRender_Draw(SubmitPool->CommandBuffer, 3, 1, 0, 0); // 3 hardcoded vertices
@@ -871,99 +708,17 @@ namespace Render
 		descriptorSetLayouts.push_back(FrameDataLayout);
 		descriptorSetLayouts.push_back(LightSpaceMatrixLayout);
 
-		// Build pipeline description
-		BmRender_PipelineDescription PipelineDesc = {};
-		PipelineDesc.Extent = DepthViewportExtent;
-		PipelineDesc.Attachment = ResourceInfo;
-
-		// Set shader stages
-		PipelineDesc.ShaderStages = StageDescriptions;
-		PipelineDesc.ShaderStagesCount = Metadata_Depth_vertPipeline.StageCount;
-
-		// Set descriptor set layouts
-		PipelineDesc.DescriptorSetLayouts = descriptorSetLayouts.data();
-		PipelineDesc.DescriptorSetLayoutsCount = static_cast<u32>(descriptorSetLayouts.size());
-
-		// Set push constants (none)
-		PipelineDesc.PushConstantRanges = nullptr;
-		PipelineDesc.PushConstantRangesCount = 0;
-
-		// Rasterization state
-		PipelineDesc.RasterizationState = {};
-		PipelineDesc.RasterizationState.DepthClampEnable = false;
-		PipelineDesc.RasterizationState.RasterizerDiscardEnable = false;
-		PipelineDesc.RasterizationState.PolygonMode = BmRender_PolygonMode::Fill;
-		PipelineDesc.RasterizationState.LineWidth = 1.0f;
-		PipelineDesc.RasterizationState.CullMode = BmRender_CullModeFlags::Back;
-		PipelineDesc.RasterizationState.FrontFace = BmRender_FrontFace::CounterClockwise;
-		PipelineDesc.RasterizationState.DepthBiasEnable = false;
-
-		// Color blend state
-		PipelineDesc.ColorBlendState = {};
-		PipelineDesc.ColorBlendState.LogicOpEnable = false;
-		PipelineDesc.ColorBlendState.AttachmentCount = 1;
-
-		// Color blend attachment
-		PipelineDesc.ColorBlendAttachment = {};
-		PipelineDesc.ColorBlendAttachment.ColorWriteMask = BmRender_ColorComponentFlags::RGBA;
-		PipelineDesc.ColorBlendAttachment.BlendEnable = true;
-		PipelineDesc.ColorBlendAttachment.SrcColorBlendFactor = BmRender_BlendFactor::SrcAlpha;
-		PipelineDesc.ColorBlendAttachment.DstColorBlendFactor = BmRender_BlendFactor::OneMinusSrcAlpha;
-		PipelineDesc.ColorBlendAttachment.ColorBlendOp = BmRender_BlendOp::Add;
-		PipelineDesc.ColorBlendAttachment.SrcAlphaBlendFactor = BmRender_BlendFactor::One;
-		PipelineDesc.ColorBlendAttachment.DstAlphaBlendFactor = BmRender_BlendFactor::Zero;
-		PipelineDesc.ColorBlendAttachment.AlphaBlendOp = BmRender_BlendOp::Add;
-
-		// Depth stencil state
-		PipelineDesc.DepthStencilState = {};
-		PipelineDesc.DepthStencilState.DepthTestEnable = true;
-		PipelineDesc.DepthStencilState.DepthWriteEnable = true;
-		PipelineDesc.DepthStencilState.DepthCompareOp = BmRender_CompareOp::Less;
-		PipelineDesc.DepthStencilState.DepthBoundsTestEnable = false;
-		PipelineDesc.DepthStencilState.StencilTestEnable = false;
-
-		// Multisample state
-		PipelineDesc.MultisampleState = {};
-		PipelineDesc.MultisampleState.SampleShadingEnable = false;
-
-		// Input assembly state
-		PipelineDesc.InputAssemblyState = {};
-		PipelineDesc.InputAssemblyState.Topology = BmRender_PrimitiveTopology::TriangleList;
-		PipelineDesc.InputAssemblyState.PrimitiveRestartEnable = false;
-
-		// Viewport state
-		PipelineDesc.ViewportState = {};
-		PipelineDesc.ViewportState.ViewportCount = 1;
-		PipelineDesc.ViewportState.ScissorCount = 1;
-
-		// Viewport
-		PipelineDesc.Viewport = {};
-		PipelineDesc.Viewport.MinDepth = 0.0f;
-		PipelineDesc.Viewport.MaxDepth = 1.0f;
-		PipelineDesc.Viewport.X = 0.0f;
-		PipelineDesc.Viewport.Y = 0.0f;
-		PipelineDesc.Viewport.Width = static_cast<f32>(DepthViewportExtent.Width);
-		PipelineDesc.Viewport.Height = static_cast<f32>(DepthViewportExtent.Height);
-
-		// Scissor
-		PipelineDesc.Scissor = {};
-		PipelineDesc.Scissor.Offset.X = 0;
-		PipelineDesc.Scissor.Offset.Y = 0;
-		PipelineDesc.Scissor.Extent.Width = DepthViewportExtent.Width;
-		PipelineDesc.Scissor.Extent.Height = DepthViewportExtent.Height;
-
 		// Create pipeline layout from parsed descriptor set layouts
 		BmRender_PipelineLayoutDescription LayoutDesc = {};
-		LayoutDesc.SetLayoutCount = PipelineDesc.DescriptorSetLayoutsCount;
-		LayoutDesc.SetLayouts = PipelineDesc.DescriptorSetLayouts;
-		LayoutDesc.PushConstantRangeCount = PipelineDesc.PushConstantRangesCount;
-		LayoutDesc.PushConstantRanges = PipelineDesc.PushConstantRanges;
+		LayoutDesc.SetLayoutCount = descriptorSetLayouts.size();
+		LayoutDesc.SetLayouts = descriptorSetLayouts.data();
+		LayoutDesc.PushConstantRangeCount = 0;
 		LayoutDesc.PipelineType = BmRender_PipelineType::Graphics;
 
-		PipelineLayouts["Depth"] = BmRender_CreatePipelineLayout(&LayoutDesc);
-		PipelineDesc.PipelineLayout = PipelineLayouts["Depth"];
+		BmRender_PipelineSettings PipelineDesc = GetDepthPipelineDescription();
 
-		Pipelines["Depth"] = BmRender_CreatePipeline(&PipelineDesc);
+		PipelineLayouts["Depth"] = BmRender_CreatePipelineLayout(&LayoutDesc);
+		Pipelines["Depth"] = BmRender_CreatePipeline(PipelineLayouts["Depth"], &PipelineDesc, StageDescriptions, Metadata_Depth_vertPipeline.StageCount, &ResourceInfo);
 	}
 
 	void LightningPassDraw(DrawScene* Scene)
@@ -1007,7 +762,7 @@ namespace Render
 
 			const u32 SetsCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
-			GenericDraw(SubmitPool->CommandBuffer, Scene, PipelineLayouts["Depth"], Pipelines["Depth"], DescriptorSetGroup, SetsCount, nullptr, 0);
+			GenericDraw(SubmitPool->CommandBuffer, Scene, Pipelines["Depth"], DescriptorSetGroup, SetsCount, nullptr, 0);
 
 			BmRender_EndRendering(SubmitPool->CommandBuffer);
 		}
