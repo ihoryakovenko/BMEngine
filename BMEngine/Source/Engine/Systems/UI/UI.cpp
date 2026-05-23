@@ -47,7 +47,7 @@ namespace UI
 		//ImGui::DragFloat3("DirectionLightDirection", &(*Data->DirectionLightDirection)[0], 0.05, -1, 1);
 		//ImGui::DragFloat3("eye", &(*Data->Eye)[0], 0.05, -100, 100);
 
-		Render::RenderState* State =  Render::GetRenderState();
+		RenderState* State =  GetRenderState();
 
 
 

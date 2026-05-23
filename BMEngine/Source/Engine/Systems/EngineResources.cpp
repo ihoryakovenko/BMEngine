@@ -83,7 +83,7 @@ namespace EngineResources
 
 		BmRender_DescriptorSetUpdateData Bindings[] = { DiffuseBinding };
 
-		BmRender_UpdateDescriptorSet(Render::GetHandles()->FrameBufferSet, Bindings, 1);
+		BmRender_UpdateDescriptorSet(GetHandles()->FrameBufferSet, Bindings, 1);
 	}
 
 	void DeInit()
@@ -112,7 +112,7 @@ namespace EngineResources
 		}
 	}
 
-	void Update(Render::DrawScene* TmpScene)
+	void Update(DrawScene* TmpScene)
 	{
 		std::lock_guard Lock(ModelLoadMutex);
 
@@ -168,7 +168,7 @@ namespace EngineResources
 
 							BmRender_DescriptorSetUpdateData Bindings[] = { DiffuseBinding };
 
-							BmRender_UpdateDescriptorSet(Render::GetHandles()->FrameBufferSet, Bindings, 1);
+							BmRender_UpdateDescriptorSet(GetHandles()->FrameBufferSet, Bindings, 1);
 
 							++TexturesGPUIndexCounter;
 						}
@@ -196,8 +196,8 @@ namespace EngineResources
 				const u64 VerticesSize = sizeof(Shader_StaticMeshVertex) * VerticesCount;
 				const u64 IndicesSize = IndicesCount * sizeof(u32);
 					
-				BmRender_GPUBufferUpdateData VertexHandle = { Render::GetVertexBuffer(), VertexBufferOffset, VertexDataSize };
-				BmRender_GPUBufferUpdateData IndexHandle = { Render::GetIndexBuffer(), IndexBufferOffset, IndicesSize };
+				BmRender_GPUBufferUpdateData VertexHandle = { GetVertexBuffer(), VertexBufferOffset, VertexDataSize };
+				BmRender_GPUBufferUpdateData IndexHandle = { GetIndexBuffer(), IndexBufferOffset, IndicesSize };
 
 				RenderResources::UpdateBufferRegion(VertexHandle, 0, Model.VertexData + ModelVertexByteOffset, VertexDataSize);
 				RenderResources::UpdateBufferRegion(IndexHandle, 0, Model.VertexData + ModelVertexByteOffset + VertexDataSize, IndicesSize);
@@ -207,7 +207,7 @@ namespace EngineResources
 				Mat.SpecularTexIndex = TextureGPUIndex;
 				Mat.Shininess = 32.0f;
 
-				const BmRender_GPUBufferUpdateData MaterialHandle = { Render::GetMaterialBuffer(), MateriaIndex * sizeof(Mat), sizeof(Mat) };
+				const BmRender_GPUBufferUpdateData MaterialHandle = { GetMaterialBuffer(), MateriaIndex * sizeof(Mat), sizeof(Mat) };
 				RenderResources::UpdateBufferRegion(MaterialHandle, 0, &Mat, sizeof(Mat));
 
 				Shader_StaticMeshInstance Instance;
@@ -217,12 +217,12 @@ namespace EngineResources
 				++MateriaIndex;
 
 				const u64 InstanceOffset = InstanceIndex * sizeof(Instance);
-				const BmRender_GPUBufferUpdateData InstanceHandle = { Render::GetInstanceBuffer(), InstanceOffset, sizeof(Instance) };
+				const BmRender_GPUBufferUpdateData InstanceHandle = { GetInstanceBuffer(), InstanceOffset, sizeof(Instance) };
 				RenderResources::UpdateBufferRegion(InstanceHandle, 0, &Instance, sizeof(Instance));
 
 				++InstanceIndex;
 
-				Render::DrawEntity Entity = { };
+				DrawEntity Entity = { };
 				Entity.VertexBufferEntry = VertexHandle;
 				Entity.IndexBufferEntry = IndexHandle;
 				Entity.InstanceBufferEntry = InstanceHandle;

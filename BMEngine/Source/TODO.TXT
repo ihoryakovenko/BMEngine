@@ -1,1 +1,1 @@
-Pipeleine should have layout handle
+have info about entrypoints in the shader

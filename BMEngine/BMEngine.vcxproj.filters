@@ -28,6 +28,7 @@
     <ClCompile Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.cpp" />
     <ClCompile Include="Source\Util\YamlParsing.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Systems.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\PipelineManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Util\Util.h" />
@@ -47,6 +48,8 @@
     <ClInclude Include="Source\Util\YamlParsing.h" />
     <ClInclude Include="Source\Engine\Systems\Render\Systems.h" />
     <ClInclude Include="Source\Engine\Systems\Render\PipelineSettings.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\PipelineMetadata.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\PipelineManager.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />

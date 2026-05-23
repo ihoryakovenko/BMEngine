@@ -24,6 +24,7 @@
 #include "Engine/Systems/EngineResources.h"
 #include "Engine/Systems/Render/TransferSystem.h"
 #include "Engine/Systems/Concurrency/TaskSystem.h"
+#include "Systems/Render/PipelineManager.h"
 #include <Engine/Systems/Render/Shaders/ShaderTypes.h>
 
 
@@ -31,33 +32,11 @@
 
 // Global resource maps
 std::unordered_map<std::string, BmRender_Sampler> Samplers;
-std::unordered_map<std::string, BmRender_Shader> Shaders;
 std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
 std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
 
 namespace Engine
 {
-	static void ParseAndCreateShaders(Yaml::Node& ShadersNode)
-	{
-		for (auto It = ShadersNode.Begin(); It != ShadersNode.End(); It++)
-		{
-			std::string ShaderPath = Util::ParseShaderNode((*It).second);
-
-			std::vector<char> ShaderCode;
-			if (Util::OpenAndReadFileFull(ShaderPath.c_str(), ShaderCode, "rb"))
-			{
-				BmRender_ShaderDescription ShaderDesc = {};
-				ShaderDesc.Code = reinterpret_cast<const u32*>(ShaderCode.data());
-				ShaderDesc.CodeSize = ShaderCode.size();
-				Shaders[(*It).first] = BmRender_CreateShader(&ShaderDesc);
-			}
-			else
-			{
-				assert(false);
-			}
-		}
-	}
-
 	static void ParseAndCreateSamplers(Yaml::Node& SamplersNode)
 	{
 		for (auto It = SamplersNode.Begin(); It != SamplersNode.End(); It++)
@@ -104,7 +83,7 @@ namespace Engine
 	static const f32 Near = 0.1f;
 	static const f32 Far = 5000.0f;
 
-	static Render::DrawEntity SkyBox;
+	static DrawEntity SkyBox;
 
 	static UI::GuiData GuiData;
 
@@ -116,7 +95,7 @@ namespace Engine
 
 
 
-	static Render::DrawScene Scene;
+	static DrawScene Scene;
 
 
 
@@ -163,7 +142,7 @@ namespace Engine
 				//TaskSystem::TaskLambda Task = [&]() { TransferSystem::Transfer(); };
 				//TaskSystem::AddTask(&Task, &Group);
 				TransferSystem::Transfer();
-				Render::Draw(&Scene, LastTransfer);
+				Render_Draw(&Scene, LastTransfer);
 
 				//TaskSystem::WaitForGroup(&Group);
 			}
@@ -214,15 +193,14 @@ namespace Engine
 		Yaml::Parse(Root, "./Resources/Settings/RenderResources.yaml");
 
 		BmRender_Init(Window);
-		
+		PipelineManger_Init();
 
 
 
-		ParseAndCreateShaders(Util::GetShaders(Root));
 		ParseAndCreateSamplers(Util::GetSamplers(Root));
 
 		TransferSystem::Init();
-		Render::Init(Window);
+		Render_Init(Window);
 
 		EngineResources::Init();
 
@@ -254,16 +232,12 @@ namespace Engine
 
 	void DeInit()
 	{
-		Render::DeInit();
+		Render_DeInit();
 		TransferSystem::DeInit();
 		EngineResources::DeInit();
 		UI::DeInit();
 
-		for (auto& [name, shader] : Shaders)
-		{
-			BmRender_DestroyShader(shader);
-		}
-		Shaders.clear();
+		PipelineManager_DeInit();
 
 		BmRender_DeInit();
 

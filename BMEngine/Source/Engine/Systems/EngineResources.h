@@ -9,10 +9,7 @@
 
 #include <RenderInterface.h>
 
-namespace Render
-{
-	struct DrawScene;
-}
+struct DrawScene;
 
 namespace EngineResources
 {
@@ -34,7 +31,7 @@ namespace EngineResources
 	void Init();
 	void DeInit();
 
-	void Update(Render::DrawScene* TmpScene);
+	void Update(DrawScene* TmpScene);
 
 	void RegisterTextureAsset(const std::string& Name, const std::string& Path);
 	void RequestModelLoad(const ModelLoadRequest& Request);

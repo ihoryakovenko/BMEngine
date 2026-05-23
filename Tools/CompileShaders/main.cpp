@@ -9,13 +9,28 @@
 #include <slang.h>
 #include <slang-com-ptr.h>
 
-#include <PipelineMetadata.h>
+#include <Engine/Systems/Render/PipelineMetadata.h>
 
 namespace fs = std::filesystem;
 
 const std::string SPV_EXT = ".spv";
 const std::string GNERATED_EXT = ".generated.h";
 const std::string SLANG_EXTENSION = ".slang";
+
+//struct Metadata_Descriptor
+//{
+//	u32 Binding;
+//	BmRender_DescriptorShaderStage Stage;
+//	BmRender_DescriptorType Type;
+//	bool IsBindless;
+//};
+//
+//struct Metadata_DescriptorSet
+//{
+//	const Metadata_Descriptor* Descriptors;
+//	u32 DescriptorCount;
+//	u32 Set;
+//};
 
 struct DescriptorSetGenerationHelper
 {
@@ -42,167 +57,167 @@ void CheckDiagnostics(Slang::ComPtr<slang::IBlob> diagnostics)
 	}
 }
 
-std::string GenerateMetadata(slang::IComponentType* LinkedProgram, const std::string& ModuleName)
-{
-	slang::ProgramLayout* ProgramLayout = LinkedProgram->getLayout();
-	const u32 ParametersCount = ProgramLayout->getParameterCount();
+//std::string GenerateMetadata(slang::IComponentType* LinkedProgram, const std::string& ModuleName)
+//{
+//	slang::ProgramLayout* ProgramLayout = LinkedProgram->getLayout();
+//	const u32 ParametersCount = ProgramLayout->getParameterCount();
 
-	std::unordered_map<u32, DescriptorSetGenerationHelper> DescriptorSetGenerationMap;
+	//std::unordered_map<u32, DescriptorSetGenerationHelper> DescriptorSetGenerationMap;
 
-	std::string DescriptorsVariableName = "Private_Metadata_" + ModuleName + "Descriptors";
-	std::string DescriptorArrayGeneration = "inline constexpr Metadata_Descriptor " + DescriptorsVariableName + "[] = { ";
-	
-	u32 DescriptorCount = 0;
+	//std::string DescriptorsVariableName = "Private_Metadata_" + ModuleName + "Descriptors";
+	//std::string DescriptorArrayGeneration = "inline constexpr Metadata_Descriptor " + DescriptorsVariableName + "[] = { ";
+	//
+	//u32 DescriptorCount = 0;
 
-	for (u32 i = 0; i < ParametersCount; ++i)
-	{
-		slang::VariableLayoutReflection* varLayout = ProgramLayout->getParameterByIndex(i);
-		slang::VariableReflection* var = varLayout->getVariable();
+	//for (u32 i = 0; i < ParametersCount; ++i)
+	//{
+	//	slang::VariableLayoutReflection* varLayout = ProgramLayout->getParameterByIndex(i);
+	//	slang::VariableReflection* var = varLayout->getVariable();
 
-		slang::TypeReflection* type = var->getType();
-		SlangResourceShape Shape = type->getResourceShape();
+	//	slang::TypeReflection* type = var->getType();
+	//	SlangResourceShape Shape = type->getResourceShape();
 
-		slang::TypeReflection::Kind SlangKind = type->getKind();
-		const char* DescriptorName = var->getName();
+	//	slang::TypeReflection::Kind SlangKind = type->getKind();
+	//	const char* DescriptorName = var->getName();
 
-		const u32 bindingIndex = varLayout->getBindingIndex();
-		const u32 SetIndex = varLayout->getBindingSpace();
+	//	const u32 bindingIndex = varLayout->getBindingIndex();
+	//	const u32 SetIndex = varLayout->getBindingSpace();
 
-		auto DescriptorGenerationIt = DescriptorSetGenerationMap.find(SetIndex);
-		if (DescriptorGenerationIt == DescriptorSetGenerationMap.end())
-		{
-			DescriptorSetGenerationMap[SetIndex] = { std::string(), 0 };
-			DescriptorGenerationIt = DescriptorSetGenerationMap.find(SetIndex);
-		}
+	//	auto DescriptorGenerationIt = DescriptorSetGenerationMap.find(SetIndex);
+	//	if (DescriptorGenerationIt == DescriptorSetGenerationMap.end())
+	//	{
+	//		DescriptorSetGenerationMap[SetIndex] = { std::string(), 0 };
+	//		DescriptorGenerationIt = DescriptorSetGenerationMap.find(SetIndex);
+	//	}
 
-		DescriptorGenerationIt->second.Text += "\n\t{ " + std::to_string(bindingIndex) + ", BmRender_DescriptorShaderStage::Vertex | BmRender_DescriptorShaderStage::Fragment, ";
-		++DescriptorGenerationIt->second.Count;
+	//	DescriptorGenerationIt->second.Text += "\n\t{ " + std::to_string(bindingIndex) + ", BmRender_DescriptorShaderStage::Vertex | BmRender_DescriptorShaderStage::Fragment, ";
+	//	++DescriptorGenerationIt->second.Count;
 
-		if (SlangKind == slang::TypeReflection::Kind::ConstantBuffer)
-		{
-			DescriptorGenerationIt->second.Text += "BmRender_DescriptorType::UniformBuffer, false";
-			++DescriptorCount;
-		}
-		else if (SlangKind == slang::TypeReflection::Kind::Resource)
-		{
-			if (Shape == SLANG_STRUCTURED_BUFFER)
-			{
-				DescriptorGenerationIt->second.Text += "BmRender_DescriptorType::StorageBuffer, false";
-				++DescriptorCount;
-			}
-			else if (Shape & SLANG_TEXTURE_COMBINED_FLAG)
-			{
-				if (Shape & SLANG_TEXTURE_2D)
-				{
-					DescriptorGenerationIt->second.Text += "BmRender_DescriptorType::CombinedImageSampler, false";
-					++DescriptorCount;
-				}
-				else
-				{
-					assert(false);
-				}
-			}
-			else
-			{
-				assert(false);
-			}
-		}
-		else if (SlangKind == slang::TypeReflection::Kind::Array)
-		{
-			slang::TypeLayoutReflection* arrayLayout = varLayout->getTypeLayout();
-			slang::TypeReflection* arrayType = arrayLayout->getType();
-			u64 elementCount = arrayType->getElementCount();
-			bool isBindless = (elementCount == 0);
-			assert(isBindless);
+	//	if (SlangKind == slang::TypeReflection::Kind::ConstantBuffer)
+	//	{
+	//		DescriptorGenerationIt->second.Text += "BmRender_DescriptorType::UniformBuffer, false";
+	//		++DescriptorCount;
+	//	}
+	//	else if (SlangKind == slang::TypeReflection::Kind::Resource)
+	//	{
+	//		if (Shape == SLANG_STRUCTURED_BUFFER)
+	//		{
+	//			DescriptorGenerationIt->second.Text += "BmRender_DescriptorType::StorageBuffer, false";
+	//			++DescriptorCount;
+	//		}
+	//		else if (Shape & SLANG_TEXTURE_COMBINED_FLAG)
+	//		{
+	//			if (Shape & SLANG_TEXTURE_2D)
+	//			{
+	//				DescriptorGenerationIt->second.Text += "BmRender_DescriptorType::CombinedImageSampler, false";
+	//				++DescriptorCount;
+	//			}
+	//			else
+	//			{
+	//				assert(false);
+	//			}
+	//		}
+	//		else
+	//		{
+	//			assert(false);
+	//		}
+	//	}
+	//	else if (SlangKind == slang::TypeReflection::Kind::Array)
+	//	{
+	//		slang::TypeLayoutReflection* arrayLayout = varLayout->getTypeLayout();
+	//		slang::TypeReflection* arrayType = arrayLayout->getType();
+	//		u64 elementCount = arrayType->getElementCount();
+	//		bool isBindless = (elementCount == 0);
+	//		assert(isBindless);
 
-			if (Shape & SLANG_TEXTURE_COMBINED_FLAG)
-			{
-				if (Shape & SLANG_TEXTURE_2D)
-				{
-					DescriptorGenerationIt->second.Text += "BmRender_DescriptorType::CombinedImageSampler, true";
-					++DescriptorCount;
-				}
-			}
-			else
-			{
-				assert(false);
-			}
-		}
-		else
-		{
-			assert(false);
-		}
-	   
-		DescriptorGenerationIt->second.Text += " },";
-	}
+	//		if (Shape & SLANG_TEXTURE_COMBINED_FLAG)
+	//		{
+	//			if (Shape & SLANG_TEXTURE_2D)
+	//			{
+	//				DescriptorGenerationIt->second.Text += "BmRender_DescriptorType::CombinedImageSampler, true";
+	//				++DescriptorCount;
+	//			}
+	//		}
+	//		else
+	//		{
+	//			assert(false);
+	//		}
+	//	}
+	//	else
+	//	{
+	//		assert(false);
+	//	}
+	//   
+	//	DescriptorGenerationIt->second.Text += " },";
+	//}
 
-	std::string DescriptorsSetVariableName = "Private_Metadata_" + ModuleName + "DescriptorSets";
-	std::string DescriptorSetArrayGeneration = "inline constexpr Metadata_DescriptorSet " + DescriptorsSetVariableName + "[] = { ";
+	//std::string DescriptorsSetVariableName = "Private_Metadata_" + ModuleName + "DescriptorSets";
+	//std::string DescriptorSetArrayGeneration = "inline constexpr Metadata_DescriptorSet " + DescriptorsSetVariableName + "[] = { ";
 
-	if (DescriptorCount > 0)
-	{
-		u32 SetIndex = 0;
-		u32 TotalDescriptors = 0;
-		for (const auto& [DescriptorSet, DescriptorGeneration] : DescriptorSetGenerationMap)
-		{
-			DescriptorArrayGeneration += DescriptorGeneration.Text;
-			DescriptorSetArrayGeneration += "\n\t{ " + DescriptorsVariableName + " + " + std::to_string(TotalDescriptors) + ", "
-				+ std::to_string(DescriptorGeneration.Count) + ", " + std::to_string(SetIndex) + " },";
-			TotalDescriptors += DescriptorGeneration.Count;
-			++SetIndex;
-		}
+	//if (DescriptorCount > 0)
+	//{
+	//	u32 SetIndex = 0;
+	//	u32 TotalDescriptors = 0;
+	//	for (const auto& [DescriptorSet, DescriptorGeneration] : DescriptorSetGenerationMap)
+	//	{
+	//		DescriptorArrayGeneration += DescriptorGeneration.Text;
+	//		DescriptorSetArrayGeneration += "\n\t{ " + DescriptorsVariableName + " + " + std::to_string(TotalDescriptors) + ", "
+	//			+ std::to_string(DescriptorGeneration.Count) + ", " + std::to_string(SetIndex) + " },";
+	//		TotalDescriptors += DescriptorGeneration.Count;
+	//		++SetIndex;
+	//	}
 
-		DescriptorArrayGeneration += "\n};";
-		DescriptorSetArrayGeneration += "\n};";
-	}
+	//	DescriptorArrayGeneration += "\n};";
+	//	DescriptorSetArrayGeneration += "\n};";
+	//}
 
-	std::string StageVariableName = "Private_Metadata_" + ModuleName + "Stages";
-	std::string StageArrayGeneration = "inline constexpr Metadata_Stage " + StageVariableName + "[] = { ";
+	//std::string StageVariableName = "Private_Metadata_" + ModuleName + "Stages";
+	//std::string StageArrayGeneration = "inline constexpr Metadata_Stage " + StageVariableName + "[] = { ";
 
-	const u32 EntryPointsCount = ProgramLayout->getEntryPointCount();
-	for (int i = 0; i < EntryPointsCount; ++i)
-	{
-		slang::EntryPointReflection* EntryPoint = ProgramLayout->getEntryPointByIndex(i);
-		SlangStage Stage = EntryPoint->getStage();
+	//const u32 EntryPointsCount = ProgramLayout->getEntryPointCount();
+	//for (int i = 0; i < EntryPointsCount; ++i)
+	//{
+	//	slang::EntryPointReflection* EntryPoint = ProgramLayout->getEntryPointByIndex(i);
+	//	SlangStage Stage = EntryPoint->getStage();
 
-		StageArrayGeneration += "\n\t{ ";
+	//	StageArrayGeneration += "\n\t{ ";
 
-		switch (Stage)
-		{
-		case SLANG_STAGE_VERTEX:
-			StageArrayGeneration += "BmRender_PipelineShaderStage::Vertex";
-			break;
+	//	switch (Stage)
+	//	{
+	//	case SLANG_STAGE_VERTEX:
+	//		StageArrayGeneration += "BmRender_PipelineShaderStage::Vertex";
+	//		break;
 
-		case SLANG_STAGE_FRAGMENT:
-			StageArrayGeneration += "BmRender_PipelineShaderStage::Fragment";
-			break;
+	//	case SLANG_STAGE_FRAGMENT:
+	//		StageArrayGeneration += "BmRender_PipelineShaderStage::Fragment";
+	//		break;
 
-		case SLANG_STAGE_COMPUTE:
-			StageArrayGeneration += "BmRender_PipelineShaderStage::Compute";
-			break;
-		default:
-			assert(false);
-			break;
-		}
+	//	case SLANG_STAGE_COMPUTE:
+	//		StageArrayGeneration += "BmRender_PipelineShaderStage::Compute";
+	//		break;
+	//	default:
+	//		assert(false);
+	//		break;
+	//	}
 
-		StageArrayGeneration += ", \"" + std::string(EntryPoint->getName()) + "\" },";
-	}
+	//	StageArrayGeneration += ", \"" + std::string(EntryPoint->getName()) + "\" },";
+	//}
 
-	StageArrayGeneration += "\n};";
+	//StageArrayGeneration += "\n};";
 
-	std::string PipelineVariableName = "Metadata_" + ModuleName + "Pipeline";
-	std::string PipelineGeneration = "inline constexpr Metadata_Pipeline " + PipelineVariableName + " = { \"" + ModuleName + "\", " + StageVariableName + ", " +
-		DescriptorsSetVariableName + ", " + std::to_string(EntryPointsCount) + ", " + std::to_string(DescriptorSetGenerationMap.size()) + " };";
+	//std::string PipelineVariableName = "Metadata_" + ModuleName + "Pipeline";
+	//std::string PipelineGeneration = "inline constexpr Metadata_Pipeline " + PipelineVariableName + " = { \"" + ModuleName + "\", " + StageVariableName + ", " +
+	//	DescriptorsSetVariableName + ", " + std::to_string(EntryPointsCount) + ", " + std::to_string(DescriptorSetGenerationMap.size()) + " };";
 
-	const std::string MetadataFile = "#pragma once\n\n#include \"RenderInterface.h\"\n#include <PipelineMetadata.h>\n\n" + DescriptorArrayGeneration + "\n\n" +
-		DescriptorSetArrayGeneration + "\n\n" + StageArrayGeneration + "\n\n" + PipelineGeneration + "\n";
+	//const std::string MetadataFile = "#pragma once\n\n#include \"RenderInterface.h\"\n#include <Engine/Systems/Render/PipelineMetadata.h>\n\n" + DescriptorArrayGeneration + "\n\n" +
+	//	DescriptorSetArrayGeneration + "\n\n" + StageArrayGeneration + "\n\n" + PipelineGeneration + "\n";
 
-	return MetadataFile;
-}
+//	return MetadataFile;
+//}
 
 int main(int argc, const char* argv[])
 {
-	//argc = 3;
+	//argc = 4;
 	//argv[1] = "E:/code/BMEngine/BMEngine/Source/Engine/Systems/Render/Shaders";
 	//argv[2] = "E:/code/BMEngine/BMEngine/Resources/Shaders";
 	//argv[3] = "E:/code/BMEngine/BMEngine/Source/Generated";
@@ -214,12 +229,14 @@ int main(int argc, const char* argv[])
 		return 1;
 	}
 
+	std::vector<std::string> Names;
+
 	const fs::path sourceDir(argv[1]);
 	const fs::path outputDir(argv[2]);
 	const fs::path GenOutputDir(argv[3]);
 
 	const std::string IncludePath = sourceDir.string();
-	const bool ForceRecompile = std::string(argv[4]) == "-fr";
+	const bool ForceRecompile = argc > 3 && std::string(argv[4]) == "-fr";
 
 	if (!fs::exists(sourceDir))
 	{
@@ -256,6 +273,15 @@ int main(int argc, const char* argv[])
 	slang::ISession* session = nullptr;
 	globalSession->createSession(sessionDesc, &session);
 
+	std::string StageVariableName = "Metadata_Stages";
+	std::string StageArrayGeneration = "inline constexpr Metadata_Stage " + StageVariableName + "[] = { ";
+
+
+	std::string PipelineVariableName = "Metadata_Pipelines";
+	std::string PipelineGeneration = "inline constexpr Metadata_Pipeline " + PipelineVariableName + "[] = { ";
+
+	u32 TotalStages = 0;
+
 	for (const auto& entry : fs::directory_iterator(sourceDir))
 	{
 		if (!entry.is_regular_file()) continue;
@@ -272,17 +298,6 @@ int main(int argc, const char* argv[])
 		std::replace(baseName.begin(), baseName.end(), '.', '_');
 
 		fs::path outPath = outputDir / (baseName + SPV_EXT);
-		fs::path outGenPath = GenOutputDir / (baseName + GNERATED_EXT);
-
-		if (!ForceRecompile && fs::exists(outPath) && fs::exists(outGenPath) &&
-			fs::last_write_time(filePath) <= fs::last_write_time(outPath))
-		{
-			std::cout << "Up to date: " << FullPathName << std::endl;
-			continue;
-		}
-
-		fs::remove(outPath);
-		fs::remove(outGenPath);
 
 		std::ifstream ShaderSourceFile(filePath, std::ios::binary);
 
@@ -322,22 +337,86 @@ int main(int argc, const char* argv[])
 		program->link(linkedProgram.writeRef(), diagnostics.writeRef());
 		CheckDiagnostics(diagnostics);
 
+		slang::ProgramLayout* ProgramLayout = program->getLayout();
+		const u32 EntryPointsCount = ProgramLayout->getEntryPointCount();
+		for (int i = 0; i < EntryPointsCount; ++i)
+		{
+			slang::EntryPointReflection* EntryPoint = ProgramLayout->getEntryPointByIndex(i);
+			SlangStage Stage = EntryPoint->getStage();
+
+			StageArrayGeneration += "\n\t{ ";
+
+			switch (Stage)
+			{
+			case SLANG_STAGE_VERTEX:
+				StageArrayGeneration += "BmRender_PipelineShaderStage::Vertex";
+				break;
+
+			case SLANG_STAGE_FRAGMENT:
+				StageArrayGeneration += "BmRender_PipelineShaderStage::Fragment";
+				break;
+
+			case SLANG_STAGE_COMPUTE:
+				StageArrayGeneration += "BmRender_PipelineShaderStage::Compute";
+				break;
+			default:
+				assert(false);
+				break;
+			}
+
+			StageArrayGeneration += ", \"" + std::string(EntryPoint->getName()) + "\" },";
+		}
+
+		PipelineGeneration += "\n\t{ \"" + outPath.generic_string() + "\", \"" + baseName + "\", " + StageVariableName + " + " + std::to_string(TotalStages) + ", " + std::to_string(EntryPointsCount) + " },";
+
+		TotalStages += EntryPointsCount;
+
+		Names.push_back(baseName);
+
+		if (!ForceRecompile && fs::exists(outPath) &&
+			fs::last_write_time(filePath) <= fs::last_write_time(outPath))
+		{
+			std::cout << "Up to date: " << FullPathName << std::endl;
+			continue;
+		}
+
+		fs::remove(outPath);
+
 		linkedProgram->getTargetCode(0, spirv.writeRef(), diagnostics.writeRef());
 		CheckDiagnostics(diagnostics);
-
-		const std::string& Metadata = GenerateMetadata(linkedProgram, baseName);
 
 		std::cout << baseName << " compiled\n";
 
 		std::ofstream SpirVOutput(outPath, std::ios::binary);
 		SpirVOutput.write((const char*)spirv->getBufferPointer(), spirv->getBufferSize());
-
-		std::ofstream GetOutput(outGenPath, std::ios::binary);
-		GetOutput.write(Metadata.c_str(), Metadata.size());
 	}
+
+	StageArrayGeneration += "\n};";
+	PipelineGeneration += "\n};";
 
 	session->Release();
 	globalSession->Release();
+
+	struct Metadata_ShaderEntry
+	{
+		const char* ShaderName;
+		const char* FilePath;
+	};
+
+	std::string ShaderRegistryGeneration = "#pragma once\n\n#include <Engine/Systems/Render/PipelineMetadata.h>\n\nenum class PipelineNames : u32\n{\n";
+
+	for (u32 i = 0; i < Names.size(); ++i)
+	{
+		ShaderRegistryGeneration += "\t" + Names[i] + ",\n";
+	}
+
+	ShaderRegistryGeneration += "\tMAX_VALUE\n};\n\n" + StageArrayGeneration + "\n\n" + PipelineGeneration + "\n\n";
+
+	fs::path outGenPath = GenOutputDir / ("ShaderRegistry" + GNERATED_EXT);
+	fs::remove(outGenPath);
+
+	std::ofstream GetOutput(outGenPath, std::ios::binary);
+	GetOutput.write(ShaderRegistryGeneration.c_str(), ShaderRegistryGeneration.size());
 
 	return 0;
 }

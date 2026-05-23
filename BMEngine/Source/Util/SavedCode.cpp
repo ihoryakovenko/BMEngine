@@ -425,7 +425,7 @@
 //		VkDescriptorSetLayout MapDescriptorLayouts[] =
 //		{
 //			FrameManager::GetViewProjectionLayout(),
-//			//Render::TestGetTerrainSkyBoxLayout(),
+//			//TestGetTerrainSkyBoxLayout(),
 //			MapTileSettingsLayout,
 //		};
 //		const u32 MapDescriptorLayoutCount = sizeof(MapDescriptorLayouts) / sizeof(MapDescriptorLayouts[0]);
@@ -434,7 +434,7 @@
 //
 //		VulkanInterface::PipelineResourceInfo ResourceInfo;
 //		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
-//		//ResourceInfo.RenderPass = Render::TestGetRenderPass();
+//		//ResourceInfo.RenderPass = TestGetRenderPass();
 //		//ResourceInfo.SubpassIndex = 0;
 //
 //		VulkanInterface::PipelineSettings PipelineSettings;
@@ -448,7 +448,7 @@
 //
 //		//IndexBuffer = VulkanInterface::CreateIndexBuffer(MB64);
 //
-//		//Render::RenderTexture TextureArrayTiles = ResourceManager::EmptyTexture(TilesTextureId, TextureTileSize, TextureTileSize,
+//		//RenderTexture TextureArrayTiles = ResourceManager::EmptyTexture(TilesTextureId, TextureTileSize, TextureTileSize,
 //			//MaxTextureTilesPerAxis, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
 //
 //		VkDescriptorSet TilesMaterial;
@@ -518,7 +518,7 @@
 //			}
 //
 //			TestIndicesCount = Indices.size();
-//			//Render::LoadIndices(&IndexBuffer, Indices.data(), Indices.size(), 0);
+//			//LoadIndices(&IndexBuffer, Indices.data(), Indices.size(), 0);
 //			MapTileSettings.VertexTilesPerAxis = VertexTilesPerAxis;
 //		}
 //
@@ -611,7 +611,7 @@
 //			//TestDownload = false;
 //		}
 //
-//		//Render::RenderTexture* Texture = ResourceManager::FindTexture(TilesTextureId);
+//		//RenderTexture* Texture = ResourceManager::FindTexture(TilesTextureId);
 //
 //		{
 //			std::unique_lock Lock(QueueMutex);
@@ -623,7 +623,7 @@
 //				int width, height, channels;
 //				unsigned char* image = stbi_load_from_memory(data, TileDataCompressed.Data.size(), &width, &height, &channels, 4);
 //
-//				//Render::TextureArrayInfo Info;
+//				//TextureArrayInfo Info;
 //				//Info.Width = TextureTileSize;
 //				//Info.Height = TextureTileSize;
 //				//Info.Format = 4;
@@ -631,7 +631,7 @@
 //				//Info.BaseArrayLayer = TileDataCompressed.ArrayLayer;
 //				//Info.Data = &image;
 //
-//				//Render::UpdateTexture(Texture, &Info);
+//				//UpdateTexture(Texture, &Info);
 //
 //				DownloadQueue.pop();
 //			}
@@ -856,8 +856,8 @@
 			indices.push_back(uniqueVertices[vertex]);
 		}
 
-		SkyBox.VertexOffset = Render::LoadVertices(vertices.data(), sizeof(StaticMeshVertex), vertices.size());
-		SkyBox.IndexOffset = Render::LoadIndices(indices.data(), indices.size());
+		SkyBox.VertexOffset = LoadVertices(vertices.data(), sizeof(StaticMeshVertex), vertices.size());
+		SkyBox.IndexOffset = LoadIndices(indices.data(), indices.size());
 		SkyBox.IndicesCount = indices.size();
 		SkyBox.TextureSet = Material;*/
 		//}
