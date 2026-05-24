@@ -876,3 +876,160 @@
 //	};
 //}
 
+//std::string GenerateMetadata(slang::IComponentType* LinkedProgram, const std::string& ModuleName)
+//{
+//	slang::ProgramLayout* ProgramLayout = LinkedProgram->getLayout();
+//	const u32 ParametersCount = ProgramLayout->getParameterCount();
+
+	//std::unordered_map<u32, DescriptorSetGenerationHelper> DescriptorSetGenerationMap;
+
+	//std::string DescriptorsVariableName = "Private_Metadata_" + ModuleName + "Descriptors";
+	//std::string DescriptorArrayGeneration = "inline constexpr Metadata_Descriptor " + DescriptorsVariableName + "[] = { ";
+	//
+	//u32 DescriptorCount = 0;
+
+	//for (u32 i = 0; i < ParametersCount; ++i)
+	//{
+	//	slang::VariableLayoutReflection* varLayout = ProgramLayout->getParameterByIndex(i);
+	//	slang::VariableReflection* var = varLayout->getVariable();
+
+	//	slang::TypeReflection* type = var->getType();
+	//	SlangResourceShape Shape = type->getResourceShape();
+
+	//	slang::TypeReflection::Kind SlangKind = type->getKind();
+	//	const char* DescriptorName = var->getName();
+
+	//	const u32 bindingIndex = varLayout->getBindingIndex();
+	//	const u32 SetIndex = varLayout->getBindingSpace();
+
+	//	auto DescriptorGenerationIt = DescriptorSetGenerationMap.find(SetIndex);
+	//	if (DescriptorGenerationIt == DescriptorSetGenerationMap.end())
+	//	{
+	//		DescriptorSetGenerationMap[SetIndex] = { std::string(), 0 };
+	//		DescriptorGenerationIt = DescriptorSetGenerationMap.find(SetIndex);
+	//	}
+
+	//	DescriptorGenerationIt->second.Text += "\n\t{ " + std::to_string(bindingIndex) + ", BmRender_DescriptorShaderStage::Vertex | BmRender_DescriptorShaderStage::Fragment, ";
+	//	++DescriptorGenerationIt->second.Count;
+
+	//	if (SlangKind == slang::TypeReflection::Kind::ConstantBuffer)
+	//	{
+	//		DescriptorGenerationIt->second.Text += "BmRender_DescriptorType::UniformBuffer, false";
+	//		++DescriptorCount;
+	//	}
+	//	else if (SlangKind == slang::TypeReflection::Kind::Resource)
+	//	{
+	//		if (Shape == SLANG_STRUCTURED_BUFFER)
+	//		{
+	//			DescriptorGenerationIt->second.Text += "BmRender_DescriptorType::StorageBuffer, false";
+	//			++DescriptorCount;
+	//		}
+	//		else if (Shape & SLANG_TEXTURE_COMBINED_FLAG)
+	//		{
+	//			if (Shape & SLANG_TEXTURE_2D)
+	//			{
+	//				DescriptorGenerationIt->second.Text += "BmRender_DescriptorType::CombinedImageSampler, false";
+	//				++DescriptorCount;
+	//			}
+	//			else
+	//			{
+	//				assert(false);
+	//			}
+	//		}
+	//		else
+	//		{
+	//			assert(false);
+	//		}
+	//	}
+	//	else if (SlangKind == slang::TypeReflection::Kind::Array)
+	//	{
+	//		slang::TypeLayoutReflection* arrayLayout = varLayout->getTypeLayout();
+	//		slang::TypeReflection* arrayType = arrayLayout->getType();
+	//		u64 elementCount = arrayType->getElementCount();
+	//		bool isBindless = (elementCount == 0);
+	//		assert(isBindless);
+
+	//		if (Shape & SLANG_TEXTURE_COMBINED_FLAG)
+	//		{
+	//			if (Shape & SLANG_TEXTURE_2D)
+	//			{
+	//				DescriptorGenerationIt->second.Text += "BmRender_DescriptorType::CombinedImageSampler, true";
+	//				++DescriptorCount;
+	//			}
+	//		}
+	//		else
+	//		{
+	//			assert(false);
+	//		}
+	//	}
+	//	else
+	//	{
+	//		assert(false);
+	//	}
+	//   
+	//	DescriptorGenerationIt->second.Text += " },";
+	//}
+
+	//std::string DescriptorsSetVariableName = "Private_Metadata_" + ModuleName + "DescriptorSets";
+	//std::string DescriptorSetArrayGeneration = "inline constexpr Metadata_DescriptorSet " + DescriptorsSetVariableName + "[] = { ";
+
+	//if (DescriptorCount > 0)
+	//{
+	//	u32 SetIndex = 0;
+	//	u32 TotalDescriptors = 0;
+	//	for (const auto& [DescriptorSet, DescriptorGeneration] : DescriptorSetGenerationMap)
+	//	{
+	//		DescriptorArrayGeneration += DescriptorGeneration.Text;
+	//		DescriptorSetArrayGeneration += "\n\t{ " + DescriptorsVariableName + " + " + std::to_string(TotalDescriptors) + ", "
+	//			+ std::to_string(DescriptorGeneration.Count) + ", " + std::to_string(SetIndex) + " },";
+	//		TotalDescriptors += DescriptorGeneration.Count;
+	//		++SetIndex;
+	//	}
+
+	//	DescriptorArrayGeneration += "\n};";
+	//	DescriptorSetArrayGeneration += "\n};";
+	//}
+
+	//std::string StageVariableName = "Private_Metadata_" + ModuleName + "Stages";
+	//std::string StageArrayGeneration = "inline constexpr Metadata_Stage " + StageVariableName + "[] = { ";
+
+	//const u32 EntryPointsCount = ProgramLayout->getEntryPointCount();
+	//for (int i = 0; i < EntryPointsCount; ++i)
+	//{
+	//	slang::EntryPointReflection* EntryPoint = ProgramLayout->getEntryPointByIndex(i);
+	//	SlangStage Stage = EntryPoint->getStage();
+
+	//	StageArrayGeneration += "\n\t{ ";
+
+	//	switch (Stage)
+	//	{
+	//	case SLANG_STAGE_VERTEX:
+	//		StageArrayGeneration += "BmRender_PipelineShaderStage::Vertex";
+	//		break;
+
+	//	case SLANG_STAGE_FRAGMENT:
+	//		StageArrayGeneration += "BmRender_PipelineShaderStage::Fragment";
+	//		break;
+
+	//	case SLANG_STAGE_COMPUTE:
+	//		StageArrayGeneration += "BmRender_PipelineShaderStage::Compute";
+	//		break;
+	//	default:
+	//		assert(false);
+	//		break;
+	//	}
+
+	//	StageArrayGeneration += ", \"" + std::string(EntryPoint->getName()) + "\" },";
+	//}
+
+	//StageArrayGeneration += "\n};";
+
+	//std::string PipelineVariableName = "Metadata_" + ModuleName + "Pipeline";
+	//std::string PipelineGeneration = "inline constexpr Metadata_Pipeline " + PipelineVariableName + " = { \"" + ModuleName + "\", " + StageVariableName + ", " +
+	//	DescriptorsSetVariableName + ", " + std::to_string(EntryPointsCount) + ", " + std::to_string(DescriptorSetGenerationMap.size()) + " };";
+
+	//const std::string MetadataFile = "#pragma once\n\n#include \"RenderInterface.h\"\n#include <Engine/Systems/Render/PipelineMetadata.h>\n\n" + DescriptorArrayGeneration + "\n\n" +
+	//	DescriptorSetArrayGeneration + "\n\n" + StageArrayGeneration + "\n\n" + PipelineGeneration + "\n";
+
+//	return MetadataFile;
+//}

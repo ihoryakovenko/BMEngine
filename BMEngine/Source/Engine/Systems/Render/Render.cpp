@@ -2,7 +2,6 @@
 
 #include "RenderResources.h"
 #include "TransferSystem.h"
-#include "Systems.h"
 
 #include "imgui.h"
 #include "imgui_impl_vulkan.h"
@@ -31,10 +30,16 @@
 
 #include <SharedLib.h>
 
+static BmRender_Semaphore ImageAvailable[MAX_DRAW_FRAMES];
+static BmRender_Semaphore RenderFinished[MAX_DRAW_FRAMES];
+static BmRender_Fence InFlightFence[MAX_DRAW_FRAMES];
+static BmRender_CommandBuffer RenderCommandBuffers[MAX_DRAW_FRAMES];
+static BmRender_CommandPool RenderCommandPool;
+BmRender_Queue GraphicsQueue;
+static u32 CurrentFrame;
+
 // Extern declarations for global resource maps
 extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
-extern std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
-extern std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
 
 static BmRender_Image ShadowMapArray;
 
@@ -66,7 +71,6 @@ static BmRender_ImageView DeferredInputColorImageInterface[MAX_DRAW_FRAMES];
 static BmRender_DescriptorSet DeferredInputSet[MAX_DRAW_FRAMES];
 
 static AttachmentData DeferredPassPipelineAttachmentData;
-static BmRender_ImageView DeferredPassColorAttachments[16];
 
 // LightningPass static variables
 static BmRender_DescriptorSet LightSpaceMatrixSet[MAX_DRAW_FRAMES];
@@ -81,24 +85,10 @@ static BmRender_ImageView ShadowMapElement2ImageInterface[MAX_DRAW_FRAMES];
 
 // MainPass static variables
 static AttachmentData MainPassPipelineAttachmentData;
-static BmRender_ImageView MainPassColorAttachments[16];
-
-static void FillStageDescriptionsFromMetadata(PipelineNames Name, BmRender_ShaderStageDescription* OutStageDescriptions)
-{
-	const Metadata_Pipeline* Metadata = PipelineManager_GetPipelineMetadata(Name);
-	for (u32 i = 0; i < Metadata->StageCount; ++i)
-	{
-		BmRender_ShaderStageDescription* Stage = OutStageDescriptions + i;
-		Stage->Shader = PipelineManager_GetShader(Name);
-		Stage->EntryPointFunction = Metadata->Stages[i].EntryPoint;
-		Stage->Stage = Metadata->Stages[i].Stage;
-	}
-}
 
 static void GenericDraw(BmRender_CommandBuffer CommandBuffer, DrawScene* Scene, BmRender_Pipeline Pipeline,
 	const BmRender_DescriptorSet* Sets, u32 SetsCount, const u32* DynamicOffsets, u32 DynamicOffsetsCount)
 {
-	const u32 CurrentFrame = GetDrawSystemData()->CurrentFrame;
 	const u32 FrameDynamicOffset = CurrentFrame * sizeof(Shader_FrameData);
 
 	BmRender_BindPipeline(CommandBuffer, Pipeline);
@@ -171,13 +161,13 @@ static void InitImGuiPipeline(BmRender_DescriptorPool* ImGuiPool, GLFWwindow* Wn
 
 	*ImGuiPool = BmRender_CreateDescriptorPool(PoolSizes, 1, (u32)IM_ARRAYSIZE(PoolSizes), BmRender_DescriptorPoolType::CreateFree);
 
-	BmRender_Queue GraphicsQueue = BmRender_CreateQueue(BmRender_QueueType::Graphic);
+	BmRender_Queue ImbuiGraphicsQueue = BmRender_CreateQueue(BmRender_QueueType::Graphic);
 	ImGui_ImplVulkan_InitInfo InitInfo = { };
 	InitInfo.Instance = (VkInstance)BmRender_GetVulkanInstance();
 	InitInfo.PhysicalDevice = (VkPhysicalDevice)BmRender_GetPhysicalDevice();
 	InitInfo.Device = (VkDevice)BmRender_GetLogicalDevice();
-	InitInfo.QueueFamily = BmRender_GetQueueFamily(GraphicsQueue);
-	InitInfo.Queue = (VkQueue)GraphicsQueue;
+	InitInfo.QueueFamily = BmRender_GetQueueFamily(ImbuiGraphicsQueue);
+	InitInfo.Queue = (VkQueue)ImbuiGraphicsQueue;
 	InitInfo.PipelineCache = nullptr;
 	InitInfo.DescriptorPool = *((VkDescriptorPool*)ImGuiPool);
 	InitInfo.RenderPass = nullptr;
@@ -224,42 +214,24 @@ static void InitStaticMeshPipeline(StaticMeshPipelineDepr* MeshPipeline, BmRende
 	}
 
 	AttachmentData ResourceInfo = MainPassPipelineAttachmentData;
-	BmRender_ImageView ResourceInfoColorAttachments[16];
-	ResourceInfo.ColorAttachments = ResourceInfoColorAttachments;
 	for (u32 i = 0; i < ResourceInfo.ColorAttachmentCount; ++i)
 	{
-		ResourceInfoColorAttachments[i] = MainPassPipelineAttachmentData.ColorAttachments[i];
+		ResourceInfo.ColorAttachments[i] = MainPassPipelineAttachmentData.ColorAttachments[i];
 	}
 
-	// Create vectors to hold pipeline data
 	std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
-	
-	const u32 StageCount = PipelineManager_GetStageCout(PipelineNames::Entity);
-	BmRender_ShaderStageDescription* StageDescriptions = (BmRender_ShaderStageDescription*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), sizeof(BmRender_ShaderStageDescription) * StageCount);
-	FillStageDescriptionsFromMetadata(PipelineNames::Entity, StageDescriptions);
 
-	// Build descriptor set layouts
 	descriptorSetLayouts.push_back(FrameDataLayout);
 	descriptorSetLayouts.push_back(ShadowMapArrayLayout);
 
-	// Create pipeline layout from parsed descriptor set layouts
-	BmRender_PipelineLayoutDescription LayoutDesc = {};
-	LayoutDesc.SetLayoutCount = descriptorSetLayouts.size();
-	LayoutDesc.SetLayouts = descriptorSetLayouts.data();
-	LayoutDesc.PushConstantRangeCount = 0;
-	LayoutDesc.PushConstantRanges = {};
-	LayoutDesc.PipelineType = BmRender_PipelineType::Graphics;
-
 	BmRender_PipelineSettings Settings = GetStaticPipelineDescription();
 
-	PipelineLayouts["StaticMesh"] = BmRender_CreatePipelineLayout(&LayoutDesc);
-	Pipelines["StaticMesh"] = BmRender_CreatePipeline(PipelineLayouts["StaticMesh"], &Settings, StageDescriptions, StageCount, &ResourceInfo);
+	PipelineManager_CreatePipelineLayout(PipelineNames::Entity, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0, BmRender_PipelineType::Graphics);
+	PipelineManager_CreatePipeline(PipelineNames::Entity, &Settings, &ResourceInfo);
 }
 
 static void DrawStaticMeshes(BmRender_CommandBuffer CommandBuffer, StaticMeshPipelineDepr* MeshPipeline, DrawScene* Scene, const DescriptorSetHandles& DescriptorSets)
 {
-	u32 CurrentFrame = GetDrawSystemData()->CurrentFrame;
-
 	const BmRender_DescriptorSet DescriptorSetGroup[] =
 	{
 		MeshPipeline->ShadowMapArraySet[CurrentFrame],
@@ -267,7 +239,7 @@ static void DrawStaticMeshes(BmRender_CommandBuffer CommandBuffer, StaticMeshPip
 
 	const u32 SetsCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
-	GenericDraw(CommandBuffer, Scene, Pipelines["StaticMesh"], DescriptorSetGroup, SetsCount, nullptr, 0);
+	GenericDraw(CommandBuffer, Scene, PipelineManager_GetPipeline(PipelineNames::Entity), DescriptorSetGroup, SetsCount, nullptr, 0);
 }
 
 static void DeferredPassInit(BmRender_DescriptorPool MainPool)
@@ -282,8 +254,7 @@ static void DeferredPassInit(BmRender_DescriptorPool MainPool)
 	}
 
 	DeferredPassPipelineAttachmentData.ColorAttachmentCount = 1;
-	DeferredPassPipelineAttachmentData.ColorAttachments = DeferredPassColorAttachments;
-	DeferredPassColorAttachments[0] = DeferredInputColorImageInterface[0];
+	DeferredPassPipelineAttachmentData.ColorAttachments[0] = DeferredInputColorImageInterface[0];
 	DeferredPassPipelineAttachmentData.DepthAttachment = DeferredInputDepthImageInterface[0];
 	DeferredPassPipelineAttachmentData.StencilAttachment = nullptr;
 
@@ -325,38 +296,19 @@ static void DeferredPassInit(BmRender_DescriptorPool MainPool)
 		}
 	}
 
-	// Create vectors to hold pipeline data
 	std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
-	std::vector<BmRender_PushConstant> pushConstantRanges;
-
-	const u32 StageCount = PipelineManager_GetStageCout(PipelineNames::Deferred);
-	BmRender_ShaderStageDescription* StageDescriptions = (BmRender_ShaderStageDescription*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), sizeof(BmRender_ShaderStageDescription) * StageCount);
-	FillStageDescriptionsFromMetadata(PipelineNames::Deferred, StageDescriptions);
-
-	// Build descriptor set layouts
 	descriptorSetLayouts.push_back(FrameDataLayout);
 	descriptorSetLayouts.push_back(MainPassOutputLayout);
 
-	// Create pipeline layout from parsed descriptor set layouts
-	BmRender_PipelineLayoutDescription LayoutDesc = {};
-	LayoutDesc.SetLayoutCount = descriptorSetLayouts.size();
-	LayoutDesc.SetLayouts = descriptorSetLayouts.data();
-	LayoutDesc.PushConstantRangeCount = 0;
-	LayoutDesc.PushConstantRanges = {};
-	LayoutDesc.PipelineType = BmRender_PipelineType::Graphics;
-
 	BmRender_PipelineSettings PipelineDesc = GetDeferredPipelineDescription();
 
-	PipelineLayouts["Deferred"] = BmRender_CreatePipelineLayout(&LayoutDesc);
-	Pipelines["Deferred"] = BmRender_CreatePipeline(PipelineLayouts["Deferred"], &PipelineDesc, StageDescriptions, StageCount, &DeferredPassPipelineAttachmentData);
+	PipelineManager_CreatePipelineLayout(PipelineNames::Deferred, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0, BmRender_PipelineType::Graphics);
+	PipelineManager_CreatePipeline(PipelineNames::Deferred, &PipelineDesc, &DeferredPassPipelineAttachmentData);
 }
 
 static void DeferredPassDraw()
 {
-	CommandWorkerData* SubmitPool = GetSubmitPoolData(GetRenderState()->GraphicsCommandWorker);
-	BmRender_BindPipeline(SubmitPool->CommandBuffer, Pipelines["Deferred"]);
-
-	const u32 CurrentFrame = GetDrawSystemData()->CurrentFrame;
+	BmRender_BindPipeline(RenderCommandBuffers[CurrentFrame], PipelineManager_GetPipeline(PipelineNames::Deferred));
 
 	const BmRender_DescriptorSet Sets[2] = {
 		DescriptorSets.FrameBufferSet,
@@ -366,16 +318,14 @@ static void DeferredPassDraw()
 	const u32 FrameDynamicOffset = CurrentFrame * sizeof(Shader_FrameData);
 	const u32 DynamicOffsets[] = { FrameDynamicOffset };
 
-	BmRender_RecordBindDescriptorSets(SubmitPool->CommandBuffer, Pipelines["Deferred"],
+	BmRender_RecordBindDescriptorSets(RenderCommandBuffers[CurrentFrame], PipelineManager_GetPipeline(PipelineNames::Deferred),
 		0, 2, Sets, 1, DynamicOffsets);
 
-	BmRender_Draw(SubmitPool->CommandBuffer, 3, 1, 0, 0); // 3 hardcoded vertices
+	BmRender_Draw(RenderCommandBuffers[CurrentFrame], 3, 1, 0, 0); // 3 hardcoded vertices
 }
 
 static void DeferredPassBeginPass()
 {
-	CommandWorkerData* SubmitPool = GetSubmitPoolData(GetRenderState()->GraphicsCommandWorker);
-
 	BmRender_RenderingColorAttachment SwapchainColorAttachment = { };
 	SwapchainColorAttachment.ImageView = BmRender_GetSwapchainImageView(CurrentImageIndex);
 	SwapchainColorAttachment.LoadOp = BmRender_AttachmentLoadOp::Clear;
@@ -389,19 +339,17 @@ static void DeferredPassBeginPass()
 	RenderingInfo.ColorAttachmentCount = 1;
 	RenderingInfo.DepthAttachment = nullptr;
 
-	BmRender_TransitionImageForSampling(SubmitPool->CommandBuffer, DeferredInputColorImage[GetDrawSystemData()->CurrentFrame]);
-	BmRender_TransitionImageForSampling(SubmitPool->CommandBuffer, DeferredInputDepthImage[GetDrawSystemData()->CurrentFrame]);
-	BmRender_TransitionImageForRendering(SubmitPool->CommandBuffer, BmRender_GetSwapchainImage(CurrentImageIndex));
+	BmRender_TransitionImageForSampling(RenderCommandBuffers[CurrentFrame], DeferredInputColorImage[CurrentFrame]);
+	BmRender_TransitionImageForSampling(RenderCommandBuffers[CurrentFrame], DeferredInputDepthImage[CurrentFrame]);
+	BmRender_TransitionImageForRendering(RenderCommandBuffers[CurrentFrame], BmRender_GetSwapchainImage(CurrentImageIndex));
 
-	BmRender_BeginRendering(SubmitPool->CommandBuffer, &RenderingInfo);
+	BmRender_BeginRendering(RenderCommandBuffers[CurrentFrame], &RenderingInfo);
 }
 
 static void DeferredPassEndPass()
 {
-	CommandWorkerData* SubmitPool = GetSubmitPoolData(GetRenderState()->GraphicsCommandWorker);
-	BmRender_EndRendering(SubmitPool->CommandBuffer);
-
-	BmRender_TransitionImageForPresentation(SubmitPool->CommandBuffer, BmRender_GetSwapchainImage(CurrentImageIndex));
+	BmRender_EndRendering(RenderCommandBuffers[CurrentFrame]);
+	BmRender_TransitionImageForPresentation(RenderCommandBuffers[CurrentFrame], BmRender_GetSwapchainImage(CurrentImageIndex));
 }
 
 static void DeferredPassDeInit()
@@ -452,54 +400,36 @@ static void LightningPassInit(BmRender_DescriptorPool MainPool)
 
 	AttachmentData ResourceInfo;
 	ResourceInfo.ColorAttachmentCount = 0;
-	ResourceInfo.ColorAttachments = nullptr;
 	ResourceInfo.DepthAttachment = ShadowMapElement1ImageInterface[0];
 	ResourceInfo.StencilAttachment = nullptr;
 
-	// Create vectors to hold pipeline data
 	std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
-	std::vector<BmRender_PushConstant> pushConstantRanges;
-
-	const u32 StageCount = PipelineManager_GetStageCout(PipelineNames::Depth_vert);
-	BmRender_ShaderStageDescription* StageDescriptions = (BmRender_ShaderStageDescription*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), sizeof(BmRender_ShaderStageDescription) * StageCount);
-	FillStageDescriptionsFromMetadata(PipelineNames::Deferred, StageDescriptions);
-
-	// Build descriptor set layouts
 	descriptorSetLayouts.push_back(FrameDataLayout);
 	descriptorSetLayouts.push_back(LightSpaceMatrixLayout);
 
-	// Create pipeline layout from parsed descriptor set layouts
-	BmRender_PipelineLayoutDescription LayoutDesc = {};
-	LayoutDesc.SetLayoutCount = descriptorSetLayouts.size();
-	LayoutDesc.SetLayouts = descriptorSetLayouts.data();
-	LayoutDesc.PushConstantRangeCount = 0;
-	LayoutDesc.PipelineType = BmRender_PipelineType::Graphics;
-
 	BmRender_PipelineSettings PipelineDesc = GetDepthPipelineDescription();
 
-	PipelineLayouts["Depth"] = BmRender_CreatePipelineLayout(&LayoutDesc);
-	Pipelines["Depth"] = BmRender_CreatePipeline(PipelineLayouts["Depth"], &PipelineDesc, StageDescriptions, StageCount, &ResourceInfo);
+	PipelineManager_CreatePipelineLayout(PipelineNames::Depth_vert, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0, BmRender_PipelineType::Graphics);
+	PipelineManager_CreatePipeline(PipelineNames::Depth_vert, &PipelineDesc, &ResourceInfo);
 }
 
 static void LightningPassDraw(DrawScene* Scene)
 {
-	CommandWorkerData* SubmitPool = GetSubmitPoolData(GetRenderState()->GraphicsCommandWorker);
-
 	const glm::mat4* LightViews[] =
 	{
 		&Scene->FrameDataBuffer.directionLight.LightSpaceMatrix,
 		&Scene->FrameDataBuffer.spotlight.LightSpaceMatrix,
 	};
 
-	BmRender_TransitionImageForRendering(SubmitPool->CommandBuffer, ShadowMapArray, MAX_SHADOW_TEXTURES * GetDrawSystemData()->CurrentFrame, MAX_SHADOW_TEXTURES);
+	BmRender_TransitionImageForRendering(RenderCommandBuffers[CurrentFrame], ShadowMapArray, MAX_SHADOW_TEXTURES * CurrentFrame, MAX_SHADOW_TEXTURES);
 
 	for (u32 LightCaster = 0; LightCaster < MAX_SHADOW_TEXTURES; ++LightCaster)
 	{
 		RenderResources::UpdateBufferRegion(LightSpaceMatrixBufferRegion[LightCaster], 0, LightViews[LightCaster], sizeof(glm::mat4));
 
 		BmRender_ImageView DepthImageView = (LightCaster == 0) ?
-			ShadowMapElement1ImageInterface[GetDrawSystemData()->CurrentFrame] :
-			ShadowMapElement2ImageInterface[GetDrawSystemData()->CurrentFrame];
+			ShadowMapElement1ImageInterface[CurrentFrame] :
+			ShadowMapElement2ImageInterface[CurrentFrame];
 
 		BmRender_RenderingDepthAttachment DepthAttachment{ };
 		DepthAttachment.ImageView = DepthImageView;
@@ -514,7 +444,7 @@ static void LightningPassDraw(DrawScene* Scene)
 		RenderingInfo.ColorAttachmentCount = 0;
 		RenderingInfo.DepthAttachment = &DepthAttachment;
 
-		BmRender_BeginRendering(SubmitPool->CommandBuffer, &RenderingInfo);
+		BmRender_BeginRendering(RenderCommandBuffers[CurrentFrame], &RenderingInfo);
 
 		const BmRender_DescriptorSet DescriptorSetGroup[] = {
 			LightSpaceMatrixSet[LightCaster],
@@ -522,13 +452,13 @@ static void LightningPassDraw(DrawScene* Scene)
 
 		const u32 SetsCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
-		GenericDraw(SubmitPool->CommandBuffer, Scene, Pipelines["Depth"], DescriptorSetGroup, SetsCount, nullptr, 0);
+		GenericDraw(RenderCommandBuffers[CurrentFrame], Scene, PipelineManager_GetPipeline(PipelineNames::Depth_vert), DescriptorSetGroup, SetsCount, nullptr, 0);
 
-		BmRender_EndRendering(SubmitPool->CommandBuffer);
+		BmRender_EndRendering(RenderCommandBuffers[CurrentFrame]);
 	}
 
 	// TODO: move to Main pass?
-	BmRender_TransitionImageForSampling(SubmitPool->CommandBuffer, ShadowMapArray, MAX_SHADOW_TEXTURES * GetDrawSystemData()->CurrentFrame, MAX_SHADOW_TEXTURES);
+	BmRender_TransitionImageForSampling(RenderCommandBuffers[CurrentFrame], ShadowMapArray, MAX_SHADOW_TEXTURES * CurrentFrame, MAX_SHADOW_TEXTURES);
 }
 
 static void LightningPassDeInit()
@@ -545,24 +475,21 @@ static void LightningPassDeInit()
 static void MainPassInit()
 {
 	MainPassPipelineAttachmentData.ColorAttachmentCount = 1;
-	MainPassPipelineAttachmentData.ColorAttachments = MainPassColorAttachments;
-	MainPassColorAttachments[0] = TestDeferredInputColorImageInterface()[0];
+	MainPassPipelineAttachmentData.ColorAttachments[0] = TestDeferredInputColorImageInterface()[0];
 	MainPassPipelineAttachmentData.DepthAttachment = TestDeferredInputDepthImageInterface()[0];
 	MainPassPipelineAttachmentData.StencilAttachment = nullptr;
 }
 
 static void MainPassBeginPass()
 {
-	CommandWorkerData* SubmitPool = GetSubmitPoolData(GetRenderState()->GraphicsCommandWorker);
-
 	BmRender_RenderingColorAttachment ColorAttachment = { };
-	ColorAttachment.ImageView = TestDeferredInputColorImageInterface()[GetDrawSystemData()->CurrentFrame];
+	ColorAttachment.ImageView = TestDeferredInputColorImageInterface()[CurrentFrame];
 	ColorAttachment.LoadOp = BmRender_AttachmentLoadOp::Clear;
 	ColorAttachment.StoreOp = BmRender_AttachmentStoreOp::Store;
 	ColorAttachment.ClearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 	BmRender_RenderingDepthAttachment DepthAttachment = { };
-	DepthAttachment.ImageView = TestDeferredInputDepthImageInterface()[GetDrawSystemData()->CurrentFrame];
+	DepthAttachment.ImageView = TestDeferredInputDepthImageInterface()[CurrentFrame];
 	DepthAttachment.LoadOp = BmRender_AttachmentLoadOp::Clear;
 	DepthAttachment.StoreOp = BmRender_AttachmentStoreOp::Store;
 	DepthAttachment.ClearValue = { 1.0f, 0 };
@@ -574,16 +501,15 @@ static void MainPassBeginPass()
 	RenderingInfo.ColorAttachmentCount = 1;
 	RenderingInfo.DepthAttachment = &DepthAttachment;
 
-	BmRender_TransitionImageForRendering(SubmitPool->CommandBuffer, TestDeferredInputColorImage()[GetDrawSystemData()->CurrentFrame]);
-	BmRender_TransitionImageForRendering(SubmitPool->CommandBuffer, TestDeferredInputDepthImage()[GetDrawSystemData()->CurrentFrame]);
+	BmRender_TransitionImageForRendering(RenderCommandBuffers[CurrentFrame], TestDeferredInputColorImage()[CurrentFrame]);
+	BmRender_TransitionImageForRendering(RenderCommandBuffers[CurrentFrame], TestDeferredInputDepthImage()[CurrentFrame]);
 
-	BmRender_BeginRendering(SubmitPool->CommandBuffer, &RenderingInfo);
+	BmRender_BeginRendering(RenderCommandBuffers[CurrentFrame], &RenderingInfo);
 }
 
 static void MainPassEndPass()
 {
-	CommandWorkerData* SubmitPool = GetSubmitPoolData(GetRenderState()->GraphicsCommandWorker);
-	BmRender_EndRendering(SubmitPool->CommandBuffer);
+	BmRender_EndRendering(RenderCommandBuffers[CurrentFrame]);
 }
 
 void Render_Init(GLFWwindow* WindowHandler)
@@ -615,10 +541,18 @@ void Render_Init(GLFWwindow* WindowHandler)
 	InstanceBuffer = BmRender_CreateStorageBuffer(MB4, MemoryPropertyFlag::GPULocal);
 	MaterialBuffer = BmRender_CreateStorageBuffer(MB4, MemoryPropertyFlag::GPULocal);
 
-	InitCommandSystem(3);
-	InitDrawSystem(3);
+	GraphicsQueue = BmRender_CreateQueue(BmRender_QueueType::Graphic);
 
-		
+	BmRender_CreateQueue(BmRender_QueueType::Graphic);
+	RenderCommandPool = BmRender_CreateCommandPool(BmRender_QueueType::Graphic);
+
+	for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); ++i)
+	{
+		RenderCommandBuffers[i] = BmRender_AllocateCommandBuffer(RenderCommandPool);
+		InFlightFence[i] = BmRender_CreateFence();
+		ImageAvailable[i] = BmRender_CreateSemaphore();
+		RenderFinished[i] = BmRender_CreateSemaphore();
+	}
 
 	DescriptorSets = DescriptorSetHandles();
 
@@ -699,24 +633,19 @@ void Render_DeInit()
 	BmRender_DestroyDescriptorSetLayout(LightSpaceMatrixLayout);
 
 	DeInitImGuiPipeline(State.DebugUiPool);
+
+	BmRender_DestroyCommandPool(RenderCommandPool);
 		
 	for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 	{
 		BmRender_DestroyImageView(State.MeshPipeline.ShadowMapArrayImageInterface[i]);
+		BmRender_DestroySemaphore(ImageAvailable[i]);
+		BmRender_DestroySemaphore(RenderFinished[i]);
+		BmRender_DestroyFence(InFlightFence[i]);
 	}
-
+	
 	DeferredPassDeInit();
 	LightningPassDeInit();
-
-	for (auto& [name, pipeline] : Pipelines)
-	{
-		BmRender_DestroyPipeline(pipeline);
-	}
-
-	for (auto& [name, layout] : PipelineLayouts)
-	{
-		BmRender_DestroyPipelineLayout(layout);
-	}
 
 	for (auto& [name, sampler] : Samplers)
 	{
@@ -724,9 +653,6 @@ void Render_DeInit()
 	}
 
 	BmRender_DestroyDescriptorPool(State.MainPool);
-
-	DeInitDrawSystem();
-	DeInitCommandSystem();
 
 	// Destroy GPUBuffers
 	BmRender_DestroyGPUBuffer(VertexBuffer);
@@ -738,61 +664,53 @@ void Render_DeInit()
 
 void Render_Draw(DrawScene* Scene, u64 WaitSemaphoreValue)
 {
-	const u32 CurrentFrame = GetCurrentFrameIndex();
+	BmRender_WaitForFences(InFlightFence[CurrentFrame], true, UINT64_MAX);
+	BmRender_ResetFences(InFlightFence[CurrentFrame]);
 
 	RenderResources::UpdateBuffer(FrameDataBuffer, sizeof(Shader_FrameData) * CurrentFrame, &Scene->FrameDataBuffer, sizeof(Shader_FrameData));
 
-	const u32 ImageIndex = AcquireNextSwapchainImage(CurrentFrame);
-	CurrentImageIndex = ImageIndex;
+	BmRender_AcquireNextSwapchainImage(UINT64_MAX, ImageAvailable[CurrentFrame], nullptr, &CurrentImageIndex);
 
-	State.GraphicsCommandWorker = AcquireWorker(ULLONG_MAX);
-	StartRecording(State.GraphicsCommandWorker);
-
-	CommandWorkerData* SubmitPool = GetSubmitPoolData(State.GraphicsCommandWorker);
+	BmRender_BeginCommandBuffer(RenderCommandBuffers[CurrentFrame]);
 
 	LightningPassDraw(Scene);
 	MainPassBeginPass();
-	//TerrainDraw();
-	DrawStaticMeshes(SubmitPool->CommandBuffer, &State.MeshPipeline, Scene, State.DescriptorSets);
+	DrawStaticMeshes(RenderCommandBuffers[CurrentFrame], &State.MeshPipeline, Scene, State.DescriptorSets);
 	MainPassEndPass();
 	DeferredPassBeginPass();
 	DeferredPassDraw();
 	ImGui::Render();
-	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), (VkCommandBuffer)SubmitPool->CommandBuffer);
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), (VkCommandBuffer)RenderCommandBuffers[CurrentFrame]);
 	DeferredPassEndPass();
 
-	EndRecording(State.GraphicsCommandWorker);
+	BmRender_EndCommandBuffer(RenderCommandBuffers[CurrentFrame]);
 
 	BmRender_PipelineSyncStage WaitStages[] = {
 		BmRender_PipelineSyncStage::ColorAttachmentOutput,
 	};
 
-	DrawSystemData* DrawSystem = GetDrawSystemData();
-
 	BmRender_SubmitInfo SubmitInfo = { };
 	SubmitInfo.WaitDstStageFlags = WaitStages;
-	SubmitInfo.WaitSemaphores = &DrawSystem->ImagesAvailable[CurrentFrame];
+	SubmitInfo.WaitSemaphores = &ImageAvailable[CurrentFrame];
 	SubmitInfo.WaitSemaphoreCount = 1;
 	SubmitInfo.WaitTimelineSemaphores = nullptr;
 	SubmitInfo.WaitTimelineSemaphoreCount = 0;
-	SubmitInfo.CommandBuffers = &SubmitPool->CommandBuffer;
+	SubmitInfo.CommandBuffers = &RenderCommandBuffers[CurrentFrame];
 	SubmitInfo.CommandBufferCount = 1;
-	SubmitInfo.SignalSemaphores = &DrawSystem->RenderFinished[CurrentFrame];
+	SubmitInfo.SignalSemaphores = &RenderFinished[CurrentFrame];
 	SubmitInfo.SignalSemaphoreCount = 1;
 	SubmitInfo.SignalTimelineSemaphores = nullptr;
 	SubmitInfo.SignalTimelineSemaphoreCount = 0;
 
 	BmRender_PresentInfo PresentInfo = { };
-	PresentInfo.WaitSemaphores = &DrawSystem->RenderFinished[CurrentFrame];
+	PresentInfo.WaitSemaphores = &RenderFinished[CurrentFrame];
 	PresentInfo.WaitSemaphoreCount = 1;
-	PresentInfo.ImageIndices = &ImageIndex;
+	PresentInfo.ImageIndices = &CurrentImageIndex;
 
-	std::unique_lock Lock(GetCommandSystemData()->QueueSubmitMutex);
-	BmRender_QueueSubmit(GetCommandSystemData()->GraphicsQueue, 1, &SubmitInfo, SubmitPool->Fence);
-	BmRender_QueuePresent(GetCommandSystemData()->GraphicsQueue, &PresentInfo);
-	Lock.unlock();
+	BmRender_QueueSubmit(GraphicsQueue, 1, &SubmitInfo, InFlightFence[CurrentFrame]);
+	BmRender_QueuePresent(GraphicsQueue, &PresentInfo);
 
-	GetDrawSystemData()->CurrentFrame = Math::WrapIncrement(CurrentFrame, 3u);
+	CurrentFrame = Math::WrapIncrement(CurrentFrame, 3u);
 
 	BmRender_FrameFree();
 }

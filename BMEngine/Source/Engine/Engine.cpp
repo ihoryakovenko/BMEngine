@@ -32,8 +32,6 @@
 
 // Global resource maps
 std::unordered_map<std::string, BmRender_Sampler> Samplers;
-std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
-std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
 
 namespace Engine
 {
@@ -139,6 +137,8 @@ namespace Engine
 			{			
 				EngineResources::Update(&Scene);
 
+				PipelineManager_Update();
+
 				//TaskSystem::TaskLambda Task = [&]() { TransferSystem::Transfer(); };
 				//TaskSystem::AddTask(&Task, &Group);
 				TransferSystem::Transfer();
@@ -193,7 +193,7 @@ namespace Engine
 		Yaml::Parse(Root, "./Resources/Settings/RenderResources.yaml");
 
 		BmRender_Init(Window);
-		PipelineManger_Init();
+		PipelineManger_Init(true);
 
 
 

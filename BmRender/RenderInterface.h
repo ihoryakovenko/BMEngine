@@ -489,7 +489,7 @@ struct BmRender_SurfaceFormat
 struct AttachmentData
 {
 	u32 ColorAttachmentCount;
-	BmRender_ImageView* ColorAttachments;
+	BmRender_ImageView ColorAttachments[4];
 	BmRender_ImageView DepthAttachment;
 	BmRender_ImageView StencilAttachment;
 };

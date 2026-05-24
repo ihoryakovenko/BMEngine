@@ -330,6 +330,16 @@ void DestroyCommandBufferHandle(BmRender_CommandBuffer Handle)
 		Memory_PoolAllocator_FreeData(&CommandBufferStorage.Allocator, Index);
 	}
 }
+
+void DestroyPipelineData(BmRender_Pipeline Handle)
+{
+	VkPipeline Pipeline = (VkPipeline)Handle;
+	u32 Index;
+	if (Systems_SparceHashMap_Remove(&PipelineStorage.HashMap, (u64)Pipeline, &Index))
+	{
+		Memory_PoolAllocator_FreeData(&PipelineStorage.Allocator, Index);
+	}
+}
 // DESTROY
 
 // GET

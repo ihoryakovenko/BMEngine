@@ -864,6 +864,7 @@ void BmRender_DestroyPipeline(BmRender_Pipeline Handle)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	vkDestroyPipeline(Device, (VkPipeline)Handle, GetVulkanAllocator());
+	DestroyPipelineData(Handle);
 }
 
 void BmRender_DestroyShader(BmRender_Shader Handle)

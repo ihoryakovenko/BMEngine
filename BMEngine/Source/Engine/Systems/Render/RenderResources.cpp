@@ -9,7 +9,6 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
-#include "Systems.h"
 
 namespace RenderResources
 {

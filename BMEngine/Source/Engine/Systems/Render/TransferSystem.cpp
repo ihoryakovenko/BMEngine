@@ -6,7 +6,8 @@
 #include "Util/Util.h"
 #include "Util/Math.h"
 #include "RenderInterface.h"
-#include "Systems.h"
+
+extern BmRender_Queue GraphicsQueue;
 
 namespace TransferSystem
 {
@@ -301,9 +302,9 @@ namespace TransferSystem
 		SubmitInfo.WaitTimelineSemaphoreCount = 0;
 
 		// Todo submit using queue system
-		std::unique_lock SubmitLock(GetCommandSystemData()->QueueSubmitMutex);
-		BmRender_QueueSubmit(GetCommandSystemData()->GraphicsQueue, 1, &SubmitInfo, TransferState.Frames.Fences[CurrentFrame]);
-		SubmitLock.unlock();
+		//std::unique_lock SubmitLock(GetCommandSystemData()->QueueSubmitMutex);
+		BmRender_QueueSubmit(GraphicsQueue, 1, &SubmitInfo, TransferState.Frames.Fences[CurrentFrame]);
+		//SubmitLock.unlock();
 
 		assert(TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] <= TransferState.MaxTransferSizePerFrame);
 		TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] = 0;

@@ -11,6 +11,7 @@ struct Metadata_Stage
 
 struct Metadata_Pipeline
 {
+	const char* SourcePath;
 	const char* FilePath;
 	const char* ModuleName;
 	const Metadata_Stage* Stages;

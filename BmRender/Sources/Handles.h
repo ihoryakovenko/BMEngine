@@ -66,4 +66,4 @@ void DestroyGPUBufferHandle(BmRender_GPUBuffer Handle);
 void DestroySemaphoreHandle(BmRender_Semaphore Handle);
 void DestroyCommandPoolHandle(BmRender_CommandPool Handle);
 void DestroyCommandBufferHandle(BmRender_CommandBuffer Handle);
-
+void DestroyPipelineData(BmRender_Pipeline Handle);

@@ -30,7 +30,7 @@ static BmRender_Pipeline Pipeline;
 static BmRender_Queue GraphicsQueue;
 static BmRender_CommandPool CommandPool;
 static BmRender_CommandBuffer CommandBuffer;
-static BmRender_Semaphore ImageAvailableSemaphore;
+static BmRender_Semaphore ImageAvailable;
 static BmRender_Semaphore RenderFinishedSemaphores[MAX_SWAPCHAIN_IMAGES];
 static u32 SwapchainImageCount;
 static BmRender_Fence InFlightFence;
@@ -140,24 +140,24 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	LayoutDesc.PipelineType = BmRender_PipelineType::Graphics;
 	PipelineLayout = BmRender_CreatePipelineLayout(&LayoutDesc);
 
-	BmRender_PipelineSettings PipelineDesc = {};
-	PipelineDesc.PipelineLayout = PipelineLayout;
+	//BmRender_PipelineSettings PipelineDesc = {};
+	//PipelineDesc.PipelineLayout = PipelineLayout;
 
-	BmRender_ImageView PipelineColorAttachments[1];
-	PipelineColorAttachments[0] = ColorImageView;
+	//BmRender_ImageView PipelineColorAttachments[1];
+	//PipelineColorAttachments[0] = ColorImageView;
 
-	PipelineDesc.Attachment.ColorAttachmentCount = 1;
-	PipelineDesc.Attachment.ColorAttachments = PipelineColorAttachments;
-	PipelineDesc.Attachment.DepthAttachment = DepthImageView;
-	PipelineDesc.Attachment.StencilAttachment = nullptr;
+	//PipelineDesc.Attachment.ColorAttachmentCount = 1;
+	//PipelineDesc.Attachment.ColorAttachments = PipelineColorAttachments;
+	//PipelineDesc.Attachment.DepthAttachment = DepthImageView;
+	//PipelineDesc.Attachment.StencilAttachment = nullptr;
 
-	BmRender_ShaderStageDescription ShaderStages[2] = {};
-	ShaderStages[0].Shader = VertexShader;
-	ShaderStages[0].EntryPointFunction = "main";
-	ShaderStages[1].Shader = FragmentShader;
-	ShaderStages[1].EntryPointFunction = "main";
-	PipelineDesc.ShaderStages = ShaderStages;
-	PipelineDesc.ShaderStagesCount = 2;
+	//BmRender_ShaderStageDescription ShaderStages[2] = {};
+	//ShaderStages[0].Shader = VertexShader;
+	//ShaderStages[0].EntryPointFunction = "main";
+	//ShaderStages[1].Shader = FragmentShader;
+	//ShaderStages[1].EntryPointFunction = "main";
+	//PipelineDesc.ShaderStages = ShaderStages;
+	//PipelineDesc.ShaderStagesCount = 2;
 
 	//VertexAttribute NanodegAttr = {};
 	//NanodegAttr.Type = BmRender_AttributeType::Ivec2;
@@ -197,79 +197,79 @@ int StreetsRender_Init(GLFWwindow* Window, s32 WindowWidth, s32 WindowHeight)
 	//PipelineDesc.VertexBindings = Bindings;
 	//PipelineDesc.VertexBindingsCount = 2;
 
-	PipelineDesc.DescriptorSetLayouts = &DescriptorSetLayout;
-	PipelineDesc.DescriptorSetLayoutsCount = 1;
-	PipelineDesc.PushConstantRanges = &PushConstantRange;
-	PipelineDesc.PushConstantRangesCount = 1;
+	//PipelineDesc.DescriptorSetLayouts = &DescriptorSetLayout;
+	//PipelineDesc.DescriptorSetLayoutsCount = 1;
+	//PipelineDesc.PushConstantRanges = &PushConstantRange;
+	//PipelineDesc.PushConstantRangesCount = 1;
 
-	PipelineDesc.RasterizationState = {};
-	PipelineDesc.RasterizationState.DepthClampEnable = false;
-	PipelineDesc.RasterizationState.RasterizerDiscardEnable = false;
-	PipelineDesc.RasterizationState.PolygonMode = BmRender_PolygonMode::Fill;
-	PipelineDesc.RasterizationState.LineWidth = 1.0f;
-	PipelineDesc.RasterizationState.CullMode = BmRender_CullModeFlags::Back;
-	PipelineDesc.RasterizationState.FrontFace = BmRender_FrontFace::CounterClockwise;
-	PipelineDesc.RasterizationState.DepthBiasEnable = false;
+	//PipelineDesc.RasterizationState = {};
+	//PipelineDesc.RasterizationState.DepthClampEnable = false;
+	//PipelineDesc.RasterizationState.RasterizerDiscardEnable = false;
+	//PipelineDesc.RasterizationState.PolygonMode = BmRender_PolygonMode::Fill;
+	//PipelineDesc.RasterizationState.LineWidth = 1.0f;
+	//PipelineDesc.RasterizationState.CullMode = BmRender_CullModeFlags::Back;
+	//PipelineDesc.RasterizationState.FrontFace = BmRender_FrontFace::CounterClockwise;
+	//PipelineDesc.RasterizationState.DepthBiasEnable = false;
 
-	PipelineDesc.ColorBlendAttachment = {};
-	PipelineDesc.ColorBlendAttachment.ColorWriteMask = BmRender_ColorComponentFlags::RGBA;
-	PipelineDesc.ColorBlendAttachment.BlendEnable = false;
-	PipelineDesc.ColorBlendAttachment.SrcColorBlendFactor = BmRender_BlendFactor::SrcAlpha;
-	PipelineDesc.ColorBlendAttachment.DstColorBlendFactor = BmRender_BlendFactor::OneMinusSrcAlpha;
-	PipelineDesc.ColorBlendAttachment.ColorBlendOp = BmRender_BlendOp::Add;
-	PipelineDesc.ColorBlendAttachment.SrcAlphaBlendFactor = BmRender_BlendFactor::One;
-	PipelineDesc.ColorBlendAttachment.DstAlphaBlendFactor = BmRender_BlendFactor::Zero;
-	PipelineDesc.ColorBlendAttachment.AlphaBlendOp = BmRender_BlendOp::Add;
+	//PipelineDesc.ColorBlendAttachment = {};
+	//PipelineDesc.ColorBlendAttachment.ColorWriteMask = BmRender_ColorComponentFlags::RGBA;
+	//PipelineDesc.ColorBlendAttachment.BlendEnable = false;
+	//PipelineDesc.ColorBlendAttachment.SrcColorBlendFactor = BmRender_BlendFactor::SrcAlpha;
+	//PipelineDesc.ColorBlendAttachment.DstColorBlendFactor = BmRender_BlendFactor::OneMinusSrcAlpha;
+	//PipelineDesc.ColorBlendAttachment.ColorBlendOp = BmRender_BlendOp::Add;
+	//PipelineDesc.ColorBlendAttachment.SrcAlphaBlendFactor = BmRender_BlendFactor::One;
+	//PipelineDesc.ColorBlendAttachment.DstAlphaBlendFactor = BmRender_BlendFactor::Zero;
+	//PipelineDesc.ColorBlendAttachment.AlphaBlendOp = BmRender_BlendOp::Add;
 
-	PipelineDesc.ColorBlendState = {};
-	PipelineDesc.ColorBlendState.LogicOpEnable = false;
-	PipelineDesc.ColorBlendState.AttachmentCount = 1;
+	//PipelineDesc.ColorBlendState = {};
+	//PipelineDesc.ColorBlendState.LogicOpEnable = false;
+	//PipelineDesc.ColorBlendState.AttachmentCount = 1;
 
-	PipelineDesc.DepthStencilState = {};
-	PipelineDesc.DepthStencilState.DepthTestEnable = true;
-	PipelineDesc.DepthStencilState.DepthWriteEnable = true;
-	PipelineDesc.DepthStencilState.DepthCompareOp = BmRender_CompareOp::Less;
-	PipelineDesc.DepthStencilState.DepthBoundsTestEnable = false;
-	PipelineDesc.DepthStencilState.StencilTestEnable = false;
+	//PipelineDesc.DepthStencilState = {};
+	//PipelineDesc.DepthStencilState.DepthTestEnable = true;
+	//PipelineDesc.DepthStencilState.DepthWriteEnable = true;
+	//PipelineDesc.DepthStencilState.DepthCompareOp = BmRender_CompareOp::Less;
+	//PipelineDesc.DepthStencilState.DepthBoundsTestEnable = false;
+	//PipelineDesc.DepthStencilState.StencilTestEnable = false;
 
-	PipelineDesc.MultisampleState = {};
-	PipelineDesc.MultisampleState.SampleShadingEnable = false;
+	//PipelineDesc.MultisampleState = {};
+	//PipelineDesc.MultisampleState.SampleShadingEnable = false;
 
-	PipelineDesc.InputAssemblyState = {};
-	PipelineDesc.InputAssemblyState.Topology = BmRender_PrimitiveTopology::TriangleList;
-	PipelineDesc.InputAssemblyState.PrimitiveRestartEnable = false;
+	//PipelineDesc.InputAssemblyState = {};
+	//PipelineDesc.InputAssemblyState.Topology = BmRender_PrimitiveTopology::TriangleList;
+	//PipelineDesc.InputAssemblyState.PrimitiveRestartEnable = false;
 
-	PipelineDesc.Extent = { (u32)WindowWidth, (u32)WindowHeight };
-	BmRender_Viewport Viewport = {};
-	Viewport.X = 0.0f;
-	Viewport.Y = 0.0f;
-	Viewport.Width = (f32)WindowWidth;
-	Viewport.Height = (f32)WindowHeight;
-	Viewport.MinDepth = 0.0f;
-	Viewport.MaxDepth = 1.0f;
-	PipelineDesc.Viewport = Viewport;
+	//PipelineDesc.Extent = { (u32)WindowWidth, (u32)WindowHeight };
+	//BmRender_Viewport Viewport = {};
+	//Viewport.X = 0.0f;
+	//Viewport.Y = 0.0f;
+	//Viewport.Width = (f32)WindowWidth;
+	//Viewport.Height = (f32)WindowHeight;
+	//Viewport.MinDepth = 0.0f;
+	//Viewport.MaxDepth = 1.0f;
+	//PipelineDesc.Viewport = Viewport;
 
-	BmRender_Rect2D Scissor = {};
-	Scissor.Offset = { 0, 0 };
-	Scissor.Extent = { (u32)WindowWidth, (u32)WindowHeight };
-	PipelineDesc.Scissor = Scissor;
+	//BmRender_Rect2D Scissor = {};
+	//Scissor.Offset = { 0, 0 };
+	//Scissor.Extent = { (u32)WindowWidth, (u32)WindowHeight };
+	//PipelineDesc.Scissor = Scissor;
 
-	PipelineDesc.ViewportState = {};
-	PipelineDesc.ViewportState.ViewportCount = 1;
-	PipelineDesc.ViewportState.ScissorCount = 1;
+	//PipelineDesc.ViewportState = {};
+	//PipelineDesc.ViewportState.ViewportCount = 1;
+	//PipelineDesc.ViewportState.ScissorCount = 1;
 
-	StagingBufferSize = MB256;
-	StagingBuffer = BmRender_CreateStagingBuffer(StagingBufferSize);
+	//StagingBufferSize = MB256;
+	//StagingBuffer = BmRender_CreateStagingBuffer(StagingBufferSize);
 
-	Pipeline = BmRender_CreatePipeline(&PipelineDesc);
-	GraphicsQueue = BmRender_CreateQueue(BmRender_QueueType::Graphic);
-	CommandPool = BmRender_CreateCommandPool(BmRender_QueueType::Graphic);
-	CommandBuffer = BmRender_AllocateCommandBuffer(CommandPool);
-	ImageAvailableSemaphore = BmRender_CreateSemaphore();
-	SwapchainImageCount = BmRender_GetSwapchainImageCount();
-	for (u32 i = 0; i < SwapchainImageCount; ++i)
-		RenderFinishedSemaphores[i] = BmRender_CreateSemaphore();
-	InFlightFence = BmRender_CreateFence();
+	//Pipeline = BmRender_CreatePipeline(&PipelineDesc);
+	//GraphicsQueue = BmRender_CreateQueue(BmRender_QueueType::Graphic);
+	//CommandPool = BmRender_CreateCommandPool(BmRender_QueueType::Graphic);
+	//CommandBuffer = BmRender_AllocateCommandBuffer(CommandPool);
+	//ImageAvailable = BmRender_CreateSemaphore();
+	//SwapchainImageCount = BmRender_GetSwapchainImageCount();
+	//for (u32 i = 0; i < SwapchainImageCount; ++i)
+	//	RenderFinishedSemaphores[i] = BmRender_CreateSemaphore();
+	//InFlightFence = BmRender_CreateFence();
 }
 
 void StreetsRender_CreateMaterials(StreetsRender_Material* Materials, u32 MaterialsCount)
@@ -309,7 +309,7 @@ void StreetsRender_Draw(StreetsRender_FrameData* FrameData, StreetsRender_3DObje
 	BmRender_ResetFences(InFlightFence);
 
 	u32 ImageIndex;
-	BmRender_SwapchainResult AcquireResult = BmRender_AcquireNextSwapchainImage(UINT64_MAX, ImageAvailableSemaphore, nullptr, &ImageIndex);
+	BmRender_SwapchainResult AcquireResult = BmRender_AcquireNextSwapchainImage(UINT64_MAX, ImageAvailable, nullptr, &ImageIndex);
 
 	if (AcquireResult == BmRender_SwapchainResult::OutOfDate || AcquireResult == BmRender_SwapchainResult::Suboptimal)
 	{
@@ -343,9 +343,9 @@ void StreetsRender_Draw(StreetsRender_FrameData* FrameData, StreetsRender_3DObje
 
 	BmRender_BeginRendering(CommandBuffer, &RenderingInfo);
 
-	BmRender_BindPipeline(CommandBuffer, Pipeline);
-	BmRender_RecordPushConstants(CommandBuffer, PipelineLayout, (BmRender_DescriptorShaderStage)((u64)BmRender_DescriptorShaderStage::Vertex | (u64)BmRender_DescriptorShaderStage::Fragment), 0, sizeof(StreetsRender_FrameData), FrameData);
-	BmRender_RecordBindDescriptorSets(CommandBuffer, PipelineLayout, 0, 1, &MaterialDescriptorSet, 0, nullptr);
+	//BmRender_BindPipeline(CommandBuffer, Pipeline);
+	//BmRender_RecordPushConstants(CommandBuffer, PipelineLayout, (BmRender_DescriptorShaderStage)((u64)BmRender_DescriptorShaderStage::Vertex | (u64)BmRender_DescriptorShaderStage::Fragment), 0, sizeof(StreetsRender_FrameData), FrameData);
+	//BmRender_RecordBindDescriptorSets(CommandBuffer, PipelineLayout, 0, 1, &MaterialDescriptorSet, 0, nullptr);
 
 	for (u32 i = 0; i < MeshCount; ++i)
 	{
@@ -367,7 +367,7 @@ void StreetsRender_Draw(StreetsRender_FrameData* FrameData, StreetsRender_3DObje
 
 	BmRender_SubmitInfo SubmitInfo = {};
 	SubmitInfo.WaitDstStageFlags = WaitStages;
-	SubmitInfo.WaitSemaphores = &ImageAvailableSemaphore;
+	SubmitInfo.WaitSemaphores = &ImageAvailable;
 	SubmitInfo.WaitSemaphoreCount = 1;
 	SubmitInfo.SignalSemaphores = &RenderFinishedSemaphores[ImageIndex];
 	SubmitInfo.SignalSemaphoreCount = 1;
@@ -475,7 +475,7 @@ void StreetsRender_DeInit()
 	BmRender_DestroyDescriptorSetLayout(DescriptorSetLayout);
 	BmRender_DestroyShader(VertexShader);
 	BmRender_DestroyShader(FragmentShader);
-	BmRender_DestroySemaphore(ImageAvailableSemaphore);
+	BmRender_DestroySemaphore(ImageAvailable);
 	for (u32 i = 0; i < SwapchainImageCount; ++i)
 		BmRender_DestroySemaphore(RenderFinishedSemaphores[i]);
 	BmRender_DestroyCommandPool(CommandPool);

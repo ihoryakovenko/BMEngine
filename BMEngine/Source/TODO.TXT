@@ -1,1 +1,1 @@
-have info about entrypoints in the shader
+Define pipeline type durimg creation using BmRender_PipelineType

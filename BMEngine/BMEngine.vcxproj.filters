@@ -27,7 +27,6 @@
     <ClCompile Include="Source\Engine\Systems\Concurrency\TaskSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.cpp" />
     <ClCompile Include="Source\Util\YamlParsing.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\Systems.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\PipelineManager.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -46,10 +45,10 @@
     <ClInclude Include="Source\Engine\Systems\Render\TransferSystem.h" />
     <ClInclude Include="Source\Engine\Systems\Concurrency\TaskSystem.h" />
     <ClInclude Include="Source\Util\YamlParsing.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\Systems.h" />
     <ClInclude Include="Source\Engine\Systems\Render\PipelineSettings.h" />
     <ClInclude Include="Source\Engine\Systems\Render\PipelineMetadata.h" />
     <ClInclude Include="Source\Engine\Systems\Render\PipelineManager.h" />
+    <ClInclude Include="Source\Util\LiveShaders.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\Second.frag" />
