@@ -51,7 +51,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(SolutionDir)External;$(SolutionDir)External\GLFW\include;$(SolutionDir)BMEngine\Source;$(SolutionDir)SharedLib;$(SolutionDir)BmRender;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Shared\;$(VULKAN_SDK)\Include;$(SolutionDir)External;$(SolutionDir)External\GLFW\include;$(SolutionDir)BMEngine\Source;$(SolutionDir)SharedLib;$(SolutionDir)BmRender;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -70,7 +70,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(SolutionDir)External;$(SolutionDir)External\GLFW\include;$(SolutionDir)BMEngine\Source;$(SolutionDir)SharedLib;$(SolutionDir)BmRender;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Shared\;$(VULKAN_SDK)\Include;$(SolutionDir)External;$(SolutionDir)External\GLFW\include;$(SolutionDir)BMEngine\Source;$(SolutionDir)SharedLib;$(SolutionDir)BmRender;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>

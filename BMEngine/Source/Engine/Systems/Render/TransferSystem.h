@@ -22,7 +22,7 @@ namespace TransferSystem
 
 	struct DataTaskDescription
 	{
-		BmRender_GPUBufferBinding Handle;
+		BmRender_GPUBufferUpdateData Handle;
 		BmRender_PipelineSyncStage StageBarrier;
 	};
 

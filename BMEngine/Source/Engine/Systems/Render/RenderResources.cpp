@@ -9,11 +9,10 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
-#include "Systems.h"
 
 namespace RenderResources
 {
-	void UpdateBufferRegion(BmRender_GPUBufferBinding Handle, u64 ResourceOffset, const void* Data, u32 DataSize)
+	void UpdateBufferRegion(BmRender_GPUBufferUpdateData Handle, u64 ResourceOffset, const void* Data, u32 DataSize)
 	{
 		const MemoryPropertyFlag Flag = BmRender_GetGpuBufferMemoryPropertyFlag(Handle.GPUBufferHandle);
 		const u64 Offset = Handle.BufferOffset + ResourceOffset;

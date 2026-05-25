@@ -5,7 +5,7 @@
 struct GLFWwindow;
 
 inline constexpr u32 MAX_DRAW_FRAMES = 3;
-inline constexpr u32 MAX_DESCRIPTOR_SET_LAYOUT_BUINDINGS = 3;
+inline constexpr u32 MAX_DESCRIPTOR_SET_LAYOUT_BUINDINGS = 16;
 
 typedef struct BmRender_Instance_T* BmRender_Instance;
 typedef struct BmRender_PhysicalDevice_T* BmRender_PhysicalDevice;
@@ -28,19 +28,7 @@ typedef struct BmRender_CommandBuffer_T* BmRender_CommandBuffer;
 typedef struct BmRender_Queue_T* BmRender_Queue;
 typedef struct BmRender_DeviceMemory_T* BmRender_DeviceMemory;
 
-#define DEFINE_ENUM_OR(EnumType) inline EnumType operator| (EnumType lhs, EnumType rhs) { return (EnumType)((u64)(lhs) | (u64)(rhs)); }
-
-enum class BmRender_AttributeType : u8
-{
-	Int,
-	Uint,
-	Float,
-	Ivec2,
-	Vec2,
-	Vec3,
-	Vec4,
-	Mat4
-};
+#define DEFINE_ENUM_OR(EnumType) constexpr inline EnumType operator| (EnumType lhs, EnumType rhs) { return (EnumType)((u64)(lhs) | (u64)(rhs)); }
 
 enum class BmRender_DescriptorShaderStage : u64
 {
@@ -201,12 +189,6 @@ enum class BmRender_AttachmentStoreOp : u32
 {
 	Store,
 	DontCare,
-};
-
-enum class BmRender_VertexInputRate : u32
-{
-	Vertex,
-	Instance,
 };
 
 enum class BmRender_DescriptorType : u32
@@ -507,7 +489,7 @@ struct BmRender_SurfaceFormat
 struct AttachmentData
 {
 	u32 ColorAttachmentCount;
-	BmRender_ImageView* ColorAttachments;
+	BmRender_ImageView ColorAttachments[4];
 	BmRender_ImageView DepthAttachment;
 	BmRender_ImageView StencilAttachment;
 };
@@ -553,17 +535,16 @@ struct BmRender_DescriptorSetLayoutBinding
 	BmRender_DescriptorType DescriptorType;
 	u32 DescriptorCount;
 	BmRender_DescriptorShaderStage StageFlags;
-	u32 Binding;
 };
 
-struct BmRender_ImageBinding
+struct BmRender_ImageUpdateData
 {
 	BmRender_Sampler Sampler;
 	BmRender_ImageLayout ImageLayout; // Check if can store layout with Image resource as target layout and use instead this
 	BmRender_ImageView ImageView;
 };
 
-struct BmRender_GPUBufferBinding
+struct BmRender_GPUBufferUpdateData
 {
 	BmRender_GPUBuffer GPUBufferHandle;
 	u64 BufferOffset;
@@ -596,32 +577,20 @@ struct BmRender_RenderingInfo
 	const BmRender_RenderingDepthAttachment* DepthAttachment;
 };
 
-struct BmRender_DescriptorSetBinding
+struct BmRender_DescriptorSetUpdateData
 {
-	BmRender_GPUBufferBinding* BufferRegions;
-	BmRender_ImageBinding ImageBinding;
+	BmRender_GPUBufferUpdateData* BufferRegions;
+	BmRender_ImageUpdateData ImageBinding;
 	u32 BindingCount;
 	u32 DstArrayElement;
-};
-
-struct VertexAttribute
-{
-	BmRender_AttributeType Type;
-	u32 Offset;
-};
-
-struct BmRender_VertexBinding
-{
-	VertexAttribute* Attributes;
-	u32 AttributesCount;
-	u32 Stride;
-	BmRender_VertexInputRate InputRate;
+	u32 DstBinding;
 };
 
 struct BmRender_ShaderStageDescription
 {
 	BmRender_Shader Shader;
 	const char* EntryPointFunction;
+	BmRender_PipelineShaderStage Stage;
 };
 
 struct BmRender_RasterizationState
@@ -679,21 +648,8 @@ struct BmRender_ViewportState
 	u32 ScissorCount;
 };
 
-struct BmRender_PipelineDescription
+struct BmRender_PipelineSettings
 {
-	BmRender_PipelineLayout PipelineLayout;
-	AttachmentData Attachment;
-
-	const BmRender_ShaderStageDescription* ShaderStages;
-	const BmRender_VertexBinding* VertexBindings;
-	const BmRender_PushConstant* PushConstantRanges;
-	const BmRender_DescriptorSetLayout* DescriptorSetLayouts;
-
-	u32 ShaderStagesCount;
-	u32 VertexBindingsCount;
-	u32 DescriptorSetLayoutsCount;
-	u32 PushConstantRangesCount;
-
 	BmRender_RasterizationState RasterizationState;
 	BmRender_ColorBlendAttachment ColorBlendAttachment;
 	BmRender_ColorBlendState ColorBlendState;
@@ -720,7 +676,6 @@ struct BmRender_ShaderDescription
 {
 	const u32* Code;
 	u64 CodeSize;
-	BmRender_PipelineShaderStage Stage;
 };
 
 struct BmRender_TimelineSemaphoreSubmit
@@ -784,7 +739,7 @@ BmRender_QueueType BmRender_GetQueueType(BmRender_Queue Queue);
 u32 BmRender_GetQueueFamily(BmRender_Queue Queue);
 
 BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description);
-BmRender_Pipeline BmRender_CreatePipeline(const BmRender_PipelineDescription* Description);
+BmRender_Pipeline BmRender_CreatePipeline(BmRender_PipelineLayout PipelineLayout, const BmRender_PipelineSettings* Settings, const BmRender_ShaderStageDescription* ShaderStageDescriptions, u32 ShaderStagesCount, const AttachmentData* Attachment);
 BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description);
 BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutBinding* Bindings, u32 BindingsCount);
 BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolSize* PoolSizes, u32 MaxSets, u32 PoolSizeCount, BmRender_DescriptorPoolType Type);
@@ -809,7 +764,7 @@ BmRender_CommandPool BmRender_CreateCommandPool(BmRender_QueueType BmRender_Queu
 BmRender_CommandBuffer BmRender_AllocateCommandBuffer(BmRender_CommandPool CommandPool);
 
 void BmRender_UpdateHostCompatibleBuffer(BmRender_GPUBuffer Buffer, u64 BufferOffset, u64 DataSize, const void* Data);
-void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, const BmRender_DescriptorSetBinding* Bindings, u32 BindingsCount);
+void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, const BmRender_DescriptorSetUpdateData* Bindings, u32 BindingsCount);
 
 BmRender_FenceStatus BmRender_GetFenceStatus(BmRender_Fence Handle);
 BmRender_WaitResult BmRender_WaitForFences(BmRender_Fence Handle, bool WaitAll, u64 Timeout);
@@ -829,8 +784,8 @@ void BmRender_RecordUpdateGPULocalBuffer(BmRender_CommandBuffer CommandBuffer, B
 void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRender_RenderingInfo* pRenderingInfo);
 void BmRender_EndRendering(BmRender_CommandBuffer CommandBuffer);
 void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline);
-void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* pValues);
-void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets);
+void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* pValues);
+void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets);
 void BmRender_RecordBindVertexBuffers(BmRender_CommandBuffer CommandBuffer, u32 FirstBinding, u32 BindingCount, const BmRender_GPUBuffer* Buffers, const u64* Offsets);
 void BmRender_RecordBindIndexBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer Buffer, u64 Offset, BmRender_IndexType IndexType);
 void BmRender_Draw(BmRender_CommandBuffer CommandBuffer, u32 VertexCount, u32 InstanceCount, u32 FirstVertex, u32 FirstInstance);
@@ -859,5 +814,7 @@ BmRender_Image BmRender_GetOwningImage(BmRender_ImageView Handle);
 BmRender_Format BmRender_GetOwningImageFormat(BmRender_ImageView Handle);
 
 MemoryPropertyFlag BmRender_GetGpuBufferMemoryPropertyFlag(BmRender_GPUBuffer Handle);
+
+BmRender_PipelineLayout BmRender_GetPipelineLayout(BmRender_Pipeline Handle);
 
 void BmRender_FrameFree();

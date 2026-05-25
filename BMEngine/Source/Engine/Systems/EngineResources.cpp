@@ -9,10 +9,6 @@
 
 // Extern declarations for global resource maps
 extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
-extern std::unordered_map<std::string, BmRender_DescriptorSetLayout> DescriptorSetLayouts;
-extern std::unordered_map<std::string, BmRender_Shader> Shaders;
-extern std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
-extern std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
 
 namespace EngineResources
 {
@@ -74,16 +70,17 @@ namespace EngineResources
 		BmRender_ImageView DefaultViewHandle = BmRender_CreateImageView2D(DefaultAsset.RenderImageHandle);
 		DefaultAsset.RenderViewHandle = DefaultViewHandle;
 
-		BmRender_DescriptorSetBinding DiffuseBinding;
+		BmRender_DescriptorSetUpdateData DiffuseBinding;
 		DiffuseBinding.ImageBinding.Sampler = Samplers["DiffuseTexture"];
 		DiffuseBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
 		DiffuseBinding.ImageBinding.ImageView = DefaultAsset.RenderViewHandle;
 		DiffuseBinding.DstArrayElement = 0;
 		DiffuseBinding.BindingCount = 1;
+		DiffuseBinding.DstBinding = 3;
 
-		BmRender_DescriptorSetBinding Bindings[] = { DiffuseBinding };
+		BmRender_DescriptorSetUpdateData Bindings[] = { DiffuseBinding };
 
-		BmRender_UpdateDescriptorSet(Render::GetHandles()->BindlesTexturesSet, Bindings, 1);
+		BmRender_UpdateDescriptorSet(GetHandles()->FrameBufferSet, Bindings, 1);
 	}
 
 	void DeInit()
@@ -112,7 +109,7 @@ namespace EngineResources
 		}
 	}
 
-	void Update(Render::DrawScene* TmpScene)
+	void Update(DrawScene* TmpScene)
 	{
 		std::lock_guard Lock(ModelLoadMutex);
 
@@ -158,16 +155,17 @@ namespace EngineResources
 
 							AlbedoTextureHandle = it->second.RenderImageHandle;
 
-							BmRender_DescriptorSetBinding DiffuseBinding;
+							BmRender_DescriptorSetUpdateData DiffuseBinding;
 							DiffuseBinding.ImageBinding.Sampler = Samplers["DiffuseTexture"];
 							DiffuseBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
 							DiffuseBinding.ImageBinding.ImageView = it->second.RenderViewHandle;
 							DiffuseBinding.DstArrayElement = TexturesGPUIndexCounter;
 							DiffuseBinding.BindingCount = 1;
+							DiffuseBinding.DstBinding = 3;
 
-							BmRender_DescriptorSetBinding Bindings[] = { DiffuseBinding };
+							BmRender_DescriptorSetUpdateData Bindings[] = { DiffuseBinding };
 
-							BmRender_UpdateDescriptorSet(Render::GetHandles()->BindlesTexturesSet, Bindings, 1);
+							BmRender_UpdateDescriptorSet(GetHandles()->FrameBufferSet, Bindings, 1);
 
 							++TexturesGPUIndexCounter;
 						}
@@ -191,37 +189,37 @@ namespace EngineResources
 					//}
 				}
 
-				const u64 VertexDataSize = VerticesCount * sizeof(StaticMeshVertex);
-				const u64 VerticesSize = sizeof(StaticMeshVertex) * VerticesCount;
+				const u64 VertexDataSize = VerticesCount * sizeof(Shader_StaticMeshVertex);
+				const u64 VerticesSize = sizeof(Shader_StaticMeshVertex) * VerticesCount;
 				const u64 IndicesSize = IndicesCount * sizeof(u32);
 					
-				BmRender_GPUBufferBinding VertexHandle = { Render::GetVertexBuffer(), VertexBufferOffset, VertexDataSize };
-				BmRender_GPUBufferBinding IndexHandle = { Render::GetIndexBuffer(), IndexBufferOffset, IndicesSize };
+				BmRender_GPUBufferUpdateData VertexHandle = { GetVertexBuffer(), VertexBufferOffset, VertexDataSize };
+				BmRender_GPUBufferUpdateData IndexHandle = { GetIndexBuffer(), IndexBufferOffset, IndicesSize };
 
 				RenderResources::UpdateBufferRegion(VertexHandle, 0, Model.VertexData + ModelVertexByteOffset, VertexDataSize);
 				RenderResources::UpdateBufferRegion(IndexHandle, 0, Model.VertexData + ModelVertexByteOffset + VertexDataSize, IndicesSize);
 
-				Material Mat;
+				Shader_Material Mat;
 				Mat.AlbedoTexIndex = TextureGPUIndex;
 				Mat.SpecularTexIndex = TextureGPUIndex;
 				Mat.Shininess = 32.0f;
 
-				const BmRender_GPUBufferBinding MaterialHandle = { Render::GetMaterialBuffer(), MateriaIndex * sizeof(Mat), sizeof(Mat) };
+				const BmRender_GPUBufferUpdateData MaterialHandle = { GetMaterialBuffer(), MateriaIndex * sizeof(Mat), sizeof(Mat) };
 				RenderResources::UpdateBufferRegion(MaterialHandle, 0, &Mat, sizeof(Mat));
 
-				StaticMeshInstance Instance;
+				Shader_StaticMeshInstance Instance;
 				Instance.MaterialIndex = MateriaIndex;
 				Instance.ModelMatrix = glm::translate(glm::mat4(1), Request.Position);
 
 				++MateriaIndex;
 
 				const u64 InstanceOffset = InstanceIndex * sizeof(Instance);
-				const BmRender_GPUBufferBinding InstanceHandle = { Render::GetInstanceBuffer(), InstanceOffset, sizeof(Instance) };
+				const BmRender_GPUBufferUpdateData InstanceHandle = { GetInstanceBuffer(), InstanceOffset, sizeof(Instance) };
 				RenderResources::UpdateBufferRegion(InstanceHandle, 0, &Instance, sizeof(Instance));
 
 				++InstanceIndex;
 
-				Render::DrawEntity Entity = { };
+				DrawEntity Entity = { };
 				Entity.VertexBufferEntry = VertexHandle;
 				Entity.IndexBufferEntry = IndexHandle;
 				Entity.InstanceBufferEntry = InstanceHandle;

@@ -1,3 +1,132 @@
+//void printConstantBuffer(slang::VariableLayoutReflection* cbLayout)
+//{
+//	slang::VariableReflection* cbVar = cbLayout->getVariable();
+//	slang::TypeLayoutReflection* cbTypeLayout = cbLayout->getTypeLayout();
+//
+//	// 1. Get Binding Info (e.g., b0 in DX12, or binding = X in Vulkan)
+//	// Constant buffers use the UNIFORM category for their descriptor binding slot
+//	uint32_t bindingIndex = cbLayout->getBindingIndex();
+//	uint32_t spaceIndex = cbLayout->getBindingSpace(SLANG_PARAMETER_CATEGORY_UNIFORM);
+//
+//	// 2. Get the layout of the struct inside the ConstantBuffer
+//	slang::TypeLayoutReflection* elementLayout = cbTypeLayout->getElementTypeLayout();
+//
+//	// 3. Get total byte size of the constant buffer
+//	size_t bufferSize = elementLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
+//
+//	printf("==================================================\n");
+//	printf("CONSTANT BUFFER: %s\n", cbVar->getName());
+//	printf("  Binding Slot : register(b%u, space%u)\n", bindingIndex, spaceIndex);
+//	printf("  Total Size   : %llu bytes\n", bufferSize);
+//	printf("--------------------------------------------------\n");
+//
+//	// 4. Iterate and print all fields inside the constant buffer
+//	slang::TypeReflection* elementType = elementLayout->getType();
+//	uint32_t fieldCount = elementType->getFieldCount();
+//
+//	for (uint32_t i = 0; i < fieldCount; ++i)
+//	{
+//		slang::VariableLayoutReflection* fieldLayout = elementLayout->getFieldByIndex(i);
+//		slang::VariableReflection* field = fieldLayout->getVariable();
+//
+//		// Get the field's local offset relative to the start of the constant buffer
+//		size_t offset = fieldLayout->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM);
+//
+//		// Get type name (e.g., "float4", "int", "MyCustomStruct")
+//		const char* typeName = field->getType()->getName();
+//
+//		printf("  Offset: %4llu | Field: %-20s | Type: %s\n",
+//			offset,
+//			field->getName(),
+//			typeName);
+//
+//		// Optional: If a field is a nested struct, you can recursively print it
+//		if (field->getType()->getKind() == slang::TypeReflection::Kind::Struct)
+//		{
+//			printf("    [Nested Structure Detected]\n");
+//		}
+//	}
+//	printf("==================================================\n\n");
+//}
+//
+//void reflectResource(slang::VariableLayoutReflection* varLayout)
+//{
+//	slang::TypeLayoutReflection* typeLayout = varLayout->getTypeLayout();
+//	slang::TypeReflection* type = typeLayout->getType();
+//
+//	// Check the Resource Shape (e.g., StructuredBuffer, Texture2D)
+//	SlangResourceShape shape = type->getResourceShape();
+//
+//	// Check if it's a structured buffer
+//	if (shape == SLANG_STRUCTURED_BUFFER)
+//	{
+//		printf("    Type: StructuredBuffer\n");
+//
+//		// Query the inner element type layout (the "T" in StructuredBuffer<T>)
+//		slang::TypeLayoutReflection* elementLayout = typeLayout->getElementTypeLayout();
+//		size_t stride = elementLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
+//
+//		printf("    Element Type: %s\n", elementLayout->getType()->getName());
+//		printf("    Element Stride: %llu bytes\n", stride);
+//	}
+//
+//	// Get API Bindings (descriptor sets / spaces)
+//	// Slang organizes slots by SlangParameterCategory
+//	auto category = varLayout->getCategory();
+//
+//	// For structured buffers / textures, this is usually SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE
+//	// or SLANG_PARAMETER_CATEGORY_UNIFORM depending on the exact target context.
+//
+//	uint32_t bindingIndex = varLayout->getBindingIndex();
+//	uint32_t spaceIndex = varLayout->getBindingSpace(category);
+//
+//	printf("    API Binding -> Space/Set: %u, Binding/Register: %u\n", spaceIndex, bindingIndex);
+//}
+//
+//std::vector<Slang::ComPtr<slang::IComponentType>> GetEntryPoints(Slang::ComPtr<slang::IModule> module)
+//{
+//	std::vector<Slang::ComPtr<slang::IComponentType>> componentsToLink;
+//	const int definedEntryPointCount = module->getDefinedEntryPointCount();
+//
+//	for (int i = 0; i < definedEntryPointCount; i++)
+//	{
+//		Slang::ComPtr<slang::IEntryPoint> entryPoint;
+//		module->getDefinedEntryPoint(i, entryPoint.writeRef());
+//		printf("Entry point: %s \n", entryPoint->getFunctionReflection()->getName());
+//		componentsToLink.push_back(Slang::ComPtr<slang::IComponentType>(entryPoint.get()));
+//	}
+//
+//	return componentsToLink;
+//}
+//
+//void reflectStruct(slang::TypeLayoutReflection* typeLayout)
+//{
+//	// The logical type info
+//	slang::TypeReflection* type = typeLayout->getType();
+//
+//	// Total byte size of the uniform struct
+//	size_t totalSize = typeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
+//	printf("  Total Struct Size: %llu bytes\n", totalSize);
+//
+//	uint32_t fieldCount = type->getFieldCount();
+//	for (uint32_t i = 0; i < fieldCount; ++i)
+//	{
+//		slang::VariableLayoutReflection* fieldLayout = typeLayout->getFieldByIndex(i);
+//		slang::VariableReflection* field = fieldLayout->getVariable();
+//
+//		// Get the memory offset of this specific field relative to the struct start
+//		size_t offset = fieldLayout->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM);
+//
+//		printf("    Field: %s | Offset: %llu bytes | Type: %s\n",
+//			field->getName(),
+//			offset,
+//			field->getType()->getName());
+//	}
+//}
+
+
+
+
 //struct RecyclingCommandPool
 //{
 //	VkCommandPool CommandPool;
@@ -296,7 +425,7 @@
 //		VkDescriptorSetLayout MapDescriptorLayouts[] =
 //		{
 //			FrameManager::GetViewProjectionLayout(),
-//			//Render::TestGetTerrainSkyBoxLayout(),
+//			//TestGetTerrainSkyBoxLayout(),
 //			MapTileSettingsLayout,
 //		};
 //		const u32 MapDescriptorLayoutCount = sizeof(MapDescriptorLayouts) / sizeof(MapDescriptorLayouts[0]);
@@ -305,7 +434,7 @@
 //
 //		VulkanInterface::PipelineResourceInfo ResourceInfo;
 //		ResourceInfo.PipelineLayout = Pipeline.PipelineLayout;
-//		//ResourceInfo.RenderPass = Render::TestGetRenderPass();
+//		//ResourceInfo.RenderPass = TestGetRenderPass();
 //		//ResourceInfo.SubpassIndex = 0;
 //
 //		VulkanInterface::PipelineSettings PipelineSettings;
@@ -319,7 +448,7 @@
 //
 //		//IndexBuffer = VulkanInterface::CreateIndexBuffer(MB64);
 //
-//		//Render::RenderTexture TextureArrayTiles = ResourceManager::EmptyTexture(TilesTextureId, TextureTileSize, TextureTileSize,
+//		//RenderTexture TextureArrayTiles = ResourceManager::EmptyTexture(TilesTextureId, TextureTileSize, TextureTileSize,
 //			//MaxTextureTilesPerAxis, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
 //
 //		VkDescriptorSet TilesMaterial;
@@ -389,7 +518,7 @@
 //			}
 //
 //			TestIndicesCount = Indices.size();
-//			//Render::LoadIndices(&IndexBuffer, Indices.data(), Indices.size(), 0);
+//			//LoadIndices(&IndexBuffer, Indices.data(), Indices.size(), 0);
 //			MapTileSettings.VertexTilesPerAxis = VertexTilesPerAxis;
 //		}
 //
@@ -482,7 +611,7 @@
 //			//TestDownload = false;
 //		}
 //
-//		//Render::RenderTexture* Texture = ResourceManager::FindTexture(TilesTextureId);
+//		//RenderTexture* Texture = ResourceManager::FindTexture(TilesTextureId);
 //
 //		{
 //			std::unique_lock Lock(QueueMutex);
@@ -494,7 +623,7 @@
 //				int width, height, channels;
 //				unsigned char* image = stbi_load_from_memory(data, TileDataCompressed.Data.size(), &width, &height, &channels, 4);
 //
-//				//Render::TextureArrayInfo Info;
+//				//TextureArrayInfo Info;
 //				//Info.Width = TextureTileSize;
 //				//Info.Height = TextureTileSize;
 //				//Info.Format = 4;
@@ -502,7 +631,7 @@
 //				//Info.BaseArrayLayer = TileDataCompressed.ArrayLayer;
 //				//Info.Data = &image;
 //
-//				//Render::UpdateTexture(Texture, &Info);
+//				//UpdateTexture(Texture, &Info);
 //
 //				DownloadQueue.pop();
 //			}
@@ -727,8 +856,8 @@
 			indices.push_back(uniqueVertices[vertex]);
 		}
 
-		SkyBox.VertexOffset = Render::LoadVertices(vertices.data(), sizeof(StaticMeshVertex), vertices.size());
-		SkyBox.IndexOffset = Render::LoadIndices(indices.data(), indices.size());
+		SkyBox.VertexOffset = LoadVertices(vertices.data(), sizeof(StaticMeshVertex), vertices.size());
+		SkyBox.IndexOffset = LoadIndices(indices.data(), indices.size());
 		SkyBox.IndicesCount = indices.size();
 		SkyBox.TextureSet = Material;*/
 		//}
@@ -747,3 +876,160 @@
 //	};
 //}
 
+//std::string GenerateMetadata(slang::IComponentType* LinkedProgram, const std::string& ModuleName)
+//{
+//	slang::ProgramLayout* ProgramLayout = LinkedProgram->getLayout();
+//	const u32 ParametersCount = ProgramLayout->getParameterCount();
+
+	//std::unordered_map<u32, DescriptorSetGenerationHelper> DescriptorSetGenerationMap;
+
+	//std::string DescriptorsVariableName = "Private_Metadata_" + ModuleName + "Descriptors";
+	//std::string DescriptorArrayGeneration = "inline constexpr Metadata_Descriptor " + DescriptorsVariableName + "[] = { ";
+	//
+	//u32 DescriptorCount = 0;
+
+	//for (u32 i = 0; i < ParametersCount; ++i)
+	//{
+	//	slang::VariableLayoutReflection* varLayout = ProgramLayout->getParameterByIndex(i);
+	//	slang::VariableReflection* var = varLayout->getVariable();
+
+	//	slang::TypeReflection* type = var->getType();
+	//	SlangResourceShape Shape = type->getResourceShape();
+
+	//	slang::TypeReflection::Kind SlangKind = type->getKind();
+	//	const char* DescriptorName = var->getName();
+
+	//	const u32 bindingIndex = varLayout->getBindingIndex();
+	//	const u32 SetIndex = varLayout->getBindingSpace();
+
+	//	auto DescriptorGenerationIt = DescriptorSetGenerationMap.find(SetIndex);
+	//	if (DescriptorGenerationIt == DescriptorSetGenerationMap.end())
+	//	{
+	//		DescriptorSetGenerationMap[SetIndex] = { std::string(), 0 };
+	//		DescriptorGenerationIt = DescriptorSetGenerationMap.find(SetIndex);
+	//	}
+
+	//	DescriptorGenerationIt->second.Text += "\n\t{ " + std::to_string(bindingIndex) + ", BmRender_DescriptorShaderStage::Vertex | BmRender_DescriptorShaderStage::Fragment, ";
+	//	++DescriptorGenerationIt->second.Count;
+
+	//	if (SlangKind == slang::TypeReflection::Kind::ConstantBuffer)
+	//	{
+	//		DescriptorGenerationIt->second.Text += "BmRender_DescriptorType::UniformBuffer, false";
+	//		++DescriptorCount;
+	//	}
+	//	else if (SlangKind == slang::TypeReflection::Kind::Resource)
+	//	{
+	//		if (Shape == SLANG_STRUCTURED_BUFFER)
+	//		{
+	//			DescriptorGenerationIt->second.Text += "BmRender_DescriptorType::StorageBuffer, false";
+	//			++DescriptorCount;
+	//		}
+	//		else if (Shape & SLANG_TEXTURE_COMBINED_FLAG)
+	//		{
+	//			if (Shape & SLANG_TEXTURE_2D)
+	//			{
+	//				DescriptorGenerationIt->second.Text += "BmRender_DescriptorType::CombinedImageSampler, false";
+	//				++DescriptorCount;
+	//			}
+	//			else
+	//			{
+	//				assert(false);
+	//			}
+	//		}
+	//		else
+	//		{
+	//			assert(false);
+	//		}
+	//	}
+	//	else if (SlangKind == slang::TypeReflection::Kind::Array)
+	//	{
+	//		slang::TypeLayoutReflection* arrayLayout = varLayout->getTypeLayout();
+	//		slang::TypeReflection* arrayType = arrayLayout->getType();
+	//		u64 elementCount = arrayType->getElementCount();
+	//		bool isBindless = (elementCount == 0);
+	//		assert(isBindless);
+
+	//		if (Shape & SLANG_TEXTURE_COMBINED_FLAG)
+	//		{
+	//			if (Shape & SLANG_TEXTURE_2D)
+	//			{
+	//				DescriptorGenerationIt->second.Text += "BmRender_DescriptorType::CombinedImageSampler, true";
+	//				++DescriptorCount;
+	//			}
+	//		}
+	//		else
+	//		{
+	//			assert(false);
+	//		}
+	//	}
+	//	else
+	//	{
+	//		assert(false);
+	//	}
+	//   
+	//	DescriptorGenerationIt->second.Text += " },";
+	//}
+
+	//std::string DescriptorsSetVariableName = "Private_Metadata_" + ModuleName + "DescriptorSets";
+	//std::string DescriptorSetArrayGeneration = "inline constexpr Metadata_DescriptorSet " + DescriptorsSetVariableName + "[] = { ";
+
+	//if (DescriptorCount > 0)
+	//{
+	//	u32 SetIndex = 0;
+	//	u32 TotalDescriptors = 0;
+	//	for (const auto& [DescriptorSet, DescriptorGeneration] : DescriptorSetGenerationMap)
+	//	{
+	//		DescriptorArrayGeneration += DescriptorGeneration.Text;
+	//		DescriptorSetArrayGeneration += "\n\t{ " + DescriptorsVariableName + " + " + std::to_string(TotalDescriptors) + ", "
+	//			+ std::to_string(DescriptorGeneration.Count) + ", " + std::to_string(SetIndex) + " },";
+	//		TotalDescriptors += DescriptorGeneration.Count;
+	//		++SetIndex;
+	//	}
+
+	//	DescriptorArrayGeneration += "\n};";
+	//	DescriptorSetArrayGeneration += "\n};";
+	//}
+
+	//std::string StageVariableName = "Private_Metadata_" + ModuleName + "Stages";
+	//std::string StageArrayGeneration = "inline constexpr Metadata_Stage " + StageVariableName + "[] = { ";
+
+	//const u32 EntryPointsCount = ProgramLayout->getEntryPointCount();
+	//for (int i = 0; i < EntryPointsCount; ++i)
+	//{
+	//	slang::EntryPointReflection* EntryPoint = ProgramLayout->getEntryPointByIndex(i);
+	//	SlangStage Stage = EntryPoint->getStage();
+
+	//	StageArrayGeneration += "\n\t{ ";
+
+	//	switch (Stage)
+	//	{
+	//	case SLANG_STAGE_VERTEX:
+	//		StageArrayGeneration += "BmRender_PipelineShaderStage::Vertex";
+	//		break;
+
+	//	case SLANG_STAGE_FRAGMENT:
+	//		StageArrayGeneration += "BmRender_PipelineShaderStage::Fragment";
+	//		break;
+
+	//	case SLANG_STAGE_COMPUTE:
+	//		StageArrayGeneration += "BmRender_PipelineShaderStage::Compute";
+	//		break;
+	//	default:
+	//		assert(false);
+	//		break;
+	//	}
+
+	//	StageArrayGeneration += ", \"" + std::string(EntryPoint->getName()) + "\" },";
+	//}
+
+	//StageArrayGeneration += "\n};";
+
+	//std::string PipelineVariableName = "Metadata_" + ModuleName + "Pipeline";
+	//std::string PipelineGeneration = "inline constexpr Metadata_Pipeline " + PipelineVariableName + " = { \"" + ModuleName + "\", " + StageVariableName + ", " +
+	//	DescriptorsSetVariableName + ", " + std::to_string(EntryPointsCount) + ", " + std::to_string(DescriptorSetGenerationMap.size()) + " };";
+
+	//const std::string MetadataFile = "#pragma once\n\n#include \"RenderInterface.h\"\n#include <Engine/Systems/Render/PipelineMetadata.h>\n\n" + DescriptorArrayGeneration + "\n\n" +
+	//	DescriptorSetArrayGeneration + "\n\n" + StageArrayGeneration + "\n\n" + PipelineGeneration + "\n";
+
+//	return MetadataFile;
+//}

@@ -14,23 +14,18 @@ struct GLFWwindow;
 
 struct VulkanCoreContext;
 
-struct BmRender_DescriptorSetLayoutBindingData
+struct DescriptorSetLayoutBindingData
 {
 	BmRender_DescriptorType DescriptorType;
 };
 
-struct BmRender_DescriptorSetLayoutData
+struct DescriptorSetLayoutData
 {
-	BmRender_DescriptorSetLayoutBindingData LayoutBindings[MAX_DESCRIPTOR_SET_LAYOUT_BUINDINGS];
+	DescriptorSetLayoutBindingData LayoutBindings[MAX_DESCRIPTOR_SET_LAYOUT_BUINDINGS];
 	u32 BindingsCount;
 };
 
-struct BmRender_ShaderData
-{
-	BmRender_PipelineShaderStage Stage;
-};
-
-struct BmRender_ImageResource
+struct ImageData
 {
 	BmRender_DeviceMemory Memory;
 	BmRender_Format Format;
@@ -40,46 +35,51 @@ struct BmRender_ImageResource
 	BmRender_SampleCount SampleCount;
 };
 
-struct BmRender_ImageViewData
+struct ImageViewData
 {
 	BmRender_Image Image;
 	BmRender_Format Format;
 };
 
-struct BmRender_GPUBufferData
+struct BufferData
 {
 	BmRender_DeviceMemory Memory;
 	MemoryPropertyFlag PropertyFlag;
 };
 
-struct BmRender_DescriptorSetData
+struct DescriptorSetData
 {
 	BmRender_DescriptorSetLayout Layout;
 };
 
-struct BmRender_SemaphoreData
+struct SemaphoreData
 {
 	BmRender_SemaphoreType Type;
 };
 
-struct BmRender_CommandPoolData
+struct CommandPoolData
 {
 	u32 QueueFamilyIndex;
 };
 
-struct BmRender_CommandBufferData
+struct CommandBufferData
 {
 	BmRender_CommandPool CommandPool;
 };
 
-struct BmRender_QueueData
+struct QueueData
 {
 	BmRender_QueueType QueueType;
 };
 
-struct BmRender_PipelineLayoutData
+struct PipelineLayoutData
 {
 	BmRender_PipelineType PipelineType;
+};
+
+struct PipelineData
+{
+	BmRender_PipelineLayout Layout;
 };
 
 void InitializeFrameMemory();

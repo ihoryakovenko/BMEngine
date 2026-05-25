@@ -62,34 +62,10 @@ samplers:
     unnormalizedCoordinates: false
 
 shaders:
-  StaticMeshVertex:
-    path: "./Resources/Shaders/Entity_vert.spv"
-    PipelineStage: Vertex
-  StaticMeshFragment:
-    path: "./Resources/Shaders/Entity_frag.spv"
-    PipelineStage: Fragment
-  DeferredVertex:
-    path: "./Resources/Shaders/Deferred_vert.spv"
-    PipelineStage: Vertex
-  DeferredFragment:
-    path: "./Resources/Shaders/Deferred_frag.spv"
-    PipelineStage: Fragment
-  DepthVertex:
+  Entity:
+    path: "./Resources/Shaders/Entity.spv"
+  Deferred:
+    path: "./Resources/Shaders/Deferred.spv"
+  Depth_vert:
     path: "./Resources/Shaders/Depth_vert.spv"
     PipelineStage: Vertex
-
-DescriptorSetLayouts:
-  MainPassOutputLayout:
-    bindings:
-      - type: sampler2d
-        updateFrequency: Static
-        stages: FRAGMENT
-      - type: sampler2d
-        updateFrequency: Static
-        stages: FRAGMENT
-
-  LightSpaceMatrixLayout:
-    bindings:
-      - type: uniform
-        updateFrequency: Static
-        stages: VERTEX | FRAGMENT

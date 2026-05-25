@@ -104,7 +104,7 @@ void BmRender_DeviceWaitIdle()
 
 void BmRender_TransitionImageForRendering(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer, u32 LayersCount)
 {
-	BmRender_ImageResource Data;
+	ImageData Data;
 	BmRender_GetImageData(Image, &Data);
 
 	VkImageAspectFlags AspectFlags;
@@ -161,7 +161,7 @@ void BmRender_TransitionImageForRendering(BmRender_CommandBuffer CommandBuffer, 
 
 void BmRender_TransitionImageForSampling(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer, u32 LayersCount)
 {
-	BmRender_ImageResource Data;
+	ImageData Data;
 	BmRender_GetImageData(Image, &Data);
 
 	VkImageAspectFlags AspectFlags;
@@ -278,10 +278,10 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 		VkAttachment->resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		VkAttachment->resolveImageView = (VkImageView)Attachment.ResolveImageView;
 
-		BmRender_ImageViewData ViewData;
+		ImageViewData ViewData;
 		BmRender_GetImageViewData(Attachment.ImageView, &ViewData);
 
-		BmRender_ImageResource ImageData;
+		ImageData ImageData;
 		BmRender_GetImageData(ViewData.Image, &ImageData);
 
 		if (ImageData.SampleCount > BmRender_SampleCount::Count1)
@@ -324,19 +324,22 @@ void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeli
 	vkCmdBindPipeline(VkCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipeline)Pipeline);
 }
 
-void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* pValues)
+void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* pValues)
 {
+	BmRender_PipelineLayout PipelineLayout = BmRender_GetPipelineLayout(Pipeline);
 	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
 	VkPipelineLayout Layout = (VkPipelineLayout)PipelineLayout;
 	vkCmdPushConstants(VkCmdBuffer, Layout, ShaderStageFlagsToVk(StageFlags), Offset, Size, pValues);
 }
 
-void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets)
+void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets)
 {
+	BmRender_PipelineLayout PipelineLayout = BmRender_GetPipelineLayout(Pipeline);
+
 	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
 	VkPipelineLayout Layout = (VkPipelineLayout)PipelineLayout;
 	
-	BmRender_PipelineLayoutData LayoutData;
+	PipelineLayoutData LayoutData;
 	if (BmRender_GetPipelineLayoutData(PipelineLayout, &LayoutData))
 	{
 		VkPipelineBindPoint BindPoint = PipelineTypeToVkPipelineBindPoint(LayoutData.PipelineType);

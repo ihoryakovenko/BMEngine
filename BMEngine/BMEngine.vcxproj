@@ -24,7 +24,7 @@
     <ClCompile Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderResources.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\Systems.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\PipelineManager.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\TransferSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\UI\UI.cpp" />
     <ClCompile Include="Source\main.cpp" />
@@ -37,11 +37,14 @@
     <ClInclude Include="Source\Engine\Engine.h" />
     <ClInclude Include="Source\Engine\Systems\Concurrency\TaskSystem.h" />
     <ClInclude Include="Source\Engine\Systems\EngineResources.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\PipelineMetadata.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\PipelineSettings.h" />
     <ClInclude Include="Source\Engine\Systems\Render\RenderResources.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\Systems.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\PipelineManager.h" />
     <ClInclude Include="Source\Engine\Systems\Render\TransferSystem.h" />
     <ClInclude Include="Source\Engine\Systems\UI\UI.h" />
     <ClInclude Include="Source\Util\DefaultTextureData.h" />
+    <ClInclude Include="Source\Util\LiveShaders.h" />
     <ClInclude Include="Source\Util\Math.h" />
     <ClInclude Include="Source\Util\Settings.h" />
     <ClInclude Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.h" />
@@ -56,19 +59,13 @@
     <None Include="Resources\Settings\RenderResources.yaml" />
     <None Include="Resources\Shaders\Second.frag" />
     <None Include="Resources\Shaders\Second.vert" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Common.h" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Deferred.frag.slang" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Deferred.vert.slang" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Common.slang" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Deferred.slang" />
     <None Include="Source\Engine\Systems\Render\Shaders\Depth.vert.slang" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Entity.frag.slang" />
-    <None Include="Source\Engine\Systems\Render\Shaders\Entity.vert.slang" />
-    <None Include="Source\Engine\Systems\Render\Shaders\QuadBasedSphere.frag.glsl" />
-    <None Include="Source\Engine\Systems\Render\Shaders\QuadBasedSphere.vert.glsl" />
+    <None Include="Source\Engine\Systems\Render\Shaders\Entity.slang" />
     <None Include="Source\Engine\Systems\Render\Shaders\ShaderTypes.h" />
     <None Include="Source\Engine\Systems\Render\Shaders\SkyBox.frag.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\SkyBox.vert.glsl" />
-    <None Include="Source\Engine\Systems\Render\Shaders\TerrainGenerator.frag.glsl" />
-    <None Include="Source\Engine\Systems\Render\Shaders\TerrainGenerator.vert.glsl" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\BmRender\BmRender.vcxproj">
@@ -142,15 +139,15 @@
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;GLM_FORCE_DEPTH_ZERO_TO_ONE;GLM_FORCE_RADIANS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_NONSTDC_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)External\GLFW\include;$(VULKAN_SDK)\Include;$(ProjectDir)Source;$(SolutionDir)External;$(SolutionDir)External\imgui;$(SolutionDir)External\imgui\backends;%(AdditionalIncludeDirectories);$(SolutionDir)SharedLib;$(SolutionDir)BmRender</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SLANG)\include;$(SolutionDir)Shared\;$(SolutionDir)External\GLFW\include;$(VULKAN_SDK)\Include;$(ProjectDir)Source;$(SolutionDir)External;$(SolutionDir)External\imgui;$(SolutionDir)External\imgui\backends;%(AdditionalIncludeDirectories);$(SolutionDir)SharedLib;$(SolutionDir)BmRender</AdditionalIncludeDirectories>
       <TreatWarningAsError>false</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)External\GLFW\lib-vc2022;$(VULKAN_SDK)\Lib;$(SolutionDir)$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;Shlwapi.lib;BmRender.lib;SharedLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)External\GLFW\lib-vc2022;$(VULKAN_SDK)\Lib;$(SolutionDir)$(Platform)\$(Configuration);$(SLANG)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;Shlwapi.lib;BmRender.lib;SharedLib.lib;slang.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
       <Command>
@@ -161,7 +158,7 @@
       <Message>1</Message>
     </PostBuildEvent>
     <CustomBuildStep>
-      <Command>$(SolutionDir)$(Platform)\$(Configuration)\CompileShaders.exe "$(ProjectDir)Source\Engine\Systems\Render\Shaders" "$(ProjectDir)Resources\Shaders" "slangc"</Command>
+      <Command>$(SolutionDir)$(Platform)\$(Configuration)\CompileShaders.exe "$(ProjectDir)Source\Engine\Systems\Render\Shaders" "$(ProjectDir)Resources\Shaders" "$(ProjectDir)Source\Engine\Generated" -fr</Command>
       <Outputs>1</Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>
@@ -174,7 +171,7 @@
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;GLM_FORCE_DEPTH_ZERO_TO_ONE;GLM_FORCE_RADIANS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_NONSTDC_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)External\GLFW\include;$(VULKAN_SDK)\Include;$(ProjectDir)Source;$(SolutionDir)External;$(SolutionDir)External\imgui;$(SolutionDir)External\imgui\backends;%(AdditionalIncludeDirectories);$(SolutionDir)BmRender;$(SolutionDir)BmRender;$(SolutionDir)SharedLib;$(SolutionDir)SharedLib;$(SolutionDir)BmRender</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SLANG)\include;$(SolutionDir)Shared\;$(SolutionDir)External\GLFW\include;$(VULKAN_SDK)\Include;$(ProjectDir)Source;$(SolutionDir)External;$(SolutionDir)External\imgui;$(SolutionDir)External\imgui\backends;%(AdditionalIncludeDirectories);$(SolutionDir)BmRender;$(SolutionDir)BmRender;$(SolutionDir)SharedLib;$(SolutionDir)SharedLib;$(SolutionDir)BmRender</AdditionalIncludeDirectories>
       <TreatWarningAsError>false</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -183,8 +180,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)External\GLFW\lib-vc2022;$(VULKAN_SDK)\Lib;$(SolutionDir)$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;Shlwapi.lib;BmRender.lib;SharedLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)External\GLFW\lib-vc2022;$(VULKAN_SDK)\Lib;$(SolutionDir)$(Platform)\$(Configuration);$(SLANG)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;Shlwapi.lib;BmRender.lib;SharedLib.lib;slang.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
       <Command>
@@ -195,7 +192,7 @@
       <Message>1</Message>
     </PostBuildEvent>
     <CustomBuildStep>
-      <Command>$(SolutionDir)$(Platform)\$(Configuration)\CompileShaders.exe "$(ProjectDir)Source\Engine\Systems\Render\Shaders" "$(ProjectDir)Resources\Shaders" "slangc"</Command>
+      <Command>$(SolutionDir)$(Platform)\$(Configuration)\CompileShaders.exe "$(ProjectDir)Source\Engine\Systems\Render\Shaders" "$(ProjectDir)Resources\Shaders" "$(ProjectDir)Source\Engine\Generated" -fr</Command>
       <Outputs>1</Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>

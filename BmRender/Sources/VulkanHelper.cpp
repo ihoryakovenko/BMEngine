@@ -811,20 +811,6 @@ VkAttachmentStoreOp AttachmentStoreOpToVk(BmRender_AttachmentStoreOp Op)
 	}
 }
 
-VkVertexInputRate VertexInputRateToVk(BmRender_VertexInputRate Rate)
-{
-	switch (Rate)
-	{
-		case BmRender_VertexInputRate::Vertex:
-			return VK_VERTEX_INPUT_RATE_VERTEX;
-		case BmRender_VertexInputRate::Instance:
-			return VK_VERTEX_INPUT_RATE_INSTANCE;
-		default:
-			assert(false);
-			return VK_VERTEX_INPUT_RATE_VERTEX;
-	}
-}
-
 VkDescriptorType DescriptorTypeToVk(BmRender_DescriptorType Type)
 {
 	switch (Type)
