@@ -35,7 +35,7 @@ void PipelineManger_Init(bool EnableLiveShaders)
 
 	if (LiveShaders)
 	{
-		
+		slang::createGlobalSession(&GlobalSession);
 	}
 
 	std::vector<char> ShaderCode;
@@ -96,7 +96,6 @@ void PipelineManager_Update()
 
 			if (!Session)
 			{
-				slang::createGlobalSession(&GlobalSession);
 				Session = InitalizeSlangSession(GlobalSession, Metadata_ShadersIcludePaths, sizeof(Metadata_ShadersIcludePaths) / sizeof(Metadata_ShadersIcludePaths[0]));
 			}
 
@@ -183,11 +182,8 @@ void PipelineManager_Update()
 
 		if (Session)
 		{
-			GlobalSession->Release();
 			Session->Release();
-
 			Session = nullptr;
-			GlobalSession = nullptr;
 		}
 	}
 }
