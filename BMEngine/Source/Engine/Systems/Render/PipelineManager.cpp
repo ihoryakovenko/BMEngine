@@ -35,8 +35,7 @@ void PipelineManger_Init(bool EnableLiveShaders)
 
 	if (LiveShaders)
 	{
-		slang::createGlobalSession(&GlobalSession);
-		Session = InitalizeSlangSession(GlobalSession, Metadata_ShadersIcludePaths, sizeof(Metadata_ShadersIcludePaths) / sizeof(Metadata_ShadersIcludePaths[0]));
+		
 	}
 
 	std::vector<char> ShaderCode;
@@ -67,8 +66,7 @@ void PipelineManager_DeInit()
 {
 	if (LiveShaders)
 	{
-		GlobalSession->Release();
-		Session->Release();
+		
 	}
 
 	assert(Initialized);
@@ -95,6 +93,12 @@ void PipelineManager_Update()
 			}
 
 			BmRender_DeviceWaitIdle();
+
+			if (!Session)
+			{
+				slang::createGlobalSession(&GlobalSession);
+				Session = InitalizeSlangSession(GlobalSession, Metadata_ShadersIcludePaths, sizeof(Metadata_ShadersIcludePaths) / sizeof(Metadata_ShadersIcludePaths[0]));
+			}
 
 			LastCompilationTime[i] = WriteTime;
 
@@ -175,6 +179,15 @@ void PipelineManager_Update()
 			}
 
 			Pipelines[i] = BmRender_CreatePipeline(Layouts[i], SavedSettings + i, StageDescriptions, Metadata->StageCount, SavedAttachmentData + i);
+		}
+
+		if (Session)
+		{
+			GlobalSession->Release();
+			Session->Release();
+
+			Session = nullptr;
+			GlobalSession = nullptr;
 		}
 	}
 }
