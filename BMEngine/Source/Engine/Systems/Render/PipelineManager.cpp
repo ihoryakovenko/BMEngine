@@ -66,7 +66,7 @@ void PipelineManager_DeInit()
 {
 	if (LiveShaders)
 	{
-		
+		GlobalSession->Release();
 	}
 
 	assert(Initialized);
