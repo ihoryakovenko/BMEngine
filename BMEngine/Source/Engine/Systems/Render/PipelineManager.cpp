@@ -92,8 +92,6 @@ void PipelineManager_Update()
 				continue;
 			}
 
-			BmRender_DeviceWaitIdle();
-
 			if (!Session)
 			{
 				Session = InitalizeSlangSession(GlobalSession, Metadata_ShadersIcludePaths, sizeof(Metadata_ShadersIcludePaths) / sizeof(Metadata_ShadersIcludePaths[0]));
@@ -225,6 +223,24 @@ void PipelineManager_CreatePipeline(PipelineNames Name, const BmRender_PipelineS
 		SavedSettings[u32(Name)] = *Settings;
 		SavedAttachmentData[u32(Name)] = *ResourceInfo;
 	}
+}
+
+void PipelineManager_CreateComputePipeline(PipelineNames Name)
+{
+	assert(Initialized);
+
+	const Metadata_Pipeline* Metadata = Metadata_Pipelines + u32(Name);
+	BmRender_ShaderStageDescription* StageDescriptions = (BmRender_ShaderStageDescription*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), sizeof(BmRender_ShaderStageDescription) * Metadata->StageCount);
+
+	for (u32 i = 0; i < Metadata->StageCount; ++i)
+	{
+		BmRender_ShaderStageDescription* Stage = StageDescriptions + i;
+		Stage->Shader = Shaders[(u32)Name];
+		Stage->EntryPointFunction = Metadata->Stages[i].EntryPoint;
+		Stage->Stage = Metadata->Stages[i].Stage;
+	}
+
+	Pipelines[u32(Name)] = BmRender_CreateComputePipeline(Layouts[u32(Name)], StageDescriptions);
 }
 
 BmRender_Pipeline PipelineManager_GetPipeline(PipelineNames Name)

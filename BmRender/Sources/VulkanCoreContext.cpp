@@ -342,7 +342,8 @@ void CreateCoreContext(VulkanCoreContext* Context, GLFWwindow* Window)
 	SwapchainCreateInfo.imageExtent = Context->SwapExtent;
 	SwapchainCreateInfo.minImageCount = ImageCount;
 	SwapchainCreateInfo.imageArrayLayers = 1;
-	SwapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	//SwapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	SwapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_STORAGE_BIT;
 	SwapchainCreateInfo.preTransform = SurfaceCapabilities.currentTransform;
 	SwapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // How to handle windows blending
 	SwapchainCreateInfo.clipped = VK_TRUE;

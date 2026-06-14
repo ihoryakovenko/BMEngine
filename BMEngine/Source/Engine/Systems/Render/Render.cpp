@@ -73,7 +73,6 @@ static BmRender_ImageView DeferredInputColorImageInterface[MAX_DRAW_FRAMES];
 static BmRender_DescriptorSet DeferredInputSet[MAX_DRAW_FRAMES];
 
 static AttachmentData DeferredPassPipelineAttachmentData;
-
 // LightningPass static variables
 static BmRender_DescriptorSet LightSpaceMatrixSet[MAX_DRAW_FRAMES];
 
@@ -113,7 +112,7 @@ static void InitImGuiPipeline(BmRender_DescriptorPool* ImGuiPool, GLFWwindow* Wn
 {
 	ImGui_ImplGlfw_InitForVulkan(Wnd, true);
 
-	AttachmentData* AttachmentDataPtr = DeferredPassGetAttachmentData();
+	AttachmentData* AttachmentDataPtr = &DeferredPassPipelineAttachmentData;
 	VkFormat* ColorAttachmentFormats = (VkFormat*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), AttachmentDataPtr->ColorAttachmentCount * sizeof(VkFormat));
 	for (u32 i = 0; i < AttachmentDataPtr->ColorAttachmentCount; ++i)
 	{
@@ -261,17 +260,21 @@ static void DeferredPassInit(BmRender_DescriptorPool MainPool)
 	DeferredPassPipelineAttachmentData.StencilAttachment = nullptr;
 
 	{
-		const u32 BindingsCover = 2;
-		BmRender_DescriptorSetLayoutBinding LayoutBindings[BindingsCover];
+		const u32 BindingsCount = 3;
+		BmRender_DescriptorSetLayoutBinding LayoutBindings[BindingsCount];
 		LayoutBindings[0].DescriptorCount = 1;
 		LayoutBindings[0].DescriptorType = BmRender_DescriptorType::CombinedImageSampler;
-		LayoutBindings[0].StageFlags = BmRender_DescriptorShaderStage::Fragment;
+		LayoutBindings[0].StageFlags = BmRender_DescriptorShaderStage::Compute;
 
 		LayoutBindings[1].DescriptorCount = 1;
 		LayoutBindings[1].DescriptorType = BmRender_DescriptorType::CombinedImageSampler;
-		LayoutBindings[1].StageFlags = BmRender_DescriptorShaderStage::Fragment;
+		LayoutBindings[1].StageFlags = BmRender_DescriptorShaderStage::Compute;
 
-		MainPassOutputLayout = BmRender_CreateDescriptorSetLayout(LayoutBindings, BindingsCover);
+		LayoutBindings[2].DescriptorCount = 1;
+		LayoutBindings[2].DescriptorType = BmRender_DescriptorType::StorageImage;
+		LayoutBindings[2].StageFlags = BmRender_DescriptorShaderStage::Compute;
+
+		MainPassOutputLayout = BmRender_CreateDescriptorSetLayout(LayoutBindings, BindingsCount);
 
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
@@ -291,10 +294,17 @@ static void DeferredPassInit(BmRender_DescriptorPool MainPool)
 			DepthBinding.DstArrayElement = 0;
 			DepthBinding.DstBinding = 1;
 
-			BmRender_DescriptorSetUpdateData Bindings[] = { ColorBinding, DepthBinding };
+			BmRender_DescriptorSetUpdateData OutputTextureBinding;
+			OutputTextureBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::General;
+			OutputTextureBinding.ImageBinding.ImageView = BmRender_GetSwapchainImageView(i);
+			OutputTextureBinding.BindingCount = 1;
+			OutputTextureBinding.DstArrayElement = 0;
+			OutputTextureBinding.DstBinding = 2;
+
+			BmRender_DescriptorSetUpdateData Bindings[] = { ColorBinding, DepthBinding, OutputTextureBinding };
 
 			DeferredInputSet[i] = BmRender_CreateDescriptorSet(MainPassOutputLayout, MainPool);
-			BmRender_UpdateDescriptorSet(DeferredInputSet[i], Bindings, 2);
+			BmRender_UpdateDescriptorSet(DeferredInputSet[i], Bindings, BindingsCount);
 		}
 	}
 
@@ -302,10 +312,8 @@ static void DeferredPassInit(BmRender_DescriptorPool MainPool)
 	descriptorSetLayouts.push_back(FrameDataLayout);
 	descriptorSetLayouts.push_back(MainPassOutputLayout);
 
-	BmRender_PipelineSettings PipelineDesc = GetDeferredPipelineDescription();
-
-	PipelineManager_CreatePipelineLayout(PipelineNames::Deferred, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0, BmRender_PipelineType::Graphics);
-	PipelineManager_CreatePipeline(PipelineNames::Deferred, &PipelineDesc, &DeferredPassPipelineAttachmentData);
+	PipelineManager_CreatePipelineLayout(PipelineNames::Deferred, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0, BmRender_PipelineType::Compute);
+	PipelineManager_CreateComputePipeline(PipelineNames::Deferred);
 }
 
 static void DeferredPassDraw()
@@ -323,34 +331,21 @@ static void DeferredPassDraw()
 	BmRender_RecordBindDescriptorSets(RenderCommandBuffers[CurrentFrame], PipelineManager_GetPipeline(PipelineNames::Deferred),
 		0, 2, Sets, 1, DynamicOffsets);
 
-	BmRender_Draw(RenderCommandBuffers[CurrentFrame], 3, 1, 0, 0); // 3 hardcoded vertices
+	u32 groupX = (MainScreenExtent.Width + 7) / 8;
+	u32 groupY = (MainScreenExtent.Height + 7) / 8;
+
+	BmRender_RecordDispatch(RenderCommandBuffers[CurrentFrame], groupX, groupY, 1);
 }
 
 static void DeferredPassBeginPass()
 {
-	BmRender_RenderingColorAttachment SwapchainColorAttachment = { };
-	SwapchainColorAttachment.ImageView = BmRender_GetSwapchainImageView(CurrentImageIndex);
-	SwapchainColorAttachment.LoadOp = BmRender_AttachmentLoadOp::Clear;
-	SwapchainColorAttachment.StoreOp = BmRender_AttachmentStoreOp::Store;
-	SwapchainColorAttachment.ClearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
-
-	BmRender_RenderingInfo RenderingInfo{ };
-	RenderingInfo.Offset = { 0, 0 };
-	RenderingInfo.Extent = MainScreenExtent;
-	RenderingInfo.ColorAttachments = &SwapchainColorAttachment;
-	RenderingInfo.ColorAttachmentCount = 1;
-	RenderingInfo.DepthAttachment = nullptr;
-
 	BmRender_TransitionImageForSampling(RenderCommandBuffers[CurrentFrame], DeferredInputColorImage[CurrentFrame]);
 	BmRender_TransitionImageForSampling(RenderCommandBuffers[CurrentFrame], DeferredInputDepthImage[CurrentFrame]);
-	BmRender_TransitionImageForRendering(RenderCommandBuffers[CurrentFrame], BmRender_GetSwapchainImage(CurrentImageIndex));
-
-	BmRender_BeginRendering(RenderCommandBuffers[CurrentFrame], &RenderingInfo);
+	BmRender_TransitionImageForComputeWrite(RenderCommandBuffers[CurrentFrame], BmRender_GetSwapchainImage(CurrentImageIndex));
 }
 
 static void DeferredPassEndPass()
 {
-	BmRender_EndRendering(RenderCommandBuffers[CurrentFrame]);
 	BmRender_TransitionImageForPresentation(RenderCommandBuffers[CurrentFrame], BmRender_GetSwapchainImage(CurrentImageIndex));
 }
 
@@ -691,14 +686,14 @@ void Render_Draw(DrawScene* Scene, u64 WaitSemaphoreValue)
 	MainPassEndPass();
 	DeferredPassBeginPass();
 	DeferredPassDraw();
-	ImGui::Render();
-	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), (VkCommandBuffer)RenderCommandBuffers[CurrentFrame]);
+	//ImGui::Render();
+	//ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), (VkCommandBuffer)RenderCommandBuffers[CurrentFrame]);
 	DeferredPassEndPass();
 
 	BmRender_EndCommandBuffer(RenderCommandBuffers[CurrentFrame]);
 
 	BmRender_PipelineSyncStage WaitStages[] = {
-		BmRender_PipelineSyncStage::ColorAttachmentOutput,
+		BmRender_PipelineSyncStage::ComputeShader,
 	};
 
 	BmRender_SubmitInfo SubmitInfo = { };
@@ -750,11 +745,6 @@ BmRender_Image* TestDeferredInputColorImage()
 BmRender_Image* TestDeferredInputDepthImage()
 {
 	return DeferredInputDepthImage;
-}
-
-AttachmentData* DeferredPassGetAttachmentData()
-{
-	return &DeferredPassPipelineAttachmentData;
 }
 
 AttachmentData* MainPassGetAttachmentData()

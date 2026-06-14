@@ -203,7 +203,8 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, co
 
 			WriteDescriptorSets[i].pBufferInfo = BufferInfo;
 		}
-		else if (VkDescriptorType == VK_DESCRIPTOR_TYPE_SAMPLER || VkDescriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+		else if (VkDescriptorType == VK_DESCRIPTOR_TYPE_SAMPLER || VkDescriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
+			VkDescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
 		{
 			VkDescriptorImageInfo* ImageInfo = (VkDescriptorImageInfo*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkDescriptorImageInfo));
 			ImageInfo->imageLayout = ImageLayoutToVk(Binding.ImageBinding.ImageLayout);
@@ -214,7 +215,7 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet DescriptorSetHandle, co
 		}
 		else
 		{
-			assert(false || "Unimplemented");
+			assert(false && "Unimplemented");
 		}
 	}
 
@@ -427,25 +428,25 @@ BmRender_Pipeline BmRender_CreatePipeline(BmRender_PipelineLayout PipelineLayout
 	VkSampleCountFlagBits SampleCount = VK_SAMPLE_COUNT_1_BIT;
 
 	VkFormat* ColorAttachmentFormats = (VkFormat*)Memory_LinearAllocator_Alloc(GetFrameMemory(), Attachment->ColorAttachmentCount * sizeof(VkFormat));
-	for (u32 i = 0; i < Attachment->ColorAttachmentCount; ++i)
-	{
-		ImageViewData ImageViewData;
-		ImageData ImageResource;
+		for (u32 i = 0; i < Attachment->ColorAttachmentCount; ++i)
+		{
+			ImageViewData ImageViewData;
+			ImageData ImageResource;
 
 		if (Attachment->ColorAttachments[i] != nullptr &&  BmRender_GetImageViewData(Attachment->ColorAttachments[i], &ImageViewData) && BmRender_GetImageData(ImageViewData.Image, &ImageResource))
-		{
-			ColorAttachmentFormats[i] = BmRender_FormatToVk(ImageResource.Format);
-
-			if (!SampleCountFound)
 			{
-				SampleCount = SampleCountToVk(ImageResource.SampleCount);
+				ColorAttachmentFormats[i] = BmRender_FormatToVk(ImageResource.Format);
+
+				if (!SampleCountFound)
+				{
+					SampleCount = SampleCountToVk(ImageResource.SampleCount);
+				}
+			}
+			else
+			{
+				ColorAttachmentFormats[i] = VK_FORMAT_UNDEFINED;
 			}
 		}
-		else
-		{
-			ColorAttachmentFormats[i] = VK_FORMAT_UNDEFINED;
-		}
-	}
 
 	VkFormat DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
 	if (Attachment->DepthAttachment != nullptr)
@@ -482,12 +483,12 @@ BmRender_Pipeline BmRender_CreatePipeline(BmRender_PipelineLayout PipelineLayout
 	}
 
 	VkPipelineRenderingCreateInfo RenderingInfo = { };
-	RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-	RenderingInfo.pNext = nullptr;
-	RenderingInfo.colorAttachmentCount = Attachment->ColorAttachmentCount;
-	RenderingInfo.pColorAttachmentFormats = ColorAttachmentFormats;
-	RenderingInfo.depthAttachmentFormat = DepthAttachmentFormat;
-	RenderingInfo.stencilAttachmentFormat = StencilAttachmentFormat;
+		RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+		RenderingInfo.pNext = nullptr;
+		RenderingInfo.colorAttachmentCount = Attachment->ColorAttachmentCount;
+		RenderingInfo.pColorAttachmentFormats = ColorAttachmentFormats;
+		RenderingInfo.depthAttachmentFormat = DepthAttachmentFormat;
+		RenderingInfo.stencilAttachmentFormat = StencilAttachmentFormat;
 
 	VkPipelineColorBlendAttachmentState VkColorBlendAttachment = ColorBlendAttachmentToVk(Settings->ColorBlendAttachment);
 	VkPipelineColorBlendStateCreateInfo ColorBlendState = ColorBlendStateToVk(Settings->ColorBlendState);
@@ -530,6 +531,36 @@ BmRender_Pipeline BmRender_CreatePipeline(BmRender_PipelineLayout PipelineLayout
 
 	VkPipeline Pipeline;
 	VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, 1, PipelineCreateInfo, GetVulkanAllocator(), &Pipeline));
+
+	PipelineData Data;
+	Data.Layout = PipelineLayout;
+	return CreatePipelineHandle(Pipeline, &Data);
+}
+
+BmRender_Pipeline BmRender_CreateComputePipeline(BmRender_PipelineLayout PipelineLayout, const BmRender_ShaderStageDescription* ShaderStageDescription)
+{
+	VkDevice Device = GetCoreContext()->LogicalDevice;
+
+	VkPipelineShaderStageCreateInfo VkShaderStage = { };
+	VkShaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	VkShaderStage.pNext = nullptr;
+	VkShaderStage.flags = 0;
+	VkShaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+	VkShaderStage.module = (VkShaderModule)ShaderStageDescription->Shader;
+	VkShaderStage.pName = ShaderStageDescription->EntryPointFunction;
+	VkShaderStage.pSpecializationInfo = nullptr;
+
+	VkComputePipelineCreateInfo PipelineCreateInfo = { };
+	PipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+	PipelineCreateInfo.pNext = nullptr;
+	PipelineCreateInfo.flags = 0;
+	PipelineCreateInfo.stage = VkShaderStage;
+	PipelineCreateInfo.layout = (VkPipelineLayout)PipelineLayout;
+	PipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
+	PipelineCreateInfo.basePipelineIndex = -1;
+
+	VkPipeline Pipeline;
+	VULKAN_CHECK_RESULT(vkCreateComputePipelines(Device, VK_NULL_HANDLE, 1, &PipelineCreateInfo, GetVulkanAllocator(), &Pipeline));
 
 	PipelineData Data;
 	Data.Layout = PipelineLayout;

@@ -221,7 +221,7 @@ void BmRender_TransitionImageForPresentation(BmRender_CommandBuffer CommandBuffe
 {
 	VkImageMemoryBarrier2 Barrier = { };
 	Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-	Barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	Barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
 	Barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 	Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -237,6 +237,39 @@ void BmRender_TransitionImageForPresentation(BmRender_CommandBuffer CommandBuffe
 	Barrier.dstAccessMask = 0;
 
 	VkDependencyInfo DepInfo = { };
+	DepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+	DepInfo.imageMemoryBarrierCount = 1;
+	DepInfo.pImageMemoryBarriers = &Barrier;
+
+	vkCmdPipelineBarrier2((VkCommandBuffer)CommandBuffer, &DepInfo);
+}
+
+void BmRender_TransitionImageForComputeWrite(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer, u32 LayersCount)
+{
+	VkImageMemoryBarrier2 Barrier = {};
+	Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+
+	Barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	Barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	Barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+	Barrier.srcAccessMask = VK_ACCESS_2_NONE;
+
+	Barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+	Barrier.dstAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+
+	Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+	Barrier.image = (VkImage)Image;
+
+	Barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	Barrier.subresourceRange.baseMipLevel = 0;
+	Barrier.subresourceRange.levelCount = 1;
+	Barrier.subresourceRange.baseArrayLayer = BaseLayer;
+	Barrier.subresourceRange.layerCount = LayersCount;
+
+	VkDependencyInfo DepInfo = {};
 	DepInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	DepInfo.imageMemoryBarrierCount = 1;
 	DepInfo.pImageMemoryBarriers = &Barrier;
@@ -321,7 +354,16 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline)
 {
 	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
-	vkCmdBindPipeline(VkCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipeline)Pipeline);
+	VkPipelineBindPoint BindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+
+	BmRender_PipelineLayout PipelineLayout = BmRender_GetPipelineLayout(Pipeline);
+	PipelineLayoutData LayoutData;
+	if (BmRender_GetPipelineLayoutData(PipelineLayout, &LayoutData))
+	{
+		BindPoint = PipelineTypeToVkPipelineBindPoint(LayoutData.PipelineType);
+	}
+
+	vkCmdBindPipeline(VkCmdBuffer, BindPoint, (VkPipeline)Pipeline);
 }
 
 void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* pValues)
@@ -382,6 +424,12 @@ void BmRender_RecordDrawIndexedIndirect(BmRender_CommandBuffer CommandBuffer, Bm
 	VkBuffer VkIndirectBuffer = (VkBuffer)IndirectBuffer;
 	vkCmdDrawIndexedIndirect(VkCmdBuffer, VkIndirectBuffer, Offset, DrawCount, Stride);
 
+}
+
+void BmRender_RecordDispatch(BmRender_CommandBuffer CommandBuffer, u32 GroupCountX, u32 GroupCountY, u32  GroupCountZ)
+{
+	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
+	vkCmdDispatch(VkCmdBuffer, GroupCountX, GroupCountY, GroupCountZ);
 }
 
 void BmRender_EndRendering(BmRender_CommandBuffer CommandBuffer)

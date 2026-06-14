@@ -270,7 +270,7 @@ namespace Engine
 		GuiData.DirectionLightDirection = &Scene.FrameDataBuffer.directionLight.Direction;
 		GuiData.Eye = &Eye;
 
-		UI::Update();
+		//UI::Update();
 	}
 
 	void SetUpScene()

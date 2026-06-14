@@ -76,7 +76,6 @@ BmRender_ImageView* TestDeferredInputColorImageInterface();
 BmRender_ImageView* TestDeferredInputDepthImageInterface();
 BmRender_Image* TestDeferredInputColorImage();
 BmRender_Image* TestDeferredInputDepthImage();
-AttachmentData* DeferredPassGetAttachmentData();
 
 DescriptorSetHandles* GetHandles();
 BmRender_GPUBuffer GetVertexBuffer();

@@ -740,6 +740,7 @@ u32 BmRender_GetQueueFamily(BmRender_Queue Queue);
 
 BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description);
 BmRender_Pipeline BmRender_CreatePipeline(BmRender_PipelineLayout PipelineLayout, const BmRender_PipelineSettings* Settings, const BmRender_ShaderStageDescription* ShaderStageDescriptions, u32 ShaderStagesCount, const AttachmentData* Attachment);
+BmRender_Pipeline BmRender_CreateComputePipeline(BmRender_PipelineLayout PipelineLayout, const BmRender_ShaderStageDescription* ShaderStageDescription);
 BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description);
 BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutBinding* Bindings, u32 BindingsCount);
 BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolSize* PoolSizes, u32 MaxSets, u32 PoolSizeCount, BmRender_DescriptorPoolType Type);
@@ -780,6 +781,7 @@ void BmRender_DeviceWaitIdle();
 void BmRender_TransitionImageForRendering(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer = 0,  u32 LayersCount = 1);
 void BmRender_TransitionImageForSampling(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer = 0, u32 LayersCount = 1);
 void BmRender_TransitionImageForPresentation(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer = 0, u32 LayersCount = 1);
+void BmRender_TransitionImageForComputeWrite(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer = 0, u32 LayersCount = 1);
 void BmRender_RecordUpdateGPULocalBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer DstBuffer, BmRender_GPUBuffer SrcBuffer, u64 SrcOffset, u64 DstOffset, u64 DataSize);
 void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRender_RenderingInfo* pRenderingInfo);
 void BmRender_EndRendering(BmRender_CommandBuffer CommandBuffer);
@@ -791,6 +793,7 @@ void BmRender_RecordBindIndexBuffer(BmRender_CommandBuffer CommandBuffer, BmRend
 void BmRender_Draw(BmRender_CommandBuffer CommandBuffer, u32 VertexCount, u32 InstanceCount, u32 FirstVertex, u32 FirstInstance);
 void BmRender_DrawIndexed(BmRender_CommandBuffer CommandBuffer, u32 IndexCount, u32 InstanceCount, u32 FirstIndex, u32 VertexOffset, u32 FirstInstance);
 void BmRender_RecordDrawIndexedIndirect(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer IndirectBuffer, u64 Offset, u32 DrawCount, u32 Stride);
+void BmRender_RecordDispatch(BmRender_CommandBuffer CommandBuffer, u32 GroupCountX, u32 GroupCountY, u32  GroupCountZ);
 
 void BmRender_DestroySampler(BmRender_Sampler Handle);
 void BmRender_DestroyPipeline(BmRender_Pipeline Handle);
