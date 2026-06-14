@@ -38,8 +38,10 @@ static BmRender_CommandPool RenderCommandPool;
 BmRender_Queue GraphicsQueue;
 static u32 CurrentFrame;
 
-// Extern declarations for global resource maps
-extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
+BmRender_Sampler ShadowMapSampler;
+BmRender_Sampler DiffuseTextureSampler;
+BmRender_Sampler ColorAttachmentSampler;
+BmRender_Sampler DepthAttachmentSampler;
 
 static BmRender_Image ShadowMapArray;
 
@@ -202,7 +204,7 @@ static void InitStaticMeshPipeline(StaticMeshPipelineDepr* MeshPipeline, BmRende
 		MeshPipeline->ShadowMapArrayImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_SHADOW_TEXTURES * i, MAX_SHADOW_TEXTURES);
 			
 		BmRender_DescriptorSetUpdateData ShadowMapBinding;
-		ShadowMapBinding.ImageBinding.Sampler = Samplers["ShadowMap"];
+		ShadowMapBinding.ImageBinding.Sampler = ShadowMapSampler;
 		ShadowMapBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
 		ShadowMapBinding.ImageBinding.ImageView = MeshPipeline->ShadowMapArrayImageInterface[i];
 		ShadowMapBinding.BindingCount = 1;
@@ -274,7 +276,7 @@ static void DeferredPassInit(BmRender_DescriptorPool MainPool)
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
 			BmRender_DescriptorSetUpdateData ColorBinding;
-			ColorBinding.ImageBinding.Sampler = Samplers["ColorAttachment"];
+			ColorBinding.ImageBinding.Sampler = ColorAttachmentSampler;
 			ColorBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
 			ColorBinding.ImageBinding.ImageView = DeferredInputColorImageInterface[i];
 			ColorBinding.BindingCount = 1;
@@ -282,7 +284,7 @@ static void DeferredPassInit(BmRender_DescriptorPool MainPool)
 			ColorBinding.DstBinding = 0;
 
 			BmRender_DescriptorSetUpdateData DepthBinding;
-			DepthBinding.ImageBinding.Sampler = Samplers["DepthAttachment"];
+			DepthBinding.ImageBinding.Sampler = DepthAttachmentSampler;
 			DepthBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
 			DepthBinding.ImageBinding.ImageView = DeferredInputDepthImageInterface[i];
 			DepthBinding.BindingCount = 1;
@@ -543,6 +545,16 @@ void Render_Init(GLFWwindow* WindowHandler)
 
 	GraphicsQueue = BmRender_CreateQueue(BmRender_QueueType::Graphic);
 
+	BmRHI_SamplerDescription ShadowMapSamplerDescription = GetShadowMapSamplerDescription();
+	BmRHI_SamplerDescription DiffuseTextureSamplerDescription = GetDiffuseTextureSamplerDescription();
+	BmRHI_SamplerDescription ColorAttachmentSamplerDescription = GetColorAttachmentSamplerDescription();
+	BmRHI_SamplerDescription DepthAttachmentSamplerDescription = GetDepthAttachmentSamplerDescription();
+
+	ShadowMapSampler = BmRender_CreateSampler(&ShadowMapSamplerDescription);
+	DiffuseTextureSampler = BmRender_CreateSampler(&DiffuseTextureSamplerDescription);
+	ColorAttachmentSampler = BmRender_CreateSampler(&ColorAttachmentSamplerDescription);
+	DepthAttachmentSampler = BmRender_CreateSampler(&DepthAttachmentSamplerDescription);
+
 	BmRender_CreateQueue(BmRender_QueueType::Graphic);
 	RenderCommandPool = BmRender_CreateCommandPool(BmRender_QueueType::Graphic);
 
@@ -627,6 +639,11 @@ void Render_DeInit()
 {
 	BmRender_DeviceWaitIdle();
 
+	BmRender_DestroySampler(ShadowMapSampler);
+	BmRender_DestroySampler(DiffuseTextureSampler);
+	BmRender_DestroySampler(ColorAttachmentSampler);
+	BmRender_DestroySampler(DepthAttachmentSampler);
+
 	BmRender_DestroyDescriptorSetLayout(FrameDataLayout);
 	BmRender_DestroyDescriptorSetLayout(ShadowMapArrayLayout);
 	BmRender_DestroyDescriptorSetLayout(MainPassOutputLayout);
@@ -646,11 +663,6 @@ void Render_DeInit()
 	
 	DeferredPassDeInit();
 	LightningPassDeInit();
-
-	for (auto& [name, sampler] : Samplers)
-	{
-		BmRender_DestroySampler(sampler);
-	}
 
 	BmRender_DestroyDescriptorPool(State.MainPool);
 

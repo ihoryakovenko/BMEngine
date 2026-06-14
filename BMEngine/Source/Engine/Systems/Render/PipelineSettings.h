@@ -3,7 +3,7 @@
 #include <RenderInterface.h>
 #include <Util/Settings.h>
 
-BmRender_PipelineSettings GetStaticPipelineDescription()
+inline BmRender_PipelineSettings GetStaticPipelineDescription()
 {
 	BmRender_PipelineSettings PipelineDesc = {};
 	PipelineDesc.Extent = MainScreenExtent;
@@ -66,7 +66,7 @@ BmRender_PipelineSettings GetStaticPipelineDescription()
 	return PipelineDesc;
 }
 
-BmRender_PipelineSettings GetDeferredPipelineDescription()
+inline BmRender_PipelineSettings GetDeferredPipelineDescription()
 {
 	BmRender_PipelineSettings PipelineDesc = {};
 	PipelineDesc.Extent = MainScreenExtent;
@@ -129,7 +129,7 @@ BmRender_PipelineSettings GetDeferredPipelineDescription()
 	return PipelineDesc;
 }
 
-BmRender_PipelineSettings GetDepthPipelineDescription()
+inline BmRender_PipelineSettings GetDepthPipelineDescription()
 {
 	BmRender_PipelineSettings PipelineDesc = {};
 	PipelineDesc.Extent = DepthViewportExtent;
@@ -190,4 +190,88 @@ BmRender_PipelineSettings GetDepthPipelineDescription()
 	PipelineDesc.Scissor.Extent.Height = DepthViewportExtent.Height;
 
 	return PipelineDesc;
+}
+
+inline BmRHI_SamplerDescription GetShadowMapSamplerDescription()
+{
+	BmRHI_SamplerDescription ShadowMapSamplerDescription;
+	ShadowMapSamplerDescription.MagFilter = BmRender_Filter::Linear;
+	ShadowMapSamplerDescription.MinFilter = BmRender_Filter::Linear;
+	ShadowMapSamplerDescription.MipmapMode = BmRender_SamplerMipmapMode::Linear;
+	ShadowMapSamplerDescription.AddressModeU = BmRender_SamplerAddressMode::ClampToBorder;
+	ShadowMapSamplerDescription.AddressModeV = BmRender_SamplerAddressMode::ClampToBorder;
+	ShadowMapSamplerDescription.AddressModeW = BmRender_SamplerAddressMode::ClampToBorder;
+	ShadowMapSamplerDescription.MipLodBias = 0.0f;
+	ShadowMapSamplerDescription.AnisotropyEnable = true;
+	ShadowMapSamplerDescription.MaxAnisotropy = 1.0f;
+	ShadowMapSamplerDescription.CompareEnable = false;
+	ShadowMapSamplerDescription.CompareOp = BmRender_CompareOp::Never;
+	ShadowMapSamplerDescription.MinLod = 0.0f;
+	ShadowMapSamplerDescription.MaxLod = 0.0f;
+	ShadowMapSamplerDescription.BorderColor = BmRender_BorderColor::IntOpaqueBlack;
+	ShadowMapSamplerDescription.UnnormalizedCoordinates = false;
+	return ShadowMapSamplerDescription;
+}
+
+inline BmRHI_SamplerDescription GetDiffuseTextureSamplerDescription()
+{
+	BmRHI_SamplerDescription DiffuseTextureSamplerDescription;
+	DiffuseTextureSamplerDescription.MagFilter = BmRender_Filter::Linear;
+	DiffuseTextureSamplerDescription.MinFilter = BmRender_Filter::Linear;
+	DiffuseTextureSamplerDescription.MipmapMode = BmRender_SamplerMipmapMode::Linear;
+	DiffuseTextureSamplerDescription.AddressModeU = BmRender_SamplerAddressMode::ClampToEdge;
+	DiffuseTextureSamplerDescription.AddressModeV = BmRender_SamplerAddressMode::ClampToEdge;
+	DiffuseTextureSamplerDescription.AddressModeW = BmRender_SamplerAddressMode::ClampToEdge;
+	DiffuseTextureSamplerDescription.MipLodBias = 0.0f;
+	DiffuseTextureSamplerDescription.AnisotropyEnable = true;
+	DiffuseTextureSamplerDescription.MaxAnisotropy = 16.0f;
+	DiffuseTextureSamplerDescription.CompareEnable = false;
+	DiffuseTextureSamplerDescription.CompareOp = BmRender_CompareOp::Never;
+	DiffuseTextureSamplerDescription.MinLod = 0.0f;
+	DiffuseTextureSamplerDescription.MaxLod = 0.0f;
+	DiffuseTextureSamplerDescription.BorderColor = BmRender_BorderColor::IntOpaqueBlack;
+	DiffuseTextureSamplerDescription.UnnormalizedCoordinates = false;
+	return DiffuseTextureSamplerDescription;
+}
+
+inline BmRHI_SamplerDescription GetColorAttachmentSamplerDescription()
+{
+	BmRHI_SamplerDescription ColorAttachmentSamplerDescription;
+	ColorAttachmentSamplerDescription.MagFilter = BmRender_Filter::Linear;
+	ColorAttachmentSamplerDescription.MinFilter = BmRender_Filter::Linear;
+	ColorAttachmentSamplerDescription.MipmapMode = BmRender_SamplerMipmapMode::Linear;
+	ColorAttachmentSamplerDescription.AddressModeU = BmRender_SamplerAddressMode::ClampToEdge;
+	ColorAttachmentSamplerDescription.AddressModeV = BmRender_SamplerAddressMode::ClampToEdge;
+	ColorAttachmentSamplerDescription.AddressModeW = BmRender_SamplerAddressMode::ClampToEdge;
+	ColorAttachmentSamplerDescription.MipLodBias = 0.0f;
+	ColorAttachmentSamplerDescription.AnisotropyEnable = true;
+	ColorAttachmentSamplerDescription.MaxAnisotropy = 16.0f;
+	ColorAttachmentSamplerDescription.CompareEnable = false;
+	ColorAttachmentSamplerDescription.CompareOp = BmRender_CompareOp::Never;
+	ColorAttachmentSamplerDescription.MinLod = 0.0f;
+	ColorAttachmentSamplerDescription.MaxLod = 0.0f;
+	ColorAttachmentSamplerDescription.BorderColor = BmRender_BorderColor::IntOpaqueBlack;
+	ColorAttachmentSamplerDescription.UnnormalizedCoordinates = false;
+	return ColorAttachmentSamplerDescription;
+}
+
+inline BmRHI_SamplerDescription GetDepthAttachmentSamplerDescription()
+{
+	BmRHI_SamplerDescription DepthAttachmentSamplerDescription;
+	DepthAttachmentSamplerDescription.MagFilter = BmRender_Filter::Nearest;
+	DepthAttachmentSamplerDescription.MinFilter = BmRender_Filter::Nearest;
+	DepthAttachmentSamplerDescription.MipmapMode = BmRender_SamplerMipmapMode::Nearest;
+	DepthAttachmentSamplerDescription.AddressModeU = BmRender_SamplerAddressMode::ClampToEdge;
+	DepthAttachmentSamplerDescription.AddressModeV = BmRender_SamplerAddressMode::ClampToEdge;
+	DepthAttachmentSamplerDescription.AddressModeW = BmRender_SamplerAddressMode::ClampToEdge;
+	DepthAttachmentSamplerDescription.MipLodBias = 0.0f;
+	DepthAttachmentSamplerDescription.AnisotropyEnable = false;
+	DepthAttachmentSamplerDescription.MaxAnisotropy = 16.0f;
+	DepthAttachmentSamplerDescription.CompareEnable = false;
+	DepthAttachmentSamplerDescription.CompareOp = BmRender_CompareOp::Never;
+	DepthAttachmentSamplerDescription.MinLod = 0.0f;
+	DepthAttachmentSamplerDescription.MaxLod = 0.0f;
+	DepthAttachmentSamplerDescription.BorderColor = BmRender_BorderColor::IntOpaqueBlack;
+	DepthAttachmentSamplerDescription.UnnormalizedCoordinates = false;
+	return DepthAttachmentSamplerDescription;
 }

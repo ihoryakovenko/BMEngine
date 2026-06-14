@@ -4,11 +4,6 @@
 
 #include <Engine/Systems/Memory/MemoryManagmentSystem.h>
 
-extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
-extern std::unordered_map<std::string, BmRender_Shader> Shaders;
-extern std::unordered_map<std::string, BmRender_Pipeline> Pipelines;
-extern std::unordered_map<std::string, BmRender_PipelineLayout> PipelineLayouts;
-
 namespace Util
 {
 	template<size_t N>
@@ -110,84 +105,6 @@ namespace Util
 			return Node["name"].As<std::string>();
 		}
 		return { };
-	}
-
-	BmRHI_SamplerDescription ParseSamplerNode(Yaml::Node& Sampler)
-	{
-		BmRHI_SamplerDescription Data = { };
-
-		std::string Value;
-
-		if (!Sampler["magFilter"].IsNone())
-		{
-			Value = Sampler["magFilter"].As<std::string>();
-			Data.MagFilter = ParseFilter(Value.c_str(), Value.length());
-		}
-		if (!Sampler["minFilter"].IsNone())
-		{
-			Value = Sampler["minFilter"].As<std::string>();
-			Data.MinFilter = ParseFilter(Value.c_str(), Value.length());
-		}
-
-		if (!Sampler["addressModeU"].IsNone())
-		{
-			Value = Sampler["addressModeU"].As<std::string>();
-			Data.AddressModeU = ParseAddressMode(Value.c_str(), Value.length());
-		}
-		if (!Sampler["addressModeV"].IsNone())
-		{
-			Value = Sampler["addressModeV"].As<std::string>();
-			Data.AddressModeV = ParseAddressMode(Value.c_str(), Value.length());
-		}
-		if (!Sampler["addressModeW"].IsNone())
-		{
-			Value = Sampler["addressModeW"].As<std::string>();
-			Data.AddressModeW = ParseAddressMode(Value.c_str(), Value.length());
-		}
-
-		if (!Sampler["borderColor"].IsNone())
-		{
-			Value = Sampler["borderColor"].As<std::string>();
-			Data.BorderColor = ParseBorderColor(Value.c_str(), Value.length());
-		}
-
-		if (!Sampler["unnormalizedCoordinates"].IsNone())
-		{
-			Data.UnnormalizedCoordinates = Sampler["unnormalizedCoordinates"].As<bool>() ? VK_TRUE : VK_FALSE;
-		}
-		if (!Sampler["anisotropyEnable"].IsNone())
-		{
-			Data.AnisotropyEnable = Sampler["anisotropyEnable"].As<bool>() ? VK_TRUE : VK_FALSE;
-		}
-		if (!Sampler["compareEnable"].IsNone())
-		{
-			Data.CompareEnable = Sampler["compareEnable"].As<bool>() ? VK_TRUE : VK_FALSE;
-		}
-
-		if (!Sampler["mipmapMode"].IsNone())
-		{
-			Value = Sampler["mipmapMode"].As<std::string>();
-			Data.MipmapMode = ParseMipmapMode(Value.c_str(), Value.length());
-		}
-
-		if (!Sampler["mipLodBias"].IsNone())
-		{
-			Data.MipLodBias = Sampler["mipLodBias"].As<f32>();
-		}
-		if (!Sampler["minLod"].IsNone())
-		{
-			Data.MinLod = Sampler["minLod"].As<f32>();
-		}
-		if (!Sampler["maxLod"].IsNone())
-		{
-			Data.MaxLod = Sampler["maxLod"].As<f32>();
-		}
-		if (!Sampler["maxAnisotropy"].IsNone())
-		{
-			Data.MaxAnisotropy = Sampler["maxAnisotropy"].As<f32>();
-		}
-
-		return Data;
 	}
 
 	Yaml::Node& GetShaders(Yaml::Node& Root)

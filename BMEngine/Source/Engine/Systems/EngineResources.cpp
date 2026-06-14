@@ -7,8 +7,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-// Extern declarations for global resource maps
-extern std::unordered_map<std::string, BmRender_Sampler> Samplers;
+extern BmRender_Sampler DiffuseTextureSampler;
 
 namespace EngineResources
 {
@@ -71,7 +70,7 @@ namespace EngineResources
 		DefaultAsset.RenderViewHandle = DefaultViewHandle;
 
 		BmRender_DescriptorSetUpdateData DiffuseBinding;
-		DiffuseBinding.ImageBinding.Sampler = Samplers["DiffuseTexture"];
+		DiffuseBinding.ImageBinding.Sampler = DiffuseTextureSampler;
 		DiffuseBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
 		DiffuseBinding.ImageBinding.ImageView = DefaultAsset.RenderViewHandle;
 		DiffuseBinding.DstArrayElement = 0;
@@ -156,7 +155,7 @@ namespace EngineResources
 							AlbedoTextureHandle = it->second.RenderImageHandle;
 
 							BmRender_DescriptorSetUpdateData DiffuseBinding;
-							DiffuseBinding.ImageBinding.Sampler = Samplers["DiffuseTexture"];
+							DiffuseBinding.ImageBinding.Sampler = DiffuseTextureSampler;
 							DiffuseBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
 							DiffuseBinding.ImageBinding.ImageView = it->second.RenderViewHandle;
 							DiffuseBinding.DstArrayElement = TexturesGPUIndexCounter;

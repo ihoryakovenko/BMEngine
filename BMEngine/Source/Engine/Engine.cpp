@@ -30,20 +30,8 @@
 
 #include <gli/gli.hpp>
 
-// Global resource maps
-std::unordered_map<std::string, BmRender_Sampler> Samplers;
-
 namespace Engine
 {
-	static void ParseAndCreateSamplers(Yaml::Node& SamplersNode)
-	{
-		for (auto It = SamplersNode.Begin(); It != SamplersNode.End(); It++)
-		{
-			BmRHI_SamplerDescription Data = Util::ParseSamplerNode((*It).second);
-			Samplers[(*It).first] = BmRender_CreateSampler(&Data);
-		}
-	}
-
 	struct Camera
 	{
 		f32 Fov;
@@ -194,10 +182,6 @@ namespace Engine
 
 		BmRender_Init(Window);
 		PipelineManger_Init(true);
-
-
-
-		ParseAndCreateSamplers(Util::GetSamplers(Root));
 
 		TransferSystem::Init();
 		Render_Init(Window);

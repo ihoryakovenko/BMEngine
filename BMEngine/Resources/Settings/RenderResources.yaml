@@ -60,12 +60,3 @@ samplers:
     compareEnable: false
     borderColor: INT_OPAQUE_BLACK
     unnormalizedCoordinates: false
-
-shaders:
-  Entity:
-    path: "./Resources/Shaders/Entity.spv"
-  Deferred:
-    path: "./Resources/Shaders/Deferred.spv"
-  Depth_vert:
-    path: "./Resources/Shaders/Depth_vert.spv"
-    PipelineStage: Vertex

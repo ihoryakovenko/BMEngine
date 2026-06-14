@@ -220,7 +220,6 @@ namespace Util
 
 	std::string ParseNameNode(Yaml::Node& Node);
 	std::string ParseShaderNode(Yaml::Node& ShaderNode);
-	BmRHI_SamplerDescription ParseSamplerNode(Yaml::Node& SamplerNode);
 	BmRender_DescriptorSetLayoutBinding ParseDescriptorSetLayoutBindingNode(Yaml::Node& BindingNode);
 
 	BmRender_PipelineShaderStage ParseShaderStage(const char* Value, u32 Length);
