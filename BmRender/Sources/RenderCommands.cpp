@@ -2,7 +2,6 @@
 
 #include <SharedLib.h>
 
-#include "Handles.h"
 #include "RenderInterface.h"
 #include "RenderTypes.h"
 #include "VulkanHelper.h"
@@ -344,22 +343,22 @@ void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeli
 	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
 	VkPipelineBindPoint BindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 
-	BmRender_PipelineLayout PipelineLayout = BmRender_GetPipelineLayout(Pipeline);
+	BmRender_PipelineLayout PipelineLayout = Pipeline.Layout;
 	BindPoint = PipelineTypeToVkPipelineBindPoint(PipelineLayout.PipelineType);
 
-	vkCmdBindPipeline(VkCmdBuffer, BindPoint, (VkPipeline)Pipeline);
+	vkCmdBindPipeline(VkCmdBuffer, BindPoint, Pipeline.InternalPipeline);
 }
 
 void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* pValues)
 {
-	BmRender_PipelineLayout PipelineLayout = BmRender_GetPipelineLayout(Pipeline);
+	BmRender_PipelineLayout PipelineLayout = Pipeline.Layout;
 	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
 	vkCmdPushConstants(VkCmdBuffer, PipelineLayout.InternalLayout, ShaderStageFlagsToVk(StageFlags), Offset, Size, pValues);
 }
 
 void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets)
 {
-	BmRender_PipelineLayout PipelineLayout = BmRender_GetPipelineLayout(Pipeline);
+	BmRender_PipelineLayout PipelineLayout = Pipeline.Layout;
 
 	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
 	VkPipelineLayout Layout = PipelineLayout.InternalLayout;

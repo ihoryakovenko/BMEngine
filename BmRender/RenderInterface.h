@@ -8,16 +8,14 @@ struct GLFWwindow;
 inline constexpr u32 MAX_DRAW_FRAMES = 3;
 inline constexpr u32 MAX_DESCRIPTOR_SET_LAYOUT_BUINDINGS = 16;
 
-typedef struct BmRender_Instance_T* BmRender_Instance;
-typedef struct BmRender_PhysicalDevice_T* BmRender_PhysicalDevice;
-typedef struct BmRender_Device_T* BmRender_Device;
-typedef struct BmRender_Sampler_T* BmRender_Sampler;
-typedef struct BmRender_Pipeline_T* BmRender_Pipeline;
-typedef struct BmRender_DescriptorPool_T* BmRender_DescriptorPool;
-typedef struct BmRender_Shader_T* BmRender_Shader;
-typedef struct BmRender_CommandWorker_T* BmRender_CommandWorker;
-typedef struct BmRender_Fence_T* BmRender_Fence;
-typedef struct BmRender_DeviceMemory_T* BmRender_DeviceMemory;
+typedef VkInstance BmRender_Instance;
+typedef VkPhysicalDevice BmRender_PhysicalDevice;
+typedef VkDevice BmRender_Device;
+typedef VkSampler BmRender_Sampler;
+typedef VkDescriptorPool BmRender_DescriptorPool;
+typedef VkShaderModule BmRender_Shader;
+typedef VkFence BmRender_Fence;
+typedef VkDeviceMemory BmRender_DeviceMemory;
 
 #define DEFINE_ENUM_OR(EnumType) constexpr inline EnumType operator| (EnumType lhs, EnumType rhs) { return (EnumType)((u64)(lhs) | (u64)(rhs)); }
 
@@ -545,6 +543,12 @@ struct BmRender_ImageView
 	const BmRender_Image* Image;
 	BmRender_Format Format;
 };
+
+struct BmRender_Pipeline
+{
+	VkPipeline InternalPipeline;
+	BmRender_PipelineLayout Layout;
+};
 //
 
 struct AttachmentData
@@ -867,7 +871,5 @@ void BmRender_DestroyFence(BmRender_Fence Handle);
 void BmRender_DestroySemaphore(BmRender_Semaphore Handle);
 void BmRender_DestroyCommandPool(BmRender_CommandPool Handle);
 void BmRender_FreeCommandBuffer(BmRender_CommandBuffer Handle);
-
-BmRender_PipelineLayout BmRender_GetPipelineLayout(BmRender_Pipeline Handle);
 
 void BmRender_FrameFree();

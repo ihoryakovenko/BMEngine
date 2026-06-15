@@ -13,13 +13,11 @@
   <ItemGroup>
     <ClInclude Include="RenderHelper.h" />
     <ClInclude Include="RenderInterface.h" />
-    <ClInclude Include="Sources\Handles.h" />
     <ClInclude Include="Sources\RenderTypes.h" />
     <ClInclude Include="Sources\VulkanCoreContext.h" />
     <ClInclude Include="Sources\VulkanHelper.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Sources\Handles.cpp" />
     <ClCompile Include="Sources\RenderCommands.cpp" />
     <ClCompile Include="Sources\RenderInterface.cpp" />
     <ClCompile Include="Sources\RenderTypes.cpp" />

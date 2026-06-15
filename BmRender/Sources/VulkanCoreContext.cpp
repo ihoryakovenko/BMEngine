@@ -7,7 +7,6 @@
 #include <GLFW/glfw3.h>
 
 #include "RenderTypes.h"
-#include "Handles.h"
 
 static VkDevice CreateLogicalDevice(VkPhysicalDevice PhDevice, PhysicalDeviceIndices Indices, const char* DeviceExtensions[],
 	u32 DeviceExtensionsSize)
@@ -384,7 +383,7 @@ void CreateCoreContext(VulkanCoreContext* Context, GLFWwindow* Window)
 	{
 		BmRender_Image ImageResourceData = { };
 		ImageResourceData.Type = BmRender_ImageType::TransferSampled;
-		ImageResourceData.Memory = CreateDeviceMemoryHandle(VK_NULL_HANDLE);
+		ImageResourceData.Memory = nullptr;
 		ImageResourceData.Format = VkFormatToBmRender(Context->SurfaceFormat.format);
 		ImageResourceData.Dimensions.Width = Context->SwapExtent.width;
 		ImageResourceData.Dimensions.Height = Context->SwapExtent.height;

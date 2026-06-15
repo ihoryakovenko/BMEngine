@@ -44,7 +44,6 @@ struct DescriptorSetHandles
 
 struct RenderState
 {
-	BmRender_CommandWorker GraphicsCommandWorker;
 	StaticMeshPipelineDepr MeshPipeline;
 	DescriptorSetHandles DescriptorSets;
 	BmRender_DescriptorPool MainPool;

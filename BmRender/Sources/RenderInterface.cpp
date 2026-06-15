@@ -2,7 +2,6 @@
 
 #include "VulkanHelper.h"
 #include "RenderTypes.h"
-#include "Handles.h"
 
 #include <type_traits>
 
@@ -12,17 +11,11 @@ void BmRender_Init(GLFWwindow* WindowHandler)
 {
 	InitializeFrameMemory();
 
-
-	InitializePipelineManager(4);
-
 	CreateCoreContext(WindowHandler);
 }
 
 void BmRender_DeInit()
 {
-
-	DeinitPipelineManager();
-
 	DestroyCoreContext();
 	DeMemory_LinearAllocator_Init();
 }

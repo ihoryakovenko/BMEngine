@@ -4,7 +4,6 @@
 
 #include <SharedLib.h>
 
-#include "Handles.h"
 #include "VulkanCoreContext.h"
 #include "RenderHelper.h"
 
@@ -249,7 +248,7 @@ static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, MemoryPropertyFlag Memor
 
 	VkBufferUsageFlags BufferUsageFlags = (VkBufferUsageFlags)Flag;
 	DeviceMemoryAllocResult AllocResult = AllocateDeviceMemory(PhysicalDevice, Device, NewBuffer.InternalBuffer, MemoryFlag, BufferUsageFlags, GetVulkanAllocator());
-	NewBuffer.Memory = CreateDeviceMemoryHandle(AllocResult.Memory);
+	NewBuffer.Memory = AllocResult.Memory;
 
 	VULKAN_CHECK_RESULT(vkBindBufferMemory(Device, NewBuffer.InternalBuffer, (VkDeviceMemory)NewBuffer.Memory, 0));
 
@@ -321,7 +320,7 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 	DeviceMemoryAllocResult AllocResult = AllocateDeviceMemory(PhysicalDevice, Device,
 		Resource.InternalImage, MemoryPropertyFlag::GPULocal, GetVulkanAllocator());
 
-	Resource.Memory = CreateDeviceMemoryHandle(AllocResult.Memory);
+	Resource.Memory = AllocResult.Memory;
 	Resource.Dimensions.Width = Description->Width;
 	Resource.Dimensions.Height = Description->Height;
 	Resource.Size = AllocResult.Size;
@@ -389,7 +388,7 @@ BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Descript
 	VkSampler VulkanSampler;
 	VULKAN_CHECK_RESULT(vkCreateSampler(Device, &CreateInfo, GetVulkanAllocator(), &VulkanSampler));
 
-	return CreateSamplerHandle(VulkanSampler);
+	return VulkanSampler;
 }
 
 BmRender_Pipeline BmRender_CreatePipeline(BmRender_PipelineLayout PipelineLayout, const BmRender_PipelineSettings* Settings, const BmRender_ShaderStageDescription* ShaderStageDescriptions,
@@ -419,22 +418,22 @@ BmRender_Pipeline BmRender_CreatePipeline(BmRender_PipelineLayout PipelineLayout
 	VkSampleCountFlagBits SampleCount = VK_SAMPLE_COUNT_1_BIT;
 
 	VkFormat* ColorAttachmentFormats = (VkFormat*)Memory_LinearAllocator_Alloc(GetFrameMemory(), Attachment->ColorAttachmentCount * sizeof(VkFormat));
-		for (u32 i = 0; i < Attachment->ColorAttachmentCount; ++i)
+	for (u32 i = 0; i < Attachment->ColorAttachmentCount; ++i)
+	{
+		if (Attachment->ColorAttachments[i].Format != BmRender_Format::Undefined)
 		{
-			if (Attachment->ColorAttachments[i].Format != BmRender_Format::Undefined)
-			{
-				ColorAttachmentFormats[i] = BmRender_FormatToVk(Attachment->ColorAttachments[i].Format);
+			ColorAttachmentFormats[i] = BmRender_FormatToVk(Attachment->ColorAttachments[i].Format);
 
-				if (!SampleCountFound)
-				{
-					SampleCount = SampleCountToVk(Attachment->ColorAttachments[i].Image->SampleCount);
-				}
-			}
-			else
+			if (!SampleCountFound)
 			{
-				ColorAttachmentFormats[i] = VK_FORMAT_UNDEFINED;
+				SampleCount = SampleCountToVk(Attachment->ColorAttachments[i].Image->SampleCount);
 			}
 		}
+		else
+		{
+			ColorAttachmentFormats[i] = VK_FORMAT_UNDEFINED;
+		}
+	}
 
 	VkFormat DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
 	if (Attachment->DepthAttachment.Format != BmRender_Format::Undefined)
@@ -508,9 +507,10 @@ BmRender_Pipeline BmRender_CreatePipeline(BmRender_PipelineLayout PipelineLayout
 	VkPipeline Pipeline;
 	VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, 1, PipelineCreateInfo, GetVulkanAllocator(), &Pipeline));
 
-	PipelineData Data;
+	BmRender_Pipeline Data;
 	Data.Layout = PipelineLayout;
-	return CreatePipelineHandle(Pipeline, &Data);
+	Data.InternalPipeline = Pipeline;
+	return Data;
 }
 
 BmRender_Pipeline BmRender_CreateComputePipeline(BmRender_PipelineLayout PipelineLayout, const BmRender_ShaderStageDescription* ShaderStageDescription)
@@ -538,9 +538,10 @@ BmRender_Pipeline BmRender_CreateComputePipeline(BmRender_PipelineLayout Pipelin
 	VkPipeline Pipeline;
 	VULKAN_CHECK_RESULT(vkCreateComputePipelines(Device, VK_NULL_HANDLE, 1, &PipelineCreateInfo, GetVulkanAllocator(), &Pipeline));
 
-	PipelineData Data;
+	BmRender_Pipeline Data;
 	Data.Layout = PipelineLayout;
-	return CreatePipelineHandle(Pipeline, &Data);
+	Data.InternalPipeline = Pipeline;
+	return Data;
 }
 
 BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description)
@@ -597,7 +598,7 @@ BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorP
 	VkDescriptorPool DescriptorPool;
 	VULKAN_CHECK_RESULT(vkCreateDescriptorPool(Device, &CreateInfo, GetVulkanAllocator(), &DescriptorPool));
 
-	return CreateDescriptorPoolHandle(DescriptorPool);
+	return DescriptorPool;
 }
 
 BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description)
@@ -614,7 +615,7 @@ BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Descript
 	VkShaderModule ShaderModule;
 	VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &CreateInfo, GetVulkanAllocator(), &ShaderModule));
 
-	return CreateShaderHandle(ShaderModule);
+	return ShaderModule;
 }
 
 
@@ -695,7 +696,7 @@ BmRender_Fence BmRender_CreateFence()
 	VkFence Fence;
 	VULKAN_CHECK_RESULT(vkCreateFence(Device, &CreateInfo, GetVulkanAllocator(), &Fence));
 
-	return CreateFenceHandle(Fence);
+	return Fence;
 }
 
 BmRender_Semaphore BmRender_CreateSemaphore()
@@ -857,8 +858,7 @@ void BmRender_DestroyDescriptorPool(BmRender_DescriptorPool Handle)
 void BmRender_DestroyPipeline(BmRender_Pipeline Handle)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	vkDestroyPipeline(Device, (VkPipeline)Handle, GetVulkanAllocator());
-	DestroyPipelineData(Handle);
+	vkDestroyPipeline(Device, Handle.InternalPipeline, GetVulkanAllocator());
 }
 
 void BmRender_DestroyShader(BmRender_Shader Handle)
@@ -910,14 +910,4 @@ void BmRender_FreeCommandBuffer(BmRender_CommandBuffer Handle)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
 	vkFreeCommandBuffers(Device, Handle.CommandPool->InternalPool, 1, &Handle.InternalBuffer);
-}
-
-BmRender_PipelineLayout BmRender_GetPipelineLayout(BmRender_Pipeline Handle)
-{
-	PipelineData Data;
-	if (BmRender_GetPipelineData(Handle, &Data))
-	{
-		return Data.Layout;
-	}
-	return {};
 }

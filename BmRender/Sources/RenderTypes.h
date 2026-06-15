@@ -14,11 +14,6 @@ struct GLFWwindow;
 
 struct VulkanCoreContext;
 
-struct PipelineData
-{
-	BmRender_PipelineLayout Layout;
-};
-
 void InitializeFrameMemory();
 void DeMemory_LinearAllocator_Init();
 
