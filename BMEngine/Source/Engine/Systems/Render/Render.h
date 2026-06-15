@@ -78,7 +78,7 @@ BmRender_Image* TestDeferredInputColorImage();
 BmRender_Image* TestDeferredInputDepthImage();
 
 DescriptorSetHandles* GetHandles();
-BmRender_GPUBuffer GetVertexBuffer();
-BmRender_GPUBuffer GetIndexBuffer();
-BmRender_GPUBuffer GetInstanceBuffer();
-BmRender_GPUBuffer GetMaterialBuffer();
+BmRender_GPUBuffer* GetVertexBuffer();
+BmRender_GPUBuffer* GetIndexBuffer();
+BmRender_GPUBuffer* GetInstanceBuffer();
+BmRender_GPUBuffer* GetMaterialBuffer();

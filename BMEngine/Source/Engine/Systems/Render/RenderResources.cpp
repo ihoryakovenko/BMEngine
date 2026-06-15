@@ -14,7 +14,7 @@ namespace RenderResources
 {
 	void UpdateBufferRegion(BmRender_GPUBufferUpdateData Handle, u64 ResourceOffset, const void* Data, u32 DataSize)
 	{
-		const MemoryPropertyFlag Flag = BmRender_GetGpuBufferMemoryPropertyFlag(Handle.GPUBufferHandle);
+		const MemoryPropertyFlag Flag = Handle.GPUBufferHandle->PropertyFlag;
 		const u64 Offset = Handle.BufferOffset + ResourceOffset;
 
 		if (Flag == MemoryPropertyFlag::HostCompatible)
@@ -45,18 +45,18 @@ namespace RenderResources
 
 	void UpdateBuffer(BmRender_GPUBuffer BufferHandle, u64 Offset, const void* Data, u32 DataSize)
 	{
-		const MemoryPropertyFlag Flag = BmRender_GetGpuBufferMemoryPropertyFlag(BufferHandle);
+		const MemoryPropertyFlag Flag = BufferHandle.PropertyFlag;
 
 		if (Flag == MemoryPropertyFlag::HostCompatible)
 		{
-			BmRender_UpdateHostCompatibleBuffer(BufferHandle, Offset, DataSize, Data);
+			BmRender_UpdateHostCompatibleBuffer(&BufferHandle, Offset, DataSize, Data);
 		}
 	}
 
-	void UpdateImageResource(BmRender_Image Handle, BmRender_ImageDescription* Description, void* Data)
+	void UpdateImageResource(const BmRender_Image* Handle, BmRender_ImageDescription* Description, void* Data)
 	{
-		const u64 Size = BmRender_GetImageSize(Handle);
-		const BmRender_Dimensions Dim = BmRender_GetImageDimensions(Handle);
+		const u64 Size = Handle->Size;
+		const BmRender_Dimensions Dim = Handle->Dimensions;
 
 		// TODO: TMP solution
 		void* TransferMemory = TransferSystem::RequestTransferMemory(Size);
@@ -66,7 +66,7 @@ namespace RenderResources
 		Task.DataSize = Size;
 		Task.Alignment = BmRender_GetFormatAlignment(Description->Format);
 		Task.RawData = TransferMemory;
-		Task.TextureDescr.Handle = Handle;
+		Task.TextureDescr.Handle = *Handle;
 		Task.TextureDescr.Width = Dim.Width;
 		Task.TextureDescr.Height = Dim.Height;
 		Task.Type = TransferSystem::TaskType::Image;

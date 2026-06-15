@@ -138,7 +138,7 @@ namespace TransferSystem
 		BmRender_ResetFences(TransferState.Frames.Fences[CurrentFrame]);
 		BmRender_BeginCommandBuffer(TransferState.Frames.CommandBuffers[CurrentFrame]);
 
-		VkCommandBuffer TransferCommandBuffer = (VkCommandBuffer)TransferState.Frames.CommandBuffers[CurrentFrame];
+		VkCommandBuffer TransferCommandBuffer = TransferState.Frames.CommandBuffers[CurrentFrame].InternalBuffer;
 
 		while (HasPendingTasks(&TransferState.TransferTasksQueue))
 		{
@@ -160,7 +160,7 @@ namespace TransferSystem
 
 			TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] = NewTotal;
 
-			BmRender_UpdateHostCompatibleBuffer(TransferState.TransferStagingPool.Buffer, AlignedOffset, Task->DataSize, Task->RawData);
+			BmRender_UpdateHostCompatibleBuffer(&TransferState.TransferStagingPool.Buffer, AlignedOffset, Task->DataSize, Task->RawData);
 
 			switch (Task->Type)
 			{
@@ -175,7 +175,7 @@ namespace TransferSystem
 					ApplyStageBarrier(&Barrier, Task->DataDescr.StageBarrier);
 					Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 					Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-					Barrier.buffer = (VkBuffer)Entry.GPUBufferHandle;
+					Barrier.buffer = Entry.GPUBufferHandle->InternalBuffer;
 					Barrier.offset = Entry.BufferOffset;
 					Barrier.size = Task->DataSize;
 
@@ -190,7 +190,7 @@ namespace TransferSystem
 					IndexBufferCopyRegion.size = Task->DataSize;
 
 					vkCmdPipelineBarrier2(TransferCommandBuffer, &DepInfo);
-					vkCmdCopyBuffer(TransferCommandBuffer, (VkBuffer)TransferState.TransferStagingPool.Buffer, (VkBuffer)Entry.GPUBufferHandle, 1, &IndexBufferCopyRegion);
+					vkCmdCopyBuffer(TransferCommandBuffer, TransferState.TransferStagingPool.Buffer.InternalBuffer, Entry.GPUBufferHandle->InternalBuffer, 1, &IndexBufferCopyRegion);
 					
 					break;
 				}
@@ -209,7 +209,7 @@ namespace TransferSystem
 					TransferImageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 					TransferImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 					TransferImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-					TransferImageBarrier.image = (VkImage)Task->TextureDescr.Handle;
+					TransferImageBarrier.image = Task->TextureDescr.Handle.InternalImage;
 					TransferImageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 					TransferImageBarrier.subresourceRange.baseMipLevel = 0;
 					TransferImageBarrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
@@ -249,7 +249,7 @@ namespace TransferSystem
 					PresentationBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 					PresentationBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 					PresentationBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-					PresentationBarrier.image = (VkImage)Task->TextureDescr.Handle;
+					PresentationBarrier.image = Task->TextureDescr.Handle.InternalImage;
 					PresentationBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 					PresentationBarrier.subresourceRange.baseMipLevel = 0;
 					PresentationBarrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
@@ -268,8 +268,8 @@ namespace TransferSystem
 					PresentDepInfo.pBufferMemoryBarriers = nullptr;
 
 					vkCmdPipelineBarrier2(TransferCommandBuffer, &TransferDepInfo);
-					vkCmdCopyBufferToImage(TransferCommandBuffer, (VkBuffer)TransferState.TransferStagingPool.Buffer,
-						(VkImage)Task->TextureDescr.Handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ImageRegion);
+					vkCmdCopyBufferToImage(TransferCommandBuffer, TransferState.TransferStagingPool.Buffer.InternalBuffer,
+						Task->TextureDescr.Handle.InternalImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &ImageRegion);
 					vkCmdPipelineBarrier2(TransferCommandBuffer, &PresentDepInfo);
 
 					break;
@@ -322,7 +322,7 @@ namespace TransferSystem
 		for (u32 i = 0; i < MAX_DRAW_FRAMES; ++i)
 		{
 			TransferState.Frames.Fences[i] = BmRender_CreateFence();
-			TransferState.Frames.CommandBuffers[i] = BmRender_AllocateCommandBuffer(TransferState.TransferCommandPool);
+			TransferState.Frames.CommandBuffers[i] = BmRender_AllocateCommandBuffer(&TransferState.TransferCommandPool);
 		}
 
 		TransferState.TransferSemaphore = BmRender_CreateTimelineSemaphore(0);
@@ -351,7 +351,7 @@ namespace TransferSystem
 		}
 
 		BmRender_DestroyCommandPool(TransferState.TransferCommandPool);
-		BmRender_DestroyGPUBuffer(TransferState.TransferStagingPool.Buffer);
+		BmRender_DestroyGPUBuffer(&TransferState.TransferStagingPool.Buffer);
 		BmRender_DestroySemaphore(TransferState.TransferSemaphore);
 
 		free(TransferState.TransferTasksQueue.Memory);

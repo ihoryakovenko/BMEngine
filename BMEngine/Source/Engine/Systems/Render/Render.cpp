@@ -116,7 +116,7 @@ static void InitImGuiPipeline(BmRender_DescriptorPool* ImGuiPool, GLFWwindow* Wn
 	VkFormat* ColorAttachmentFormats = (VkFormat*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), AttachmentDataPtr->ColorAttachmentCount * sizeof(VkFormat));
 	for (u32 i = 0; i < AttachmentDataPtr->ColorAttachmentCount; ++i)
 	{
-		const BmRender_Format Format = BmRender_GetOwningImageFormat(AttachmentDataPtr->ColorAttachments[i]);
+		const BmRender_Format Format = AttachmentDataPtr->ColorAttachments[i].Format;
 		if (Format != BmRender_Format::Undefined)
 		{
 			ColorAttachmentFormats[i] = BmRender_FormatToVk(Format);
@@ -128,9 +128,9 @@ static void InitImGuiPipeline(BmRender_DescriptorPool* ImGuiPool, GLFWwindow* Wn
 	}
 
 	VkFormat DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
-	if (AttachmentDataPtr->DepthAttachment != nullptr)
+	if (AttachmentDataPtr->DepthAttachment.Format != BmRender_Format::Undefined)
 	{
-		const BmRender_Format Format = BmRender_GetOwningImageFormat(AttachmentDataPtr->DepthAttachment);
+		const BmRender_Format Format = AttachmentDataPtr->DepthAttachment.Format;
 		if (Format != BmRender_Format::Undefined)
 		{
 			DepthAttachmentFormat = BmRender_FormatToVk(Format);
@@ -138,9 +138,9 @@ static void InitImGuiPipeline(BmRender_DescriptorPool* ImGuiPool, GLFWwindow* Wn
 	}
 
 	VkFormat StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
-	if (AttachmentDataPtr->StencilAttachment != nullptr)
+	if (AttachmentDataPtr->StencilAttachment.Format != BmRender_Format::Undefined)
 	{
-		const BmRender_Format Format = BmRender_GetOwningImageFormat(AttachmentDataPtr->StencilAttachment);
+		const BmRender_Format Format = AttachmentDataPtr->StencilAttachment.Format;
 		if (Format != BmRender_Format::Undefined)
 		{
 			StencilAttachmentFormat = BmRender_FormatToVk(Format);
@@ -168,7 +168,7 @@ static void InitImGuiPipeline(BmRender_DescriptorPool* ImGuiPool, GLFWwindow* Wn
 	InitInfo.PhysicalDevice = (VkPhysicalDevice)BmRender_GetPhysicalDevice();
 	InitInfo.Device = (VkDevice)BmRender_GetLogicalDevice();
 	InitInfo.QueueFamily = BmRender_GetQueueFamily(ImbuiGraphicsQueue);
-	InitInfo.Queue = (VkQueue)ImbuiGraphicsQueue;
+	InitInfo.Queue = ImbuiGraphicsQueue.InternalQueue;
 	InitInfo.PipelineCache = nullptr;
 	InitInfo.DescriptorPool = *((VkDescriptorPool*)ImGuiPool);
 	InitInfo.RenderPass = nullptr;
@@ -200,7 +200,7 @@ static void InitStaticMeshPipeline(StaticMeshPipelineDepr* MeshPipeline, BmRende
 
 	for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 	{
-		MeshPipeline->ShadowMapArrayImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_SHADOW_TEXTURES * i, MAX_SHADOW_TEXTURES);
+		MeshPipeline->ShadowMapArrayImageInterface[i] = BmRender_CreateImageView2DArray(&ShadowMapArray, MAX_SHADOW_TEXTURES * i, MAX_SHADOW_TEXTURES);
 			
 		BmRender_DescriptorSetUpdateData ShadowMapBinding;
 		ShadowMapBinding.ImageBinding.Sampler = ShadowMapSampler;
@@ -210,8 +210,8 @@ static void InitStaticMeshPipeline(StaticMeshPipelineDepr* MeshPipeline, BmRende
 		ShadowMapBinding.DstArrayElement = 0;
 		ShadowMapBinding.DstBinding = 0;
 
-		MeshPipeline->ShadowMapArraySet[i] = BmRender_CreateDescriptorSet(ShadowMapArrayLayout, MainPool);
-		BmRender_UpdateDescriptorSet(MeshPipeline->ShadowMapArraySet[i], &ShadowMapBinding, 1);
+		MeshPipeline->ShadowMapArraySet[i] = BmRender_CreateDescriptorSet(&ShadowMapArrayLayout, MainPool);
+		BmRender_UpdateDescriptorSet(MeshPipeline->ShadowMapArraySet + i, &ShadowMapBinding, 1);
 	}
 
 	AttachmentData ResourceInfo = MainPassPipelineAttachmentData;
@@ -250,14 +250,14 @@ static void DeferredPassInit(BmRender_DescriptorPool MainPool)
 		DeferredInputColorImage[i] = BmRender_CreateImage2D(MainScreenExtent.Width, MainScreenExtent.Height, ColorFormat, BmRender_ImageType::ColorAttachmentSampled, BmRender_SampleCount::Count1);
 		DeferredInputDepthImage[i] = BmRender_CreateImage2D(MainScreenExtent.Width, MainScreenExtent.Height, DepthFormat, BmRender_ImageType::DepthSamplad, BmRender_SampleCount::Count1);
 
-		DeferredInputColorImageInterface[i] = BmRender_CreateImageView2D(DeferredInputColorImage[i]);
-		DeferredInputDepthImageInterface[i] = BmRender_CreateImageView2D(DeferredInputDepthImage[i]);
+		DeferredInputColorImageInterface[i] = BmRender_CreateImageView2D(DeferredInputColorImage + i);
+		DeferredInputDepthImageInterface[i] = BmRender_CreateImageView2D(DeferredInputDepthImage + i);
 	}
 
 	DeferredPassPipelineAttachmentData.ColorAttachmentCount = 1;
 	DeferredPassPipelineAttachmentData.ColorAttachments[0] = DeferredInputColorImageInterface[0];
 	DeferredPassPipelineAttachmentData.DepthAttachment = DeferredInputDepthImageInterface[0];
-	DeferredPassPipelineAttachmentData.StencilAttachment = nullptr;
+	DeferredPassPipelineAttachmentData.StencilAttachment = {};
 
 	{
 		const u32 BindingsCount = 3;
@@ -303,8 +303,8 @@ static void DeferredPassInit(BmRender_DescriptorPool MainPool)
 
 			BmRender_DescriptorSetUpdateData Bindings[] = { ColorBinding, DepthBinding, OutputTextureBinding };
 
-			DeferredInputSet[i] = BmRender_CreateDescriptorSet(MainPassOutputLayout, MainPool);
-			BmRender_UpdateDescriptorSet(DeferredInputSet[i], Bindings, BindingsCount);
+			DeferredInputSet[i] = BmRender_CreateDescriptorSet(&MainPassOutputLayout, MainPool);
+			BmRender_UpdateDescriptorSet(DeferredInputSet + i, Bindings, BindingsCount);
 		}
 	}
 
@@ -339,8 +339,8 @@ static void DeferredPassDraw()
 
 static void DeferredPassBeginPass()
 {
-	BmRender_TransitionImageForSampling(RenderCommandBuffers[CurrentFrame], DeferredInputColorImage[CurrentFrame]);
-	BmRender_TransitionImageForSampling(RenderCommandBuffers[CurrentFrame], DeferredInputDepthImage[CurrentFrame]);
+	BmRender_TransitionImageForSampling(RenderCommandBuffers[CurrentFrame], DeferredInputColorImage + CurrentFrame);
+	BmRender_TransitionImageForSampling(RenderCommandBuffers[CurrentFrame], DeferredInputDepthImage + CurrentFrame);
 	BmRender_TransitionImageForComputeWrite(RenderCommandBuffers[CurrentFrame], BmRender_GetSwapchainImage(CurrentImageIndex));
 }
 
@@ -355,8 +355,8 @@ static void DeferredPassDeInit()
 	{
 		BmRender_DestroyImageView(DeferredInputColorImageInterface[i]);
 		BmRender_DestroyImageView(DeferredInputDepthImageInterface[i]);
-		BmRender_DestroyImage(DeferredInputColorImage[i]);
-		BmRender_DestroyImage(DeferredInputDepthImage[i]);
+		BmRender_DestroyImage(DeferredInputColorImage + i);
+		BmRender_DestroyImage(DeferredInputDepthImage + i);
 	}
 }
 
@@ -378,9 +378,9 @@ static void LightningPassInit(BmRender_DescriptorPool MainPool)
 			const u64 LightSpaceMatrixSize = sizeof(glm::mat4);
 
 			LightSpaceMatrixBuffers[i] = BmRender_CreateUniformBuffer(LightSpaceMatrixSize, MemoryPropertyFlag::HostCompatible);
-			LightSpaceMatrixBufferRegion[i] = { LightSpaceMatrixBuffers[i], 0, LightSpaceMatrixSize };
+			LightSpaceMatrixBufferRegion[i] = { LightSpaceMatrixBuffers + i, 0, LightSpaceMatrixSize };
 
-			LightSpaceMatrixSet[i] = BmRender_CreateDescriptorSet(LightSpaceMatrixLayout, MainPool);
+			LightSpaceMatrixSet[i] = BmRender_CreateDescriptorSet(&LightSpaceMatrixLayout, MainPool);
 
 			BmRender_DescriptorSetUpdateData LightSpaceMatrixBinding;
 			LightSpaceMatrixBinding.BufferRegions = &LightSpaceMatrixBufferRegion[i];
@@ -388,17 +388,17 @@ static void LightningPassInit(BmRender_DescriptorPool MainPool)
 			LightSpaceMatrixBinding.DstArrayElement = 0;
 			LightSpaceMatrixBinding.DstBinding = 0;
 
-			BmRender_UpdateDescriptorSet(LightSpaceMatrixSet[i], &LightSpaceMatrixBinding, 1);
+			BmRender_UpdateDescriptorSet(LightSpaceMatrixSet + i, &LightSpaceMatrixBinding, 1);
 
-			ShadowMapElement1ImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_SHADOW_TEXTURES * i, 1);
-			ShadowMapElement2ImageInterface[i] = BmRender_CreateImageView2DArray(ShadowMapArray, MAX_SHADOW_TEXTURES * i + 1, 1);
+			ShadowMapElement1ImageInterface[i] = BmRender_CreateImageView2DArray(&ShadowMapArray, MAX_SHADOW_TEXTURES * i, 1);
+			ShadowMapElement2ImageInterface[i] = BmRender_CreateImageView2DArray(&ShadowMapArray, MAX_SHADOW_TEXTURES * i + 1, 1);
 		}
 	}
 
 	AttachmentData ResourceInfo;
 	ResourceInfo.ColorAttachmentCount = 0;
 	ResourceInfo.DepthAttachment = ShadowMapElement1ImageInterface[0];
-	ResourceInfo.StencilAttachment = nullptr;
+	ResourceInfo.StencilAttachment = {};
 
 	std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
 	descriptorSetLayouts.push_back(FrameDataLayout);
@@ -418,7 +418,7 @@ static void LightningPassDraw(DrawScene* Scene)
 		&Scene->FrameDataBuffer.spotlight.LightSpaceMatrix,
 	};
 
-	BmRender_TransitionImageForRendering(RenderCommandBuffers[CurrentFrame], ShadowMapArray, MAX_SHADOW_TEXTURES * CurrentFrame, MAX_SHADOW_TEXTURES);
+	BmRender_TransitionImageForRendering(RenderCommandBuffers[CurrentFrame], &ShadowMapArray, MAX_SHADOW_TEXTURES * CurrentFrame, MAX_SHADOW_TEXTURES);
 
 	for (u32 LightCaster = 0; LightCaster < MAX_SHADOW_TEXTURES; ++LightCaster)
 	{
@@ -455,18 +455,18 @@ static void LightningPassDraw(DrawScene* Scene)
 	}
 
 	// TODO: move to Main pass?
-	BmRender_TransitionImageForSampling(RenderCommandBuffers[CurrentFrame], ShadowMapArray, MAX_SHADOW_TEXTURES * CurrentFrame, MAX_SHADOW_TEXTURES);
+	BmRender_TransitionImageForSampling(RenderCommandBuffers[CurrentFrame], &ShadowMapArray, MAX_SHADOW_TEXTURES * CurrentFrame, MAX_SHADOW_TEXTURES);
 }
 
 static void LightningPassDeInit()
 {
 	for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 	{
-		BmRender_DestroyGPUBuffer(LightSpaceMatrixBuffers[i]);
+		BmRender_DestroyGPUBuffer(LightSpaceMatrixBuffers + i);
 		BmRender_DestroyImageView(ShadowMapElement1ImageInterface[i]);
 		BmRender_DestroyImageView(ShadowMapElement2ImageInterface[i]);
 	}
-	BmRender_DestroyImage(ShadowMapArray);
+	BmRender_DestroyImage(&ShadowMapArray);
 }
 
 static void MainPassInit()
@@ -474,7 +474,7 @@ static void MainPassInit()
 	MainPassPipelineAttachmentData.ColorAttachmentCount = 1;
 	MainPassPipelineAttachmentData.ColorAttachments[0] = TestDeferredInputColorImageInterface()[0];
 	MainPassPipelineAttachmentData.DepthAttachment = TestDeferredInputDepthImageInterface()[0];
-	MainPassPipelineAttachmentData.StencilAttachment = nullptr;
+	MainPassPipelineAttachmentData.StencilAttachment = {};
 }
 
 static void MainPassBeginPass()
@@ -498,8 +498,8 @@ static void MainPassBeginPass()
 	RenderingInfo.ColorAttachmentCount = 1;
 	RenderingInfo.DepthAttachment = &DepthAttachment;
 
-	BmRender_TransitionImageForRendering(RenderCommandBuffers[CurrentFrame], TestDeferredInputColorImage()[CurrentFrame]);
-	BmRender_TransitionImageForRendering(RenderCommandBuffers[CurrentFrame], TestDeferredInputDepthImage()[CurrentFrame]);
+	BmRender_TransitionImageForRendering(RenderCommandBuffers[CurrentFrame], TestDeferredInputColorImage() + CurrentFrame);
+	BmRender_TransitionImageForRendering(RenderCommandBuffers[CurrentFrame], TestDeferredInputDepthImage() + CurrentFrame);
 
 	BmRender_BeginRendering(RenderCommandBuffers[CurrentFrame], &RenderingInfo);
 }
@@ -555,7 +555,7 @@ void Render_Init(GLFWwindow* WindowHandler)
 
 	for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); ++i)
 	{
-		RenderCommandBuffers[i] = BmRender_AllocateCommandBuffer(RenderCommandPool);
+		RenderCommandBuffers[i] = BmRender_AllocateCommandBuffer(&RenderCommandPool);
 		InFlightFence[i] = BmRender_CreateFence();
 		ImageAvailable[i] = BmRender_CreateSemaphore();
 		RenderFinished[i] = BmRender_CreateSemaphore();
@@ -564,10 +564,10 @@ void Render_Init(GLFWwindow* WindowHandler)
 	DescriptorSets = DescriptorSetHandles();
 
 	{
-		FrameBufferBinding[0] = { FrameDataBuffer, 0, sizeof(Shader_FrameData) };
-		BmRender_GPUBufferUpdateData VertexBufferRegion = { VertexBuffer, 0, VK_WHOLE_SIZE };
-		BmRender_GPUBufferUpdateData InstanceBufferRegion = { InstanceBuffer, 0, VK_WHOLE_SIZE };
-		BmRender_GPUBufferUpdateData MaterialBufferRegion = { MaterialBuffer, 0, VK_WHOLE_SIZE };
+		FrameBufferBinding[0] = { &FrameDataBuffer, 0, sizeof(Shader_FrameData) };
+		BmRender_GPUBufferUpdateData VertexBufferRegion = { &VertexBuffer, 0, VK_WHOLE_SIZE };
+		BmRender_GPUBufferUpdateData InstanceBufferRegion = { &InstanceBuffer, 0, VK_WHOLE_SIZE };
+		BmRender_GPUBufferUpdateData MaterialBufferRegion = { &MaterialBuffer, 0, VK_WHOLE_SIZE };
 
 		const u32 DescriptorCount = 5;
 		BmRender_DescriptorSetLayoutBinding LayoutBindings[DescriptorCount];
@@ -615,8 +615,8 @@ void Render_Init(GLFWwindow* WindowHandler)
 		Updates[3].DstBinding = 4;
 
 		FrameDataLayout = BmRender_CreateDescriptorSetLayout(LayoutBindings, DescriptorCount);
-		DescriptorSets.FrameBufferSet = BmRender_CreateDescriptorSet(FrameDataLayout, MainPool);
-		BmRender_UpdateDescriptorSet(DescriptorSets.FrameBufferSet, Updates, UpdatesCount);
+		DescriptorSets.FrameBufferSet = BmRender_CreateDescriptorSet(&FrameDataLayout, MainPool);
+		BmRender_UpdateDescriptorSet(&DescriptorSets.FrameBufferSet, Updates, UpdatesCount);
 	}
 
 	State.DescriptorSets = DescriptorSets;
@@ -639,10 +639,10 @@ void Render_DeInit()
 	BmRender_DestroySampler(ColorAttachmentSampler);
 	BmRender_DestroySampler(DepthAttachmentSampler);
 
-	BmRender_DestroyDescriptorSetLayout(FrameDataLayout);
-	BmRender_DestroyDescriptorSetLayout(ShadowMapArrayLayout);
-	BmRender_DestroyDescriptorSetLayout(MainPassOutputLayout);
-	BmRender_DestroyDescriptorSetLayout(LightSpaceMatrixLayout);
+	BmRender_DestroyDescriptorSetLayout(&FrameDataLayout);
+	BmRender_DestroyDescriptorSetLayout(&ShadowMapArrayLayout);
+	BmRender_DestroyDescriptorSetLayout(&MainPassOutputLayout);
+	BmRender_DestroyDescriptorSetLayout(&LightSpaceMatrixLayout);
 
 	DeInitImGuiPipeline(State.DebugUiPool);
 
@@ -662,11 +662,11 @@ void Render_DeInit()
 	BmRender_DestroyDescriptorPool(State.MainPool);
 
 	// Destroy GPUBuffers
-	BmRender_DestroyGPUBuffer(VertexBuffer);
-	BmRender_DestroyGPUBuffer(IndexBuffer);
-	BmRender_DestroyGPUBuffer(InstanceBuffer);
-	BmRender_DestroyGPUBuffer(MaterialBuffer);
-	BmRender_DestroyGPUBuffer(FrameDataBuffer);
+	BmRender_DestroyGPUBuffer(&VertexBuffer);
+	BmRender_DestroyGPUBuffer(&IndexBuffer);
+	BmRender_DestroyGPUBuffer(&InstanceBuffer);
+	BmRender_DestroyGPUBuffer(&MaterialBuffer);
+	BmRender_DestroyGPUBuffer(&FrameDataBuffer);
 }
 
 void Render_Draw(DrawScene* Scene, u64 WaitSemaphoreValue)
@@ -757,22 +757,22 @@ DescriptorSetHandles* GetHandles()
 	return &DescriptorSets;
 }
 
-BmRender_GPUBuffer GetVertexBuffer()
+BmRender_GPUBuffer* GetVertexBuffer()
 {
-	return VertexBuffer;
+	return &VertexBuffer;
 }
 
-BmRender_GPUBuffer GetIndexBuffer()
+BmRender_GPUBuffer* GetIndexBuffer()
 {
-	return IndexBuffer;
+	return &IndexBuffer;
 }
 
-BmRender_GPUBuffer GetInstanceBuffer()
+BmRender_GPUBuffer* GetInstanceBuffer()
 {
-	return InstanceBuffer;
+	return &InstanceBuffer;
 }
 
-BmRender_GPUBuffer GetMaterialBuffer()
+BmRender_GPUBuffer* GetMaterialBuffer()
 {
-	return MaterialBuffer;
+	return &MaterialBuffer;
 }

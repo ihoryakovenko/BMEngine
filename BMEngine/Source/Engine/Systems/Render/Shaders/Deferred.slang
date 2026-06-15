@@ -30,39 +30,6 @@ float3 Grayscale(float3 Color)
 [[vk::binding(1, 1)]] Sampler2D InputDepth;
 [[vk::binding(2, 1)]] RWTexture2D<float4> OutputTexture;
 
-//[shader("fragment")]
-//PSOutput MainFragment(PSInput input)
-//{
-//    PSOutput output;
-
-//    float4 SceneColor = InputColor.Sample(input.vUV);
-//    float depth = InputDepth.Sample(input.vUV).r;
-
-//    float Gamma = 2.2;
-
-//    int xHalf = 1600;
-
-//    if (false)
-//    {
-//        float lowerBound = 0.99;
-//        float upperBound = 1.0;
-
-//        float depthColorScaled = 1.0 - ((depth - lowerBound) / (upperBound - lowerBound));
-
-//        output.Color = float4(0.0, depthColorScaled, 0.0, SceneColor.a);
-//    }
-//    else
-//    {
-//        // output.Color = float4(Grayscale(SceneColor.rgb), SceneColor.a);
-//        // output.Color = float4(InverseColor(SceneColor.rgb), SceneColor.a);
-//        output.Color = SceneColor;
-//    }
-
-//    output.Color.rgb = pow(output.Color.rgb, float3(1.0 / Gamma));
-
-//    return output;
-//}
-
 [numthreads(8, 8, 1)]
 [shader("compute")]
 void main(uint2 dispatchThreadID: SV_DispatchThreadID)

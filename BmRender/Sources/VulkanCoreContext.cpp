@@ -382,16 +382,17 @@ void CreateCoreContext(VulkanCoreContext* Context, GLFWwindow* Window)
 
 	for (u32 i = 0; i < Context->ImagesCount; ++i)
 	{
-		ImageData ImageResourceData = { };
+		BmRender_Image ImageResourceData = { };
 		ImageResourceData.Type = BmRender_ImageType::TransferSampled;
 		ImageResourceData.Memory = CreateDeviceMemoryHandle(VK_NULL_HANDLE);
 		ImageResourceData.Format = VkFormatToBmRender(Context->SurfaceFormat.format);
 		ImageResourceData.Dimensions.Width = Context->SwapExtent.width;
 		ImageResourceData.Dimensions.Height = Context->SwapExtent.height;
 		ImageResourceData.Size = 0;
+		ImageResourceData.InternalImage = Images[i];
 
-		Context->Images[i] = CreateImageHandle(Images[i], &ImageResourceData);
-		Context->ImageViews[i] = BmRender_CreateImageView2D(Context->Images[i]);
+		Context->Images[i] = ImageResourceData;
+		Context->ImageViews[i] = BmRender_CreateImageView2D(Context->Images + i);
 	}
 }
 

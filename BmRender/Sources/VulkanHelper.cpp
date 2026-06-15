@@ -2172,7 +2172,7 @@ void RenderLog(LogType LogType, const char* Format, va_list Args)
 			vprintf(Format, ArgsCopy);
 			va_end(ArgsCopy);
 			vprintf("\n\033[m", Args);
-			//assert(false);
+			assert(false);
 			break;
 		}
 		case LogType::Warning:

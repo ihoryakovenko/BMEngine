@@ -36,8 +36,8 @@ namespace EngineResources
 
 		BmRender_Image ImageHandle = BmRender_CreateImage2D(Extent.x, Extent.y, Util::GliFormatToVkFormat(Texture.format()), BmRender_ImageType::TransferSampled, BmRender_SampleCount::Count1);
 		Asset.RenderImageHandle = ImageHandle;
-		RenderResources::UpdateImageResource(Asset.RenderImageHandle, &TextureDescription, Texture.data());
-		BmRender_ImageView ViewHandle = BmRender_CreateImageView2D(Asset.RenderImageHandle);
+		RenderResources::UpdateImageResource(&Asset.RenderImageHandle, &TextureDescription, Texture.data());
+		BmRender_ImageView ViewHandle = BmRender_CreateImageView2D(&Asset.RenderImageHandle);
 		Asset.RenderViewHandle = ViewHandle;
 	}
 
@@ -65,8 +65,8 @@ namespace EngineResources
 		DefaultAsset.RenderImageHandle = DefaultImageHandle;
 		DefaultAsset.IsCreated = true;
 
-		RenderResources::UpdateImageResource(DefaultAsset.RenderImageHandle, &DefaultTextureDescription, DefaultTexture.data());
-		BmRender_ImageView DefaultViewHandle = BmRender_CreateImageView2D(DefaultAsset.RenderImageHandle);
+		RenderResources::UpdateImageResource(&DefaultAsset.RenderImageHandle, &DefaultTextureDescription, DefaultTexture.data());
+		BmRender_ImageView DefaultViewHandle = BmRender_CreateImageView2D(&DefaultAsset.RenderImageHandle);
 		DefaultAsset.RenderViewHandle = DefaultViewHandle;
 
 		BmRender_DescriptorSetUpdateData DiffuseBinding;
@@ -79,7 +79,7 @@ namespace EngineResources
 
 		BmRender_DescriptorSetUpdateData Bindings[] = { DiffuseBinding };
 
-		BmRender_UpdateDescriptorSet(GetHandles()->FrameBufferSet, Bindings, 1);
+		BmRender_UpdateDescriptorSet(&GetHandles()->FrameBufferSet, Bindings, 1);
 	}
 
 	void DeInit()
@@ -89,14 +89,14 @@ namespace EngineResources
 			if (asset.IsCreated)
 			{
 				BmRender_DestroyImageView(asset.RenderViewHandle);
-				BmRender_DestroyImage(asset.RenderImageHandle);
+				BmRender_DestroyImage(&asset.RenderImageHandle);
 			}
 		}
 
 		if (DefaultAsset.IsCreated)
 		{
 			BmRender_DestroyImageView(DefaultAsset.RenderViewHandle);
-			BmRender_DestroyImage(DefaultAsset.RenderImageHandle);
+			BmRender_DestroyImage(&DefaultAsset.RenderImageHandle);
 		}
 
 		TextureAssets.clear();
@@ -164,7 +164,7 @@ namespace EngineResources
 
 							BmRender_DescriptorSetUpdateData Bindings[] = { DiffuseBinding };
 
-							BmRender_UpdateDescriptorSet(GetHandles()->FrameBufferSet, Bindings, 1);
+							BmRender_UpdateDescriptorSet(&GetHandles()->FrameBufferSet, Bindings, 1);
 
 							++TexturesGPUIndexCounter;
 						}

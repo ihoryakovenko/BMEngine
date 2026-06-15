@@ -49,10 +49,10 @@ BmRender_WaitResult BmRender_WaitForFences(BmRender_Fence Handle, bool WaitAll, 
 	}
 }
 
-u64 BmRender_GetBufferDeviceAddress(BmRender_GPUBuffer Buffer)
+u64 BmRender_GetBufferDeviceAddress(BmRender_GPUBuffer* Buffer)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	VkBuffer VkBufferHandle = (VkBuffer)Buffer;
+	VkBuffer VkBufferHandle = Buffer->InternalBuffer;
 
 	VkBufferDeviceAddressInfo AddressInfo = {};
 	AddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
@@ -71,7 +71,7 @@ void BmRender_ResetFences(BmRender_Fence Handle)
 void BmRender_GetSemaphoreCounterValue(BmRender_Semaphore Handle, u64* pValue)
 {
 	VkDevice Device = GetCoreContext()->LogicalDevice;
-	VkSemaphore VulkanSemaphore = (VkSemaphore)Handle;
+	VkSemaphore VulkanSemaphore = Handle.InternalSemaphore;
 	VULKAN_CHECK_RESULT(vkGetSemaphoreCounterValue(Device, VulkanSemaphore, pValue));
 }
 
@@ -81,19 +81,19 @@ void BmRender_BeginCommandBuffer(BmRender_CommandBuffer Handle)
 	BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	BeginInfo.flags = 0;
 
-	VkCommandBuffer VulkanCommandBuffer = (VkCommandBuffer)Handle;
+	VkCommandBuffer VulkanCommandBuffer = Handle.InternalBuffer;
 	VULKAN_CHECK_RESULT(vkBeginCommandBuffer(VulkanCommandBuffer, &BeginInfo));
 }
 
 void BmRender_EndCommandBuffer(BmRender_CommandBuffer Handle)
 {
-	VkCommandBuffer VulkanCommandBuffer = (VkCommandBuffer)Handle;
+	VkCommandBuffer VulkanCommandBuffer = Handle.InternalBuffer;
 	VULKAN_CHECK_RESULT(vkEndCommandBuffer(VulkanCommandBuffer));
 }
 
 void BmRender_QueueWaitIdle(BmRender_Queue Queue)
 {
-	vkQueueWaitIdle((VkQueue)Queue);
+	vkQueueWaitIdle(Queue.InternalQueue);
 }
 
 void BmRender_DeviceWaitIdle()
@@ -102,16 +102,13 @@ void BmRender_DeviceWaitIdle()
 	vkDeviceWaitIdle(Device);
 }
 
-void BmRender_TransitionImageForRendering(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer, u32 LayersCount)
+void BmRender_TransitionImageForRendering(BmRender_CommandBuffer CommandBuffer, BmRender_Image* Image, u32 BaseLayer, u32 LayersCount)
 {
-	ImageData Data;
-	BmRender_GetImageData(Image, &Data);
-
 	VkImageAspectFlags AspectFlags;
 	VkPipelineStageFlags2 DstStageMask;
 	VkAccessFlags2 DstAccessMask;
 	VkImageLayout NewLayout;
-	switch (Data.Type)
+	switch (Image->Type)
 	{
 		case BmRender_ImageType::ColorAttachmentSampled:
 		case BmRender_ImageType::TransferSampled:
@@ -144,7 +141,7 @@ void BmRender_TransitionImageForRendering(BmRender_CommandBuffer CommandBuffer, 
 	Barrier.dstAccessMask = DstAccessMask;
 	Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	Barrier.image = (VkImage)Image;
+	Barrier.image = Image->InternalImage;
 	Barrier.subresourceRange.aspectMask = AspectFlags;
 	Barrier.subresourceRange.baseMipLevel = 0;
 	Barrier.subresourceRange.levelCount = 1;
@@ -156,19 +153,16 @@ void BmRender_TransitionImageForRendering(BmRender_CommandBuffer CommandBuffer, 
 	DepInfo.imageMemoryBarrierCount = 1;
 	DepInfo.pImageMemoryBarriers = &Barrier;
 
-	vkCmdPipelineBarrier2((VkCommandBuffer)CommandBuffer, &DepInfo);
+	vkCmdPipelineBarrier2(CommandBuffer.InternalBuffer, &DepInfo);
 }
 
-void BmRender_TransitionImageForSampling(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer, u32 LayersCount)
+void BmRender_TransitionImageForSampling(BmRender_CommandBuffer CommandBuffer, BmRender_Image* Image, u32 BaseLayer, u32 LayersCount)
 {
-	ImageData Data;
-	BmRender_GetImageData(Image, &Data);
-
 	VkImageAspectFlags AspectFlags;
 	VkPipelineStageFlags2 SrcStageMask;
 	VkAccessFlags2 SrcAccessMask;
 	VkImageLayout OldLayout;
-	switch (Data.Type)
+	switch (Image->Type)
 	{
 		case BmRender_ImageType::ColorAttachmentSampled:
 		case BmRender_ImageType::TransferSampled:
@@ -202,7 +196,7 @@ void BmRender_TransitionImageForSampling(BmRender_CommandBuffer CommandBuffer, B
 	Barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
 	Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	Barrier.image = (VkImage)Image;
+	Barrier.image = Image->InternalImage;
 	Barrier.subresourceRange.aspectMask = AspectFlags;
 	Barrier.subresourceRange.baseMipLevel = 0;
 	Barrier.subresourceRange.levelCount = 1;
@@ -214,10 +208,10 @@ void BmRender_TransitionImageForSampling(BmRender_CommandBuffer CommandBuffer, B
 	DepInfo.imageMemoryBarrierCount = 1;
 	DepInfo.pImageMemoryBarriers = &Barrier;
 
-	vkCmdPipelineBarrier2((VkCommandBuffer)CommandBuffer, &DepInfo);
+	vkCmdPipelineBarrier2(CommandBuffer.InternalBuffer, &DepInfo);
 }
 
-void BmRender_TransitionImageForPresentation(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer, u32 LayersCount)
+void BmRender_TransitionImageForPresentation(BmRender_CommandBuffer CommandBuffer, BmRender_Image* Image, u32 BaseLayer, u32 LayersCount)
 {
 	VkImageMemoryBarrier2 Barrier = { };
 	Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -225,7 +219,7 @@ void BmRender_TransitionImageForPresentation(BmRender_CommandBuffer CommandBuffe
 	Barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 	Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	Barrier.image = (VkImage)Image;
+	Barrier.image = Image->InternalImage;
 	Barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	Barrier.subresourceRange.baseMipLevel = 0;
 	Barrier.subresourceRange.levelCount = 1;
@@ -241,10 +235,10 @@ void BmRender_TransitionImageForPresentation(BmRender_CommandBuffer CommandBuffe
 	DepInfo.imageMemoryBarrierCount = 1;
 	DepInfo.pImageMemoryBarriers = &Barrier;
 
-	vkCmdPipelineBarrier2((VkCommandBuffer)CommandBuffer, &DepInfo);
+	vkCmdPipelineBarrier2(CommandBuffer.InternalBuffer, &DepInfo);
 }
 
-void BmRender_TransitionImageForComputeWrite(BmRender_CommandBuffer CommandBuffer, BmRender_Image Image, u32 BaseLayer, u32 LayersCount)
+void BmRender_TransitionImageForComputeWrite(BmRender_CommandBuffer CommandBuffer, BmRender_Image* Image, u32 BaseLayer, u32 LayersCount)
 {
 	VkImageMemoryBarrier2 Barrier = {};
 	Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -261,7 +255,7 @@ void BmRender_TransitionImageForComputeWrite(BmRender_CommandBuffer CommandBuffe
 	Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
-	Barrier.image = (VkImage)Image;
+	Barrier.image = Image->InternalImage;
 
 	Barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	Barrier.subresourceRange.baseMipLevel = 0;
@@ -274,22 +268,22 @@ void BmRender_TransitionImageForComputeWrite(BmRender_CommandBuffer CommandBuffe
 	DepInfo.imageMemoryBarrierCount = 1;
 	DepInfo.pImageMemoryBarriers = &Barrier;
 
-	vkCmdPipelineBarrier2((VkCommandBuffer)CommandBuffer, &DepInfo);
+	vkCmdPipelineBarrier2(CommandBuffer.InternalBuffer, &DepInfo);
 }
 
-void BmRender_RecordUpdateGPULocalBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer DstBuffer, BmRender_GPUBuffer SrcBuffer, u64 SrcOffset, u64 DstOffset, u64 DataSize)
+void BmRender_RecordUpdateGPULocalBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer* DstBuffer, BmRender_GPUBuffer* SrcBuffer, u64 SrcOffset, u64 DstOffset, u64 DataSize)
 {
 	VkBufferCopy CopyRegion = { };
 	CopyRegion.srcOffset = SrcOffset;
 	CopyRegion.dstOffset = DstOffset;
 	CopyRegion.size = DataSize;
 
-	vkCmdCopyBuffer((VkCommandBuffer)CommandBuffer, (VkBuffer)SrcBuffer, (VkBuffer)DstBuffer, 1, &CopyRegion);
+	vkCmdCopyBuffer(CommandBuffer.InternalBuffer, SrcBuffer->InternalBuffer, DstBuffer->InternalBuffer, 1, &CopyRegion);
 }
 
 void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRender_RenderingInfo* pRenderingInfo)
 {
-	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
+	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
 
 	VkRenderingAttachmentInfo* ColorAttachments = nullptr;
 	VkRenderingAttachmentInfo* DepthAttachment = nullptr;
@@ -302,22 +296,16 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 		VkRenderingAttachmentInfo* VkAttachment = ColorAttachments + i;
 		*VkAttachment = { };
 		VkAttachment->sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		VkAttachment->imageView = (VkImageView)Attachment.ImageView;
+		VkAttachment->imageView = Attachment.ImageView.InternalView;
 		VkAttachment->imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		VkAttachment->loadOp = AttachmentLoadOpToVk(Attachment.LoadOp);
 		VkAttachment->storeOp = AttachmentStoreOpToVk(Attachment.StoreOp);
 		VkAttachment->clearValue.color = ClearColorValueToVk(Attachment.ClearValue);
 
 		VkAttachment->resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		VkAttachment->resolveImageView = (VkImageView)Attachment.ResolveImageView;
+		VkAttachment->resolveImageView = Attachment.ResolveImageView.InternalView;
 
-		ImageViewData ViewData;
-		BmRender_GetImageViewData(Attachment.ImageView, &ViewData);
-
-		ImageData ImageData;
-		BmRender_GetImageData(ViewData.Image, &ImageData);
-
-		if (ImageData.SampleCount > BmRender_SampleCount::Count1)
+		if (Attachment.ImageView.Image->SampleCount > BmRender_SampleCount::Count1)
 		{
 			VkAttachment->resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
 		}
@@ -329,7 +317,7 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 		const BmRender_RenderingDepthAttachment& Attachment = *pRenderingInfo->DepthAttachment;
 
 		DepthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		DepthAttachmentInfo.imageView = (VkImageView)Attachment.ImageView;
+		DepthAttachmentInfo.imageView = Attachment.ImageView.InternalView;
 		DepthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		DepthAttachmentInfo.loadOp = AttachmentLoadOpToVk(Attachment.LoadOp);
 		DepthAttachmentInfo.storeOp = AttachmentStoreOpToVk(Attachment.StoreOp);
@@ -353,15 +341,11 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 
 void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline)
 {
-	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
+	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
 	VkPipelineBindPoint BindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 
 	BmRender_PipelineLayout PipelineLayout = BmRender_GetPipelineLayout(Pipeline);
-	PipelineLayoutData LayoutData;
-	if (BmRender_GetPipelineLayoutData(PipelineLayout, &LayoutData))
-	{
-		BindPoint = PipelineTypeToVkPipelineBindPoint(LayoutData.PipelineType);
-	}
+	BindPoint = PipelineTypeToVkPipelineBindPoint(PipelineLayout.PipelineType);
 
 	vkCmdBindPipeline(VkCmdBuffer, BindPoint, (VkPipeline)Pipeline);
 }
@@ -369,72 +353,73 @@ void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeli
 void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* pValues)
 {
 	BmRender_PipelineLayout PipelineLayout = BmRender_GetPipelineLayout(Pipeline);
-	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
-	VkPipelineLayout Layout = (VkPipelineLayout)PipelineLayout;
-	vkCmdPushConstants(VkCmdBuffer, Layout, ShaderStageFlagsToVk(StageFlags), Offset, Size, pValues);
+	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
+	vkCmdPushConstants(VkCmdBuffer, PipelineLayout.InternalLayout, ShaderStageFlagsToVk(StageFlags), Offset, Size, pValues);
 }
 
 void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets)
 {
 	BmRender_PipelineLayout PipelineLayout = BmRender_GetPipelineLayout(Pipeline);
 
-	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
-	VkPipelineLayout Layout = (VkPipelineLayout)PipelineLayout;
+	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
+	VkPipelineLayout Layout = PipelineLayout.InternalLayout;
 	
-	PipelineLayoutData LayoutData;
-	if (BmRender_GetPipelineLayoutData(PipelineLayout, &LayoutData))
-	{
-		VkPipelineBindPoint BindPoint = PipelineTypeToVkPipelineBindPoint(LayoutData.PipelineType);
+	VkPipelineBindPoint BindPoint = PipelineTypeToVkPipelineBindPoint(PipelineLayout.PipelineType);
 		
-		vkCmdBindDescriptorSets(VkCmdBuffer, BindPoint, Layout, FirstSet, DescriptorSetCount, 
-			(const VkDescriptorSet*)pDescriptorSets, DynamicOffsetCount, pDynamicOffsets);
+	VkDescriptorSet* Sets = (VkDescriptorSet*)Memory_LinearAllocator_Alloc(GetFrameMemory(), sizeof(VkDescriptorSet) * DescriptorSetCount);
+	for (u32 i = 0; i < DescriptorSetCount; ++i)
+	{
+		Sets[i] = pDescriptorSets[i].InternalSet;
 	}
+
+	vkCmdBindDescriptorSets(VkCmdBuffer, BindPoint, Layout, FirstSet, DescriptorSetCount, 
+		Sets, DynamicOffsetCount, pDynamicOffsets);
 }
 
 void BmRender_RecordBindVertexBuffers(BmRender_CommandBuffer CommandBuffer, u32 FirstBinding, u32 BindingCount, const BmRender_GPUBuffer* Buffers, const u64* Offsets)
 {
-	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
+	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
 	const VkBuffer* VkBuffers = (const VkBuffer*)Buffers;
 	
 	vkCmdBindVertexBuffers(VkCmdBuffer, FirstBinding, BindingCount, VkBuffers, Offsets);
 }
 
-void BmRender_RecordBindIndexBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer Buffer, u64 Offset, BmRender_IndexType IndexType)
+void BmRender_RecordBindIndexBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer* Buffer, u64 Offset, BmRender_IndexType IndexType)
 {
-	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
-	VkBuffer VkBufferHandle = (VkBuffer)Buffer;
+	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
+	VkBuffer VkBufferHandle = Buffer->InternalBuffer;
 	vkCmdBindIndexBuffer(VkCmdBuffer, VkBufferHandle, Offset, IndexTypeToVk(IndexType));
 }
 
 void BmRender_Draw(BmRender_CommandBuffer CommandBuffer, u32 VertexCount, u32 InstanceCount, u32 FirstVertex, u32 FirstInstance)
 {
-	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
+	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
 	vkCmdDraw(VkCmdBuffer, VertexCount, InstanceCount, FirstVertex, FirstInstance);
 }
 
 void BmRender_DrawIndexed(BmRender_CommandBuffer CommandBuffer, u32 IndexCount, u32 InstanceCount, u32 FirstIndex, u32 VertexOffset, u32 FirstInstance)
 {
-	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
+	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
 	vkCmdDrawIndexed(VkCmdBuffer, IndexCount, InstanceCount, FirstIndex, VertexOffset, FirstInstance);
 }
 
-void BmRender_RecordDrawIndexedIndirect(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer IndirectBuffer, u64 Offset, u32 DrawCount, u32 Stride)
+void BmRender_RecordDrawIndexedIndirect(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer* IndirectBuffer, u64 Offset, u32 DrawCount, u32 Stride)
 {
-	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
-	VkBuffer VkIndirectBuffer = (VkBuffer)IndirectBuffer;
+	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
+	VkBuffer VkIndirectBuffer = IndirectBuffer->InternalBuffer;
 	vkCmdDrawIndexedIndirect(VkCmdBuffer, VkIndirectBuffer, Offset, DrawCount, Stride);
 
 }
 
 void BmRender_RecordDispatch(BmRender_CommandBuffer CommandBuffer, u32 GroupCountX, u32 GroupCountY, u32  GroupCountZ)
 {
-	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
+	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
 	vkCmdDispatch(VkCmdBuffer, GroupCountX, GroupCountY, GroupCountZ);
 }
 
 void BmRender_EndRendering(BmRender_CommandBuffer CommandBuffer)
 {
-	VkCommandBuffer VkCmdBuffer = (VkCommandBuffer)CommandBuffer;
+	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
 	vkCmdEndRendering(VkCmdBuffer);
 }
 
@@ -489,29 +474,29 @@ void BmRender_QueueSubmit(BmRender_Queue Queue, u32 SubmitCount, const BmRender_
 		for (u32 j = 0; j < Submit.WaitSemaphoreCount; ++j)
 		{
 			WaitValues[j] = 0;
-			WaitSemaphores[j] = (VkSemaphore)Submit.WaitSemaphores[j];
+			WaitSemaphores[j] = Submit.WaitSemaphores[j].InternalSemaphore;
 		}
 
 		for (u32 j = 0; j < Submit.WaitTimelineSemaphoreCount; ++j)
 		{
 			WaitValues[Submit.WaitSemaphoreCount + j] = Submit.WaitTimelineSemaphores[j].Value;
-			WaitSemaphores[Submit.WaitSemaphoreCount + j] = (VkSemaphore)Submit.WaitTimelineSemaphores[j].Semaphore;
+			WaitSemaphores[Submit.WaitSemaphoreCount + j] = Submit.WaitTimelineSemaphores[j].Semaphore.InternalSemaphore;
 		}
 
 		for (u32 j = 0; j < Submit.SignalSemaphoreCount; ++j)
 		{
 			SignalValues[j] = 0;
-			SignalSemaphores[j] = (VkSemaphore)Submit.SignalSemaphores[j];
+			SignalSemaphores[j] = Submit.SignalSemaphores[j].InternalSemaphore;
 		}
 
 		for (u32 j = 0; j < Submit.SignalTimelineSemaphoreCount; ++j)
 		{
 			SignalValues[Submit.SignalSemaphoreCount + j] = Submit.SignalTimelineSemaphores[j].Value;
-			SignalSemaphores[Submit.SignalSemaphoreCount + j] = (VkSemaphore)Submit.SignalTimelineSemaphores[j].Semaphore;
+			SignalSemaphores[Submit.SignalSemaphoreCount + j] = (VkSemaphore)Submit.SignalTimelineSemaphores[j].Semaphore.InternalSemaphore;
 		}
 	}
 
-	VkQueue VkQueueHandle = (VkQueue)Queue;
+	VkQueue VkQueueHandle = Queue.InternalQueue;
 	VULKAN_CHECK_RESULT(vkQueueSubmit(VkQueueHandle, SubmitCount, VkSubmits, VkFenceHandle));
 }
 
@@ -531,10 +516,10 @@ BmRender_SwapchainResult BmRender_QueuePresent(BmRender_Queue Queue, const BmRen
 
 	for (u32 i = 0; i < pPresentInfo->WaitSemaphoreCount; ++i)
 	{
-		WaitSemaphores[i] = (VkSemaphore)pPresentInfo->WaitSemaphores[i];
+		WaitSemaphores[i] = pPresentInfo->WaitSemaphores[i].InternalSemaphore;
 	}
 
-	VkQueue VkQueueHandle = (VkQueue)Queue;
+	VkQueue VkQueueHandle = Queue.InternalQueue;
 	VkResult Result = vkQueuePresentKHR(VkQueueHandle, &PresentInfo);
 
 	if (Result == VK_SUCCESS)
@@ -563,7 +548,7 @@ BmRender_SwapchainResult BmRender_AcquireNextSwapchainImage(u64 Timeout, BmRende
 
 	VkSwapchainKHR Swapchain = CoreContext->VulkanSwapchain;
 	VkFence VkFenceHandle = Fence != nullptr ? (VkFence)Fence : VK_NULL_HANDLE;
-	VkResult Result = vkAcquireNextImageKHR(Device, Swapchain, Timeout, (VkSemaphore)Semaphore, VkFenceHandle, pImageIndex);
+	VkResult Result = vkAcquireNextImageKHR(Device, Swapchain, Timeout, Semaphore.InternalSemaphore, VkFenceHandle, pImageIndex);
 
 	if (Result == VK_SUCCESS)
 	{
