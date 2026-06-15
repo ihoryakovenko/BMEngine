@@ -1,93 +1,76 @@
 #include "RenderInterface.h"
 
-#include "VulkanHelper.h"
-#include "RenderTypes.h"
+#include <SharedLib.h>
 
-#include <type_traits>
+#include <cstdarg>
+#include <stdio.h>
+#include <cassert>
 
-#include "VulkanCoreContext.h"
+#include "RenderInternal.h"
+
+Memory_LinearAllocator FrameMemory;
 
 void BmRender_Init(GLFWwindow* WindowHandler)
 {
-	InitializeFrameMemory();
-
-	CreateCoreContext(WindowHandler);
+	Memory_LinearAllocator_Init(&FrameMemory, 1024 * 1024);
+	InitBackend(WindowHandler);
 }
 
 void BmRender_DeInit()
 {
-	DestroyCoreContext();
-	DeMemory_LinearAllocator_Init();
-}
-
-u32 BmRender_GetSwapchainImageCount()
-{
-	return GetCoreContext()->ImagesCount;
-}
-
-BmRender_SurfaceFormat BmRender_GetSurfaceFormat()
-{
-	return VkSurfaceFormatToBmRender(GetCoreContext()->SurfaceFormat);
-}
-
-BmRender_Image* BmRender_GetSwapchainImage(u32 Index)
-{
-	VulkanCoreContext* CoreContext = GetCoreContext();
-	if (Index >= CoreContext->ImagesCount)
-	{
-		return nullptr;
-	}
-	return CoreContext->Images + Index;
-}
-
-BmRender_ImageView BmRender_GetSwapchainImageView(u32 Index)
-{
-	VulkanCoreContext* CoreContext = GetCoreContext();
-	if (Index >= CoreContext->ImagesCount)
-	{
-		return { };
-	}
-	return CoreContext->ImageViews[Index];
-}
-
-BmRender_Dimensions BmRender_GetSwapchainExtent()
-{
-	return VkExtent2DToBmRender(GetCoreContext()->SwapExtent);
-}
-
-BmRender_Instance BmRender_GetVulkanInstance()
-{
-	return (BmRender_Instance)GetCoreContext()->VulkanInstance;
-}
-
-BmRender_PhysicalDevice BmRender_GetPhysicalDevice()
-{
-	return (BmRender_PhysicalDevice)GetCoreContext()->PhysicalDevice;
-}
-
-BmRender_Device BmRender_GetLogicalDevice()
-{
-	return (BmRender_Device)GetCoreContext()->LogicalDevice;
-}
-
-u32 BmRender_GetGraphicsQueueFamily()
-{
-	return (u32)GetCoreContext()->Indices.GraphicsFamily;
-}
-
-u32 BmRender_GetQueueFamily(BmRender_Queue Queue)
-{
-	VulkanCoreContext* CoreContext = GetCoreContext();
-	s32 FamilyIndex = GetQueueFamilyIndexFromQueueType(Queue.QueueType, CoreContext->Indices);
-	if (FamilyIndex != -1)
-	{
-		return (u32)FamilyIndex;
-	}
-
-	return 0;
+	DeInitBackend();
+	Memory_LinearAllocator_Free(&FrameMemory);
 }
 
 void BmRender_FrameFree()
 {
-	Memory_LinearAllocator_FreeMemory(GetFrameMemory());
+	Memory_LinearAllocator_FreeMemory(&FrameMemory);
+}
+
+void RenderLog(LogType LogType, const char* Format, va_list Args);
+
+void RenderLog(LogType logType, const char* format, ...)
+{
+	va_list args;
+	va_start(args, format);
+	RenderLog(logType, format, args);
+	va_end(args);
+}
+
+void RenderLog(LogType LogType, const char* Format, va_list Args)
+{
+	switch (LogType)
+	{
+	case LogType::Error:
+	{
+		vprintf("\033[31;5mError: ", Args);
+		va_list ArgsCopy;
+		va_copy(ArgsCopy, Args);
+		vprintf(Format, ArgsCopy);
+		va_end(ArgsCopy);
+		vprintf("\n\033[m", Args);
+		assert(false);
+		break;
+	}
+	case LogType::Warning:
+	{
+		vprintf("\033[33;5mWarning: ", Args);
+		va_list ArgsCopy;
+		va_copy(ArgsCopy, Args);
+		vprintf(Format, ArgsCopy);
+		va_end(ArgsCopy);
+		vprintf("\n\033[m", Args);
+		break;
+	}
+	case LogType::Info:
+	{
+		vprintf("Info: ", Args);
+		va_list ArgsCopy;
+		va_copy(ArgsCopy, Args);
+		vprintf(Format, ArgsCopy);
+		va_end(ArgsCopy);
+		vprintf("\n", Args);
+		break;
+	}
+	}
 }

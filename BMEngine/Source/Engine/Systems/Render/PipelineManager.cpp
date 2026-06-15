@@ -170,7 +170,7 @@ void PipelineManager_Update()
 			for (u32 j = 0; j < Metadata->StageCount; ++j)
 			{
 				BmRender_ShaderStageDescription* Stage = StageDescriptions + j;
-				Stage->Shader = Shaders[i];
+				Stage->Shader = &Shaders[i];
 				Stage->EntryPointFunction = Metadata->Stages[j].EntryPoint;
 				Stage->Stage = Metadata->Stages[j].Stage;
 			}
@@ -211,7 +211,7 @@ void PipelineManager_CreatePipeline(PipelineNames Name, const BmRender_PipelineS
 	for (u32 i = 0; i < Metadata->StageCount; ++i)
 	{
 		BmRender_ShaderStageDescription* Stage = StageDescriptions + i;
-		Stage->Shader = Shaders[(u32)Name];
+		Stage->Shader = &Shaders[(u32)Name];
 		Stage->EntryPointFunction = Metadata->Stages[i].EntryPoint;
 		Stage->Stage = Metadata->Stages[i].Stage;
 	}
@@ -235,7 +235,7 @@ void PipelineManager_CreateComputePipeline(PipelineNames Name)
 	for (u32 i = 0; i < Metadata->StageCount; ++i)
 	{
 		BmRender_ShaderStageDescription* Stage = StageDescriptions + i;
-		Stage->Shader = Shaders[(u32)Name];
+		Stage->Shader = &Shaders[(u32)Name];
 		Stage->EntryPointFunction = Metadata->Stages[i].EntryPoint;
 		Stage->Stage = Metadata->Stages[i].Stage;
 	}

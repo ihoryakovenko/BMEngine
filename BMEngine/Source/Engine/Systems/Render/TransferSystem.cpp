@@ -285,7 +285,7 @@ namespace TransferSystem
 		++TransferState.CompletedTransfer;
 
 		BmRender_TimelineSemaphoreSubmit SignalTimelineSemaphore;
-		SignalTimelineSemaphore.Semaphore = TransferState.TransferSemaphore;
+		SignalTimelineSemaphore.Semaphore = &TransferState.TransferSemaphore;
 		SignalTimelineSemaphore.Value = TransferState.CompletedTransfer;
 
 		BmRender_SubmitInfo SubmitInfo = { };

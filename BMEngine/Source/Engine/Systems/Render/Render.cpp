@@ -22,13 +22,15 @@
 #include <Engine/Generated/ShaderRegistry.generated.h>
 
 
-#include <RenderHelper.h>
 #include "PipelineMetadata.h"
 
 #include <random>
 #include <mutex>
 
 #include <SharedLib.h>
+
+#define DEFINE_ENUM_OR(EnumType) constexpr inline EnumType operator| (EnumType lhs, EnumType rhs) { return (EnumType)((u64)(lhs) | (u64)(rhs)); }
+DEFINE_ENUM_OR(BmRender_DescriptorShaderStage);
 
 static BmRender_Semaphore ImageAvailable[MAX_DRAW_FRAMES];
 static BmRender_Semaphore RenderFinished[MAX_DRAW_FRAMES];
@@ -128,9 +130,9 @@ static void InitImGuiPipeline(BmRender_DescriptorPool* ImGuiPool, GLFWwindow* Wn
 	}
 
 	VkFormat DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
-	if (AttachmentDataPtr->DepthAttachment.Format != BmRender_Format::Undefined)
+	if (AttachmentDataPtr->DepthAttachment)
 	{
-		const BmRender_Format Format = AttachmentDataPtr->DepthAttachment.Format;
+		const BmRender_Format Format = AttachmentDataPtr->DepthAttachment->Format;
 		if (Format != BmRender_Format::Undefined)
 		{
 			DepthAttachmentFormat = BmRender_FormatToVk(Format);
@@ -138,9 +140,9 @@ static void InitImGuiPipeline(BmRender_DescriptorPool* ImGuiPool, GLFWwindow* Wn
 	}
 
 	VkFormat StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
-	if (AttachmentDataPtr->StencilAttachment.Format != BmRender_Format::Undefined)
+	if (AttachmentDataPtr->StencilAttachment)
 	{
-		const BmRender_Format Format = AttachmentDataPtr->StencilAttachment.Format;
+		const BmRender_Format Format = AttachmentDataPtr->StencilAttachment->Format;
 		if (Format != BmRender_Format::Undefined)
 		{
 			StencilAttachmentFormat = BmRender_FormatToVk(Format);
@@ -189,7 +191,7 @@ static void DeInitImGuiPipeline(BmRender_DescriptorPool ImGuiPool)
 	BmRender_DestroyDescriptorPool(ImGuiPool);
 }
 
-static void InitStaticMeshPipeline(StaticMeshPipelineDepr* MeshPipeline, BmRender_DescriptorPool MainPool)
+static void InitStaticMeshPipeline(StaticMeshPipelineDepr* MeshPipeline, BmRender_DescriptorPool* MainPool)
 {
 	BmRender_DescriptorSetLayoutBinding LayoutBindings[1];
 	LayoutBindings[0].DescriptorCount = 1;
@@ -203,9 +205,9 @@ static void InitStaticMeshPipeline(StaticMeshPipelineDepr* MeshPipeline, BmRende
 		MeshPipeline->ShadowMapArrayImageInterface[i] = BmRender_CreateImageView2DArray(&ShadowMapArray, MAX_SHADOW_TEXTURES * i, MAX_SHADOW_TEXTURES);
 			
 		BmRender_DescriptorSetUpdateData ShadowMapBinding;
-		ShadowMapBinding.ImageBinding.Sampler = ShadowMapSampler;
+		ShadowMapBinding.ImageBinding.Sampler = &ShadowMapSampler;
 		ShadowMapBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
-		ShadowMapBinding.ImageBinding.ImageView = MeshPipeline->ShadowMapArrayImageInterface[i];
+		ShadowMapBinding.ImageBinding.ImageView = &MeshPipeline->ShadowMapArrayImageInterface[i];
 		ShadowMapBinding.BindingCount = 1;
 		ShadowMapBinding.DstArrayElement = 0;
 		ShadowMapBinding.DstBinding = 0;
@@ -243,7 +245,7 @@ static void DrawStaticMeshes(BmRender_CommandBuffer CommandBuffer, StaticMeshPip
 	GenericDraw(CommandBuffer, Scene, PipelineManager_GetPipeline(PipelineNames::Entity), DescriptorSetGroup, SetsCount, nullptr, 0);
 }
 
-static void DeferredPassInit(BmRender_DescriptorPool MainPool)
+static void DeferredPassInit(BmRender_DescriptorPool* MainPool)
 {
 	for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 	{
@@ -255,8 +257,8 @@ static void DeferredPassInit(BmRender_DescriptorPool MainPool)
 	}
 
 	DeferredPassPipelineAttachmentData.ColorAttachmentCount = 1;
-	DeferredPassPipelineAttachmentData.ColorAttachments[0] = DeferredInputColorImageInterface[0];
-	DeferredPassPipelineAttachmentData.DepthAttachment = DeferredInputDepthImageInterface[0];
+	DeferredPassPipelineAttachmentData.ColorAttachments = DeferredInputColorImageInterface;
+	DeferredPassPipelineAttachmentData.DepthAttachment = &DeferredInputDepthImageInterface[0];
 	DeferredPassPipelineAttachmentData.StencilAttachment = {};
 
 	{
@@ -279,22 +281,22 @@ static void DeferredPassInit(BmRender_DescriptorPool MainPool)
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
 			BmRender_DescriptorSetUpdateData ColorBinding;
-			ColorBinding.ImageBinding.Sampler = ColorAttachmentSampler;
+			ColorBinding.ImageBinding.Sampler = &ColorAttachmentSampler;
 			ColorBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
-			ColorBinding.ImageBinding.ImageView = DeferredInputColorImageInterface[i];
+			ColorBinding.ImageBinding.ImageView = &DeferredInputColorImageInterface[i];
 			ColorBinding.BindingCount = 1;
 			ColorBinding.DstArrayElement = 0;
 			ColorBinding.DstBinding = 0;
 
 			BmRender_DescriptorSetUpdateData DepthBinding;
-			DepthBinding.ImageBinding.Sampler = DepthAttachmentSampler;
+			DepthBinding.ImageBinding.Sampler = &DepthAttachmentSampler;
 			DepthBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
-			DepthBinding.ImageBinding.ImageView = DeferredInputDepthImageInterface[i];
+			DepthBinding.ImageBinding.ImageView = &DeferredInputDepthImageInterface[i];
 			DepthBinding.BindingCount = 1;
 			DepthBinding.DstArrayElement = 0;
 			DepthBinding.DstBinding = 1;
 
-			BmRender_DescriptorSetUpdateData OutputTextureBinding;
+			BmRender_DescriptorSetUpdateData OutputTextureBinding = {};
 			OutputTextureBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::General;
 			OutputTextureBinding.ImageBinding.ImageView = BmRender_GetSwapchainImageView(i);
 			OutputTextureBinding.BindingCount = 1;
@@ -360,7 +362,7 @@ static void DeferredPassDeInit()
 	}
 }
 
-static void LightningPassInit(BmRender_DescriptorPool MainPool)
+static void LightningPassInit(BmRender_DescriptorPool* MainPool)
 {
 	ShadowMapArray = BmRender_CreateImage2DArray(DepthViewportExtent.Width, DepthViewportExtent.Height, DepthFormat,
 		BmRender_ImageType::DepthSamplad, MAX_SHADOW_TEXTURES * BmRender_GetSwapchainImageCount(), BmRender_SampleCount::Count1);
@@ -397,7 +399,7 @@ static void LightningPassInit(BmRender_DescriptorPool MainPool)
 
 	AttachmentData ResourceInfo;
 	ResourceInfo.ColorAttachmentCount = 0;
-	ResourceInfo.DepthAttachment = ShadowMapElement1ImageInterface[0];
+	ResourceInfo.DepthAttachment = &ShadowMapElement1ImageInterface[0];
 	ResourceInfo.StencilAttachment = {};
 
 	std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
@@ -429,7 +431,7 @@ static void LightningPassDraw(DrawScene* Scene)
 			ShadowMapElement2ImageInterface[CurrentFrame];
 
 		BmRender_RenderingDepthAttachment DepthAttachment{ };
-		DepthAttachment.ImageView = DepthImageView;
+		DepthAttachment.ImageView = &DepthImageView;
 		DepthAttachment.LoadOp = BmRender_AttachmentLoadOp::Clear;
 		DepthAttachment.StoreOp = BmRender_AttachmentStoreOp::Store;
 		DepthAttachment.ClearValue = { 1.0f, 0 };
@@ -472,21 +474,21 @@ static void LightningPassDeInit()
 static void MainPassInit()
 {
 	MainPassPipelineAttachmentData.ColorAttachmentCount = 1;
-	MainPassPipelineAttachmentData.ColorAttachments[0] = TestDeferredInputColorImageInterface()[0];
-	MainPassPipelineAttachmentData.DepthAttachment = TestDeferredInputDepthImageInterface()[0];
+	MainPassPipelineAttachmentData.ColorAttachments = TestDeferredInputColorImageInterface();
+	MainPassPipelineAttachmentData.DepthAttachment = &TestDeferredInputDepthImageInterface()[0];
 	MainPassPipelineAttachmentData.StencilAttachment = {};
 }
 
 static void MainPassBeginPass()
 {
 	BmRender_RenderingColorAttachment ColorAttachment = { };
-	ColorAttachment.ImageView = TestDeferredInputColorImageInterface()[CurrentFrame];
+	ColorAttachment.ImageView = &TestDeferredInputColorImageInterface()[CurrentFrame];
 	ColorAttachment.LoadOp = BmRender_AttachmentLoadOp::Clear;
 	ColorAttachment.StoreOp = BmRender_AttachmentStoreOp::Store;
 	ColorAttachment.ClearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 	BmRender_RenderingDepthAttachment DepthAttachment = { };
-	DepthAttachment.ImageView = TestDeferredInputDepthImageInterface()[CurrentFrame];
+	DepthAttachment.ImageView = &TestDeferredInputDepthImageInterface()[CurrentFrame];
 	DepthAttachment.LoadOp = BmRender_AttachmentLoadOp::Clear;
 	DepthAttachment.StoreOp = BmRender_AttachmentStoreOp::Store;
 	DepthAttachment.ClearValue = { 1.0f, 0 };
@@ -615,18 +617,18 @@ void Render_Init(GLFWwindow* WindowHandler)
 		Updates[3].DstBinding = 4;
 
 		FrameDataLayout = BmRender_CreateDescriptorSetLayout(LayoutBindings, DescriptorCount);
-		DescriptorSets.FrameBufferSet = BmRender_CreateDescriptorSet(&FrameDataLayout, MainPool);
+		DescriptorSets.FrameBufferSet = BmRender_CreateDescriptorSet(&FrameDataLayout, &MainPool);
 		BmRender_UpdateDescriptorSet(&DescriptorSets.FrameBufferSet, Updates, UpdatesCount);
 	}
 
 	State.DescriptorSets = DescriptorSets;
 	State.MainPool = MainPool;
 
-	DeferredPassInit(State.MainPool);
+	DeferredPassInit(&State.MainPool);
 	MainPassInit();
-	LightningPassInit(State.MainPool);
+	LightningPassInit(&State.MainPool);
 
-	InitStaticMeshPipeline(&State.MeshPipeline, State.MainPool);
+	InitStaticMeshPipeline(&State.MeshPipeline, &State.MainPool);
 	InitImGuiPipeline(&State.DebugUiPool, WindowHandler);
 }
 

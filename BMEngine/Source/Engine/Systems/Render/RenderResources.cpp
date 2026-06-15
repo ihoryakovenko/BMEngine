@@ -4,7 +4,6 @@
 
 #include "TransferSystem.h"
 #include "RenderInterface.h"
-#include "RenderHelper.h"
 
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -56,7 +55,6 @@ namespace RenderResources
 	void UpdateImageResource(const BmRender_Image* Handle, BmRender_ImageDescription* Description, void* Data)
 	{
 		const u64 Size = Handle->Size;
-		const BmRender_Dimensions Dim = Handle->Dimensions;
 
 		// TODO: TMP solution
 		void* TransferMemory = TransferSystem::RequestTransferMemory(Size);
@@ -67,8 +65,8 @@ namespace RenderResources
 		Task.Alignment = BmRender_GetFormatAlignment(Description->Format);
 		Task.RawData = TransferMemory;
 		Task.TextureDescr.Handle = *Handle;
-		Task.TextureDescr.Width = Dim.Width;
-		Task.TextureDescr.Height = Dim.Height;
+		Task.TextureDescr.Width = Handle->Width;
+		Task.TextureDescr.Height = Handle->Height;
 		Task.Type = TransferSystem::TaskType::Image;
 
 		AddTask(&Task);

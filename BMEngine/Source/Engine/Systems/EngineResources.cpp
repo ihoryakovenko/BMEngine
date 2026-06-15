@@ -70,9 +70,9 @@ namespace EngineResources
 		DefaultAsset.RenderViewHandle = DefaultViewHandle;
 
 		BmRender_DescriptorSetUpdateData DiffuseBinding;
-		DiffuseBinding.ImageBinding.Sampler = DiffuseTextureSampler;
+		DiffuseBinding.ImageBinding.Sampler = &DiffuseTextureSampler;
 		DiffuseBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
-		DiffuseBinding.ImageBinding.ImageView = DefaultAsset.RenderViewHandle;
+		DiffuseBinding.ImageBinding.ImageView = &DefaultAsset.RenderViewHandle;
 		DiffuseBinding.DstArrayElement = 0;
 		DiffuseBinding.BindingCount = 1;
 		DiffuseBinding.DstBinding = 3;
@@ -155,9 +155,9 @@ namespace EngineResources
 							AlbedoTextureHandle = it->second.RenderImageHandle;
 
 							BmRender_DescriptorSetUpdateData DiffuseBinding;
-							DiffuseBinding.ImageBinding.Sampler = DiffuseTextureSampler;
+							DiffuseBinding.ImageBinding.Sampler = &DiffuseTextureSampler;
 							DiffuseBinding.ImageBinding.ImageLayout = BmRender_ImageLayout::ShaderReadOnlyOptimal;
-							DiffuseBinding.ImageBinding.ImageView = it->second.RenderViewHandle;
+							DiffuseBinding.ImageBinding.ImageView = &it->second.RenderViewHandle;
 							DiffuseBinding.DstArrayElement = TexturesGPUIndexCounter;
 							DiffuseBinding.BindingCount = 1;
 							DiffuseBinding.DstBinding = 3;

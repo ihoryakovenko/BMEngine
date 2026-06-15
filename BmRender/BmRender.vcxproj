@@ -11,18 +11,17 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="RenderHelper.h" />
     <ClInclude Include="RenderInterface.h" />
-    <ClInclude Include="Sources\RenderTypes.h" />
-    <ClInclude Include="Sources\VulkanCoreContext.h" />
-    <ClInclude Include="Sources\VulkanHelper.h" />
+    <ClInclude Include="Sources\RenderInternal.h" />
+    <ClInclude Include="Sources\VulkanBackend\VulkanRender.h" />
+    <ClInclude Include="Sources\VulkanBackend\VulkanCoreContext.h" />
+    <ClInclude Include="Sources\VulkanBackend\VulkanHelper.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Sources\RenderCommands.cpp" />
     <ClCompile Include="Sources\RenderInterface.cpp" />
-    <ClCompile Include="Sources\RenderTypes.cpp" />
-    <ClCompile Include="Sources\VulkanCoreContext.cpp" />
-    <ClCompile Include="Sources\VulkanHelper.cpp" />
+    <ClCompile Include="Sources\VulkanBackend\VulkanRender.cpp" />
+    <ClCompile Include="Sources\VulkanBackend\VulkanCoreContext.cpp" />
+    <ClCompile Include="Sources\VulkanBackend\VulkanHelper.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

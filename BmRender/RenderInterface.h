@@ -1,23 +1,14 @@
 #pragma once
 
+#define BM_RENDER_VULKAN_BACKEND
+
 #include <ShortTypes.h>
-#include <vulkan/vulkan.h>
+
+#if defined (BM_RENDER_VULKAN_BACKEND)
+#include "Sources/VulkanBackend/VulkanRender.h"
+#endif
 
 struct GLFWwindow;
-
-inline constexpr u32 MAX_DRAW_FRAMES = 3;
-inline constexpr u32 MAX_DESCRIPTOR_SET_LAYOUT_BUINDINGS = 16;
-
-typedef VkInstance BmRender_Instance;
-typedef VkPhysicalDevice BmRender_PhysicalDevice;
-typedef VkDevice BmRender_Device;
-typedef VkSampler BmRender_Sampler;
-typedef VkDescriptorPool BmRender_DescriptorPool;
-typedef VkShaderModule BmRender_Shader;
-typedef VkFence BmRender_Fence;
-typedef VkDeviceMemory BmRender_DeviceMemory;
-
-#define DEFINE_ENUM_OR(EnumType) constexpr inline EnumType operator| (EnumType lhs, EnumType rhs) { return (EnumType)((u64)(lhs) | (u64)(rhs)); }
 
 enum class BmRender_DescriptorShaderStage : u64
 {
@@ -26,7 +17,6 @@ enum class BmRender_DescriptorShaderStage : u64
 	Fragment = 1 << 1,
 	Compute = 1 << 2,
 };
-DEFINE_ENUM_OR(BmRender_DescriptorShaderStage);
 
 enum class BmRender_PipelineShaderStage : u8
 {
@@ -418,7 +408,6 @@ enum class BmRender_SampleCount : u32
 	Count64 = 64,
 };
 
-
 struct BmRender_Offset2D
 {
 	s32 X;
@@ -475,88 +464,12 @@ struct BmRender_SurfaceFormat
 	//VkColorSpaceKHR ColorSpace;
 };
 
-// Types
-struct BmRender_DescriptorSetLayout
-{
-	VkDescriptorSetLayout InternalLayout;
-	BmRender_DescriptorType LayoutBindings[MAX_DESCRIPTOR_SET_LAYOUT_BUINDINGS];
-	u32 BindingsCount;
-};
-
-struct BmRender_Image
-{
-	VkImage InternalImage;
-	BmRender_DeviceMemory Memory;
-	BmRender_Format Format;
-	u64 Size;
-	BmRender_ImageType Type;
-	BmRender_Dimensions Dimensions;
-	BmRender_SampleCount SampleCount;
-};
-
-struct BmRender_GPUBuffer
-{
-	VkBuffer InternalBuffer;
-	BmRender_DeviceMemory Memory;
-	MemoryPropertyFlag PropertyFlag;
-};
-
-struct BmRender_DescriptorSet
-{
-	VkDescriptorSet InternalSet;
-	BmRender_DescriptorSetLayout* Layout;
-};
-
-struct BmRender_Semaphore
-{
-	VkSemaphore InternalSemaphore;
-	BmRender_SemaphoreType Type;
-};
-
-struct BmRender_CommandPool
-{
-	VkCommandPool InternalPool;
-	u32 QueueFamilyIndex;
-};
-
-struct BmRender_CommandBuffer
-{
-	VkCommandBuffer InternalBuffer;
-	const BmRender_CommandPool* CommandPool;
-};
-
-struct BmRender_Queue
-{
-	VkQueue InternalQueue;
-	BmRender_QueueType QueueType;
-};
-
-struct BmRender_PipelineLayout
-{
-	VkPipelineLayout InternalLayout;
-	BmRender_PipelineType PipelineType;
-};
-
-struct BmRender_ImageView
-{
-	VkImageView InternalView;
-	const BmRender_Image* Image;
-	BmRender_Format Format;
-};
-
-struct BmRender_Pipeline
-{
-	VkPipeline InternalPipeline;
-	BmRender_PipelineLayout Layout;
-};
-//
-
 struct AttachmentData
 {
 	u32 ColorAttachmentCount;
-	BmRender_ImageView ColorAttachments[4];
-	BmRender_ImageView DepthAttachment;
-	BmRender_ImageView StencilAttachment;
+	BmRender_ImageView* ColorAttachments;
+	BmRender_ImageView* DepthAttachment;
+	BmRender_ImageView* StencilAttachment;
 };
 
 struct BmRHI_SamplerDescription
@@ -604,9 +517,9 @@ struct BmRender_DescriptorSetLayoutBinding
 
 struct BmRender_ImageUpdateData
 {
-	BmRender_Sampler Sampler;
+	BmRender_Sampler* Sampler;
 	BmRender_ImageLayout ImageLayout; // Check if can store layout with Image resource as target layout and use instead this
-	BmRender_ImageView ImageView;
+	BmRender_ImageView* ImageView;
 };
 
 struct BmRender_GPUBufferUpdateData
@@ -618,8 +531,8 @@ struct BmRender_GPUBufferUpdateData
 
 struct BmRender_RenderingColorAttachment
 {
-	BmRender_ImageView ImageView;
-	BmRender_ImageView ResolveImageView;
+	BmRender_ImageView* ImageView;
+	BmRender_ImageView* ResolveImageView;
 	BmRender_AttachmentLoadOp LoadOp;
 	BmRender_AttachmentStoreOp StoreOp;
 	BmRender_ClearColorValue ClearValue;
@@ -627,7 +540,7 @@ struct BmRender_RenderingColorAttachment
 
 struct BmRender_RenderingDepthAttachment
 {
-	BmRender_ImageView ImageView;
+	BmRender_ImageView* ImageView;
 	BmRender_AttachmentLoadOp LoadOp;
 	BmRender_AttachmentStoreOp StoreOp;
 	BmRender_ClearDepthStencilValue ClearValue;
@@ -653,7 +566,7 @@ struct BmRender_DescriptorSetUpdateData
 
 struct BmRender_ShaderStageDescription
 {
-	BmRender_Shader Shader;
+	BmRender_Shader* Shader;
 	const char* EntryPointFunction;
 	BmRender_PipelineShaderStage Stage;
 };
@@ -745,7 +658,7 @@ struct BmRender_ShaderDescription
 
 struct BmRender_TimelineSemaphoreSubmit
 {
-	BmRender_Semaphore Semaphore;
+	BmRender_Semaphore* Semaphore;
 	u64 Value;
 };
 
@@ -793,7 +706,7 @@ BmRender_SwapchainResult BmRender_AcquireNextSwapchainImage(u64 Timeout, BmRende
 
 BmRender_SurfaceFormat BmRender_GetSurfaceFormat();
 BmRender_Image* BmRender_GetSwapchainImage(u32 Index);
-BmRender_ImageView BmRender_GetSwapchainImageView(u32 Index);
+BmRender_ImageView* BmRender_GetSwapchainImageView(u32 Index);
 BmRender_Dimensions BmRender_GetSwapchainExtent();
 
 BmRender_Instance BmRender_GetVulkanInstance();
@@ -809,7 +722,7 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutBinding* Bindings, u32 BindingsCount);
 BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolSize* PoolSizes, u32 MaxSets, u32 PoolSizeCount, BmRender_DescriptorPoolType Type);
 BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description);
-BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout* LayoutHandle, BmRender_DescriptorPool PoolHandle);
+BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout* LayoutHandle, BmRender_DescriptorPool* PoolHandle);
 BmRender_GPUBuffer BmRender_CreateVertexStageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag);
 BmRender_GPUBuffer BmRender_CreateInstanceBuffer(u64 Size, MemoryPropertyFlag MemoryFlag);
 BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, MemoryPropertyFlag MemoryFlag);
@@ -873,3 +786,11 @@ void BmRender_DestroyCommandPool(BmRender_CommandPool Handle);
 void BmRender_FreeCommandBuffer(BmRender_CommandBuffer Handle);
 
 void BmRender_FrameFree();
+
+#if defined (BM_RENDER_VULKAN_BACKEND)
+
+u32 BmRender_GetFormatAlignment(BmRender_Format Format);
+VkFormat BmRender_FormatToVk(BmRender_Format Format);
+VkAllocationCallbacks* BmRender_GetVulkanAllocator();
+
+#endif
