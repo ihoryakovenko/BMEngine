@@ -19,6 +19,7 @@ namespace fs = std::filesystem;
 static BmRender_Shader Shaders[(u32)PipelineNames::MAX_VALUE];
 static BmRender_PipelineLayout Layouts[(u32)PipelineNames::MAX_VALUE];
 static BmRender_Pipeline Pipelines[(u32)PipelineNames::MAX_VALUE];
+
 static bool LiveShaders;
 static bool Initialized;
 
@@ -175,7 +176,7 @@ void PipelineManager_Update()
 				Stage->Stage = Metadata->Stages[j].Stage;
 			}
 
-			Pipelines[i] = BmRender_CreatePipeline(Layouts[i], SavedSettings + i, StageDescriptions, Metadata->StageCount, SavedAttachmentData + i);
+			Pipelines[i] = BmRender_CreateGraphicsPipeline(Layouts[i], SavedSettings + i, StageDescriptions, Metadata->StageCount, SavedAttachmentData + i);
 		}
 
 		if (Session)
@@ -187,7 +188,7 @@ void PipelineManager_Update()
 }
 
 void PipelineManager_CreatePipelineLayout(PipelineNames Name, const BmRender_DescriptorSetLayout* SetLayouts, u32 SetLayoutsCount,
-	const BmRender_PushConstant* PushConstants, u32 PushConstantsCount, BmRender_PipelineType PipelineType)
+	const BmRender_PushConstant* PushConstants, u32 PushConstantsCount)
 {
 	assert(Initialized);
 
@@ -196,12 +197,11 @@ void PipelineManager_CreatePipelineLayout(PipelineNames Name, const BmRender_Des
 	LayoutDesc.SetLayouts = SetLayouts;
 	LayoutDesc.PushConstantRangeCount = PushConstantsCount;
 	LayoutDesc.PushConstantRanges = PushConstants;
-	LayoutDesc.PipelineType = PipelineType;
 
 	Layouts[u32(Name)] = BmRender_CreatePipelineLayout(&LayoutDesc);
 }
 
-void PipelineManager_CreatePipeline(PipelineNames Name, const BmRender_PipelineSettings* Settings, const AttachmentData* ResourceInfo)
+void PipelineManager_CreateGraphicsPipeline(PipelineNames Name, const BmRender_PipelineSettings* Settings, const AttachmentData* ResourceInfo)
 {
 	assert(Initialized);
 
@@ -216,7 +216,7 @@ void PipelineManager_CreatePipeline(PipelineNames Name, const BmRender_PipelineS
 		Stage->Stage = Metadata->Stages[i].Stage;
 	}
 
-	Pipelines[u32(Name)] = BmRender_CreatePipeline(Layouts[u32(Name)], Settings, StageDescriptions, Metadata->StageCount, ResourceInfo);
+	Pipelines[u32(Name)] = BmRender_CreateGraphicsPipeline(Layouts[u32(Name)], Settings, StageDescriptions, Metadata->StageCount, ResourceInfo);
 
 	if (LiveShaders)
 	{
@@ -243,8 +243,12 @@ void PipelineManager_CreateComputePipeline(PipelineNames Name)
 	Pipelines[u32(Name)] = BmRender_CreateComputePipeline(Layouts[u32(Name)], StageDescriptions);
 }
 
-BmRender_Pipeline PipelineManager_GetPipeline(PipelineNames Name)
+void PipelineManager_BindPipeline(BmRender_CommandBuffer CmdBuffer, PipelineNames Name)
 {
-	assert(Initialized);
-	return Pipelines[u32(Name)];
+	BmRender_BindPipeline(CmdBuffer, Pipelines[u32(Name)], Layouts[u32(Name)]);
+}
+
+void PipelineManager_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, PipelineNames Name, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets)
+{
+	BmRender_RecordBindDescriptorSets(CommandBuffer, Pipelines[u32(Name)], Layouts[u32(Name)], FirstSet, DescriptorSetCount, pDescriptorSets, DynamicOffsetCount, pDynamicOffsets);
 }

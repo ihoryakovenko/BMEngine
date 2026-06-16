@@ -343,7 +343,7 @@ BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Descript
 	return VulkanSampler;
 }
 
-BmRender_Pipeline BmRender_CreatePipeline(BmRender_PipelineLayout PipelineLayout, const BmRender_PipelineSettings* Settings, const BmRender_ShaderStageDescription* ShaderStageDescriptions,
+BmRender_Pipeline BmRender_CreateGraphicsPipeline(BmRender_PipelineLayout PipelineLayout, const BmRender_PipelineSettings* Settings, const BmRender_ShaderStageDescription* ShaderStageDescriptions,
 	u32 ShaderStagesCount, const AttachmentData* Attachment)
 {
 	VkDevice Device = CoreContext.LogicalDevice;
@@ -405,7 +405,7 @@ BmRender_Pipeline BmRender_CreatePipeline(BmRender_PipelineLayout PipelineLayout
 
 		if (!SampleCountFound)
 		{
-			SampleCount = SampleCountToVk(Attachment->DepthAttachment->Image->SampleCount);
+			SampleCount = SampleCountToVk(Attachment->StencilAttachment->Image->SampleCount);
 		}
 	}
 
@@ -460,8 +460,8 @@ BmRender_Pipeline BmRender_CreatePipeline(BmRender_PipelineLayout PipelineLayout
 	VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, 1, PipelineCreateInfo, &VulkanAllocator, &Pipeline));
 
 	BmRender_Pipeline Data;
-	Data.Layout = PipelineLayout;
 	Data.InternalPipeline = Pipeline;
+	Data.PipelineType = BmRender_PipelineType::Graphics;
 	return Data;
 }
 
@@ -491,8 +491,8 @@ BmRender_Pipeline BmRender_CreateComputePipeline(BmRender_PipelineLayout Pipelin
 	VULKAN_CHECK_RESULT(vkCreateComputePipelines(Device, VK_NULL_HANDLE, 1, &PipelineCreateInfo, &VulkanAllocator, &Pipeline));
 
 	BmRender_Pipeline Data;
-	Data.Layout = PipelineLayout;
 	Data.InternalPipeline = Pipeline;
+	Data.PipelineType = BmRender_PipelineType::Compute;
 	return Data;
 }
 
@@ -524,7 +524,6 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 
 	BmRender_PipelineLayout LayoutData = { };
 	VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &CreateInfo, &VulkanAllocator, &LayoutData.InternalLayout));
-	LayoutData.PipelineType = Description->PipelineType;
 
 	return LayoutData;
 }
@@ -1192,32 +1191,28 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 	vkCmdBeginRendering(VkCmdBuffer, &RenderingInfo);
 }
 
-void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline)
+void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, BmRender_PipelineLayout Layout)
 {
 	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
 	VkPipelineBindPoint BindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 
-	BmRender_PipelineLayout PipelineLayout = Pipeline.Layout;
-	BindPoint = PipelineTypeToVkPipelineBindPoint(PipelineLayout.PipelineType);
+	BindPoint = PipelineTypeToVkPipelineBindPoint(Pipeline.PipelineType);
 
 	vkCmdBindPipeline(VkCmdBuffer, BindPoint, Pipeline.InternalPipeline);
 }
 
-void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* pValues)
+void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* pValues)
 {
-	BmRender_PipelineLayout PipelineLayout = Pipeline.Layout;
 	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
 	vkCmdPushConstants(VkCmdBuffer, PipelineLayout.InternalLayout, ShaderStageFlagsToVk(StageFlags), Offset, Size, pValues);
 }
 
-void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets)
+void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, BmRender_PipelineLayout PipelineLayout, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets)
 {
-	BmRender_PipelineLayout PipelineLayout = Pipeline.Layout;
-
 	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
 	VkPipelineLayout Layout = PipelineLayout.InternalLayout;
 
-	VkPipelineBindPoint BindPoint = PipelineTypeToVkPipelineBindPoint(PipelineLayout.PipelineType);
+	VkPipelineBindPoint BindPoint = PipelineTypeToVkPipelineBindPoint(Pipeline.PipelineType);
 
 	VkDescriptorSet* Sets = (VkDescriptorSet*)Memory_LinearAllocator_Alloc(&FrameMemory, sizeof(VkDescriptorSet) * DescriptorSetCount);
 	for (u32 i = 0; i < DescriptorSetCount; ++i)

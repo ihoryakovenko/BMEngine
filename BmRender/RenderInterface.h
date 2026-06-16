@@ -647,7 +647,6 @@ struct BmRender_PipelineLayoutDescription
 	const BmRender_PushConstant* PushConstantRanges;
 	u32 SetLayoutCount;
 	u32 PushConstantRangeCount;
-	BmRender_PipelineType PipelineType;
 };
 
 struct BmRender_ShaderDescription
@@ -716,7 +715,7 @@ u32 BmRender_GetGraphicsQueueFamily();
 u32 BmRender_GetQueueFamily(BmRender_Queue Queue);
 
 BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description);
-BmRender_Pipeline BmRender_CreatePipeline(BmRender_PipelineLayout PipelineLayout, const BmRender_PipelineSettings* Settings, const BmRender_ShaderStageDescription* ShaderStageDescriptions, u32 ShaderStagesCount, const AttachmentData* Attachment);
+BmRender_Pipeline BmRender_CreateGraphicsPipeline(BmRender_PipelineLayout PipelineLayout, const BmRender_PipelineSettings* Settings, const BmRender_ShaderStageDescription* ShaderStageDescriptions, u32 ShaderStagesCount, const AttachmentData* Attachment);
 BmRender_Pipeline BmRender_CreateComputePipeline(BmRender_PipelineLayout PipelineLayout, const BmRender_ShaderStageDescription* ShaderStageDescription);
 BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description);
 BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutBinding* Bindings, u32 BindingsCount);
@@ -761,9 +760,9 @@ void BmRender_TransitionImageForComputeWrite(BmRender_CommandBuffer CommandBuffe
 void BmRender_RecordUpdateGPULocalBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer* DstBuffer, BmRender_GPUBuffer* SrcBuffer, u64 SrcOffset, u64 DstOffset, u64 DataSize);
 void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRender_RenderingInfo* pRenderingInfo);
 void BmRender_EndRendering(BmRender_CommandBuffer CommandBuffer);
-void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline);
-void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* pValues);
-void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets);
+void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, BmRender_PipelineLayout Layout);
+void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* pValues);
+void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, BmRender_PipelineLayout PipelineLayout, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets);
 void BmRender_RecordBindVertexBuffers(BmRender_CommandBuffer CommandBuffer, u32 FirstBinding, u32 BindingCount, const BmRender_GPUBuffer* Buffers, const u64* Offsets);
 void BmRender_RecordBindIndexBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer* Buffer, u64 Offset, BmRender_IndexType IndexType);
 void BmRender_Draw(BmRender_CommandBuffer CommandBuffer, u32 VertexCount, u32 InstanceCount, u32 FirstVertex, u32 FirstInstance);

@@ -74,7 +74,6 @@ struct BmRender_Queue
 struct BmRender_PipelineLayout
 {
 	VkPipelineLayout InternalLayout;
-	BmRender_PipelineType PipelineType;
 };
 
 struct BmRender_ImageView
@@ -87,7 +86,7 @@ struct BmRender_ImageView
 struct BmRender_Pipeline
 {
 	VkPipeline InternalPipeline;
-	BmRender_PipelineLayout Layout;
+	BmRender_PipelineType PipelineType;
 };
 
 void InitBackend(GLFWwindow* WindowHandler);

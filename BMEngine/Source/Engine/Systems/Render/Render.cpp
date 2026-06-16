@@ -89,15 +89,15 @@ static BmRender_ImageView ShadowMapElement2ImageInterface[MAX_DRAW_FRAMES];
 // MainPass static variables
 static AttachmentData MainPassPipelineAttachmentData;
 
-static void GenericDraw(BmRender_CommandBuffer CommandBuffer, DrawScene* Scene, BmRender_Pipeline Pipeline,
+static void GenericDraw(BmRender_CommandBuffer CommandBuffer, DrawScene* Scene, PipelineNames Name,
 	const BmRender_DescriptorSet* Sets, u32 SetsCount, const u32* DynamicOffsets, u32 DynamicOffsetsCount)
 {
 	const u32 FrameDynamicOffset = CurrentFrame * sizeof(Shader_FrameData);
 
-	BmRender_BindPipeline(CommandBuffer, Pipeline);
+	PipelineManager_BindPipeline(CommandBuffer, Name);
 
-	BmRender_RecordBindDescriptorSets(CommandBuffer, Pipeline, 0, 1, &DescriptorSets.FrameBufferSet, 1, &FrameDynamicOffset);
-	BmRender_RecordBindDescriptorSets(CommandBuffer, Pipeline, 1, SetsCount, Sets, DynamicOffsetsCount, DynamicOffsets);
+	PipelineManager_RecordBindDescriptorSets(CommandBuffer, Name, 0, 1, &DescriptorSets.FrameBufferSet, 1, &FrameDynamicOffset);
+	PipelineManager_RecordBindDescriptorSets(CommandBuffer, Name, 1, SetsCount, Sets, DynamicOffsetsCount, DynamicOffsets);
 
 	std::unique_lock Lock(Scene->TempLock);
 
@@ -229,8 +229,8 @@ static void InitStaticMeshPipeline(StaticMeshPipelineDepr* MeshPipeline, BmRende
 
 	BmRender_PipelineSettings Settings = GetStaticPipelineDescription();
 
-	PipelineManager_CreatePipelineLayout(PipelineNames::Entity, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0, BmRender_PipelineType::Graphics);
-	PipelineManager_CreatePipeline(PipelineNames::Entity, &Settings, &ResourceInfo);
+	PipelineManager_CreatePipelineLayout(PipelineNames::Entity, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0);
+	PipelineManager_CreateGraphicsPipeline(PipelineNames::Entity, &Settings, &ResourceInfo);
 }
 
 static void DrawStaticMeshes(BmRender_CommandBuffer CommandBuffer, StaticMeshPipelineDepr* MeshPipeline, DrawScene* Scene, const DescriptorSetHandles& DescriptorSets)
@@ -242,7 +242,7 @@ static void DrawStaticMeshes(BmRender_CommandBuffer CommandBuffer, StaticMeshPip
 
 	const u32 SetsCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
-	GenericDraw(CommandBuffer, Scene, PipelineManager_GetPipeline(PipelineNames::Entity), DescriptorSetGroup, SetsCount, nullptr, 0);
+	GenericDraw(CommandBuffer, Scene, PipelineNames::Entity, DescriptorSetGroup, SetsCount, nullptr, 0);
 }
 
 static void DeferredPassInit(BmRender_DescriptorPool* MainPool)
@@ -314,13 +314,13 @@ static void DeferredPassInit(BmRender_DescriptorPool* MainPool)
 	descriptorSetLayouts.push_back(FrameDataLayout);
 	descriptorSetLayouts.push_back(MainPassOutputLayout);
 
-	PipelineManager_CreatePipelineLayout(PipelineNames::Deferred, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0, BmRender_PipelineType::Compute);
+	PipelineManager_CreatePipelineLayout(PipelineNames::Deferred, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0);
 	PipelineManager_CreateComputePipeline(PipelineNames::Deferred);
 }
 
 static void DeferredPassDraw()
 {
-	BmRender_BindPipeline(RenderCommandBuffers[CurrentFrame], PipelineManager_GetPipeline(PipelineNames::Deferred));
+	PipelineManager_BindPipeline(RenderCommandBuffers[CurrentFrame], PipelineNames::Deferred);
 
 	const BmRender_DescriptorSet Sets[2] = {
 		DescriptorSets.FrameBufferSet,
@@ -330,8 +330,7 @@ static void DeferredPassDraw()
 	const u32 FrameDynamicOffset = CurrentFrame * sizeof(Shader_FrameData);
 	const u32 DynamicOffsets[] = { FrameDynamicOffset };
 
-	BmRender_RecordBindDescriptorSets(RenderCommandBuffers[CurrentFrame], PipelineManager_GetPipeline(PipelineNames::Deferred),
-		0, 2, Sets, 1, DynamicOffsets);
+	PipelineManager_RecordBindDescriptorSets(RenderCommandBuffers[CurrentFrame], PipelineNames::Deferred, 0, 2, Sets, 1, DynamicOffsets);
 
 	u32 groupX = (MainScreenExtent.Width + 7) / 8;
 	u32 groupY = (MainScreenExtent.Height + 7) / 8;
@@ -408,8 +407,8 @@ static void LightningPassInit(BmRender_DescriptorPool* MainPool)
 
 	BmRender_PipelineSettings PipelineDesc = GetDepthPipelineDescription();
 
-	PipelineManager_CreatePipelineLayout(PipelineNames::Depth_vert, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0, BmRender_PipelineType::Graphics);
-	PipelineManager_CreatePipeline(PipelineNames::Depth_vert, &PipelineDesc, &ResourceInfo);
+	PipelineManager_CreatePipelineLayout(PipelineNames::Depth_vert, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0);
+	PipelineManager_CreateGraphicsPipeline(PipelineNames::Depth_vert, &PipelineDesc, &ResourceInfo);
 }
 
 static void LightningPassDraw(DrawScene* Scene)
@@ -451,7 +450,7 @@ static void LightningPassDraw(DrawScene* Scene)
 
 		const u32 SetsCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
-		GenericDraw(RenderCommandBuffers[CurrentFrame], Scene, PipelineManager_GetPipeline(PipelineNames::Depth_vert), DescriptorSetGroup, SetsCount, nullptr, 0);
+		GenericDraw(RenderCommandBuffers[CurrentFrame], Scene, PipelineNames::Depth_vert, DescriptorSetGroup, SetsCount, nullptr, 0);
 
 		BmRender_EndRendering(RenderCommandBuffers[CurrentFrame]);
 	}
