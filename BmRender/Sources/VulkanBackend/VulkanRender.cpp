@@ -87,7 +87,7 @@ BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_D
 	BmRender_DescriptorSetLayout Layout = { };
 	Layout.BindingsCount = BindingsCount;
 
-	VkDescriptorSetLayoutBinding* NewLayoutBindings = (VkDescriptorSetLayoutBinding*)Memory_LinearAllocator_Alloc(&FrameMemory, sizeof(VkDescriptorSetLayoutBinding) * BindingsCount);
+	VkDescriptorSetLayoutBinding* NewLayoutBindings = Memory_LinearAllocator_CAlloc(&FrameMemory, VkDescriptorSetLayoutBinding, BindingsCount);
 	for (u32 i = 0; i < BindingsCount; ++i)
 	{
 		NewLayoutBindings[i].binding = i;
@@ -115,7 +115,7 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet* DescriptorSetHandle, c
 {
 	VkDevice Device = CoreContext.LogicalDevice;
 
-	VkWriteDescriptorSet* WriteDescriptorSets = (VkWriteDescriptorSet*)Memory_LinearAllocator_Alloc(&FrameMemory, sizeof(VkWriteDescriptorSet) * BindingsCount);
+	VkWriteDescriptorSet* WriteDescriptorSets = Memory_LinearAllocator_CAlloc(&FrameMemory, VkWriteDescriptorSet, BindingsCount);
 
 	for (u32 i = 0; i < BindingsCount; i++)
 	{
@@ -135,7 +135,7 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet* DescriptorSetHandle, c
 		if (VkDescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || VkDescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC ||
 			VkDescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER || VkDescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC)
 		{
-			VkDescriptorBufferInfo* BufferInfo = (VkDescriptorBufferInfo*)Memory_LinearAllocator_Alloc(&FrameMemory, sizeof(VkDescriptorBufferInfo) * Binding.BindingCount);
+			VkDescriptorBufferInfo* BufferInfo = Memory_LinearAllocator_CAlloc(&FrameMemory, VkDescriptorBufferInfo, Binding.BindingCount);
 			for (u32 j = 0; j < Binding.BindingCount; ++j)
 			{
 				const BmRender_GPUBufferUpdateData& Entry = Binding.BufferRegions[j];
@@ -150,7 +150,7 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet* DescriptorSetHandle, c
 		else if (VkDescriptorType == VK_DESCRIPTOR_TYPE_SAMPLER || VkDescriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
 			VkDescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
 		{
-			VkDescriptorImageInfo* ImageInfo = (VkDescriptorImageInfo*)Memory_LinearAllocator_Alloc(&FrameMemory, sizeof(VkDescriptorImageInfo));
+			VkDescriptorImageInfo* ImageInfo = Memory_LinearAllocator_CAlloc(&FrameMemory, VkDescriptorImageInfo, 1);
 			ImageInfo->imageLayout = ImageLayoutToVk(Binding.ImageBinding.ImageLayout);
 			ImageInfo->imageView = Binding.ImageBinding.ImageView->InternalView;
 			ImageInfo->sampler = Binding.ImageBinding.Sampler ? *Binding.ImageBinding.Sampler : nullptr;
@@ -348,7 +348,7 @@ BmRender_Pipeline BmRender_CreateGraphicsPipeline(BmRender_PipelineLayout Pipeli
 {
 	VkDevice Device = CoreContext.LogicalDevice;
 
-	VkPipelineShaderStageCreateInfo* VkShaderStages = (VkPipelineShaderStageCreateInfo*)Memory_LinearAllocator_Alloc(&FrameMemory, sizeof(VkPipelineShaderStageCreateInfo) * ShaderStagesCount);
+	VkPipelineShaderStageCreateInfo* VkShaderStages = Memory_LinearAllocator_CAlloc(&FrameMemory, VkPipelineShaderStageCreateInfo, ShaderStagesCount);
 	for (u32 i = 0; i < ShaderStagesCount; ++i)
 	{
 		const BmRender_ShaderStageDescription* ShaderStageDesc = ShaderStageDescriptions + i;
@@ -369,7 +369,7 @@ BmRender_Pipeline BmRender_CreateGraphicsPipeline(BmRender_PipelineLayout Pipeli
 	bool SampleCountFound = false;
 	VkSampleCountFlagBits SampleCount = VK_SAMPLE_COUNT_1_BIT;
 
-	VkFormat* ColorAttachmentFormats = (VkFormat*)Memory_LinearAllocator_Alloc(&FrameMemory, Attachment->ColorAttachmentCount * sizeof(VkFormat));
+	VkFormat* ColorAttachmentFormats = Memory_LinearAllocator_CAlloc(&FrameMemory, VkFormat, Attachment->ColorAttachmentCount);
 	for (u32 i = 0; i < Attachment->ColorAttachmentCount; ++i)
 	{
 		if (Attachment->ColorAttachments[i].Format != BmRender_Format::Undefined)
@@ -435,7 +435,7 @@ BmRender_Pipeline BmRender_CreateGraphicsPipeline(BmRender_PipelineLayout Pipeli
 
 	MultisampleState.rasterizationSamples = SampleCount;
 
-	auto PipelineCreateInfo = (VkGraphicsPipelineCreateInfo*)Memory_LinearAllocator_Alloc(&FrameMemory, sizeof(VkGraphicsPipelineCreateInfo));
+	auto PipelineCreateInfo = Memory_LinearAllocator_CAlloc(&FrameMemory, VkGraphicsPipelineCreateInfo, 1);
 	*PipelineCreateInfo = { };
 	PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	PipelineCreateInfo->stageCount = ShaderStagesCount;
@@ -500,13 +500,13 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 {
 	VkDevice Device = CoreContext.LogicalDevice;
 
-	VkDescriptorSetLayout* VkSetLayouts = (VkDescriptorSetLayout*)Memory_LinearAllocator_Alloc(&FrameMemory, Description->SetLayoutCount * sizeof(VkDescriptorSetLayout));
+	VkDescriptorSetLayout* VkSetLayouts = Memory_LinearAllocator_CAlloc(&FrameMemory, VkDescriptorSetLayout, Description->SetLayoutCount);
 	for (u32 i = 0; i < Description->SetLayoutCount; ++i)
 	{
 		VkSetLayouts[i] = Description->SetLayouts[i].InternalLayout;
 	}
 
-	VkPushConstantRange* VkPushConstantRanges = (VkPushConstantRange*)Memory_LinearAllocator_Alloc(&FrameMemory, Description->PushConstantRangeCount * sizeof(VkPushConstantRange));
+	VkPushConstantRange* VkPushConstantRanges = Memory_LinearAllocator_CAlloc(&FrameMemory, VkPushConstantRange, Description->PushConstantRangeCount);
 	for (u32 i = 0; i < Description->PushConstantRangeCount; ++i)
 	{
 		VkPushConstantRanges[i].offset = Description->PushConstantRanges[i].Offset;
@@ -532,7 +532,7 @@ BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorP
 {
 	VkDevice Device = CoreContext.LogicalDevice;
 
-	VkDescriptorPoolSize* VkPoolSizes = (VkDescriptorPoolSize*)Memory_LinearAllocator_Alloc(&FrameMemory, PoolSizeCount * sizeof(VkDescriptorPoolSize));
+	VkDescriptorPoolSize* VkPoolSizes = Memory_LinearAllocator_CAlloc(&FrameMemory, VkDescriptorPoolSize, PoolSizeCount);
 	for (u32 i = 0; i < PoolSizeCount; ++i)
 	{
 		VkPoolSizes[i] = DescriptorPoolSizeToVk(PoolSizes[i]);
@@ -1140,7 +1140,7 @@ void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRende
 	VkRenderingAttachmentInfo* ColorAttachments = nullptr;
 	VkRenderingAttachmentInfo* DepthAttachment = nullptr;
 
-	ColorAttachments = (VkRenderingAttachmentInfo*)Memory_LinearAllocator_Alloc(&FrameMemory, sizeof(VkRenderingAttachmentInfo) * pRenderingInfo->ColorAttachmentCount);
+	ColorAttachments = Memory_LinearAllocator_CAlloc(&FrameMemory, VkRenderingAttachmentInfo, pRenderingInfo->ColorAttachmentCount);
 	for (u32 i = 0; i < pRenderingInfo->ColorAttachmentCount; ++i)
 	{
 		const BmRender_RenderingColorAttachment& Attachment = pRenderingInfo->ColorAttachments[i];
@@ -1214,7 +1214,7 @@ void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmR
 
 	VkPipelineBindPoint BindPoint = PipelineTypeToVkPipelineBindPoint(Pipeline.PipelineType);
 
-	VkDescriptorSet* Sets = (VkDescriptorSet*)Memory_LinearAllocator_Alloc(&FrameMemory, sizeof(VkDescriptorSet) * DescriptorSetCount);
+	VkDescriptorSet* Sets = Memory_LinearAllocator_CAlloc(&FrameMemory, VkDescriptorSet, DescriptorSetCount);
 	for (u32 i = 0; i < DescriptorSetCount; ++i)
 	{
 		Sets[i] = pDescriptorSets[i].InternalSet;
@@ -1274,7 +1274,7 @@ void BmRender_EndRendering(BmRender_CommandBuffer CommandBuffer)
 void BmRender_QueueSubmit(BmRender_Queue Queue, u32 SubmitCount, const BmRender_SubmitInfo* Submits, BmRender_Fence Fence)
 {
 	VkFence VkFenceHandle = (VkFence)Fence;
-	VkSubmitInfo* VkSubmits = (VkSubmitInfo*)Memory_LinearAllocator_Alloc(&FrameMemory, sizeof(VkSubmitInfo) * SubmitCount);
+	VkSubmitInfo* VkSubmits = Memory_LinearAllocator_CAlloc(&FrameMemory, VkSubmitInfo, SubmitCount);
 
 	for (u32 i = 0; i < SubmitCount; ++i)
 	{
@@ -1293,7 +1293,7 @@ void BmRender_QueueSubmit(BmRender_Queue Queue, u32 SubmitCount, const BmRender_
 		VkPipelineStageFlags* WaitDstStageFlags = nullptr;
 		if (Submit.WaitDstStageFlags != nullptr)
 		{
-			WaitDstStageFlags = (VkPipelineStageFlags*)Memory_LinearAllocator_Alloc(&FrameMemory, sizeof(VkPipelineStageFlags) * TotalWaitSemaphoreCount);
+			WaitDstStageFlags = Memory_LinearAllocator_CAlloc(&FrameMemory, VkPipelineStageFlags, TotalWaitSemaphoreCount);
 			for (u32 j = 0; j < TotalWaitSemaphoreCount; ++j)
 			{
 				WaitDstStageFlags[j] = PipelineStageFlagsToVk(Submit.WaitDstStageFlags[j]);
@@ -1308,10 +1308,10 @@ void BmRender_QueueSubmit(BmRender_Queue Queue, u32 SubmitCount, const BmRender_
 		VkSubmit.commandBufferCount = Submit.CommandBufferCount;
 		VkSubmit.signalSemaphoreCount = TotalSignalSemaphoreCount;
 
-		u64* WaitValues = (u64*)Memory_LinearAllocator_Alloc(&FrameMemory, sizeof(u64) * TotalWaitSemaphoreCount);
-		u64* SignalValues = (u64*)Memory_LinearAllocator_Alloc(&FrameMemory, sizeof(u64) * TotalSignalSemaphoreCount);
-		VkSemaphore* WaitSemaphores = (VkSemaphore*)Memory_LinearAllocator_Alloc(&FrameMemory, sizeof(VkSemaphore) * TotalWaitSemaphoreCount);
-		VkSemaphore* SignalSemaphores = (VkSemaphore*)Memory_LinearAllocator_Alloc(&FrameMemory, sizeof(VkSemaphore) * TotalSignalSemaphoreCount);
+		u64* WaitValues = Memory_LinearAllocator_CAlloc(&FrameMemory, u64, TotalWaitSemaphoreCount);
+		u64* SignalValues = Memory_LinearAllocator_CAlloc(&FrameMemory, u64, TotalSignalSemaphoreCount);
+		VkSemaphore* WaitSemaphores = Memory_LinearAllocator_CAlloc(&FrameMemory, VkSemaphore, TotalWaitSemaphoreCount);
+		VkSemaphore* SignalSemaphores = Memory_LinearAllocator_CAlloc(&FrameMemory, VkSemaphore, TotalSignalSemaphoreCount);
 
 		NewTimelineInfo.pWaitSemaphoreValues = WaitValues;
 		NewTimelineInfo.pSignalSemaphoreValues = SignalValues;
@@ -1357,7 +1357,7 @@ BmRender_SwapchainResult BmRender_QueuePresent(BmRender_Queue Queue, const BmRen
 	PresentInfo.pSwapchains = &CoreContext.VulkanSwapchain;
 	PresentInfo.pImageIndices = pPresentInfo->ImageIndices;
 
-	VkSemaphore* WaitSemaphores = (VkSemaphore*)Memory_LinearAllocator_Alloc(&FrameMemory, sizeof(VkSemaphore) * pPresentInfo->WaitSemaphoreCount);
+	VkSemaphore* WaitSemaphores = Memory_LinearAllocator_CAlloc(&FrameMemory, VkSemaphore, pPresentInfo->WaitSemaphoreCount);
 	PresentInfo.pWaitSemaphores = WaitSemaphores;
 
 	for (u32 i = 0; i < pPresentInfo->WaitSemaphoreCount; ++i)

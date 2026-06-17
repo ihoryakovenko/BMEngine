@@ -1,4 +1,4 @@
-#include "PipelineManager.h"
+#include "RenderResourceManager.h"
 
 #include <Util/Util.h>
 #include <SharedLib.h>
@@ -63,7 +63,7 @@ void PipelineManger_Init(bool EnableLiveShaders)
 	Initialized = true;
 }
 
-void PipelineManager_DeInit()
+void RenderResourceManager_DeInit()
 {
 	if (LiveShaders)
 	{
@@ -81,7 +81,7 @@ void PipelineManager_DeInit()
 	Initialized = false;
 }
 
-void PipelineManager_Update()
+void RenderResourceManager_Update()
 {
 	if (LiveShaders)
 	{
@@ -157,7 +157,7 @@ void PipelineManager_Update()
 				continue;
 			}
 
-			BmRender_DestroyPipeline(Pipelines[i]);
+			
 			BmRender_DestroyShader(Shaders[i]);
 
 			BmRender_ShaderDescription ShaderDesc = {};
@@ -166,7 +166,7 @@ void PipelineManager_Update()
 			Shaders[i] = BmRender_CreateShader(&ShaderDesc);
 
 			const Metadata_Pipeline* Metadata = Metadata_Pipelines + i;
-			BmRender_ShaderStageDescription* StageDescriptions = (BmRender_ShaderStageDescription*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), sizeof(BmRender_ShaderStageDescription) * Metadata->StageCount);
+			BmRender_ShaderStageDescription* StageDescriptions = Memory_LinearAllocator_CAlloc(Memory::GetGeneralFrameMemory(), BmRender_ShaderStageDescription, Metadata->StageCount);
 
 			for (u32 j = 0; j < Metadata->StageCount; ++j)
 			{
@@ -176,7 +176,22 @@ void PipelineManager_Update()
 				Stage->Stage = Metadata->Stages[j].Stage;
 			}
 
-			Pipelines[i] = BmRender_CreateGraphicsPipeline(Layouts[i], SavedSettings + i, StageDescriptions, Metadata->StageCount, SavedAttachmentData + i);
+			const BmRender_PipelineType Type = Pipelines[i].PipelineType;
+
+			BmRender_DestroyPipeline(Pipelines[i]);
+
+			if (Type == BmRender_PipelineType::Graphics)
+			{
+				Pipelines[i] = BmRender_CreateGraphicsPipeline(Layouts[i], SavedSettings + i, StageDescriptions, Metadata->StageCount, SavedAttachmentData + i);
+			}
+			else if (Type == BmRender_PipelineType::Compute)
+			{
+				Pipelines[i] = BmRender_CreateComputePipeline(Layouts[i], StageDescriptions);
+			}
+			else
+			{
+				assert(false);
+			}
 		}
 
 		if (Session)
@@ -187,7 +202,7 @@ void PipelineManager_Update()
 	}
 }
 
-void PipelineManager_CreatePipelineLayout(PipelineNames Name, const BmRender_DescriptorSetLayout* SetLayouts, u32 SetLayoutsCount,
+void RenderResourceManager_CreatePipelineLayout(PipelineNames Name, const BmRender_DescriptorSetLayout* SetLayouts, u32 SetLayoutsCount,
 	const BmRender_PushConstant* PushConstants, u32 PushConstantsCount)
 {
 	assert(Initialized);
@@ -201,12 +216,12 @@ void PipelineManager_CreatePipelineLayout(PipelineNames Name, const BmRender_Des
 	Layouts[u32(Name)] = BmRender_CreatePipelineLayout(&LayoutDesc);
 }
 
-void PipelineManager_CreateGraphicsPipeline(PipelineNames Name, const BmRender_PipelineSettings* Settings, const AttachmentData* ResourceInfo)
+void RenderResourceManager_CreateGraphicsPipeline(PipelineNames Name, const BmRender_PipelineSettings* Settings, const AttachmentData* ResourceInfo)
 {
 	assert(Initialized);
 
 	const Metadata_Pipeline* Metadata = Metadata_Pipelines + u32(Name);
-	BmRender_ShaderStageDescription* StageDescriptions = (BmRender_ShaderStageDescription*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), sizeof(BmRender_ShaderStageDescription) * Metadata->StageCount);
+	BmRender_ShaderStageDescription* StageDescriptions = Memory_LinearAllocator_CAlloc(Memory::GetGeneralFrameMemory(), BmRender_ShaderStageDescription, Metadata->StageCount);
 
 	for (u32 i = 0; i < Metadata->StageCount; ++i)
 	{
@@ -225,12 +240,12 @@ void PipelineManager_CreateGraphicsPipeline(PipelineNames Name, const BmRender_P
 	}
 }
 
-void PipelineManager_CreateComputePipeline(PipelineNames Name)
+void RenderResourceManager_CreateComputePipeline(PipelineNames Name)
 {
 	assert(Initialized);
 
 	const Metadata_Pipeline* Metadata = Metadata_Pipelines + u32(Name);
-	BmRender_ShaderStageDescription* StageDescriptions = (BmRender_ShaderStageDescription*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), sizeof(BmRender_ShaderStageDescription) * Metadata->StageCount);
+	BmRender_ShaderStageDescription* StageDescriptions = Memory_LinearAllocator_CAlloc(Memory::GetGeneralFrameMemory(), BmRender_ShaderStageDescription, Metadata->StageCount);
 
 	for (u32 i = 0; i < Metadata->StageCount; ++i)
 	{
@@ -243,12 +258,16 @@ void PipelineManager_CreateComputePipeline(PipelineNames Name)
 	Pipelines[u32(Name)] = BmRender_CreateComputePipeline(Layouts[u32(Name)], StageDescriptions);
 }
 
-void PipelineManager_BindPipeline(BmRender_CommandBuffer CmdBuffer, PipelineNames Name)
+void RenderResourceManager_BindPipeline(BmRender_CommandBuffer CmdBuffer, PipelineNames Name)
 {
+	assert(Initialized);
+
 	BmRender_BindPipeline(CmdBuffer, Pipelines[u32(Name)], Layouts[u32(Name)]);
 }
 
-void PipelineManager_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, PipelineNames Name, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets)
+void RenderResourceManager_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, PipelineNames Name, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets)
 {
+	assert(Initialized);
+
 	BmRender_RecordBindDescriptorSets(CommandBuffer, Pipelines[u32(Name)], Layouts[u32(Name)], FirstSet, DescriptorSetCount, pDescriptorSets, DynamicOffsetCount, pDynamicOffsets);
 }

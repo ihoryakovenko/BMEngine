@@ -13,7 +13,7 @@
 #include "Util/Math.h"
 
 #include "PipelineSettings.h"
-#include "PipelineManager.h"
+#include "RenderResourceManager.h"
 
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 
@@ -94,10 +94,10 @@ static void GenericDraw(BmRender_CommandBuffer CommandBuffer, DrawScene* Scene, 
 {
 	const u32 FrameDynamicOffset = CurrentFrame * sizeof(Shader_FrameData);
 
-	PipelineManager_BindPipeline(CommandBuffer, Name);
+	RenderResourceManager_BindPipeline(CommandBuffer, Name);
 
-	PipelineManager_RecordBindDescriptorSets(CommandBuffer, Name, 0, 1, &DescriptorSets.FrameBufferSet, 1, &FrameDynamicOffset);
-	PipelineManager_RecordBindDescriptorSets(CommandBuffer, Name, 1, SetsCount, Sets, DynamicOffsetsCount, DynamicOffsets);
+	RenderResourceManager_RecordBindDescriptorSets(CommandBuffer, Name, 0, 1, &DescriptorSets.FrameBufferSet, 1, &FrameDynamicOffset);
+	RenderResourceManager_RecordBindDescriptorSets(CommandBuffer, Name, 1, SetsCount, Sets, DynamicOffsetsCount, DynamicOffsets);
 
 	std::unique_lock Lock(Scene->TempLock);
 
@@ -115,7 +115,7 @@ static void InitImGuiPipeline(BmRender_DescriptorPool* ImGuiPool, GLFWwindow* Wn
 	ImGui_ImplGlfw_InitForVulkan(Wnd, true);
 
 	AttachmentData* AttachmentDataPtr = &DeferredPassPipelineAttachmentData;
-	VkFormat* ColorAttachmentFormats = (VkFormat*)Memory_LinearAllocator_Alloc(Memory::GetGeneralFrameMemory(), AttachmentDataPtr->ColorAttachmentCount * sizeof(VkFormat));
+	VkFormat* ColorAttachmentFormats = Memory_LinearAllocator_CAlloc(Memory::GetGeneralFrameMemory(), VkFormat, AttachmentDataPtr->ColorAttachmentCount);
 	for (u32 i = 0; i < AttachmentDataPtr->ColorAttachmentCount; ++i)
 	{
 		const BmRender_Format Format = AttachmentDataPtr->ColorAttachments[i].Format;
@@ -229,8 +229,8 @@ static void InitStaticMeshPipeline(StaticMeshPipelineDepr* MeshPipeline, BmRende
 
 	BmRender_PipelineSettings Settings = GetStaticPipelineDescription();
 
-	PipelineManager_CreatePipelineLayout(PipelineNames::Entity, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0);
-	PipelineManager_CreateGraphicsPipeline(PipelineNames::Entity, &Settings, &ResourceInfo);
+	RenderResourceManager_CreatePipelineLayout(PipelineNames::Entity, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0);
+	RenderResourceManager_CreateGraphicsPipeline(PipelineNames::Entity, &Settings, &ResourceInfo);
 }
 
 static void DrawStaticMeshes(BmRender_CommandBuffer CommandBuffer, StaticMeshPipelineDepr* MeshPipeline, DrawScene* Scene, const DescriptorSetHandles& DescriptorSets)
@@ -314,13 +314,13 @@ static void DeferredPassInit(BmRender_DescriptorPool* MainPool)
 	descriptorSetLayouts.push_back(FrameDataLayout);
 	descriptorSetLayouts.push_back(MainPassOutputLayout);
 
-	PipelineManager_CreatePipelineLayout(PipelineNames::Deferred, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0);
-	PipelineManager_CreateComputePipeline(PipelineNames::Deferred);
+	RenderResourceManager_CreatePipelineLayout(PipelineNames::Deferred, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0);
+	RenderResourceManager_CreateComputePipeline(PipelineNames::Deferred);
 }
 
-static void DeferredPassDraw()
+static void DeferredPassDispatch()
 {
-	PipelineManager_BindPipeline(RenderCommandBuffers[CurrentFrame], PipelineNames::Deferred);
+	RenderResourceManager_BindPipeline(RenderCommandBuffers[CurrentFrame], PipelineNames::Deferred);
 
 	const BmRender_DescriptorSet Sets[2] = {
 		DescriptorSets.FrameBufferSet,
@@ -330,24 +330,12 @@ static void DeferredPassDraw()
 	const u32 FrameDynamicOffset = CurrentFrame * sizeof(Shader_FrameData);
 	const u32 DynamicOffsets[] = { FrameDynamicOffset };
 
-	PipelineManager_RecordBindDescriptorSets(RenderCommandBuffers[CurrentFrame], PipelineNames::Deferred, 0, 2, Sets, 1, DynamicOffsets);
+	RenderResourceManager_RecordBindDescriptorSets(RenderCommandBuffers[CurrentFrame], PipelineNames::Deferred, 0, 2, Sets, 1, DynamicOffsets);
 
 	u32 groupX = (MainScreenExtent.Width + 7) / 8;
 	u32 groupY = (MainScreenExtent.Height + 7) / 8;
 
 	BmRender_RecordDispatch(RenderCommandBuffers[CurrentFrame], groupX, groupY, 1);
-}
-
-static void DeferredPassBeginPass()
-{
-	BmRender_TransitionImageForSampling(RenderCommandBuffers[CurrentFrame], DeferredInputColorImage + CurrentFrame);
-	BmRender_TransitionImageForSampling(RenderCommandBuffers[CurrentFrame], DeferredInputDepthImage + CurrentFrame);
-	BmRender_TransitionImageForComputeWrite(RenderCommandBuffers[CurrentFrame], BmRender_GetSwapchainImage(CurrentImageIndex));
-}
-
-static void DeferredPassEndPass()
-{
-	BmRender_TransitionImageForPresentation(RenderCommandBuffers[CurrentFrame], BmRender_GetSwapchainImage(CurrentImageIndex));
 }
 
 static void DeferredPassDeInit()
@@ -407,8 +395,8 @@ static void LightningPassInit(BmRender_DescriptorPool* MainPool)
 
 	BmRender_PipelineSettings PipelineDesc = GetDepthPipelineDescription();
 
-	PipelineManager_CreatePipelineLayout(PipelineNames::Depth_vert, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0);
-	PipelineManager_CreateGraphicsPipeline(PipelineNames::Depth_vert, &PipelineDesc, &ResourceInfo);
+	RenderResourceManager_CreatePipelineLayout(PipelineNames::Depth_vert, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0);
+	RenderResourceManager_CreateGraphicsPipeline(PipelineNames::Depth_vert, &PipelineDesc, &ResourceInfo);
 }
 
 static void LightningPassDraw(DrawScene* Scene)
@@ -685,11 +673,19 @@ void Render_Draw(DrawScene* Scene, u64 WaitSemaphoreValue)
 	MainPassBeginPass();
 	DrawStaticMeshes(RenderCommandBuffers[CurrentFrame], &State.MeshPipeline, Scene, State.DescriptorSets);
 	MainPassEndPass();
-	DeferredPassBeginPass();
-	DeferredPassDraw();
+	
+	BmRender_TransitionImageForSampling(RenderCommandBuffers[CurrentFrame], DeferredInputColorImage + CurrentFrame);
+	BmRender_TransitionImageForSampling(RenderCommandBuffers[CurrentFrame], DeferredInputDepthImage + CurrentFrame);
+	BmRender_TransitionImageForComputeWrite(RenderCommandBuffers[CurrentFrame], BmRender_GetSwapchainImage(CurrentImageIndex));
+
+	DeferredPassDispatch();
+
+	BmRender_TransitionImageForRendering(RenderCommandBuffers[CurrentFrame], BmRender_GetSwapchainImage(CurrentImageIndex));
 	//ImGui::Render();
-	//ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), (VkCommandBuffer)RenderCommandBuffers[CurrentFrame]);
-	DeferredPassEndPass();
+	//ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), RenderCommandBuffers[CurrentFrame].InternalBuffer);
+
+
+	BmRender_TransitionImageForPresentation(RenderCommandBuffers[CurrentFrame], BmRender_GetSwapchainImage(CurrentImageIndex));
 
 	BmRender_EndCommandBuffer(RenderCommandBuffers[CurrentFrame]);
 

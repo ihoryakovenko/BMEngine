@@ -24,7 +24,7 @@
     <ClCompile Include="Source\Engine\Systems\Memory\MemoryManagmentSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\Render.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\RenderResources.cpp" />
-    <ClCompile Include="Source\Engine\Systems\Render\PipelineManager.cpp" />
+    <ClCompile Include="Source\Engine\Systems\Render\RenderResourceManager.cpp" />
     <ClCompile Include="Source\Engine\Systems\Render\TransferSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\UI\UI.cpp" />
     <ClCompile Include="Source\main.cpp" />
@@ -40,7 +40,7 @@
     <ClInclude Include="Source\Engine\Systems\Render\PipelineMetadata.h" />
     <ClInclude Include="Source\Engine\Systems\Render\PipelineSettings.h" />
     <ClInclude Include="Source\Engine\Systems\Render\RenderResources.h" />
-    <ClInclude Include="Source\Engine\Systems\Render\PipelineManager.h" />
+    <ClInclude Include="Source\Engine\Systems\Render\RenderResourceManager.h" />
     <ClInclude Include="Source\Engine\Systems\Render\TransferSystem.h" />
     <ClInclude Include="Source\Engine\Systems\UI\UI.h" />
     <ClInclude Include="Source\Util\DefaultTextureData.h" />

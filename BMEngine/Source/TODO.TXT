@@ -1,6 +1,5 @@
-Move pipeline type from pipeline layout and add to pipeline
 Remove PipelineDesc.ColorBlendState from settings as it specifies attachment count
 Define pipeline type durimg creation using BmRender_PipelineType
-refactor PipelineManager_CreateComputePipeline, compute pipeline have only one stage so no need for StageCount
+refactor RenderResourceManager_CreateComputePipeline, compute pipeline have only one stage so no need for StageCount
 save oldLayout in image as BmRender_TransitionImageForPresentation has hardcoded old layout but it can be after compute or after attachmet
 after Aquaire image its src stage mask is VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT

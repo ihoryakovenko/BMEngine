@@ -2,6 +2,8 @@
 
 #include "ShortTypes.h"
 
+#define ALIGN_UP(x, a) (((x) + (a) - 1) & ~((a) - 1))
+
 struct Memory_PoolAllocator
 {
 	void* Data;
@@ -33,8 +35,9 @@ void Memory_LinearAllocator_Free(Memory_LinearAllocator* Memory);
 void* Memory_LinearAllocator_Alloc(Memory_LinearAllocator* Memory, u64 Size);
 void Memory_LinearAllocator_FreeMemory(Memory_LinearAllocator* Memory);
 void* Memory_LinearAllocator_GetHead(Memory_LinearAllocator* Memory);
+#define Memory_LinearAllocator_CAlloc(Memory, Type, Count) ((Type*)Memory_LinearAllocator_Alloc((Memory), sizeof(Type) * (Count)))
 
-struct SparceHashMap
+struct Container_SparceHashMap
 {
 	u64* Keys;
 	u32* Indices;
@@ -44,11 +47,20 @@ struct SparceHashMap
 	u64 Count;
 };
 
-void Systems_SparceHashMap_Init(SparceHashMap* Map, u64 InitialCapacity);
-void Systems_SparceHashMap_Free(SparceHashMap* Map);
-void Systems_SparceHashMap_Insert(SparceHashMap* Map, u64 Key, u32 Index);
-bool Systems_SparceHashMap_Get(const SparceHashMap* Map, u64 Key, u32* OutIndex);
-bool Systems_SparceHashMap_Remove(SparceHashMap* Map, u64 Key, u32* OutIndex);
+void Container_SparceHashMap_Init(Container_SparceHashMap* Map, u64 InitialCapacity);
+void Container_SparceHashMap_Free(Container_SparceHashMap* Map);
+void Container_SparceHashMap_Insert(Container_SparceHashMap* Map, u64 Key, u32 Index);
+bool Container_SparceHashMap_Get(const Container_SparceHashMap* Map, u64 Key, u32* OutIndex);
+bool Container_SparceHashMap_Remove(Container_SparceHashMap* Map, u64 Key, u32* OutIndex);
+
+//struct Container_DynamicArrayHeader
+//{
+//	u32 DataSize;
+//	u32 Count;
+//	u32 Capacity;
+//};
+//
+//void*
 
 struct System_HandleManager_Entry
 {

@@ -24,7 +24,7 @@
 #include "Engine/Systems/EngineResources.h"
 #include "Engine/Systems/Render/TransferSystem.h"
 #include "Engine/Systems/Concurrency/TaskSystem.h"
-#include "Systems/Render/PipelineManager.h"
+#include "Systems/Render/RenderResourceManager.h"
 #include <Engine/Systems/Render/Shaders/ShaderTypes.h>
 
 
@@ -125,7 +125,7 @@ namespace Engine
 			{			
 				EngineResources::Update(&Scene);
 
-				PipelineManager_Update();
+				RenderResourceManager_Update();
 
 				//TaskSystem::TaskLambda Task = [&]() { TransferSystem::Transfer(); };
 				//TaskSystem::AddTask(&Task, &Group);
@@ -180,7 +180,11 @@ namespace Engine
 		Yaml::Node Root;
 		Yaml::Parse(Root, "./Resources/Settings/RenderResources.yaml");
 
-		BmRender_Init(Window);
+		BmRender_InitData InitData;
+		InitData.EnableDebug = true;
+		InitData.WindowHandler = Window;
+
+		BmRender_Init(&InitData);
 		PipelineManger_Init(true);
 
 		TransferSystem::Init();
@@ -221,7 +225,7 @@ namespace Engine
 		EngineResources::DeInit();
 		UI::DeInit();
 
-		PipelineManager_DeInit();
+		RenderResourceManager_DeInit();
 
 		BmRender_DeInit();
 

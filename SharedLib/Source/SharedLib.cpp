@@ -113,7 +113,7 @@ static inline u64 NextIndex(u64 i, u64 Mask)
 	return (i + 1) & Mask;
 }
 
-static void SparceHashMap_Resize(SparceHashMap* Map)
+static void SparceHashMap_Resize(Container_SparceHashMap* Map)
 {
 	u64 OldCapacity = Map->Capacity;
 	u64* OldKeys = Map->Keys;
@@ -122,13 +122,13 @@ static void SparceHashMap_Resize(SparceHashMap* Map)
 	bool* OldOccupied = Map->Occupied;
 
 	u64 NewCapacity = OldCapacity * 2;
-	Systems_SparceHashMap_Init(Map, NewCapacity);
+	Container_SparceHashMap_Init(Map, NewCapacity);
 
 	for (u64 i = 0; i < OldCapacity; ++i)
 	{
 		if (OldOccupied[i])
 		{
-			Systems_SparceHashMap_Insert(Map, OldKeys[i], OldIndices[i]);
+			Container_SparceHashMap_Insert(Map, OldKeys[i], OldIndices[i]);
 		}
 	}
 
@@ -138,7 +138,7 @@ static void SparceHashMap_Resize(SparceHashMap* Map)
 	free(OldOccupied);
 }
 
-void Systems_SparceHashMap_Init(SparceHashMap* Map, u64 InitialCapacity)
+void Container_SparceHashMap_Init(Container_SparceHashMap* Map, u64 InitialCapacity)
 {
 	assert((InitialCapacity & (InitialCapacity - 1)) == 0);
 	Map->Capacity = InitialCapacity;
@@ -149,7 +149,7 @@ void Systems_SparceHashMap_Init(SparceHashMap* Map, u64 InitialCapacity)
 	Map->Occupied = (bool*)calloc(InitialCapacity, sizeof(bool));
 }
 
-void Systems_SparceHashMap_Free(SparceHashMap* Map)
+void Container_SparceHashMap_Free(Container_SparceHashMap* Map)
 {
 	free(Map->Keys);
 	free(Map->Indices);
@@ -157,7 +157,7 @@ void Systems_SparceHashMap_Free(SparceHashMap* Map)
 	free(Map->Occupied);
 }
 
-void Systems_SparceHashMap_Insert(SparceHashMap* Map, u64 Key, u32 Index)
+void Container_SparceHashMap_Insert(Container_SparceHashMap* Map, u64 Key, u32 Index)
 {
 	const float LoadFactor = 0.8f;
 	if (Map->Count + 1 > (u64)(Map->Capacity * LoadFactor))
@@ -207,7 +207,7 @@ void Systems_SparceHashMap_Insert(SparceHashMap* Map, u64 Key, u32 Index)
 	}
 }
 
-bool Systems_SparceHashMap_Get(const SparceHashMap* Map, u64 Key, u32* OutIndex)
+bool Container_SparceHashMap_Get(const Container_SparceHashMap* Map, u64 Key, u32* OutIndex)
 {
 	u64 Mask = Map->Capacity - 1;
 	u64 i = GetIndexFromHandleMask(Key, Map->Capacity);
@@ -231,7 +231,7 @@ bool Systems_SparceHashMap_Get(const SparceHashMap* Map, u64 Key, u32* OutIndex)
 	}
 }
 
-bool Systems_SparceHashMap_Remove(SparceHashMap* Map, u64 Key, u32* OutIndex)
+bool Container_SparceHashMap_Remove(Container_SparceHashMap* Map, u64 Key, u32* OutIndex)
 {
 	u64 Mask = Map->Capacity - 1;
 	u64 i = GetIndexFromHandleMask(Key, Map->Capacity);
