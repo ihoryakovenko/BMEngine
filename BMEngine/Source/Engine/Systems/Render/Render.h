@@ -9,7 +9,6 @@
 
 #include "Util/EngineTypes.h"
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
-#include "RenderInterface.h"
 
 #include <atomic>
 #include <mutex>

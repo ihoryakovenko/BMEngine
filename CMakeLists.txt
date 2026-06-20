@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.20)
+
+set(TARGET_NAME BmEngine)
+project(BMEngine LANGUAGES C CXX)
+
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/x64)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/x64)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/x64)
+
+add_subdirectory(SharedLib)
+add_subdirectory(BmRender)

@@ -1,11 +1,9 @@
 #pragma once
 
-#define BM_RENDER_VULKAN_BACKEND
-
 #include <ShortTypes.h>
 
 #if defined (BM_RENDER_VULKAN_BACKEND)
-#include "Sources/VulkanBackend/VulkanRender.h"
+#include "VulkanBackend/VulkanRender.h"
 #endif
 
 struct GLFWwindow;

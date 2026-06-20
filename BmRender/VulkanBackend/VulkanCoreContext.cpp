@@ -6,6 +6,8 @@
 
 #include <GLFW/glfw3.h>
 
+#include <RenderInternal.h>
+
 extern Memory_LinearAllocator FrameMemory;
 
 static VkDevice CreateLogicalDevice(VkPhysicalDevice PhDevice, PhysicalDeviceIndices Indices, const char* DeviceExtensions[],

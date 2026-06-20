@@ -102,7 +102,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);BM_RENDER_VULKAN_BACKEND</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)Shared\;$(SLANG)\include;$(SolutionDir)BmRender;$(SolutionDir)BMEngine\Source;$(VULKAN_SDK)\Include;$(SolutionDir)SharedLib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -120,7 +120,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)BM_RENDER_VULKAN_BACKENDBM_RENDER_VULKAN_BACKEND;BM_RENDER_VULKAN_BACKEND</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)Shared\;$(SLANG)\include;$(SolutionDir)BmRender;$(SolutionDir)BMEngine\Source;$(VULKAN_SDK)\Include;$(SolutionDir)SharedLib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>

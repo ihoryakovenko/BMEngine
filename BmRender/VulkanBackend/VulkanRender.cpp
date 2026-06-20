@@ -6,6 +6,8 @@
 #include <forge_memory_debugger.h>
 #include <cassert>
 
+#include <RenderInternal.h>
+
 extern Memory_LinearAllocator FrameMemory;
 
 static VulkanCoreContext CoreContext;

@@ -6,6 +6,8 @@
 
 #include <glm/glm.hpp>
 
+#include <RenderInternal.h>
+
 extern Memory_LinearAllocator FrameMemory;
 
 VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface, const VkSurfaceFormatKHR* AvailableFormats, u32 Count)
