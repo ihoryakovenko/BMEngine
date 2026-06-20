@@ -697,6 +697,7 @@ struct BmRender_InitData
 {
 	GLFWwindow* WindowHandler;
 	bool EnableDebug;
+	u32 TypeDebugDatainitialSize;
 };
 
 void BmRender_Init(const BmRender_InitData* InitData);

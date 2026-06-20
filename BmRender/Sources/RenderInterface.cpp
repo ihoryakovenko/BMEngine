@@ -13,6 +13,7 @@ Memory_LinearAllocator FrameMemory;
 void BmRender_Init(const BmRender_InitData* InitData)
 {
 	Memory_LinearAllocator_Init(&FrameMemory, 1024 * 1024);
+
 	InitBackend(InitData->WindowHandler);
 }
 

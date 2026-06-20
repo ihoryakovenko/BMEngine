@@ -433,7 +433,7 @@ VkPresentModeKHR GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurf
 	u32 PresentModeCount;
 	VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &PresentModeCount, nullptr));
 
-	auto PresentModes = Memory_LinearAllocator_CAlloc(&FrameMemory, VkPresentModeKHR, PresentModeCount);
+	auto PresentModes = Memory_LinearAllocator_AllocTC(&FrameMemory, VkPresentModeKHR, PresentModeCount);
 	vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &PresentModeCount, PresentModes);
 
 	for (u32 i = 0; i < PresentModeCount; ++i)

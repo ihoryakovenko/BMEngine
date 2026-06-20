@@ -7,6 +7,5 @@
   <ItemGroup>
     <ClInclude Include="forge_memory_debugger.h" />
     <ClInclude Include="SharedLib.h" />
-    <ClInclude Include="ShortTypes.h" />
   </ItemGroup>
 </Project>

@@ -206,11 +206,11 @@ void CreateCoreContext(VulkanCoreContext* Context, GLFWwindow* Window)
 	u32 ExtensionCount;
 	VULKAN_CHECK_RESULT(vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, nullptr));
 
-	auto AvailableExtensions = Memory_LinearAllocator_CAlloc(&FrameMemory, VkExtensionProperties, ExtensionCount);
+	auto AvailableExtensions = Memory_LinearAllocator_AllocTC(&FrameMemory, VkExtensionProperties, ExtensionCount);
 	vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, AvailableExtensions);
 
 	const u32 ExtensionsCount = RequiredExtensionsCount + ValidationExtensionsCount;
-	auto RequiredExtensions = Memory_LinearAllocator_CAlloc(&FrameMemory, const char*, RequiredExtensionsCount);
+	auto RequiredExtensions = Memory_LinearAllocator_AllocTC(&FrameMemory, const char*, RequiredExtensionsCount);
 	GetRequiredInstanceExtensions(RequiredInstanceExtensions, RequiredExtensionsCount,
 		ValidationExtensions, ValidationExtensionsCount, RequiredExtensions);
 
@@ -263,7 +263,7 @@ void CreateCoreContext(VulkanCoreContext* Context, GLFWwindow* Window)
 	u32 DeviceCount;
 	vkEnumeratePhysicalDevices(Context->VulkanInstance, &DeviceCount, nullptr);
 
-	auto DeviceList = Memory_LinearAllocator_CAlloc(&FrameMemory, VkPhysicalDevice, DeviceCount);
+	auto DeviceList = Memory_LinearAllocator_AllocTC(&FrameMemory, VkPhysicalDevice, DeviceCount);
 	vkEnumeratePhysicalDevices(Context->VulkanInstance, &DeviceCount, DeviceList);
 
 	bool IsDeviceFound = false;
@@ -274,13 +274,13 @@ void CreateCoreContext(VulkanCoreContext* Context, GLFWwindow* Window)
 		u32 DeviceExtensionCount;
 		VULKAN_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(Context->PhysicalDevice, nullptr, &DeviceExtensionCount, nullptr));
 
-		auto DeviceExtensionsData = Memory_LinearAllocator_CAlloc(&FrameMemory, VkExtensionProperties, DeviceExtensionCount);
+		auto DeviceExtensionsData = Memory_LinearAllocator_AllocTC(&FrameMemory, VkExtensionProperties, DeviceExtensionCount);
 		VULKAN_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(Context->PhysicalDevice, nullptr, &DeviceExtensionCount, DeviceExtensionsData));
 
 		u32 QueueFamilyCount;
 		vkGetPhysicalDeviceQueueFamilyProperties(Context->PhysicalDevice, &QueueFamilyCount, nullptr);
 
-		auto FamilyPropertiesData = Memory_LinearAllocator_CAlloc(&FrameMemory, VkQueueFamilyProperties, QueueFamilyCount);
+		auto FamilyPropertiesData = Memory_LinearAllocator_AllocTC(&FrameMemory, VkQueueFamilyProperties, QueueFamilyCount);
 		vkGetPhysicalDeviceQueueFamilyProperties(Context->PhysicalDevice, &QueueFamilyCount, FamilyPropertiesData);
 
 		Context->Indices = GetPhysicalDeviceIndices(FamilyPropertiesData, QueueFamilyCount, Context->PhysicalDevice, Context->Surface);
@@ -308,7 +308,7 @@ void CreateCoreContext(VulkanCoreContext* Context, GLFWwindow* Window)
 	u32 SurfaceFormatCount;
 	VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfaceFormatsKHR(Context->PhysicalDevice, Context->Surface, &SurfaceFormatCount, nullptr));
 
-	auto AvailableFormats = Memory_LinearAllocator_CAlloc(&FrameMemory, VkSurfaceFormatKHR, SurfaceFormatCount);
+	auto AvailableFormats = Memory_LinearAllocator_AllocTC(&FrameMemory, VkSurfaceFormatKHR, SurfaceFormatCount);
 	vkGetPhysicalDeviceSurfaceFormatsKHR(Context->PhysicalDevice, Context->Surface, &SurfaceFormatCount, AvailableFormats);
 
 	Context->SurfaceFormat = GetBestSurfaceFormat(Context->Surface, AvailableFormats, SurfaceFormatCount);
@@ -374,7 +374,7 @@ void CreateCoreContext(VulkanCoreContext* Context, GLFWwindow* Window)
 	u32 SwapchainImageCount;
 	vkGetSwapchainImagesKHR(Context->LogicalDevice, Context->VulkanSwapchain, &SwapchainImageCount, nullptr);
 
-	auto Images = Memory_LinearAllocator_CAlloc(&FrameMemory, VkImage, SwapchainImageCount);
+	auto Images = Memory_LinearAllocator_AllocTC(&FrameMemory, VkImage, SwapchainImageCount);
 	vkGetSwapchainImagesKHR(Context->LogicalDevice, Context->VulkanSwapchain, &SwapchainImageCount, Images);
 
 	Context->ImagesCount = SwapchainImageCount;

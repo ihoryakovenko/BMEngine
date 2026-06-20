@@ -115,7 +115,7 @@ static void InitImGuiPipeline(BmRender_DescriptorPool* ImGuiPool, GLFWwindow* Wn
 	ImGui_ImplGlfw_InitForVulkan(Wnd, true);
 
 	AttachmentData* AttachmentDataPtr = &DeferredPassPipelineAttachmentData;
-	VkFormat* ColorAttachmentFormats = Memory_LinearAllocator_CAlloc(Memory::GetGeneralFrameMemory(), VkFormat, AttachmentDataPtr->ColorAttachmentCount);
+	VkFormat* ColorAttachmentFormats = Memory_LinearAllocator_AllocTC(Memory::GetGeneralFrameMemory(), VkFormat, AttachmentDataPtr->ColorAttachmentCount);
 	for (u32 i = 0; i < AttachmentDataPtr->ColorAttachmentCount; ++i)
 	{
 		const BmRender_Format Format = AttachmentDataPtr->ColorAttachments[i].Format;
