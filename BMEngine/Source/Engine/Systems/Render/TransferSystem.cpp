@@ -308,7 +308,7 @@ namespace TransferSystem
 
 		assert(TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] <= TransferState.MaxTransferSizePerFrame);
 		TransferState.TransferStagingPool.AllocatedForFrame[CurrentFrame] = 0;
-		TransferState.CurrentFrame = Math::WrapIncrement(CurrentFrame, MAX_DRAW_FRAMES);
+		TransferState.CurrentFrame = Math::WrapIncrement(CurrentFrame, u32(MAX_DRAW_FRAMES));
 
 		return 1;
 	}

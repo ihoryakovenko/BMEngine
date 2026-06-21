@@ -30,6 +30,13 @@
 
 #include <gli/gli.hpp>
 
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#else
+#error "Unimplemented"
+#endif
+
 namespace Engine
 {
 	struct Camera
@@ -175,14 +182,19 @@ namespace Engine
 		TaskSystem::Init();
 		//TaskSystem::SetConcurencyEnabled(false);
 
-		UI::Init(&GuiData);
+		//UI::Init(&GuiData);
 
-		Yaml::Node Root;
-		Yaml::Parse(Root, "./Resources/Settings/RenderResources.yaml");
+		
+		std::filesystem::path ExeDir = std::filesystem::current_path();
 
 		BmRender_InitData InitData;
 		InitData.EnableDebug = true;
-		InitData.WindowHandler = Window;
+
+#ifdef _WIN32
+		InitData.NativeWindow = (void*)glfwGetWin32Window(Window);
+#else
+#error "Unimplemented"
+#endif
 
 		BmRender_Init(&InitData);
 		PipelineManger_Init(true);
@@ -192,8 +204,9 @@ namespace Engine
 
 		EngineResources::Init();
 
+		std::filesystem::path ScenePath = ExeDir / "Resources" / "Scenes" / "TestScene.yaml";
 		Yaml::Node TestScene;
-		Yaml::Parse(TestScene, "./Resources/Scenes/TestScene.yaml");
+		Yaml::Parse(TestScene, ScenePath.string().c_str());
 		Yaml::Node& SceneResourcesNode = Util::GetSceneResources(TestScene);
 
 		Yaml::Node& TexturesNode = Util::GetTextures(SceneResourcesNode);
@@ -223,7 +236,7 @@ namespace Engine
 		Render_DeInit();
 		TransferSystem::DeInit();
 		EngineResources::DeInit();
-		UI::DeInit();
+		//UI::DeInit();
 
 		RenderResourceManager_DeInit();
 

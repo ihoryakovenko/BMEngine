@@ -17,7 +17,7 @@ namespace UI
 		int* Zoom = nullptr;
 	};
 
-	void Init(GuiData* Data);
-	void DeInit();
-	void Update();
+	//void Init(GuiData* Data);
+	//void DeInit();
+	//void Update();
 }

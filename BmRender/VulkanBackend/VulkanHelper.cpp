@@ -2,11 +2,15 @@
 
 #include <cassert>
 
-#include <GLFW/glfw3.h>
-
 #include <glm/glm.hpp>
 
 #include <RenderInternal.h>
+
+#ifdef _WIN32
+#define VK_USE_PLATFORM_WIN32_KHR
+#include <windows.h>
+#include <vulkan/vulkan_win32.h>
+#endif
 
 extern Memory_LinearAllocator FrameMemory;
 
@@ -403,7 +407,7 @@ void PrintDeviceData(VkPhysicalDeviceProperties* DeviceProperties, VkPhysicalDev
 	);
 }
 
-VkExtent2D GetBestSwapExtent(VkPhysicalDevice PhysicalDevice, GLFWwindow* WindowHandler, VkSurfaceKHR Surface)
+VkExtent2D GetBestSwapExtent(VkPhysicalDevice PhysicalDevice, void* WindowHandle, VkSurfaceKHR Surface)
 {
 	VkSurfaceCapabilitiesKHR SurfaceCapabilities = { };
 
@@ -417,14 +421,27 @@ VkExtent2D GetBestSwapExtent(VkPhysicalDevice PhysicalDevice, GLFWwindow* Window
 	}
 	else
 	{
-		s32 Width;
-		s32 Height;
-		glfwGetFramebufferSize(WindowHandler, &Width, &Height);
+#ifdef _WIN32
+		RECT ClientRect;
+		GetClientRect((HWND)WindowHandle, &ClientRect);
 
-		Width = glm::clamp(static_cast<u32>(Width), SurfaceCapabilities.minImageExtent.width, SurfaceCapabilities.maxImageExtent.width);
-		Height = glm::clamp(static_cast<u32>(Height), SurfaceCapabilities.minImageExtent.height, SurfaceCapabilities.maxImageExtent.height);
+		u32 Width = static_cast<u32>(ClientRect.right - ClientRect.left);
+		u32 Height = static_cast<u32>(ClientRect.bottom - ClientRect.top);
 
-		SwapExtent = { static_cast<u32>(Width), static_cast<u32>(Height) };
+		Width = glm::clamp(
+			Width,
+			SurfaceCapabilities.minImageExtent.width,
+			SurfaceCapabilities.maxImageExtent.width);
+
+		Height = glm::clamp(
+			Height,
+			SurfaceCapabilities.minImageExtent.height,
+			SurfaceCapabilities.maxImageExtent.height);
+
+		SwapExtent = { Width, Height };
+#else
+#error "Unsupported platform"
+#endif
 	}
 
 	return SwapExtent;
@@ -570,8 +587,8 @@ bool DestroyDebugMessenger(VkInstance Instance, VkDebugUtilsMessengerEXT InDebug
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL MessengerDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
-	[[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
-	[[maybe_unused]] void* UserData)
+	 VkDebugUtilsMessageTypeFlagsEXT MessageType, const VkDebugUtilsMessengerCallbackDataEXT* CallbackData,
+	 void* UserData)
 {
 	if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
 	{

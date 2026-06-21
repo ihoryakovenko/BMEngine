@@ -1485,7 +1485,7 @@ VkAllocationCallbacks* BmRender_GetVulkanAllocator()
 	return &VulkanAllocator;
 }
 
-void InitBackend(GLFWwindow* WindowHandler)
+void InitBackend(void* WindowHandle)
 {
 	VulkanAllocator.pUserData = nullptr;
 	VulkanAllocator.pfnAllocation = VulkanAllocationCallback;
@@ -1494,7 +1494,7 @@ void InitBackend(GLFWwindow* WindowHandler)
 	VulkanAllocator.pfnInternalAllocation = VulkanInternalAllocationNotification;
 	VulkanAllocator.pfnInternalFree = VulkanInternalFreeNotification;
 
-	CreateCoreContext(&CoreContext, WindowHandler);
+	CreateCoreContext(&CoreContext, WindowHandle);
 }
 
 void DeInitBackend()

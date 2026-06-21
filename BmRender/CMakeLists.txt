@@ -4,17 +4,21 @@ set(TARGET_NAME BmRender)
 
 project(${TARGET_NAME} LANGUAGES C CXX)
 
-add_library(${TARGET_NAME} STATIC
-	RenderInterface.h
-	Sources/RenderInterface.cpp
-	Sources/RenderInternal.h
-	VulkanBackend/VulkanCoreContext.cpp
-	VulkanBackend/VulkanCoreContext.h
-	VulkanBackend/VulkanHelper.cpp
-	VulkanBackend/VulkanHelper.h
-	VulkanBackend/VulkanRender.cpp
-	VulkanBackend/VulkanRender.h
+set(SOURCES
+    RenderInterface.h
+    Sources/RenderInterface.cpp
+    Sources/RenderInternal.h
+    VulkanBackend/VulkanCoreContext.cpp
+    VulkanBackend/VulkanCoreContext.h
+    VulkanBackend/VulkanHelper.cpp
+    VulkanBackend/VulkanHelper.h
+    VulkanBackend/VulkanRender.cpp
+    VulkanBackend/VulkanRender.h
 )
+
+add_library(${TARGET_NAME} STATIC ${SOURCES})
+
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES})
 
 target_include_directories(${TARGET_NAME}
     PUBLIC
@@ -30,20 +34,16 @@ if(MSVC)
 endif()
 
 set_target_properties(${TARGET_NAME} PROPERTIES
-	CXX_STANDARD 17
-	CXX_STANDARD_REQUIRED YES
 	CXX_EXTENSIONS NO
 )
 
 find_package(Vulkan REQUIRED)
-target_link_libraries(${TARGET_NAME} PRIVATE
+target_link_libraries(BmRender PUBLIC
 	Vulkan::Vulkan
-	SharedLib
-	${CMAKE_SOURCE_DIR}/External/glfw/lib/glfw3.lib
 )
 
-target_include_directories(${TARGET_NAME} PRIVATE
-    ${CMAKE_SOURCE_DIR}/External/glfw/include
+target_link_libraries(${TARGET_NAME} PRIVATE
+	SharedLib
 )
 
 target_compile_definitions(${TARGET_NAME} PUBLIC

@@ -3,9 +3,9 @@
 #include "RenderResources.h"
 #include "TransferSystem.h"
 
-#include "imgui.h"
-#include "imgui_impl_vulkan.h"
-#include "imgui_impl_glfw.h"
+//#include "imgui.h"
+//#include "imgui_impl_vulkan.h"
+//#include "imgui_impl_glfw.h"
 
 #include "Util/Util.h"
 #include "Util/YamlParsing.h"
@@ -112,82 +112,82 @@ static void GenericDraw(BmRender_CommandBuffer CommandBuffer, DrawScene* Scene, 
 
 static void InitImGuiPipeline(BmRender_DescriptorPool* ImGuiPool, GLFWwindow* Wnd)
 {
-	ImGui_ImplGlfw_InitForVulkan(Wnd, true);
+	//ImGui_ImplGlfw_InitForVulkan(Wnd, true);
 
-	AttachmentData* AttachmentDataPtr = &DeferredPassPipelineAttachmentData;
-	VkFormat* ColorAttachmentFormats = Memory_LinearAllocator_AllocTC(Memory::GetGeneralFrameMemory(), VkFormat, AttachmentDataPtr->ColorAttachmentCount);
-	for (u32 i = 0; i < AttachmentDataPtr->ColorAttachmentCount; ++i)
-	{
-		const BmRender_Format Format = AttachmentDataPtr->ColorAttachments[i].Format;
-		if (Format != BmRender_Format::Undefined)
-		{
-			ColorAttachmentFormats[i] = BmRender_FormatToVk(Format);
-		}
-		else
-		{
-			ColorAttachmentFormats[i] = VK_FORMAT_UNDEFINED;
-		}
-	}
+	//AttachmentData* AttachmentDataPtr = &DeferredPassPipelineAttachmentData;
+	//VkFormat* ColorAttachmentFormats = Memory_LinearAllocator_AllocTC(Memory::GetGeneralFrameMemory(), VkFormat, AttachmentDataPtr->ColorAttachmentCount);
+	//for (u32 i = 0; i < AttachmentDataPtr->ColorAttachmentCount; ++i)
+	//{
+	//	const BmRender_Format Format = AttachmentDataPtr->ColorAttachments[i].Format;
+	//	if (Format != BmRender_Format::Undefined)
+	//	{
+	//		ColorAttachmentFormats[i] = BmRender_FormatToVk(Format);
+	//	}
+	//	else
+	//	{
+	//		ColorAttachmentFormats[i] = VK_FORMAT_UNDEFINED;
+	//	}
+	//}
 
-	VkFormat DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
-	if (AttachmentDataPtr->DepthAttachment)
-	{
-		const BmRender_Format Format = AttachmentDataPtr->DepthAttachment->Format;
-		if (Format != BmRender_Format::Undefined)
-		{
-			DepthAttachmentFormat = BmRender_FormatToVk(Format);
-		}
-	}
+	//VkFormat DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
+	//if (AttachmentDataPtr->DepthAttachment)
+	//{
+	//	const BmRender_Format Format = AttachmentDataPtr->DepthAttachment->Format;
+	//	if (Format != BmRender_Format::Undefined)
+	//	{
+	//		DepthAttachmentFormat = BmRender_FormatToVk(Format);
+	//	}
+	//}
 
-	VkFormat StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
-	if (AttachmentDataPtr->StencilAttachment)
-	{
-		const BmRender_Format Format = AttachmentDataPtr->StencilAttachment->Format;
-		if (Format != BmRender_Format::Undefined)
-		{
-			StencilAttachmentFormat = BmRender_FormatToVk(Format);
-		}
-	}
+	//VkFormat StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+	//if (AttachmentDataPtr->StencilAttachment)
+	//{
+	//	const BmRender_Format Format = AttachmentDataPtr->StencilAttachment->Format;
+	//	if (Format != BmRender_Format::Undefined)
+	//	{
+	//		StencilAttachmentFormat = BmRender_FormatToVk(Format);
+	//	}
+	//}
 
-	VkPipelineRenderingCreateInfo RenderingInfo = { };
-	RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-	RenderingInfo.pNext = nullptr;
-	RenderingInfo.colorAttachmentCount = AttachmentDataPtr->ColorAttachmentCount;
-	RenderingInfo.pColorAttachmentFormats = ColorAttachmentFormats;
-	RenderingInfo.depthAttachmentFormat = DepthAttachmentFormat;
-	RenderingInfo.stencilAttachmentFormat = StencilAttachmentFormat;
+	//VkPipelineRenderingCreateInfo RenderingInfo = { };
+	//RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+	//RenderingInfo.pNext = nullptr;
+	//RenderingInfo.colorAttachmentCount = AttachmentDataPtr->ColorAttachmentCount;
+	//RenderingInfo.pColorAttachmentFormats = ColorAttachmentFormats;
+	//RenderingInfo.depthAttachmentFormat = DepthAttachmentFormat;
+	//RenderingInfo.stencilAttachmentFormat = StencilAttachmentFormat;
 
-	BmRender_DescriptorPoolSize PoolSizes[] =
-	{
-		{ BmRender_DescriptorType::CombinedImageSampler, 1 },
-	};
+	//BmRender_DescriptorPoolSize PoolSizes[] =
+	//{
+	//	{ BmRender_DescriptorType::CombinedImageSampler, 1 },
+	//};
 
-	*ImGuiPool = BmRender_CreateDescriptorPool(PoolSizes, 1, (u32)IM_ARRAYSIZE(PoolSizes), BmRender_DescriptorPoolType::CreateFree);
+	//*ImGuiPool = BmRender_CreateDescriptorPool(PoolSizes, 1, (u32)IM_ARRAYSIZE(PoolSizes), BmRender_DescriptorPoolType::CreateFree);
 
-	BmRender_Queue ImbuiGraphicsQueue = BmRender_CreateQueue(BmRender_QueueType::Graphic);
-	ImGui_ImplVulkan_InitInfo InitInfo = { };
-	InitInfo.Instance = (VkInstance)BmRender_GetVulkanInstance();
-	InitInfo.PhysicalDevice = (VkPhysicalDevice)BmRender_GetPhysicalDevice();
-	InitInfo.Device = (VkDevice)BmRender_GetLogicalDevice();
-	InitInfo.QueueFamily = BmRender_GetQueueFamily(ImbuiGraphicsQueue);
-	InitInfo.Queue = ImbuiGraphicsQueue.InternalQueue;
-	InitInfo.PipelineCache = nullptr;
-	InitInfo.DescriptorPool = *((VkDescriptorPool*)ImGuiPool);
-	InitInfo.RenderPass = nullptr;
-	InitInfo.UseDynamicRendering = true;
-	InitInfo.MinImageCount = 2;
-	InitInfo.ImageCount = 3;
-	InitInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-	InitInfo.PipelineRenderingCreateInfo = RenderingInfo;
-	InitInfo.Allocator = BmRender_GetVulkanAllocator();
-	ImGui_ImplVulkan_Init(&InitInfo);
+	//BmRender_Queue ImbuiGraphicsQueue = BmRender_CreateQueue(BmRender_QueueType::Graphic);
+	//ImGui_ImplVulkan_InitInfo InitInfo = { };
+	//InitInfo.Instance = (VkInstance)BmRender_GetVulkanInstance();
+	//InitInfo.PhysicalDevice = (VkPhysicalDevice)BmRender_GetPhysicalDevice();
+	//InitInfo.Device = (VkDevice)BmRender_GetLogicalDevice();
+	//InitInfo.QueueFamily = BmRender_GetQueueFamily(ImbuiGraphicsQueue);
+	//InitInfo.Queue = ImbuiGraphicsQueue.InternalQueue;
+	//InitInfo.PipelineCache = nullptr;
+	//InitInfo.DescriptorPool = *((VkDescriptorPool*)ImGuiPool);
+	//InitInfo.RenderPass = nullptr;
+	//InitInfo.UseDynamicRendering = true;
+	//InitInfo.MinImageCount = 2;
+	//InitInfo.ImageCount = 3;
+	//InitInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+	//InitInfo.PipelineRenderingCreateInfo = RenderingInfo;
+	//InitInfo.Allocator = BmRender_GetVulkanAllocator();
+	//ImGui_ImplVulkan_Init(&InitInfo);
 
-	ImGui_ImplVulkan_CreateFontsTexture();
+	//ImGui_ImplVulkan_CreateFontsTexture();
 }
 
 static void DeInitImGuiPipeline(BmRender_DescriptorPool ImGuiPool)
 {
-	ImGui_ImplVulkan_Shutdown();
+	//ImGui_ImplVulkan_Shutdown();
 	BmRender_DestroyDescriptorPool(ImGuiPool);
 }
 
@@ -498,7 +498,7 @@ static void MainPassEndPass()
 	BmRender_EndRendering(RenderCommandBuffers[CurrentFrame]);
 }
 
-void Render_Init(GLFWwindow* WindowHandler)
+void Render_Init(GLFWwindow* WindowHandle)
 {
 	// Create MainPool using stack array
 	const u32 PoolSizeCount = 11;
@@ -616,7 +616,7 @@ void Render_Init(GLFWwindow* WindowHandler)
 	LightningPassInit(&State.MainPool);
 
 	InitStaticMeshPipeline(&State.MeshPipeline, &State.MainPool);
-	InitImGuiPipeline(&State.DebugUiPool, WindowHandler);
+	InitImGuiPipeline(&State.DebugUiPool, WindowHandle);
 }
 
 void Render_DeInit()

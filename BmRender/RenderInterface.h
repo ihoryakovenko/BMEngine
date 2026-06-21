@@ -6,8 +6,6 @@
 #include "VulkanBackend/VulkanRender.h"
 #endif
 
-struct GLFWwindow;
-
 enum class BmRender_DescriptorShaderStage : u64
 {
 	None = 0,
@@ -693,7 +691,7 @@ struct BmRender_DrawIndexedIndirectCommand
 
 struct BmRender_InitData
 {
-	GLFWwindow* WindowHandler;
+	void* NativeWindow;
 	bool EnableDebug;
 	u32 TypeDebugDatainitialSize;
 };

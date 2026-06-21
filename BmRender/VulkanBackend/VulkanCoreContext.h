@@ -4,9 +4,7 @@
 
 #include <vulkan/vulkan.h>
 
-struct GLFWwindow;
-
-inline static const u32 MAX_SWAPCHAIN_IMAGES_COUNT = 3;
+#define MAX_SWAPCHAIN_IMAGES_COUNT  3
 
 struct VulkanCoreContext
 {
@@ -25,8 +23,8 @@ struct VulkanCoreContext
 
 	VkSurfaceKHR Surface;
 	VkSurfaceFormatKHR SurfaceFormat;
-	GLFWwindow* WindowHandler;
+	void* WindowHandle;
 };
 
-void CreateCoreContext(VulkanCoreContext* Context, GLFWwindow* Window);
+void CreateCoreContext(VulkanCoreContext* Context, void* Window);
 void DestroyCoreContext(VulkanCoreContext* Context);

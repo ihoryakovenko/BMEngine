@@ -67,14 +67,6 @@
     <None Include="Source\Engine\Systems\Render\Shaders\SkyBox.frag.glsl" />
     <None Include="Source\Engine\Systems\Render\Shaders\SkyBox.vert.glsl" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Tools\CompileShaders\CompileShaders.vcxproj">
-      <Project>{caffe9d4-4e8d-435f-84f9-8d9d7f849e1f}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\Tools\Converter\Converter.vcxproj">
-      <Project>{ae0c3971-99f2-47bf-8261-914e31e3d352}</Project>
-    </ProjectReference>
-  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>

@@ -52,8 +52,6 @@ namespace Util
 		u64* UniqueTextureHashes;
 	};
 
-	void ObjToModel3D(const char* FilePath, const char* OutputPath);
-
 	Model3DData LoadModel3DData(const char* FilePath);
 	void ClearModel3DData(Model3DData Data);
 

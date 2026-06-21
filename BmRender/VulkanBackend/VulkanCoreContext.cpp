@@ -4,9 +4,13 @@
 
 #include <SharedLib.h>
 
-#include <GLFW/glfw3.h>
-
 #include <RenderInternal.h>
+
+#ifdef _WIN32
+#define VK_USE_PLATFORM_WIN32_KHR
+#include <windows.h>
+#include <vulkan/vulkan_win32.h>
+#endif
 
 extern Memory_LinearAllocator FrameMemory;
 
@@ -187,15 +191,17 @@ static bool CheckDeviceSuitability(const char* DeviceExtensions[], u32 DeviceExt
 	return true;
 }
 
-void CreateCoreContext(VulkanCoreContext* Context, GLFWwindow* Window)
+void CreateCoreContext(VulkanCoreContext* Context, void* Window)
 {
-	Context->WindowHandler = Window;
+	Context->WindowHandle = Window;
 
 	const u32 RequiredExtensionsCount = 2;
 	const char* RequiredInstanceExtensions[RequiredExtensionsCount] =
 	{
 		VK_KHR_SURFACE_EXTENSION_NAME,
+#ifdef _WIN32
 		VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+#endif
 	};
 
 	const char* ValidationExtensions[] =
@@ -251,7 +257,16 @@ void CreateCoreContext(VulkanCoreContext* Context, GLFWwindow* Window)
 		RenderLog(LogType::Error, "Cannot create debug messenger");
 	}
 
-	VULKAN_CHECK_RESULT(glfwCreateWindowSurface(Context->VulkanInstance, Context->WindowHandler, nullptr, &Context->Surface));
+#ifdef _WIN32
+	VkWin32SurfaceCreateInfoKHR SurfaceCreateInfo{};
+	SurfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+	SurfaceCreateInfo.hinstance = GetModuleHandle(nullptr);
+	SurfaceCreateInfo.hwnd = (HWND)Context->WindowHandle;
+
+	VULKAN_CHECK_RESULT(vkCreateWin32SurfaceKHR(Context->VulkanInstance, &SurfaceCreateInfo, nullptr, &Context->Surface));
+#else
+#error "Unsupported platform"
+#endif
 
 	const char* DeviceExtensions[] =
 	{
@@ -316,7 +331,7 @@ void CreateCoreContext(VulkanCoreContext* Context, GLFWwindow* Window)
 	Context->SurfaceFormat = GetBestSurfaceFormat(Context->Surface, AvailableFormats, SurfaceFormatCount);
 
 	CheckFormats(Context->PhysicalDevice);
-	Context->SwapExtent = GetBestSwapExtent(Context->PhysicalDevice, Context->WindowHandler, Context->Surface);
+	Context->SwapExtent = GetBestSwapExtent(Context->PhysicalDevice, Context->WindowHandle, Context->Surface);
 
 	VkSurfaceCapabilitiesKHR SurfaceCapabilities = { };
 	VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Context->PhysicalDevice, Context->Surface, &SurfaceCapabilities));

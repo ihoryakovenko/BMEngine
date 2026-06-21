@@ -6,10 +6,6 @@
 
 #include "RenderInterface.h"
 
-struct GLFWwindow;
-
-#define VK_KHR_WIN32_SURFACE_EXTENSION_NAME "VK_KHR_win32_surface"
-
 #define VULKAN_CHECK_RESULT(call) \
 	{ \
 		const VkResult result = (call); \
@@ -17,9 +13,6 @@ struct GLFWwindow;
 			RenderLog(LogType::Error, "%s returned %d at %s:%d", #call, result, __FILE__, __LINE__); \
 		} \
 	}
-
-inline constexpr u32 MAX_VERTEX_INPUTS_ATTRIBUTES = 16;
-inline constexpr u32 MAX_VERTEX_INPUT_BINDINGS = 16;
 
 enum class BufferUsageFlag
 {
@@ -61,7 +54,7 @@ void GetRequiredInstanceExtensions(const char** RequiredInstanceExtensions, u32 
 PhysicalDeviceIndices GetPhysicalDeviceIndices(VkQueueFamilyProperties* Properties, u32 PropertiesCount,
 	VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
 u32 GetMemoryTypeIndex(VkPhysicalDevice PhysicalDevice, u32 AllowedTypes, VkMemoryPropertyFlags Properties);
-VkExtent2D GetBestSwapExtent(VkPhysicalDevice PhysicalDevice, GLFWwindow* WindowHandler, VkSurfaceKHR Surface);
+VkExtent2D GetBestSwapExtent(VkPhysicalDevice PhysicalDevice, void* WindowHandle, VkSurfaceKHR Surface);
 VkPresentModeKHR GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface);
 
 bool CheckRequiredInstanceExtensionsSupport(VkExtensionProperties* AvailableExtensions, u32 AvailableExtensionsCount,

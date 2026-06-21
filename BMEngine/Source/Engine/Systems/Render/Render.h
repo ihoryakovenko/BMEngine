@@ -18,6 +18,8 @@
 
 #include <Engine/Systems/Render/Shaders/ShaderTypes.h>
 
+struct GLFWwindow;
+
 struct DrawEntity
 {
 	BmRender_GPUBufferUpdateData VertexBufferEntry;
@@ -63,7 +65,7 @@ struct DrawScene
 	std::vector<DrawEntity> DrawEntities;
 };
 
-void Render_Init(GLFWwindow* WindowHandler);
+void Render_Init(GLFWwindow* WindowHandle);
 void Render_DeInit();
 
 void Render_Draw(DrawScene* Data, u64 WaitSemaphoreValue);

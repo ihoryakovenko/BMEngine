@@ -3,10 +3,8 @@
 #include <vulkan/vulkan.h>
 #include <SharedLib.h>
 
-struct GLFWwindow;
-
-inline constexpr u32 MAX_DRAW_FRAMES = 3;
-inline constexpr u32 MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS = 16;
+#define MAX_DRAW_FRAMES 3
+#define MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS 16
 
 enum class BmRender_DescriptorShaderStage : u64;
 enum class BmRender_PipelineShaderStage : u8;
@@ -123,5 +121,5 @@ struct BmRender_Pipeline
 	BmRender_PipelineType PipelineType;
 };
 
-void InitBackend(GLFWwindow* WindowHandler);
+void InitBackend(void* WindowHandle);
 void DeInitBackend();
