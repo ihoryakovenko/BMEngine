@@ -49,3 +49,5 @@ target_link_libraries(${TARGET_NAME} PRIVATE
 target_compile_definitions(${TARGET_NAME} PUBLIC
 	BM_RENDER_VULKAN_BACKEND
 )
+
+target_compile_options(${TARGET_NAME} PRIVATE /MP)

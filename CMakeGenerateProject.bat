@@ -8,12 +8,6 @@ REM Paths
 set SOURCE_DIR=%ROOT%.
 set BUILD_DIR=%ROOT%Temp
 
-REM Clean previous build (optional but recommended for consistency)
-if exist "%BUILD_DIR%" (
-    echo Cleaning old Temp folder...
-    rmdir /s /q "%BUILD_DIR%"
-)
-
 echo Generating Visual Studio project...
 
 cmake ^

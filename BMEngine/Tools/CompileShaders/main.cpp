@@ -33,7 +33,7 @@ bool IsSlangFile(const std::string& fileName)
 
 	return false;
 }
-
+#include <Windows.h>
 int main(int argc, const char* argv[])
 {
 	//argc = 4;
@@ -42,7 +42,7 @@ int main(int argc, const char* argv[])
 	//argv[3] = "E:/code/BMEngine/BMEngine/Source/Generated";
 	//argv[4] = "-fr";
 
-	if (argc < 3)
+	if (argc < 4)
 	{
 		std::cerr << "Usage: " << argv[0] << " <SOURCE_DIR> <OUTPUT_DIR> <GEN_OUTPUT_DIR>" << std::endl;
 		return 1;
@@ -55,7 +55,7 @@ int main(int argc, const char* argv[])
 	const fs::path GenOutputDir(argv[3]);
 
 	const std::string IncludePath = sourceDir.string();
-	const bool ForceRecompile = argc > 3 && std::string(argv[4]) == "-fr";
+	const bool ForceRecompile = argc > 4 && std::string(argv[4]) == "-fr";
 
 	if (!fs::exists(sourceDir))
 	{
@@ -81,6 +81,8 @@ int main(int argc, const char* argv[])
 	std::string PipelineGeneration = "inline constexpr Metadata_Pipeline " + PipelineVariableName + "[] = { ";
 
 	u32 TotalStages = 0;
+
+	bool AtLeastOneRecompiled = false;
 
 	for (const auto& entry : fs::directory_iterator(sourceDir))
 	{
@@ -195,6 +197,13 @@ int main(int argc, const char* argv[])
 
 		std::ofstream SpirVOutput(outPath, std::ios::binary);
 		SpirVOutput.write((const char*)spirv->getBufferPointer(), spirv->getBufferSize());
+
+		AtLeastOneRecompiled = true;
+	}
+
+	if (!AtLeastOneRecompiled)
+	{
+		return 0;
 	}
 
 	StageArrayGeneration += "\n};";

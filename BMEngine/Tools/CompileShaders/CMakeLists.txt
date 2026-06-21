@@ -23,3 +23,5 @@ target_link_libraries(${TARGET_NAME} PRIVATE
 	BMEngine_Include
 	BmRender
 )
+
+target_compile_options(${TARGET_NAME} PRIVATE /MP)

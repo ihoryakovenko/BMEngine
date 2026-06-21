@@ -26,3 +26,4 @@ set_target_properties(${TARGET_NAME} PROPERTIES
 	CXX_EXTENSIONS NO
 )
 
+target_compile_options(${TARGET_NAME} PRIVATE /MP)

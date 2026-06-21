@@ -19,10 +19,12 @@ target_link_libraries(${TARGET_NAME} PRIVATE
 	SharedLib
 	BMEngine_Include
 	BmRender
-	${CMAKE_SOURCE_DIR}/External/glfw/lib-vc2022/glfw3.lib
+	glfw
 )
 
 target_include_directories(${TARGET_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/External/glfw/include
     ${CMAKE_SOURCE_DIR}/External
 )
+
+target_compile_options(${TARGET_NAME} PRIVATE /MP)

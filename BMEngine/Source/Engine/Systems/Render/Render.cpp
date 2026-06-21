@@ -99,8 +99,6 @@ static void GenericDraw(BmRender_CommandBuffer CommandBuffer, DrawScene* Scene, 
 	RenderResourceManager_RecordBindDescriptorSets(CommandBuffer, Name, 0, 1, &DescriptorSets.FrameBufferSet, 1, &FrameDynamicOffset);
 	RenderResourceManager_RecordBindDescriptorSets(CommandBuffer, Name, 1, SetsCount, Sets, DynamicOffsetsCount, DynamicOffsets);
 
-	std::unique_lock Lock(Scene->TempLock);
-
 	for (u32 i = 0; i < Scene->DrawEntities.size(); ++i)
 	{
 		DrawEntity* Entity = Scene->DrawEntities.data() + i;
@@ -680,7 +678,7 @@ void Render_Draw(DrawScene* Scene, u64 WaitSemaphoreValue)
 
 	DeferredPassDispatch();
 
-	BmRender_TransitionImageForRendering(RenderCommandBuffers[CurrentFrame], BmRender_GetSwapchainImage(CurrentImageIndex));
+	//BmRender_TransitionImageForRendering(RenderCommandBuffers[CurrentFrame], BmRender_GetSwapchainImage(CurrentImageIndex));
 	//ImGui::Render();
 	//ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), RenderCommandBuffers[CurrentFrame].InternalBuffer);
 

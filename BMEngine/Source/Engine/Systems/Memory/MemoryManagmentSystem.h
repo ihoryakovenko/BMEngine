@@ -3,11 +3,6 @@
 #include <cstdint>
 #include <memory>
 
-#ifndef CUSTOM_ASSERT
-#include <cassert>
-#endif
-
-#include "Util/EngineTypes.h"
 #include "Util/Math.h"
 
 #include <forge_memory_debugger.h>

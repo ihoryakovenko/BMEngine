@@ -10,12 +10,6 @@
 #include "Util/EngineTypes.h"
 #include "Engine/Systems/Memory/MemoryManagmentSystem.h"
 
-#include <atomic>
-#include <mutex>
-#include <condition_variable>
-#include <unordered_map>
-#include <vector>
-
 #include <Engine/Systems/Render/Shaders/ShaderTypes.h>
 
 struct GLFWwindow;
@@ -61,7 +55,6 @@ struct DrawScene
 	DrawEntity SkyBox;
 	bool DrawSkyBox = false;
 
-	std::mutex TempLock;
 	std::vector<DrawEntity> DrawEntities;
 };
 

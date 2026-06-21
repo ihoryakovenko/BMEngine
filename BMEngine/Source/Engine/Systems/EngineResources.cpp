@@ -13,7 +13,6 @@ namespace EngineResources
 {
 	static std::unordered_map<u64, TextureAsset> TextureAssets;
 	static std::queue<ModelLoadRequest> ModelLoadRequests;
-	static std::mutex ModelLoadMutex;
 	static TextureAsset DefaultAsset;
 	
 	static void CreateTexture(TextureAsset& Asset)
@@ -101,7 +100,6 @@ namespace EngineResources
 
 		TextureAssets.clear();
 
-		std::lock_guard Lock(ModelLoadMutex);
 		while (!ModelLoadRequests.empty())
 		{
 			ModelLoadRequests.pop();
@@ -110,8 +108,6 @@ namespace EngineResources
 
 	void Update(DrawScene* TmpScene)
 	{
-		std::lock_guard Lock(ModelLoadMutex);
-
 		u32 TexturesGPUIndexCounter = 1;
 
 		while (!ModelLoadRequests.empty())
@@ -225,9 +221,7 @@ namespace EngineResources
 				Entity.IndicesCount = IndicesCount;
 				Entity.Instances = 1;
 
-				std::unique_lock Lock(TmpScene->TempLock);
 				TmpScene->DrawEntities.push_back(Entity);
-				Lock.unlock();
 
 				VertexBufferOffset += VertexDataSize;
 				IndexBufferOffset += IndicesSize;
@@ -250,7 +244,6 @@ namespace EngineResources
 
 	void RequestModelLoad(const ModelLoadRequest& Request)
 	{
-		std::lock_guard Lock(ModelLoadMutex);
 		ModelLoadRequests.push(Request);
 	}
 }

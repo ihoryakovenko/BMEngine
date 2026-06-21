@@ -1,6 +1,9 @@
 @echo off
 
-set CURRENT_PATH=%~dp0
+set SOURCE_DIR=%~1
+set BUILD_DIR=%~2
 
-xcopy /E /I /Y /D %CURRENT_PATH%BMEngine\Resources %CURRENT_PATH%x64\Debug\Resources
-xcopy /E /I /Y /D %CURRENT_PATH%BMEngine\Resources %CURRENT_PATH%x64\Release\Resources
+echo Source: %SOURCE_DIR%
+echo Build: %BUILD_DIR%
+
+xcopy /E /I /Y /D "%SOURCE_DIR%\BMEngine\Resources" "%BUILD_DIR%\Resources"
