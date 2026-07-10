@@ -12,7 +12,8 @@
 #include <vulkan/vulkan_win32.h>
 #endif
 
-extern Memory_LinearAllocator FrameMemory;
+extern Memory_LinearAllocator* RenderFrameAlloctor;
+extern Memory_ScopeAllocator* RenderScopeAlloctor;
 
 VkSurfaceFormatKHR GetBestSurfaceFormat(VkSurfaceKHR Surface, const VkSurfaceFormatKHR* AvailableFormats, u32 Count)
 {
@@ -452,7 +453,7 @@ VkPresentModeKHR GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurf
 	u32 PresentModeCount;
 	VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &PresentModeCount, nullptr));
 
-	auto PresentModes = Memory_LinearAllocator_AllocTC(&FrameMemory, VkPresentModeKHR, PresentModeCount);
+	auto PresentModes = Memory_LinearAllocator_AllocTC(RenderFrameAlloctor, VkPresentModeKHR, PresentModeCount);
 	vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &PresentModeCount, PresentModes);
 
 	for (u32 i = 0; i < PresentModeCount; ++i)

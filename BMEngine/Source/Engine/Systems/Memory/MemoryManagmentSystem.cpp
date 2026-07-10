@@ -4,10 +4,14 @@
 
 #include <SharedLib.h>
 
+Memory_LinearAllocator _FrameAllocator;
+Memory_ScopeAllocator _ScopeAllocator;
+
+extern Memory_LinearAllocator* FrameAllocator = &_FrameAllocator;
+extern Memory_ScopeAllocator* ScopeAllocator = &_ScopeAllocator;
+
 namespace Memory
 {
-	static Memory_LinearAllocator GeneralFrameMemory;
-
 	static std::recursive_mutex MemoryDebugMutex;
 	static bool IsMemoryDebuggingEnabled;
 	static bool IsMemoryDumpAllowed;
@@ -34,12 +38,14 @@ namespace Memory
 			f_debug_mem_thread_safe_init((int(*)(void*))Lock, (int(*)(void*))Unlock, &MemoryDebugMutex);
 		}
 
-		Memory_LinearAllocator_Init(&GeneralFrameMemory, 1024 * 1024);
+		Memory_LinearAllocator_Init(FrameAllocator, 1024 * 1024);
+		Memory_ScopeAllocator_Init(ScopeAllocator, 1024 * 1024);
 	}
 
 	void DeInit()
 	{
-		Memory_LinearAllocator_Free(&GeneralFrameMemory);
+		Memory_LinearAllocator_Free(FrameAllocator);
+		Memory_ScopeAllocator_Free(ScopeAllocator);
 
 		if (IsMemoryDebuggingEnabled)
 		{
@@ -76,10 +82,5 @@ namespace Memory
 	void AllowFrameMemoryChecks(bool Allow)
 	{
 		AreFrameMemoryChecksEnabled = Allow;
-	}
-
-	Memory_LinearAllocator* GetGeneralFrameMemory()
-	{
-		return &GeneralFrameMemory;
 	}
 }

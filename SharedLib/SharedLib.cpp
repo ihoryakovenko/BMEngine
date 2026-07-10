@@ -419,3 +419,24 @@ void* Memory_LinearAllocator_GetHead(Memory_LinearAllocator* Memory)
 {
 	return Memory->Head;
 }
+
+void Memory_ScopeAllocator_Init(Memory_ScopeAllocator* Memory, u64 SpaceToAllocate)
+{
+	Memory_LinearAllocator_Init(&Memory->Allocator, SpaceToAllocate);
+}
+
+void Memory_ScopeAllocator_Free(Memory_ScopeAllocator* Memory)
+{
+	Memory_LinearAllocator_Free(&Memory->Allocator);
+}
+
+void* Memory_ScopeAllocator_Allocate(Memory_ScopeAllocator* Memory, u64 Size)
+{
+	return Memory_LinearAllocator_Alloc(&Memory->Allocator, Size);
+}
+
+void Memory_ScopeAllocator_FreeSpace(Memory_ScopeAllocator* Memory, u64 SpaceToFree)
+{
+	Memory->Allocator.Head -= SpaceToFree;
+	assert(Memory->Allocator.Head - Memory->Allocator.Base >= 0);
+}

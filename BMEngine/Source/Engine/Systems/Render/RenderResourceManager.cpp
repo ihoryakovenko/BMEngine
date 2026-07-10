@@ -166,7 +166,7 @@ void RenderResourceManager_Update()
 			Shaders[i] = BmRender_CreateShader(&ShaderDesc);
 
 			const Metadata_Pipeline* Metadata = Metadata_Pipelines + i;
-			BmRender_ShaderStageDescription* StageDescriptions = Memory_LinearAllocator_AllocTC(Memory::GetGeneralFrameMemory(), BmRender_ShaderStageDescription, Metadata->StageCount);
+			BmRender_ShaderStageDescription* StageDescriptions = Memory_ScopeAllocator_AllocTC(ScopeAllocator, BmRender_ShaderStageDescription, Metadata->StageCount);
 
 			for (u32 j = 0; j < Metadata->StageCount; ++j)
 			{
@@ -221,7 +221,7 @@ void RenderResourceManager_CreateGraphicsPipeline(PipelineNames Name, const BmRe
 	assert(Initialized);
 
 	const Metadata_Pipeline* Metadata = Metadata_Pipelines + u32(Name);
-	BmRender_ShaderStageDescription* StageDescriptions = Memory_LinearAllocator_AllocTC(Memory::GetGeneralFrameMemory(), BmRender_ShaderStageDescription, Metadata->StageCount);
+	BmRender_ShaderStageDescription* StageDescriptions = Memory_ScopeAllocator_AllocTC(ScopeAllocator, BmRender_ShaderStageDescription, Metadata->StageCount);
 
 	for (u32 i = 0; i < Metadata->StageCount; ++i)
 	{
@@ -245,7 +245,7 @@ void RenderResourceManager_CreateComputePipeline(PipelineNames Name)
 	assert(Initialized);
 
 	const Metadata_Pipeline* Metadata = Metadata_Pipelines + u32(Name);
-	BmRender_ShaderStageDescription* StageDescriptions = Memory_LinearAllocator_AllocTC(Memory::GetGeneralFrameMemory(), BmRender_ShaderStageDescription, Metadata->StageCount);
+	BmRender_ShaderStageDescription* StageDescriptions = Memory_ScopeAllocator_AllocTC(ScopeAllocator, BmRender_ShaderStageDescription, Metadata->StageCount);
 
 	for (u32 i = 0; i < Metadata->StageCount; ++i)
 	{

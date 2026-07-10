@@ -1,13 +1,12 @@
 #pragma once
 
-#include <cstdint>
-#include <memory>
-
 #include "Util/Math.h"
 
+#include <SharedLib.h>
 #include <forge_memory_debugger.h>
 
-struct Memory_LinearAllocator;
+extern Memory_LinearAllocator* FrameAllocator;
+extern Memory_ScopeAllocator* ScopeAllocator;
 
 namespace Memory
 {
@@ -17,8 +16,6 @@ namespace Memory
 
 	void AllowFrameMemoryDump(bool Allow);
 	void AllowFrameMemoryChecks(bool Allow);
-
-	Memory_LinearAllocator* GetGeneralFrameMemory();
 
 	template <typename T>
 	struct Array

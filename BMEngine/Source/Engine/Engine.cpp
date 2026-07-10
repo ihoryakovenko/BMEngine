@@ -142,7 +142,7 @@ namespace Engine
 				//TaskSystem::WaitForGroup(&Group);
 			}
 
-			Memory_LinearAllocator_FreeMemory(Memory::GetGeneralFrameMemory());
+			Memory_LinearAllocator_FreeMemory(FrameAllocator);
 		}
 
 		DeInit();

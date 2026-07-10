@@ -8,11 +8,16 @@
 
 #include "RenderInternal.h"
 
-Memory_LinearAllocator FrameMemory;
+Memory_LinearAllocator _RenderFrameAlloctor;
+Memory_ScopeAllocator _RenderScopeAlloctor;
+
+Memory_LinearAllocator* RenderFrameAlloctor = &_RenderFrameAlloctor;
+Memory_ScopeAllocator* RenderScopeAlloctor = &_RenderScopeAlloctor;
 
 void BmRender_Init(const BmRender_InitData* InitData)
 {
-	Memory_LinearAllocator_Init(&FrameMemory, 1024 * 1024);
+	Memory_LinearAllocator_Init(RenderFrameAlloctor, 1024 * 1024);
+	Memory_ScopeAllocator_Init(RenderScopeAlloctor, 1024 * 1024);
 
 	InitBackend(InitData->NativeWindow);
 }
@@ -20,12 +25,13 @@ void BmRender_Init(const BmRender_InitData* InitData)
 void BmRender_DeInit()
 {
 	DeInitBackend();
-	Memory_LinearAllocator_Free(&FrameMemory);
+	Memory_LinearAllocator_Free(RenderFrameAlloctor);
+	Memory_ScopeAllocator_Free(RenderScopeAlloctor);
 }
 
 void BmRender_FrameFree()
 {
-	Memory_LinearAllocator_FreeMemory(&FrameMemory);
+	Memory_LinearAllocator_FreeMemory(&_RenderFrameAlloctor);
 }
 
 void RenderLog(LogType LogType, const char* Format, va_list Args);
