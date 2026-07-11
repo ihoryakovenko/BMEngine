@@ -24,7 +24,7 @@ void Memory_PoolAllocator_Init(Memory_PoolAllocator* Allocator, u64 InitialCapac
 	Allocator->DataSize = DataSize;
 	Allocator->Alignment = Alignment;
 
-	u32 Stride = SHARED_LIB_ALIGN_UP(DataSize, Allocator->Alignment);
+	u32 Stride = SharedLib_AlignUp(DataSize, Allocator->Alignment);
 	u64 TotalSize = InitialCapacity * Stride + Allocator->Alignment - 1;
 	Allocator->RawData = calloc(1, TotalSize);
 	Allocator->Data = AlignPointer(Allocator->RawData, Allocator->Alignment);
@@ -41,7 +41,7 @@ void Memory_PoolAllocator_Free(Memory_PoolAllocator* Allocator)
 
 u32 Memory_PoolAllocator_PushData(Memory_PoolAllocator* Allocator, const void* Data)
 {
-	u32 Stride = SHARED_LIB_ALIGN_UP(Allocator->DataSize, Allocator->Alignment);
+	u32 Stride = SharedLib_AlignUp(Allocator->DataSize, Allocator->Alignment);
 
 	if (Allocator->FreeCount > 0)
 	{
@@ -73,7 +73,7 @@ u32 Memory_PoolAllocator_PushData(Memory_PoolAllocator* Allocator, const void* D
 
 void Memory_PoolAllocator_GetData(Memory_PoolAllocator* Allocator, u32 Index, void* OutData)
 {
-	u32 Stride = SHARED_LIB_ALIGN_UP(Allocator->DataSize, Allocator->Alignment);
+	u32 Stride = SharedLib_AlignUp(Allocator->DataSize, Allocator->Alignment);
 	memcpy(OutData, (char*)Allocator->Data + Index * Stride, Allocator->DataSize);
 }
 
@@ -430,13 +430,19 @@ void Memory_ScopeAllocator_Free(Memory_ScopeAllocator* Memory)
 	Memory_LinearAllocator_Free(&Memory->Allocator);
 }
 
-void* Memory_ScopeAllocator_Allocate(Memory_ScopeAllocator* Memory, u64 Size)
+Memory_ScopeAllocator_Marker Memory_ScopeAllocator_Mark(Memory_ScopeAllocator* Memory)
 {
-	return Memory_LinearAllocator_Alloc(&Memory->Allocator, Size);
+	return Memory_ScopeAllocator_Marker{ Memory, 0 };
 }
 
-void Memory_ScopeAllocator_FreeSpace(Memory_ScopeAllocator* Memory, u64 SpaceToFree)
+void* Memory_ScopeAllocator_Alloc(Memory_ScopeAllocator_Marker* Marker, u64 Size)
 {
-	Memory->Allocator.Head -= SpaceToFree;
-	assert(Memory->Allocator.Head - Memory->Allocator.Base >= 0);
+	Marker->Allocated += Size;
+	return Memory_LinearAllocator_Alloc(&Marker->ScopeAllocator->Allocator, Size);
+}
+
+void Memory_ScopeAllocator_FreeSpace(Memory_ScopeAllocator_Marker* Marker)
+{
+	Marker->ScopeAllocator->Allocator.Head -= Marker->Allocated;
+	assert(Marker->ScopeAllocator->Allocator.Head - Marker->ScopeAllocator->Allocator.Base >= 0);
 }

@@ -2,9 +2,6 @@
 
 #include "ShortTypes.h"
 
-#define SHARED_LIB_ALIGN_UP(x, a) (((x) + (a) - 1) & ~((a) - 1))
-#define SHARED_LIB_MIN(a, b) (((a) < (b)) ? (a) : (b))
-#define SHARED_LIB_MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define CONCAT_IMPL(x, y) x##y
 #define CONCAT(x, y) CONCAT_IMPL(x, y)
 
@@ -22,7 +19,26 @@ Helpers_Defer<F> Helpers_MakeDefer(F func)
 	return Helpers_Defer<F>(func);
 }
 
+// Stollen from JAI
 #define DEFER(code) const auto CONCAT(_helpers_defer_, __LINE__) = Helpers_MakeDefer([&](){ code; })
+
+template<typename T>
+constexpr T SharedLib_AlignUp(T value, T alignment)
+{
+	return (value + alignment - 1) & ~(alignment - 1);
+}
+
+template<typename T>
+constexpr const T& SharedLib_Min(const T& a, const T& b)
+{
+	return (a < b) ? a : b;
+}
+
+template<typename T>
+constexpr const T& SharedLib_Max(const T& a, const T& b)
+{
+	return (a > b) ? a : b;
+}
 
 struct Memory_PoolAllocator
 {
@@ -56,27 +72,34 @@ void* Memory_LinearAllocator_Alloc(Memory_LinearAllocator* Memory, u64 Size);
 void Memory_LinearAllocator_FreeMemory(Memory_LinearAllocator* Memory);
 void* Memory_LinearAllocator_GetHead(Memory_LinearAllocator* Memory);
 
-#define Memory_LinearAllocator_AllocT(Memory, Type) (Type*)Memory_LinearAllocator_Alloc(Memory, sizeof(Type))
-#define Memory_LinearAllocator_AllocTC(Memory, Type, Count) (Type*)Memory_LinearAllocator_Alloc(Memory, sizeof(Type) * Count)
+template<typename T>
+T* Memory_LinearAllocator_AllocT(Memory_LinearAllocator* Memory, u32 Count = 1)
+{
+	return(T*)Memory_LinearAllocator_Alloc(Memory, sizeof(T) * Count);
+}
 
 struct Memory_ScopeAllocator
 {
 	Memory_LinearAllocator Allocator;
 };
 
+struct Memory_ScopeAllocator_Marker
+{
+	Memory_ScopeAllocator* ScopeAllocator;
+	u64 Allocated;
+};
+
 void Memory_ScopeAllocator_Init(Memory_ScopeAllocator* Memory, u64 SpaceToAllocate);
 void Memory_ScopeAllocator_Free(Memory_ScopeAllocator* Memory);
-void* Memory_ScopeAllocator_Allocate(Memory_ScopeAllocator* Memory, u64 Size);
-void Memory_ScopeAllocator_FreeSpace(Memory_ScopeAllocator* Memory, u64 SpaceToFree);
+Memory_ScopeAllocator_Marker Memory_ScopeAllocator_Mark(Memory_ScopeAllocator* Memory);
+void* Memory_ScopeAllocator_Alloc(Memory_ScopeAllocator_Marker* Marker, u64 Size);
+void Memory_ScopeAllocator_FreeSpace(Memory_ScopeAllocator_Marker* Marker);
 
-#define Memory_ScopeAllocator_Alloc(Memory, Size) \
-	Memory_ScopeAllocator_Allocate(Memory, Size); const auto CONCAT(_helpers_defer_, __LINE__) = Helpers_MakeDefer([&]() { Memory_ScopeAllocator_FreeSpace(Memory, Size); })
-
-#define Memory_ScopeAllocator_AllocT(Memory, Type) \
-	(Type*)Memory_ScopeAllocator_Allocate(Memory, sizeof(Type)); const auto CONCAT(_helpers_defer_, __LINE__) = Helpers_MakeDefer([&]() { Memory_ScopeAllocator_FreeSpace(Memory, sizeof(Type)); })
-
-#define Memory_ScopeAllocator_AllocTC(Memory, Type, Count) \
-	(Type*)Memory_ScopeAllocator_Allocate(Memory, sizeof(Type) * Count); const auto CONCAT(_helpers_defer_, __LINE__) = Helpers_MakeDefer([&]() { Memory_ScopeAllocator_FreeSpace(Memory, sizeof(Type) * Count); })
+template<typename T>
+T* Memory_ScopeAllocator_AllocT(Memory_ScopeAllocator_Marker* Marker, u32 Count = 1)
+{
+	return (T*)Memory_ScopeAllocator_Alloc(Marker, sizeof(T) * Count);
+}
 
 struct Container_SparceHashMap
 {

@@ -450,10 +450,13 @@ VkExtent2D GetBestSwapExtent(VkPhysicalDevice PhysicalDevice, void* WindowHandle
 
 VkPresentModeKHR GetBestPresentationMode(VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface)
 {
+	auto AllocatorMarker = Memory_ScopeAllocator_Mark(RenderScopeAlloctor);
+	DEFER(Memory_ScopeAllocator_FreeSpace(&AllocatorMarker));
+
 	u32 PresentModeCount;
 	VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &PresentModeCount, nullptr));
 
-	auto PresentModes = Memory_LinearAllocator_AllocTC(RenderFrameAlloctor, VkPresentModeKHR, PresentModeCount);
+	auto PresentModes = Memory_ScopeAllocator_AllocT<VkPresentModeKHR>(&AllocatorMarker, PresentModeCount);
 	vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, Surface, &PresentModeCount, PresentModes);
 
 	for (u32 i = 0; i < PresentModeCount; ++i)

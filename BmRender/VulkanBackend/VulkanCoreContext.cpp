@@ -194,6 +194,9 @@ static bool CheckDeviceSuitability(const char* DeviceExtensions[], u32 DeviceExt
 
 void CreateCoreContext(VulkanCoreContext* Context, void* Window)
 {
+	auto AllocatorMarker = Memory_ScopeAllocator_Mark(RenderScopeAlloctor);
+	DEFER(Memory_ScopeAllocator_FreeSpace(&AllocatorMarker));
+
 	Context->WindowHandle = Window;
 
 	const u32 RequiredExtensionsCount = 2;
@@ -215,11 +218,11 @@ void CreateCoreContext(VulkanCoreContext* Context, void* Window)
 	u32 ExtensionCount;
 	VULKAN_CHECK_RESULT(vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, nullptr));
 
-	auto AvailableExtensions = Memory_ScopeAllocator_AllocTC(RenderScopeAlloctor, VkExtensionProperties, ExtensionCount);
+	auto AvailableExtensions = Memory_ScopeAllocator_AllocT<VkExtensionProperties>(&AllocatorMarker, ExtensionCount);
 	vkEnumerateInstanceExtensionProperties(nullptr, &ExtensionCount, AvailableExtensions);
 
 	const u32 ExtensionsCount = RequiredExtensionsCount + ValidationExtensionsCount;
-	auto RequiredExtensions = Memory_ScopeAllocator_AllocTC(RenderScopeAlloctor, const char*, RequiredExtensionsCount);
+	auto RequiredExtensions = Memory_ScopeAllocator_AllocT<const char*>(&AllocatorMarker, RequiredExtensionsCount);
 	GetRequiredInstanceExtensions(RequiredInstanceExtensions, RequiredExtensionsCount,
 		ValidationExtensions, ValidationExtensionsCount, RequiredExtensions);
 
@@ -281,7 +284,7 @@ void CreateCoreContext(VulkanCoreContext* Context, void* Window)
 	u32 DeviceCount;
 	vkEnumeratePhysicalDevices(Context->VulkanInstance, &DeviceCount, nullptr);
 
-	auto DeviceList = Memory_ScopeAllocator_AllocTC(RenderScopeAlloctor, VkPhysicalDevice, DeviceCount);
+	auto DeviceList = Memory_ScopeAllocator_AllocT<VkPhysicalDevice>(&AllocatorMarker, DeviceCount);
 	vkEnumeratePhysicalDevices(Context->VulkanInstance, &DeviceCount, DeviceList);
 
 	bool IsDeviceFound = false;
@@ -292,13 +295,13 @@ void CreateCoreContext(VulkanCoreContext* Context, void* Window)
 		u32 DeviceExtensionCount;
 		VULKAN_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(Context->PhysicalDevice, nullptr, &DeviceExtensionCount, nullptr));
 
-		auto DeviceExtensionsData = Memory_ScopeAllocator_AllocTC(RenderScopeAlloctor, VkExtensionProperties, DeviceExtensionCount);
+		auto DeviceExtensionsData = Memory_ScopeAllocator_AllocT<VkExtensionProperties>(&AllocatorMarker, DeviceExtensionCount);
 		VULKAN_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(Context->PhysicalDevice, nullptr, &DeviceExtensionCount, DeviceExtensionsData));
 
 		u32 QueueFamilyCount;
 		vkGetPhysicalDeviceQueueFamilyProperties(Context->PhysicalDevice, &QueueFamilyCount, nullptr);
 
-		auto FamilyPropertiesData = Memory_ScopeAllocator_AllocTC(RenderScopeAlloctor, VkQueueFamilyProperties, QueueFamilyCount);
+		auto FamilyPropertiesData = Memory_ScopeAllocator_AllocT<VkQueueFamilyProperties>(&AllocatorMarker, QueueFamilyCount);
 		vkGetPhysicalDeviceQueueFamilyProperties(Context->PhysicalDevice, &QueueFamilyCount, FamilyPropertiesData);
 
 		Context->Indices = GetPhysicalDeviceIndices(FamilyPropertiesData, QueueFamilyCount, Context->PhysicalDevice, Context->Surface);
@@ -326,7 +329,7 @@ void CreateCoreContext(VulkanCoreContext* Context, void* Window)
 	u32 SurfaceFormatCount;
 	VULKAN_CHECK_RESULT(vkGetPhysicalDeviceSurfaceFormatsKHR(Context->PhysicalDevice, Context->Surface, &SurfaceFormatCount, nullptr));
 
-	auto AvailableFormats = Memory_ScopeAllocator_AllocTC(RenderScopeAlloctor, VkSurfaceFormatKHR, SurfaceFormatCount);
+	auto AvailableFormats = Memory_ScopeAllocator_AllocT<VkSurfaceFormatKHR>(&AllocatorMarker, SurfaceFormatCount);
 	vkGetPhysicalDeviceSurfaceFormatsKHR(Context->PhysicalDevice, Context->Surface, &SurfaceFormatCount, AvailableFormats);
 
 	Context->SurfaceFormat = GetBestSurfaceFormat(Context->Surface, AvailableFormats, SurfaceFormatCount);
@@ -392,7 +395,7 @@ void CreateCoreContext(VulkanCoreContext* Context, void* Window)
 	u32 SwapchainImageCount;
 	vkGetSwapchainImagesKHR(Context->LogicalDevice, Context->VulkanSwapchain, &SwapchainImageCount, nullptr);
 
-	auto Images = Memory_ScopeAllocator_AllocTC(RenderScopeAlloctor, VkImage, SwapchainImageCount);
+	auto Images = Memory_ScopeAllocator_AllocT<VkImage>(&AllocatorMarker, SwapchainImageCount);
 	vkGetSwapchainImagesKHR(Context->LogicalDevice, Context->VulkanSwapchain, &SwapchainImageCount, Images);
 
 	Context->ImagesCount = SwapchainImageCount;

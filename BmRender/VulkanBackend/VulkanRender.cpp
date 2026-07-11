@@ -85,12 +85,15 @@ BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout
 BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutBinding* Bindings, u32 BindingsCount)
 {
 	assert(BindingsCount <= MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS);
+	auto AllocatorMarker = Memory_ScopeAllocator_Mark(RenderScopeAlloctor);
+	DEFER(Memory_ScopeAllocator_FreeSpace(&AllocatorMarker));
+
 	VkDevice Device = CoreContext.LogicalDevice;
 
 	BmRender_DescriptorSetLayout Layout = { };
 	Layout.BindingsCount = BindingsCount;
 
-	VkDescriptorSetLayoutBinding* NewLayoutBindings = Memory_ScopeAllocator_AllocTC(RenderScopeAlloctor, VkDescriptorSetLayoutBinding, BindingsCount);
+	VkDescriptorSetLayoutBinding* NewLayoutBindings = Memory_ScopeAllocator_AllocT<VkDescriptorSetLayoutBinding>(&AllocatorMarker, BindingsCount);
 	for (u32 i = 0; i < BindingsCount; ++i)
 	{
 		NewLayoutBindings[i].binding = i;
@@ -116,9 +119,12 @@ BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_D
 
 void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet* DescriptorSetHandle, const BmRender_DescriptorSetUpdateData* Bindings, u32 BindingsCount)
 {
+	auto AllocatorMarker = Memory_ScopeAllocator_Mark(RenderScopeAlloctor);
+	DEFER(Memory_ScopeAllocator_FreeSpace(&AllocatorMarker));
+
 	VkDevice Device = CoreContext.LogicalDevice;
 
-	VkWriteDescriptorSet* WriteDescriptorSets = Memory_ScopeAllocator_AllocTC(RenderScopeAlloctor, VkWriteDescriptorSet, BindingsCount);
+	VkWriteDescriptorSet* WriteDescriptorSets = Memory_ScopeAllocator_AllocT<VkWriteDescriptorSet>(&AllocatorMarker, BindingsCount);
 
 	for (u32 i = 0; i < BindingsCount; i++)
 	{
@@ -138,7 +144,7 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet* DescriptorSetHandle, c
 		if (VkDescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || VkDescriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC ||
 			VkDescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER || VkDescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC)
 		{
-			VkDescriptorBufferInfo* BufferInfo = Memory_LinearAllocator_AllocTC(RenderFrameAlloctor, VkDescriptorBufferInfo, Binding.BindingCount);
+			VkDescriptorBufferInfo* BufferInfo = Memory_ScopeAllocator_AllocT<VkDescriptorBufferInfo>(&AllocatorMarker, Binding.BindingCount);
 			for (u32 j = 0; j < Binding.BindingCount; ++j)
 			{
 				const BmRender_GPUBufferUpdateData& Entry = Binding.BufferRegions[j];
@@ -153,7 +159,7 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet* DescriptorSetHandle, c
 		else if (VkDescriptorType == VK_DESCRIPTOR_TYPE_SAMPLER || VkDescriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
 			VkDescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
 		{
-			VkDescriptorImageInfo* ImageInfo = Memory_LinearAllocator_AllocTC(RenderFrameAlloctor, VkDescriptorImageInfo, 1);
+			VkDescriptorImageInfo* ImageInfo = Memory_ScopeAllocator_AllocT<VkDescriptorImageInfo>(&AllocatorMarker);
 			ImageInfo->imageLayout = ImageLayoutToVk(Binding.ImageBinding.ImageLayout);
 			ImageInfo->imageView = Binding.ImageBinding.ImageView->InternalView;
 			ImageInfo->sampler = Binding.ImageBinding.Sampler ? *Binding.ImageBinding.Sampler : nullptr;
@@ -349,9 +355,12 @@ BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Descript
 BmRender_Pipeline BmRender_CreateGraphicsPipeline(BmRender_PipelineLayout PipelineLayout, const BmRender_PipelineSettings* Settings, const BmRender_ShaderStageDescription* ShaderStageDescriptions,
 	u32 ShaderStagesCount, const AttachmentData* Attachment)
 {
+	auto AllocatorMarker = Memory_ScopeAllocator_Mark(RenderScopeAlloctor);
+	DEFER(Memory_ScopeAllocator_FreeSpace(&AllocatorMarker));
+
 	VkDevice Device = CoreContext.LogicalDevice;
 
-	VkPipelineShaderStageCreateInfo* VkShaderStages = Memory_LinearAllocator_AllocTC(RenderFrameAlloctor, VkPipelineShaderStageCreateInfo, ShaderStagesCount);
+	VkPipelineShaderStageCreateInfo* VkShaderStages = Memory_ScopeAllocator_AllocT<VkPipelineShaderStageCreateInfo>(&AllocatorMarker, ShaderStagesCount);
 	for (u32 i = 0; i < ShaderStagesCount; ++i)
 	{
 		const BmRender_ShaderStageDescription* ShaderStageDesc = ShaderStageDescriptions + i;
@@ -372,7 +381,7 @@ BmRender_Pipeline BmRender_CreateGraphicsPipeline(BmRender_PipelineLayout Pipeli
 	bool SampleCountFound = false;
 	VkSampleCountFlagBits SampleCount = VK_SAMPLE_COUNT_1_BIT;
 
-	VkFormat* ColorAttachmentFormats = Memory_LinearAllocator_AllocTC(RenderFrameAlloctor, VkFormat, Attachment->ColorAttachmentCount);
+	VkFormat* ColorAttachmentFormats = Memory_ScopeAllocator_AllocT<VkFormat>(&AllocatorMarker, Attachment->ColorAttachmentCount);
 	for (u32 i = 0; i < Attachment->ColorAttachmentCount; ++i)
 	{
 		if (Attachment->ColorAttachments[i].Format != BmRender_Format::Undefined)
@@ -438,7 +447,7 @@ BmRender_Pipeline BmRender_CreateGraphicsPipeline(BmRender_PipelineLayout Pipeli
 
 	MultisampleState.rasterizationSamples = SampleCount;
 
-	auto PipelineCreateInfo = Memory_LinearAllocator_AllocT(RenderFrameAlloctor, VkGraphicsPipelineCreateInfo);
+	auto PipelineCreateInfo = Memory_ScopeAllocator_AllocT<VkGraphicsPipelineCreateInfo>(&AllocatorMarker);
 	*PipelineCreateInfo = { };
 	PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	PipelineCreateInfo->stageCount = ShaderStagesCount;
@@ -501,15 +510,18 @@ BmRender_Pipeline BmRender_CreateComputePipeline(BmRender_PipelineLayout Pipelin
 
 BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description)
 {
+	auto AllocatorMarker = Memory_ScopeAllocator_Mark(RenderScopeAlloctor);
+	DEFER(Memory_ScopeAllocator_FreeSpace(&AllocatorMarker));
+
 	VkDevice Device = CoreContext.LogicalDevice;
 
-	VkDescriptorSetLayout* VkSetLayouts = Memory_LinearAllocator_AllocTC(RenderFrameAlloctor, VkDescriptorSetLayout, Description->SetLayoutCount);
+	VkDescriptorSetLayout* VkSetLayouts = Memory_ScopeAllocator_AllocT<VkDescriptorSetLayout>(&AllocatorMarker, Description->SetLayoutCount);
 	for (u32 i = 0; i < Description->SetLayoutCount; ++i)
 	{
 		VkSetLayouts[i] = Description->SetLayouts[i].InternalLayout;
 	}
 
-	VkPushConstantRange* VkPushConstantRanges = Memory_LinearAllocator_AllocTC(RenderFrameAlloctor, VkPushConstantRange, Description->PushConstantRangeCount);
+	VkPushConstantRange* VkPushConstantRanges = Memory_ScopeAllocator_AllocT<VkPushConstantRange>(&AllocatorMarker, Description->PushConstantRangeCount);
 	for (u32 i = 0; i < Description->PushConstantRangeCount; ++i)
 	{
 		VkPushConstantRanges[i].offset = Description->PushConstantRanges[i].Offset;
@@ -533,9 +545,12 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 
 BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolSize* PoolSizes, u32 MaxSets, u32 PoolSizeCount, BmRender_DescriptorPoolType Type)
 {
+	auto AllocatorMarker = Memory_ScopeAllocator_Mark(RenderScopeAlloctor);
+	DEFER(Memory_ScopeAllocator_FreeSpace(&AllocatorMarker));
+
 	VkDevice Device = CoreContext.LogicalDevice;
 
-	VkDescriptorPoolSize* VkPoolSizes = Memory_LinearAllocator_AllocTC(RenderFrameAlloctor, VkDescriptorPoolSize, PoolSizeCount);
+	VkDescriptorPoolSize* VkPoolSizes = Memory_ScopeAllocator_AllocT<VkDescriptorPoolSize>(&AllocatorMarker, PoolSizeCount);
 	for (u32 i = 0; i < PoolSizeCount; ++i)
 	{
 		VkPoolSizes[i] = DescriptorPoolSizeToVk(PoolSizes[i]);
@@ -1138,12 +1153,15 @@ void BmRender_RecordUpdateGPULocalBuffer(BmRender_CommandBuffer CommandBuffer, B
 
 void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRender_RenderingInfo* pRenderingInfo)
 {
+	auto AllocatorMarker = Memory_ScopeAllocator_Mark(RenderScopeAlloctor);
+	DEFER(Memory_ScopeAllocator_FreeSpace(&AllocatorMarker));
+
 	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
 
 	VkRenderingAttachmentInfo* ColorAttachments = nullptr;
 	VkRenderingAttachmentInfo* DepthAttachment = nullptr;
 
-	ColorAttachments = Memory_LinearAllocator_AllocTC(RenderFrameAlloctor, VkRenderingAttachmentInfo, pRenderingInfo->ColorAttachmentCount);
+	ColorAttachments = Memory_ScopeAllocator_AllocT<VkRenderingAttachmentInfo>(&AllocatorMarker, pRenderingInfo->ColorAttachmentCount);
 	for (u32 i = 0; i < pRenderingInfo->ColorAttachmentCount; ++i)
 	{
 		const BmRender_RenderingColorAttachment& Attachment = pRenderingInfo->ColorAttachments[i];
@@ -1212,12 +1230,15 @@ void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender
 
 void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, BmRender_PipelineLayout PipelineLayout, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets)
 {
+	auto AllocatorMarker = Memory_ScopeAllocator_Mark(RenderScopeAlloctor);
+	DEFER(Memory_ScopeAllocator_FreeSpace(&AllocatorMarker));
+
 	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
 	VkPipelineLayout Layout = PipelineLayout.InternalLayout;
 
 	VkPipelineBindPoint BindPoint = PipelineTypeToVkPipelineBindPoint(Pipeline.PipelineType);
 
-	VkDescriptorSet* Sets = Memory_LinearAllocator_AllocTC(RenderFrameAlloctor, VkDescriptorSet, DescriptorSetCount);
+	VkDescriptorSet* Sets = Memory_ScopeAllocator_AllocT<VkDescriptorSet>(&AllocatorMarker, DescriptorSetCount);
 	for (u32 i = 0; i < DescriptorSetCount; ++i)
 	{
 		Sets[i] = pDescriptorSets[i].InternalSet;
@@ -1276,8 +1297,11 @@ void BmRender_EndRendering(BmRender_CommandBuffer CommandBuffer)
 
 void BmRender_QueueSubmit(BmRender_Queue Queue, u32 SubmitCount, const BmRender_SubmitInfo* Submits, BmRender_Fence Fence)
 {
+	auto AllocatorMarker = Memory_ScopeAllocator_Mark(RenderScopeAlloctor);
+	DEFER(Memory_ScopeAllocator_FreeSpace(&AllocatorMarker));
+
 	VkFence VkFenceHandle = (VkFence)Fence;
-	VkSubmitInfo* VkSubmits = Memory_LinearAllocator_AllocTC(RenderFrameAlloctor, VkSubmitInfo, SubmitCount);
+	VkSubmitInfo* VkSubmits = Memory_ScopeAllocator_AllocT<VkSubmitInfo>(&AllocatorMarker, SubmitCount);
 
 	for (u32 i = 0; i < SubmitCount; ++i)
 	{
@@ -1296,7 +1320,7 @@ void BmRender_QueueSubmit(BmRender_Queue Queue, u32 SubmitCount, const BmRender_
 		VkPipelineStageFlags* WaitDstStageFlags = nullptr;
 		if (Submit.WaitDstStageFlags != nullptr)
 		{
-			WaitDstStageFlags = Memory_LinearAllocator_AllocTC(RenderFrameAlloctor, VkPipelineStageFlags, TotalWaitSemaphoreCount);
+			WaitDstStageFlags = Memory_ScopeAllocator_AllocT<VkPipelineStageFlags>(&AllocatorMarker, TotalWaitSemaphoreCount);
 			for (u32 j = 0; j < TotalWaitSemaphoreCount; ++j)
 			{
 				WaitDstStageFlags[j] = PipelineStageFlagsToVk(Submit.WaitDstStageFlags[j]);
@@ -1311,10 +1335,10 @@ void BmRender_QueueSubmit(BmRender_Queue Queue, u32 SubmitCount, const BmRender_
 		VkSubmit.commandBufferCount = Submit.CommandBufferCount;
 		VkSubmit.signalSemaphoreCount = TotalSignalSemaphoreCount;
 
-		u64* WaitValues = Memory_LinearAllocator_AllocTC(RenderFrameAlloctor, u64, TotalWaitSemaphoreCount);
-		u64* SignalValues = Memory_LinearAllocator_AllocTC(RenderFrameAlloctor, u64, TotalSignalSemaphoreCount);
-		VkSemaphore* WaitSemaphores = Memory_LinearAllocator_AllocTC(RenderFrameAlloctor, VkSemaphore, TotalWaitSemaphoreCount);
-		VkSemaphore* SignalSemaphores = Memory_LinearAllocator_AllocTC(RenderFrameAlloctor, VkSemaphore, TotalSignalSemaphoreCount);
+		u64* WaitValues = Memory_ScopeAllocator_AllocT<u64>(&AllocatorMarker, TotalWaitSemaphoreCount);
+		u64* SignalValues = Memory_ScopeAllocator_AllocT<u64>(&AllocatorMarker, TotalSignalSemaphoreCount);
+		VkSemaphore* WaitSemaphores = Memory_ScopeAllocator_AllocT<VkSemaphore>(&AllocatorMarker, TotalWaitSemaphoreCount);
+		VkSemaphore* SignalSemaphores = Memory_ScopeAllocator_AllocT<VkSemaphore>(&AllocatorMarker, TotalSignalSemaphoreCount);
 
 		NewTimelineInfo.pWaitSemaphoreValues = WaitValues;
 		NewTimelineInfo.pSignalSemaphoreValues = SignalValues;
@@ -1353,6 +1377,9 @@ void BmRender_QueueSubmit(BmRender_Queue Queue, u32 SubmitCount, const BmRender_
 
 BmRender_SwapchainResult BmRender_QueuePresent(BmRender_Queue Queue, const BmRender_PresentInfo* pPresentInfo)
 {
+	auto AllocatorMarker = Memory_ScopeAllocator_Mark(RenderScopeAlloctor);
+	DEFER(Memory_ScopeAllocator_FreeSpace(&AllocatorMarker));
+
 	VkPresentInfoKHR PresentInfo = { };
 	PresentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	PresentInfo.waitSemaphoreCount = pPresentInfo->WaitSemaphoreCount;
@@ -1360,7 +1387,7 @@ BmRender_SwapchainResult BmRender_QueuePresent(BmRender_Queue Queue, const BmRen
 	PresentInfo.pSwapchains = &CoreContext.VulkanSwapchain;
 	PresentInfo.pImageIndices = pPresentInfo->ImageIndices;
 
-	VkSemaphore* WaitSemaphores = Memory_ScopeAllocator_AllocTC(RenderScopeAlloctor, VkSemaphore, pPresentInfo->WaitSemaphoreCount);
+	VkSemaphore* WaitSemaphores = Memory_ScopeAllocator_AllocT<VkSemaphore>(&AllocatorMarker, pPresentInfo->WaitSemaphoreCount);
 	PresentInfo.pWaitSemaphores = WaitSemaphores;
 
 	for (u32 i = 0; i < pPresentInfo->WaitSemaphoreCount; ++i)

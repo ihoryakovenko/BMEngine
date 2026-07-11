@@ -83,6 +83,9 @@ void RenderResourceManager_DeInit()
 
 void RenderResourceManager_Update()
 {
+	auto AllocatorMarker = Memory_ScopeAllocator_Mark(ScopeAllocator);
+	DEFER(Memory_ScopeAllocator_FreeSpace(&AllocatorMarker));
+
 	if (LiveShaders)
 	{
 		for (u32 i = 0; i < (u32)PipelineNames::MAX_VALUE; ++i)
@@ -166,7 +169,7 @@ void RenderResourceManager_Update()
 			Shaders[i] = BmRender_CreateShader(&ShaderDesc);
 
 			const Metadata_Pipeline* Metadata = Metadata_Pipelines + i;
-			BmRender_ShaderStageDescription* StageDescriptions = Memory_ScopeAllocator_AllocTC(ScopeAllocator, BmRender_ShaderStageDescription, Metadata->StageCount);
+			BmRender_ShaderStageDescription* StageDescriptions = Memory_ScopeAllocator_AllocT<BmRender_ShaderStageDescription>(&AllocatorMarker, Metadata->StageCount);
 
 			for (u32 j = 0; j < Metadata->StageCount; ++j)
 			{
@@ -220,8 +223,11 @@ void RenderResourceManager_CreateGraphicsPipeline(PipelineNames Name, const BmRe
 {
 	assert(Initialized);
 
+	auto AllocatorMarker = Memory_ScopeAllocator_Mark(ScopeAllocator);
+	DEFER(Memory_ScopeAllocator_FreeSpace(&AllocatorMarker));
+
 	const Metadata_Pipeline* Metadata = Metadata_Pipelines + u32(Name);
-	BmRender_ShaderStageDescription* StageDescriptions = Memory_ScopeAllocator_AllocTC(ScopeAllocator, BmRender_ShaderStageDescription, Metadata->StageCount);
+	BmRender_ShaderStageDescription* StageDescriptions = Memory_ScopeAllocator_AllocT<BmRender_ShaderStageDescription>(&AllocatorMarker, Metadata->StageCount);
 
 	for (u32 i = 0; i < Metadata->StageCount; ++i)
 	{
@@ -244,8 +250,11 @@ void RenderResourceManager_CreateComputePipeline(PipelineNames Name)
 {
 	assert(Initialized);
 
+	auto AllocatorMarker = Memory_ScopeAllocator_Mark(ScopeAllocator);
+	DEFER(Memory_ScopeAllocator_FreeSpace(&AllocatorMarker));
+
 	const Metadata_Pipeline* Metadata = Metadata_Pipelines + u32(Name);
-	BmRender_ShaderStageDescription* StageDescriptions = Memory_ScopeAllocator_AllocTC(ScopeAllocator, BmRender_ShaderStageDescription, Metadata->StageCount);
+	BmRender_ShaderStageDescription* StageDescriptions = Memory_ScopeAllocator_AllocT<BmRender_ShaderStageDescription>(&AllocatorMarker, Metadata->StageCount);
 
 	for (u32 i = 0; i < Metadata->StageCount; ++i)
 	{
