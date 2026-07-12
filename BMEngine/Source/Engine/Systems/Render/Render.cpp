@@ -556,7 +556,7 @@ void Render_Init(GLFWwindow* WindowHandle)
 		BmRender_GPUBufferUpdateData InstanceBufferRegion = { &InstanceBuffer, 0, VK_WHOLE_SIZE };
 		BmRender_GPUBufferUpdateData MaterialBufferRegion = { &MaterialBuffer, 0, VK_WHOLE_SIZE };
 
-		const u32 DescriptorCount = 5;
+		const u32 DescriptorCount = 6;
 		BmRender_DescriptorSetLayoutBinding LayoutBindings[DescriptorCount];
 
 		LayoutBindings[0].DescriptorCount = 1;
@@ -572,14 +572,18 @@ void Render_Init(GLFWwindow* WindowHandle)
 		LayoutBindings[2].StageFlags = BmRender_DescriptorShaderStage::Vertex;
 
 		LayoutBindings[3].DescriptorCount = 64;
-		LayoutBindings[3].DescriptorType = BmRender_DescriptorType::CombinedImageSampler;
+		LayoutBindings[3].DescriptorType = BmRender_DescriptorType::SampledImage;
 		LayoutBindings[3].StageFlags = BmRender_DescriptorShaderStage::Fragment;
 
 		LayoutBindings[4].DescriptorCount = 1;
-		LayoutBindings[4].DescriptorType = BmRender_DescriptorType::StorageBuffer;
+		LayoutBindings[4].DescriptorType = BmRender_DescriptorType::Sampler;
 		LayoutBindings[4].StageFlags = BmRender_DescriptorShaderStage::Fragment;
 
-		const u32 UpdatesCount = 4;
+		LayoutBindings[5].DescriptorCount = 1;
+		LayoutBindings[5].DescriptorType = BmRender_DescriptorType::StorageBuffer;
+		LayoutBindings[5].StageFlags = BmRender_DescriptorShaderStage::Fragment;
+
+		const u32 UpdatesCount = 5;
 		BmRender_DescriptorSetUpdateData Updates[UpdatesCount];
 		Updates[0].BufferRegions = FrameBufferBinding;
 		Updates[0].BindingCount = 1;
@@ -596,10 +600,17 @@ void Render_Init(GLFWwindow* WindowHandle)
 		Updates[2].DstArrayElement = 0;
 		Updates[2].DstBinding = 2;
 
-		Updates[3].BufferRegions = &MaterialBufferRegion;
+		Updates[3].ImageBinding.Sampler = &DiffuseTextureSampler;
+		Updates[3].ImageBinding.ImageLayout = BmRender_ImageLayout::Undefined;
+		Updates[3].ImageBinding.ImageView = nullptr;
 		Updates[3].BindingCount = 1;
 		Updates[3].DstArrayElement = 0;
 		Updates[3].DstBinding = 4;
+
+		Updates[4].BufferRegions = &MaterialBufferRegion;
+		Updates[4].BindingCount = 1;
+		Updates[4].DstArrayElement = 0;
+		Updates[4].DstBinding = 5;
 
 		FrameDataLayout = BmRender_CreateDescriptorSetLayout(LayoutBindings, DescriptorCount);
 		DescriptorSets.FrameBufferSet = BmRender_CreateDescriptorSet(&FrameDataLayout, &MainPool);

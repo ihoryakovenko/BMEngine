@@ -235,7 +235,7 @@ FragmentOutput MainFragment(FragmentInput input)
 
     Shader_Material Mat = MaterialsDescriptor[input.layout.FragmentMaterialIndex];
 
-    float4 albedo = AlbedoTexture[Mat.AlbedoTexIndex].Sample(input.layout.FragmentTexture);
+    float4 albedo = Textures[Mat.AlbedoTexIndex].Sample(Sampler, input.layout.FragmentTexture);
 
     float3 N = normalize(input.layout.FragmentNormal);
     float3 V = normalize(-input.layout.WorldFragPos);

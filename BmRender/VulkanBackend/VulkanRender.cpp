@@ -156,13 +156,34 @@ void BmRender_UpdateDescriptorSet(BmRender_DescriptorSet* DescriptorSetHandle, c
 
 			WriteDescriptorSets[i].pBufferInfo = BufferInfo;
 		}
-		else if (VkDescriptorType == VK_DESCRIPTOR_TYPE_SAMPLER || VkDescriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
-			VkDescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
+		else if (VkDescriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+		{
+			assert(Binding.ImageBinding.Sampler);
+			assert(Binding.ImageBinding.ImageView);
+
+			VkDescriptorImageInfo* ImageInfo = Memory_ScopeAllocator_AllocT<VkDescriptorImageInfo>(&AllocatorMarker);
+			ImageInfo->imageLayout = ImageLayoutToVk(Binding.ImageBinding.ImageLayout);
+			ImageInfo->imageView = Binding.ImageBinding.ImageView->InternalView;
+			ImageInfo->sampler = *Binding.ImageBinding.Sampler;
+
+			WriteDescriptorSets[i].pImageInfo = ImageInfo;
+		}
+		else if (VkDescriptorType == VK_DESCRIPTOR_TYPE_SAMPLER)
+		{
+			assert(Binding.ImageBinding.Sampler);
+
+			VkDescriptorImageInfo* ImageInfo = Memory_ScopeAllocator_AllocT<VkDescriptorImageInfo>(&AllocatorMarker);
+			ImageInfo->sampler = *Binding.ImageBinding.Sampler;
+			ImageInfo->imageView = nullptr;
+
+			WriteDescriptorSets[i].pImageInfo = ImageInfo;
+		}
+		else if (VkDescriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE || VkDescriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
 		{
 			VkDescriptorImageInfo* ImageInfo = Memory_ScopeAllocator_AllocT<VkDescriptorImageInfo>(&AllocatorMarker);
 			ImageInfo->imageLayout = ImageLayoutToVk(Binding.ImageBinding.ImageLayout);
 			ImageInfo->imageView = Binding.ImageBinding.ImageView->InternalView;
-			ImageInfo->sampler = Binding.ImageBinding.Sampler ? *Binding.ImageBinding.Sampler : nullptr;
+			ImageInfo->sampler = nullptr;
 
 			WriteDescriptorSets[i].pImageInfo = ImageInfo;
 		}
