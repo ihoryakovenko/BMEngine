@@ -103,8 +103,8 @@ static void GenericDraw(BmRender_CommandBuffer CommandBuffer, DrawScene* Scene, 
 	{
 		DrawEntity* Entity = Scene->DrawEntities.data() + i;
 
-		BmRender_RecordBindIndexBuffer(CommandBuffer, Entity->IndexBufferEntry.GPUBufferHandle, Entity->IndexBufferEntry.BufferOffset, BmRender_IndexType::Uint32);
-		BmRender_DrawIndexed(CommandBuffer, Entity->IndicesCount, Entity->Instances, 0, 0, i);
+		
+		BmRender_DrawIndexed(CommandBuffer, Entity->IndicesCount, Entity->Instances, Entity->IndexBufferEntry.BufferOffset / 4, 0, i);
 	}
 }
 
@@ -677,6 +677,8 @@ void Render_Draw(DrawScene* Scene, u64 WaitSemaphoreValue)
 	BmRender_AcquireNextSwapchainImage(UINT64_MAX, ImageAvailable[CurrentFrame], nullptr, &CurrentImageIndex);
 
 	BmRender_BeginCommandBuffer(RenderCommandBuffers[CurrentFrame]);
+
+	BmRender_RecordBindIndexBuffer(RenderCommandBuffers[CurrentFrame], &IndexBuffer, 0, BmRender_IndexType::Uint32);
 
 	LightningPassDraw(Scene);
 	MainPassBeginPass();
