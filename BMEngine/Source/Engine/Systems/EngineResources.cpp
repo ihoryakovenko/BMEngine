@@ -60,7 +60,7 @@ namespace EngineResources
 		DefaultTextureDescription.Type = BmRender_ImageType::TransferSampled;
 		DefaultTextureDescription.SampleCount = BmRender_SampleCount::Count1;
 
-		BmRender_Image DefaultImageHandle = BmRender_CreateImage2D(DefaultAssetExtent.x, DefaultAssetExtent.y, Util::GliFormatToVkFormat(DefaultTexture.format()), BmRender_ImageType::TransferSampled, BmRender_SampleCount::Count1);
+		BmRender_Image DefaultImageHandle = BmRender_CreateImage2D(DefaultAssetExtent.x, DefaultAssetExtent.y, Util::GliFormatToVkFormat(DefaultTexture.format()), BmRender_ImageType::TransferSampled, BmRender_SampleCount::Count1, "Default texture");
 		DefaultAsset.RenderImageHandle = DefaultImageHandle;
 		DefaultAsset.IsCreated = true;
 

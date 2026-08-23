@@ -47,6 +47,17 @@ typedef VkShaderModule BmRender_Shader;
 typedef VkFence BmRender_Fence;
 typedef VkDeviceMemory BmRender_DeviceMemory;
 
+struct BmRender_ImageDescription
+{
+	u32 Width;
+	u32 Height;
+	BmRender_Format Format;
+	u32 ArrayLayers;
+	BmRender_ImageType Type;
+	BmRender_SampleCount SampleCount;
+	const char* DebugName;
+};
+
 struct BmRender_DescriptorSetLayout
 {
 	VkDescriptorSetLayout InternalLayout;
@@ -123,3 +134,5 @@ struct BmRender_Pipeline
 
 void InitBackend(void* WindowHandle);
 void DeInitBackend();
+
+void SetDebugUtilsObjectName(VkDevice Device, VkObjectType ObjectType, uint64_t ObjectHandle, const char* ObjectName);

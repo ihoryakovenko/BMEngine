@@ -247,8 +247,8 @@ static void DeferredPassInit(BmRender_DescriptorPool* MainPool)
 {
 	for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 	{
-		DeferredInputColorImage[i] = BmRender_CreateImage2D(MainScreenExtent.Width, MainScreenExtent.Height, ColorFormat, BmRender_ImageType::ColorAttachmentSampled, BmRender_SampleCount::Count1);
-		DeferredInputDepthImage[i] = BmRender_CreateImage2D(MainScreenExtent.Width, MainScreenExtent.Height, DepthFormat, BmRender_ImageType::DepthSamplad, BmRender_SampleCount::Count1);
+		DeferredInputColorImage[i] = BmRender_CreateImage2D(MainScreenExtent.Width, MainScreenExtent.Height, ColorFormat, BmRender_ImageType::ColorAttachmentSampled, BmRender_SampleCount::Count1, "DeferredInputColorImage");
+		DeferredInputDepthImage[i] = BmRender_CreateImage2D(MainScreenExtent.Width, MainScreenExtent.Height, DepthFormat, BmRender_ImageType::DepthSamplad, BmRender_SampleCount::Count1, "DeferredInputDepthImage");
 
 		DeferredInputColorImageInterface[i] = BmRender_CreateImageView2D(DeferredInputColorImage + i);
 		DeferredInputDepthImageInterface[i] = BmRender_CreateImageView2D(DeferredInputDepthImage + i);
@@ -350,7 +350,7 @@ static void DeferredPassDeInit()
 static void LightningPassInit(BmRender_DescriptorPool* MainPool)
 {
 	ShadowMapArray = BmRender_CreateImage2DArray(DepthViewportExtent.Width, DepthViewportExtent.Height, DepthFormat,
-		BmRender_ImageType::DepthSamplad, MAX_SHADOW_TEXTURES * BmRender_GetSwapchainImageCount(), BmRender_SampleCount::Count1);
+		BmRender_ImageType::DepthSamplad, MAX_SHADOW_TEXTURES * BmRender_GetSwapchainImageCount(), BmRender_SampleCount::Count1, "ShadowMapArray");
 
 	{
 		BmRender_DescriptorSetLayoutBinding LayoutBindings[1];

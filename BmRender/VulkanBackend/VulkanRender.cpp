@@ -14,6 +14,8 @@ extern Memory_ScopeAllocator* RenderScopeAlloctor;
 static VulkanCoreContext CoreContext;
 static VkAllocationCallbacks VulkanAllocator;
 
+static PFN_vkSetDebugUtilsObjectNameEXT FnVkSetDebugUtilsObjectNameEXT;
+
 static void* VKAPI_CALL VulkanAllocationCallback(
 	void* UserData,
 	size_t Size,
@@ -61,7 +63,7 @@ static void VKAPI_CALL VulkanInternalFreeNotification(
 
 }
 
-BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout* LayoutHandle, BmRender_DescriptorPool* PoolHandle)
+BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout* LayoutHandle, BmRender_DescriptorPool* PoolHandle, const char* DebugName)
 {
 	VkDevice Device = CoreContext.LogicalDevice;
 
@@ -82,7 +84,7 @@ BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout
 	return NewSet;
 }
 
-BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutBinding* Bindings, u32 BindingsCount)
+BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutBinding* Bindings, u32 BindingsCount, const char* DebugName)
 {
 	assert(BindingsCount <= MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS);
 	auto AllocatorMarker = Memory_ScopeAllocator_Mark(RenderScopeAlloctor);
@@ -113,6 +115,11 @@ BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_D
 	LayoutCreateInfo.pNext = nullptr;
 
 	VULKAN_CHECK_RESULT(vkCreateDescriptorSetLayout(Device, &LayoutCreateInfo, &VulkanAllocator, &Layout.InternalLayout));
+
+	if (DebugName)
+	{
+		SetDebugUtilsObjectName(Device, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, (u64)Layout.InternalLayout, DebugName);
+	}
 
 	return Layout;
 }
@@ -309,6 +316,12 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 	Resource.SampleCount = Description->SampleCount;
 
 	VULKAN_CHECK_RESULT(vkBindImageMemory(Device, Resource.InternalImage, (VkDeviceMemory)Resource.Memory, 0));
+
+	if (Description->DebugName)
+	{
+		SetDebugUtilsObjectName(Device, VK_OBJECT_TYPE_IMAGE, (u64)Resource.InternalImage, Description->DebugName);
+	}
+
 	return Resource;
 }
 
@@ -343,7 +356,7 @@ static BmRender_ImageView CreateImageView(const BmRender_Image* Handle, u32 Base
 	return ImageViewData;
 }
 
-BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description)
+BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description, const char* DebugName)
 {
 	VkDevice Device = CoreContext.LogicalDevice;
 
@@ -369,6 +382,11 @@ BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Descript
 
 	VkSampler VulkanSampler;
 	VULKAN_CHECK_RESULT(vkCreateSampler(Device, &CreateInfo, &VulkanAllocator, &VulkanSampler));
+
+	if (DebugName)
+	{
+		SetDebugUtilsObjectName(Device, VK_OBJECT_TYPE_SAMPLER, (u64)VulkanSampler, DebugName);
+	}
 
 	return VulkanSampler;
 }
@@ -495,6 +513,7 @@ BmRender_Pipeline BmRender_CreateGraphicsPipeline(BmRender_PipelineLayout Pipeli
 	BmRender_Pipeline Data;
 	Data.InternalPipeline = Pipeline;
 	Data.PipelineType = BmRender_PipelineType::Graphics;
+
 	return Data;
 }
 
@@ -529,7 +548,7 @@ BmRender_Pipeline BmRender_CreateComputePipeline(BmRender_PipelineLayout Pipelin
 	return Data;
 }
 
-BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description)
+BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description, const char* DebugName)
 {
 	auto AllocatorMarker = Memory_ScopeAllocator_Mark(RenderScopeAlloctor);
 	DEFER(Memory_ScopeAllocator_FreeSpace(&AllocatorMarker));
@@ -561,10 +580,15 @@ BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLay
 	BmRender_PipelineLayout LayoutData = { };
 	VULKAN_CHECK_RESULT(vkCreatePipelineLayout(Device, &CreateInfo, &VulkanAllocator, &LayoutData.InternalLayout));
 
+	if (DebugName)
+	{
+		SetDebugUtilsObjectName(Device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (u64)LayoutData.InternalLayout, DebugName);
+	}
+
 	return LayoutData;
 }
 
-BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolSize* PoolSizes, u32 MaxSets, u32 PoolSizeCount, BmRender_DescriptorPoolType Type)
+BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolSize* PoolSizes, u32 MaxSets, u32 PoolSizeCount, BmRender_DescriptorPoolType Type, const char* DebugName)
 {
 	auto AllocatorMarker = Memory_ScopeAllocator_Mark(RenderScopeAlloctor);
 	DEFER(Memory_ScopeAllocator_FreeSpace(&AllocatorMarker));
@@ -588,10 +612,15 @@ BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorP
 	VkDescriptorPool DescriptorPool;
 	VULKAN_CHECK_RESULT(vkCreateDescriptorPool(Device, &CreateInfo, &VulkanAllocator, &DescriptorPool));
 
+	if (DebugName)
+	{
+		SetDebugUtilsObjectName(Device, VK_OBJECT_TYPE_DESCRIPTOR_POOL, (u64)DescriptorPool, DebugName);
+	}
+
 	return DescriptorPool;
 }
 
-BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description)
+BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description, const char* DebugName)
 {
 	VkDevice Device = CoreContext.LogicalDevice;
 
@@ -605,11 +634,16 @@ BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Descript
 	VkShaderModule ShaderModule;
 	VULKAN_CHECK_RESULT(vkCreateShaderModule(Device, &CreateInfo, &VulkanAllocator, &ShaderModule));
 
+	if (DebugName)
+	{
+		SetDebugUtilsObjectName(Device, VK_OBJECT_TYPE_SHADER_MODULE, (u64)ShaderModule, DebugName);
+	}
+
 	return ShaderModule;
 }
 
 
-BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, BmRender_SampleCount SampleCount)
+BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, BmRender_SampleCount SampleCount, const char* DebugName)
 {
 	BmRender_ImageDescription Descr;
 	Descr.ArrayLayers = 1;
@@ -618,11 +652,12 @@ BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, BmRender_Format For
 	Descr.Height = Height;
 	Descr.Type = Type;
 	Descr.SampleCount = SampleCount;
+	Descr.DebugName = DebugName;
 
 	return CreateImageResource(&Descr);
 }
 
-BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, u32 ArrayLayers, BmRender_SampleCount SampleCount)
+BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, u32 ArrayLayers, BmRender_SampleCount SampleCount, const char* DebugName)
 {
 	BmRender_ImageDescription Descr;
 	Descr.ArrayLayers = ArrayLayers;
@@ -631,46 +666,47 @@ BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, BmRender_Forma
 	Descr.Height = Height;
 	Descr.Type = Type;
 	Descr.SampleCount = SampleCount;
+	Descr.DebugName = DebugName;
 
 	return CreateImageResource(&Descr);
 }
 
-BmRender_ImageView BmRender_CreateImageView2D(const BmRender_Image* Handle)
+BmRender_ImageView BmRender_CreateImageView2D(const BmRender_Image* Handle, const char* DebugName)
 {
 	return CreateImageView(Handle, 0, 1, VK_IMAGE_VIEW_TYPE_2D);
 }
 
-BmRender_ImageView BmRender_CreateImageView2DArray(const BmRender_Image* Handle, u32 BaseLayer, u32 LayerCount)
+BmRender_ImageView BmRender_CreateImageView2DArray(const BmRender_Image* Handle, u32 BaseLayer, u32 LayerCount, const char* DebugName)
 {
 	return CreateImageView(Handle, BaseLayer, LayerCount, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
 }
 
-BmRender_GPUBuffer BmRender_CreateVertexStageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag)
+BmRender_GPUBuffer BmRender_CreateVertexStageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName)
 {
 	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::CombinedVertexIndexFlag);
 }
 
-BmRender_GPUBuffer BmRender_CreateInstanceBuffer(u64 Size, MemoryPropertyFlag MemoryFlag)
+BmRender_GPUBuffer BmRender_CreateInstanceBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName)
 {
 	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::InstanceFlag);
 }
 
-BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, MemoryPropertyFlag MemoryFlag)
+BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName)
 {
 	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::UniformFlag);
 }
 
-BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag)
+BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName)
 {
 	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::StorageFlag);
 }
 
-BmRender_GPUBuffer BmRender_CreateIndirectDrawBuffer(u64 Size, MemoryPropertyFlag MemoryFlag)
+BmRender_GPUBuffer BmRender_CreateIndirectDrawBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName)
 {
 	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::IndirectDrawBufferFlag);
 }
 
-BmRender_GPUBuffer BmRender_CreateStagingBuffer(u64 Size)
+BmRender_GPUBuffer BmRender_CreateStagingBuffer(u64 Size, const char* DebugName)
 {
 	return CreateGPUBuffer(Size, MemoryPropertyFlag::HostCompatible, BufferUsageFlag::StagingFlag);
 }
@@ -1544,9 +1580,25 @@ void InitBackend(void* WindowHandle)
 	VulkanAllocator.pfnInternalFree = VulkanInternalFreeNotification;
 
 	CreateCoreContext(&CoreContext, WindowHandle);
+
+	FnVkSetDebugUtilsObjectNameEXT = (PFN_vkSetDebugUtilsObjectNameEXT)(vkGetInstanceProcAddr(CoreContext.VulkanInstance, "vkSetDebugUtilsObjectNameEXT"));
+	assert(FnVkSetDebugUtilsObjectNameEXT);
 }
 
 void DeInitBackend()
 {
 	DestroyCoreContext(&CoreContext);
+}
+
+void SetDebugUtilsObjectName(VkDevice Device, VkObjectType ObjectType, u64 ObjectHandle, const char* ObjectName)
+{
+	assert(ObjectName);
+
+	VkDebugUtilsObjectNameInfoEXT NameInfo = {};
+	NameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+	NameInfo.objectType = VK_OBJECT_TYPE_IMAGE;
+	NameInfo.objectHandle = ObjectHandle;
+	NameInfo.pObjectName = ObjectName;
+
+	VULKAN_CHECK_RESULT(FnVkSetDebugUtilsObjectNameEXT(Device, &NameInfo));
 }

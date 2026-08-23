@@ -487,16 +487,6 @@ struct BmRHI_SamplerDescription
 	bool UnnormalizedCoordinates;
 };
 
-struct BmRender_ImageDescription
-{
-	u32 Width;
-	u32 Height;
-	BmRender_Format Format;
-	u32 ArrayLayers;
-	BmRender_ImageType Type;
-	BmRender_SampleCount SampleCount;
-};
-
 struct BmRender_PushConstant
 {
 	u32 Offset;
@@ -717,24 +707,24 @@ BmRender_Device BmRender_GetLogicalDevice();
 u32 BmRender_GetGraphicsQueueFamily();
 u32 BmRender_GetQueueFamily(BmRender_Queue Queue);
 
-BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description);
+BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description, const char* DebugName = nullptr);
 BmRender_Pipeline BmRender_CreateGraphicsPipeline(BmRender_PipelineLayout PipelineLayout, const BmRender_PipelineSettings* Settings, const BmRender_ShaderStageDescription* ShaderStageDescriptions, u32 ShaderStagesCount, const AttachmentData* Attachment);
 BmRender_Pipeline BmRender_CreateComputePipeline(BmRender_PipelineLayout PipelineLayout, const BmRender_ShaderStageDescription* ShaderStageDescription);
-BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description);
-BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutBinding* Bindings, u32 BindingsCount);
-BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolSize* PoolSizes, u32 MaxSets, u32 PoolSizeCount, BmRender_DescriptorPoolType Type);
-BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description);
-BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout* LayoutHandle, BmRender_DescriptorPool* PoolHandle);
-BmRender_GPUBuffer BmRender_CreateVertexStageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag);
-BmRender_GPUBuffer BmRender_CreateInstanceBuffer(u64 Size, MemoryPropertyFlag MemoryFlag);
-BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, MemoryPropertyFlag MemoryFlag);
-BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag);
-BmRender_GPUBuffer BmRender_CreateIndirectDrawBuffer(u64 Size, MemoryPropertyFlag MemoryFlag);
-BmRender_GPUBuffer BmRender_CreateStagingBuffer(u64 Size);
-BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, BmRender_SampleCount SampleCount);
-BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, u32 ArrayLayers, BmRender_SampleCount SampleCount);
-BmRender_ImageView BmRender_CreateImageView2D(const BmRender_Image* Handle);
-BmRender_ImageView BmRender_CreateImageView2DArray(const BmRender_Image* Handle, u32 BaseLayer, u32 LayerCount);
+BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description, const char* DebugName = nullptr);
+BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutBinding* Bindings, u32 BindingsCount, const char* DebugName = nullptr);
+BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolSize* PoolSizes, u32 MaxSets, u32 PoolSizeCount, BmRender_DescriptorPoolType Type, const char* DebugName = nullptr);
+BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description, const char* DebugName = nullptr);
+BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout* LayoutHandle, BmRender_DescriptorPool* PoolHandle, const char* DebugName = nullptr);
+BmRender_GPUBuffer BmRender_CreateVertexStageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName = nullptr);
+BmRender_GPUBuffer BmRender_CreateInstanceBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName = nullptr);
+BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName = nullptr);
+BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName = nullptr);
+BmRender_GPUBuffer BmRender_CreateIndirectDrawBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName = nullptr);
+BmRender_GPUBuffer BmRender_CreateStagingBuffer(u64 Size, const char* DebugName = nullptr);
+BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, BmRender_SampleCount SampleCount, const char* DebugName = nullptr);
+BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, u32 ArrayLayers, BmRender_SampleCount SampleCount, const char* DebugName = nullptr);
+BmRender_ImageView BmRender_CreateImageView2D(const BmRender_Image* Handle, const char* DebugName = nullptr);
+BmRender_ImageView BmRender_CreateImageView2DArray(const BmRender_Image* Handle, u32 BaseLayer, u32 LayerCount, const char* DebugName = nullptr);
 BmRender_PushConstant BmRender_CreatePushConstant(BmRender_DescriptorShaderStage Stage, u32 Offset, u32 Size);
 BmRender_Fence BmRender_CreateFence();
 BmRender_Semaphore BmRender_CreateSemaphore();
