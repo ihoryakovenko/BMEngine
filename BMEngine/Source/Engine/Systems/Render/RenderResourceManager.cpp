@@ -185,11 +185,20 @@ void RenderResourceManager_Update()
 
 			if (Type == BmRender_PipelineType::Graphics)
 			{
-				Pipelines[i] = BmRender_CreateGraphicsPipeline(Layouts[i], SavedSettings + i, StageDescriptions, Metadata->StageCount, SavedAttachmentData + i);
+				BmRender_GraphicsPipelineDescription Description;
+				Description.Attachment = SavedAttachmentData + i;
+				Description.PipelineLayout = Layouts[i];
+				Description.Settings = SavedSettings + i;
+				Description.ShaderStageDescriptions = StageDescriptions;
+				Description.ShaderStagesCount = Metadata->StageCount;
+				BmRender_CreateGraphicsPipelines(&Description, 1, Pipelines + i);
 			}
 			else if (Type == BmRender_PipelineType::Compute)
 			{
-				Pipelines[i] = BmRender_CreateComputePipeline(Layouts[i], StageDescriptions);
+				BmRender_ComputePipelineDescription Description;
+				Description.PipelineLayout = Layouts[i];
+				Description.ShaderStageDescription = StageDescriptions;
+				BmRender_CreateComputePipelines(&Description, 1, Pipelines + i);
 			}
 			else
 			{
@@ -237,7 +246,13 @@ void RenderResourceManager_CreateGraphicsPipeline(PipelineNames Name, const BmRe
 		Stage->Stage = Metadata->Stages[i].Stage;
 	}
 
-	Pipelines[u32(Name)] = BmRender_CreateGraphicsPipeline(Layouts[u32(Name)], Settings, StageDescriptions, Metadata->StageCount, ResourceInfo);
+	BmRender_GraphicsPipelineDescription Description;
+	Description.Attachment = ResourceInfo;
+	Description.PipelineLayout = Layouts[u32(Name)];
+	Description.Settings = Settings;
+	Description.ShaderStageDescriptions = StageDescriptions;
+	Description.ShaderStagesCount = Metadata->StageCount;
+	BmRender_CreateGraphicsPipelines(&Description, 1, Pipelines + u32(Name));
 
 	if (LiveShaders)
 	{
@@ -264,7 +279,10 @@ void RenderResourceManager_CreateComputePipeline(PipelineNames Name)
 		Stage->Stage = Metadata->Stages[i].Stage;
 	}
 
-	Pipelines[u32(Name)] = BmRender_CreateComputePipeline(Layouts[u32(Name)], StageDescriptions);
+	BmRender_ComputePipelineDescription Description;
+	Description.PipelineLayout = Layouts[u32(Name)];
+	Description.ShaderStageDescription = StageDescriptions;
+	BmRender_CreateComputePipelines(&Description, 1, Pipelines + u32(Name));
 }
 
 void RenderResourceManager_BindPipeline(BmRender_CommandBuffer CmdBuffer, PipelineNames Name)

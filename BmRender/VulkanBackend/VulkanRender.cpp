@@ -391,161 +391,179 @@ BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Descript
 	return VulkanSampler;
 }
 
-BmRender_Pipeline BmRender_CreateGraphicsPipeline(BmRender_PipelineLayout PipelineLayout, const BmRender_PipelineSettings* Settings, const BmRender_ShaderStageDescription* ShaderStageDescriptions,
-	u32 ShaderStagesCount, const AttachmentData* Attachment)
+void BmRender_CreateGraphicsPipelines(const BmRender_GraphicsPipelineDescription* Descriptions, u32 DescriptionCount, BmRender_Pipeline* OutPipelines)
 {
 	auto AllocatorMarker = Memory_ScopeAllocator_Mark(RenderScopeAlloctor);
 	DEFER(Memory_ScopeAllocator_FreeSpace(&AllocatorMarker));
 
 	VkDevice Device = CoreContext.LogicalDevice;
 
-	VkPipelineShaderStageCreateInfo* VkShaderStages = Memory_ScopeAllocator_AllocT<VkPipelineShaderStageCreateInfo>(&AllocatorMarker, ShaderStagesCount);
-	for (u32 i = 0; i < ShaderStagesCount; ++i)
+	auto PipelineCreateInfos = Memory_ScopeAllocator_AllocT<VkGraphicsPipelineCreateInfo>(&AllocatorMarker, DescriptionCount);
+
+	for (u32 DescriptionIndex = 0; DescriptionIndex < DescriptionCount; ++DescriptionIndex)
 	{
-		const BmRender_ShaderStageDescription* ShaderStageDesc = ShaderStageDescriptions + i;
+		const BmRender_GraphicsPipelineDescription* Description = Descriptions + DescriptionIndex;
 
-		VkPipelineShaderStageCreateInfo* VkStage = VkShaderStages + i;
-		VkStage->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		VkStage->pNext = nullptr;
-		VkStage->flags = 0;
-		VkStage->stage = PipelineShaderStageToVkShaderStage(ShaderStageDesc->Stage);
-		VkStage->module = *ShaderStageDesc->Shader;
-		VkStage->pName = ShaderStageDesc->EntryPointFunction;
-		VkStage->pSpecializationInfo = nullptr;
-	}
-
-	VkPipelineVertexInputStateCreateInfo VertexInputState = { };
-	VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-
-	bool SampleCountFound = false;
-	VkSampleCountFlagBits SampleCount = VK_SAMPLE_COUNT_1_BIT;
-
-	VkFormat* ColorAttachmentFormats = Memory_ScopeAllocator_AllocT<VkFormat>(&AllocatorMarker, Attachment->ColorAttachmentCount);
-	for (u32 i = 0; i < Attachment->ColorAttachmentCount; ++i)
-	{
-		if (Attachment->ColorAttachments[i].Format != BmRender_Format::Undefined)
+		VkPipelineShaderStageCreateInfo* VkShaderStages = Memory_ScopeAllocator_AllocT<VkPipelineShaderStageCreateInfo>(&AllocatorMarker, Description->ShaderStagesCount);
+		for (u32 i = 0; i < Description->ShaderStagesCount; ++i)
 		{
-			ColorAttachmentFormats[i] = BmRender_FormatToVk(Attachment->ColorAttachments[i].Format);
+			const BmRender_ShaderStageDescription* ShaderStageDesc = Description->ShaderStageDescriptions + i;
+
+			VkPipelineShaderStageCreateInfo* VkStage = VkShaderStages + i;
+			VkStage->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			VkStage->pNext = nullptr;
+			VkStage->flags = 0;
+			VkStage->stage = PipelineShaderStageToVkShaderStage(ShaderStageDesc->Stage);
+			VkStage->module = *ShaderStageDesc->Shader;
+			VkStage->pName = ShaderStageDesc->EntryPointFunction;
+			VkStage->pSpecializationInfo = nullptr;
+		}
+
+		VkPipelineVertexInputStateCreateInfo VertexInputState = { };
+		VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+		bool SampleCountFound = false;
+		VkSampleCountFlagBits SampleCount = VK_SAMPLE_COUNT_1_BIT;
+
+		VkFormat* ColorAttachmentFormats = Memory_ScopeAllocator_AllocT<VkFormat>(&AllocatorMarker, Description->Attachment->ColorAttachmentCount);
+		for (u32 i = 0; i < Description->Attachment->ColorAttachmentCount; ++i)
+		{
+			if (Description->Attachment->ColorAttachments[i].Format != BmRender_Format::Undefined)
+			{
+				ColorAttachmentFormats[i] = BmRender_FormatToVk(Description->Attachment->ColorAttachments[i].Format);
+
+				if (!SampleCountFound)
+				{
+					SampleCount = SampleCountToVk(Description->Attachment->ColorAttachments[i].Image->SampleCount);
+				}
+			}
+			else
+			{
+				ColorAttachmentFormats[i] = VK_FORMAT_UNDEFINED;
+			}
+		}
+
+		VkFormat DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
+		if (Description->Attachment->DepthAttachment)
+		{
+			DepthAttachmentFormat = BmRender_FormatToVk(Description->Attachment->DepthAttachment->Format);
 
 			if (!SampleCountFound)
 			{
-				SampleCount = SampleCountToVk(Attachment->ColorAttachments[i].Image->SampleCount);
+				SampleCount = SampleCountToVk(Description->Attachment->DepthAttachment->Image->SampleCount);
 			}
 		}
-		else
+
+		VkFormat StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+		if (Description->Attachment->StencilAttachment)
 		{
-			ColorAttachmentFormats[i] = VK_FORMAT_UNDEFINED;
+			StencilAttachmentFormat = BmRender_FormatToVk(Description->Attachment->StencilAttachment->Format);
+
+			if (!SampleCountFound)
+			{
+				SampleCount = SampleCountToVk(Description->Attachment->StencilAttachment->Image->SampleCount);
+			}
 		}
+
+		VkPipelineRenderingCreateInfo RenderingInfo = { };
+		RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+		RenderingInfo.pNext = nullptr;
+		RenderingInfo.colorAttachmentCount = Description->Attachment->ColorAttachmentCount;
+		RenderingInfo.pColorAttachmentFormats = ColorAttachmentFormats;
+		RenderingInfo.depthAttachmentFormat = DepthAttachmentFormat;
+		RenderingInfo.stencilAttachmentFormat = StencilAttachmentFormat;
+
+		VkPipelineColorBlendAttachmentState VkColorBlendAttachment = ColorBlendAttachmentToVk(Description->Settings->ColorBlendAttachment);
+		VkPipelineColorBlendStateCreateInfo ColorBlendState = ColorBlendStateToVk(Description->Settings->ColorBlendState);
+		ColorBlendState.pAttachments = &VkColorBlendAttachment;
+
+		VkViewport VkViewport = ViewportToVk(Description->Settings->Viewport);
+		VkRect2D VkScissor = Rect2DToVk(Description->Settings->Scissor);
+
+		VkPipelineViewportStateCreateInfo ViewportState = ViewportStateToVk(Description->Settings->ViewportState);
+		ViewportState.pViewports = &VkViewport;
+		ViewportState.pScissors = &VkScissor;
+
+		VkPipelineRasterizationStateCreateInfo RasterizationState = RasterizationStateToVk(Description->Settings->RasterizationState);
+		VkPipelineMultisampleStateCreateInfo MultisampleState = MultisampleStateToVk(Description->Settings->MultisampleState);
+		VkPipelineInputAssemblyStateCreateInfo InputAssemblyState = InputAssemblyStateToVk(Description->Settings->InputAssemblyState);
+		VkPipelineDepthStencilStateCreateInfo DepthStencilState = DepthStencilStateToVk(Description->Settings->DepthStencilState);
+
+		MultisampleState.rasterizationSamples = SampleCount;
+
+		VkGraphicsPipelineCreateInfo* PipelineCreateInfo = PipelineCreateInfos + DescriptionIndex;
+		*PipelineCreateInfo = { };
+		PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		PipelineCreateInfo->stageCount = Description->ShaderStagesCount;
+		PipelineCreateInfo->pStages = VkShaderStages;
+		PipelineCreateInfo->pVertexInputState = &VertexInputState;
+		PipelineCreateInfo->pInputAssemblyState = &InputAssemblyState;
+		PipelineCreateInfo->pViewportState = &ViewportState;
+		PipelineCreateInfo->pDynamicState = nullptr;
+		PipelineCreateInfo->pRasterizationState = &RasterizationState;
+		PipelineCreateInfo->pMultisampleState = &MultisampleState;
+		PipelineCreateInfo->pColorBlendState = &ColorBlendState;
+		PipelineCreateInfo->pDepthStencilState = &DepthStencilState;
+		PipelineCreateInfo->layout = Description->PipelineLayout.InternalLayout;
+		PipelineCreateInfo->renderPass = nullptr;
+		PipelineCreateInfo->subpass = 0;
+		PipelineCreateInfo->pNext = &RenderingInfo;
+
+		PipelineCreateInfo->basePipelineHandle = VK_NULL_HANDLE;
+		PipelineCreateInfo->basePipelineIndex = -1;
 	}
 
-	VkFormat DepthAttachmentFormat = VK_FORMAT_UNDEFINED;
-	if (Attachment->DepthAttachment)
+	auto Pipelines = Memory_ScopeAllocator_AllocT<VkPipeline>(&AllocatorMarker, DescriptionCount);
+	VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, DescriptionCount, PipelineCreateInfos, &VulkanAllocator, Pipelines));
+
+	for (u32 DescriptionIndex = 0; DescriptionIndex < DescriptionCount; ++DescriptionIndex)
 	{
-		DepthAttachmentFormat = BmRender_FormatToVk(Attachment->DepthAttachment->Format);
-
-		if (!SampleCountFound)
-		{
-			SampleCount = SampleCountToVk(Attachment->DepthAttachment->Image->SampleCount);
-		}
+		OutPipelines[DescriptionIndex].InternalPipeline = Pipelines[DescriptionIndex];
+		OutPipelines[DescriptionIndex].PipelineType = BmRender_PipelineType::Graphics;
 	}
-
-	VkFormat StencilAttachmentFormat = VK_FORMAT_UNDEFINED;
-	if (Attachment->StencilAttachment)
-	{
-		StencilAttachmentFormat = BmRender_FormatToVk(Attachment->StencilAttachment->Format);
-
-		if (!SampleCountFound)
-		{
-			SampleCount = SampleCountToVk(Attachment->StencilAttachment->Image->SampleCount);
-		}
-	}
-
-	VkPipelineRenderingCreateInfo RenderingInfo = { };
-	RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-	RenderingInfo.pNext = nullptr;
-	RenderingInfo.colorAttachmentCount = Attachment->ColorAttachmentCount;
-	RenderingInfo.pColorAttachmentFormats = ColorAttachmentFormats;
-	RenderingInfo.depthAttachmentFormat = DepthAttachmentFormat;
-	RenderingInfo.stencilAttachmentFormat = StencilAttachmentFormat;
-
-	VkPipelineColorBlendAttachmentState VkColorBlendAttachment = ColorBlendAttachmentToVk(Settings->ColorBlendAttachment);
-	VkPipelineColorBlendStateCreateInfo ColorBlendState = ColorBlendStateToVk(Settings->ColorBlendState);
-	ColorBlendState.pAttachments = &VkColorBlendAttachment;
-
-	VkViewport VkViewport = ViewportToVk(Settings->Viewport);
-	VkRect2D VkScissor = Rect2DToVk(Settings->Scissor);
-
-	VkPipelineViewportStateCreateInfo ViewportState = ViewportStateToVk(Settings->ViewportState);
-	ViewportState.pViewports = &VkViewport;
-	ViewportState.pScissors = &VkScissor;
-
-	VkPipelineRasterizationStateCreateInfo RasterizationState = RasterizationStateToVk(Settings->RasterizationState);
-	VkPipelineMultisampleStateCreateInfo MultisampleState = MultisampleStateToVk(Settings->MultisampleState);
-	VkPipelineInputAssemblyStateCreateInfo InputAssemblyState = InputAssemblyStateToVk(Settings->InputAssemblyState);
-	VkPipelineDepthStencilStateCreateInfo DepthStencilState = DepthStencilStateToVk(Settings->DepthStencilState);
-
-	MultisampleState.rasterizationSamples = SampleCount;
-
-	auto PipelineCreateInfo = Memory_ScopeAllocator_AllocT<VkGraphicsPipelineCreateInfo>(&AllocatorMarker);
-	*PipelineCreateInfo = { };
-	PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	PipelineCreateInfo->stageCount = ShaderStagesCount;
-	PipelineCreateInfo->pStages = VkShaderStages;
-	PipelineCreateInfo->pVertexInputState = &VertexInputState;
-	PipelineCreateInfo->pInputAssemblyState = &InputAssemblyState;
-	PipelineCreateInfo->pViewportState = &ViewportState;
-	PipelineCreateInfo->pDynamicState = nullptr;
-	PipelineCreateInfo->pRasterizationState = &RasterizationState;
-	PipelineCreateInfo->pMultisampleState = &MultisampleState;
-	PipelineCreateInfo->pColorBlendState = &ColorBlendState;
-	PipelineCreateInfo->pDepthStencilState = &DepthStencilState;
-	PipelineCreateInfo->layout = PipelineLayout.InternalLayout;
-	PipelineCreateInfo->renderPass = nullptr;
-	PipelineCreateInfo->subpass = 0;
-	PipelineCreateInfo->pNext = &RenderingInfo;
-
-	PipelineCreateInfo->basePipelineHandle = VK_NULL_HANDLE;
-	PipelineCreateInfo->basePipelineIndex = -1;
-
-	VkPipeline Pipeline;
-	VULKAN_CHECK_RESULT(vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, 1, PipelineCreateInfo, &VulkanAllocator, &Pipeline));
-
-	BmRender_Pipeline Data;
-	Data.InternalPipeline = Pipeline;
-	Data.PipelineType = BmRender_PipelineType::Graphics;
-
-	return Data;
 }
 
-BmRender_Pipeline BmRender_CreateComputePipeline(BmRender_PipelineLayout PipelineLayout, const BmRender_ShaderStageDescription* ShaderStageDescription)
+void BmRender_CreateComputePipelines(const BmRender_ComputePipelineDescription* Descriptions, u32 DescriptionCount, BmRender_Pipeline* OutPipelines)
 {
+	auto AllocatorMarker = Memory_ScopeAllocator_Mark(RenderScopeAlloctor);
+	DEFER(Memory_ScopeAllocator_FreeSpace(&AllocatorMarker));
+
 	VkDevice Device = CoreContext.LogicalDevice;
 
-	VkPipelineShaderStageCreateInfo VkShaderStage = { };
-	VkShaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	VkShaderStage.pNext = nullptr;
-	VkShaderStage.flags = 0;
-	VkShaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-	VkShaderStage.module = *ShaderStageDescription->Shader;
-	VkShaderStage.pName = ShaderStageDescription->EntryPointFunction;
-	VkShaderStage.pSpecializationInfo = nullptr;
+	auto PipelineCreateInfos = Memory_ScopeAllocator_AllocT<VkComputePipelineCreateInfo>(&AllocatorMarker, DescriptionCount);
 
-	VkComputePipelineCreateInfo PipelineCreateInfo = { };
-	PipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-	PipelineCreateInfo.pNext = nullptr;
-	PipelineCreateInfo.flags = 0;
-	PipelineCreateInfo.stage = VkShaderStage;
-	PipelineCreateInfo.layout = PipelineLayout.InternalLayout;
-	PipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
-	PipelineCreateInfo.basePipelineIndex = -1;
+	for (u32 DescriptionIndex = 0; DescriptionIndex < DescriptionCount; ++DescriptionIndex)
+	{
+		const BmRender_ComputePipelineDescription* Description = Descriptions + DescriptionIndex;
 
-	VkPipeline Pipeline;
-	VULKAN_CHECK_RESULT(vkCreateComputePipelines(Device, VK_NULL_HANDLE, 1, &PipelineCreateInfo, &VulkanAllocator, &Pipeline));
+		VkPipelineShaderStageCreateInfo VkShaderStage = { };
+		VkShaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		VkShaderStage.pNext = nullptr;
+		VkShaderStage.flags = 0;
+		VkShaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+		VkShaderStage.module = *Description->ShaderStageDescription->Shader;
+		VkShaderStage.pName = Description->ShaderStageDescription->EntryPointFunction;
+		VkShaderStage.pSpecializationInfo = nullptr;
 
-	BmRender_Pipeline Data;
-	Data.InternalPipeline = Pipeline;
-	Data.PipelineType = BmRender_PipelineType::Compute;
-	return Data;
+		VkComputePipelineCreateInfo* PipelineCreateInfo = PipelineCreateInfos + DescriptionIndex;
+		*PipelineCreateInfo = {};
+		PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+		PipelineCreateInfo->pNext = nullptr;
+		PipelineCreateInfo->flags = 0;
+		PipelineCreateInfo->stage = VkShaderStage;
+		PipelineCreateInfo->layout = Description->PipelineLayout.InternalLayout;
+		PipelineCreateInfo->basePipelineHandle = VK_NULL_HANDLE;
+		PipelineCreateInfo->basePipelineIndex = -1;
+	}
+
+	auto Pipelines = Memory_ScopeAllocator_AllocT<VkPipeline>(&AllocatorMarker, DescriptionCount);
+	VULKAN_CHECK_RESULT(vkCreateComputePipelines(Device, VK_NULL_HANDLE, DescriptionCount, PipelineCreateInfos, &VulkanAllocator, Pipelines));
+
+	for (u32 DescriptionIndex = 0; DescriptionIndex < DescriptionCount; ++DescriptionIndex)
+	{
+		OutPipelines[DescriptionIndex].InternalPipeline = Pipelines[DescriptionIndex];
+		OutPipelines[DescriptionIndex].PipelineType = BmRender_PipelineType::Compute;
+	}
 }
 
 BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description, const char* DebugName)

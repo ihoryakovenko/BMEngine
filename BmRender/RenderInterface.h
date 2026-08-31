@@ -686,6 +686,21 @@ struct BmRender_InitData
 	u32 TypeDebugDatainitialSize;
 };
 
+struct BmRender_GraphicsPipelineDescription
+{
+	BmRender_PipelineLayout PipelineLayout;
+	const BmRender_PipelineSettings* Settings;
+	const BmRender_ShaderStageDescription* ShaderStageDescriptions; 
+	u32 ShaderStagesCount;
+	const AttachmentData* Attachment;
+};
+
+struct BmRender_ComputePipelineDescription
+{
+	BmRender_PipelineLayout PipelineLayout;
+	const BmRender_ShaderStageDescription* ShaderStageDescription;
+};
+
 void BmRender_Init(const BmRender_InitData* InitData);
 void BmRender_DeInit();
 
@@ -708,8 +723,8 @@ u32 BmRender_GetGraphicsQueueFamily();
 u32 BmRender_GetQueueFamily(BmRender_Queue Queue);
 
 BmRender_Sampler BmRender_CreateSampler(const BmRHI_SamplerDescription* Description, const char* DebugName = nullptr);
-BmRender_Pipeline BmRender_CreateGraphicsPipeline(BmRender_PipelineLayout PipelineLayout, const BmRender_PipelineSettings* Settings, const BmRender_ShaderStageDescription* ShaderStageDescriptions, u32 ShaderStagesCount, const AttachmentData* Attachment);
-BmRender_Pipeline BmRender_CreateComputePipeline(BmRender_PipelineLayout PipelineLayout, const BmRender_ShaderStageDescription* ShaderStageDescription);
+void BmRender_CreateGraphicsPipelines(const BmRender_GraphicsPipelineDescription* Descriptions, u32 DescriptionCount, BmRender_Pipeline* OutPipelines);
+void BmRender_CreateComputePipelines(const BmRender_ComputePipelineDescription* Descriptions, u32 DescriptionCount, BmRender_Pipeline* OutPipelines);
 BmRender_PipelineLayout BmRender_CreatePipelineLayout(const BmRender_PipelineLayoutDescription* Description, const char* DebugName = nullptr);
 BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_DescriptorSetLayoutBinding* Bindings, u32 BindingsCount, const char* DebugName = nullptr);
 BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolSize* PoolSizes, u32 MaxSets, u32 PoolSizeCount, BmRender_DescriptorPoolType Type, const char* DebugName = nullptr);
