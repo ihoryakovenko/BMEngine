@@ -136,6 +136,7 @@ float ApplyShadow(float4x4 LightSpaceMatrix, float ShadowMapLayer, bool doLinear
     float2 texelSize = 1.0 / float2(width, height);
 
     float shadow = 0.0;
+    float bias = 0.005;
 
     for (int x = -1; x <= 1; x++)
     {
@@ -151,7 +152,7 @@ float ApplyShadow(float4x4 LightSpaceMatrix, float ShadowMapLayer, bool doLinear
             if (doLinearize)
                 pcfDepth = LinearizeDepth(pcfDepth, Planes);
 
-            shadow += currentDepth > pcfDepth ? 1.0 : 0.0;
+            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
         }
     }
 
@@ -185,7 +186,7 @@ float3 CastPointLight(Shader_PointLight light, float3 fragPos, float3 albedo, fl
     return brdf * radiance;
 }
 
-float3 CastSpotLight(Shader_SpotLight light, float3 fragPos, float3 albedo, float3 V, float3 N)
+float3 CastSpotLight(Shader_SpotLight light, float3 fragPos, float3 albedo, float3 V, float3 N, float3 worldPos)
 {
     float3 lightPos = light.Position;
     float3 lightDir = normalize(-light.Direction);
@@ -199,12 +200,15 @@ float3 CastSpotLight(Shader_SpotLight light, float3 fragPos, float3 albedo, floa
     float theta = dot(L, lightDir);
     float cone = smoothstep(light.OuterCutOff, light.CutOff, theta);
 
-    float intensity = 20.0;
+    float intensity = 200.0;
     float3 radiance = light.Color * intensity * attenuation * cone;
 
     float3 brdf = CookTorranceBRDF(N, V, L, albedo, 0.5, 0.5);
 
+    float shadow = ApplyShadow(light.LightSpaceMatrix, SPOT_LIGHT_SHADOW_TEXTURE_INDEX, true, light.Planes, worldPos);
+
     return brdf * radiance;
+    //return (1.0 - shadow) * brdf * radiance;
 }
 
 [shader("vertex")]
@@ -244,7 +248,7 @@ FragmentOutput MainFragment(FragmentInput input)
 
     Lo += CastDirectionLight(FrameBufferDescriptor.directionLight, albedo.rgb, V, N, input.layout.WorldFragPos);
     Lo += CastPointLight(FrameBufferDescriptor.pointlight, input.layout.WorldFragPos, albedo.rgb, V, N);
-    Lo += CastSpotLight(FrameBufferDescriptor.spotlight, input.layout.WorldFragPos, albedo.rgb, V, N);
+    Lo += CastSpotLight(FrameBufferDescriptor.spotlight, input.layout.WorldFragPos, albedo.rgb, V, N, input.layout.WorldFragPos);
 
     output.OutColor = float4(Lo, albedo.a);
     return output;

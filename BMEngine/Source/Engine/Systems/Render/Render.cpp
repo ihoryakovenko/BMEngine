@@ -103,7 +103,9 @@ static void GenericDraw(BmRender_CommandBuffer CommandBuffer, DrawScene* Scene, 
 	{
 		DrawEntity* Entity = Scene->DrawEntities.data() + i;
 
-		
+		u64 FrameDataAddr = BmRender_GetBufferDeviceAddress(&FrameDataBuffer) + sizeof(Shader_FrameData) * CurrentFrame;
+		//BmRender_RecordPushData(CommandBuffer, &FrameDataAddr, sizeof(FrameDataAddr));
+
 		BmRender_DrawIndexed(CommandBuffer, Entity->IndicesCount, Entity->Instances, Entity->IndexBufferEntry.BufferOffset / 4, 0, i);
 	}
 }
@@ -435,6 +437,9 @@ static void LightningPassDraw(DrawScene* Scene)
 		};
 
 		const u32 SetsCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
+
+		u64 FrameDataAddr = BmRender_GetBufferDeviceAddress(&FrameDataBuffer) + sizeof(Shader_FrameData) * CurrentFrame;
+		//BmRender_RecordPushData(RenderCommandBuffers[CurrentFrame], &FrameDataAddr, sizeof(FrameDataAddr));
 
 		GenericDraw(RenderCommandBuffers[CurrentFrame], Scene, PipelineNames::Depth_vert, DescriptorSetGroup, SetsCount, nullptr, 0);
 

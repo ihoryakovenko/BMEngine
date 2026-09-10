@@ -15,6 +15,7 @@ static VulkanCoreContext CoreContext;
 static VkAllocationCallbacks VulkanAllocator;
 
 static PFN_vkSetDebugUtilsObjectNameEXT FnVkSetDebugUtilsObjectNameEXT;
+static PFN_vkCmdPushDataEXT FnVkCmdPushDataEXT;
 
 static void* VKAPI_CALL VulkanAllocationCallback(
 	void* UserData,
@@ -1364,6 +1365,17 @@ void BmRender_RecordDispatch(BmRender_CommandBuffer CommandBuffer, u32 GroupCoun
 	vkCmdDispatch(VkCmdBuffer, GroupCountX, GroupCountY, GroupCountZ);
 }
 
+void BmRender_RecordPushData(BmRender_CommandBuffer CommandBuffer, const void* Data, u64 DataSize)
+{
+	VkPushDataInfoEXT PushInfo;
+	PushInfo.sType = VK_STRUCTURE_TYPE_PUSH_DATA_INFO_EXT;
+	PushInfo.offset = 0;
+	PushInfo.data.address = Data;
+	PushInfo.data.size = DataSize;
+
+	FnVkCmdPushDataEXT(CommandBuffer.InternalBuffer, &PushInfo);
+}
+
 void BmRender_EndRendering(BmRender_CommandBuffer CommandBuffer)
 {
 	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
@@ -1601,6 +1613,9 @@ void InitBackend(void* WindowHandle)
 
 	FnVkSetDebugUtilsObjectNameEXT = (PFN_vkSetDebugUtilsObjectNameEXT)(vkGetInstanceProcAddr(CoreContext.VulkanInstance, "vkSetDebugUtilsObjectNameEXT"));
 	assert(FnVkSetDebugUtilsObjectNameEXT);
+
+	FnVkCmdPushDataEXT = (PFN_vkCmdPushDataEXT)(vkGetDeviceProcAddr(CoreContext.LogicalDevice, "vkCmdPushDataEXT"));
+	assert(FnVkCmdPushDataEXT);
 }
 
 void DeInitBackend()

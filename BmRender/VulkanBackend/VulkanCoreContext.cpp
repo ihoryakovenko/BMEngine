@@ -277,6 +277,8 @@ void CreateCoreContext(VulkanCoreContext* Context, void* Window)
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 		VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
 		VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
+		VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
+		VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME,
 	};
 
 	const u32 DeviceExtensionsSize = sizeof(DeviceExtensions) / sizeof(DeviceExtensions[0]);
