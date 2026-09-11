@@ -74,7 +74,7 @@ namespace EngineResources
 		DiffuseBinding.ImageBinding.ImageView = &DefaultAsset.RenderViewHandle;
 		DiffuseBinding.DstArrayElement = 0;
 		DiffuseBinding.BindingCount = 1;
-		DiffuseBinding.DstBinding = 3;
+		DiffuseBinding.DstBinding = 1;
 
 		BmRender_DescriptorSetUpdateData Bindings[] = { DiffuseBinding };
 
@@ -156,7 +156,7 @@ namespace EngineResources
 							DiffuseBinding.ImageBinding.ImageView = &it->second.RenderViewHandle;
 							DiffuseBinding.DstArrayElement = TexturesGPUIndexCounter;
 							DiffuseBinding.BindingCount = 1;
-							DiffuseBinding.DstBinding = 3;
+							DiffuseBinding.DstBinding = 1;
 
 							BmRender_DescriptorSetUpdateData Bindings[] = { DiffuseBinding };
 

@@ -13,14 +13,14 @@ namespace RenderResources
 {
 	void UpdateBufferRegion(BmRender_GPUBufferUpdateData Handle, u64 ResourceOffset, const void* Data, u32 DataSize)
 	{
-		const MemoryPropertyFlag Flag = Handle.GPUBufferHandle->PropertyFlag;
+		const BmRender_MemoryPropertyFlag Flag = Handle.GPUBufferHandle->PropertyFlag;
 		const u64 Offset = Handle.BufferOffset + ResourceOffset;
 
-		if (Flag == MemoryPropertyFlag::HostCompatible)
+		if (Flag == BmRender_MemoryPropertyFlag::HostCompatible)
 		{
 			BmRender_UpdateHostCompatibleBuffer(Handle.GPUBufferHandle, Offset, DataSize, Data);
 		}
-		else if (Flag == MemoryPropertyFlag::GPULocal)
+		else if (Flag == BmRender_MemoryPropertyFlag::GPULocal)
 		{
 			// TODO: TMP solution
 			void* TransferMemory = TransferSystem::RequestTransferMemory(DataSize);
@@ -44,9 +44,9 @@ namespace RenderResources
 
 	void UpdateBuffer(BmRender_GPUBuffer BufferHandle, u64 Offset, const void* Data, u32 DataSize)
 	{
-		const MemoryPropertyFlag Flag = BufferHandle.PropertyFlag;
+		const BmRender_MemoryPropertyFlag Flag = BufferHandle.PropertyFlag;
 
-		if (Flag == MemoryPropertyFlag::HostCompatible)
+		if (Flag == BmRender_MemoryPropertyFlag::HostCompatible)
 		{
 			BmRender_UpdateHostCompatibleBuffer(&BufferHandle, Offset, DataSize, Data);
 		}

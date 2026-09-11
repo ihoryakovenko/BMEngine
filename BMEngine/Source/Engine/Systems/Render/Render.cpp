@@ -59,7 +59,6 @@ static BmRender_GPUBufferUpdateData FrameBufferBinding[1];
 
 static BmRender_DescriptorSetLayout FrameDataLayout;
 static BmRender_DescriptorSetLayout ShadowMapArrayLayout;
-static BmRender_DescriptorSetLayout LightSpaceMatrixLayout;
 static BmRender_DescriptorSetLayout MainPassOutputLayout;
 
 static RenderState State;
@@ -75,10 +74,6 @@ static BmRender_ImageView DeferredInputColorImageInterface[MAX_DRAW_FRAMES];
 static BmRender_DescriptorSet DeferredInputSet[MAX_DRAW_FRAMES];
 
 static AttachmentData DeferredPassPipelineAttachmentData;
-// LightningPass static variables
-static BmRender_DescriptorSet LightSpaceMatrixSet[MAX_DRAW_FRAMES];
-
-static BmRender_GPUBufferUpdateData LightSpaceMatrixBufferRegion[MAX_DRAW_FRAMES];
 
 // Buffer handles array
 static BmRender_GPUBuffer LightSpaceMatrixBuffers[MAX_DRAW_FRAMES];
@@ -89,21 +84,28 @@ static BmRender_ImageView ShadowMapElement2ImageInterface[MAX_DRAW_FRAMES];
 // MainPass static variables
 static AttachmentData MainPassPipelineAttachmentData;
 
-static void GenericDraw(BmRender_CommandBuffer CommandBuffer, DrawScene* Scene, PipelineNames Name,
-	const BmRender_DescriptorSet* Sets, u32 SetsCount, const u32* DynamicOffsets, u32 DynamicOffsetsCount)
-{
-	const u32 FrameDynamicOffset = CurrentFrame * sizeof(Shader_FrameData);
+static BmRender_PushConstant PushConstantsDesc;
+static Shader_PushData FrameConstants;
 
+static void GenericDraw(BmRender_CommandBuffer CommandBuffer, DrawScene* Scene, PipelineNames Name,
+	const BmRender_DescriptorSet* Sets, u32 SetsCount, const u32* DynamicOffsets, u32 DynamicOffsetsCount, Shader_PushData ConstantData)
+{
 	RenderResourceManager_BindPipeline(CommandBuffer, Name);
 
-	RenderResourceManager_RecordBindDescriptorSets(CommandBuffer, Name, 0, 1, &DescriptorSets.FrameBufferSet, 1, &FrameDynamicOffset);
-	RenderResourceManager_RecordBindDescriptorSets(CommandBuffer, Name, 1, SetsCount, Sets, DynamicOffsetsCount, DynamicOffsets);
+	RenderResourceManager_RecordPushConstants(CommandBuffer, Name, BmRender_DescriptorShaderStage::Vertex | BmRender_DescriptorShaderStage::Fragment, 0, sizeof(Shader_PushData), &ConstantData);
+
+	RenderResourceManager_RecordBindDescriptorSets(CommandBuffer, Name, 0, 1, &DescriptorSets.FrameBufferSet, 0, nullptr);
+
+	if (Sets)
+	{
+		RenderResourceManager_RecordBindDescriptorSets(CommandBuffer, Name, 1, SetsCount, Sets, DynamicOffsetsCount, DynamicOffsets);
+	}
 
 	for (u32 i = 0; i < Scene->DrawEntities.size(); ++i)
 	{
 		DrawEntity* Entity = Scene->DrawEntities.data() + i;
 
-		u64 FrameDataAddr = BmRender_GetBufferDeviceAddress(&FrameDataBuffer) + sizeof(Shader_FrameData) * CurrentFrame;
+		
 		//BmRender_RecordPushData(CommandBuffer, &FrameDataAddr, sizeof(FrameDataAddr));
 
 		BmRender_DrawIndexed(CommandBuffer, Entity->IndicesCount, Entity->Instances, Entity->IndexBufferEntry.BufferOffset / 4, 0, i);
@@ -229,7 +231,7 @@ static void InitStaticMeshPipeline(StaticMeshPipelineDepr* MeshPipeline, BmRende
 
 	BmRender_PipelineSettings Settings = GetStaticPipelineDescription();
 
-	RenderResourceManager_CreatePipelineLayout(PipelineNames::Entity, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0);
+	RenderResourceManager_CreatePipelineLayout(PipelineNames::Entity, descriptorSetLayouts.data(), descriptorSetLayouts.size(), &PushConstantsDesc, 1);
 	RenderResourceManager_CreateGraphicsPipeline(PipelineNames::Entity, &Settings, &ResourceInfo);
 }
 
@@ -242,7 +244,7 @@ static void DrawStaticMeshes(BmRender_CommandBuffer CommandBuffer, StaticMeshPip
 
 	const u32 SetsCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
-	GenericDraw(CommandBuffer, Scene, PipelineNames::Entity, DescriptorSetGroup, SetsCount, nullptr, 0);
+	GenericDraw(CommandBuffer, Scene, PipelineNames::Entity, DescriptorSetGroup, SetsCount, nullptr, 0, FrameConstants);
 }
 
 static void DeferredPassInit(BmRender_DescriptorPool* MainPool)
@@ -327,10 +329,7 @@ static void DeferredPassDispatch()
 		DeferredInputSet[CurrentFrame],
 	};
 
-	const u32 FrameDynamicOffset = CurrentFrame * sizeof(Shader_FrameData);
-	const u32 DynamicOffsets[] = { FrameDynamicOffset };
-
-	RenderResourceManager_RecordBindDescriptorSets(RenderCommandBuffers[CurrentFrame], PipelineNames::Deferred, 0, 2, Sets, 1, DynamicOffsets);
+	RenderResourceManager_RecordBindDescriptorSets(RenderCommandBuffers[CurrentFrame], PipelineNames::Deferred, 0, 2, Sets, 0, nullptr);
 
 	u32 groupX = (MainScreenExtent.Width + 7) / 8;
 	u32 groupY = (MainScreenExtent.Height + 7) / 8;
@@ -355,30 +354,10 @@ static void LightningPassInit(BmRender_DescriptorPool* MainPool)
 		BmRender_ImageType::DepthSamplad, MAX_SHADOW_TEXTURES * BmRender_GetSwapchainImageCount(), BmRender_SampleCount::Count1, "ShadowMapArray");
 
 	{
-		BmRender_DescriptorSetLayoutBinding LayoutBindings[1];
-		LayoutBindings[0].DescriptorCount = 1;
-		LayoutBindings[0].DescriptorType = BmRender_DescriptorType::UniformBuffer;
-		LayoutBindings[0].StageFlags = BmRender_DescriptorShaderStage::Vertex;
-
-		LightSpaceMatrixLayout = BmRender_CreateDescriptorSetLayout(LayoutBindings, 1);
-
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
 			const u64 LightSpaceMatrixSize = sizeof(glm::mat4);
-
-			LightSpaceMatrixBuffers[i] = BmRender_CreateUniformBuffer(LightSpaceMatrixSize, MemoryPropertyFlag::HostCompatible);
-			LightSpaceMatrixBufferRegion[i] = { LightSpaceMatrixBuffers + i, 0, LightSpaceMatrixSize };
-
-			LightSpaceMatrixSet[i] = BmRender_CreateDescriptorSet(&LightSpaceMatrixLayout, MainPool);
-
-			BmRender_DescriptorSetUpdateData LightSpaceMatrixBinding;
-			LightSpaceMatrixBinding.BufferRegions = &LightSpaceMatrixBufferRegion[i];
-			LightSpaceMatrixBinding.BindingCount = 1;
-			LightSpaceMatrixBinding.DstArrayElement = 0;
-			LightSpaceMatrixBinding.DstBinding = 0;
-
-			BmRender_UpdateDescriptorSet(LightSpaceMatrixSet + i, &LightSpaceMatrixBinding, 1);
-
+			LightSpaceMatrixBuffers[i] = BmRender_CreateUniformBuffer(LightSpaceMatrixSize, BmRender_MemoryPropertyFlag::HostCompatible);
 			ShadowMapElement1ImageInterface[i] = BmRender_CreateImageView2DArray(&ShadowMapArray, MAX_SHADOW_TEXTURES * i, 1);
 			ShadowMapElement2ImageInterface[i] = BmRender_CreateImageView2DArray(&ShadowMapArray, MAX_SHADOW_TEXTURES * i + 1, 1);
 		}
@@ -391,11 +370,10 @@ static void LightningPassInit(BmRender_DescriptorPool* MainPool)
 
 	std::vector<BmRender_DescriptorSetLayout> descriptorSetLayouts;
 	descriptorSetLayouts.push_back(FrameDataLayout);
-	descriptorSetLayouts.push_back(LightSpaceMatrixLayout);
 
 	BmRender_PipelineSettings PipelineDesc = GetDepthPipelineDescription();
 
-	RenderResourceManager_CreatePipelineLayout(PipelineNames::Depth_vert, descriptorSetLayouts.data(), descriptorSetLayouts.size(), nullptr, 0);
+	RenderResourceManager_CreatePipelineLayout(PipelineNames::Depth_vert, descriptorSetLayouts.data(), descriptorSetLayouts.size(), &PushConstantsDesc, 1);
 	RenderResourceManager_CreateGraphicsPipeline(PipelineNames::Depth_vert, &PipelineDesc, &ResourceInfo);
 }
 
@@ -411,7 +389,8 @@ static void LightningPassDraw(DrawScene* Scene)
 
 	for (u32 LightCaster = 0; LightCaster < MAX_SHADOW_TEXTURES; ++LightCaster)
 	{
-		RenderResources::UpdateBufferRegion(LightSpaceMatrixBufferRegion[LightCaster], 0, LightViews[LightCaster], sizeof(glm::mat4));
+		BmRender_UpdateHostCompatibleBuffer(&LightSpaceMatrixBuffers[CurrentFrame], 0, sizeof(glm::mat4), LightViews[LightCaster]);
+		FrameConstants.LightSpaceMatrixData = (Shader_LightSpaceMatrixData*)BmRender_GetBufferDeviceAddress(&LightSpaceMatrixBuffers[CurrentFrame]);
 
 		BmRender_ImageView DepthImageView = (LightCaster == 0) ?
 			ShadowMapElement1ImageInterface[CurrentFrame] :
@@ -432,16 +411,9 @@ static void LightningPassDraw(DrawScene* Scene)
 
 		BmRender_BeginRendering(RenderCommandBuffers[CurrentFrame], &RenderingInfo);
 
-		const BmRender_DescriptorSet DescriptorSetGroup[] = {
-			LightSpaceMatrixSet[LightCaster],
-		};
-
-		const u32 SetsCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
-
-		u64 FrameDataAddr = BmRender_GetBufferDeviceAddress(&FrameDataBuffer) + sizeof(Shader_FrameData) * CurrentFrame;
 		//BmRender_RecordPushData(RenderCommandBuffers[CurrentFrame], &FrameDataAddr, sizeof(FrameDataAddr));
 
-		GenericDraw(RenderCommandBuffers[CurrentFrame], Scene, PipelineNames::Depth_vert, DescriptorSetGroup, SetsCount, nullptr, 0);
+		GenericDraw(RenderCommandBuffers[CurrentFrame], Scene, PipelineNames::Depth_vert, nullptr, 0, nullptr, 0, FrameConstants);
 
 		BmRender_EndRendering(RenderCommandBuffers[CurrentFrame]);
 	}
@@ -504,31 +476,22 @@ static void MainPassEndPass()
 void Render_Init(GLFWwindow* WindowHandle)
 {
 	// Create MainPool using stack array
-	const u32 PoolSizeCount = 11;
+	const u32 PoolSizeCount = 2;
 	BmRender_DescriptorPoolSize TotalPassPoolSizes[PoolSizeCount];
 	u32 TotalDescriptorLayouts = 21;
-	TotalPassPoolSizes[0] = { BmRender_DescriptorType::UniformBuffer, 3 };
-	TotalPassPoolSizes[1] = { BmRender_DescriptorType::UniformBuffer, 3 };
-	TotalPassPoolSizes[2] = { BmRender_DescriptorType::UniformBuffer, 3 };
-	TotalPassPoolSizes[3] = { BmRender_DescriptorType::InputAttachment, 3 };
-	TotalPassPoolSizes[4] = { BmRender_DescriptorType::InputAttachment, 3 };
-	TotalPassPoolSizes[5] = { BmRender_DescriptorType::InputAttachment, 3 };
-	TotalPassPoolSizes[6] = { BmRender_DescriptorType::UniformBuffer, 3 };
-	TotalPassPoolSizes[7] = { BmRender_DescriptorType::UniformBuffer, 3 };
-	TotalPassPoolSizes[8] = { BmRender_DescriptorType::UniformBuffer, 3 };
-	TotalPassPoolSizes[9] = { BmRender_DescriptorType::CombinedImageSampler, 256 };
-	TotalPassPoolSizes[10] = { BmRender_DescriptorType::UniformBufferDynamic, 3 };
+	TotalPassPoolSizes[0] = { BmRender_DescriptorType::SampledImage, 128 };
+	TotalPassPoolSizes[1] = { BmRender_DescriptorType::CombinedImageSampler, 9 };
 
 	u32 TotalDescriptorCount = TotalDescriptorLayouts * 3;
 	TotalDescriptorCount += 256;
 
 	BmRender_DescriptorPool MainPool = BmRender_CreateDescriptorPool(TotalPassPoolSizes, TotalDescriptorCount, PoolSizeCount, BmRender_DescriptorPoolType::UpdateAfterBind);
 
-	FrameDataBuffer = BmRender_CreateUniformBuffer(65536, MemoryPropertyFlag::HostCompatible);
-	VertexBuffer = BmRender_CreateStorageBuffer(MB4, MemoryPropertyFlag::GPULocal);
-	IndexBuffer = BmRender_CreateVertexStageBuffer(MB4, MemoryPropertyFlag::GPULocal);
-	InstanceBuffer = BmRender_CreateStorageBuffer(MB4, MemoryPropertyFlag::GPULocal);
-	MaterialBuffer = BmRender_CreateStorageBuffer(MB4, MemoryPropertyFlag::GPULocal);
+	FrameDataBuffer = BmRender_CreateUniformBuffer(65536, BmRender_MemoryPropertyFlag::HostCompatible);
+	VertexBuffer = BmRender_CreateSrvUavBuffer(MB4, BmRender_MemoryPropertyFlag::GPULocal);
+	IndexBuffer = BmRender_CreateIndexBuffer(MB4, BmRender_MemoryPropertyFlag::GPULocal);
+	InstanceBuffer = BmRender_CreateSrvUavBuffer(MB4, BmRender_MemoryPropertyFlag::GPULocal);
+	MaterialBuffer = BmRender_CreateSrvUavBuffer(MB4, BmRender_MemoryPropertyFlag::GPULocal);
 
 	GraphicsQueue = BmRender_CreateQueue(BmRender_QueueType::Graphic);
 
@@ -557,65 +520,26 @@ void Render_Init(GLFWwindow* WindowHandle)
 
 	{
 		FrameBufferBinding[0] = { &FrameDataBuffer, 0, sizeof(Shader_FrameData) };
-		BmRender_GPUBufferUpdateData VertexBufferRegion = { &VertexBuffer, 0, VK_WHOLE_SIZE };
-		BmRender_GPUBufferUpdateData InstanceBufferRegion = { &InstanceBuffer, 0, VK_WHOLE_SIZE };
-		BmRender_GPUBufferUpdateData MaterialBufferRegion = { &MaterialBuffer, 0, VK_WHOLE_SIZE };
 
-		const u32 DescriptorCount = 6;
+		const u32 DescriptorCount = 2;
 		BmRender_DescriptorSetLayoutBinding LayoutBindings[DescriptorCount];
 
 		LayoutBindings[0].DescriptorCount = 1;
-		LayoutBindings[0].DescriptorType = BmRender_DescriptorType::UniformBufferDynamic;
-		LayoutBindings[0].StageFlags = BmRender_DescriptorShaderStage::Vertex | BmRender_DescriptorShaderStage::Fragment;
+		LayoutBindings[0].DescriptorType = BmRender_DescriptorType::Sampler;
+		LayoutBindings[0].StageFlags = BmRender_DescriptorShaderStage::Fragment;
 
-		LayoutBindings[1].DescriptorCount = 1;
-		LayoutBindings[1].DescriptorType = BmRender_DescriptorType::StorageBuffer;
-		LayoutBindings[1].StageFlags = BmRender_DescriptorShaderStage::Vertex;
+		LayoutBindings[1].DescriptorCount = 64;
+		LayoutBindings[1].DescriptorType = BmRender_DescriptorType::SampledImage;
+		LayoutBindings[1].StageFlags = BmRender_DescriptorShaderStage::Fragment;
 
-		LayoutBindings[2].DescriptorCount = 1;
-		LayoutBindings[2].DescriptorType = BmRender_DescriptorType::StorageBuffer;
-		LayoutBindings[2].StageFlags = BmRender_DescriptorShaderStage::Vertex;
-
-		LayoutBindings[3].DescriptorCount = 64;
-		LayoutBindings[3].DescriptorType = BmRender_DescriptorType::SampledImage;
-		LayoutBindings[3].StageFlags = BmRender_DescriptorShaderStage::Fragment;
-
-		LayoutBindings[4].DescriptorCount = 1;
-		LayoutBindings[4].DescriptorType = BmRender_DescriptorType::Sampler;
-		LayoutBindings[4].StageFlags = BmRender_DescriptorShaderStage::Fragment;
-
-		LayoutBindings[5].DescriptorCount = 1;
-		LayoutBindings[5].DescriptorType = BmRender_DescriptorType::StorageBuffer;
-		LayoutBindings[5].StageFlags = BmRender_DescriptorShaderStage::Fragment;
-
-		const u32 UpdatesCount = 5;
+		const u32 UpdatesCount = 1;
 		BmRender_DescriptorSetUpdateData Updates[UpdatesCount];
-		Updates[0].BufferRegions = FrameBufferBinding;
+		Updates[0].ImageBinding.Sampler = &DiffuseTextureSampler;
+		Updates[0].ImageBinding.ImageLayout = BmRender_ImageLayout::Undefined;
+		Updates[0].ImageBinding.ImageView = nullptr;
 		Updates[0].BindingCount = 1;
 		Updates[0].DstArrayElement = 0;
 		Updates[0].DstBinding = 0;
-
-		Updates[1].BufferRegions = &VertexBufferRegion;
-		Updates[1].BindingCount = 1;
-		Updates[1].DstArrayElement = 0;
-		Updates[1].DstBinding = 1;
-
-		Updates[2].BufferRegions = &InstanceBufferRegion;
-		Updates[2].BindingCount = 1;
-		Updates[2].DstArrayElement = 0;
-		Updates[2].DstBinding = 2;
-
-		Updates[3].ImageBinding.Sampler = &DiffuseTextureSampler;
-		Updates[3].ImageBinding.ImageLayout = BmRender_ImageLayout::Undefined;
-		Updates[3].ImageBinding.ImageView = nullptr;
-		Updates[3].BindingCount = 1;
-		Updates[3].DstArrayElement = 0;
-		Updates[3].DstBinding = 4;
-
-		Updates[4].BufferRegions = &MaterialBufferRegion;
-		Updates[4].BindingCount = 1;
-		Updates[4].DstArrayElement = 0;
-		Updates[4].DstBinding = 5;
 
 		FrameDataLayout = BmRender_CreateDescriptorSetLayout(LayoutBindings, DescriptorCount);
 		DescriptorSets.FrameBufferSet = BmRender_CreateDescriptorSet(&FrameDataLayout, &MainPool);
@@ -624,6 +548,10 @@ void Render_Init(GLFWwindow* WindowHandle)
 
 	State.DescriptorSets = DescriptorSets;
 	State.MainPool = MainPool;
+
+	PushConstantsDesc.Offset = 0;
+	PushConstantsDesc.Size = sizeof(Shader_PushData);
+	PushConstantsDesc.StageFlags = BmRender_DescriptorShaderStage::Vertex | BmRender_DescriptorShaderStage::Fragment;
 
 	DeferredPassInit(&State.MainPool);
 	MainPassInit();
@@ -645,7 +573,6 @@ void Render_DeInit()
 	BmRender_DestroyDescriptorSetLayout(&FrameDataLayout);
 	BmRender_DestroyDescriptorSetLayout(&ShadowMapArrayLayout);
 	BmRender_DestroyDescriptorSetLayout(&MainPassOutputLayout);
-	BmRender_DestroyDescriptorSetLayout(&LightSpaceMatrixLayout);
 
 	DeInitImGuiPipeline(State.DebugUiPool);
 
@@ -677,7 +604,13 @@ void Render_Draw(DrawScene* Scene, u64 WaitSemaphoreValue)
 	BmRender_WaitForFences(InFlightFence[CurrentFrame], true, UINT64_MAX);
 	BmRender_ResetFences(InFlightFence[CurrentFrame]);
 
+	Scene->FrameDataBuffer.StaticMeshVertexBuffer = (Shader_StaticMeshVertex*)BmRender_GetBufferDeviceAddress(&VertexBuffer);
+	Scene->FrameDataBuffer.StaticMeshInstanceBuffer = (Shader_StaticMeshInstance*)BmRender_GetBufferDeviceAddress(&InstanceBuffer);
+	Scene->FrameDataBuffer.MaterialBuffer = (Shader_Material*)BmRender_GetBufferDeviceAddress(&MaterialBuffer);
+
 	RenderResources::UpdateBuffer(FrameDataBuffer, sizeof(Shader_FrameData) * CurrentFrame, &Scene->FrameDataBuffer, sizeof(Shader_FrameData));
+
+	FrameConstants.FrameData = (Shader_FrameData*)(BmRender_GetBufferDeviceAddress(&FrameDataBuffer) + sizeof(Shader_FrameData) * CurrentFrame);
 
 	BmRender_AcquireNextSwapchainImage(UINT64_MAX, ImageAvailable[CurrentFrame], nullptr, &CurrentImageIndex);
 

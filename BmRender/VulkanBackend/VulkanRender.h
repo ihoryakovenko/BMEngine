@@ -17,7 +17,7 @@ enum class BmRender_SemaphoreType : u8;
 enum class BmRender_QueueType : u32;
 enum class BmRender_PipelineType : u8;
 enum class BmRender_DescriptorPoolType : u32;
-enum class MemoryPropertyFlag : u32;
+enum class BmRender_MemoryPropertyFlag : u32;
 enum class BmRender_Filter : u32;
 enum class BmRender_SamplerMipmapMode : u32;
 enum class BmRender_SamplerAddressMode : u32;
@@ -81,7 +81,7 @@ struct BmRender_GPUBuffer
 {
 	VkBuffer InternalBuffer;
 	BmRender_DeviceMemory Memory;
-	MemoryPropertyFlag PropertyFlag;
+	BmRender_MemoryPropertyFlag PropertyFlag;
 };
 
 struct BmRender_DescriptorSet

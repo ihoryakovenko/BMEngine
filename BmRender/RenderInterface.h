@@ -89,7 +89,7 @@ enum class BmRender_DescriptorPoolType : u32
 	CreateFree = 1ull << 1,
 };
 
-enum class MemoryPropertyFlag : u32
+enum class BmRender_MemoryPropertyFlag : u32
 {
 	None,
 	GPULocal = 1,
@@ -172,12 +172,6 @@ enum class BmRender_DescriptorType : u32
 	CombinedImageSampler,
 	SampledImage,
 	StorageImage,
-	UniformTexelBuffer,
-	StorageTexelBuffer,
-	UniformBuffer,
-	StorageBuffer,
-	UniformBufferDynamic,
-	StorageBufferDynamic,
 	InputAttachment,
 };
 
@@ -730,11 +724,10 @@ BmRender_DescriptorSetLayout BmRender_CreateDescriptorSetLayout(const BmRender_D
 BmRender_DescriptorPool BmRender_CreateDescriptorPool(const BmRender_DescriptorPoolSize* PoolSizes, u32 MaxSets, u32 PoolSizeCount, BmRender_DescriptorPoolType Type, const char* DebugName = nullptr);
 BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Description, const char* DebugName = nullptr);
 BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout* LayoutHandle, BmRender_DescriptorPool* PoolHandle, const char* DebugName = nullptr);
-BmRender_GPUBuffer BmRender_CreateVertexStageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName = nullptr);
-BmRender_GPUBuffer BmRender_CreateInstanceBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName = nullptr);
-BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName = nullptr);
-BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName = nullptr);
-BmRender_GPUBuffer BmRender_CreateIndirectDrawBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName = nullptr);
+BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, BmRender_MemoryPropertyFlag MemoryFlag, const char* DebugName = nullptr);
+BmRender_GPUBuffer BmRender_CreateSrvUavBuffer(u64 Size, BmRender_MemoryPropertyFlag MemoryFlag, const char* DebugName = nullptr);
+BmRender_GPUBuffer BmRender_CreateIndexBuffer(u64 Size, BmRender_MemoryPropertyFlag MemoryFlag, const char* DebugName = nullptr);
+BmRender_GPUBuffer BmRender_CreateIndirectDrawBuffer(u64 Size, BmRender_MemoryPropertyFlag MemoryFlag, const char* DebugName = nullptr);
 BmRender_GPUBuffer BmRender_CreateStagingBuffer(u64 Size, const char* DebugName = nullptr);
 BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, BmRender_SampleCount SampleCount, const char* DebugName = nullptr);
 BmRender_Image BmRender_CreateImage2DArray(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, u32 ArrayLayers, BmRender_SampleCount SampleCount, const char* DebugName = nullptr);
@@ -769,8 +762,8 @@ void BmRender_RecordUpdateGPULocalBuffer(BmRender_CommandBuffer CommandBuffer, B
 void BmRender_BeginRendering(BmRender_CommandBuffer CommandBuffer, const BmRender_RenderingInfo* pRenderingInfo);
 void BmRender_EndRendering(BmRender_CommandBuffer CommandBuffer);
 void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, BmRender_PipelineLayout Layout);
-void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* pValues);
-void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, BmRender_PipelineLayout PipelineLayout, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets);
+void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* Values);
+void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, BmRender_PipelineLayout PipelineLayout, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* DescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets);
 void BmRender_RecordBindVertexBuffers(BmRender_CommandBuffer CommandBuffer, u32 FirstBinding, u32 BindingCount, const BmRender_GPUBuffer* Buffers, const u64* Offsets);
 void BmRender_RecordBindIndexBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer* Buffer, u64 Offset, BmRender_IndexType IndexType);
 void BmRender_Draw(BmRender_CommandBuffer CommandBuffer, u32 VertexCount, u32 InstanceCount, u32 FirstVertex, u32 FirstInstance);

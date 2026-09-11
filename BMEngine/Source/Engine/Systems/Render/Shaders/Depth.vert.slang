@@ -6,17 +6,15 @@ struct VSOutput
     float4 Position : SV_Position;
 };
 
-[[vk::binding(0, 1)]] ConstantBuffer<LightSpaceMatrixData> lightSpaceMatrix;
-
 [shader("vertex")]
 VSOutput main(uint vID: SV_VertexID, uint iID: SV_InstanceID)
 {
-    Shader_StaticMeshVertex vertex = VertexDescriptor[vID];
-    Shader_StaticMeshInstance instance = InstanceDescriptor[iID];
+    Shader_StaticMeshVertex vertex = PushData.FrameData.StaticMeshVertexBuffer[vID];
+    Shader_StaticMeshInstance instance = PushData.FrameData.StaticMeshInstanceBuffer[iID];
 
     VSOutput output;
 
-    output.Position = mul(lightSpaceMatrix.Matrix, mul(instance.ModelMatrix, float4(vertex.Position, 1.0)));
+    output.Position = mul(PushData.LightSpaceMatrixData.Matrix, mul(instance.ModelMatrix, float4(vertex.Position, 1.0)));
 
     return output;
 }

@@ -18,3 +18,5 @@ void RenderResourceManager_CreateComputePipeline(PipelineNames Name);
 
 void RenderResourceManager_BindPipeline(BmRender_CommandBuffer CmdBuffer, PipelineNames Name);
 void RenderResourceManager_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, PipelineNames Name, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets);
+
+void RenderResourceManager_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, PipelineNames Name, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* pValues);

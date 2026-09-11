@@ -74,7 +74,7 @@ VkBuffer CreateBuffer(VkDevice Device, u64 Size, BufferUsageFlag Flag, const VkA
 	return Buffer;
 }
 
-DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer, MemoryPropertyFlag Properties, VkBufferUsageFlags BufferUsageFlags, const VkAllocationCallbacks* Allocator)
+DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkBuffer Buffer, BmRender_MemoryPropertyFlag Properties, VkBufferUsageFlags BufferUsageFlags, const VkAllocationCallbacks* Allocator)
 {
 	VkMemoryRequirements MemoryRequirements;
 	vkGetBufferMemoryRequirements(Device, Buffer, &MemoryRequirements);
@@ -103,7 +103,7 @@ DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, Vk
 	return Result;
 }
 
-DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkImage Image, MemoryPropertyFlag Properties, const VkAllocationCallbacks* Allocator)
+DeviceMemoryAllocResult AllocateDeviceMemory(VkPhysicalDevice PhysicalDevice, VkDevice Device, VkImage Image, BmRender_MemoryPropertyFlag Properties, const VkAllocationCallbacks* Allocator)
 {
 	VkMemoryRequirements MemoryRequirements;
 	vkGetImageMemoryRequirements(Device, Image, &MemoryRequirements);
@@ -844,18 +844,6 @@ VkDescriptorType DescriptorTypeToVk(BmRender_DescriptorType Type)
 			return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
 		case BmRender_DescriptorType::StorageImage:
 			return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		case BmRender_DescriptorType::UniformTexelBuffer:
-			return VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
-		case BmRender_DescriptorType::StorageTexelBuffer:
-			return VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
-		case BmRender_DescriptorType::UniformBuffer:
-			return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		case BmRender_DescriptorType::StorageBuffer:
-			return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		case BmRender_DescriptorType::UniformBufferDynamic:
-			return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		case BmRender_DescriptorType::StorageBufferDynamic:
-			return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
 		case BmRender_DescriptorType::InputAttachment:
 			return VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
 		default:
@@ -876,18 +864,6 @@ BmRender_DescriptorType VkDescriptorTypeToBmRender(VkDescriptorType Type)
 			return BmRender_DescriptorType::SampledImage;
 		case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
 			return BmRender_DescriptorType::StorageImage;
-		case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
-			return BmRender_DescriptorType::UniformTexelBuffer;
-		case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
-			return BmRender_DescriptorType::StorageTexelBuffer;
-		case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-			return BmRender_DescriptorType::UniformBuffer;
-		case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-			return BmRender_DescriptorType::StorageBuffer;
-		case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
-			return BmRender_DescriptorType::UniformBufferDynamic;
-		case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
-			return BmRender_DescriptorType::StorageBufferDynamic;
 		case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
 			return BmRender_DescriptorType::InputAttachment;
 		default:
@@ -2137,13 +2113,13 @@ VkDescriptorPoolCreateFlags DescriptorPoolTypeToVkFlags(BmRender_DescriptorPoolT
 	return flags;
 }
 
-VkMemoryPropertyFlags MemoryPropertyFlagToVkFlags(MemoryPropertyFlag Flag)
+VkMemoryPropertyFlags MemoryPropertyFlagToVkFlags(BmRender_MemoryPropertyFlag Flag)
 {
 	switch (Flag)
 	{
-		case MemoryPropertyFlag::GPULocal:
+		case BmRender_MemoryPropertyFlag::GPULocal:
 			return VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		case MemoryPropertyFlag::HostCompatible:
+		case BmRender_MemoryPropertyFlag::HostCompatible:
 			return VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		default:
 			assert(false);

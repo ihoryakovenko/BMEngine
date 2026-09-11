@@ -7,6 +7,7 @@
 
 typedef glm::mat4 float4x4;
 typedef glm::vec4 float4;
+typedef glm::ivec4 uint4;
 typedef glm::vec3 float3;
 typedef glm::ivec3 uint3;
 typedef glm::vec2 float2;
@@ -49,15 +50,6 @@ struct Shader_SpotLight
     uint2 pad2;
 };
 
-struct Shader_FrameData
-{
-    float4x4 View;
-    float4x4 Projection;
-    Shader_PointLight pointlight;
-    Shader_DirectionLight directionLight;
-    Shader_SpotLight spotlight;
-};
-
 struct Shader_Material
 {
     uint AlbedoTexIndex;
@@ -89,9 +81,28 @@ struct Shader_StaticMeshVertexInput
     Shader_StaticMeshInstance Instance;
 };
 
-struct LightSpaceMatrixData
+struct Shader_LightSpaceMatrixData
 {
     float4x4 Matrix;
+};
+
+struct Shader_FrameData
+{
+    float4x4 View;
+    float4x4 Projection;
+    Shader_PointLight pointlight;
+    Shader_DirectionLight directionLight;
+    Shader_SpotLight spotlight;
+    Shader_StaticMeshVertex* StaticMeshVertexBuffer;
+    Shader_StaticMeshInstance* StaticMeshInstanceBuffer;
+    Shader_Material* MaterialBuffer;
+    uint pad;
+};
+
+struct Shader_PushData
+{
+    Shader_FrameData* FrameData;
+    Shader_LightSpaceMatrixData* LightSpaceMatrixData;
 };
 
 #endif

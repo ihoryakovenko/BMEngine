@@ -214,7 +214,7 @@ BmRender_PushConstant BmRender_CreatePushConstant(BmRender_DescriptorShaderStage
 	return Constant;
 }
 
-static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, MemoryPropertyFlag MemoryFlag, BufferUsageFlag Flag)
+static BmRender_GPUBuffer CreateGPUBuffer(u64 Capacity, BmRender_MemoryPropertyFlag MemoryFlag, BufferUsageFlag Flag)
 {
 	VkDevice Device = CoreContext.LogicalDevice;
 	VkPhysicalDevice PhysicalDevice = CoreContext.PhysicalDevice;
@@ -308,7 +308,7 @@ static BmRender_Image CreateImageResource(BmRender_ImageDescription* Description
 	VULKAN_CHECK_RESULT(vkCreateImage(Device, &ImageCreateInfo, &VulkanAllocator, &Resource.InternalImage));
 
 	DeviceMemoryAllocResult AllocResult = AllocateDeviceMemory(PhysicalDevice, Device,
-		Resource.InternalImage, MemoryPropertyFlag::GPULocal, &VulkanAllocator);
+		Resource.InternalImage, BmRender_MemoryPropertyFlag::GPULocal, &VulkanAllocator);
 
 	Resource.Memory = AllocResult.Memory;
 	Resource.Width = Description->Width;
@@ -700,34 +700,29 @@ BmRender_ImageView BmRender_CreateImageView2DArray(const BmRender_Image* Handle,
 	return CreateImageView(Handle, BaseLayer, LayerCount, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
 }
 
-BmRender_GPUBuffer BmRender_CreateVertexStageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName)
-{
-	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::CombinedVertexIndexFlag);
-}
-
-BmRender_GPUBuffer BmRender_CreateInstanceBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName)
-{
-	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::InstanceFlag);
-}
-
-BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName)
+BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, BmRender_MemoryPropertyFlag MemoryFlag, const char* DebugName)
 {
 	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::UniformFlag);
 }
 
-BmRender_GPUBuffer BmRender_CreateStorageBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName)
+BmRender_GPUBuffer BmRender_CreateSrvUavBuffer(u64 Size, BmRender_MemoryPropertyFlag MemoryFlag, const char* DebugName)
 {
-	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::StorageFlag);
+	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::SrvUavBufferFlag);
 }
 
-BmRender_GPUBuffer BmRender_CreateIndirectDrawBuffer(u64 Size, MemoryPropertyFlag MemoryFlag, const char* DebugName)
+BmRender_GPUBuffer BmRender_CreateIndexBuffer(u64 Size, BmRender_MemoryPropertyFlag MemoryFlag, const char* DebugName)
+{
+	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::IndexFlag);
+}
+
+BmRender_GPUBuffer BmRender_CreateIndirectDrawBuffer(u64 Size, BmRender_MemoryPropertyFlag MemoryFlag, const char* DebugName)
 {
 	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::IndirectDrawBufferFlag);
 }
 
 BmRender_GPUBuffer BmRender_CreateStagingBuffer(u64 Size, const char* DebugName)
 {
-	return CreateGPUBuffer(Size, MemoryPropertyFlag::HostCompatible, BufferUsageFlag::StagingFlag);
+	return CreateGPUBuffer(Size, BmRender_MemoryPropertyFlag::HostCompatible, BufferUsageFlag::StagingFlag);
 }
 
 BmRender_Fence BmRender_CreateFence()
@@ -1298,10 +1293,10 @@ void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeli
 	vkCmdBindPipeline(VkCmdBuffer, BindPoint, Pipeline.InternalPipeline);
 }
 
-void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* pValues)
+void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* Values)
 {
 	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
-	vkCmdPushConstants(VkCmdBuffer, PipelineLayout.InternalLayout, ShaderStageFlagsToVk(StageFlags), Offset, Size, pValues);
+	vkCmdPushConstants(VkCmdBuffer, PipelineLayout.InternalLayout, ShaderStageFlagsToVk(StageFlags), Offset, Size, Values);
 }
 
 void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, BmRender_PipelineLayout PipelineLayout, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* pDescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets)
@@ -1614,8 +1609,8 @@ void InitBackend(void* WindowHandle)
 	FnVkSetDebugUtilsObjectNameEXT = (PFN_vkSetDebugUtilsObjectNameEXT)(vkGetInstanceProcAddr(CoreContext.VulkanInstance, "vkSetDebugUtilsObjectNameEXT"));
 	assert(FnVkSetDebugUtilsObjectNameEXT);
 
-	FnVkCmdPushDataEXT = (PFN_vkCmdPushDataEXT)(vkGetDeviceProcAddr(CoreContext.LogicalDevice, "vkCmdPushDataEXT"));
-	assert(FnVkCmdPushDataEXT);
+	//FnVkCmdPushDataEXT = (PFN_vkCmdPushDataEXT)(vkGetDeviceProcAddr(CoreContext.LogicalDevice, "vkCmdPushDataEXT"));
+	//assert(FnVkCmdPushDataEXT);
 }
 
 void DeInitBackend()

@@ -214,8 +214,8 @@ float3 CastSpotLight(Shader_SpotLight light, float3 fragPos, float3 albedo, floa
 [shader("vertex")]
 VertexOutput MainVertex(uint vID: SV_VertexID, uint iID: SV_StartInstanceLocation)
 {
-    Shader_StaticMeshVertex vertex = VertexDescriptor[vID];
-    Shader_StaticMeshInstance instance = InstanceDescriptor[iID];
+    Shader_StaticMeshVertex vertex = PushData.FrameData.StaticMeshVertexBuffer[vID];
+    Shader_StaticMeshInstance instance = PushData.FrameData.StaticMeshInstanceBuffer[iID];
 
     VertexOutput output;
     output.layout.FragmentTexture = vertex.TextureCoords;
@@ -227,7 +227,7 @@ VertexOutput MainVertex(uint vID: SV_VertexID, uint iID: SV_StartInstanceLocatio
 
     output.layout.FragmentNormal = normalize(mul(normalMatrix, vertex.Normal));
     output.layout.FragmentMaterialIndex = instance.MaterialIndex;
-    output.Position = mul(FrameBufferDescriptor.Projection, mul(FrameBufferDescriptor.View, worldPos));
+    output.Position = mul(PushData.FrameData.Projection, mul(PushData.FrameData.View, worldPos));
 
     return output;
 }
@@ -237,7 +237,7 @@ FragmentOutput MainFragment(FragmentInput input)
 {
     FragmentOutput output;
 
-    Shader_Material Mat = MaterialsDescriptor[input.layout.FragmentMaterialIndex];
+    Shader_Material Mat = PushData.FrameData.MaterialBuffer[input.layout.FragmentMaterialIndex];
 
     float4 albedo = Textures[Mat.AlbedoTexIndex].Sample(Sampler, input.layout.FragmentTexture);
 
@@ -246,9 +246,9 @@ FragmentOutput MainFragment(FragmentInput input)
 
     float3 Lo = 0.0;
 
-    Lo += CastDirectionLight(FrameBufferDescriptor.directionLight, albedo.rgb, V, N, input.layout.WorldFragPos);
-    Lo += CastPointLight(FrameBufferDescriptor.pointlight, input.layout.WorldFragPos, albedo.rgb, V, N);
-    Lo += CastSpotLight(FrameBufferDescriptor.spotlight, input.layout.WorldFragPos, albedo.rgb, V, N, input.layout.WorldFragPos);
+    Lo += CastDirectionLight(PushData.FrameData.directionLight, albedo.rgb, V, N, input.layout.WorldFragPos);
+    Lo += CastPointLight(PushData.FrameData.pointlight, input.layout.WorldFragPos, albedo.rgb, V, N);
+    Lo += CastSpotLight(PushData.FrameData.spotlight, input.layout.WorldFragPos, albedo.rgb, V, N, input.layout.WorldFragPos);
 
     output.OutColor = float4(Lo, albedo.a);
     return output;

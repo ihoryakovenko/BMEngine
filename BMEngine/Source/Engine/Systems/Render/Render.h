@@ -26,9 +26,6 @@ struct DrawEntity
 struct StaticMeshPipelineDepr
 {
 	BmRender_ImageView ShadowMapArrayImageInterface[MAX_DRAW_FRAMES];
-
-	VkPushConstantRange PushConstants;
-
 	BmRender_DescriptorSet ShadowMapArraySet[MAX_DRAW_FRAMES];
 };
 

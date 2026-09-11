@@ -21,7 +21,7 @@ namespace Util
 	struct DescriptorBinding
 	{
 		ShaderType Type;
-		MemoryPropertyFlag MemoryFlag;
+		BmRender_MemoryPropertyFlag MemoryFlag;
 		BmRender_DescriptorShaderStage StageFlags;
 	};
 
@@ -231,7 +231,7 @@ namespace Util
 	BmRender_DescriptorType ParseDescriptorType(const char* Value, u32 Length);
 	BmRender_DescriptorShaderStage ParseShaderStageFlags(const char* Value, u32 Length);
 
-	MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length);
+	BmRender_MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length);
 	std::string GetBufferName(Yaml::Node& BufferNode);
 
 	ShaderType ParseShaderType(const char* Value, u32 Length);

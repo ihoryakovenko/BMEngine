@@ -275,12 +275,6 @@ namespace Util
 		if (StringMatches(Value, Length, ParseStrings::COMBINED_IMAGE_SAMPLER_STRINGS)) return BmRender_DescriptorType::CombinedImageSampler;
 		if (StringMatches(Value, Length, ParseStrings::SAMPLED_IMAGE_STRINGS)) return BmRender_DescriptorType::SampledImage;
 		if (StringMatches(Value, Length, ParseStrings::STORAGE_IMAGE_STRINGS)) return BmRender_DescriptorType::StorageImage;
-		if (StringMatches(Value, Length, ParseStrings::UNIFORM_TEXEL_BUFFER_STRINGS)) return BmRender_DescriptorType::UniformTexelBuffer;
-		if (StringMatches(Value, Length, ParseStrings::STORAGE_TEXEL_BUFFER_STRINGS)) return BmRender_DescriptorType::StorageTexelBuffer;
-		if (StringMatches(Value, Length, ParseStrings::UNIFORM_BUFFER_STRINGS)) return BmRender_DescriptorType::UniformBuffer;
-		if (StringMatches(Value, Length, ParseStrings::STORAGE_BUFFER_STRINGS)) return BmRender_DescriptorType::StorageBuffer;
-		if (StringMatches(Value, Length, ParseStrings::UNIFORM_BUFFER_DYNAMIC_STRINGS)) return BmRender_DescriptorType::UniformBufferDynamic;
-		if (StringMatches(Value, Length, ParseStrings::STORAGE_BUFFER_DYNAMIC_STRINGS)) return BmRender_DescriptorType::StorageBufferDynamic;
 		if (StringMatches(Value, Length, ParseStrings::INPUT_ATTACHMENT_STRINGS)) return BmRender_DescriptorType::InputAttachment;
 
 		return BmRender_DescriptorType::CombinedImageSampler;
@@ -322,13 +316,13 @@ namespace Util
 		return static_cast<BmRender_DescriptorShaderStage>(flags);
 	}
 
-	MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length)
+	BmRender_MemoryPropertyFlag ParseMemoryPropertyFlag(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::GPU_LOCAL_STRINGS)) return MemoryPropertyFlag::GPULocal;
-		if (StringMatches(Value, Length, ParseStrings::CPU_HOST_COMPATIBLE_STRINGS)) return MemoryPropertyFlag::HostCompatible;
+		if (StringMatches(Value, Length, ParseStrings::GPU_LOCAL_STRINGS)) return BmRender_MemoryPropertyFlag::GPULocal;
+		if (StringMatches(Value, Length, ParseStrings::CPU_HOST_COMPATIBLE_STRINGS)) return BmRender_MemoryPropertyFlag::HostCompatible;
 
 		assert(false);
-		return MemoryPropertyFlag::GPULocal;
+		return BmRender_MemoryPropertyFlag::GPULocal;
 	}
 
 
@@ -384,11 +378,11 @@ namespace Util
 					// Map legacy "Static" -> GPULocal, "PerFrame" -> HostCompatible
 					if (freqStr == "Static")
 					{
-						Binding.MemoryFlag = MemoryPropertyFlag::GPULocal;
+						Binding.MemoryFlag = BmRender_MemoryPropertyFlag::GPULocal;
 					}
 					else if (freqStr == "PerFrame")
 					{
-						Binding.MemoryFlag = MemoryPropertyFlag::HostCompatible;
+						Binding.MemoryFlag = BmRender_MemoryPropertyFlag::HostCompatible;
 					}
 					else
 					{
@@ -402,7 +396,7 @@ namespace Util
 				}
 				else
 				{
-					Binding.MemoryFlag = MemoryPropertyFlag::GPULocal;
+					Binding.MemoryFlag = BmRender_MemoryPropertyFlag::GPULocal;
 				}
 
 				// Parse stage flags

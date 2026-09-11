@@ -298,3 +298,8 @@ void RenderResourceManager_RecordBindDescriptorSets(BmRender_CommandBuffer Comma
 
 	BmRender_RecordBindDescriptorSets(CommandBuffer, Pipelines[u32(Name)], Layouts[u32(Name)], FirstSet, DescriptorSetCount, pDescriptorSets, DynamicOffsetCount, pDynamicOffsets);
 }
+
+void RenderResourceManager_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, PipelineNames Name, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* pValues)
+{
+	BmRender_RecordPushConstants(CommandBuffer, Layouts[u32(Name)], StageFlags, Offset, Size, pValues);
+}
