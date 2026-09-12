@@ -14,7 +14,11 @@ typedef glm::vec2 float2;
 typedef glm::ivec2 uint2;
 typedef u32 uint;
 
+#define GPU_POINTER_TYPE(T) u64
+
 #else
+
+#define GPU_POINTER_TYPE(T) T*
 
 #endif
 
@@ -93,16 +97,16 @@ struct Shader_FrameData
     Shader_PointLight pointlight;
     Shader_DirectionLight directionLight;
     Shader_SpotLight spotlight;
-    Shader_StaticMeshVertex* StaticMeshVertexBuffer;
-    Shader_StaticMeshInstance* StaticMeshInstanceBuffer;
-    Shader_Material* MaterialBuffer;
+    GPU_POINTER_TYPE(Shader_StaticMeshVertex) StaticMeshVertexBuffer;
+    GPU_POINTER_TYPE(Shader_StaticMeshInstance) StaticMeshInstanceBuffer;
+    GPU_POINTER_TYPE(Shader_Material) MaterialBuffer;
     uint pad;
 };
 
 struct Shader_PushData
 {
-    Shader_FrameData* FrameData;
-    Shader_LightSpaceMatrixData* LightSpaceMatrixData;
+    GPU_POINTER_TYPE(Shader_FrameData) FrameData;
+    GPU_POINTER_TYPE(Shader_LightSpaceMatrixData) LightSpaceMatrixData;
 };
 
 #endif

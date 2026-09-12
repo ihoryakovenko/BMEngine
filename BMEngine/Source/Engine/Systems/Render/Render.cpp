@@ -48,14 +48,14 @@ BmRender_Sampler DepthAttachmentSampler;
 static BmRender_Image ShadowMapArray;
 
 static BmRender_GPUBuffer FrameDataBuffer;
+static const u64 LightSpaceMatrixDataOffset = sizeof(Shader_FrameData) * MAX_DRAW_FRAMES;
+
 static BmRender_GPUBuffer VertexBuffer;
 static BmRender_GPUBuffer IndexBuffer;
 static BmRender_GPUBuffer InstanceBuffer;
 static BmRender_GPUBuffer MaterialBuffer;
 
 static DescriptorSetHandles DescriptorSets;
-
-static BmRender_GPUBufferUpdateData FrameBufferBinding[1];
 
 static BmRender_DescriptorSetLayout FrameDataLayout;
 static BmRender_DescriptorSetLayout ShadowMapArrayLayout;
@@ -74,9 +74,6 @@ static BmRender_ImageView DeferredInputColorImageInterface[MAX_DRAW_FRAMES];
 static BmRender_DescriptorSet DeferredInputSet[MAX_DRAW_FRAMES];
 
 static AttachmentData DeferredPassPipelineAttachmentData;
-
-// Buffer handles array
-static BmRender_GPUBuffer LightSpaceMatrixBuffers[MAX_DRAW_FRAMES];
 
 static BmRender_ImageView ShadowMapElement1ImageInterface[MAX_DRAW_FRAMES];
 static BmRender_ImageView ShadowMapElement2ImageInterface[MAX_DRAW_FRAMES];
@@ -357,7 +354,6 @@ static void LightningPassInit(BmRender_DescriptorPool* MainPool)
 		for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 		{
 			const u64 LightSpaceMatrixSize = sizeof(glm::mat4);
-			LightSpaceMatrixBuffers[i] = BmRender_CreateUniformBuffer(LightSpaceMatrixSize, BmRender_MemoryPropertyFlag::HostCompatible);
 			ShadowMapElement1ImageInterface[i] = BmRender_CreateImageView2DArray(&ShadowMapArray, MAX_SHADOW_TEXTURES * i, 1);
 			ShadowMapElement2ImageInterface[i] = BmRender_CreateImageView2DArray(&ShadowMapArray, MAX_SHADOW_TEXTURES * i + 1, 1);
 		}
@@ -387,10 +383,12 @@ static void LightningPassDraw(DrawScene* Scene)
 
 	BmRender_TransitionImageForRendering(RenderCommandBuffers[CurrentFrame], &ShadowMapArray, MAX_SHADOW_TEXTURES * CurrentFrame, MAX_SHADOW_TEXTURES);
 
+	const u64 CurrentLightSpaceMatrixDataOffset = LightSpaceMatrixDataOffset + sizeof(glm::mat4) * CurrentFrame;
+
 	for (u32 LightCaster = 0; LightCaster < MAX_SHADOW_TEXTURES; ++LightCaster)
 	{
-		BmRender_UpdateHostCompatibleBuffer(&LightSpaceMatrixBuffers[CurrentFrame], 0, sizeof(glm::mat4), LightViews[LightCaster]);
-		FrameConstants.LightSpaceMatrixData = (Shader_LightSpaceMatrixData*)BmRender_GetBufferDeviceAddress(&LightSpaceMatrixBuffers[CurrentFrame]);
+		BmRender_UpdateHostCompatibleBuffer(&FrameDataBuffer, CurrentLightSpaceMatrixDataOffset, sizeof(glm::mat4), LightViews[LightCaster]);
+		FrameConstants.LightSpaceMatrixData = BmRender_GetBufferDeviceAddress(&FrameDataBuffer) + CurrentLightSpaceMatrixDataOffset;
 
 		BmRender_ImageView DepthImageView = (LightCaster == 0) ?
 			ShadowMapElement1ImageInterface[CurrentFrame] :
@@ -426,7 +424,6 @@ static void LightningPassDeInit()
 {
 	for (u32 i = 0; i < BmRender_GetSwapchainImageCount(); i++)
 	{
-		BmRender_DestroyGPUBuffer(LightSpaceMatrixBuffers + i);
 		BmRender_DestroyImageView(ShadowMapElement1ImageInterface[i]);
 		BmRender_DestroyImageView(ShadowMapElement2ImageInterface[i]);
 	}
@@ -519,8 +516,6 @@ void Render_Init(GLFWwindow* WindowHandle)
 	DescriptorSets = DescriptorSetHandles();
 
 	{
-		FrameBufferBinding[0] = { &FrameDataBuffer, 0, sizeof(Shader_FrameData) };
-
 		const u32 DescriptorCount = 2;
 		BmRender_DescriptorSetLayoutBinding LayoutBindings[DescriptorCount];
 
@@ -604,13 +599,13 @@ void Render_Draw(DrawScene* Scene, u64 WaitSemaphoreValue)
 	BmRender_WaitForFences(InFlightFence[CurrentFrame], true, UINT64_MAX);
 	BmRender_ResetFences(InFlightFence[CurrentFrame]);
 
-	Scene->FrameDataBuffer.StaticMeshVertexBuffer = (Shader_StaticMeshVertex*)BmRender_GetBufferDeviceAddress(&VertexBuffer);
-	Scene->FrameDataBuffer.StaticMeshInstanceBuffer = (Shader_StaticMeshInstance*)BmRender_GetBufferDeviceAddress(&InstanceBuffer);
-	Scene->FrameDataBuffer.MaterialBuffer = (Shader_Material*)BmRender_GetBufferDeviceAddress(&MaterialBuffer);
+	Scene->FrameDataBuffer.StaticMeshVertexBuffer = BmRender_GetBufferDeviceAddress(&VertexBuffer);
+	Scene->FrameDataBuffer.StaticMeshInstanceBuffer = BmRender_GetBufferDeviceAddress(&InstanceBuffer);
+	Scene->FrameDataBuffer.MaterialBuffer = BmRender_GetBufferDeviceAddress(&MaterialBuffer);
 
 	RenderResources::UpdateBuffer(FrameDataBuffer, sizeof(Shader_FrameData) * CurrentFrame, &Scene->FrameDataBuffer, sizeof(Shader_FrameData));
 
-	FrameConstants.FrameData = (Shader_FrameData*)(BmRender_GetBufferDeviceAddress(&FrameDataBuffer) + sizeof(Shader_FrameData) * CurrentFrame);
+	FrameConstants.FrameData = BmRender_GetBufferDeviceAddress(&FrameDataBuffer) + sizeof(Shader_FrameData) * CurrentFrame;
 
 	BmRender_AcquireNextSwapchainImage(UINT64_MAX, ImageAvailable[CurrentFrame], nullptr, &CurrentImageIndex);
 
