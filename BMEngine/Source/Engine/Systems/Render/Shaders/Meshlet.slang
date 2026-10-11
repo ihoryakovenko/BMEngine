@@ -104,7 +104,7 @@ bool IsMeshletVisibleFromLight(uint meshletIndex)
     Shader_Meshlet meshlet = PushData.FrameData.MeshletBuffer[meshletIndex];
     float4x4 modelMatrix = PushData.FrameData.StaticMeshInstanceBuffer[meshlet.InstanceIndex].ModelMatrix;
 
-    return IsSphereInFrustum(GetWorldBoundingSphere(meshlet, modelMatrix), PushData.LightSpaceMatrixData.Matrix);
+    return IsSphereInFrustum(GetWorldBoundingSphere(meshlet, modelMatrix), PushData.LightSpaceMatrixData.CullMatrix);
 }
 
 Shader_StaticMeshVertex LoadMeshletVertex(Shader_Meshlet meshlet, uint vertexIndex)

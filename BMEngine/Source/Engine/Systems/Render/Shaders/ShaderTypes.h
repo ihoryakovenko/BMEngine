@@ -108,6 +108,7 @@ struct Shader_StaticMeshVertexInput
 struct Shader_LightSpaceMatrixData
 {
     float4x4 Matrix;
+    float4x4 CullMatrix;
 };
 
 struct Shader_FrameData

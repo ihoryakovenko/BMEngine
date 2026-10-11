@@ -385,11 +385,15 @@ static void LightningPassDraw(DrawScene* Scene)
 
 	BmRender_TransitionImageForRendering(RenderCommandBuffers[CurrentFrame], &ShadowMapArray, MAX_SHADOW_TEXTURES * CurrentFrame, MAX_SHADOW_TEXTURES);
 
-	const u64 CurrentLightSpaceMatrixDataOffset = LightSpaceMatrixDataOffset + sizeof(glm::mat4) * CurrentFrame;
+	const u64 CurrentLightSpaceMatrixDataOffset = LightSpaceMatrixDataOffset + sizeof(Shader_LightSpaceMatrixData) * CurrentFrame;
 
 	for (u32 LightCaster = 0; LightCaster < MAX_SHADOW_TEXTURES; ++LightCaster)
 	{
-		BmRender_UpdateHostCompatibleBuffer(&FrameDataBuffer, CurrentLightSpaceMatrixDataOffset, sizeof(glm::mat4), LightViews[LightCaster]);
+		Shader_LightSpaceMatrixData LightSpaceMatrixData;
+		LightSpaceMatrixData.Matrix = *LightViews[LightCaster];
+		LightSpaceMatrixData.CullMatrix = Scene->CullLightSpaceMatrices[LightCaster];
+
+		BmRender_UpdateHostCompatibleBuffer(&FrameDataBuffer, CurrentLightSpaceMatrixDataOffset, sizeof(LightSpaceMatrixData), &LightSpaceMatrixData);
 		FrameConstants.LightSpaceMatrixData = BmRender_GetBufferDeviceAddress(&FrameDataBuffer) + CurrentLightSpaceMatrixDataOffset;
 
 		BmRender_ImageView DepthImageView = (LightCaster == 0) ?

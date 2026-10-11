@@ -71,6 +71,8 @@ namespace Engine
 	static f32 Yaw = -90.0f;
 	static f32 Pitch = 0.0f;
 	static bool MeshletDebugKeyDown = false;
+	static bool FreezeCullingKeyDown = false;
+	static bool FreezeCulling = false;
 
 	static f64 DeltaTime = 0.0f;
 	static f64 LastTime = 0.0f;
@@ -273,8 +275,6 @@ namespace Engine
 		//}
 
 		Scene.FrameDataBuffer.View = glm::lookAt(MainCamera.Position, MainCamera.Position + MainCamera.Front, MainCamera.Up);
-		Scene.FrameDataBuffer.CullViewProjection = Scene.FrameDataBuffer.Projection * Scene.FrameDataBuffer.View;
-		Scene.FrameDataBuffer.CullCameraPosition = MainCamera.Position;
 
 		float NearPlane = 0.1f, FarPlane = 100.0f;
 		float HalfSize = 30.0f;
@@ -288,6 +288,14 @@ namespace Engine
 		Scene.FrameDataBuffer.spotlight.Position = MainCamera.Position;
 		Scene.FrameDataBuffer.spotlight.Planes = glm::vec2(Near, Far);
 		Scene.FrameDataBuffer.spotlight.LightSpaceMatrix = Scene.FrameDataBuffer.Projection * Scene.FrameDataBuffer.View;
+
+		if (!FreezeCulling)
+		{
+			Scene.FrameDataBuffer.CullViewProjection = Scene.FrameDataBuffer.Projection * Scene.FrameDataBuffer.View;
+			Scene.FrameDataBuffer.CullCameraPosition = MainCamera.Position;
+			Scene.CullLightSpaceMatrices[0] = Scene.FrameDataBuffer.directionLight.LightSpaceMatrix;
+			Scene.CullLightSpaceMatrices[1] = Scene.FrameDataBuffer.spotlight.LightSpaceMatrix;
+		}
 
 		GuiData.DirectionLightDirection = &Scene.FrameDataBuffer.directionLight.Direction;
 		GuiData.Eye = &Eye;
@@ -391,6 +399,12 @@ namespace Engine
 		{
 			Scene.MeshletDebugView = !Scene.MeshletDebugView;
 			std::cout << "Meshlet debug view: " << (Scene.MeshletDebugView ? "on" : "off") << std::endl;
+		}
+
+		if (IsKeyPressedOnce(Window, GLFW_KEY_F, FreezeCullingKeyDown))
+		{
+			FreezeCulling = !FreezeCulling;
+			std::cout << "Culling freeze: " << (FreezeCulling ? "on" : "off") << std::endl;
 		}
 	}
 }

@@ -53,6 +53,7 @@ struct DrawScene
 	bool DrawSkyBox = false;
 
 	bool MeshletDebugView = false;
+	glm::mat4 CullLightSpaceMatrices[MAX_SHADOW_TEXTURES];
 };
 
 void Render_Init(GLFWwindow* WindowHandle);
