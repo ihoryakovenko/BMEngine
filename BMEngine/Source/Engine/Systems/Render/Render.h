@@ -51,6 +51,8 @@ struct DrawScene
 
 	DrawEntity SkyBox;
 	bool DrawSkyBox = false;
+
+	bool MeshletDebugView = false;
 };
 
 void Render_Init(GLFWwindow* WindowHandle);

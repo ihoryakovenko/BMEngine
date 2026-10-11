@@ -59,6 +59,7 @@ namespace Engine
 	static void SetUpScene();
 
 	static void MoveCamera(GLFWwindow* Window, f32 DeltaTime, Camera& MainCamera);
+	static void HandleDebugKeys(GLFWwindow* Window);
 
 	static GLFWwindow* Window = nullptr;
 	static bool IsMinimized = false;
@@ -69,6 +70,7 @@ namespace Engine
 	static f32 LastX = 400, LastY = 300;
 	static f32 Yaw = -90.0f;
 	static f32 Pitch = 0.0f;
+	static bool MeshletDebugKeyDown = false;
 
 	static f64 DeltaTime = 0.0f;
 	static f64 LastTime = 0.0f;
@@ -255,6 +257,7 @@ namespace Engine
 		Memory::Update();
 
 		MoveCamera(Window, DeltaTime, MainCamera);
+		HandleDebugKeys(Window);
 
 		static f32 Angle = 0.0f;
 
@@ -371,5 +374,23 @@ namespace Engine
 		Front.y = sin(glm::radians(Pitch));
 		Front.z = sin(glm::radians(Yaw)) * cos(glm::radians(Pitch));
 		MainCamera.Front = glm::normalize(Front);
+	}
+
+	static bool IsKeyPressedOnce(GLFWwindow* Window, s32 Key, bool& WasDown)
+	{
+		const bool IsDown = glfwGetKey(Window, Key) == GLFW_PRESS;
+		const bool IsPressed = IsDown && !WasDown;
+		WasDown = IsDown;
+
+		return IsPressed;
+	}
+
+	void HandleDebugKeys(GLFWwindow* Window)
+	{
+		if (IsKeyPressedOnce(Window, GLFW_KEY_M, MeshletDebugKeyDown))
+		{
+			Scene.MeshletDebugView = !Scene.MeshletDebugView;
+			std::cout << "Meshlet debug view: " << (Scene.MeshletDebugView ? "on" : "off") << std::endl;
+		}
 	}
 }

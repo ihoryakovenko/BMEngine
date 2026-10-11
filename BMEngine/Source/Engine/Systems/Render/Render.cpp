@@ -228,6 +228,9 @@ static void InitStaticMeshPipeline(StaticMeshPipelineDepr* MeshPipeline, BmRende
 
 	RenderResourceManager_CreatePipelineLayout(PipelineNames::Entity, descriptorSetLayouts.data(), descriptorSetLayouts.size(), &PushConstantsDesc, 1);
 	RenderResourceManager_CreateGraphicsPipeline(PipelineNames::Entity, &Settings, &ResourceInfo);
+
+	RenderResourceManager_CreatePipelineLayout(PipelineNames::EntityMeshletDebug, descriptorSetLayouts.data(), descriptorSetLayouts.size(), &PushConstantsDesc, 1);
+	RenderResourceManager_CreateGraphicsPipeline(PipelineNames::EntityMeshletDebug, &Settings, &ResourceInfo);
 }
 
 static void DrawStaticMeshes(BmRender_CommandBuffer CommandBuffer, StaticMeshPipelineDepr* MeshPipeline, DrawScene* Scene, const DescriptorSetHandles& DescriptorSets)
@@ -239,7 +242,8 @@ static void DrawStaticMeshes(BmRender_CommandBuffer CommandBuffer, StaticMeshPip
 
 	const u32 SetsCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
-	GenericDraw(CommandBuffer, Scene, PipelineNames::Entity, DescriptorSetGroup, SetsCount, nullptr, 0, FrameConstants);
+	const PipelineNames Pipeline = Scene->MeshletDebugView ? PipelineNames::EntityMeshletDebug : PipelineNames::Entity;
+	GenericDraw(CommandBuffer, Scene, Pipeline, DescriptorSetGroup, SetsCount, nullptr, 0, FrameConstants);
 }
 
 static void DeferredPassInit(BmRender_DescriptorPool* MainPool)
