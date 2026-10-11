@@ -182,6 +182,8 @@ void RenderResourceManager_Update()
 				continue;
 			}
 
+			BmRender_DeviceWaitIdle();
+
 			for (u32 j = 0; j < Metadata->StageCount; ++j)
 			{
 				BmRender_DestroyShader(Shaders[FirstStage + j]);
