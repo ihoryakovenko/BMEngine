@@ -20,6 +20,7 @@ target_link_libraries(${TARGET_NAME} PRIVATE
 	BMEngine_Include
 	BmRender
 	glfw
+	meshoptimizer
 )
 
 target_include_directories(${TARGET_NAME} PRIVATE

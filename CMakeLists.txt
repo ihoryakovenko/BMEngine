@@ -55,6 +55,7 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/BmRender)
 add_subdirectory(${CMAKE_SOURCE_DIR}/BmEngine/Tools/CompileShaders)
 add_subdirectory(${CMAKE_SOURCE_DIR}/BmEngine/Tools/Converter)
 add_subdirectory(${CMAKE_SOURCE_DIR}/External/glfw)
+add_subdirectory(${CMAKE_SOURCE_DIR}/External/meshoptimizer)
 
 set(TOOLS
     CompileShaders
