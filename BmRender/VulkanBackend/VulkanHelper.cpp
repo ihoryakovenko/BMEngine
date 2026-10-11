@@ -616,6 +616,8 @@ VkShaderStageFlags DescriptorShaderStageToVkShaderStage(BmRender_DescriptorShade
 	if ((u64)stage & (u64)BmRender_DescriptorShaderStage::Vertex)   flags |= VK_SHADER_STAGE_VERTEX_BIT;
 	if ((u64)stage & (u64)BmRender_DescriptorShaderStage::Fragment) flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
 	if ((u64)stage & (u64)BmRender_DescriptorShaderStage::Compute)  flags |= VK_SHADER_STAGE_COMPUTE_BIT;
+	if ((u64)stage & (u64)BmRender_DescriptorShaderStage::Task)     flags |= VK_SHADER_STAGE_TASK_BIT_EXT;
+	if ((u64)stage & (u64)BmRender_DescriptorShaderStage::Mesh)     flags |= VK_SHADER_STAGE_MESH_BIT_EXT;
 	return flags;
 }
 
@@ -629,6 +631,8 @@ VkShaderStageFlagBits PipelineShaderStageToVkShaderStage(BmRender_PipelineShader
 		case BmRender_PipelineShaderStage::TessControl: return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
 		case BmRender_PipelineShaderStage::TessEval:    return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
 		case BmRender_PipelineShaderStage::Compute:     return VK_SHADER_STAGE_COMPUTE_BIT;
+		case BmRender_PipelineShaderStage::Task:        return VK_SHADER_STAGE_TASK_BIT_EXT;
+		case BmRender_PipelineShaderStage::Mesh:        return VK_SHADER_STAGE_MESH_BIT_EXT;
 	}
 	return VK_SHADER_STAGE_VERTEX_BIT;
 }
@@ -1561,6 +1565,10 @@ VkShaderStageFlags ShaderStageFlagsToVk(BmRender_DescriptorShaderStage StageFlag
 		VkFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
 	if ((FlagsValue & static_cast<u64>(BmRender_DescriptorShaderStage::Compute)) != 0)
 		VkFlags |= VK_SHADER_STAGE_COMPUTE_BIT;
+	if ((FlagsValue & static_cast<u64>(BmRender_DescriptorShaderStage::Task)) != 0)
+		VkFlags |= VK_SHADER_STAGE_TASK_BIT_EXT;
+	if ((FlagsValue & static_cast<u64>(BmRender_DescriptorShaderStage::Mesh)) != 0)
+		VkFlags |= VK_SHADER_STAGE_MESH_BIT_EXT;
 	return VkFlags;
 }
 
@@ -1573,6 +1581,10 @@ BmRender_DescriptorShaderStage VkShaderStageFlagsToBmRender(VkShaderStageFlags S
 		BmFlags = static_cast<BmRender_DescriptorShaderStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_DescriptorShaderStage::Fragment));
 	if (StageFlags & VK_SHADER_STAGE_COMPUTE_BIT)
 		BmFlags = static_cast<BmRender_DescriptorShaderStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_DescriptorShaderStage::Compute));
+	if (StageFlags & VK_SHADER_STAGE_TASK_BIT_EXT)
+		BmFlags = static_cast<BmRender_DescriptorShaderStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_DescriptorShaderStage::Task));
+	if (StageFlags & VK_SHADER_STAGE_MESH_BIT_EXT)
+		BmFlags = static_cast<BmRender_DescriptorShaderStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_DescriptorShaderStage::Mesh));
 	return BmFlags;
 }
 

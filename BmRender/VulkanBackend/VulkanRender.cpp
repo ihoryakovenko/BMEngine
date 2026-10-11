@@ -16,6 +16,7 @@ static VkAllocationCallbacks VulkanAllocator;
 
 static PFN_vkSetDebugUtilsObjectNameEXT FnVkSetDebugUtilsObjectNameEXT;
 static PFN_vkCmdPushDataEXT FnVkCmdPushDataEXT;
+static PFN_vkCmdDrawMeshTasksEXT FnVkCmdDrawMeshTasksEXT;
 
 static void* VKAPI_CALL VulkanAllocationCallback(
 	void* UserData,
@@ -1360,6 +1361,12 @@ void BmRender_RecordDispatch(BmRender_CommandBuffer CommandBuffer, u32 GroupCoun
 	vkCmdDispatch(VkCmdBuffer, GroupCountX, GroupCountY, GroupCountZ);
 }
 
+void BmRender_DrawMeshTasks(BmRender_CommandBuffer CommandBuffer, u32 GroupCountX, u32 GroupCountY, u32 GroupCountZ)
+{
+	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
+	FnVkCmdDrawMeshTasksEXT(VkCmdBuffer, GroupCountX, GroupCountY, GroupCountZ);
+}
+
 void BmRender_RecordPushData(BmRender_CommandBuffer CommandBuffer, const void* Data, u64 DataSize)
 {
 	VkPushDataInfoEXT PushInfo;
@@ -1608,6 +1615,9 @@ void InitBackend(void* WindowHandle)
 
 	FnVkSetDebugUtilsObjectNameEXT = (PFN_vkSetDebugUtilsObjectNameEXT)(vkGetInstanceProcAddr(CoreContext.VulkanInstance, "vkSetDebugUtilsObjectNameEXT"));
 	assert(FnVkSetDebugUtilsObjectNameEXT);
+
+	FnVkCmdDrawMeshTasksEXT = (PFN_vkCmdDrawMeshTasksEXT)(vkGetDeviceProcAddr(CoreContext.LogicalDevice, "vkCmdDrawMeshTasksEXT"));
+	assert(FnVkCmdDrawMeshTasksEXT);
 
 	//FnVkCmdPushDataEXT = (PFN_vkCmdPushDataEXT)(vkGetDeviceProcAddr(CoreContext.LogicalDevice, "vkCmdPushDataEXT"));
 	//assert(FnVkCmdPushDataEXT);

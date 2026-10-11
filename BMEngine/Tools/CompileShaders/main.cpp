@@ -166,6 +166,14 @@ int main(int argc, const char* argv[])
 			case SLANG_STAGE_COMPUTE:
 				StageArrayGeneration += "BmRender_PipelineShaderStage::Compute";
 				break;
+
+			case SLANG_STAGE_AMPLIFICATION:
+				StageArrayGeneration += "BmRender_PipelineShaderStage::Task";
+				break;
+
+			case SLANG_STAGE_MESH:
+				StageArrayGeneration += "BmRender_PipelineShaderStage::Mesh";
+				break;
 			default:
 				assert(false);
 				break;

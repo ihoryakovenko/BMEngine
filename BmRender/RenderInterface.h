@@ -12,6 +12,8 @@ enum class BmRender_DescriptorShaderStage : u64
 	Vertex = 1 << 0,
 	Fragment = 1 << 1,
 	Compute = 1 << 2,
+	Task = 1 << 3,
+	Mesh = 1 << 4,
 };
 
 enum class BmRender_PipelineShaderStage : u8
@@ -21,7 +23,9 @@ enum class BmRender_PipelineShaderStage : u8
 	Geometry,
 	TessControl,
 	TessEval,
-	Compute
+	Compute,
+	Task,
+	Mesh
 };
 
 enum class BmRender_PipelineSyncStage : u64
@@ -770,6 +774,7 @@ void BmRender_Draw(BmRender_CommandBuffer CommandBuffer, u32 VertexCount, u32 In
 void BmRender_DrawIndexed(BmRender_CommandBuffer CommandBuffer, u32 IndexCount, u32 InstanceCount, u32 FirstIndex, u32 VertexOffset, u32 FirstInstance);
 void BmRender_RecordDrawIndexedIndirect(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer* IndirectBuffer, u64 Offset, u32 DrawCount, u32 Stride);
 void BmRender_RecordDispatch(BmRender_CommandBuffer CommandBuffer, u32 GroupCountX, u32 GroupCountY, u32  GroupCountZ);
+void BmRender_DrawMeshTasks(BmRender_CommandBuffer CommandBuffer, u32 GroupCountX, u32 GroupCountY, u32 GroupCountZ);
 void BmRender_RecordPushData(BmRender_CommandBuffer CommandBuffer, const void* Data, u64 DataSize);
 
 void BmRender_DestroySampler(BmRender_Sampler Handle);
