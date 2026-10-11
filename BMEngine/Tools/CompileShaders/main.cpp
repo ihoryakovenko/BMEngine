@@ -180,8 +180,23 @@ int main(int argc, const char* argv[])
 
 		Names.push_back(baseName);
 
+		fs::file_time_type NewestSourceTime = fs::last_write_time(filePath);
+		for (SlangInt32 i = 0; i < module->getDependencyFileCount(); ++i)
+		{
+			fs::path DependencyPath = module->getDependencyFilePath(i);
+			if (DependencyPath.is_relative())
+			{
+				DependencyPath = sourceDir / DependencyPath;
+			}
+
+			if (fs::exists(DependencyPath) && fs::last_write_time(DependencyPath) > NewestSourceTime)
+			{
+				NewestSourceTime = fs::last_write_time(DependencyPath);
+			}
+		}
+
 		if (!ForceRecompile && fs::exists(outPath) &&
-			fs::last_write_time(filePath) <= fs::last_write_time(outPath))
+			NewestSourceTime <= fs::last_write_time(outPath))
 		{
 			std::cout << "Up to date: " << FullPathName << std::endl;
 			continue;
