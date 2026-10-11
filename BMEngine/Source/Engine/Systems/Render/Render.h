@@ -51,8 +51,6 @@ struct DrawScene
 
 	DrawEntity SkyBox;
 	bool DrawSkyBox = false;
-
-	std::vector<DrawEntity> DrawEntities;
 };
 
 void Render_Init(GLFWwindow* WindowHandle);
@@ -69,6 +67,8 @@ BmRender_Image* TestDeferredInputDepthImage();
 
 DescriptorSetHandles* GetHandles();
 BmRender_GPUBuffer* GetVertexBuffer();
-BmRender_GPUBuffer* GetIndexBuffer();
 BmRender_GPUBuffer* GetInstanceBuffer();
 BmRender_GPUBuffer* GetMaterialBuffer();
+BmRender_GPUBuffer* GetMeshletBuffer();
+BmRender_GPUBuffer* GetMeshletVertexBuffer();
+BmRender_GPUBuffer* GetMeshletTriangleBuffer();

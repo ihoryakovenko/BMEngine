@@ -15,6 +15,10 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 
+#include <meshoptimizer.h>
+
+static const float MeshletConeWeight = 0.25f;
+
 struct VertexEqual
 {
 	bool operator()(const Shader_StaticMeshVertex& lhs, const Shader_StaticMeshVertex& rhs) const
@@ -66,9 +70,6 @@ void ObjToModel3D(const char* FilePath, const char* OutputPath)
 	}
 
 
-	u64* VerticesCounts = (u64*)malloc(Shapes.size() * sizeof(u64));
-	u32* IndicesCounts = (u32*)malloc(Shapes.size() * sizeof(u32));
-
 	std::unordered_map<Shader_StaticMeshVertex, u32,
 		std::hash<Shader_StaticMeshVertex>, VertexEqual> uniqueVertices{ };
 
@@ -78,13 +79,20 @@ void ObjToModel3D(const char* FilePath, const char* OutputPath)
 	std::vector<Util::Model3DMaterial> uniqueMaterials;
 	std::vector<u32> meshMaterialIndices;
 	std::vector<u64> uniqueTextureHashes;
-	std::vector<u8> VerticesAndIndices;
 	std::vector<Shader_StaticMeshVertex> Vertices;
 	std::vector<u32> Indices;
 
 	std::unordered_set<u64> textureHashes;
 
-	u64 VertexShift = 0;
+	std::vector<Shader_StaticMeshVertex> ModelVertices;
+	std::vector<Shader_Meshlet> ModelMeshlets;
+	std::vector<u32> ModelMeshletVertices;
+	std::vector<u32> ModelMeshletTriangles;
+	std::vector<u32> MeshletCounts;
+
+	std::vector<meshopt_Meshlet> Meshlets;
+	std::vector<u32> MeshletVertices;
+	std::vector<u8> MeshletTriangles;
 
 	uniqueMaterials.reserve(Materials.size());
 	uniqueTextureHashes.reserve(Materials.size());
@@ -115,6 +123,7 @@ void ObjToModel3D(const char* FilePath, const char* OutputPath)
 	}
 
 	meshMaterialIndices.reserve(Shapes.size());
+	MeshletCounts.reserve(Shapes.size());
 
 	for (u32 i = 0; i < Shapes.size(); i++)
 	{
@@ -158,27 +167,59 @@ void ObjToModel3D(const char* FilePath, const char* OutputPath)
 				Vertices.push_back(vertex);
 			}
 
-			Indices.push_back(uniqueVertices[vertex] + VertexShift);
-			//Indices.push_back(uniqueVertices[vertex]);
+			Indices.push_back(uniqueVertices[vertex]);
 		}
 
-		VertexShift += Vertices.size();
-		VerticesCounts[i] = Vertices.size();
-		IndicesCounts[i] = Indices.size();
+		u64 MeshletCount = 0;
 
-		u64 VertexBytes = Vertices.size() * sizeof(Shader_StaticMeshVertex);
-		u64 IndexBytes = Indices.size() * sizeof(u32);
-
-		u64 CurrentOffset = VerticesAndIndices.size();
-		VerticesAndIndices.resize(CurrentOffset + VertexBytes + IndexBytes);
-
-		std::memcpy(VerticesAndIndices.data() + CurrentOffset, Vertices.data(), VertexBytes);
-		std::memcpy(VerticesAndIndices.data() + CurrentOffset + VertexBytes, Indices.data(), IndexBytes);
-
-		if (Shape->mesh.material_ids[0] != -1)
+		if (!Indices.empty())
 		{
-			meshMaterialIndices.push_back(Shape->mesh.material_ids[0]);
+			Meshlets.resize(meshopt_buildMeshletsBound(Indices.size(), MESHLET_MAX_VERTICES, MESHLET_MAX_TRIANGLES));
+			MeshletVertices.resize(Indices.size());
+			MeshletTriangles.resize(Indices.size());
+
+			MeshletCount = meshopt_buildMeshlets(Meshlets.data(), MeshletVertices.data(), MeshletTriangles.data(),
+				Indices.data(), Indices.size(), &Vertices[0].Position.x, Vertices.size(), sizeof(Shader_StaticMeshVertex),
+				MESHLET_MAX_VERTICES, MESHLET_MAX_TRIANGLES, MeshletConeWeight);
 		}
+
+		for (u64 j = 0; j < MeshletCount; j++)
+		{
+			const meshopt_Meshlet& Meshlet = Meshlets[j];
+			u32* LocalVertices = MeshletVertices.data() + Meshlet.vertex_offset;
+			u8* LocalTriangles = MeshletTriangles.data() + Meshlet.triangle_offset;
+
+			meshopt_optimizeMeshlet(LocalVertices, LocalTriangles, Meshlet.triangle_count, Meshlet.vertex_count);
+
+			const meshopt_Bounds Bounds = meshopt_computeMeshletBounds(LocalVertices, LocalTriangles, Meshlet.triangle_count,
+				&Vertices[0].Position.x, Vertices.size(), sizeof(Shader_StaticMeshVertex));
+
+			Shader_Meshlet NewMeshlet = { };
+			NewMeshlet.BoundsCenter = { Bounds.center[0], Bounds.center[1], Bounds.center[2] };
+			NewMeshlet.BoundsRadius = Bounds.radius;
+			NewMeshlet.ConeAxis = { Bounds.cone_axis[0], Bounds.cone_axis[1], Bounds.cone_axis[2] };
+			NewMeshlet.ConeCutoff = Bounds.cone_cutoff;
+			NewMeshlet.VertexOffset = static_cast<u32>(ModelMeshletVertices.size());
+			NewMeshlet.TriangleOffset = static_cast<u32>(ModelMeshletTriangles.size());
+			NewMeshlet.VertexCount = Meshlet.vertex_count;
+			NewMeshlet.TriangleCount = Meshlet.triangle_count;
+			ModelMeshlets.push_back(NewMeshlet);
+
+			for (u32 k = 0; k < Meshlet.vertex_count; k++)
+			{
+				ModelMeshletVertices.push_back(LocalVertices[k] + static_cast<u32>(ModelVertices.size()));
+			}
+
+			for (u32 k = 0; k < Meshlet.triangle_count; k++)
+			{
+				const u8* Triangle = LocalTriangles + k * 3;
+				ModelMeshletTriangles.push_back(Triangle[0] | (Triangle[1] << 8) | (Triangle[2] << 16));
+			}
+		}
+
+		ModelVertices.insert(ModelVertices.end(), Vertices.begin(), Vertices.end());
+		MeshletCounts.push_back(static_cast<u32>(MeshletCount));
+		meshMaterialIndices.push_back(static_cast<u32>(Shape->mesh.material_ids[0]));
 	}
 
 	std::ofstream outFile(newAssetPathStr, std::ios::binary);
@@ -191,20 +232,22 @@ void ObjToModel3D(const char* FilePath, const char* OutputPath)
 	// Write the header
 	Util::Model3DFileHeader Header;
 	Header.MeshCount = Shapes.size();
-	Header.VertexDataSize = VerticesAndIndices.size();
 	Header.MaterialCount = uniqueMaterials.size();
 	Header.UniqueTextureCount = uniqueTextureHashes.size();
+	Header.VertexCount = ModelVertices.size();
+	Header.MeshletCount = ModelMeshlets.size();
+	Header.MeshletVertexCount = ModelMeshletVertices.size();
+	Header.MeshletTriangleCount = ModelMeshletTriangles.size();
 
 	outFile.write(reinterpret_cast<const char*>(&Header), sizeof(Header));
-	outFile.write(reinterpret_cast<const char*>(VerticesAndIndices.data()), Header.VertexDataSize);
-	outFile.write(reinterpret_cast<const char*>(VerticesCounts), Header.MeshCount * sizeof(VerticesCounts[0]));
-	outFile.write(reinterpret_cast<const char*>(IndicesCounts), Header.MeshCount * sizeof(IndicesCounts[0]));
-	outFile.write(reinterpret_cast<const char*>(meshMaterialIndices.data()), meshMaterialIndices.size() * sizeof(meshMaterialIndices[0]));
+	outFile.write(reinterpret_cast<const char*>(ModelVertices.data()), Header.VertexCount * sizeof(Shader_StaticMeshVertex));
+	outFile.write(reinterpret_cast<const char*>(ModelMeshlets.data()), Header.MeshletCount * sizeof(Shader_Meshlet));
+	outFile.write(reinterpret_cast<const char*>(ModelMeshletVertices.data()), Header.MeshletVertexCount * sizeof(u32));
+	outFile.write(reinterpret_cast<const char*>(ModelMeshletTriangles.data()), Header.MeshletTriangleCount * sizeof(u32));
+	outFile.write(reinterpret_cast<const char*>(MeshletCounts.data()), Header.MeshCount * sizeof(u32));
+	outFile.write(reinterpret_cast<const char*>(meshMaterialIndices.data()), Header.MeshCount * sizeof(u32));
 	outFile.write(reinterpret_cast<const char*>(uniqueMaterials.data()), Header.MaterialCount * sizeof(Util::Model3DMaterial));
 	outFile.write(reinterpret_cast<const char*>(uniqueTextureHashes.data()), Header.UniqueTextureCount * sizeof(u64));
-
-	free(VerticesCounts);
-	free(IndicesCounts);
 }
 
 void CreateDirectoryRecursively(const char* Path)
@@ -231,39 +274,29 @@ void CreateDirectoryRecursively(const char* Path)
 
 int main(u32 argc, const char* argv[])
 {
-	if (argc < 2)
+	if (argc < 4 || strcmp(argv[1], "-m") != 0)
 	{
-		argc = 3;
-		argv[0] = "-m";
-		argv[1] = "E:\\Code\\BMEngine\\BMEngine\\Resources\\Models/";
-		argv[2] = "E:\\Code\\BMEngine\\BMEngine\\Resources\\Models\\uh60.obj";
+		printf("Usage: %s -m <OUTPUT_DIR> <FILE.obj>...\n", argv[0]);
+		return 1;
 	}
 
-	for (u32 i = 0; i < argc; i++)
+	const char* OutputPath = argv[2];
+	CreateDirectoryRecursively(OutputPath);
+
+	printf("Output path: %s\n", OutputPath);
+
+	for (u32 i = 3; i < argc; i++)
 	{
-		const char* Command = argv[i];
-		if (strcmp(Command, "-m") == 0)
+		const char* File = argv[i];
+		printf("  %s\n", File);
+
+		if (GetFileAttributesA(File) != INVALID_FILE_ATTRIBUTES)
 		{
-			const char* OutputPath = argv[1];
-			CreateDirectoryRecursively(OutputPath);
-
-			printf("Output path: %s\n", OutputPath);
-
-			for (u32 j = 2; j < argc; j++)
-			{
-				const char* File = argv[j];
-				printf("  %s\n", File);
-
-				if (GetFileAttributesA(File) != INVALID_FILE_ATTRIBUTES)
-				{
-					ObjToModel3D(File, OutputPath);
-				}
-				else
-				{
-					printf("  -> File does not exist: %s\n", argv[j]);
-				}
-			}
-			break;
+			ObjToModel3D(File, OutputPath);
+		}
+		else
+		{
+			printf("  -> File does not exist: %s\n", File);
 		}
 	}
 

@@ -113,13 +113,19 @@ namespace Util
 		memcpy(&Model.Header, Data, sizeof(Model3DFileHeader));
 		Data += sizeof(Model3DFileHeader);
 
-		Model.VertexData = Data;
-		Data += Model.Header.VertexDataSize;
+		Model.Vertices = (Shader_StaticMeshVertex*)Data;
+		Data += Model.Header.VertexCount * sizeof(Shader_StaticMeshVertex);
 
-		Model.VerticesCounts = (u64*)Data;
-		Data += Model.Header.MeshCount * sizeof(u64);
+		Model.Meshlets = (Shader_Meshlet*)Data;
+		Data += Model.Header.MeshletCount * sizeof(Shader_Meshlet);
 
-		Model.IndicesCounts = (u32*)Data;
+		Model.MeshletVertices = (u32*)Data;
+		Data += Model.Header.MeshletVertexCount * sizeof(u32);
+
+		Model.MeshletTriangles = (u32*)Data;
+		Data += Model.Header.MeshletTriangleCount * sizeof(u32);
+
+		Model.MeshletCounts = (u32*)Data;
 		Data += Model.Header.MeshCount * sizeof(u32);
 
 		Model.MaterialIndices = (u32*)Data;
