@@ -16,6 +16,7 @@ static VkAllocationCallbacks VulkanAllocator;
 
 static PFN_vkSetDebugUtilsObjectNameEXT FnVkSetDebugUtilsObjectNameEXT;
 static PFN_vkCmdPushDataEXT FnVkCmdPushDataEXT;
+static PFN_vkCmdDrawMeshTasksEXT FnVkCmdDrawMeshTasksEXT;
 
 static void* VKAPI_CALL VulkanAllocationCallback(
 	void* UserData,
@@ -420,9 +421,6 @@ void BmRender_CreateGraphicsPipelines(const BmRender_GraphicsPipelineDescription
 			VkStage->pSpecializationInfo = nullptr;
 		}
 
-		VkPipelineVertexInputStateCreateInfo VertexInputState = { };
-		VertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-
 		bool SampleCountFound = false;
 		VkSampleCountFlagBits SampleCount = VK_SAMPLE_COUNT_1_BIT;
 
@@ -487,7 +485,6 @@ void BmRender_CreateGraphicsPipelines(const BmRender_GraphicsPipelineDescription
 
 		VkPipelineRasterizationStateCreateInfo RasterizationState = RasterizationStateToVk(Description->Settings->RasterizationState);
 		VkPipelineMultisampleStateCreateInfo MultisampleState = MultisampleStateToVk(Description->Settings->MultisampleState);
-		VkPipelineInputAssemblyStateCreateInfo InputAssemblyState = InputAssemblyStateToVk(Description->Settings->InputAssemblyState);
 		VkPipelineDepthStencilStateCreateInfo DepthStencilState = DepthStencilStateToVk(Description->Settings->DepthStencilState);
 
 		MultisampleState.rasterizationSamples = SampleCount;
@@ -497,8 +494,6 @@ void BmRender_CreateGraphicsPipelines(const BmRender_GraphicsPipelineDescription
 		PipelineCreateInfo->sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 		PipelineCreateInfo->stageCount = Description->ShaderStagesCount;
 		PipelineCreateInfo->pStages = VkShaderStages;
-		PipelineCreateInfo->pVertexInputState = &VertexInputState;
-		PipelineCreateInfo->pInputAssemblyState = &InputAssemblyState;
 		PipelineCreateInfo->pViewportState = &ViewportState;
 		PipelineCreateInfo->pDynamicState = nullptr;
 		PipelineCreateInfo->pRasterizationState = &RasterizationState;
@@ -708,11 +703,6 @@ BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, BmRender_MemoryPropert
 BmRender_GPUBuffer BmRender_CreateSrvUavBuffer(u64 Size, BmRender_MemoryPropertyFlag MemoryFlag, const char* DebugName)
 {
 	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::SrvUavBufferFlag);
-}
-
-BmRender_GPUBuffer BmRender_CreateIndexBuffer(u64 Size, BmRender_MemoryPropertyFlag MemoryFlag, const char* DebugName)
-{
-	return CreateGPUBuffer(Size, MemoryFlag, BufferUsageFlag::IndexFlag);
 }
 
 BmRender_GPUBuffer BmRender_CreateIndirectDrawBuffer(u64 Size, BmRender_MemoryPropertyFlag MemoryFlag, const char* DebugName)
@@ -1319,45 +1309,16 @@ void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmR
 		Sets, DynamicOffsetCount, pDynamicOffsets);
 }
 
-void BmRender_RecordBindVertexBuffers(BmRender_CommandBuffer CommandBuffer, u32 FirstBinding, u32 BindingCount, const BmRender_GPUBuffer* Buffers, const u64* Offsets)
-{
-	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
-	const VkBuffer* VkBuffers = (const VkBuffer*)Buffers;
-
-	vkCmdBindVertexBuffers(VkCmdBuffer, FirstBinding, BindingCount, VkBuffers, Offsets);
-}
-
-void BmRender_RecordBindIndexBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer* Buffer, u64 Offset, BmRender_IndexType IndexType)
-{
-	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
-	VkBuffer VkBufferHandle = Buffer->InternalBuffer;
-	vkCmdBindIndexBuffer(VkCmdBuffer, VkBufferHandle, Offset, IndexTypeToVk(IndexType));
-}
-
-void BmRender_Draw(BmRender_CommandBuffer CommandBuffer, u32 VertexCount, u32 InstanceCount, u32 FirstVertex, u32 FirstInstance)
-{
-	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
-	vkCmdDraw(VkCmdBuffer, VertexCount, InstanceCount, FirstVertex, FirstInstance);
-}
-
-void BmRender_DrawIndexed(BmRender_CommandBuffer CommandBuffer, u32 IndexCount, u32 InstanceCount, u32 FirstIndex, u32 VertexOffset, u32 FirstInstance)
-{
-	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
-	vkCmdDrawIndexed(VkCmdBuffer, IndexCount, InstanceCount, FirstIndex, VertexOffset, FirstInstance);
-}
-
-void BmRender_RecordDrawIndexedIndirect(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer* IndirectBuffer, u64 Offset, u32 DrawCount, u32 Stride)
-{
-	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
-	VkBuffer VkIndirectBuffer = IndirectBuffer->InternalBuffer;
-	vkCmdDrawIndexedIndirect(VkCmdBuffer, VkIndirectBuffer, Offset, DrawCount, Stride);
-
-}
-
 void BmRender_RecordDispatch(BmRender_CommandBuffer CommandBuffer, u32 GroupCountX, u32 GroupCountY, u32  GroupCountZ)
 {
 	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
 	vkCmdDispatch(VkCmdBuffer, GroupCountX, GroupCountY, GroupCountZ);
+}
+
+void BmRender_DrawMeshTasks(BmRender_CommandBuffer CommandBuffer, u32 GroupCountX, u32 GroupCountY, u32 GroupCountZ)
+{
+	VkCommandBuffer VkCmdBuffer = CommandBuffer.InternalBuffer;
+	FnVkCmdDrawMeshTasksEXT(VkCmdBuffer, GroupCountX, GroupCountY, GroupCountZ);
 }
 
 void BmRender_RecordPushData(BmRender_CommandBuffer CommandBuffer, const void* Data, u64 DataSize)
@@ -1608,6 +1569,9 @@ void InitBackend(void* WindowHandle)
 
 	FnVkSetDebugUtilsObjectNameEXT = (PFN_vkSetDebugUtilsObjectNameEXT)(vkGetInstanceProcAddr(CoreContext.VulkanInstance, "vkSetDebugUtilsObjectNameEXT"));
 	assert(FnVkSetDebugUtilsObjectNameEXT);
+
+	FnVkCmdDrawMeshTasksEXT = (PFN_vkCmdDrawMeshTasksEXT)(vkGetDeviceProcAddr(CoreContext.LogicalDevice, "vkCmdDrawMeshTasksEXT"));
+	assert(FnVkCmdDrawMeshTasksEXT);
 
 	//FnVkCmdPushDataEXT = (PFN_vkCmdPushDataEXT)(vkGetDeviceProcAddr(CoreContext.LogicalDevice, "vkCmdPushDataEXT"));
 	//assert(FnVkCmdPushDataEXT);

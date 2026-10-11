@@ -18,7 +18,6 @@ enum class BufferUsageFlag
 {
 	UniformFlag = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 	StagingFlag = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-	IndexFlag = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 	IndirectDrawBufferFlag = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
 	SrvUavBufferFlag = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 };
@@ -101,7 +100,6 @@ VkAttachmentLoadOp AttachmentLoadOpToVk(BmRender_AttachmentLoadOp Op);
 VkAttachmentStoreOp AttachmentStoreOpToVk(BmRender_AttachmentStoreOp Op);
 VkDescriptorType DescriptorTypeToVk(BmRender_DescriptorType Type);
 BmRender_DescriptorType VkDescriptorTypeToBmRender(VkDescriptorType Type);
-VkIndexType IndexTypeToVk(BmRender_IndexType Type);
 BmRender_Format VkFormatToBmRender(VkFormat Format);
 VkSurfaceFormatKHR SurfaceFormatToVk(BmRender_SurfaceFormat SurfaceFormat);
 BmRender_SurfaceFormat VkSurfaceFormatToBmRender(VkSurfaceFormatKHR SurfaceFormat);
@@ -139,7 +137,6 @@ VkFrontFace FrontFaceToVk(BmRender_FrontFace Face);
 VkColorComponentFlags ColorComponentFlagsToVk(BmRender_ColorComponentFlags Flags);
 VkBlendFactor BlendFactorToVk(BmRender_BlendFactor Factor);
 VkBlendOp BlendOpToVk(BmRender_BlendOp Op);
-VkPrimitiveTopology PrimitiveTopologyToVk(BmRender_PrimitiveTopology Topology);
 VkSampleCountFlagBits SampleCountToVk(BmRender_SampleCount Count);
 
 VkPipelineRasterizationStateCreateInfo RasterizationStateToVk(const BmRender_RasterizationState& State);
@@ -147,5 +144,4 @@ VkPipelineColorBlendAttachmentState ColorBlendAttachmentToVk(const BmRender_Colo
 VkPipelineColorBlendStateCreateInfo ColorBlendStateToVk(const BmRender_ColorBlendState& State);
 VkPipelineDepthStencilStateCreateInfo DepthStencilStateToVk(const BmRender_DepthStencilState& State);
 VkPipelineMultisampleStateCreateInfo MultisampleStateToVk(const BmRender_MultisampleState& State);
-VkPipelineInputAssemblyStateCreateInfo InputAssemblyStateToVk(const BmRender_InputAssemblyState& State);
 VkPipelineViewportStateCreateInfo ViewportStateToVk(const BmRender_ViewportState& State);

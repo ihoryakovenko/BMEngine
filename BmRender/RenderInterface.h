@@ -9,26 +9,24 @@
 enum class BmRender_DescriptorShaderStage : u64
 {
 	None = 0,
-	Vertex = 1 << 0,
 	Fragment = 1 << 1,
 	Compute = 1 << 2,
+	Task = 1 << 3,
+	Mesh = 1 << 4,
 };
 
 enum class BmRender_PipelineShaderStage : u8
 {
-	Vertex,
 	Fragment,
-	Geometry,
-	TessControl,
-	TessEval,
-	Compute
+	Compute,
+	Task,
+	Mesh
 };
 
 enum class BmRender_PipelineSyncStage : u64
 {
 	None = 0,
 	TopOfPipe = 1ull << 0,
-	VertexShader = 1ull << 1,
 	FragmentShader = 1ull << 2,
 	ColorAttachmentOutput = 1ull << 3,
 	ComputeShader = 1ull << 4,
@@ -173,12 +171,6 @@ enum class BmRender_DescriptorType : u32
 	SampledImage,
 	StorageImage,
 	InputAttachment,
-};
-
-enum class BmRender_IndexType : u32
-{
-	Uint16,
-	Uint32,
 };
 
 enum class BmRender_Format : u32
@@ -370,21 +362,6 @@ enum class BmRender_BlendOp : u32
 	ReverseSubtract,
 	Min,
 	Max,
-};
-
-enum class BmRender_PrimitiveTopology : u32
-{
-	PointList,
-	LineList,
-	LineStrip,
-	TriangleList,
-	TriangleStrip,
-	TriangleFan,
-	LineListWithAdjacency,
-	LineStripWithAdjacency,
-	TriangleListWithAdjacency,
-	TriangleStripWithAdjacency,
-	PatchList,
 };
 
 enum class BmRender_SampleCount : u32
@@ -594,12 +571,6 @@ struct BmRender_MultisampleState
 	bool SampleShadingEnable;
 };
 
-struct BmRender_InputAssemblyState
-{
-	BmRender_PrimitiveTopology Topology;
-	bool PrimitiveRestartEnable;
-};
-
 struct BmRender_ViewportState
 {
 	u32 ViewportCount;
@@ -613,7 +584,6 @@ struct BmRender_PipelineSettings
 	BmRender_ColorBlendState ColorBlendState;
 	BmRender_DepthStencilState DepthStencilState;
 	BmRender_MultisampleState MultisampleState;
-	BmRender_InputAssemblyState InputAssemblyState;
 	BmRender_ViewportState ViewportState;
 
 	BmRender_Dimensions Extent;
@@ -662,15 +632,6 @@ struct BmRender_PresentInfo
 	const BmRender_Semaphore* WaitSemaphores;
 	u32 WaitSemaphoreCount;
 	const u32* ImageIndices;
-};
-
-struct BmRender_DrawIndexedIndirectCommand
-{
-	u32 IndexCount;
-	u32 InstanceCount;
-	u32 FirstIndex;
-	s32 VertexOffset;
-	u32 FirstInstance;
 };
 
 struct BmRender_InitData
@@ -726,7 +687,6 @@ BmRender_Shader BmRender_CreateShader(const BmRender_ShaderDescription* Descript
 BmRender_DescriptorSet BmRender_CreateDescriptorSet(BmRender_DescriptorSetLayout* LayoutHandle, BmRender_DescriptorPool* PoolHandle, const char* DebugName = nullptr);
 BmRender_GPUBuffer BmRender_CreateUniformBuffer(u64 Size, BmRender_MemoryPropertyFlag MemoryFlag, const char* DebugName = nullptr);
 BmRender_GPUBuffer BmRender_CreateSrvUavBuffer(u64 Size, BmRender_MemoryPropertyFlag MemoryFlag, const char* DebugName = nullptr);
-BmRender_GPUBuffer BmRender_CreateIndexBuffer(u64 Size, BmRender_MemoryPropertyFlag MemoryFlag, const char* DebugName = nullptr);
 BmRender_GPUBuffer BmRender_CreateIndirectDrawBuffer(u64 Size, BmRender_MemoryPropertyFlag MemoryFlag, const char* DebugName = nullptr);
 BmRender_GPUBuffer BmRender_CreateStagingBuffer(u64 Size, const char* DebugName = nullptr);
 BmRender_Image BmRender_CreateImage2D(u32 Width, u32 Height, BmRender_Format Format, BmRender_ImageType Type, BmRender_SampleCount SampleCount, const char* DebugName = nullptr);
@@ -764,12 +724,8 @@ void BmRender_EndRendering(BmRender_CommandBuffer CommandBuffer);
 void BmRender_BindPipeline(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, BmRender_PipelineLayout Layout);
 void BmRender_RecordPushConstants(BmRender_CommandBuffer CommandBuffer, BmRender_PipelineLayout PipelineLayout, BmRender_DescriptorShaderStage StageFlags, u32 Offset, u32 Size, const void* Values);
 void BmRender_RecordBindDescriptorSets(BmRender_CommandBuffer CommandBuffer, BmRender_Pipeline Pipeline, BmRender_PipelineLayout PipelineLayout, u32 FirstSet, u32 DescriptorSetCount, const BmRender_DescriptorSet* DescriptorSets, u32 DynamicOffsetCount, const u32* pDynamicOffsets);
-void BmRender_RecordBindVertexBuffers(BmRender_CommandBuffer CommandBuffer, u32 FirstBinding, u32 BindingCount, const BmRender_GPUBuffer* Buffers, const u64* Offsets);
-void BmRender_RecordBindIndexBuffer(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer* Buffer, u64 Offset, BmRender_IndexType IndexType);
-void BmRender_Draw(BmRender_CommandBuffer CommandBuffer, u32 VertexCount, u32 InstanceCount, u32 FirstVertex, u32 FirstInstance);
-void BmRender_DrawIndexed(BmRender_CommandBuffer CommandBuffer, u32 IndexCount, u32 InstanceCount, u32 FirstIndex, u32 VertexOffset, u32 FirstInstance);
-void BmRender_RecordDrawIndexedIndirect(BmRender_CommandBuffer CommandBuffer, BmRender_GPUBuffer* IndirectBuffer, u64 Offset, u32 DrawCount, u32 Stride);
 void BmRender_RecordDispatch(BmRender_CommandBuffer CommandBuffer, u32 GroupCountX, u32 GroupCountY, u32  GroupCountZ);
+void BmRender_DrawMeshTasks(BmRender_CommandBuffer CommandBuffer, u32 GroupCountX, u32 GroupCountY, u32 GroupCountZ);
 void BmRender_RecordPushData(BmRender_CommandBuffer CommandBuffer, const void* Data, u64 DataSize);
 
 void BmRender_DestroySampler(BmRender_Sampler Handle);

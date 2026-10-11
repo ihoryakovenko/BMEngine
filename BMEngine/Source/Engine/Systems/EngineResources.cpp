@@ -14,6 +14,14 @@ namespace EngineResources
 	static std::unordered_map<u64, TextureAsset> TextureAssets;
 	static std::queue<ModelLoadRequest> ModelLoadRequests;
 	static TextureAsset DefaultAsset;
+
+	static u32 TexturesGPUIndexCounter = 1;
+	static u32 MateriaIndex = 0;
+	static u32 InstanceIndex = 0;
+	static u32 VertexCount = 0;
+	static u32 MeshletCount = 0;
+	static u32 MeshletVertexCount = 0;
+	static u32 MeshletTriangleCount = 0;
 	
 	static void CreateTexture(TextureAsset& Asset)
 	{
@@ -108,8 +116,6 @@ namespace EngineResources
 
 	void Update(DrawScene* TmpScene)
 	{
-		u32 TexturesGPUIndexCounter = 1;
-
 		while (!ModelLoadRequests.empty())
 		{
 			ModelLoadRequest Request = ModelLoadRequests.front();
@@ -118,23 +124,19 @@ namespace EngineResources
 			Util::Model3DData ModelData = Util::LoadModel3DData(Request.Path.c_str());
 			Util::Model3D Model = Util::ParseModel3D(ModelData);
 
-			u32 MateriaIndex = 0;
-			u32 InstanceIndex = 0;
-			u64 ModelVertexByteOffset = 0;
-			u64 VertexBufferOffset = 0;
-			u64 IndexBufferOffset = 0;
+			std::vector<Shader_Meshlet> Meshlets(Model.Meshlets, Model.Meshlets + Model.Header.MeshletCount);
+			std::vector<u32> MeshletVertices(Model.MeshletVertices, Model.MeshletVertices + Model.Header.MeshletVertexCount);
+
+			u32 ModelMeshletIndex = 0;
 
 			for (u32 i = 0; i < Model.Header.MeshCount; i++)
 			{
-				const u64 VerticesCount = Model.VerticesCounts[i];
-				const u32 IndicesCount = Model.IndicesCounts[i];
-
 				BmRender_Image AlbedoTextureHandle = DefaultAsset.RenderImageHandle;
 				u32 TextureGPUIndex = 0;
 
-				if (Model.Header.MaterialCount > 0)
+				const u32 MaterialIndex = Model.MaterialIndices[i];
+				if (MaterialIndex < Model.Header.MaterialCount)
 				{
-					const u32 MaterialIndex = Model.MaterialIndices[i];
 					const Util::Model3DMaterial& material = Model.Materials[MaterialIndex];
 
 					auto it = TextureAssets.find(material.DiffuseTextureHash);
@@ -184,16 +186,6 @@ namespace EngineResources
 					//}
 				}
 
-				const u64 VertexDataSize = VerticesCount * sizeof(Shader_StaticMeshVertex);
-				const u64 VerticesSize = sizeof(Shader_StaticMeshVertex) * VerticesCount;
-				const u64 IndicesSize = IndicesCount * sizeof(u32);
-					
-				BmRender_GPUBufferUpdateData VertexHandle = { GetVertexBuffer(), VertexBufferOffset, VertexDataSize };
-				BmRender_GPUBufferUpdateData IndexHandle = { GetIndexBuffer(), IndexBufferOffset, IndicesSize };
-
-				RenderResources::UpdateBufferRegion(VertexHandle, 0, Model.VertexData + ModelVertexByteOffset, VertexDataSize);
-				RenderResources::UpdateBufferRegion(IndexHandle, 0, Model.VertexData + ModelVertexByteOffset + VertexDataSize, IndicesSize);
-
 				Shader_Material Mat;
 				Mat.AlbedoTexIndex = TextureGPUIndex;
 				Mat.SpecularTexIndex = TextureGPUIndex;
@@ -212,21 +204,44 @@ namespace EngineResources
 				const BmRender_GPUBufferUpdateData InstanceHandle = { GetInstanceBuffer(), InstanceOffset, sizeof(Instance) };
 				RenderResources::UpdateBufferRegion(InstanceHandle, 0, &Instance, sizeof(Instance));
 
+				for (u32 j = 0; j < Model.MeshletCounts[i]; j++, ModelMeshletIndex++)
+				{
+					Shader_Meshlet& Meshlet = Meshlets[ModelMeshletIndex];
+					Meshlet.InstanceIndex = InstanceIndex;
+					Meshlet.VertexOffset += MeshletVertexCount;
+					Meshlet.TriangleOffset += MeshletTriangleCount;
+				}
+
 				++InstanceIndex;
-
-				DrawEntity Entity = { };
-				Entity.VertexBufferEntry = VertexHandle;
-				Entity.IndexBufferEntry = IndexHandle;
-				Entity.InstanceBufferEntry = InstanceHandle;
-				Entity.IndicesCount = IndicesCount;
-				Entity.Instances = 1;
-
-				TmpScene->DrawEntities.push_back(Entity);
-
-				VertexBufferOffset += VertexDataSize;
-				IndexBufferOffset += IndicesSize;
-				ModelVertexByteOffset += VertexDataSize + IndicesSize;
 			}
+
+			for (u32& MeshletVertex : MeshletVertices)
+			{
+				MeshletVertex += VertexCount;
+			}
+
+			const u64 VerticesSize = Model.Header.VertexCount * sizeof(Shader_StaticMeshVertex);
+			const BmRender_GPUBufferUpdateData VertexHandle = { GetVertexBuffer(), VertexCount * sizeof(Shader_StaticMeshVertex), VerticesSize };
+			RenderResources::UpdateBufferRegion(VertexHandle, 0, Model.Vertices, VerticesSize);
+
+			const u64 MeshletsSize = Meshlets.size() * sizeof(Shader_Meshlet);
+			const BmRender_GPUBufferUpdateData MeshletHandle = { GetMeshletBuffer(), MeshletCount * sizeof(Shader_Meshlet), MeshletsSize };
+			RenderResources::UpdateBufferRegion(MeshletHandle, 0, Meshlets.data(), MeshletsSize);
+
+			const u64 MeshletVerticesSize = MeshletVertices.size() * sizeof(u32);
+			const BmRender_GPUBufferUpdateData MeshletVertexHandle = { GetMeshletVertexBuffer(), MeshletVertexCount * sizeof(u32), MeshletVerticesSize };
+			RenderResources::UpdateBufferRegion(MeshletVertexHandle, 0, MeshletVertices.data(), MeshletVerticesSize);
+
+			const u64 MeshletTrianglesSize = Model.Header.MeshletTriangleCount * sizeof(u32);
+			const BmRender_GPUBufferUpdateData MeshletTriangleHandle = { GetMeshletTriangleBuffer(), MeshletTriangleCount * sizeof(u32), MeshletTrianglesSize };
+			RenderResources::UpdateBufferRegion(MeshletTriangleHandle, 0, Model.MeshletTriangles, MeshletTrianglesSize);
+
+			VertexCount += Model.Header.VertexCount;
+			MeshletCount += Model.Header.MeshletCount;
+			MeshletVertexCount += Model.Header.MeshletVertexCount;
+			MeshletTriangleCount += Model.Header.MeshletTriangleCount;
+
+			TmpScene->FrameDataBuffer.MeshletCount = MeshletCount;
 
 			Util::ClearModel3DData(ModelData);
 		}

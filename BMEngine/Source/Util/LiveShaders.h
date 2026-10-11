@@ -11,6 +11,7 @@ inline slang::ISession* InitalizeSlangSession(slang::IGlobalSession* GlobalSessi
 	{
 		slang::CompilerOptionName::EmitSpirvDirectly, {slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr},
 		slang::CompilerOptionName::MatrixLayoutColumn, {slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr},
+		slang::CompilerOptionName::VulkanUseEntryPointName, {slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr},
 	};
 
 	slang::TargetDesc targetDesc = {};

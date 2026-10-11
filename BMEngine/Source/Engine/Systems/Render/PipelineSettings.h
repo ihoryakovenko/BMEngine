@@ -41,10 +41,6 @@ inline BmRender_PipelineSettings GetStaticPipelineDescription()
 	PipelineDesc.MultisampleState = {};
 	PipelineDesc.MultisampleState.SampleShadingEnable = false;
 
-	PipelineDesc.InputAssemblyState = {};
-	PipelineDesc.InputAssemblyState.Topology = BmRender_PrimitiveTopology::TriangleList;
-	PipelineDesc.InputAssemblyState.PrimitiveRestartEnable = false;
-
 	PipelineDesc.ViewportState = {};
 	PipelineDesc.ViewportState.ViewportCount = 1;
 	PipelineDesc.ViewportState.ScissorCount = 1;
@@ -103,10 +99,6 @@ inline BmRender_PipelineSettings GetDepthPipelineDescription()
 
 	PipelineDesc.MultisampleState = {};
 	PipelineDesc.MultisampleState.SampleShadingEnable = false;
-
-	PipelineDesc.InputAssemblyState = {};
-	PipelineDesc.InputAssemblyState.Topology = BmRender_PrimitiveTopology::TriangleList;
-	PipelineDesc.InputAssemblyState.PrimitiveRestartEnable = false;
 
 	PipelineDesc.ViewportState = {};
 	PipelineDesc.ViewportState.ViewportCount = 1;

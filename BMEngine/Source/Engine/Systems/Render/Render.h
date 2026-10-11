@@ -14,15 +14,6 @@
 
 struct GLFWwindow;
 
-struct DrawEntity
-{
-	BmRender_GPUBufferUpdateData VertexBufferEntry;
-	BmRender_GPUBufferUpdateData IndexBufferEntry;
-	BmRender_GPUBufferUpdateData InstanceBufferEntry;
-	u32 IndicesCount;
-	u32 Instances;
-};
-
 struct StaticMeshPipelineDepr
 {
 	BmRender_ImageView ShadowMapArrayImageInterface[MAX_DRAW_FRAMES];
@@ -46,13 +37,8 @@ struct DrawScene
 {
 	Shader_FrameData FrameDataBuffer;
 
-	DrawEntity* DrawTransparentEntities = nullptr;
-	u32 DrawTransparentEntitiesCount = 0;
-
-	DrawEntity SkyBox;
-	bool DrawSkyBox = false;
-
-	std::vector<DrawEntity> DrawEntities;
+	bool MeshletDebugView = false;
+	glm::mat4 CullLightSpaceMatrices[MAX_SHADOW_TEXTURES];
 };
 
 void Render_Init(GLFWwindow* WindowHandle);
@@ -69,6 +55,8 @@ BmRender_Image* TestDeferredInputDepthImage();
 
 DescriptorSetHandles* GetHandles();
 BmRender_GPUBuffer* GetVertexBuffer();
-BmRender_GPUBuffer* GetIndexBuffer();
 BmRender_GPUBuffer* GetInstanceBuffer();
 BmRender_GPUBuffer* GetMaterialBuffer();
+BmRender_GPUBuffer* GetMeshletBuffer();
+BmRender_GPUBuffer* GetMeshletVertexBuffer();
+BmRender_GPUBuffer* GetMeshletTriangleBuffer();

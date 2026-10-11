@@ -1,5 +1,6 @@
 #include "Common.slang"
 #include "ShaderTypes.h"
+#include "Meshlet.slang"
 
 static const int DIRECTIONAL_LIGHT_SHADOW_TEXTURE_INDEX = 0;
 static const int SPOT_LIGHT_SHADOW_TEXTURE_INDEX = 1;
@@ -211,25 +212,48 @@ float3 CastSpotLight(Shader_SpotLight light, float3 fragPos, float3 albedo, floa
     //return (1.0 - shadow) * brdf * radiance;
 }
 
-[shader("vertex")]
-VertexOutput MainVertex(uint vID: SV_VertexID, uint iID: SV_StartInstanceLocation)
+[shader("amplification")]
+[numthreads(MESHLET_GROUP_SIZE, 1, 1)]
+void MainTask(uint3 dispatchThreadID: SV_DispatchThreadID, uint groupThreadIndex: SV_GroupIndex)
 {
-    Shader_StaticMeshVertex vertex = PushData.FrameData.StaticMeshVertexBuffer[vID];
-    Shader_StaticMeshInstance instance = PushData.FrameData.StaticMeshInstanceBuffer[iID];
+    uint meshletIndex = dispatchThreadID.x;
+    DispatchMeshlets(meshletIndex, groupThreadIndex, IsMeshletVisibleFromCamera(meshletIndex));
+}
 
-    VertexOutput output;
-    output.layout.FragmentTexture = vertex.TextureCoords;
+[shader("mesh")]
+[outputtopology("triangle")]
+[numthreads(MESHLET_GROUP_SIZE, 1, 1)]
+void MainMesh(uint groupThreadIndex: SV_GroupIndex, uint3 groupID: SV_GroupID, in payload MeshletPayload payload,
+    out vertices VertexOutput outVertices[MESHLET_MAX_VERTICES], out indices uint3 outTriangles[MESHLET_MAX_TRIANGLES])
+{
+    Shader_Meshlet meshlet = PushData.FrameData.MeshletBuffer[payload.MeshletIndices[groupID.x]];
+    Shader_StaticMeshInstance instance = PushData.FrameData.StaticMeshInstanceBuffer[meshlet.InstanceIndex];
 
-    float4 worldPos = mul(instance.ModelMatrix, float4(vertex.Position, 1.0));
-    output.layout.WorldFragPos = worldPos.xyz;
+    SetMeshOutputCounts(meshlet.VertexCount, meshlet.TriangleCount);
 
     float3x3 normalMatrix = (float3x3)transpose(inverse((float3x3)instance.ModelMatrix));
 
-    output.layout.FragmentNormal = normalize(mul(normalMatrix, vertex.Normal));
-    output.layout.FragmentMaterialIndex = instance.MaterialIndex;
-    output.Position = mul(PushData.FrameData.Projection, mul(PushData.FrameData.View, worldPos));
+    for (uint i = groupThreadIndex; i < meshlet.VertexCount; i += MESHLET_GROUP_SIZE)
+    {
+        Shader_StaticMeshVertex vertex = LoadMeshletVertex(meshlet, i);
 
-    return output;
+        VertexOutput output;
+        output.layout.FragmentTexture = vertex.TextureCoords;
+
+        float4 worldPos = mul(instance.ModelMatrix, float4(vertex.Position, 1.0));
+        output.layout.WorldFragPos = worldPos.xyz;
+
+        output.layout.FragmentNormal = normalize(mul(normalMatrix, vertex.Normal));
+        output.layout.FragmentMaterialIndex = instance.MaterialIndex;
+        output.Position = mul(PushData.FrameData.Projection, mul(PushData.FrameData.View, worldPos));
+
+        outVertices[i] = output;
+    }
+
+    for (uint i = groupThreadIndex; i < meshlet.TriangleCount; i += MESHLET_GROUP_SIZE)
+    {
+        outTriangles[i] = LoadMeshletTriangle(meshlet, i);
+    }
 }
 
 [shader("fragment")]

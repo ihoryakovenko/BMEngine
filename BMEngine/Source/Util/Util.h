@@ -34,19 +34,24 @@ namespace Util
 
 	struct Model3DFileHeader
 	{
-		u64 VertexDataSize;
 		u32 MeshCount;
 		u32 MaterialCount;
 		u32 UniqueTextureCount;
+		u32 VertexCount;
+		u32 MeshletCount;
+		u32 MeshletVertexCount;
+		u32 MeshletTriangleCount;
 	};
 
 	struct Model3D
 	{
 		Model3DFileHeader Header;
 
-		u8* VertexData;
-		u64* VerticesCounts;
-		u32* IndicesCounts;
+		Shader_StaticMeshVertex* Vertices;
+		Shader_Meshlet* Meshlets;
+		u32* MeshletVertices;
+		u32* MeshletTriangles;
+		u32* MeshletCounts;
 		u32* MaterialIndices;
 		Model3DMaterial* Materials;
 		u64* UniqueTextureHashes;

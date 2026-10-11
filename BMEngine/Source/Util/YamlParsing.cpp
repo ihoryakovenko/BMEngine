@@ -166,57 +166,16 @@ namespace Util
 		return OutBinding;
 	}
 
-	Yaml::Node& GetVertexBindingNode(Yaml::Node& VertexNode)
-	{
-		if (!VertexNode["binding"].IsNone())
-		{
-			return VertexNode["binding"];
-		}
-		assert(false);
-		static Yaml::Node Empty;
-		return Empty;
-	}
-
-	Yaml::Node& GetVertexAttributesNode(Yaml::Node& VertexNode)
-	{
-		if (!VertexNode["attributes"].IsNone())
-		{
-			return VertexNode["attributes"];
-		}
-		assert(false);
-		static Yaml::Node Empty;
-		return Empty;
-	}
-
-	Yaml::Node& GetVertexAttributeTypeNode(Yaml::Node& AttributeNode)
-	{
-		if (!AttributeNode["type"].IsNone())
-		{
-			return AttributeNode["type"];
-		}
-		assert(false);
-		static Yaml::Node Empty;
-		return Empty;
-	}
-
 	BmRender_PipelineShaderStage ParseShaderStage(const char* Value, u32 Length)
 	{
-		if (StringMatches(Value, Length, ParseStrings::VERTEX_SHADER_STRINGS))
-			return BmRender_PipelineShaderStage::Vertex;
 		if (StringMatches(Value, Length, ParseStrings::FRAGMENT_STRINGS))
 			return BmRender_PipelineShaderStage::Fragment;
-		if (StringMatches(Value, Length, ParseStrings::GEOMETRY_STRINGS))
-			return BmRender_PipelineShaderStage::Geometry;
 		if (StringMatches(Value, Length, ParseStrings::COMPUTE_STRINGS))
 			return BmRender_PipelineShaderStage::Compute;
-		if (StringMatches(Value, Length, ParseStrings::TESS_CONTROL_STRINGS))
-			return BmRender_PipelineShaderStage::TessControl;
-		if (StringMatches(Value, Length, ParseStrings::TESS_EVAL_STRINGS))
-			return BmRender_PipelineShaderStage::TessEval;
 		if (StringMatches(Value, Length, ParseStrings::TASK_STRINGS))
-			assert(false); // Task shader not supported in PipelineShaderStage enum
+			return BmRender_PipelineShaderStage::Task;
 		if (StringMatches(Value, Length, ParseStrings::MESH_STRINGS))
-			assert(false); // Mesh shader not supported in PipelineShaderStage enum
+			return BmRender_PipelineShaderStage::Mesh;
 		if (StringMatches(Value, Length, ParseStrings::RAYGEN_STRINGS))
 			assert(false); // Ray gen shader not supported in PipelineShaderStage enum
 		if (StringMatches(Value, Length, ParseStrings::CLOSEST_HIT_STRINGS))
@@ -231,7 +190,7 @@ namespace Util
 			assert(false); // Callable shader not supported in PipelineShaderStage enum
 
 		assert(false);
-		return BmRender_PipelineShaderStage::Vertex;
+		return BmRender_PipelineShaderStage::Fragment;
 	}
 
 	BmRender_Filter ParseFilter(const char* Value, u32 Length)
@@ -297,14 +256,10 @@ namespace Util
 
 			u32 tokenLength = static_cast<u32>(token - tokenStart);
 
-			if (StringMatches(tokenStart, tokenLength, ParseStrings::VERTEX_BIT_STRINGS)) flags |= static_cast<u64>(BmRender_DescriptorShaderStage::Vertex);
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::FRAGMENT_BIT_STRINGS)) flags |= static_cast<u64>(BmRender_DescriptorShaderStage::Fragment);
+			if (StringMatches(tokenStart, tokenLength, ParseStrings::FRAGMENT_BIT_STRINGS)) flags |= static_cast<u64>(BmRender_DescriptorShaderStage::Fragment);
 			else if (StringMatches(tokenStart, tokenLength, ParseStrings::COMPUTE_BIT_STRINGS)) flags |= static_cast<u64>(BmRender_DescriptorShaderStage::Compute);
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::GEOMETRY_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::TESSELLATION_CONTROL_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::TESSELLATION_EVALUATION_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::TASK_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage
-			else if (StringMatches(tokenStart, tokenLength, ParseStrings::MESH_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::TASK_BIT_STRINGS)) flags |= static_cast<u64>(BmRender_DescriptorShaderStage::Task);
+			else if (StringMatches(tokenStart, tokenLength, ParseStrings::MESH_BIT_STRINGS)) flags |= static_cast<u64>(BmRender_DescriptorShaderStage::Mesh);
 			else if (StringMatches(tokenStart, tokenLength, ParseStrings::RAYGEN_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage
 			else if (StringMatches(tokenStart, tokenLength, ParseStrings::CLOSEST_HIT_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage
 			else if (StringMatches(tokenStart, tokenLength, ParseStrings::ANY_HIT_BIT_STRINGS)) assert(false); // Not in DescriptorShaderStage

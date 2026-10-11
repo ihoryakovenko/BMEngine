@@ -613,9 +613,10 @@ VKAPI_ATTR VkBool32 VKAPI_CALL MessengerDebugCallback(VkDebugUtilsMessageSeverit
 VkShaderStageFlags DescriptorShaderStageToVkShaderStage(BmRender_DescriptorShaderStage stage)
 {
 	VkShaderStageFlags flags = 0;
-	if ((u64)stage & (u64)BmRender_DescriptorShaderStage::Vertex)   flags |= VK_SHADER_STAGE_VERTEX_BIT;
 	if ((u64)stage & (u64)BmRender_DescriptorShaderStage::Fragment) flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
 	if ((u64)stage & (u64)BmRender_DescriptorShaderStage::Compute)  flags |= VK_SHADER_STAGE_COMPUTE_BIT;
+	if ((u64)stage & (u64)BmRender_DescriptorShaderStage::Task)     flags |= VK_SHADER_STAGE_TASK_BIT_EXT;
+	if ((u64)stage & (u64)BmRender_DescriptorShaderStage::Mesh)     flags |= VK_SHADER_STAGE_MESH_BIT_EXT;
 	return flags;
 }
 
@@ -623,20 +624,17 @@ VkShaderStageFlagBits PipelineShaderStageToVkShaderStage(BmRender_PipelineShader
 {
 	switch (stage)
 	{
-		case BmRender_PipelineShaderStage::Vertex:   return VK_SHADER_STAGE_VERTEX_BIT;
 		case BmRender_PipelineShaderStage::Fragment: return VK_SHADER_STAGE_FRAGMENT_BIT;
-		case BmRender_PipelineShaderStage::Geometry: return VK_SHADER_STAGE_GEOMETRY_BIT;
-		case BmRender_PipelineShaderStage::TessControl: return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
-		case BmRender_PipelineShaderStage::TessEval:    return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
 		case BmRender_PipelineShaderStage::Compute:     return VK_SHADER_STAGE_COMPUTE_BIT;
+		case BmRender_PipelineShaderStage::Task:        return VK_SHADER_STAGE_TASK_BIT_EXT;
+		case BmRender_PipelineShaderStage::Mesh:        return VK_SHADER_STAGE_MESH_BIT_EXT;
 	}
-	return VK_SHADER_STAGE_VERTEX_BIT;
+	return VK_SHADER_STAGE_FRAGMENT_BIT;
 }
 
 VkPipelineStageFlags PipelineSyncToVkPipelineStage(BmRender_PipelineSyncStage stage)
 {
 	VkPipelineStageFlags flags = 0;
-	if ((u64)stage & (u64)BmRender_PipelineSyncStage::VertexShader)          flags |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
 	if ((u64)stage & (u64)BmRender_PipelineSyncStage::FragmentShader)        flags |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 	if ((u64)stage & (u64)BmRender_PipelineSyncStage::ColorAttachmentOutput) flags |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	if ((u64)stage & (u64)BmRender_PipelineSyncStage::ComputeShader)         flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
@@ -869,20 +867,6 @@ BmRender_DescriptorType VkDescriptorTypeToBmRender(VkDescriptorType Type)
 		default:
 			assert(false);
 			return BmRender_DescriptorType::Sampler;
-	}
-}
-
-VkIndexType IndexTypeToVk(BmRender_IndexType Type)
-{
-	switch (Type)
-	{
-		case BmRender_IndexType::Uint16:
-			return VK_INDEX_TYPE_UINT16;
-		case BmRender_IndexType::Uint32:
-			return VK_INDEX_TYPE_UINT32;
-		default:
-			assert(false);
-			return VK_INDEX_TYPE_UINT16;
 	}
 }
 
@@ -1555,24 +1539,28 @@ VkShaderStageFlags ShaderStageFlagsToVk(BmRender_DescriptorShaderStage StageFlag
 {
 	VkShaderStageFlags VkFlags = 0;
 	u64 FlagsValue = static_cast<u64>(StageFlags);
-	if ((FlagsValue & static_cast<u64>(BmRender_DescriptorShaderStage::Vertex)) != 0)
-		VkFlags |= VK_SHADER_STAGE_VERTEX_BIT;
 	if ((FlagsValue & static_cast<u64>(BmRender_DescriptorShaderStage::Fragment)) != 0)
 		VkFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
 	if ((FlagsValue & static_cast<u64>(BmRender_DescriptorShaderStage::Compute)) != 0)
 		VkFlags |= VK_SHADER_STAGE_COMPUTE_BIT;
+	if ((FlagsValue & static_cast<u64>(BmRender_DescriptorShaderStage::Task)) != 0)
+		VkFlags |= VK_SHADER_STAGE_TASK_BIT_EXT;
+	if ((FlagsValue & static_cast<u64>(BmRender_DescriptorShaderStage::Mesh)) != 0)
+		VkFlags |= VK_SHADER_STAGE_MESH_BIT_EXT;
 	return VkFlags;
 }
 
 BmRender_DescriptorShaderStage VkShaderStageFlagsToBmRender(VkShaderStageFlags StageFlags)
 {
 	BmRender_DescriptorShaderStage BmFlags = BmRender_DescriptorShaderStage::None;
-	if (StageFlags & VK_SHADER_STAGE_VERTEX_BIT)
-		BmFlags = static_cast<BmRender_DescriptorShaderStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_DescriptorShaderStage::Vertex));
 	if (StageFlags & VK_SHADER_STAGE_FRAGMENT_BIT)
 		BmFlags = static_cast<BmRender_DescriptorShaderStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_DescriptorShaderStage::Fragment));
 	if (StageFlags & VK_SHADER_STAGE_COMPUTE_BIT)
 		BmFlags = static_cast<BmRender_DescriptorShaderStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_DescriptorShaderStage::Compute));
+	if (StageFlags & VK_SHADER_STAGE_TASK_BIT_EXT)
+		BmFlags = static_cast<BmRender_DescriptorShaderStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_DescriptorShaderStage::Task));
+	if (StageFlags & VK_SHADER_STAGE_MESH_BIT_EXT)
+		BmFlags = static_cast<BmRender_DescriptorShaderStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_DescriptorShaderStage::Mesh));
 	return BmFlags;
 }
 
@@ -1582,8 +1570,6 @@ VkPipelineStageFlags PipelineStageFlagsToVk(BmRender_PipelineSyncStage StageFlag
 	u64 FlagsValue = static_cast<u64>(StageFlags);
 	if ((FlagsValue & static_cast<u64>(BmRender_PipelineSyncStage::TopOfPipe)) != 0)
 		VkFlags |= VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-	if ((FlagsValue & static_cast<u64>(BmRender_PipelineSyncStage::VertexShader)) != 0)
-		VkFlags |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
 	if ((FlagsValue & static_cast<u64>(BmRender_PipelineSyncStage::FragmentShader)) != 0)
 		VkFlags |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 	if ((FlagsValue & static_cast<u64>(BmRender_PipelineSyncStage::ColorAttachmentOutput)) != 0)
@@ -1600,8 +1586,6 @@ BmRender_PipelineSyncStage VkPipelineStageFlagsToBmRender(VkPipelineStageFlags S
 	BmRender_PipelineSyncStage BmFlags = BmRender_PipelineSyncStage::None;
 	if (StageFlags & VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT)
 		BmFlags = static_cast<BmRender_PipelineSyncStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_PipelineSyncStage::TopOfPipe));
-	if (StageFlags & VK_PIPELINE_STAGE_VERTEX_SHADER_BIT)
-		BmFlags = static_cast<BmRender_PipelineSyncStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_PipelineSyncStage::VertexShader));
 	if (StageFlags & VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
 		BmFlags = static_cast<BmRender_PipelineSyncStage>(static_cast<u64>(BmFlags) | static_cast<u64>(BmRender_PipelineSyncStage::FragmentShader));
 	if (StageFlags & VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
@@ -1722,38 +1706,6 @@ VkBlendOp BlendOpToVk(BmRender_BlendOp Op)
 	}
 }
 
-VkPrimitiveTopology PrimitiveTopologyToVk(BmRender_PrimitiveTopology Topology)
-{
-	switch (Topology)
-	{
-		case BmRender_PrimitiveTopology::PointList:
-			return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-		case BmRender_PrimitiveTopology::LineList:
-			return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-		case BmRender_PrimitiveTopology::LineStrip:
-			return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
-		case BmRender_PrimitiveTopology::TriangleList:
-			return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-		case BmRender_PrimitiveTopology::TriangleStrip:
-			return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-		case BmRender_PrimitiveTopology::TriangleFan:
-			return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
-		case BmRender_PrimitiveTopology::LineListWithAdjacency:
-			return VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY;
-		case BmRender_PrimitiveTopology::LineStripWithAdjacency:
-			return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY;
-		case BmRender_PrimitiveTopology::TriangleListWithAdjacency:
-			return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY;
-		case BmRender_PrimitiveTopology::TriangleStripWithAdjacency:
-			return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY;
-		case BmRender_PrimitiveTopology::PatchList:
-			return VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
-		default:
-			assert(false);
-			return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	}
-}
-
 VkSampleCountFlagBits SampleCountToVk(BmRender_SampleCount Count)
 {
 	switch (Count)
@@ -1832,15 +1784,6 @@ VkPipelineMultisampleStateCreateInfo MultisampleStateToVk(const BmRender_Multisa
 	VkPipelineMultisampleStateCreateInfo VkState = {};
 	VkState.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	VkState.sampleShadingEnable = State.SampleShadingEnable ? VK_TRUE : VK_FALSE;
-	return VkState;
-}
-
-VkPipelineInputAssemblyStateCreateInfo InputAssemblyStateToVk(const BmRender_InputAssemblyState& State)
-{
-	VkPipelineInputAssemblyStateCreateInfo VkState = {};
-	VkState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	VkState.topology = PrimitiveTopologyToVk(State.Topology);
-	VkState.primitiveRestartEnable = State.PrimitiveRestartEnable ? VK_TRUE : VK_FALSE;
 	return VkState;
 }
 

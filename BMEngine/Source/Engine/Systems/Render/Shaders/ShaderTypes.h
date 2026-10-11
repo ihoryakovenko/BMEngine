@@ -24,6 +24,10 @@ typedef u32 uint;
 
 static const int MAX_SHADOW_TEXTURES = 2;
 
+static const uint MESHLET_MAX_VERTICES = 64;
+static const uint MESHLET_MAX_TRIANGLES = 124;
+static const uint MESHLET_GROUP_SIZE = 32;
+
 struct Shader_PointLight
 {
     float3 Position;
@@ -79,15 +83,26 @@ struct Shader_StaticMeshInstance
     
 };
 
-struct Shader_StaticMeshVertexInput
+struct Shader_Meshlet
 {
-    Shader_StaticMeshVertex Vertex;
-    Shader_StaticMeshInstance Instance;
+    float3 BoundsCenter;
+    float BoundsRadius;
+    float3 ConeAxis;
+    float ConeCutoff;
+    uint VertexOffset;
+    uint TriangleOffset;
+    uint VertexCount;
+    uint TriangleCount;
+    uint InstanceIndex;
+    uint pad1;
+    uint pad2;
+    uint pad3;
 };
 
 struct Shader_LightSpaceMatrixData
 {
     float4x4 Matrix;
+    float4x4 CullMatrix;
 };
 
 struct Shader_FrameData
@@ -100,7 +115,12 @@ struct Shader_FrameData
     GPU_POINTER_TYPE(Shader_StaticMeshVertex) StaticMeshVertexBuffer;
     GPU_POINTER_TYPE(Shader_StaticMeshInstance) StaticMeshInstanceBuffer;
     GPU_POINTER_TYPE(Shader_Material) MaterialBuffer;
-    uint pad;
+    GPU_POINTER_TYPE(Shader_Meshlet) MeshletBuffer;
+    GPU_POINTER_TYPE(uint) MeshletVertexBuffer;
+    GPU_POINTER_TYPE(uint) MeshletTriangleBuffer;
+    float4x4 CullViewProjection;
+    float3 CullCameraPosition;
+    uint MeshletCount;
 };
 
 struct Shader_PushData

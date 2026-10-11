@@ -93,12 +93,6 @@ namespace TransferSystem
 	{
 		switch (Stage)
 		{
-			case BmRender_PipelineSyncStage::VertexShader:
-				Barrier->srcStageMask = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT;
-				Barrier->srcAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
-				Barrier->dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-				Barrier->dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-				break;
 			case BmRender_PipelineSyncStage::FragmentShader:
 				Barrier->srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
 				Barrier->srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT;

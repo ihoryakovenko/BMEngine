@@ -16,7 +16,7 @@
 
 namespace fs = std::filesystem;
 
-static BmRender_Shader Shaders[(u32)PipelineNames::MAX_VALUE];
+static BmRender_Shader Shaders[sizeof(Metadata_Stages) / sizeof(Metadata_Stages[0])];
 static BmRender_PipelineLayout Layouts[(u32)PipelineNames::MAX_VALUE];
 static BmRender_Pipeline Pipelines[(u32)PipelineNames::MAX_VALUE];
 
@@ -30,6 +30,11 @@ static fs::file_time_type LastCompilationTime[(u32)PipelineNames::MAX_VALUE];
 static BmRender_PipelineSettings SavedSettings[(u32)PipelineNames::MAX_VALUE];
 static AttachmentData SavedAttachmentData[(u32)PipelineNames::MAX_VALUE];
 
+static u32 GetFirstStageIndex(const Metadata_Pipeline* Metadata)
+{
+	return static_cast<u32>(Metadata->Stages - Metadata_Stages);
+}
+
 void PipelineManger_Init(bool EnableLiveShaders)
 {
 	LiveShaders = EnableLiveShaders;
@@ -42,21 +47,26 @@ void PipelineManger_Init(bool EnableLiveShaders)
 	std::vector<char> ShaderCode;
 	for (u32 i = 0; i < (u32)PipelineNames::MAX_VALUE; ++i)
 	{
-		if (Util::OpenAndReadFileFull(Metadata_Pipelines[i].FilePath, ShaderCode, "rb"))
-		{
-			BmRender_ShaderDescription ShaderDesc = {};
-			ShaderDesc.Code = reinterpret_cast<const u32*>(ShaderCode.data());
-			ShaderDesc.CodeSize = ShaderCode.size();
-			Shaders[i] = BmRender_CreateShader(&ShaderDesc);
+		const Metadata_Pipeline* Metadata = Metadata_Pipelines + i;
 
-			if (LiveShaders)
+		for (u32 j = 0; j < Metadata->StageCount; ++j)
+		{
+			if (Util::OpenAndReadFileFull(Metadata->Stages[j].FilePath, ShaderCode, "rb"))
 			{
-				LastCompilationTime[i] = fs::last_write_time(Metadata_Pipelines[i].FilePath);
+				BmRender_ShaderDescription ShaderDesc = {};
+				ShaderDesc.Code = reinterpret_cast<const u32*>(ShaderCode.data());
+				ShaderDesc.CodeSize = ShaderCode.size();
+				Shaders[GetFirstStageIndex(Metadata) + j] = BmRender_CreateShader(&ShaderDesc);
+			}
+			else
+			{
+				assert(false);
 			}
 		}
-		else
+
+		if (LiveShaders)
 		{
-			assert(false);
+			LastCompilationTime[i] = fs::last_write_time(Metadata->Stages[0].FilePath);
 		}
 	}
 
@@ -71,9 +81,13 @@ void RenderResourceManager_DeInit()
 	}
 
 	assert(Initialized);
+	for (BmRender_Shader Shader : Shaders)
+	{
+		BmRender_DestroyShader(Shader);
+	}
+
 	for (u32 i = 0; i < (u32)PipelineNames::MAX_VALUE; ++i)
 	{
-		BmRender_DestroyShader(Shaders[i]);
 		BmRender_DestroyPipelineLayout(Layouts[i]);
 		BmRender_DestroyPipeline(Pipelines[i]);
 	}
@@ -108,7 +122,6 @@ void RenderResourceManager_Update()
 			std::vector<Slang::ComPtr<slang::IComponentType>> ComponentsToLink;
 			Slang::ComPtr<slang::IComponentType> Program;
 			Slang::ComPtr<slang::IComponentType> LinkedProgram;
-			Slang::ComPtr<ISlangBlob> Spirv;
 
 			std::ifstream ShaderSourceFile(Metadata_Pipelines[i].SourcePath, std::ios::binary);
 
@@ -153,28 +166,40 @@ void RenderResourceManager_Update()
 				continue;
 			}
 
-			LinkedProgram->getTargetCode(0, Spirv.writeRef(), Diagnostics.writeRef());
-			CheckDiagnostics(Diagnostics);
-			if (!DiagnosticsCheck)
+			const Metadata_Pipeline* Metadata = Metadata_Pipelines + i;
+			const u32 FirstStage = GetFirstStageIndex(Metadata);
+
+			std::vector<Slang::ComPtr<ISlangBlob>> StageSpirv(Metadata->StageCount);
+			bool StagesCompiled = true;
+			for (u32 j = 0; j < Metadata->StageCount; ++j)
+			{
+				LinkedProgram->getEntryPointCode(j, 0, StageSpirv[j].writeRef(), Diagnostics.writeRef());
+				StagesCompiled = CheckDiagnostics(Diagnostics) && StageSpirv[j] && StagesCompiled;
+			}
+
+			if (!StagesCompiled)
 			{
 				continue;
 			}
 
-			
-			BmRender_DestroyShader(Shaders[i]);
+			BmRender_DeviceWaitIdle();
 
-			BmRender_ShaderDescription ShaderDesc = {};
-			ShaderDesc.Code = reinterpret_cast<const u32*>(Spirv->getBufferPointer());
-			ShaderDesc.CodeSize = Spirv->getBufferSize();
-			Shaders[i] = BmRender_CreateShader(&ShaderDesc);
+			for (u32 j = 0; j < Metadata->StageCount; ++j)
+			{
+				BmRender_DestroyShader(Shaders[FirstStage + j]);
 
-			const Metadata_Pipeline* Metadata = Metadata_Pipelines + i;
+				BmRender_ShaderDescription ShaderDesc = {};
+				ShaderDesc.Code = reinterpret_cast<const u32*>(StageSpirv[j]->getBufferPointer());
+				ShaderDesc.CodeSize = StageSpirv[j]->getBufferSize();
+				Shaders[FirstStage + j] = BmRender_CreateShader(&ShaderDesc);
+			}
+
 			BmRender_ShaderStageDescription* StageDescriptions = Memory_ScopeAllocator_AllocT<BmRender_ShaderStageDescription>(&AllocatorMarker, Metadata->StageCount);
 
 			for (u32 j = 0; j < Metadata->StageCount; ++j)
 			{
 				BmRender_ShaderStageDescription* Stage = StageDescriptions + j;
-				Stage->Shader = &Shaders[i];
+				Stage->Shader = &Shaders[FirstStage + j];
 				Stage->EntryPointFunction = Metadata->Stages[j].EntryPoint;
 				Stage->Stage = Metadata->Stages[j].Stage;
 			}
@@ -241,7 +266,7 @@ void RenderResourceManager_CreateGraphicsPipeline(PipelineNames Name, const BmRe
 	for (u32 i = 0; i < Metadata->StageCount; ++i)
 	{
 		BmRender_ShaderStageDescription* Stage = StageDescriptions + i;
-		Stage->Shader = &Shaders[(u32)Name];
+		Stage->Shader = &Shaders[GetFirstStageIndex(Metadata) + i];
 		Stage->EntryPointFunction = Metadata->Stages[i].EntryPoint;
 		Stage->Stage = Metadata->Stages[i].Stage;
 	}
@@ -274,7 +299,7 @@ void RenderResourceManager_CreateComputePipeline(PipelineNames Name)
 	for (u32 i = 0; i < Metadata->StageCount; ++i)
 	{
 		BmRender_ShaderStageDescription* Stage = StageDescriptions + i;
-		Stage->Shader = &Shaders[(u32)Name];
+		Stage->Shader = &Shaders[GetFirstStageIndex(Metadata) + i];
 		Stage->EntryPointFunction = Metadata->Stages[i].EntryPoint;
 		Stage->Stage = Metadata->Stages[i].Stage;
 	}

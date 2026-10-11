@@ -51,9 +51,11 @@ static BmRender_GPUBuffer FrameDataBuffer;
 static const u64 LightSpaceMatrixDataOffset = sizeof(Shader_FrameData) * MAX_DRAW_FRAMES;
 
 static BmRender_GPUBuffer VertexBuffer;
-static BmRender_GPUBuffer IndexBuffer;
 static BmRender_GPUBuffer InstanceBuffer;
 static BmRender_GPUBuffer MaterialBuffer;
+static BmRender_GPUBuffer MeshletBuffer;
+static BmRender_GPUBuffer MeshletVertexBuffer;
+static BmRender_GPUBuffer MeshletTriangleBuffer;
 
 static DescriptorSetHandles DescriptorSets;
 
@@ -89,7 +91,7 @@ static void GenericDraw(BmRender_CommandBuffer CommandBuffer, DrawScene* Scene, 
 {
 	RenderResourceManager_BindPipeline(CommandBuffer, Name);
 
-	RenderResourceManager_RecordPushConstants(CommandBuffer, Name, BmRender_DescriptorShaderStage::Vertex | BmRender_DescriptorShaderStage::Fragment, 0, sizeof(Shader_PushData), &ConstantData);
+	RenderResourceManager_RecordPushConstants(CommandBuffer, Name, PushConstantsDesc.StageFlags, 0, sizeof(Shader_PushData), &ConstantData);
 
 	RenderResourceManager_RecordBindDescriptorSets(CommandBuffer, Name, 0, 1, &DescriptorSets.FrameBufferSet, 0, nullptr);
 
@@ -98,14 +100,10 @@ static void GenericDraw(BmRender_CommandBuffer CommandBuffer, DrawScene* Scene, 
 		RenderResourceManager_RecordBindDescriptorSets(CommandBuffer, Name, 1, SetsCount, Sets, DynamicOffsetsCount, DynamicOffsets);
 	}
 
-	for (u32 i = 0; i < Scene->DrawEntities.size(); ++i)
+	const u32 MeshletCount = Scene->FrameDataBuffer.MeshletCount;
+	if (MeshletCount > 0)
 	{
-		DrawEntity* Entity = Scene->DrawEntities.data() + i;
-
-		
-		//BmRender_RecordPushData(CommandBuffer, &FrameDataAddr, sizeof(FrameDataAddr));
-
-		BmRender_DrawIndexed(CommandBuffer, Entity->IndicesCount, Entity->Instances, Entity->IndexBufferEntry.BufferOffset / 4, 0, i);
+		BmRender_DrawMeshTasks(CommandBuffer, (MeshletCount + MESHLET_GROUP_SIZE - 1) / MESHLET_GROUP_SIZE, 1, 1);
 	}
 }
 
@@ -230,6 +228,9 @@ static void InitStaticMeshPipeline(StaticMeshPipelineDepr* MeshPipeline, BmRende
 
 	RenderResourceManager_CreatePipelineLayout(PipelineNames::Entity, descriptorSetLayouts.data(), descriptorSetLayouts.size(), &PushConstantsDesc, 1);
 	RenderResourceManager_CreateGraphicsPipeline(PipelineNames::Entity, &Settings, &ResourceInfo);
+
+	RenderResourceManager_CreatePipelineLayout(PipelineNames::EntityMeshletDebug, descriptorSetLayouts.data(), descriptorSetLayouts.size(), &PushConstantsDesc, 1);
+	RenderResourceManager_CreateGraphicsPipeline(PipelineNames::EntityMeshletDebug, &Settings, &ResourceInfo);
 }
 
 static void DrawStaticMeshes(BmRender_CommandBuffer CommandBuffer, StaticMeshPipelineDepr* MeshPipeline, DrawScene* Scene, const DescriptorSetHandles& DescriptorSets)
@@ -241,7 +242,8 @@ static void DrawStaticMeshes(BmRender_CommandBuffer CommandBuffer, StaticMeshPip
 
 	const u32 SetsCount = sizeof(DescriptorSetGroup) / sizeof(DescriptorSetGroup[0]);
 
-	GenericDraw(CommandBuffer, Scene, PipelineNames::Entity, DescriptorSetGroup, SetsCount, nullptr, 0, FrameConstants);
+	const PipelineNames Pipeline = Scene->MeshletDebugView ? PipelineNames::EntityMeshletDebug : PipelineNames::Entity;
+	GenericDraw(CommandBuffer, Scene, Pipeline, DescriptorSetGroup, SetsCount, nullptr, 0, FrameConstants);
 }
 
 static void DeferredPassInit(BmRender_DescriptorPool* MainPool)
@@ -369,8 +371,8 @@ static void LightningPassInit(BmRender_DescriptorPool* MainPool)
 
 	BmRender_PipelineSettings PipelineDesc = GetDepthPipelineDescription();
 
-	RenderResourceManager_CreatePipelineLayout(PipelineNames::Depth_vert, descriptorSetLayouts.data(), descriptorSetLayouts.size(), &PushConstantsDesc, 1);
-	RenderResourceManager_CreateGraphicsPipeline(PipelineNames::Depth_vert, &PipelineDesc, &ResourceInfo);
+	RenderResourceManager_CreatePipelineLayout(PipelineNames::Depth, descriptorSetLayouts.data(), descriptorSetLayouts.size(), &PushConstantsDesc, 1);
+	RenderResourceManager_CreateGraphicsPipeline(PipelineNames::Depth, &PipelineDesc, &ResourceInfo);
 }
 
 static void LightningPassDraw(DrawScene* Scene)
@@ -383,11 +385,15 @@ static void LightningPassDraw(DrawScene* Scene)
 
 	BmRender_TransitionImageForRendering(RenderCommandBuffers[CurrentFrame], &ShadowMapArray, MAX_SHADOW_TEXTURES * CurrentFrame, MAX_SHADOW_TEXTURES);
 
-	const u64 CurrentLightSpaceMatrixDataOffset = LightSpaceMatrixDataOffset + sizeof(glm::mat4) * CurrentFrame;
-
 	for (u32 LightCaster = 0; LightCaster < MAX_SHADOW_TEXTURES; ++LightCaster)
 	{
-		BmRender_UpdateHostCompatibleBuffer(&FrameDataBuffer, CurrentLightSpaceMatrixDataOffset, sizeof(glm::mat4), LightViews[LightCaster]);
+		const u64 CurrentLightSpaceMatrixDataOffset = LightSpaceMatrixDataOffset + sizeof(Shader_LightSpaceMatrixData) * (CurrentFrame * MAX_SHADOW_TEXTURES + LightCaster);
+
+		Shader_LightSpaceMatrixData LightSpaceMatrixData;
+		LightSpaceMatrixData.Matrix = *LightViews[LightCaster];
+		LightSpaceMatrixData.CullMatrix = Scene->CullLightSpaceMatrices[LightCaster];
+
+		BmRender_UpdateHostCompatibleBuffer(&FrameDataBuffer, CurrentLightSpaceMatrixDataOffset, sizeof(LightSpaceMatrixData), &LightSpaceMatrixData);
 		FrameConstants.LightSpaceMatrixData = BmRender_GetBufferDeviceAddress(&FrameDataBuffer) + CurrentLightSpaceMatrixDataOffset;
 
 		BmRender_ImageView DepthImageView = (LightCaster == 0) ?
@@ -411,7 +417,7 @@ static void LightningPassDraw(DrawScene* Scene)
 
 		//BmRender_RecordPushData(RenderCommandBuffers[CurrentFrame], &FrameDataAddr, sizeof(FrameDataAddr));
 
-		GenericDraw(RenderCommandBuffers[CurrentFrame], Scene, PipelineNames::Depth_vert, nullptr, 0, nullptr, 0, FrameConstants);
+		GenericDraw(RenderCommandBuffers[CurrentFrame], Scene, PipelineNames::Depth, nullptr, 0, nullptr, 0, FrameConstants);
 
 		BmRender_EndRendering(RenderCommandBuffers[CurrentFrame]);
 	}
@@ -486,9 +492,11 @@ void Render_Init(GLFWwindow* WindowHandle)
 
 	FrameDataBuffer = BmRender_CreateUniformBuffer(65536, BmRender_MemoryPropertyFlag::HostCompatible);
 	VertexBuffer = BmRender_CreateSrvUavBuffer(MB4, BmRender_MemoryPropertyFlag::GPULocal);
-	IndexBuffer = BmRender_CreateIndexBuffer(MB4, BmRender_MemoryPropertyFlag::GPULocal);
 	InstanceBuffer = BmRender_CreateSrvUavBuffer(MB4, BmRender_MemoryPropertyFlag::GPULocal);
 	MaterialBuffer = BmRender_CreateSrvUavBuffer(MB4, BmRender_MemoryPropertyFlag::GPULocal);
+	MeshletBuffer = BmRender_CreateSrvUavBuffer(MB4, BmRender_MemoryPropertyFlag::GPULocal);
+	MeshletVertexBuffer = BmRender_CreateSrvUavBuffer(MB4, BmRender_MemoryPropertyFlag::GPULocal);
+	MeshletTriangleBuffer = BmRender_CreateSrvUavBuffer(MB4, BmRender_MemoryPropertyFlag::GPULocal);
 
 	GraphicsQueue = BmRender_CreateQueue(BmRender_QueueType::Graphic);
 
@@ -546,7 +554,7 @@ void Render_Init(GLFWwindow* WindowHandle)
 
 	PushConstantsDesc.Offset = 0;
 	PushConstantsDesc.Size = sizeof(Shader_PushData);
-	PushConstantsDesc.StageFlags = BmRender_DescriptorShaderStage::Vertex | BmRender_DescriptorShaderStage::Fragment;
+	PushConstantsDesc.StageFlags = BmRender_DescriptorShaderStage::Task | BmRender_DescriptorShaderStage::Mesh | BmRender_DescriptorShaderStage::Fragment;
 
 	DeferredPassInit(&State.MainPool);
 	MainPassInit();
@@ -588,9 +596,11 @@ void Render_DeInit()
 
 	// Destroy GPUBuffers
 	BmRender_DestroyGPUBuffer(&VertexBuffer);
-	BmRender_DestroyGPUBuffer(&IndexBuffer);
 	BmRender_DestroyGPUBuffer(&InstanceBuffer);
 	BmRender_DestroyGPUBuffer(&MaterialBuffer);
+	BmRender_DestroyGPUBuffer(&MeshletBuffer);
+	BmRender_DestroyGPUBuffer(&MeshletVertexBuffer);
+	BmRender_DestroyGPUBuffer(&MeshletTriangleBuffer);
 	BmRender_DestroyGPUBuffer(&FrameDataBuffer);
 }
 
@@ -602,6 +612,9 @@ void Render_Draw(DrawScene* Scene, u64 WaitSemaphoreValue)
 	Scene->FrameDataBuffer.StaticMeshVertexBuffer = BmRender_GetBufferDeviceAddress(&VertexBuffer);
 	Scene->FrameDataBuffer.StaticMeshInstanceBuffer = BmRender_GetBufferDeviceAddress(&InstanceBuffer);
 	Scene->FrameDataBuffer.MaterialBuffer = BmRender_GetBufferDeviceAddress(&MaterialBuffer);
+	Scene->FrameDataBuffer.MeshletBuffer = BmRender_GetBufferDeviceAddress(&MeshletBuffer);
+	Scene->FrameDataBuffer.MeshletVertexBuffer = BmRender_GetBufferDeviceAddress(&MeshletVertexBuffer);
+	Scene->FrameDataBuffer.MeshletTriangleBuffer = BmRender_GetBufferDeviceAddress(&MeshletTriangleBuffer);
 
 	RenderResources::UpdateBuffer(FrameDataBuffer, sizeof(Shader_FrameData) * CurrentFrame, &Scene->FrameDataBuffer, sizeof(Shader_FrameData));
 
@@ -610,8 +623,6 @@ void Render_Draw(DrawScene* Scene, u64 WaitSemaphoreValue)
 	BmRender_AcquireNextSwapchainImage(UINT64_MAX, ImageAvailable[CurrentFrame], nullptr, &CurrentImageIndex);
 
 	BmRender_BeginCommandBuffer(RenderCommandBuffers[CurrentFrame]);
-
-	BmRender_RecordBindIndexBuffer(RenderCommandBuffers[CurrentFrame], &IndexBuffer, 0, BmRender_IndexType::Uint32);
 
 	LightningPassDraw(Scene);
 	MainPassBeginPass();
@@ -703,11 +714,6 @@ BmRender_GPUBuffer* GetVertexBuffer()
 	return &VertexBuffer;
 }
 
-BmRender_GPUBuffer* GetIndexBuffer()
-{
-	return &IndexBuffer;
-}
-
 BmRender_GPUBuffer* GetInstanceBuffer()
 {
 	return &InstanceBuffer;
@@ -716,4 +722,19 @@ BmRender_GPUBuffer* GetInstanceBuffer()
 BmRender_GPUBuffer* GetMaterialBuffer()
 {
 	return &MaterialBuffer;
+}
+
+BmRender_GPUBuffer* GetMeshletBuffer()
+{
+	return &MeshletBuffer;
+}
+
+BmRender_GPUBuffer* GetMeshletVertexBuffer()
+{
+	return &MeshletVertexBuffer;
+}
+
+BmRender_GPUBuffer* GetMeshletTriangleBuffer()
+{
+	return &MeshletTriangleBuffer;
 }

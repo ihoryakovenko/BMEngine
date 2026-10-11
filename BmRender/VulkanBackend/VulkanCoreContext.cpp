@@ -86,26 +86,17 @@ static VkDevice CreateLogicalDevice(VkPhysicalDevice PhDevice, PhysicalDeviceInd
 	TimelineSemaphoreFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
 	TimelineSemaphoreFeatures.timelineSemaphore = VK_TRUE;
 
-	// Query indirect drawing feature support
-	VkPhysicalDeviceFeatures QueryDeviceFeatures = { };
-	vkGetPhysicalDeviceFeatures(PhDevice, &QueryDeviceFeatures);
-
-	// Enable indirect drawing features if supported
-	VkPhysicalDeviceFeatures DeviceFeatures = { };
-	DeviceFeatures.samplerAnisotropy = VK_TRUE;
-	DeviceFeatures.multiDrawIndirect = QueryDeviceFeatures.multiDrawIndirect ? VK_TRUE : VK_FALSE;
-	DeviceFeatures.drawIndirectFirstInstance = QueryDeviceFeatures.drawIndirectFirstInstance ? VK_TRUE : VK_FALSE;
-
-	VkPhysicalDeviceVulkan11Features features11 = {};
-	features11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
-	features11.shaderDrawParameters = VK_TRUE;
+	VkPhysicalDeviceMeshShaderFeaturesEXT MeshShaderFeatures = { };
+	MeshShaderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
+	MeshShaderFeatures.taskShader = VK_TRUE;
+	MeshShaderFeatures.meshShader = VK_TRUE;
 
 	DeviceFeatures2.pNext = &TimelineSemaphoreFeatures;
 	TimelineSemaphoreFeatures.pNext = &IndexingFeatures;
 	IndexingFeatures.pNext = &Sync2Features;
 	Sync2Features.pNext = &DynamicRenderingFeatures;
 	DynamicRenderingFeatures.pNext = &BufferDeviceAddressFeatures;
-	BufferDeviceAddressFeatures.pNext = &features11;
+	BufferDeviceAddressFeatures.pNext = &MeshShaderFeatures;
 
 
 	VkDeviceCreateInfo DeviceCreateInfo = { };
@@ -163,7 +154,18 @@ static bool CheckDeviceSuitability(const char* DeviceExtensions[], u32 DeviceExt
 	VkPhysicalDeviceFeatures2 QueryFeatures2 = { };
 	QueryFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 	QueryFeatures2.pNext = &QueryBufferDeviceAddressFeatures;
+
+	VkPhysicalDeviceMeshShaderFeaturesEXT QueryMeshShaderFeatures = { };
+	QueryMeshShaderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
+	QueryBufferDeviceAddressFeatures.pNext = &QueryMeshShaderFeatures;
+
 	vkGetPhysicalDeviceFeatures2(Device, &QueryFeatures2);
+
+	if (!QueryMeshShaderFeatures.taskShader || !QueryMeshShaderFeatures.meshShader)
+	{
+		RenderLog(LogType::Warning, "Features taskShader and meshShader are not supported");
+		return false;
+	}
 
 	// Check if buffer device address feature is supported
 	if (QueryBufferDeviceAddressFeatures.bufferDeviceAddress == VK_TRUE)
@@ -173,20 +175,6 @@ static bool CheckDeviceSuitability(const char* DeviceExtensions[], u32 DeviceExt
 	else
 	{
 		RenderLog(LogType::Warning, "Buffer device address feature is not supported");
-	}
-
-	// Query indirect drawing feature support
-	VkPhysicalDeviceFeatures QueryDeviceFeatures = { };
-	vkGetPhysicalDeviceFeatures(Device, &QueryDeviceFeatures);
-
-	// Check if indirect drawing features are supported
-	if (QueryDeviceFeatures.multiDrawIndirect == VK_TRUE || QueryDeviceFeatures.drawIndirectFirstInstance == VK_TRUE)
-	{
-		RenderLog(LogType::Info, "Indirect drawing (vkCmdDrawIndirect) features are supported");
-	}
-	else
-	{
-		RenderLog(LogType::Warning, "Indirect drawing (vkCmdDrawIndirect) features are not supported");
 	}
 
 	return true;
@@ -277,6 +265,7 @@ void CreateCoreContext(VulkanCoreContext* Context, void* Window)
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 		VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
 		VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
+		VK_EXT_MESH_SHADER_EXTENSION_NAME,
 	};
 
 	const u32 DeviceExtensionsSize = sizeof(DeviceExtensions) / sizeof(DeviceExtensions[0]);

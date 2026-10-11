@@ -99,8 +99,6 @@ int main(int argc, const char* argv[])
 		std::string baseName = filePath.stem().string();
 		std::replace(baseName.begin(), baseName.end(), '.', '_');
 
-		fs::path outPath = outputDir / (baseName + SPV_EXT);
-
 		std::ifstream ShaderSourceFile(filePath, std::ios::binary);
 
 		ShaderSourceFile.seekg(0, std::ios::end);
@@ -117,7 +115,6 @@ int main(int argc, const char* argv[])
 		std::vector<Slang::ComPtr<slang::IComponentType>> componentsToLink;
 		Slang::ComPtr<slang::IComponentType> program;
 		Slang::ComPtr<slang::IComponentType> linkedProgram;
-		Slang::ComPtr<ISlangBlob> spirv;
 
 		module = session->loadModuleFromSourceString(baseName.c_str(), FullPathName.c_str(), ShaderSource.data(), diagnostics.writeRef());
 		DiagnosticsCheck = CheckDiagnostics(diagnostics);
@@ -146,6 +143,7 @@ int main(int argc, const char* argv[])
 
 		slang::ProgramLayout* ProgramLayout = program->getLayout();
 		const u32 EntryPointsCount = ProgramLayout->getEntryPointCount();
+		std::vector<fs::path> StageOutPaths;
 		for (int i = 0; i < EntryPointsCount; ++i)
 		{
 			slang::EntryPointReflection* EntryPoint = ProgramLayout->getEntryPointByIndex(i);
@@ -155,10 +153,6 @@ int main(int argc, const char* argv[])
 
 			switch (Stage)
 			{
-			case SLANG_STAGE_VERTEX:
-				StageArrayGeneration += "BmRender_PipelineShaderStage::Vertex";
-				break;
-
 			case SLANG_STAGE_FRAGMENT:
 				StageArrayGeneration += "BmRender_PipelineShaderStage::Fragment";
 				break;
@@ -166,37 +160,74 @@ int main(int argc, const char* argv[])
 			case SLANG_STAGE_COMPUTE:
 				StageArrayGeneration += "BmRender_PipelineShaderStage::Compute";
 				break;
+
+			case SLANG_STAGE_AMPLIFICATION:
+				StageArrayGeneration += "BmRender_PipelineShaderStage::Task";
+				break;
+
+			case SLANG_STAGE_MESH:
+				StageArrayGeneration += "BmRender_PipelineShaderStage::Mesh";
+				break;
 			default:
 				assert(false);
 				break;
 			}
 
-			StageArrayGeneration += ", \"" + std::string(EntryPoint->getName()) + "\" },";
+			const std::string EntryPointName = EntryPoint->getName();
+			const fs::path StageOutPath = outputDir / (baseName + "_" + EntryPointName + SPV_EXT);
+			StageOutPaths.push_back(StageOutPath);
+
+			StageArrayGeneration += ", \"" + EntryPointName + "\", \"" + StageOutPath.generic_string() + "\" },";
 		}
 
-		PipelineGeneration += "\n\t{ \"" + filePath.generic_string() + "\", \"" + outPath.generic_string() + "\", \"" + baseName + "\", " + StageVariableName + " + " + std::to_string(TotalStages) + ", " + std::to_string(EntryPointsCount) + " },";
+		PipelineGeneration += "\n\t{ \"" + filePath.generic_string() + "\", \"" + baseName + "\", " + StageVariableName + " + " + std::to_string(TotalStages) + ", " + std::to_string(EntryPointsCount) + " },";
 
 		TotalStages += EntryPointsCount;
 
 		Names.push_back(baseName);
 
-		if (!ForceRecompile && fs::exists(outPath) &&
-			fs::last_write_time(filePath) <= fs::last_write_time(outPath))
+		fs::file_time_type NewestSourceTime = fs::last_write_time(filePath);
+		for (SlangInt32 i = 0; i < module->getDependencyFileCount(); ++i)
+		{
+			fs::path DependencyPath = module->getDependencyFilePath(i);
+			if (DependencyPath.is_relative())
+			{
+				DependencyPath = sourceDir / DependencyPath;
+			}
+
+			if (fs::exists(DependencyPath) && fs::last_write_time(DependencyPath) > NewestSourceTime)
+			{
+				NewestSourceTime = fs::last_write_time(DependencyPath);
+			}
+		}
+
+		bool UpToDate = !ForceRecompile;
+		for (const fs::path& StageOutPath : StageOutPaths)
+		{
+			if (!fs::exists(StageOutPath) || NewestSourceTime > fs::last_write_time(StageOutPath))
+			{
+				UpToDate = false;
+			}
+		}
+
+		if (UpToDate)
 		{
 			std::cout << "Up to date: " << FullPathName << std::endl;
 			continue;
 		}
 
-		fs::remove(outPath);
+		for (u32 i = 0; i < StageOutPaths.size(); ++i)
+		{
+			Slang::ComPtr<ISlangBlob> spirv;
+			linkedProgram->getEntryPointCode(i, 0, spirv.writeRef(), diagnostics.writeRef());
+			DiagnosticsCheck = CheckDiagnostics(diagnostics);
+			assert(DiagnosticsCheck);
 
-		linkedProgram->getTargetCode(0, spirv.writeRef(), diagnostics.writeRef());
-		CheckDiagnostics(diagnostics);
-		assert(DiagnosticsCheck);
+			std::ofstream SpirVOutput(StageOutPaths[i], std::ios::binary);
+			SpirVOutput.write((const char*)spirv->getBufferPointer(), spirv->getBufferSize());
+		}
 
 		std::cout << baseName << " compiled\n";
-
-		std::ofstream SpirVOutput(outPath, std::ios::binary);
-		SpirVOutput.write((const char*)spirv->getBufferPointer(), spirv->getBufferSize());
 
 		AtLeastOneRecompiled = true;
 	}
