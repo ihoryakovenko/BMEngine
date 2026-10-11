@@ -217,7 +217,7 @@ float3 CastSpotLight(Shader_SpotLight light, float3 fragPos, float3 albedo, floa
 void MainTask(uint3 dispatchThreadID: SV_DispatchThreadID, uint groupThreadIndex: SV_GroupIndex)
 {
     uint meshletIndex = dispatchThreadID.x;
-    DispatchMeshlets(meshletIndex, groupThreadIndex, meshletIndex < PushData.FrameData.MeshletCount);
+    DispatchMeshlets(meshletIndex, groupThreadIndex, IsMeshletVisibleFromCamera(meshletIndex));
 }
 
 [shader("mesh")]

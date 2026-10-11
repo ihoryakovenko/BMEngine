@@ -123,10 +123,9 @@ struct Shader_FrameData
     GPU_POINTER_TYPE(Shader_Meshlet) MeshletBuffer;
     GPU_POINTER_TYPE(uint) MeshletVertexBuffer;
     GPU_POINTER_TYPE(uint) MeshletTriangleBuffer;
+    float4x4 CullViewProjection;
+    float3 CullCameraPosition;
     uint MeshletCount;
-    uint pad1;
-    uint pad2;
-    uint pad3;
 };
 
 struct Shader_PushData

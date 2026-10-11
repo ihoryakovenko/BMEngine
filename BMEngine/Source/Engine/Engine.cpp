@@ -270,6 +270,8 @@ namespace Engine
 		//}
 
 		Scene.FrameDataBuffer.View = glm::lookAt(MainCamera.Position, MainCamera.Position + MainCamera.Front, MainCamera.Up);
+		Scene.FrameDataBuffer.CullViewProjection = Scene.FrameDataBuffer.Projection * Scene.FrameDataBuffer.View;
+		Scene.FrameDataBuffer.CullCameraPosition = MainCamera.Position;
 
 		float NearPlane = 0.1f, FarPlane = 100.0f;
 		float HalfSize = 30.0f;

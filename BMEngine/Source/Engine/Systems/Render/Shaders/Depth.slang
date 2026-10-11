@@ -12,7 +12,7 @@ struct MeshOutput
 void MainTask(uint3 dispatchThreadID: SV_DispatchThreadID, uint groupThreadIndex: SV_GroupIndex)
 {
     uint meshletIndex = dispatchThreadID.x;
-    DispatchMeshlets(meshletIndex, groupThreadIndex, meshletIndex < PushData.FrameData.MeshletCount);
+    DispatchMeshlets(meshletIndex, groupThreadIndex, IsMeshletVisibleFromLight(meshletIndex));
 }
 
 [shader("mesh")]
