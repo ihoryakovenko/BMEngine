@@ -27,7 +27,6 @@ enum class BmRender_ImageLayout : u32;
 enum class BmRender_AttachmentLoadOp : u32;
 enum class BmRender_AttachmentStoreOp : u32;
 enum class BmRender_DescriptorType : u32;
-enum class BmRender_IndexType : u32;
 enum class BmRender_Format : u32;
 enum class BmRender_PolygonMode : u32;
 enum class BmRender_CullModeFlags : u32;
@@ -35,7 +34,6 @@ enum class BmRender_FrontFace : u32;
 enum class BmRender_ColorComponentFlags : u32;
 enum class BmRender_BlendFactor : u32;
 enum class BmRender_BlendOp : u32;
-enum class BmRender_PrimitiveTopology : u32;
 enum class BmRender_SampleCount : u32;
 
 typedef VkInstance BmRender_Instance;

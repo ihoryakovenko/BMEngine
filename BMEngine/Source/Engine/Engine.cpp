@@ -80,8 +80,6 @@ namespace Engine
 	static const f32 Near = 0.1f;
 	static const f32 Far = 5000.0f;
 
-	static DrawEntity SkyBox;
-
 	static UI::GuiData GuiData;
 
 	static glm::vec3 Eye = glm::vec3(0.0f, 10.0f, 0.0f);
@@ -311,10 +309,6 @@ namespace Engine
 		MainCamera.Position = glm::vec3(0.0f, 0.0f, 20.0f);
 		MainCamera.Front = glm::vec3(0.0f, 0.0f, -1.0f);
 		MainCamera.Up = glm::vec3(0.0f, 1.0f, 0.0f);
-
-		Scene.SkyBox = SkyBox;
-		//Scene.DrawSkyBox = true;
-		Scene.DrawSkyBox = false;
 
 		Scene.FrameDataBuffer.Projection = glm::perspective(glm::radians(MainCamera.Fov),
 			MainCamera.AspectRatio, Near, Far);

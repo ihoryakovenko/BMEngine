@@ -99,12 +99,6 @@ struct Shader_Meshlet
     uint pad3;
 };
 
-struct Shader_StaticMeshVertexInput
-{
-    Shader_StaticMeshVertex Vertex;
-    Shader_StaticMeshInstance Instance;
-};
-
 struct Shader_LightSpaceMatrixData
 {
     float4x4 Matrix;

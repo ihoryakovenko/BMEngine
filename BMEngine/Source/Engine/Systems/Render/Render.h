@@ -14,15 +14,6 @@
 
 struct GLFWwindow;
 
-struct DrawEntity
-{
-	BmRender_GPUBufferUpdateData VertexBufferEntry;
-	BmRender_GPUBufferUpdateData IndexBufferEntry;
-	BmRender_GPUBufferUpdateData InstanceBufferEntry;
-	u32 IndicesCount;
-	u32 Instances;
-};
-
 struct StaticMeshPipelineDepr
 {
 	BmRender_ImageView ShadowMapArrayImageInterface[MAX_DRAW_FRAMES];
@@ -45,12 +36,6 @@ struct RenderState
 struct DrawScene
 {
 	Shader_FrameData FrameDataBuffer;
-
-	DrawEntity* DrawTransparentEntities = nullptr;
-	u32 DrawTransparentEntitiesCount = 0;
-
-	DrawEntity SkyBox;
-	bool DrawSkyBox = false;
 
 	bool MeshletDebugView = false;
 	glm::mat4 CullLightSpaceMatrices[MAX_SHADOW_TEXTURES];

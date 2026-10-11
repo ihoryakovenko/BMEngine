@@ -153,10 +153,6 @@ int main(int argc, const char* argv[])
 
 			switch (Stage)
 			{
-			case SLANG_STAGE_VERTEX:
-				StageArrayGeneration += "BmRender_PipelineShaderStage::Vertex";
-				break;
-
 			case SLANG_STAGE_FRAGMENT:
 				StageArrayGeneration += "BmRender_PipelineShaderStage::Fragment";
 				break;

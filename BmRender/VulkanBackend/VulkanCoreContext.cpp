@@ -86,20 +86,6 @@ static VkDevice CreateLogicalDevice(VkPhysicalDevice PhDevice, PhysicalDeviceInd
 	TimelineSemaphoreFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
 	TimelineSemaphoreFeatures.timelineSemaphore = VK_TRUE;
 
-	// Query indirect drawing feature support
-	VkPhysicalDeviceFeatures QueryDeviceFeatures = { };
-	vkGetPhysicalDeviceFeatures(PhDevice, &QueryDeviceFeatures);
-
-	// Enable indirect drawing features if supported
-	VkPhysicalDeviceFeatures DeviceFeatures = { };
-	DeviceFeatures.samplerAnisotropy = VK_TRUE;
-	DeviceFeatures.multiDrawIndirect = QueryDeviceFeatures.multiDrawIndirect ? VK_TRUE : VK_FALSE;
-	DeviceFeatures.drawIndirectFirstInstance = QueryDeviceFeatures.drawIndirectFirstInstance ? VK_TRUE : VK_FALSE;
-
-	VkPhysicalDeviceVulkan11Features features11 = {};
-	features11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
-	features11.shaderDrawParameters = VK_TRUE;
-
 	VkPhysicalDeviceMeshShaderFeaturesEXT MeshShaderFeatures = { };
 	MeshShaderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
 	MeshShaderFeatures.taskShader = VK_TRUE;
@@ -110,8 +96,7 @@ static VkDevice CreateLogicalDevice(VkPhysicalDevice PhDevice, PhysicalDeviceInd
 	IndexingFeatures.pNext = &Sync2Features;
 	Sync2Features.pNext = &DynamicRenderingFeatures;
 	DynamicRenderingFeatures.pNext = &BufferDeviceAddressFeatures;
-	BufferDeviceAddressFeatures.pNext = &features11;
-	features11.pNext = &MeshShaderFeatures;
+	BufferDeviceAddressFeatures.pNext = &MeshShaderFeatures;
 
 
 	VkDeviceCreateInfo DeviceCreateInfo = { };
@@ -190,20 +175,6 @@ static bool CheckDeviceSuitability(const char* DeviceExtensions[], u32 DeviceExt
 	else
 	{
 		RenderLog(LogType::Warning, "Buffer device address feature is not supported");
-	}
-
-	// Query indirect drawing feature support
-	VkPhysicalDeviceFeatures QueryDeviceFeatures = { };
-	vkGetPhysicalDeviceFeatures(Device, &QueryDeviceFeatures);
-
-	// Check if indirect drawing features are supported
-	if (QueryDeviceFeatures.multiDrawIndirect == VK_TRUE || QueryDeviceFeatures.drawIndirectFirstInstance == VK_TRUE)
-	{
-		RenderLog(LogType::Info, "Indirect drawing (vkCmdDrawIndirect) features are supported");
-	}
-	else
-	{
-		RenderLog(LogType::Warning, "Indirect drawing (vkCmdDrawIndirect) features are not supported");
 	}
 
 	return true;

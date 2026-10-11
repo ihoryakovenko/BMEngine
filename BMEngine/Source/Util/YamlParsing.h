@@ -90,26 +90,9 @@ namespace Util
 		inline constexpr const char* SAMPLE_32_STRINGS[] = { "32" };
 		inline constexpr const char* SAMPLE_64_STRINGS[] = { "64" };
 
-		// Primitive topologies
-		inline constexpr const char* POINT_LIST_STRINGS[] = { "point_list", "POINT_LIST" };
-		inline constexpr const char* LINE_LIST_STRINGS[] = { "line_list", "LINE_LIST" };
-		inline constexpr const char* LINE_STRIP_STRINGS[] = { "line_strip", "LINE_STRIP" };
-		inline constexpr const char* TRIANGLE_LIST_STRINGS[] = { "triangle_list", "TRIANGLE_LIST" };
-		inline constexpr const char* TRIANGLE_STRIP_STRINGS[] = { "triangle_strip", "TRIANGLE_STRIP" };
-		inline constexpr const char* TRIANGLE_FAN_STRINGS[] = { "triangle_fan", "TRIANGLE_FAN" };
-		inline constexpr const char* LINE_LIST_WITH_ADJACENCY_STRINGS[] = { "line_list_with_adjacency", "LINE_LIST_WITH_ADJACENCY" };
-		inline constexpr const char* LINE_STRIP_WITH_ADJACENCY_STRINGS[] = { "line_strip_with_adjacency", "LINE_STRIP_WITH_ADJACENCY" };
-		inline constexpr const char* TRIANGLE_LIST_WITH_ADJACENCY_STRINGS[] = { "triangle_list_with_adjacency", "TRIANGLE_LIST_WITH_ADJACENCY" };
-		inline constexpr const char* TRIANGLE_STRIP_WITH_ADJACENCY_STRINGS[] = { "triangle_strip_with_adjacency", "TRIANGLE_STRIP_WITH_ADJACENCY" };
-		inline constexpr const char* PATCH_LIST_STRINGS[] = { "patch_list", "PATCH_LIST" };
-
 		// Shader stages
-		inline constexpr const char* VERTEX_SHADER_STRINGS[] = { "vertex", "Vertex", "VERTEX" };
 		inline constexpr const char* FRAGMENT_STRINGS[] = { "fragment", "Fragment", "FRAGMENT" };
-		inline constexpr const char* GEOMETRY_STRINGS[] = { "geometry", "GEOMETRY" };
 		inline constexpr const char* COMPUTE_STRINGS[] = { "compute", "COMPUTE" };
-		inline constexpr const char* TESS_CONTROL_STRINGS[] = { "tess_control", "TESS_CONTROL" };
-		inline constexpr const char* TESS_EVAL_STRINGS[] = { "tess_eval", "TESS_EVAL" };
 		inline constexpr const char* TASK_STRINGS[] = { "task", "TASK" };
 		inline constexpr const char* MESH_STRINGS[] = { "mesh", "MESH" };
 		inline constexpr const char* RAYGEN_STRINGS[] = { "raygen", "RAYGEN" };
@@ -156,12 +139,8 @@ namespace Util
 		inline constexpr const char* INPUT_ATTACHMENT_STRINGS[] = { "INPUT_ATTACHMENT" };
 
 		// Shader stage flags
-		inline constexpr const char* VERTEX_BIT_STRINGS[] = { "VERTEX_BIT" };
 		inline constexpr const char* FRAGMENT_BIT_STRINGS[] = { "FRAGMENT_BIT" };
-		inline constexpr const char* GEOMETRY_BIT_STRINGS[] = { "GEOMETRY_BIT" };
 		inline constexpr const char* COMPUTE_BIT_STRINGS[] = { "COMPUTE_BIT" };
-		inline constexpr const char* TESSELLATION_CONTROL_BIT_STRINGS[] = { "TESSELLATION_CONTROL_BIT" };
-		inline constexpr const char* TESSELLATION_EVALUATION_BIT_STRINGS[] = { "TESSELLATION_EVALUATION_BIT" };
 		inline constexpr const char* TASK_BIT_STRINGS[] = { "TASK_BIT" };
 		inline constexpr const char* MESH_BIT_STRINGS[] = { "MESH_BIT" };
 		inline constexpr const char* RAYGEN_BIT_STRINGS[] = { "RAYGEN_BIT" };
@@ -178,21 +157,14 @@ namespace Util
 		inline constexpr const char* R32G32B32A32_SFLOAT_STRINGS[] = { "R32G32B32A32_SFLOAT" };
 		inline constexpr const char* R32_UINT_STRINGS[] = { "R32_UINT" };
 
-		// Vertex input rates
-		inline constexpr const char* VERTEX_STRINGS[] = { "VERTEX" };
-		inline constexpr const char* INSTANCE_STRINGS[] = { "INSTANCE" };
-
 		// Buffer types
 		inline constexpr const char* GPU_ARENA_STRINGS[] = { "GPUArena", "gpuarena", "GPU_ARENA" };
 		inline constexpr const char* GPU_STRINGS[] = { "GPU", "gpu" };
 
 		// Buffer usage flags
-		inline constexpr const char* COMBINED_VERTEX_INDEX_FLAG_STRINGS[] = { "CombinedVertexIndexFlag", "COMBINED_VERTEX_INDEX_FLAG" };
 		inline constexpr const char* INSTANCE_FLAG_STRINGS[] = { "InstanceFlag", "INSTANCE_FLAG" };
 		inline constexpr const char* STORAGE_FLAG_STRINGS[] = { "StorageFlag", "STORAGE_FLAG" };
 		inline constexpr const char* UNIFORM_FLAG_STRINGS[] = { "UniformFlag", "UNIFORM_FLAG" };
-		inline constexpr const char* VERTEX_FLAG_STRINGS[] = { "VertexFlag", "VERTEX_FLAG" };
-		inline constexpr const char* INDEX_FLAG_STRINGS[] = { "IndexFlag", "INDEX_FLAG" };
 
 		// Memory property flags
 		inline constexpr const char* GPU_LOCAL_STRINGS[] = { "GPULocal", "GPU_LOCAL" };
@@ -203,10 +175,6 @@ namespace Util
 	Yaml::Node& GetShaders(Yaml::Node& Root);
 	Yaml::Node& GetDescriptorSetLayouts(Yaml::Node& Root);
 	Yaml::Node& ParseDescriptorSetLayoutNode(Yaml::Node& Root);
-	Yaml::Node& GetVertices(Yaml::Node& Root);
-	Yaml::Node& GetVertexBindingNode(Yaml::Node& VertexNode);
-	Yaml::Node& GetVertexAttributesNode(Yaml::Node& VertexNode);
-	Yaml::Node& GetVertexAttributeTypeNode(Yaml::Node& AttributeNode);
 	Yaml::Node& GetPushConstantsFromResources(Yaml::Node& Root);
 
 	// Push constant management
